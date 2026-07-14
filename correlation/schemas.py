@@ -6,15 +6,15 @@ class PerspectiveGroup(BaseModel):
     stance: str | None = None
     origin_country: str | None = None
     article_ids: list[str] = Field(default_factory=list)
-    summary: str
+    summary: str = ""
 
 
 class CorrelatedImpact(BaseModel):
     entity: str
     effect: str
-    direction: str = Field(description="positive|negative|mixed")
-    horizon: str = Field(description="immediate|days|weeks|longer")
-    confidence: float = Field(ge=0.0, le=1.0)
+    direction: str = Field(default="mixed", description="positive|negative|mixed")
+    horizon: str = Field(default="days", description="immediate|days|weeks|longer")
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     parent_index: int | None = Field(
         default=None, description="0-based index of the first-order impact this follows from"
     )

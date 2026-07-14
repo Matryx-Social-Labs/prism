@@ -39,9 +39,9 @@ class Stance(BaseModel):
 class ExtractedImpact(BaseModel):
     entity: str
     effect: str = Field(description="e.g. service_outage, data_exposed, patch_required, stock_drop")
-    direction: str = Field(description="positive|negative|mixed")
-    horizon: str = Field(description="immediate|days|weeks|longer")
-    confidence: float = Field(ge=0.0, le=1.0)
+    direction: str = Field(default="mixed", description="positive|negative|mixed")
+    horizon: str = Field(default="days", description="immediate|days|weeks|longer")
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class SharedExtraction(BaseModel):

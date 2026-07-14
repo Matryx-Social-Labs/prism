@@ -4,8 +4,10 @@ from pydantic import BaseModel, Field
 
 
 class GateResult(BaseModel):
+    # Audit-only fields default: Ollama's schema-constrained decoding doesn't
+    # reliably enforce `required`, and a missing reason must not fail the gate.
     is_relevant: bool
-    reason: str = Field(description="One short sentence explaining the decision")
+    reason: str = Field(default="", description="One short sentence explaining the decision")
 
 
 class ClassificationResult(BaseModel):
@@ -23,4 +25,4 @@ class ClassificationResult(BaseModel):
     language: str = "en"
     role_interests: list[str] = Field(default_factory=list)
     route: Literal["standard", "fast_lane"] = "standard"
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
