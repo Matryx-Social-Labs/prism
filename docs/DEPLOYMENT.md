@@ -128,7 +128,7 @@ Local dev can point at this same instance (put the three values in `.env`).
 
 ### 2.2 The `api` service
 
-1. `⌘K → New Service → GitHub Repo` → select **MatrixSocialLab/prism** (grant repo access
+1. `⌘K → New Service → GitHub Repo` → select **Matryx-Social-Labs/prism** (grant repo access
    if asked). Railway detects the `Dockerfile` + `railway.json` automatically.
 2. Rename the service to `api`.
 3. Service → **Settings**:
@@ -171,7 +171,7 @@ Local dev can point at this same instance (put the three values in `.env`).
 
 ## Part 3 — Web app on Vercel
 
-1. <https://vercel.com/new> → Import **MatrixSocialLab/prism**.
+1. <https://vercel.com/new> → Import **Matryx-Social-Labs/prism**.
 2. **Root Directory**: `web` (critical — the Next.js app lives there).
    Framework preset: Next.js (auto-detected).
 3. **Environment variables**:
