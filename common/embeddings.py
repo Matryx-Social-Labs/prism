@@ -16,7 +16,13 @@ from common.config import get_settings
 @lru_cache
 def _get_model() -> TextEmbedding:
     settings = get_settings()
-    return TextEmbedding(model_name=settings.prism_embed_model, cache_dir=".fastembed_cache")
+    # Cap ONNX threads so embedding bursts don't starve the event loop
+    # (starvation surfaced as Redis read timeouts in the worker).
+    return TextEmbedding(
+        model_name=settings.prism_embed_model,
+        cache_dir=".fastembed_cache",
+        threads=4,
+    )
 
 
 def embed_texts_sync(texts: list[str]) -> list[list[float]]:
