@@ -27,8 +27,8 @@ CYBER_EVENT_TYPES = [
 
 class ExtractedEntity(BaseModel):
     name: str
-    type: str = Field(description="person|company|organization|government|place|product|ticker")
-    role: str = Field(description="subject|affected|actor|source_cited")
+    type: str = Field(default="organization", description="person|company|organization|government|place|product|ticker")
+    role: str = Field(default="affected", description="subject|affected|actor|source_cited")
 
 
 class Claim(BaseModel):
@@ -43,7 +43,7 @@ class Stance(BaseModel):
 
 class ExtractedImpact(BaseModel):
     entity: str
-    effect: str = Field(description="e.g. service_outage, data_exposed, patch_required, stock_drop")
+    effect: str = Field(default="affected", description="e.g. service_outage, data_exposed, patch_required, stock_drop")
     direction: str = Field(default="mixed", description="positive|negative|mixed")
     horizon: str = Field(default="days", description="immediate|days|weeks|longer")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)

@@ -81,11 +81,11 @@ async def consume(
             raise
 
     logger.info("consuming topic=%s group=%s consumer=%s", topic, group, consumer_name)
-    iterations = 0
+    next_reclaim_at = 0.0  # immediately on startup, then time-based (busy
+    # batches would starve an iteration-count cadence)
     while True:
-        # Reclaim stale pending messages on startup and periodically,
-        # draining the whole stale backlog each cycle.
-        if iterations % 12 == 0:
+        if asyncio.get_event_loop().time() >= next_reclaim_at:
+            next_reclaim_at = asyncio.get_event_loop().time() + 60
             try:
                 start_id = "0-0"
                 while True:
@@ -109,7 +109,6 @@ async def consume(
                 raise
             except Exception:
                 logger.exception("xautoclaim failed topic=%s", topic)
-        iterations += 1
 
         try:
             entries = await r.xreadgroup(
