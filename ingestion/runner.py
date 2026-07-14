@@ -2,6 +2,12 @@
 
 import logging
 
+from sqlalchemy import select, text
+
+from common import stream
+from common.db import session_scope
+from common.models import RawItem
+from common.schemas import ClassifiedItemMessage, RawItemMessage
 from ingestion import cisa_kev, gdelt, nvd, rss
 from ingestion.seed import seed_sources
 
@@ -22,5 +28,58 @@ async def run_all() -> dict[str, int]:
         except Exception:
             logger.exception("collector %s failed", name)
             results[name] = -1
+
+    results["requeued"] = await requeue_stalled()
     logger.info("ingestion run complete: %s", results)
     return results
+
+
+async def requeue_stalled(limit: int = 500) -> int:
+    """Republish items that stalled mid-pipeline (e.g. LLM outage).
+
+    Safe because every stage handler is idempotent: already-processed items
+    are skipped on replay. Covers two gaps: raw items still 'pending' after
+    a failed classification, and 'relevant' items that never got an article
+    (failed enrichment).
+    """
+    requeued = 0
+    async with session_scope() as session:
+        # Only items older than 20 minutes: fresh ones are still in-flight
+        # on the stream from their original publish.
+        pending = (
+            await session.execute(
+                select(RawItem.id)
+                .where(
+                    RawItem.relevance == "pending",
+                    RawItem.created_at < text("now() - interval '20 minutes'"),
+                )
+                .order_by(RawItem.created_at)
+                .limit(limit)
+            )
+        ).scalars().all()
+
+        unenriched = (
+            await session.execute(
+                text(
+                    """
+                    SELECT ri.id FROM raw_items ri
+                    LEFT JOIN articles a ON a.raw_item_id = ri.id
+                    WHERE ri.relevance = 'relevant' AND a.id IS NULL
+                      AND ri.updated_at < now() - interval '20 minutes'
+                    ORDER BY ri.created_at
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": limit},
+            )
+        ).scalars().all()
+
+    for raw_id in pending:
+        await stream.publish(stream.RAW_ITEMS, RawItemMessage(raw_item_id=str(raw_id)).model_dump())
+        requeued += 1
+    for raw_id in unenriched:
+        await stream.publish(
+            stream.CLASSIFIED_ITEMS, ClassifiedItemMessage(raw_item_id=str(raw_id)).model_dump()
+        )
+        requeued += 1
+    return requeued
