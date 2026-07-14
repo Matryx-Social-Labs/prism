@@ -81,7 +81,7 @@ async def main(stages: list[str]) -> None:
             asyncio.create_task(
                 stream.consume(
                     stream.RAW_ITEMS, "classification", handle_raw_item,
-                    consumer_name=f"clf-{CONSUMER_NAME}",
+                    consumer_name=f"clf-{CONSUMER_NAME}", concurrency=4,
                 )
             )
         )
@@ -90,11 +90,13 @@ async def main(stages: list[str]) -> None:
             asyncio.create_task(
                 stream.consume(
                     stream.CLASSIFIED_ITEMS, "enrichment", handle_classified_item,
-                    consumer_name=f"enr-{CONSUMER_NAME}",
+                    consumer_name=f"enr-{CONSUMER_NAME}", concurrency=4,
                 )
             )
         )
     if "correlation" in stages:
+        # concurrency must stay 1: parallel articles for the same real event
+        # would race match-or-create and split the cluster.
         tasks.append(
             asyncio.create_task(
                 stream.consume(

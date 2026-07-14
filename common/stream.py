@@ -58,6 +58,7 @@ async def consume(
     consumer_name: str = "worker-1",
     block_ms: int = 5000,
     batch_size: int = 10,
+    concurrency: int = 1,
 ) -> None:
     """Consume a topic forever with a consumer group.
 
@@ -66,6 +67,11 @@ async def consume(
     persisted rows; poison messages must not wedge the stream. Messages
     stranded in a dead consumer's pending list (e.g. after a restart under
     a different consumer name) are reclaimed via XAUTOCLAIM.
+
+    concurrency > 1 processes a batch's messages in parallel — safe only
+    for handlers whose items are independent (classification, enrichment);
+    correlation must stay at 1 or concurrent articles for the same real
+    event would race the match-or-create and split the cluster.
     """
     r = get_redis()
     try:
@@ -91,7 +97,7 @@ async def consume(
                 messages = claimed[1] if len(claimed) > 1 else []
                 if messages:
                     logger.info("reclaimed %d stale messages topic=%s", len(messages), topic)
-                    await _process(r, topic, group, handler, messages)
+                    await _process(r, topic, group, handler, messages, concurrency)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -104,6 +110,10 @@ async def consume(
             )
         except asyncio.CancelledError:
             raise
+        except aioredis.TimeoutError:
+            # Benign: redis-py's client-side read timeout races the server's
+            # BLOCK expiry on idle streams. No data either way — just re-poll.
+            continue
         except Exception:
             logger.exception("stream read failed topic=%s; retrying in 5s", topic)
             await asyncio.sleep(5)
@@ -113,22 +123,36 @@ async def consume(
             continue
 
         for _stream, messages in entries:
-            await _process(r, topic, group, handler, messages)
+            await _process(r, topic, group, handler, messages, concurrency)
 
 
-async def _process(r, topic: str, group: str, handler, messages) -> None:
-    for entry_id, fields in messages:
-        try:
-            payload = json.loads(fields["data"])
-            await handler(payload)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "handler failed topic=%s entry=%s payload=%s",
-                topic,
-                entry_id,
-                (fields or {}).get("data", "")[:500],
-            )
-        finally:
-            await r.xack(topic, group, entry_id)
+async def _process(r, topic: str, group: str, handler, messages, concurrency: int = 1) -> None:
+    if concurrency <= 1 or len(messages) <= 1:
+        for message in messages:
+            await _handle_one(r, topic, group, handler, message)
+        return
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def bounded(message):
+        async with semaphore:
+            await _handle_one(r, topic, group, handler, message)
+
+    await asyncio.gather(*(bounded(m) for m in messages))
+
+
+async def _handle_one(r, topic: str, group: str, handler, message) -> None:
+    entry_id, fields = message
+    try:
+        payload = json.loads(fields["data"])
+        await handler(payload)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception(
+            "handler failed topic=%s entry=%s payload=%s",
+            topic,
+            entry_id,
+            (fields or {}).get("data", "")[:500],
+        )
+    finally:
+        await r.xack(topic, group, entry_id)
