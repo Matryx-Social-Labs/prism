@@ -30,7 +30,14 @@ _redis: aioredis.Redis | None = None
 def get_redis() -> aioredis.Redis:
     global _redis
     if _redis is None:
-        _redis = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+        _redis = aioredis.from_url(
+            get_settings().redis_url,
+            decode_responses=True,
+            socket_connect_timeout=10,
+            socket_keepalive=True,
+            retry_on_timeout=True,
+            health_check_interval=30,
+        )
     return _redis
 
 

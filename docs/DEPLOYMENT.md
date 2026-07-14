@@ -17,6 +17,82 @@ Topology:
 
 ---
 
+## Microservice architecture on Railway
+
+**The topology above already is a microservice architecture.** Each concern is its own
+Railway service with its own lifecycle, logs, metrics, restarts, and scaling: the API,
+the pipeline worker, Postgres, Redis, and the whole Langfuse stack. Services talk only
+through two contracts — the database and the Redis Streams topics — never in-process,
+which is exactly the seam microservices need.
+
+### Recommended: start with 2 app services, split when a signal appears
+
+For the prototype's volume (a few thousand items/day), run **`api` + one `worker`**.
+Finer splits add per-service cost (Railway bills per service), more env vars to keep in
+sync, and more deploys to watch — with no benefit until one stage becomes a bottleneck.
+
+Split when you see one of these signals:
+
+| Signal | Split to make |
+|---|---|
+| Enrichment backs up (embedding CPU saturates the worker) | dedicated `enrichment` service, more CPU |
+| LLM stage slowness starves the collectors | `ingestion` separated from LLM stages |
+| A stage needs different scaling (e.g. many classification replicas during a backfill) | that stage as its own service with replicas |
+
+### How to split (already supported — no code changes)
+
+The worker takes a `--stages` flag (or `PRISM_STAGES` env var), so each pipeline stage
+can be its own Railway service from the same repo/image:
+
+| Railway service | Start command |
+|---|---|
+| `ingestion` | `python -m worker --stages ingestion` |
+| `classification` | `python -m worker --stages classification` |
+| `enrichment` | `python -m worker --stages enrichment` |
+| `correlation` | `python -m worker --stages correlation` |
+
+Each service gets the same variable set as `worker` (use Railway **Shared Variables**
+so they stay in sync). Because every stage is an idempotent Redis Streams consumer
+group, you can also scale **replicas** of a single stage — set a unique
+`PRISM_CONSUMER_NAME` per replica (e.g. reference Railway's `RAILWAY_REPLICA_ID`) so
+the consumer-group members don't collide.
+
+Postgres and Redis stay as single shared services — they are the stateful contracts,
+not microservices to multiply. When volume outgrows Redis Streams, the swap is
+Kafka/Redpanda behind `common/stream.py`, not more Railway services.
+
+---
+
+## Railway CLI (setup once, then validate anything)
+
+The dashboard steps below can also be done — and later verified — with the
+[Railway CLI](https://docs.railway.com/guides/cli):
+
+```bash
+npm i -g @railway/cli    # or: brew install railway
+railway login            # opens browser
+railway link             # run inside the repo → pick the prism project + environment
+```
+
+Useful commands once linked:
+
+```bash
+railway status                      # project / environment / linked service
+railway logs --service api         # live logs (also: --service worker)
+railway variables --service api    # list env vars
+railway variables --service api --set "CORS_ORIGINS=https://your-app.vercel.app,http://localhost:3000"
+railway up --service api           # deploy local code directly (bypasses GitHub)
+railway redeploy --service worker  # restart with the latest image
+railway run python -c "..."        # run a one-off command with the service's env vars
+railway connect Postgres           # psql shell into the database
+```
+
+After you've created the project and linked it, validation is:
+`railway status` → both services green; `railway logs --service worker` → shows
+`prism worker starting` + ingestion runs; `curl https://<api-domain>/healthz` → ok.
+
+---
+
 ## Part 1 — Langfuse (self-hosted on Railway)
 
 1. Go to <https://railway.com/deploy> and search for the official **Langfuse v3** template
