@@ -6,12 +6,15 @@ order matters: langfuse must wrap openai before any client is created
 (see .claude/skills/langfuse guidance).
 """
 
+import asyncio
 import json
 import logging
+import time
 from typing import Any
 
 # langfuse.openai must be imported before/instead of plain openai
 from langfuse.openai import AsyncOpenAI  # noqa: I001
+from openai import APIStatusError
 from pydantic import BaseModel
 
 from common.config import get_settings
@@ -19,6 +22,31 @@ from common.config import get_settings
 logger = logging.getLogger(__name__)
 
 _client: AsyncOpenAI | None = None
+
+# Global cooldown: when the provider rejects with 401/403/429 (Ollama Cloud
+# returns 401 while the GPU-time session quota is exhausted), all LLM calls
+# pause instead of hammering the API hundreds of times per minute. Items that
+# fail during the window are re-driven by the ingestion requeue.
+_QUOTA_STATUS = {401, 403, 429}
+_COOLDOWN_SECONDS = 120
+_cooldown_until = 0.0
+
+
+async def _respect_cooldown() -> None:
+    wait = _cooldown_until - time.monotonic()
+    if wait > 0:
+        await asyncio.sleep(wait)
+
+
+def _maybe_start_cooldown(error: Exception) -> None:
+    global _cooldown_until
+    if isinstance(error, APIStatusError) and error.status_code in _QUOTA_STATUS:
+        _cooldown_until = time.monotonic() + _COOLDOWN_SECONDS
+        logger.warning(
+            "LLM provider returned %d (quota/auth) — pausing all LLM calls %ds",
+            error.status_code,
+            _COOLDOWN_SECONDS,
+        )
 
 
 def get_llm() -> AsyncOpenAI:
@@ -78,7 +106,12 @@ async def structured_chat[T: BaseModel](
 
     last_err: Exception | None = None
     for attempt in range(max_retries):
-        response = await client.chat.completions.create(**kwargs)
+        await _respect_cooldown()
+        try:
+            response = await client.chat.completions.create(**kwargs)
+        except Exception as e:
+            _maybe_start_cooldown(e)
+            raise
         content = response.choices[0].message.content or ""
         try:
             return output_model.model_validate(_parse_json_loose(content))
@@ -136,5 +169,10 @@ async def plain_chat(
     }
     if langfuse_prompt is not None:
         kwargs["langfuse_prompt"] = langfuse_prompt
-    response = await client.chat.completions.create(**kwargs)
+    await _respect_cooldown()
+    try:
+        response = await client.chat.completions.create(**kwargs)
+    except Exception as e:
+        _maybe_start_cooldown(e)
+        raise
     return response.choices[0].message.content or ""
