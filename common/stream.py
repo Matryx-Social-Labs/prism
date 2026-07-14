@@ -83,21 +83,28 @@ async def consume(
     logger.info("consuming topic=%s group=%s consumer=%s", topic, group, consumer_name)
     iterations = 0
     while True:
-        # Reclaim stale pending messages on startup and periodically.
+        # Reclaim stale pending messages on startup and periodically,
+        # draining the whole stale backlog each cycle.
         if iterations % 12 == 0:
             try:
-                # Always require the idle threshold: claiming younger messages
-                # would steal work from live replicas mid-processing.
-                claimed = await r.xautoclaim(
-                    topic, group, consumer_name,
-                    min_idle_time=STALE_CLAIM_IDLE_MS,
-                    start_id="0-0", count=batch_size,
-                )
-                # redis-py returns (next_start, messages) or (next_start, messages, deleted)
-                messages = claimed[1] if len(claimed) > 1 else []
-                if messages:
-                    logger.info("reclaimed %d stale messages topic=%s", len(messages), topic)
-                    await _process(r, topic, group, handler, messages, concurrency)
+                start_id = "0-0"
+                while True:
+                    # Always require the idle threshold: claiming younger
+                    # messages would steal work from live replicas.
+                    claimed = await r.xautoclaim(
+                        topic, group, consumer_name,
+                        min_idle_time=STALE_CLAIM_IDLE_MS,
+                        start_id=start_id, count=batch_size,
+                    )
+                    # redis-py returns (next_start, messages[, deleted])
+                    next_id = claimed[0]
+                    messages = claimed[1] if len(claimed) > 1 else []
+                    if messages:
+                        logger.info("reclaimed %d stale messages topic=%s", len(messages), topic)
+                        await _process(r, topic, group, handler, messages, concurrency)
+                    if not messages or str(next_id) in ("0-0", "b'0-0'"):
+                        break
+                    start_id = next_id
             except asyncio.CancelledError:
                 raise
             except Exception:
