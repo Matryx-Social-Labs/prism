@@ -14,9 +14,12 @@ tailored to them, where every story still receives the full depth treatment.
 > consequences). The final product name is still to be decided.
 
 ## Status
-Blueprint stage. This directory holds the product and technical documentation and the code
-skeleton. No services are running yet. The research report and strategic rationale that led here
-live in [`BLUEPRINT.md`](./BLUEPRINT.md) and [`docs/MARKET-RESEARCH.md`](./docs/MARKET-RESEARCH.md).
+**Working prototype** (roadmap Milestones 1.1 + 1.2): the cyber-source pipeline runs end to end
+(ingest → gate → classify → enrich → cluster → correlate → serve) with a Next.js web app showing
+the ranked feed and the three-part story view. See the Quickstart below and
+[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) for Railway/Vercel/Langfuse hosting. The research
+report and strategic rationale live in [`BLUEPRINT.md`](./BLUEPRINT.md) and
+[`docs/MARKET-RESEARCH.md`](./docs/MARKET-RESEARCH.md).
 
 ## Lineage
 Prism generalizes the pipeline from the author's EduThreat-CTI research (ingest, classify,
@@ -45,16 +48,43 @@ the same backbone rather than as new pipelines.
 | [docs/AGENT.md](./docs/AGENT.md) | The per-story grounded question-answering agent |
 | [docs/ROADMAP.md](./docs/ROADMAP.md) | Phasing, milestones, and the first end-to-end slice |
 
-## Code skeleton
+## Code layout
 ```
 prism/
-  ingestion/        collectors + API adapters + domain feeds (publish to the stream)
+  common/           config, db, Redis-Streams spine, LLM client (Ollama Cloud via
+                    langfuse.openai), fastembed embeddings, prompt fetching + fallbacks
+  ingestion/        collectors: CISA KEV, NVD 2.0, GDELT DOC, RSS (watermarks, idempotent)
   classification/   relevance gate + sector/region/role routing
-  enrichment/       schema-constrained extraction + grounded NER + role lenses
-  correlation/      event clustering + perspective grouping + impact propagation
-  personalization/  per-user relevance and ranking, feed assembly, alerts
-  api/              REST + streaming (FastAPI, websockets/SSE)
-  agent/            per-story retrieval-augmented Q&A
-  web/              Next.js app (feed, story view, ask)
-  db/               schema + migrations
+  enrichment/       schema-constrained extraction + cyber lens + provenance + chunks/embeddings
+  correlation/      event clustering (cve_id/url/title/embedding cascade) + perspectives + impacts
+  personalization/  cyber_grc ranking (recency + CVSS + KEV + corroboration)
+  api/              FastAPI /api/v1: feed, story view, questions, SSE ask, admin trigger
+  agent/            per-story grounded Q&A (event-scoped pgvector RAG, citations, refusal)
+  worker/           consumers + scheduled collectors (python -m worker)
+  web/              Next.js app (feed, story view: Both Sides / So What / Ask)
+  db/               Alembic migrations
+  evals/            gold sets + Langfuse dataset experiments + groundedness judge
+  docs/             product + technical docs, DEPLOYMENT.md
 ```
+
+## Quickstart (local)
+
+Prereqs: Docker, Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node 20+.
+
+```bash
+cp .env.example .env          # add your OLLAMA_API_KEY (+ LANGFUSE_* when ready)
+docker compose up -d          # Postgres (pgvector) + Redis
+uv sync                       # Python deps
+uv run alembic upgrade head   # schema
+uv run python -m worker       # terminal 1: pipeline (ingests on start, then every 30 min)
+uv run uvicorn api.main:app --reload   # terminal 2: API on :8000
+cd web && npm install && npm run dev   # terminal 3: web on :3000
+```
+
+Notes:
+- CVE feeds (CISA KEV, NVD) flow end to end **without** an LLM key — deterministic
+  enrichment. News items (GDELT, RSS) and the Ask agent need `OLLAMA_API_KEY`
+  (Ollama Cloud). Items that stall during an outage are requeued automatically.
+- With `LANGFUSE_*` set, every stage and agent turn is traced; publish prompts with
+  `uv run python evals/sync_prompts.py` and run evals with `uv run python evals/run_all.py`.
+- Production deploy (Railway + Vercel + self-hosted Langfuse): [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
