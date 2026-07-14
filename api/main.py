@@ -20,6 +20,7 @@ from agent.questions import suggested_questions
 from agent.rag import answer_stream, ensure_session
 from common.config import get_settings
 from common.db import get_db
+from common.lenses import LENSES, get_lens
 from ingestion.runner import run_all
 from personalization.ranking import score_event
 
@@ -52,12 +53,27 @@ class FeedItem(BaseModel):
     cvss_severity: str | None
     kev_listed: bool
     cve_ids: list[str]
+    tickers: list[str]
+    catalyst: str | None
+    price_impact_direction: str | None
     last_updated_at: str
     score: float
 
 
 class FeedResponse(BaseModel):
     items: list[FeedItem]
+    lens: str
+
+
+class LensOut(BaseModel):
+    slug: str
+    name: str
+    tagline: str
+
+
+class LensesResponse(BaseModel):
+    lenses: list[LensOut]
+    default: str
 
 
 class SourceRef(BaseModel):
@@ -120,14 +136,29 @@ async def healthz(db: AsyncSession = Depends(get_db)):
     return {"status": "ok"}
 
 
+@app.get("/api/v1/lenses", response_model=LensesResponse)
+async def get_lenses():
+    return LensesResponse(
+        lenses=[
+            LensOut(slug=lens.slug, name=lens.name, tagline=lens.tagline)
+            for lens in LENSES.values()
+        ],
+        default="cyber_grc",
+    )
+
+
 @app.get("/api/v1/feed", response_model=FeedResponse)
 async def get_feed(
+    lens: str | None = None,
     sector: str | None = None,
     limit: int = 30,
     db: AsyncSession = Depends(get_db),
 ):
     limit = min(max(limit, 1), 100)
-    where = "WHERE (CAST(:sector AS text) IS NULL OR e.sector = CAST(:sector AS text))"
+    active_lens = get_lens(lens)
+    # Explicit ?sector= wins; otherwise the lens's sector defaults apply.
+    sectors = [sector] if sector else active_lens.sectors
+    where = "WHERE (CAST(:sectors AS text[]) IS NULL OR e.sector = ANY(CAST(:sectors AS text[])))"
     rows = (
         await db.execute(
             text(
@@ -140,7 +171,7 @@ async def get_feed(
                 LIMIT 200
                 """
             ),
-            {"sector": sector},
+            {"sectors": sectors or None},
         )
     ).mappings().all()
 
@@ -148,9 +179,9 @@ async def get_feed(
     for row in rows:
         projection = row["projection"] or {}
         cyber = projection.get("cyber") or {}
+        finance = projection.get("finance") or {}
         cvss = cyber.get("cvss") or {}
-        exploitation = cyber.get("exploitation") or {}
-        kev = bool(exploitation.get("kev_listed"))
+        kev = bool((cyber.get("exploitation") or {}).get("kev_listed"))
         # Recency = when the event happened, not when we ingested it —
         # otherwise a backfill makes years-old records look breaking.
         occurred = row["occurred_at"]
@@ -160,10 +191,9 @@ async def get_feed(
             else row["last_updated_at"]
         )
         score = score_event(
-            last_updated_at=reference_time,
-            cvss_score=cvss.get("score"),
-            kev_listed=kev,
-            source_count=projection.get("source_count", 1),
+            lens=active_lens,
+            reference_time=reference_time,
+            projection=projection,
         )
         items.append(
             FeedItem(
@@ -177,12 +207,15 @@ async def get_feed(
                 cvss_severity=cvss.get("severity"),
                 kev_listed=kev,
                 cve_ids=(cyber.get("cve_ids") or [])[:4],
+                tickers=(finance.get("tickers") or [])[:4],
+                catalyst=finance.get("catalyst"),
+                price_impact_direction=(finance.get("price_impact") or {}).get("direction"),
                 last_updated_at=row["last_updated_at"].isoformat(),
                 score=score,
             )
         )
     items.sort(key=lambda i: i.score, reverse=True)
-    return FeedResponse(items=items[:limit])
+    return FeedResponse(items=items[:limit], lens=active_lens.slug)
 
 
 @app.get("/api/v1/events/{event_id}", response_model=EventDetail)
@@ -298,7 +331,9 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/api/v1/events/{event_id}/questions", response_model=QuestionsResponse)
-async def get_questions(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_questions(
+    event_id: uuid.UUID, lens: str | None = None, db: AsyncSession = Depends(get_db)
+):
     row = (
         await db.execute(
             text("SELECT projection FROM events WHERE id = :eid"), {"eid": str(event_id)}
@@ -306,7 +341,7 @@ async def get_questions(event_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     ).mappings().first()
     if row is None:
         raise HTTPException(status_code=404, detail="event not found")
-    return QuestionsResponse(questions=suggested_questions(row["projection"]))
+    return QuestionsResponse(questions=suggested_questions(row["projection"], lens))
 
 
 @app.post("/api/v1/events/{event_id}/ask")

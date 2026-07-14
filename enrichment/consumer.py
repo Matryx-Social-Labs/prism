@@ -114,6 +114,11 @@ async def handle_classified_item(payload: dict) -> None:
             session.add(
                 ArticleChunk(article_id=article_id, chunk_index=idx, text=text, embedding=vector)
             )
+        lens_fields = {}
+        if extraction.cyber:
+            lens_fields["cyber"] = extraction.cyber.model_dump()
+        if extraction.finance:
+            lens_fields["finance"] = extraction.finance.model_dump()
         session.add(
             Enrichment(
                 id=enrichment_id,
@@ -123,7 +128,7 @@ async def handle_classified_item(payload: dict) -> None:
                 occurred_at=_parse_date(shared.occurred_at),
                 sentiment=shared.sentiment,
                 shared_fields=shared.model_dump(),
-                lens_fields={"cyber": extraction.cyber.model_dump()} if extraction.cyber else None,
+                lens_fields=lens_fields or None,
                 raw_model_output=raw_model_output,
                 model=model_used,
             )
@@ -135,10 +140,10 @@ async def handle_classified_item(payload: dict) -> None:
             for name, value in shared.model_dump().items()
             if value not in (None, [], {})
         ]
-        if extraction.cyber:
+        for lens_slug, lens_dump in lens_fields.items():
             populated += [
-                f"cyber.{name}"
-                for name, value in extraction.cyber.model_dump().items()
+                f"{lens_slug}.{name}"
+                for name, value in lens_dump.items()
                 if value not in (None, [], {})
             ]
         for field_path in populated:

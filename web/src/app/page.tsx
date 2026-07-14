@@ -1,91 +1,143 @@
 import Link from "next/link";
-import { fetchFeed, type FeedItem } from "@/lib/api";
 
-export const dynamic = "force-dynamic";
+const PILLARS = [
+  {
+    title: "Both Sides",
+    body: "Every story's sources grouped by stance and origin — vendor advisories next to researcher warnings, official framing next to independent reporting. See who says what before deciding what to believe.",
+    accent: "border-sky-500",
+  },
+  {
+    title: "So What",
+    body: "An impact graph, not just a headline: who is affected, what happens next, and — for your role — what it means for your controls, your stack, or your positions.",
+    accent: "border-amber-500",
+  },
+  {
+    title: "Ask",
+    body: "A per-story agent that answers follow-up questions from that story's own sources, with citations. If the sources don't cover it, it says so instead of guessing.",
+    accent: "border-emerald-500",
+  },
+];
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const hours = Math.floor(diffMs / 3_600_000);
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
+const LENSES = [
+  {
+    name: "Cybersecurity / GRC",
+    desc: "CVEs with CVSS, exploitation status, affected products, and NIST/CIS control mapping. From a new CVE to “does this affect me and what do I do” in under a minute.",
+    live: true,
+  },
+  {
+    name: "Finance / Trader",
+    desc: "Market-moving news with tickers, catalysts, and evidence-based price-impact reads.",
+    live: true,
+  },
+  {
+    name: "Your role",
+    desc: "Lenses are declarative add-ons over one shared pipeline — new roles ship without a rewrite.",
+    live: false,
+  },
+];
 
-function SeverityBadge({ item }: { item: FeedItem }) {
-  if (item.cvss_score == null) return null;
-  const severity = item.cvss_severity ?? (item.cvss_score >= 9 ? "critical" : item.cvss_score >= 7 ? "high" : "medium");
-  const colors: Record<string, string> = {
-    critical: "bg-red-600 text-white",
-    high: "bg-orange-600 text-white",
-    medium: "bg-amber-500 text-white",
-    low: "bg-lime-600 text-white",
-  };
+export default function LandingPage() {
   return (
-    <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${colors[severity] ?? "bg-stone-500 text-white"}`}>
-      CVSS {item.cvss_score.toFixed(1)}
-    </span>
-  );
-}
-
-export default async function FeedPage() {
-  let items: FeedItem[] = [];
-  let error: string | null = null;
-  try {
-    items = await fetchFeed();
-  } catch {
-    error = "The Prism API is unreachable. Start the backend and refresh.";
-  }
-
-  return (
-    <div>
-      <h1 className="mb-1 text-2xl font-bold">Your feed</h1>
-      <p className="mb-6 text-sm text-stone-500">
-        Ranked for a security &amp; GRC role: severity, active exploitation, recency, corroboration.
-      </p>
-
-      {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-          {error}
+    <div className="space-y-20 pb-16">
+      {/* Hero */}
+      <section className="pt-12 text-center">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-stone-500">
+          Role-aware news intelligence
+        </p>
+        <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight sm:text-5xl">
+          Every story, split into its full spectrum.
+        </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-lg text-stone-600 dark:text-stone-400">
+          Prism clusters worldwide coverage into single events, shows you every side,
+          maps the consequences for <em>your</em> role, and answers your questions —
+          grounded in the story&apos;s own sources, never beyond them.
+        </p>
+        <div className="mt-8 flex items-center justify-center gap-3">
+          <Link
+            href="/onboarding"
+            className="rounded-lg bg-stone-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300"
+          >
+            Get your feed
+          </Link>
+          <Link
+            href="/feed"
+            className="rounded-lg border border-stone-300 px-6 py-3 text-sm font-semibold transition hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-900"
+          >
+            Browse without a profile
+          </Link>
         </div>
-      )}
+      </section>
 
-      {!error && items.length === 0 && (
-        <div className="rounded-lg border border-stone-200 p-6 text-sm text-stone-500 dark:border-stone-800">
-          No events yet — the pipeline is still ingesting. Refresh in a minute.
+      {/* Three-part promise */}
+      <section>
+        <h2 className="mb-2 text-center text-2xl font-bold">The promise, per story</h2>
+        <p className="mb-8 text-center text-sm text-stone-500">
+          Not more headlines faster — the full picture of each one.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {PILLARS.map((p) => (
+            <div key={p.title} className={`rounded-xl border-t-4 ${p.accent} border border-stone-200 p-5 dark:border-stone-800`}>
+              <h3 className="mb-2 text-lg font-bold">{p.title}</h3>
+              <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{p.body}</p>
+            </div>
+          ))}
         </div>
-      )}
+      </section>
 
-      <ul className="space-y-3">
-        {items.map((item) => (
-          <li key={item.id}>
-            <Link
-              href={`/story/${item.id}`}
-              className="block rounded-lg border border-stone-200 p-4 transition hover:border-stone-400 dark:border-stone-800 dark:hover:border-stone-600"
-            >
-              <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                <SeverityBadge item={item} />
-                {item.kev_listed && (
-                  <span className="rounded bg-red-700 px-1.5 py-0.5 text-xs font-semibold text-white">
-                    ⚠ Actively exploited
+      {/* How it works */}
+      <section className="rounded-2xl border border-stone-200 p-8 dark:border-stone-800">
+        <h2 className="mb-6 text-center text-2xl font-bold">One pipeline, many lenses</h2>
+        <div className="mx-auto max-w-2xl space-y-3 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+          <p>
+            Prism continuously ingests authoritative feeds (NVD, CISA KEV) and worldwide news,
+            gates out noise, extracts typed facts with field-level source provenance, and merges
+            the many reports of one real event into a single canonical story.
+          </p>
+          <p>
+            Your role selects a <strong className="text-stone-900 dark:text-stone-100">lens</strong>:
+            the extra fields extracted, how your feed is ranked, and the questions the agent
+            suggests. Every value on every story traces back to the source that evidenced it.
+          </p>
+        </div>
+      </section>
+
+      {/* Lenses */}
+      <section>
+        <h2 className="mb-8 text-center text-2xl font-bold">Built for your role</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {LENSES.map((lens) => (
+            <div key={lens.name} className="rounded-xl border border-stone-200 p-5 dark:border-stone-800">
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="font-bold">{lens.name}</h3>
+                {lens.live ? (
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    live
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-500 dark:bg-stone-900">
+                    coming
                   </span>
                 )}
-                {item.cve_ids.map((cve) => (
-                  <span key={cve} className="rounded bg-stone-200 px-1.5 py-0.5 font-mono text-xs dark:bg-stone-800">
-                    {cve}
-                  </span>
-                ))}
-                <span className="ml-auto text-xs text-stone-400">
-                  {item.source_count} source{item.source_count === 1 ? "" : "s"} · {timeAgo(item.last_updated_at)}
-                </span>
               </div>
-              <h2 className="font-semibold leading-snug">{item.title}</h2>
-              {item.summary && (
-                <p className="mt-1 line-clamp-2 text-sm text-stone-600 dark:text-stone-400">{item.summary}</p>
-              )}
-            </Link>
-          </li>
-        ))}
-      </ul>
+              <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{lens.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Bottom CTA */}
+      <section className="text-center">
+        <h2 className="text-2xl font-bold">Trust what you read — because you can check it.</h2>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-stone-500">
+          Prototype: cybersecurity &amp; GRC and finance lenses, free while we build.
+        </p>
+        <Link
+          href="/onboarding"
+          className="mt-6 inline-block rounded-lg bg-stone-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300"
+        >
+          Choose your lens →
+        </Link>
+      </section>
     </div>
   );
 }

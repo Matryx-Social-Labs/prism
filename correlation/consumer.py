@@ -197,6 +197,7 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             return
 
         cyber: dict = {}
+        finance: dict = {}
         summaries: list[str] = []
         event_types: list[str] = []
         source_slugs: list[str] = []
@@ -206,6 +207,23 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
                 summaries.append(row["summary"])
             if row["event_type"]:
                 event_types.append(row["event_type"])
+            row_finance = (row["lens_fields"] or {}).get("finance") if row["lens_fields"] else None
+            if row_finance:
+                for ticker in row_finance.get("tickers") or []:
+                    finance.setdefault("tickers", [])
+                    if ticker not in finance["tickers"]:
+                        finance["tickers"].append(ticker)
+                if row_finance.get("sector") and not finance.get("sector"):
+                    finance["sector"] = row_finance["sector"]
+                if row_finance.get("catalyst") and not finance.get("catalyst"):
+                    finance["catalyst"] = row_finance["catalyst"]
+                # Prefer the highest-confidence price read; never average —
+                # a disclosed read is attributed once (no impact inflation).
+                pi = row_finance.get("price_impact")
+                if pi and (pi.get("confidence") or 0) >= (
+                    (finance.get("price_impact") or {}).get("confidence") or 0
+                ):
+                    finance["price_impact"] = pi
             row_lens = (row["lens_fields"] or {}).get("cyber") if row["lens_fields"] else None
             if not row_lens:
                 continue
@@ -245,6 +263,7 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             "source_count": len(rows),
             "source_slugs": sorted(set(source_slugs)),
             "cyber": cyber or None,
+            "finance": finance or None,
         }
         event.last_updated_at = func.now()
 

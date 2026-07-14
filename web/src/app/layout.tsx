@@ -17,9 +17,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="text-xl font-bold tracking-tight">
               ◮ Prism
             </Link>
-            <span className="text-xs uppercase tracking-widest text-stone-500">
-              Cyber / GRC edition — prototype
-            </span>
+            <nav className="flex items-center gap-4 text-sm">
+              <Link href="/feed" className="font-medium hover:underline">
+                Feed
+              </Link>
+              <Link
+                href="/onboarding"
+                className="rounded-md border border-stone-300 px-3 py-1.5 text-xs font-semibold hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-900"
+              >
+                Change lens
+              </Link>
+            </nav>
           </div>
         </header>
         <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>

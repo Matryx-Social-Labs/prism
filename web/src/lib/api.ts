@@ -15,8 +15,17 @@ export interface FeedItem {
   cvss_severity: string | null;
   kev_listed: boolean;
   cve_ids: string[];
+  tickers: string[];
+  catalyst: string | null;
+  price_impact_direction: string | null;
   last_updated_at: string;
   score: number;
+}
+
+export interface LensInfo {
+  slug: string;
+  name: string;
+  tagline: string;
 }
 
 export interface SourceRef {
@@ -57,6 +66,13 @@ export interface CyberLens {
   control_mapping?: { framework: string; control: string; relevance: string }[];
 }
 
+export interface FinanceLens {
+  tickers?: string[];
+  sector?: string;
+  catalyst?: string;
+  price_impact?: { direction?: string; magnitude?: string; confidence?: number };
+}
+
 export interface EventDetail {
   id: string;
   title: string;
@@ -70,14 +86,16 @@ export interface EventDetail {
     source_count?: number;
     source_slugs?: string[];
     cyber?: CyberLens | null;
+    finance?: FinanceLens | null;
   } | null;
   sources: SourceRef[];
   perspectives: PerspectiveOut[];
   impacts: ImpactOut[];
 }
 
-export async function fetchFeed(sector?: string): Promise<FeedItem[]> {
+export async function fetchFeed(lens?: string, sector?: string): Promise<FeedItem[]> {
   const params = new URLSearchParams();
+  if (lens) params.set("lens", lens);
   if (sector) params.set("sector", sector);
   const res = await fetch(`${API_URL}/api/v1/feed?${params}`, {
     next: { revalidate: 60 },
@@ -85,6 +103,13 @@ export async function fetchFeed(sector?: string): Promise<FeedItem[]> {
   if (!res.ok) throw new Error(`feed failed: ${res.status}`);
   const data = (await res.json()) as { items: FeedItem[] };
   return data.items;
+}
+
+export async function fetchLenses(): Promise<LensInfo[]> {
+  const res = await fetch(`${API_URL}/api/v1/lenses`, { next: { revalidate: 3600 } });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { lenses: LensInfo[] };
+  return data.lenses;
 }
 
 export async function fetchEvent(id: string): Promise<EventDetail> {
@@ -95,8 +120,9 @@ export async function fetchEvent(id: string): Promise<EventDetail> {
   return (await res.json()) as EventDetail;
 }
 
-export async function fetchQuestions(id: string): Promise<string[]> {
-  const res = await fetch(`${API_URL}/api/v1/events/${id}/questions`, {
+export async function fetchQuestions(id: string, lens?: string): Promise<string[]> {
+  const params = lens ? `?lens=${encodeURIComponent(lens)}` : "";
+  const res = await fetch(`${API_URL}/api/v1/events/${id}/questions${params}`, {
     cache: "no-store",
   });
   if (!res.ok) return [];

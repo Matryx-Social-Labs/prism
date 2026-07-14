@@ -11,29 +11,33 @@ top-level [BLUEPRINT.md](../BLUEPRINT.md) and [docs/MARKET-RESEARCH.md](./MARKET
 ## Phase 1 — Cybersecurity and GRC beachhead
 Ship the full experience for one role.
 
-**Milestone 1.1 — Thin vertical slice.** One end-to-end path: ingest NVD/CVE and CISA KEV plus one
-news-event API, run the relevance gate, enrich with the shared schema and the cyber lens, cluster
-into events, and serve a single event view with sources. Prove the pipeline before widening.
+**Milestone 1.1 — Thin vertical slice. ✅ (July 2026)** One end-to-end path: ingest NVD/CVE and
+CISA KEV plus GDELT and security RSS, run the relevance gate, enrich with the shared schema and
+the cyber lens, cluster into events, and serve a single event view with sources.
 
-**Milestone 1.2 — The three-part story view.** Add perspective grouping (both sides), the impact
-and control-mapping view (so what for your controls), and the per-story agent (ask), for cyber
-stories.
+**Milestone 1.2 — The three-part story view. ✅ (July 2026)** Perspective grouping (both sides),
+the impact and control-mapping view (so what for your controls), and the per-story agent (ask),
+with citations and refusal, verified against live multi-source events.
 
-**Milestone 1.3 — Personalization.** Onboarding captures role and interests; the cyber lens and a
-first ranking model produce a per-user feed. Add follow rules for specific vendors, products, and
-CVEs, plus alerts.
+**Milestone 1.3 — Personalization. ◐ in progress** Done: onboarding captures the role and selects
+a lens (localStorage profile); a declarative lens registry (`common/lenses.py`) drives per-lens
+feed ranking, sector defaults, and suggested questions; landing page + lens switcher. Remaining:
+real accounts, follow rules for specific vendors/products/CVEs/tickers, and alerts.
 
 **Milestone 1.4 — Prosumer subscription.** Accounts, plans, and billing for individual security and
-GRC professionals. Groundedness and extraction evaluation gates in place before opening access.
+GRC professionals. Groundedness and extraction evaluation gates in place before opening access
+(eval harness exists in `evals/`; gates not yet enforced).
 
 Exit criteria: a security or GRC user can go from a new CVE to "does this affect me and what do I
 do" in under a minute, with sources and a questionable agent, and returns daily.
 
-## Phase 2 — Finance and trader lens
-Add the finance lens and the real-time fast-lane on the same backbone: tickers, sector, catalyst,
-and price-impact read, delivered with low latency over the streaming transport, plus finance feeds
-(Marketaux, and a real-time catalyst feed if needed). This is where willingness to pay is highest,
-and it validates the multi-role thesis by adding a role without a rewrite.
+## Phase 2 — Finance and trader lens ◐ started early (validating the multi-role thesis)
+Done: the finance lens rides the same backbone — classifier tags `finance_trader`, extraction
+fills tickers/sector/catalyst/price-impact, correlation merges them into the event projection,
+the feed ranks by price-impact under the finance lens, and the story view shows the market read.
+GDELT runs a finance query alongside the cyber one. Remaining: dedicated finance feeds
+(Marketaux; a real-time catalyst feed if needed) and the low-latency fast-lane delivery over the
+streaming transport.
 
 ## Phase 3 — Horizontal expansion
 Open personalization to general roles and sectors, add a prosumer graph and public API, and later

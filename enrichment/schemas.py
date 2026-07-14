@@ -195,18 +195,48 @@ class CyberLens(BaseModel):
         return v
 
 
+class PriceImpact(BaseModel):
+    direction: str | None = Field(default=None, description="up|down|mixed")
+    magnitude: str | None = Field(default=None, description="minor|moderate|major")
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class FinanceLens(BaseModel):
+    tickers: list[str] = Field(default_factory=list, description="Ticker symbols, e.g. NVDA")
+    sector: str | None = Field(default=None, description="e.g. semiconductors, banking")
+    catalyst: str | None = Field(
+        default=None,
+        description="snake_case driver, e.g. earnings_beat, guidance_raise, rate_decision, merger, lawsuit",
+    )
+    price_impact: PriceImpact | None = None
+
+    @field_validator("tickers", mode="before")
+    @classmethod
+    def _none_to_list(cls, v):
+        return v or []
+
+    @field_validator("price_impact", mode="before")
+    @classmethod
+    def _coerce_price_impact(cls, v):
+        if isinstance(v, str):
+            return {"direction": v}
+        return v
+
+
 class ArticleExtraction(BaseModel):
-    """One extraction call returns shared fields plus the cyber lens (when active)."""
+    """One extraction call returns shared fields plus any active lens fields."""
 
     shared: SharedExtraction
     cyber: CyberLens | None = None
+    finance: FinanceLens | None = None
 
     @model_validator(mode="before")
     @classmethod
     def _hoist_flat_shape(cls, data):
         # Models often flatten the nesting, returning shared fields at top
-        # level with an optional cyber key. Hoist that back into shape.
+        # level with optional lens keys. Hoist that back into shape.
         if isinstance(data, dict) and "shared" not in data and "headline_summary" in data:
             cyber = data.pop("cyber", None)
-            return {"shared": data, "cyber": cyber}
+            finance = data.pop("finance", None)
+            return {"shared": data, "cyber": cyber, "finance": finance}
         return data

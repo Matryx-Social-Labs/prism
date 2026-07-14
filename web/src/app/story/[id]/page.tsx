@@ -16,6 +16,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   if (!event) notFound();
 
   const cyber = event.projection?.cyber ?? null;
+  const finance = event.projection?.finance ?? null;
   const sourceById = new Map(event.sources.map((s) => [s.article_id, s]));
 
   return (
@@ -38,6 +39,16 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
               {cve}
             </span>
           ))}
+          {(finance?.tickers ?? []).map((t) => (
+            <span key={t} className="rounded bg-indigo-100 px-1.5 py-0.5 font-mono font-semibold text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+              ${t}
+            </span>
+          ))}
+          {finance?.catalyst && (
+            <span className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-600 dark:bg-stone-900 dark:text-stone-400">
+              {finance.catalyst.replaceAll("_", " ")}
+            </span>
+          )}
         </div>
         <h1 className="text-2xl font-bold leading-tight">{event.title}</h1>
         {event.summary && <p className="mt-2 text-stone-600 dark:text-stone-400">{event.summary}</p>}
@@ -114,6 +125,37 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
               <strong>Required action:</strong> {cyber.remediation.action}
             </div>
           )}
+
+          {finance && (finance.tickers?.length || finance.price_impact || finance.catalyst) ? (
+            <div>
+              <h3 className="mb-1 text-sm font-semibold text-stone-500">For the markets</h3>
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 text-sm dark:border-indigo-900 dark:bg-indigo-950/40">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                  {finance.tickers && finance.tickers.length > 0 && (
+                    <span>
+                      <strong>Tickers:</strong>{" "}
+                      {finance.tickers.map((t) => `$${t}`).join(", ")}
+                    </span>
+                  )}
+                  {finance.sector && (
+                    <span><strong>Sector:</strong> {finance.sector}</span>
+                  )}
+                  {finance.catalyst && (
+                    <span><strong>Catalyst:</strong> {finance.catalyst.replaceAll("_", " ")}</span>
+                  )}
+                  {finance.price_impact?.direction && (
+                    <span>
+                      <strong>Price read:</strong>{" "}
+                      {finance.price_impact.direction === "up" ? "▲" : finance.price_impact.direction === "down" ? "▼" : "◆"}{" "}
+                      {finance.price_impact.magnitude ?? ""}
+                      {finance.price_impact.confidence != null &&
+                        ` (confidence ${(finance.price_impact.confidence * 100).toFixed(0)}%)`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {cyber?.control_mapping && cyber.control_mapping.length > 0 && (
             <div>
