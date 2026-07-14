@@ -31,10 +31,11 @@ async def collect() -> int:
         if watermark.get("last_modified")
         else now - timedelta(days=FIRST_RUN_WINDOW_DAYS)
     )
-    # NVD requires the date range to be <= 120 days; ours is always small.
+    # NVD requires ISO-8601 with a colon in the offset (+00:00, not +0000 —
+    # the latter 404s) and a date range <= 120 days; ours is always small.
     params = {
-        "lastModStartDate": start.strftime("%Y-%m-%dT%H:%M:%S.000%z"),
-        "lastModEndDate": now.strftime("%Y-%m-%dT%H:%M:%S.000%z"),
+        "lastModStartDate": start.isoformat(timespec="milliseconds"),
+        "lastModEndDate": now.isoformat(timespec="milliseconds"),
         "resultsPerPage": PAGE_SIZE,
         "startIndex": 0,
     }
