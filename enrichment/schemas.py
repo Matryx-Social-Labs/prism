@@ -48,6 +48,17 @@ class ExtractedImpact(BaseModel):
     horizon: str = Field(default="days", description="immediate|days|weeks|longer")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _synonym_keys(cls, data):
+        # Models drift to who/what phrasing for the affected-party fields.
+        if isinstance(data, dict):
+            if "entity" not in data and "who" in data:
+                data["entity"] = data.pop("who")
+            if "effect" not in data and "what" in data:
+                data["effect"] = data.pop("what")
+        return data
+
 
 class SharedExtraction(BaseModel):
     event_type: str = Field(default="other", description=f"One of: {', '.join(CYBER_EVENT_TYPES)}")
