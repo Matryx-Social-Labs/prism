@@ -45,14 +45,25 @@ async def structured_chat[T: BaseModel](
 ) -> T:
     """Chat completion constrained to a JSON schema, validated into a Pydantic model.
 
-    Uses Ollama's OpenAI-compatible structured outputs (response_format json_schema).
-    Retries once on invalid JSON — schema-constrained decoding makes that rare.
+    Belt and braces: the schema is embedded in the prompt (providers like
+    Ollama Cloud don't reliably enforce response_format json_schema — models
+    were observed inventing field names) AND passed as response_format for
+    providers that do enforce it. Parsing tolerates markdown fences; retries
+    feed the validation error back to the model.
     """
     client = get_llm()
     schema = output_model.model_json_schema()
+    schema_msg = {
+        "role": "system",
+        "content": (
+            "Respond with a single JSON object only — no prose, no markdown fences. "
+            "It must match this JSON Schema exactly (use these exact property names; "
+            "include every required property):\n" + json.dumps(schema)
+        ),
+    }
     kwargs: dict[str, Any] = {
         "model": model,
-        "messages": messages,
+        "messages": [*messages, schema_msg],
         "response_format": {
             "type": "json_schema",
             "json_schema": {"name": output_model.__name__, "schema": schema},
@@ -70,7 +81,7 @@ async def structured_chat[T: BaseModel](
         response = await client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content or ""
         try:
-            return output_model.model_validate(json.loads(content))
+            return output_model.model_validate(_parse_json_loose(content))
         except Exception as e:  # invalid JSON or schema mismatch
             last_err = e
             logger.warning(
@@ -80,7 +91,32 @@ async def structured_chat[T: BaseModel](
                 trace_name,
                 e,
             )
+            # Feed the failure back so the retry can correct field names/shape.
+            kwargs["messages"] = [
+                *kwargs["messages"],
+                {"role": "assistant", "content": content[:2000]},
+                {
+                    "role": "user",
+                    "content": f"That JSON failed validation: {e}. "
+                    "Return a corrected JSON object matching the schema exactly.",
+                },
+            ]
     raise ValueError(f"structured_chat failed after {max_retries} attempts: {last_err}")
+
+
+def _parse_json_loose(content: str) -> Any:
+    """Parse model output as JSON, tolerating markdown fences and prose."""
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text
+        text = text.rsplit("```", 1)[0].strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("{"), text.rfind("}")
+        if start != -1 and end > start:
+            return json.loads(text[start : end + 1])
+        raise
 
 
 async def plain_chat(
