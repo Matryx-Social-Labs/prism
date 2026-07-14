@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+node_modules/
+web/.next/
+web/out/
+*.tsbuildinfo
+.vercel/
+
+# Local data / caches
+graphify-out/
+.fastembed_cache/
+local_cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
