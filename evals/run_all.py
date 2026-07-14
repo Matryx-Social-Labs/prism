@@ -22,6 +22,7 @@ from common.observability import fetch_prompt
 
 DATASET_DIR = Path(__file__).parent / "datasets"
 
+get_settings()  # bridges .env Langfuse keys into process env for the SDK
 langfuse = get_client()
 
 

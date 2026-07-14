@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,4 +52,23 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    _export_langfuse_env(settings)
+    return settings
+
+
+def _export_langfuse_env(settings: Settings) -> None:
+    """Bridge .env values to process env for the Langfuse SDK.
+
+    pydantic-settings reads .env itself but doesn't export; the Langfuse
+    client (and its openai wrapper) reads os.environ directly. Without this,
+    keys in .env leave the SDK silently disabled. Existing env vars win.
+    """
+    if not settings.langfuse_enabled:
+        return
+    os.environ.setdefault("LANGFUSE_PUBLIC_KEY", settings.langfuse_public_key)
+    os.environ.setdefault("LANGFUSE_SECRET_KEY", settings.langfuse_secret_key)
+    if settings.langfuse_base_url:
+        # v3 SDK reads LANGFUSE_HOST; some tooling reads LANGFUSE_BASE_URL — set both.
+        os.environ.setdefault("LANGFUSE_HOST", settings.langfuse_base_url)
+        os.environ.setdefault("LANGFUSE_BASE_URL", settings.langfuse_base_url)

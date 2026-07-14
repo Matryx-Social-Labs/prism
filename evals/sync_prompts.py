@@ -9,6 +9,10 @@ from pathlib import Path
 
 from langfuse import get_client
 
+from common.config import get_settings
+
+get_settings()  # bridges .env Langfuse keys into process env for the SDK
+
 FALLBACK_DIR = Path(__file__).parent.parent / "common" / "prompts" / "fallbacks"
 
 PROMPTS = [
