@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -131,7 +132,8 @@ async def get_feed(
         await db.execute(
             text(
                 f"""
-                SELECT e.id, e.title, e.summary, e.sector, e.projection, e.last_updated_at
+                SELECT e.id, e.title, e.summary, e.sector, e.projection,
+                       e.last_updated_at, e.occurred_at
                 FROM events e
                 {where}
                 ORDER BY e.last_updated_at DESC
@@ -149,8 +151,16 @@ async def get_feed(
         cvss = cyber.get("cvss") or {}
         exploitation = cyber.get("exploitation") or {}
         kev = bool(exploitation.get("kev_listed"))
+        # Recency = when the event happened, not when we ingested it —
+        # otherwise a backfill makes years-old records look breaking.
+        occurred = row["occurred_at"]
+        reference_time = (
+            datetime.combine(occurred, datetime.min.time(), tzinfo=UTC)
+            if occurred
+            else row["last_updated_at"]
+        )
         score = score_event(
-            last_updated_at=row["last_updated_at"],
+            last_updated_at=reference_time,
             cvss_score=cvss.get("score"),
             kev_listed=kev,
             source_count=projection.get("source_count", 1),
