@@ -1,0 +1,28 @@
+{
+  "projectId": "98abbafb-85c5-41cd-9fa8-e5cdc104c5b1",
+  "shape": "package",
+  "pkg": "prism-web",
+  "globalName": "PrismDS",
+  "srcDir": "src/components",
+  "tsconfig": "../.design-sync/tsconfig.sync.json",
+  "cssEntry": ".ds-tailwind.css",
+  "componentSrcMap": {
+    "PrismHero": null,
+    "HeroVisual": null
+  },
+  "entry": "web/dist/index.js",
+  "buildCmd": "sh .design-sync/build-css.sh",
+  "libOverrides": {
+    "source-kit.mjs": "exclude componentSrcMap:null files from synth entry (three.js bloat)"
+  },
+  "dtsPropsFor": {
+    "ThemeToggle": "",
+    "HeroPoster": "",
+    "LensDemo": "",
+    "Reveal": "children: React.ReactNode; className?: string; as?: 'div' | 'section' | 'li';",
+    "AskPanel": "eventId: string; suggestedQuestions: string[];",
+    "ThreadRail": "thread: { upstream: { event_id: string; title: string; sector: string | null; occurred_at: string | null; relation: string; rationale: string | null; confidence: number | null; image_url: string | null }[]; downstream: { event_id: string; title: string; sector: string | null; occurred_at: string | null; relation: string; rationale: string | null; confidence: number | null; image_url: string | null }[] }; currentTitle: string;",
+    "StoryView": "event: { id: string; title: string; summary: string | null; sector: string | null; subsector: string | null; image_url: string | null; regions: string[]; occurred_at: string | null; last_updated_at: string; lens_briefs: Record<string, string>; available_lenses: string[]; coverage: { origins: Record<string, number>; unknown: number; single_origin: boolean } | null; entities: { name: string; entity_type: string; role: string }[]; thread: { upstream: unknown[]; downstream: unknown[] }; projection: { event_type?: string | null; source_count?: number; cyber?: unknown; finance?: unknown } | null; sources: { article_id: string; source_name: string; source_slug: string; url: string | null; title: string; published_at: string | null; stance: string | null; funding: string | null }[]; perspectives: { label: string; stance: string | null; origin_country: string | null; summary: string | null; article_ids: string[] }[]; impacts: { id: string; entity_name: string | null; effect: string; direction: string | null; horizon: string | null; confidence: number | null; parent_impact_id: string | null }[] };"
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}
