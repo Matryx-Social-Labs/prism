@@ -30,6 +30,9 @@ class Lens:
     sectors: list[str] = field(default_factory=list)  # empty = all sectors
     ranking: RankingWeights = field(default_factory=RankingWeights)
     suggested_questions: list[str] = field(default_factory=list)
+    # Raw CVE-database records (NVD/KEV entries with no news coverage) are
+    # signal for defenders but noise for everyone else.
+    include_cve_records: bool = False
 
 
 LENSES: dict[str, Lens] = {
@@ -40,6 +43,7 @@ LENSES: dict[str, Lens] = {
         role_interest="cyber_grc",
         sectors=["cybersecurity"],
         ranking=RankingWeights(recency=1.0, severity=0.8, exploited=0.5),
+        include_cve_records=True,
         suggested_questions=[
             "Does this affect my stack?",
             "Is it being actively exploited?",

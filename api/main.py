@@ -169,26 +169,38 @@ async def get_feed(
     active_lens = get_lens(lens)
     # Explicit ?sector= wins; otherwise the lens's sector defaults apply.
     sectors = [sector] if sector else active_lens.sectors
-    where = "WHERE (CAST(:sectors AS text[]) IS NULL OR e.sector = ANY(CAST(:sectors AS text[])))"
+    # Candidate window is per-sector so a high-churn sector (thousands of
+    # CVE updates a day) can't evict everyone else's news before ranking.
     rows = (
         await db.execute(
             text(
-                f"""
-                SELECT e.id, e.title, e.summary, e.sector, e.projection,
-                       e.last_updated_at, e.occurred_at
-                FROM events e
-                {where}
-                ORDER BY e.last_updated_at DESC
-                LIMIT 200
+                """
+                SELECT id, title, summary, sector, projection,
+                       last_updated_at, occurred_at
+                FROM (
+                    SELECT e.*, ROW_NUMBER() OVER (
+                        PARTITION BY e.sector ORDER BY e.last_updated_at DESC
+                    ) AS rn
+                    FROM events e
+                    WHERE (CAST(:sectors AS text[]) IS NULL
+                           OR e.sector = ANY(CAST(:sectors AS text[])))
+                ) windowed
+                WHERE rn <= 120
                 """
             ),
             {"sectors": sectors or None},
         )
     ).mappings().all()
 
+    cve_only_sources = {"nvd", "cisa_kev"}
     items: list[FeedItem] = []
     for row in rows:
         projection = row["projection"] or {}
+        # Raw database records (no news coverage) only surface for lenses
+        # that want them (cyber/GRC); they're noise for readers and traders.
+        slugs = set(projection.get("source_slugs") or [])
+        if slugs and slugs <= cve_only_sources and not active_lens.include_cve_records:
+            continue
         cyber = projection.get("cyber") or {}
         finance = projection.get("finance") or {}
         cvss = cyber.get("cvss") or {}
