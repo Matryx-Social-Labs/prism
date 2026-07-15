@@ -191,9 +191,16 @@ vercel link                     # create/link project: scope = the account, name
 ```
 
 Then in the Vercel dashboard → project **Settings**:
-- **Root Directory**: `web` (critical — the Next.js app lives there)
-- **Environment Variables** (Production): `NEXT_PUBLIC_API_URL` =
-  `https://<your-railway-api-domain>` (no trailing slash)
+- **Root Directory**: `web` (critical — the Next.js app lives there). If
+  `vercel link` generated a repo-root `vercel.json` with a `services` block,
+  its `"root"` must also be `"web"` — a `"."` root makes Vercel detect the
+  FastAPI backend and fail with *"must specify an entrypoint for runtime python"*.
+- **Environment Variables**: not usable for `NEXT_PUBLIC_*` here ⚠️ — this
+  team forces env vars to **Sensitive**, and sensitive values pull as *empty
+  strings* outside Vercel's own builders, so the prebuilt CI deploy would bake
+  `""` into the client bundle (the feed then calls the Vercel origin and 404s).
+  The workflow instead pins `NEXT_PUBLIC_API_URL` deterministically in the
+  "Inject public build env" step — change the API domain there.
 
 `vercel link` writes `.vercel/project.json` locally (gitignored) containing the
 two IDs you need next:
