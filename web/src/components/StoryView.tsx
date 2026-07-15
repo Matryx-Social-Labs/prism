@@ -319,10 +319,12 @@ export function StoryView({ event }: { event: EventDetail }) {
         )}
       </section>
 
-      {/* So What — consequence graph */}
+      <ThreadRail thread={event.thread} currentTitle={event.title} />
+
+      {/* What to expect — consequence graph */}
       <section>
         <h2 className="mb-4 text-xl font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-          So what
+          What to expect
         </h2>
         {event.impacts.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--ink-faint)" }}>Impact analysis pending.</p>

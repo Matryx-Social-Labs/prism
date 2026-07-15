@@ -1,8 +1,13 @@
 // Typed client for the Prism API (mirrors api/main.py response models).
 // The React Native app will reuse these types via packages/api-client later.
 
+// typeof guard: Next inlines NEXT_PUBLIC_* at build time, but this module
+// is also bundled outside Next (design-system sync) where `process` is gone.
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+  (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : undefined)?.replace(
+    /\/$/,
+    ""
+  ) ?? "http://localhost:8000";
 
 export interface FeedItem {
   id: string;
