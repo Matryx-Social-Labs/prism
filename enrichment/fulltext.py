@@ -6,12 +6,13 @@ fallback tiers are deferred.
 """
 
 import asyncio
-import logging
 
 import httpx
 import trafilatura
 
-logger = logging.getLogger(__name__)
+from common.logging import get_logger
+
+logger = get_logger(__name__)
 
 MIN_USEFUL_CHARS = 400
 
@@ -38,7 +39,7 @@ async def retrieve_fulltext(url: str | None, body: str | None) -> tuple[str, str
             if extracted and not body:
                 return extracted, "direct"
         except Exception:
-            logger.warning("fulltext fetch failed for %s", url, exc_info=True)
+            logger.warning("fulltext_fetch_failed", url=url, exc_info=True)
 
     if body:
         return body, "body"

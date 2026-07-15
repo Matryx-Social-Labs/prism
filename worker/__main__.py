@@ -17,7 +17,6 @@ replicas): give each replica a unique PRISM_CONSUMER_NAME.
 
 import argparse
 import asyncio
-import logging
 import os
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -25,15 +24,13 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from classification.consumer import handle_raw_item
 from common import stream
+from common.logging import get_logger, setup_logging
 from correlation.consumer import handle_enriched_item
 from enrichment.consumer import handle_classified_item
 from ingestion.runner import run_all
 
-logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO"),
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
-logger = logging.getLogger("worker")
+setup_logging()
+logger = get_logger("worker")
 
 INGEST_INTERVAL_MINUTES = int(os.environ.get("PRISM_INGEST_INTERVAL_MINUTES", "30"))
 CONSUMER_NAME = os.environ.get("PRISM_CONSUMER_NAME", "worker-1")
@@ -78,13 +75,13 @@ async def _health_server() -> None:
             writer.close()
 
     server = await asyncio.start_server(handle, "0.0.0.0", port)
-    logger.info("worker health endpoint listening on :%d", port)
+    logger.info("health_endpoint_listening", port=port)
     async with server:
         await server.serve_forever()
 
 
 async def main(stages: list[str]) -> None:
-    logger.info("prism worker starting (stages: %s, consumer: %s)", ", ".join(stages), CONSUMER_NAME)
+    logger.info("worker_starting", stages=stages, consumer=CONSUMER_NAME)
 
     tasks = [asyncio.create_task(_health_server())]
 
@@ -100,6 +97,16 @@ async def main(stages: list[str]) -> None:
         scheduler.start()
         # Kick off one ingestion run at startup so a fresh deploy has data.
         tasks.append(asyncio.create_task(_initial_ingest()))
+        # Admin-triggered runs arrive over the stream (the API never ingests
+        # in-process); overlapping triggers coalesce behind one lock.
+        tasks.append(
+            asyncio.create_task(
+                stream.consume(
+                    stream.ADMIN_TRIGGERS, "ingestion", _handle_admin_trigger,
+                    consumer_name=f"ing-{CONSUMER_NAME}",
+                )
+            )
+        )
 
     if "classification" in stages:
         tasks.append(
@@ -136,11 +143,24 @@ async def main(stages: list[str]) -> None:
     await asyncio.gather(*tasks)
 
 
+_ingest_lock = asyncio.Lock()
+
+
+async def _handle_admin_trigger(payload: dict) -> None:
+    if _ingest_lock.locked():
+        logger.info("admin_trigger_coalesced", reason="ingestion already running")
+        return
+    async with _ingest_lock:
+        logger.info("admin_trigger_received", requested_by=payload.get("requested_by", "api"))
+        await run_all()
+
+
 async def _initial_ingest() -> None:
     try:
-        await run_all()
+        async with _ingest_lock:
+            await run_all()
     except Exception:
-        logger.exception("initial ingestion run failed")
+        logger.exception("initial_ingest_failed")
 
 
 if __name__ == "__main__":

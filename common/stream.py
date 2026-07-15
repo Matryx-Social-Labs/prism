@@ -8,14 +8,14 @@ later means reimplementing publish/consume, not touching stage logic.
 
 import asyncio
 import json
-import logging
 from collections.abc import Awaitable, Callable
 
 import redis.asyncio as aioredis
 
 from common.config import get_settings
+from common.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Topics per docs/DB-SCHEMA.md (feed.updates deferred with real personalization)
 RAW_ITEMS = "raw.items"
@@ -23,6 +23,7 @@ CLASSIFIED_ITEMS = "classified.items"
 ENRICHED_ITEMS = "enriched.items"
 EVENTS = "events"
 EVENT_UPDATES = "event.updates"
+ADMIN_TRIGGERS = "admin.triggers"  # api -> worker: run ingestion now
 
 _redis: aioredis.Redis | None = None
 
@@ -80,7 +81,7 @@ async def consume(
         if "BUSYGROUP" not in str(e):
             raise
 
-    logger.info("consuming topic=%s group=%s consumer=%s", topic, group, consumer_name)
+    logger.info("consumer_started", topic=topic, group=group, consumer=consumer_name)
     next_reclaim_at = 0.0  # immediately on startup, then time-based (busy
     # batches would starve an iteration-count cadence)
     while True:
@@ -100,7 +101,7 @@ async def consume(
                     next_id = claimed[0]
                     messages = claimed[1] if len(claimed) > 1 else []
                     if messages:
-                        logger.info("reclaimed %d stale messages topic=%s", len(messages), topic)
+                        logger.info("stale_messages_reclaimed", topic=topic, count=len(messages))
                         await _process(r, topic, group, handler, messages, concurrency)
                     if not messages or str(next_id) in ("0-0", "b'0-0'"):
                         break
@@ -108,7 +109,7 @@ async def consume(
             except asyncio.CancelledError:
                 raise
             except Exception:
-                logger.exception("xautoclaim failed topic=%s", topic)
+                logger.exception("xautoclaim_failed", topic=topic)
 
         try:
             entries = await r.xreadgroup(
@@ -121,7 +122,7 @@ async def consume(
             # BLOCK expiry on idle streams. No data either way — just re-poll.
             continue
         except Exception:
-            logger.exception("stream read failed topic=%s; retrying in 5s", topic)
+            logger.exception("stream_read_failed", topic=topic, retry_in_s=5)
             await asyncio.sleep(5)
             continue
 
@@ -155,10 +156,10 @@ async def _handle_one(r, topic: str, group: str, handler, message) -> None:
         raise
     except Exception:
         logger.exception(
-            "handler failed topic=%s entry=%s payload=%s",
-            topic,
-            entry_id,
-            (fields or {}).get("data", "")[:500],
+            "handler_failed",
+            topic=topic,
+            entry_id=entry_id,
+            payload=(fields or {}).get("data", "")[:500],
         )
     finally:
         await r.xack(topic, group, entry_id)

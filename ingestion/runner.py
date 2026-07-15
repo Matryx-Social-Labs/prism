@@ -1,17 +1,16 @@
 """Run all collectors once (called by the worker scheduler and the admin endpoint)."""
 
-import logging
-
 from sqlalchemy import select, text
 
 from common import stream
 from common.db import session_scope
+from common.logging import get_logger
 from common.models import RawItem
 from common.schemas import ClassifiedItemMessage, RawItemMessage
 from ingestion import cisa_kev, gdelt, nvd, rss
 from ingestion.seed import seed_sources
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def run_all() -> dict[str, int]:
@@ -26,11 +25,11 @@ async def run_all() -> dict[str, int]:
         try:
             results[name] = await collector()
         except Exception:
-            logger.exception("collector %s failed", name)
+            logger.exception("collector_failed", collector=name)
             results[name] = -1
 
     results["requeued"] = await requeue_stalled()
-    logger.info("ingestion run complete: %s", results)
+    logger.info("ingestion_run_complete", **{f"n_{k}": v for k, v in results.items()})
     return results
 
 

@@ -8,7 +8,6 @@ order matters: langfuse must wrap openai before any client is created
 
 import asyncio
 import json
-import logging
 import time
 from typing import Any
 
@@ -18,8 +17,9 @@ from openai import APIStatusError
 from pydantic import BaseModel
 
 from common.config import get_settings
+from common.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _client: AsyncOpenAI | None = None
 
@@ -43,9 +43,7 @@ def _maybe_start_cooldown(error: Exception) -> None:
     if isinstance(error, APIStatusError) and error.status_code in _QUOTA_STATUS:
         _cooldown_until = time.monotonic() + _COOLDOWN_SECONDS
         logger.warning(
-            "LLM provider returned %d (quota/auth) — pausing all LLM calls %ds",
-            error.status_code,
-            _COOLDOWN_SECONDS,
+            "llm_quota_cooldown", status=error.status_code, pause_s=_COOLDOWN_SECONDS
         )
 
 
@@ -118,11 +116,11 @@ async def structured_chat[T: BaseModel](
         except Exception as e:  # invalid JSON or schema mismatch
             last_err = e
             logger.warning(
-                "structured_chat parse failed (attempt %d/%d) name=%s: %s",
-                attempt + 1,
-                max_retries,
-                trace_name,
-                e,
+                "structured_output_parse_failed",
+                attempt=attempt + 1,
+                max_retries=max_retries,
+                trace=trace_name,
+                error=str(e)[:300],
             )
             # Feed the failure back so the retry can correct field names/shape.
             kwargs["messages"] = [

@@ -6,7 +6,6 @@ items go through the binary LLM gate, then the classifier. Rejected items
 are kept with a reason for audit; relevant items emit classified.items.
 """
 
-import logging
 import uuid
 
 from classification.schemas import ClassificationResult, GateResult
@@ -14,11 +13,12 @@ from common import stream
 from common.config import get_settings
 from common.db import session_scope
 from common.llm import structured_chat
+from common.logging import get_logger
 from common.models import RawItem, Source
 from common.observability import fetch_prompt, observe
 from common.schemas import ClassifiedItemMessage
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 MAX_GATE_CHARS = 4000
 
@@ -30,7 +30,7 @@ async def handle_raw_item(payload: dict) -> None:
     async with session_scope() as session:
         item = await session.get(RawItem, raw_item_id)
         if item is None:
-            logger.warning("raw item %s not found", raw_item_id)
+            logger.warning("raw_item_missing", raw_item_id=str(raw_item_id))
             return
         if item.relevance != "pending":
             return  # already processed (stream replay)

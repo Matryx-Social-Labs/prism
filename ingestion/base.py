@@ -6,7 +6,6 @@ so scheduled runs fetch only new items, and publish each new raw item to
 the raw.items stream.
 """
 
-import logging
 import uuid
 
 from sqlalchemy import select
@@ -15,10 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import stream
 from common.db import session_scope
+from common.logging import get_logger
 from common.models import RawItem, Source
 from common.schemas import RawItemEnvelope, RawItemMessage
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def get_source(session: AsyncSession, slug: str) -> Source:

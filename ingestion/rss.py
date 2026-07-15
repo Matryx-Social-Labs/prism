@@ -1,21 +1,29 @@
-"""RSS collectors for the cyber beachhead (Tier 3-style own collectors)."""
+"""RSS collectors — professional beachheads + world news for the general reader.
+
+Outlet countries are set in ingestion/seed.py; distinct origins (US/GB/QA)
+feed the Both-Sides perspective grouping on international stories."""
 
 import asyncio
-import logging
 import time
 from datetime import UTC, datetime
 
 import feedparser
 import httpx
 
+from common.logging import get_logger
 from common.schemas import RawItemEnvelope
 from ingestion.base import persist_envelopes
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 FEEDS = {
+    # Cyber beachhead
     "thehackernews": "https://feeds.feedburner.com/TheHackersNews",
     "bleepingcomputer": "https://www.bleepingcomputer.com/feed/",
+    # World news (general reader)
+    "bbc_world": "http://feeds.bbci.co.uk/news/world/rss.xml",
+    "aljazeera": "https://www.aljazeera.com/xml/rss/all.xml",
+    "guardian_world": "https://www.theguardian.com/world/rss",
 }
 
 
@@ -28,7 +36,7 @@ async def collect() -> int:
                 response.raise_for_status()
                 parsed = await asyncio.to_thread(feedparser.parse, response.text)
             except Exception:
-                logger.exception("rss fetch failed for %s", slug)
+                logger.exception("rss_fetch_failed", feed=slug)
                 continue
 
             envelopes: list[RawItemEnvelope] = []
@@ -52,7 +60,7 @@ async def collect() -> int:
                 )
             inserted = await persist_envelopes(envelopes)
             inserted_total += inserted
-            logger.info("rss %s: %d new of %d entries", slug, inserted, len(envelopes))
+            logger.info("collector_run", collector=f"rss:{slug}", new=inserted, candidates=len(envelopes))
     return inserted_total
 
 

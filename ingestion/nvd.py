@@ -5,16 +5,16 @@ so the prototype has data without pulling the whole corpus.
 """
 
 import asyncio
-import logging
 from datetime import UTC, datetime, timedelta
 
 import httpx
 
 from common.config import get_settings
+from common.logging import get_logger
 from common.schemas import RawItemEnvelope
 from ingestion.base import get_watermark, persist_envelopes, set_watermark
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 SLUG = "nvd"
@@ -89,7 +89,7 @@ async def collect() -> int:
 
     if max_modified:
         await set_watermark(SLUG, {"last_modified": max_modified})
-    logger.info("nvd: %d new items", inserted_total)
+    logger.info("collector_run", collector="nvd", new=inserted_total)
     return inserted_total
 
 

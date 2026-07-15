@@ -7,7 +7,6 @@ lacks the answer, the agent says so instead of guessing.
 """
 
 import json
-import logging
 import re
 import uuid
 from collections.abc import AsyncIterator
@@ -19,10 +18,11 @@ from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_query
 from common.llm import get_llm
+from common.logging import get_logger
 from common.models import AgentMessage, AgentSession
 from common.observability import fetch_prompt
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 TOP_K = 8
 
@@ -133,7 +133,7 @@ async def answer_stream(
                 full_text += delta
                 yield {"type": "token", "text": delta}
     except Exception:
-        logger.exception("agent completion failed for event %s", event_id)
+        logger.exception("agent_completion_failed", event_id=str(event_id))
         yield {"type": "error", "message": "The agent is unavailable right now. Please retry."}
         return
 

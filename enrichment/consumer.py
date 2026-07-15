@@ -7,7 +7,6 @@ provenance; the raw model output and model id are stored for
 reproducibility. Article text is chunked + embedded for the agent.
 """
 
-import logging
 import uuid
 from datetime import date
 
@@ -18,6 +17,7 @@ from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_texts
 from common.llm import structured_chat
+from common.logging import get_logger
 from common.models import Article, ArticleChunk, Enrichment, FieldProvenance, RawItem, Source
 from common.observability import fetch_prompt, observe
 from common.schemas import EnrichedItemMessage
@@ -26,7 +26,7 @@ from enrichment.cve_lens import extract_from_kev, extract_from_nvd
 from enrichment.fulltext import retrieve_fulltext
 from enrichment.schemas import ArticleExtraction
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 MAX_EXTRACT_CHARS = 12000
 

@@ -41,6 +41,27 @@ SOURCES = [
         "country": "US",
         "language": "en",
     },
+    {
+        "slug": "bbc_world",
+        "name": "BBC World",
+        "source_type": "rss",
+        "country": "GB",
+        "language": "en",
+    },
+    {
+        "slug": "aljazeera",
+        "name": "Al Jazeera English",
+        "source_type": "rss",
+        "country": "QA",
+        "language": "en",
+    },
+    {
+        "slug": "guardian_world",
+        "name": "The Guardian World",
+        "source_type": "rss",
+        "country": "GB",
+        "language": "en",
+    },
 ]
 
 

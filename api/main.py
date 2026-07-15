@@ -3,9 +3,7 @@
 Shared by the Next.js web app now and the React Native app later.
 """
 
-import asyncio
 import json
-import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -18,13 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.questions import suggested_questions
 from agent.rag import answer_stream, ensure_session
+from common import stream
 from common.config import get_settings
 from common.db import get_db
 from common.lenses import LENSES, get_lens
-from ingestion.runner import run_all
+from common.logging import get_logger, setup_logging
 from personalization.ranking import score_event
 
-logger = logging.getLogger(__name__)
+setup_logging()
+logger = get_logger(__name__)
 
 app = FastAPI(title="Prism API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
@@ -375,10 +375,8 @@ async def ask(event_id: uuid.UUID, body: AskRequest, db: AsyncSession = Depends(
 async def trigger_pipeline(x_admin_token: str = Header(default="")):
     if x_admin_token != settings.prism_admin_token:
         raise HTTPException(status_code=403, detail="invalid admin token")
-    task = asyncio.create_task(run_all())
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
-    return {"status": "ingestion started"}
-
-
-_background_tasks: set[asyncio.Task] = set()
+    # Ingestion runs in the worker; the API only signals it. Running
+    # collectors in-process doubled GDELT load and starved API workers.
+    await stream.publish(stream.ADMIN_TRIGGERS, {"requested_by": "admin-endpoint"})
+    logger.info("admin_trigger_published")
+    return {"status": "ingestion trigger queued for worker"}

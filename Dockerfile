@@ -24,6 +24,10 @@ RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+# Bake the embedding model into the image: containers have no persistent
+# cache, so without this every boot re-downloads from HF (slow cold starts).
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5', cache_dir='.fastembed_cache')"
+
 # One image, two roles: PRISM_SERVICE_ROLE=worker runs the pipeline worker;
 # anything else (default) runs migrations + the API. Lets both Railway
 # services share the image with no per-service start-command override.

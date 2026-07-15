@@ -4,15 +4,15 @@ Watermark: the max dateAdded seen; re-runs only emit newly added entries
 (persist is idempotent on cveID anyway).
 """
 
-import logging
 from datetime import datetime
 
 import httpx
 
+from common.logging import get_logger
 from common.schemas import RawItemEnvelope
 from ingestion.base import get_watermark, persist_envelopes, set_watermark
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 SLUG = "cisa_kev"
@@ -62,7 +62,7 @@ async def collect() -> int:
     inserted = await persist_envelopes(envelopes)
     if max_added:
         await set_watermark(SLUG, {"last_date_added": max_added})
-    logger.info("cisa_kev: %d new of %d candidates", inserted, len(envelopes))
+    logger.info("collector_run", collector="cisa_kev", new=inserted, candidates=len(envelopes))
     return inserted
 
 

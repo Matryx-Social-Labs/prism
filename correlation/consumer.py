@@ -7,7 +7,6 @@ runs perspective grouping + impact propagation and emits event.updates.
 """
 
 import json
-import logging
 import uuid
 
 from sqlalchemy import delete, func, select, text
@@ -17,6 +16,7 @@ from common import stream
 from common.config import get_settings
 from common.db import session_scope
 from common.llm import structured_chat
+from common.logging import get_logger
 from common.models import (
     Article,
     Enrichment,
@@ -34,7 +34,7 @@ from common.text import slugify
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @observe(name="correlation-stage")
@@ -46,7 +46,7 @@ async def handle_enriched_item(payload: dict) -> None:
         enrichment = await session.get(Enrichment, enrichment_id)
         article = await session.get(Article, article_id)
         if enrichment is None or article is None:
-            logger.warning("enrichment %s / article %s missing", enrichment_id, article_id)
+            logger.warning("enrichment_or_article_missing", enrichment_id=str(enrichment_id), article_id=str(article_id))
             return
         already = await session.execute(
             select(EventMembership.id).where(EventMembership.article_id == article_id)
