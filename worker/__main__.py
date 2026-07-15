@@ -58,10 +58,35 @@ def parse_stages() -> list[str]:
     return stages
 
 
+async def _health_server() -> None:
+    """Minimal HTTP 200 responder on $PORT.
+
+    Railway applies railway.json's healthcheckPath to every service built
+    from it; without this the worker (no HTTP surface) is killed as FAILED
+    even while processing fine. Serves any path, so /healthz passes.
+    """
+    port = int(os.environ.get("PORT", "0"))
+    if not port:
+        return
+
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            await reader.read(2048)
+            writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+            await writer.drain()
+        finally:
+            writer.close()
+
+    server = await asyncio.start_server(handle, "0.0.0.0", port)
+    logger.info("worker health endpoint listening on :%d", port)
+    async with server:
+        await server.serve_forever()
+
+
 async def main(stages: list[str]) -> None:
     logger.info("prism worker starting (stages: %s, consumer: %s)", ", ".join(stages), CONSUMER_NAME)
 
-    tasks = []
+    tasks = [asyncio.create_task(_health_server())]
 
     if "ingestion" in stages:
         scheduler = AsyncIOScheduler()
@@ -106,7 +131,7 @@ async def main(stages: list[str]) -> None:
             )
         )
 
-    if not tasks:
+    if len(tasks) <= 1:  # only the health server — no stage selected
         raise SystemExit("no stages selected")
     await asyncio.gather(*tasks)
 

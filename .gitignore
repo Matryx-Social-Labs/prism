@@ -28,3 +28,6 @@ local_cache/
 .DS_Store
 .idea/
 .vscode/
+
+# Vercel CLI link (appended by `vercel link`; dir form already covered above)
+.vercel
