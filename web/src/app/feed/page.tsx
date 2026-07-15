@@ -31,6 +31,11 @@ function Badges({ item, lens }: { item: FeedItem; lens: string }) {
           {item.subsector ? item.subsector.replaceAll("_", " ") : item.sector}
         </span>
       )}
+      {item.coverage?.single_origin && (
+        <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }} title="Only one country's outlets have covered this so far">
+          ⚠ Single-origin
+        </span>
+      )}
       {item.is_regional && (
         <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--lens-general-bg, var(--bg-sunken))", color: "var(--lens-general, var(--ink))" }}>
           ◉ Your region

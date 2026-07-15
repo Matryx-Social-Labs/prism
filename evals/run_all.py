@@ -19,6 +19,7 @@ from common.config import get_settings
 from common.llm import structured_chat
 from common.observability import fetch_prompt
 from common.taxonomy import prompt_menu, valid_subsector
+from correlation.schemas import ThreadLinkResult
 
 DATASET_DIR = Path(__file__).parent / "datasets"
 
@@ -146,6 +147,37 @@ async def judge_evaluator(*, input, output, expected_output, **kwargs):
     return evals
 
 
+# ── Thread linking ───────────────────────────────────────────────────
+
+
+async def thread_task(*, item, **kwargs):
+    prompt = fetch_prompt("thread-link")
+    messages = prompt.compile(**item.input)
+    result = await structured_chat(
+        model=get_settings().prism_model_correlate,
+        messages=messages,
+        output_model=ThreadLinkResult,
+        trace_name="eval-thread-link",
+    )
+    return result.model_dump()
+
+
+def thread_related_evaluator(*, input, output, expected_output, **kwargs):
+    judgements = (output or {}).get("judgements") or []
+    j = next((x for x in judgements if x.get("index") == 0), None)
+    correct = bool(j is not None and bool(j.get("related")) == expected_output["related"])
+    return Evaluation(name="thread_related_accuracy", value=1.0 if correct else 0.0)
+
+
+def thread_direction_evaluator(*, input, output, expected_output, **kwargs):
+    if not expected_output["related"]:
+        return None  # direction only meaningful on related pairs
+    judgements = (output or {}).get("judgements") or []
+    j = next((x for x in judgements if x.get("index") == 0), None)
+    correct = bool(j and j.get("related") and j.get("direction") == expected_output["direction"])
+    return Evaluation(name="thread_direction_accuracy", value=1.0 if correct else 0.0)
+
+
 # ── Runner ───────────────────────────────────────────────────────────
 
 
@@ -173,6 +205,18 @@ def run_classification():
     print(result.format())
 
 
+def run_threads():
+    upload("prism-event-links", "event_links.jsonl")
+    dataset = langfuse.get_dataset("prism-event-links")
+    result = dataset.run_experiment(
+        name="thread-link",
+        description="Cross-event thread linking: related + direction accuracy",
+        task=thread_task,
+        evaluators=[thread_related_evaluator, thread_direction_evaluator],
+    )
+    print(result.format())
+
+
 def run_groundedness():
     upload("prism-agent-groundedness", "agent_groundedness.jsonl")
     dataset = langfuse.get_dataset("prism-agent-groundedness")
@@ -188,6 +232,7 @@ def run_groundedness():
 RUNS = {
     "relevance": run_relevance,
     "classification": run_classification,
+    "threads": run_threads,
     "groundedness": run_groundedness,
 }
 

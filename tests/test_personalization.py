@@ -47,3 +47,23 @@ def test_feed_spec_taxonomy_consistency():
             assert spec.sector in TAXONOMY, spec.slug
         if spec.subsector is not None:
             assert spec.subsector in TAXONOMY[spec.sector], spec.slug
+
+
+def test_thread_judgement_coercion():
+    from correlation.schemas import ThreadLinkResult
+
+    # dict-wrapped judgements + string booleans (observed Ollama drift shapes)
+    result = ThreadLinkResult.model_validate(
+        {"judgements": {"0": {"index": 0, "related": "yes", "direction": "candidate_causes_event"}}}
+    )
+    assert result.judgements[0].related is True
+    assert ThreadLinkResult.model_validate({"judgements": None}).judgements == []
+
+
+def test_coverage_single_origin_shape():
+    from common.countries import gdelt_country_to_iso
+
+    assert gdelt_country_to_iso("India") == "IN"
+    assert gdelt_country_to_iso("united states") == "US"
+    assert gdelt_country_to_iso("Atlantis") is None
+    assert gdelt_country_to_iso(None) is None

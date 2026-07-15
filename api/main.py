@@ -25,6 +25,7 @@ from common.lenses import LENSES, get_lens
 from common.logging import get_logger, setup_logging
 from common.taxonomy import TAXONOMY, display_name
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
+from correlation.threads import fetch_thread
 from personalization.ranking import score_event
 
 setup_logging()
@@ -46,6 +47,12 @@ app.add_middleware(
 # ── Schemas ──────────────────────────────────────────────────────────
 
 
+class CoverageOut(BaseModel):
+    origins: dict[str, int]
+    unknown: int = 0
+    single_origin: bool = False
+
+
 class FeedItem(BaseModel):
     id: str
     title: str
@@ -55,6 +62,7 @@ class FeedItem(BaseModel):
     regions: list[str]
     image_url: str | None
     is_regional: bool  # profile region appears in the event's regions
+    coverage: CoverageOut | None = None
     event_type: str | None
     source_count: int
     cvss_score: float | None
@@ -92,6 +100,7 @@ class SourceRef(BaseModel):
     title: str
     published_at: str | None
     stance: str | None
+    funding: str | None = None  # "state" | "public" | None — outlet transparency chip
 
 
 class PerspectiveOut(BaseModel):
@@ -112,6 +121,12 @@ class ImpactOut(BaseModel):
     parent_impact_id: str | None
 
 
+class EntityOut(BaseModel):
+    name: str
+    entity_type: str
+    role: str
+
+
 class EventDetail(BaseModel):
     id: str
     title: str
@@ -125,6 +140,9 @@ class EventDetail(BaseModel):
     projection: dict | None
     lens_briefs: dict[str, str]
     available_lenses: list[str]
+    coverage: CoverageOut | None
+    entities: list[EntityOut]
+    thread: dict  # {"upstream": [...], "downstream": [...]} of linked events
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]
@@ -290,6 +308,7 @@ async def get_feed(
                 regions=row["regions"] or [],
                 image_url=row["image_url"],
                 is_regional=bool(region and region in (row["regions"] or [])),
+                coverage=projection.get("coverage"),
                 event_type=projection.get("event_type"),
                 source_count=projection.get("source_count", 1),
                 cvss_score=cvss.get("score"),
@@ -332,6 +351,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             text(
                 """
                 SELECT a.id AS article_id, s.name AS source_name, s.slug AS source_slug,
+                       s.reliability ->> 'funding' AS funding,
                        ri.url, ri.title, ri.published_at,
                        e.shared_fields -> 'stance' ->> 'label' AS stance
                 FROM event_memberships em
@@ -376,6 +396,24 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         )
     ).mappings().all()
 
+    entities = (
+        await db.execute(
+            text(
+                """
+                SELECT en.name, en.entity_type, ee.role
+                FROM event_entities ee
+                JOIN entities en ON en.id = ee.entity_id
+                WHERE ee.event_id = :eid
+                ORDER BY (ee.role = 'affected') DESC, en.name
+                LIMIT 12
+                """
+            ),
+            {"eid": str(event_id)},
+        )
+    ).mappings().all()
+
+    thread = await fetch_thread(event_id)
+
     projection = event["projection"] or {}
     return EventDetail(
         id=str(event["id"]),
@@ -390,6 +428,11 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         projection=event["projection"],
         lens_briefs=projection.get("lens_briefs") or {},
         available_lenses=available_lenses(projection, event["sector"]),
+        coverage=projection.get("coverage"),
+        entities=[
+            EntityOut(name=e["name"], entity_type=e["entity_type"], role=e["role"]) for e in entities
+        ],
+        thread=thread,
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),
@@ -399,6 +442,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
                 title=s["title"],
                 published_at=s["published_at"].isoformat() if s["published_at"] else None,
                 stance=s["stance"],
+                funding=s["funding"],
             )
             for s in sources
         ],

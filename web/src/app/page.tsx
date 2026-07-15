@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeroVisual } from "@/components/HeroVisual";
 import { LensDemo } from "@/components/LensDemo";
 import { Reveal } from "@/components/Reveal";
 
@@ -76,29 +77,8 @@ export default function LandingPage() {
           <span className="spectrum-text">Every angle.</span>
         </h1>
 
-        {/* Refraction figure */}
-        <div className="mx-auto mt-10 max-w-xl" aria-hidden>
-          <svg viewBox="0 0 560 150" className="w-full">
-            <defs>
-              <linearGradient id="beamW" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="currentColor" stopOpacity="0" />
-                <stop offset="100%" stopColor="currentColor" stopOpacity="0.9" />
-              </linearGradient>
-            </defs>
-            <line x1="10" y1="75" x2="225" y2="75" stroke="url(#beamW)" strokeWidth="2.5" className="beam-in" />
-            <path
-              d="M258 40 L292 110 L224 110 Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-              className="prism-glow"
-            />
-            <line x1="290" y1="80" x2="550" y2="28" stroke="#f59e0b" strokeWidth="2.5" className="beam-out" opacity="0.9" />
-            <line x1="290" y1="86" x2="550" y2="86" stroke="#06b6d4" strokeWidth="2.5" className="beam-out" opacity="0.9" />
-            <line x1="290" y1="92" x2="550" y2="140" stroke="#8b5cf6" strokeWidth="2.5" className="beam-out" opacity="0.9" />
-          </svg>
-        </div>
+        {/* Refraction figure — real 3D glass when the client can handle it */}
+        <HeroVisual />
 
         <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed" style={{ color: "var(--ink-muted)" }}>
           Prism clusters worldwide coverage into single events — then reads each one through

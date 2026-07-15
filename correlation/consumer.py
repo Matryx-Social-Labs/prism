@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from common import stream
 from common.config import get_settings
+from common.countries import gdelt_country_to_iso
 from common.db import session_scope
 from common.llm import structured_chat
 from common.logging import get_logger
@@ -34,6 +35,7 @@ from common.text import slugify
 from correlation.briefs import generate_briefs, persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult
+from correlation.threads import link_event_threads
 
 logger = get_logger(__name__)
 
@@ -114,6 +116,12 @@ async def handle_enriched_item(payload: dict) -> None:
     await _rebuild_projection(event_id)
     has_news = await _correlate_event(event_id)
     await _generate_pipeline_briefs(event_id, has_news)
+    if has_news:
+        try:
+            await link_event_threads(event_id)
+        except Exception:
+            # Threads are additive; never fail the correlation stage over them.
+            logger.exception("thread_linking_failed", event_id=str(event_id))
 
     await stream.publish(stream.EVENT_UPDATES, EventUpdateMessage(event_id=str(event_id)).model_dump())
 
@@ -186,6 +194,8 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
                 text(
                     """
                     SELECT e.shared_fields, e.lens_fields, e.summary, e.event_type, s.slug AS source_slug,
+                           s.country AS source_country,
+                           ri.raw ->> 'sourcecountry' AS gdelt_country,
                            ri.classification AS classification
                     FROM event_memberships em
                     JOIN articles a ON a.id = em.article_id
@@ -208,9 +218,16 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         event_types: list[str] = []
         source_slugs: list[str] = []
         role_interests: set[str] = set()
+        origins: dict[str, int] = {}
+        unknown_origins = 0
         for row in rows:
             source_slugs.append(row["source_slug"])
             role_interests.update((row["classification"] or {}).get("role_interests") or [])
+            origin = row["source_country"] or gdelt_country_to_iso(row["gdelt_country"])
+            if origin:
+                origins[origin] = origins.get(origin, 0) + 1
+            else:
+                unknown_origins += 1
             if row["summary"]:
                 summaries.append(row["summary"])
             if row["event_type"]:
@@ -271,6 +288,13 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             "source_count": len(rows),
             "source_slugs": sorted(set(source_slugs)),
             "role_interests": sorted(role_interests),
+            # Origin-country distribution of the coverage — the axis Prism
+            # measures balance on (vs. Ground News' US left/right axis).
+            "coverage": {
+                "origins": origins,
+                "unknown": unknown_origins,
+                "single_origin": len(origins) == 1 and len(rows) >= 2,
+            },
             "cyber": cyber or None,
             "finance": finance or None,
         }

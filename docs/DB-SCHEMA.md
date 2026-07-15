@@ -202,6 +202,7 @@ are the record.
 | `classified.items` | classification | enrichment |
 | `enriched.items` | enrichment | clustering |
 | `events` | clustering | correlation |
+| `event_links` | cross-event threads (leads_to/related/none; 'none' = negative cache) | correlation |
 | `event.updates` | correlation | personalization |
 | `feed.updates` | personalization | serving and alerts |
 
@@ -209,3 +210,18 @@ are the record.
 Migrations live in `db/` (Alembic or an equivalent). The schema is additive: new lenses add columns
 or JSONB keys and new dimension rows, not destructive rewrites, so existing data and served
 projections stay valid as roles are added.
+
+### `event_links` (added July 2026)
+
+| column | type | notes |
+|---|---|---|
+| id | uuid pk | |
+| from_event_id | fk events | cause side for `leads_to` |
+| to_event_id | fk events | effect side for `leads_to` |
+| relation | text | `leads_to` \| `related` \| `none` (rejection, never re-asked) |
+| confidence | float | from the thread-link judge |
+| rationale | text | one-sentence grounded connection |
+
+Also added July 2026: `events.subsector` (taxonomy sub-domain), `events.image_url`,
+`raw_items.image_url` (thumbnails), `projection.coverage` (origin distribution + single_origin),
+`projection.role_interests` (union of member classifications, drives conditional lenses).

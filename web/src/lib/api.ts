@@ -13,6 +13,7 @@ export interface FeedItem {
   regions: string[];
   image_url: string | null;
   is_regional: boolean;
+  coverage: CoverageOut | null;
   event_type: string | null;
   source_count: number;
   cvss_score: number | null;
@@ -40,6 +41,30 @@ export interface SourceRef {
   title: string;
   published_at: string | null;
   stance: string | null;
+  funding: string | null;
+}
+
+export interface CoverageOut {
+  origins: Record<string, number>;
+  unknown: number;
+  single_origin: boolean;
+}
+
+export interface EntityOut {
+  name: string;
+  entity_type: string;
+  role: string;
+}
+
+export interface ThreadNodeOut {
+  event_id: string;
+  title: string;
+  sector: string | null;
+  occurred_at: string | null;
+  relation: string;
+  rationale: string | null;
+  confidence: number | null;
+  image_url: string | null;
 }
 
 export interface PerspectiveOut {
@@ -89,6 +114,9 @@ export interface EventDetail {
   last_updated_at: string;
   lens_briefs: Record<string, string>;
   available_lenses: string[];
+  coverage: CoverageOut | null;
+  entities: EntityOut[];
+  thread: { upstream: ThreadNodeOut[]; downstream: ThreadNodeOut[] };
   projection: {
     event_type?: string | null;
     source_count?: number;

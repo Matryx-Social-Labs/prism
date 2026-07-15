@@ -1,10 +1,25 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
 import { LENS_ORDER, lensMeta } from "@/lib/lenses";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
+import { ThreadRail } from "@/components/ThreadRail";
+
+function regionName(code: string): string {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+const FUNDING_LABEL: Record<string, string> = {
+  state: "State-affiliated",
+  public: "Public broadcaster",
+};
 
 export function StoryView({ event }: { event: EventDetail }) {
   const cyber = event.projection?.cyber ?? null;
@@ -92,6 +107,57 @@ export function StoryView({ event }: { event: EventDetail }) {
           <p className="mt-3 text-[15px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
             {event.summary}
           </p>
+        )}
+        {event.image_url && (
+          <div className="relative mt-5 aspect-video overflow-hidden rounded-2xl" style={{ background: "var(--bg-sunken)" }}>
+            <Image
+              src={event.image_url}
+              alt=""
+              fill
+              priority
+              sizes="(max-width: 768px) 100vw, 768px"
+              className="object-cover"
+              onError={(e) => {
+                (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+              }}
+            />
+          </div>
+        )}
+        {(event.entities.length > 0 || event.regions.length > 0) && (
+          <div className="mt-5 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
+              Affected
+            </span>
+            {event.regions.map((r) => (
+              <span key={r} className="rounded-full border px-2 py-0.5" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                ◉ {regionName(r)}
+              </span>
+            ))}
+            {event.entities.map((en) => (
+              <span key={`${en.name}-${en.role}`} className="rounded-full border px-2 py-0.5" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }} title={en.role}>
+                {en.entity_type === "organization" ? "🏢" : en.entity_type === "person" ? "👤" : "▪"} {en.name}
+              </span>
+            ))}
+          </div>
+        )}
+        {event.coverage && Object.keys(event.coverage.origins).length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
+              Coverage
+            </span>
+            {Object.entries(event.coverage.origins)
+              .sort((a, b) => b[1] - a[1])
+              .map(([iso, n]) => (
+                <span key={iso} className="rounded-full px-2 py-0.5" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
+                  {regionName(iso)} × {n}
+                </span>
+              ))}
+            {event.coverage.single_origin && (
+              <span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: "var(--lens-general-bg, var(--bg-sunken))", color: "var(--lens-general, var(--ink))" }}>
+                ⚠ Single-origin coverage
+              </span>
+            )}
+          </div>
         )}
       </header>
 
@@ -289,6 +355,11 @@ export function StoryView({ event }: { event: EventDetail }) {
               <span className="shrink-0 rounded-full px-2 py-0.5 text-xs" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
                 {s.source_name}
               </span>
+              {s.funding && FUNDING_LABEL[s.funding] && (
+                <span className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide" style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}>
+                  {FUNDING_LABEL[s.funding]}
+                </span>
+              )}
               {s.url ? (
                 <a href={s.url} target="_blank" rel="noopener noreferrer" className="truncate underline-offset-4 hover:underline" style={{ color: "var(--lens-cyber)" }}>
                   {s.title}

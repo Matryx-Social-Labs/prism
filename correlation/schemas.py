@@ -43,3 +43,34 @@ class LensBriefs(BaseModel):
         if isinstance(v, dict):  # models sometimes wrap: {"text": "..."}
             return v.get("text") or v.get("brief") or None
         return v
+
+
+class ThreadLinkJudgement(BaseModel):
+    """One candidate's relation to the event, from the thread-link prompt."""
+
+    index: int
+    related: bool = False
+    direction: str = Field(
+        default="unclear",
+        description="candidate_causes_event | event_causes_candidate | unclear",
+    )
+    rationale: str = ""
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+
+    @field_validator("related", mode="before")
+    @classmethod
+    def _coerce_bool(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "yes", "related", "1")
+        return bool(v)
+
+
+class ThreadLinkResult(BaseModel):
+    judgements: list[ThreadLinkJudgement] = Field(default_factory=list)
+
+    @field_validator("judgements", mode="before")
+    @classmethod
+    def _coerce_list(cls, v):
+        if isinstance(v, dict):  # models sometimes emit {"0": {...}, "1": {...}}
+            return list(v.values())
+        return v or []

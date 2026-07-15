@@ -55,6 +55,26 @@ everyone** ("One event. Every angle."):
 Beachhead depth is unchanged — the cyber/GRC lens remains the deepest; lens depth is the moat,
 the multi-lens experience is the product.
 
+## Phase 3 pull-forward, part 2 ✅ (July 2026) — India-first personalization release
+- **Sub-domain taxonomy** (`common/taxonomy.py`): 10 sectors × sub-domains (sports → cricket…,
+  technology → AI…); classifier emits validated subsectors; single-topic feeds classify
+  deterministically (zero LLM).
+- **15 new sources** across 11 origin countries incl. 7 Indian outlets and labeled state media
+  (TASS, CGTN, Press TV, Anadolu) + public broadcasters (DW, France 24); GDELT India query.
+- **Personalized feed without accounts**: `interests=sector[:subsector]`, `region=`,
+  `sort=latest|top` (latest default); 3-step onboarding (region → lens → interests) in
+  localStorage; All/India/World scoping.
+- **Thumbnails** end-to-end (RSS media tags, GDELT socialimage, og:image at fulltext fetch).
+- **Conditional lenses**: stories offer only lenses with a genuine read.
+- **Coverage-origin balance**: per-story origin distribution + single-origin blindspot flag;
+  outlet funding labels.
+- **Event threads**: `event_links` graph (leads_to/related, negative-cached rejections), one
+  batched LLM confirm per new candidate set, ThreadRail UI (what led here / what followed).
+- **Web**: real 3D glass prism hero (react-three-fiber, lazy, reduced-motion/no-WebGL poster
+  fallback), thumbnails on cards, funding chips.
+- Next gates unchanged: auth + server-side profiles (1.4), follows/alerts, mobile (Expo),
+  Marketaux fast-lane.
+
 ## Phase 3 — Horizontal expansion
 Open personalization to general roles and sectors, add a prosumer graph and public API, and later
 introduce B2B team seats for security, PR, and risk teams. Cross-national both-sides framing widens
