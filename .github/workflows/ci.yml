@@ -126,6 +126,20 @@ jobs:
         # project's Root Directory must be set to `web`.
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
+      - name: Inject public build env
+        # The Vercel team forces env vars to "Sensitive", and sensitive
+        # values pull as EMPTY strings outside Vercel's own builders — so a
+        # prebuilt CI deploy would bake "" into the client bundle. This var
+        # is public by definition (NEXT_PUBLIC_* ships in the JS), so pin it
+        # here deterministically instead.
+        run: |
+          for f in .vercel/.env.production.local web/.vercel/.env.production.local; do
+            [ -f "$f" ] || continue
+            grep -v '^NEXT_PUBLIC_API_URL=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            echo 'NEXT_PUBLIC_API_URL="https://prism-production-6747.up.railway.app"' >> "$f"
+            echo "patched $f"
+          done
+
       - name: Build with Vercel
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
