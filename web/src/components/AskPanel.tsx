@@ -52,8 +52,8 @@ export function AskPanel({
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 dark:border-stone-800">
-      <div className="space-y-4 p-4">
+    <div className="rounded-2xl border" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>
+      <div className="space-y-5 p-5">
         {turns.length === 0 && (
           <div className="flex flex-wrap gap-2">
             {suggestedQuestions.map((q) => (
@@ -61,7 +61,8 @@ export function AskPanel({
                 key={q}
                 onClick={() => submit(q)}
                 disabled={busy}
-                className="rounded-full border border-stone-300 px-3 py-1 text-sm hover:bg-stone-100 disabled:opacity-50 dark:border-stone-700 dark:hover:bg-stone-900"
+                className="rounded-full border px-3.5 py-1.5 text-sm transition hover:opacity-70 disabled:opacity-40"
+                style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
               >
                 {q}
               </button>
@@ -73,9 +74,9 @@ export function AskPanel({
           <div key={i} className="space-y-2">
             <p className="font-semibold">You: {turn.question}</p>
             {turn.error ? (
-              <p className="text-sm text-red-600">{turn.error}</p>
+              <p className="text-sm" style={{ color: "var(--danger)" }}>{turn.error}</p>
             ) : (
-              <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+              <div className="text-sm leading-relaxed" style={{ color: "var(--ink-muted)" }}>
                 {turn.answer || (turn.streaming ? "…" : "")}
                 {turn.streaming && turn.answer && <span className="animate-pulse">▍</span>}
               </div>
@@ -89,12 +90,13 @@ export function AskPanel({
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-800 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
+                      className="rounded-full px-2.5 py-0.5 text-xs font-medium transition hover:opacity-75"
+                      style={{ background: "var(--lens-cyber-bg)", color: "var(--lens-cyber)" }}
                     >
                       [{c.number}] {c.source_name}
                     </a>
                   ) : (
-                    <span key={c.number} className="rounded bg-stone-100 px-1.5 py-0.5 text-xs dark:bg-stone-900">
+                    <span key={c.number} className="rounded-full px-2.5 py-0.5 text-xs" style={{ background: "var(--bg-sunken)" }}>
                       [{c.number}] {c.source_name}
                     </span>
                   ),
@@ -110,19 +112,22 @@ export function AskPanel({
           e.preventDefault();
           void submit(input);
         }}
-        className="flex gap-2 border-t border-stone-200 p-3 dark:border-stone-800"
+        className="flex gap-2 border-t p-3.5"
+        style={{ borderColor: "var(--line)" }}
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about this story…"
-          className="flex-1 rounded-md border border-stone-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-stone-500 dark:border-stone-700"
+          className="flex-1 rounded-full border bg-transparent px-4 py-2.5 text-sm outline-none transition focus:opacity-100"
+          style={{ borderColor: "var(--line-strong)" }}
           maxLength={2000}
         />
         <button
           type="submit"
           disabled={busy || !input.trim()}
-          className="rounded-md bg-stone-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-900"
+          className="rounded-full px-5 py-2.5 text-sm font-semibold transition hover:opacity-85 disabled:opacity-40"
+          style={{ background: "var(--ink)", color: "var(--bg)" }}
         >
           {busy ? "…" : "Ask"}
         </button>

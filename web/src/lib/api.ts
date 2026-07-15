@@ -81,6 +81,8 @@ export interface EventDetail {
   regions: string[];
   occurred_at: string | null;
   last_updated_at: string;
+  lens_briefs: Record<string, string>;
+  available_lenses: string[];
   projection: {
     event_type?: string | null;
     source_count?: number;
@@ -128,6 +130,21 @@ export async function fetchQuestions(id: string, lens?: string): Promise<string[
   if (!res.ok) return [];
   const data = (await res.json()) as { questions: string[] };
   return data.questions;
+}
+
+export async function fetchBrief(
+  eventId: string,
+  lens: string,
+): Promise<{ lens: string; brief: string | null; cached: boolean } | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/events/${eventId}/brief?lens=${encodeURIComponent(lens)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export interface AskCitation {
