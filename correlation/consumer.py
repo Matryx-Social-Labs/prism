@@ -31,6 +31,7 @@ from common.models import (
 from common.observability import fetch_prompt, observe
 from common.schemas import EventUpdateMessage
 from common.text import slugify
+from correlation.briefs import generate_briefs, persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult
 
@@ -108,7 +109,8 @@ async def handle_enriched_item(payload: dict) -> None:
     # Rebuild projection + run perspective/impact correlation in fresh scopes
     # so a long LLM call doesn't hold the row transaction open.
     await _rebuild_projection(event_id)
-    await _correlate_event(event_id)
+    has_news = await _correlate_event(event_id)
+    await _generate_pipeline_briefs(event_id, has_news)
 
     await stream.publish(stream.EVENT_UPDATES, EventUpdateMessage(event_id=str(event_id)).model_dump())
 
@@ -293,7 +295,7 @@ async def _correlate_event(event_id: uuid.UUID) -> None:
         event = await session.get(Event, event_id)
         event_summary = event.summary if event else ""
     if not members:
-        return
+        return False
 
     settings = get_settings()
     has_news = any(m["source_slug"] not in ("nvd", "cisa_kev") for m in members)
@@ -359,6 +361,41 @@ async def _correlate_event(event_id: uuid.UUID) -> None:
                 )
             )
             impact_ids.append(impact_id)
+
+    return has_news
+
+
+async def _generate_pipeline_briefs(event_id: uuid.UUID, has_news: bool) -> None:
+    """Hybrid brief strategy at pipeline time (regenerated on new members).
+
+    News events: one LLM call for the general brief + the event's primary
+    lens. Other lenses are generated on demand by the API and cached.
+    CVE-record-only events: composed template briefs, zero LLM cost.
+    """
+    async with session_scope() as session:
+        row = (
+            await session.execute(
+                text("SELECT sector, summary, projection FROM events WHERE id = :eid"),
+                {"eid": str(event_id)},
+            )
+        ).mappings().first()
+    if row is None:
+        return
+    projection = row["projection"] or {}
+
+    try:
+        if not has_news:
+            briefs = template_briefs(projection, row["summary"])
+        else:
+            lenses = ["general"]
+            primary = primary_lens_for(row["sector"])
+            if primary != "general":
+                lenses.append(primary)
+            briefs = await generate_briefs(event_id, lenses)
+        await persist_briefs(event_id, briefs)
+    except Exception:
+        # Briefs are additive; never fail the correlation stage over them.
+        logger.exception("pipeline_briefs_failed", event_id=str(event_id))
 
 
 def _deterministic_correlation(members) -> CorrelationResult:

@@ -20,6 +20,7 @@ PROMPTS = [
     "classifier",
     "extract-shared",
     "perspective-impact",
+    "lens-brief",
     "agent-qa",
     "judge-groundedness",
 ]

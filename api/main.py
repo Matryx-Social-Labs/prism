@@ -3,8 +3,10 @@
 Shared by the Next.js web app now and the React Native app later.
 """
 
+import asyncio
 import json
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -21,6 +23,7 @@ from common.config import get_settings
 from common.db import get_db
 from common.lenses import LENSES, get_lens
 from common.logging import get_logger, setup_logging
+from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 from personalization.ranking import score_event
 
 setup_logging()
@@ -113,9 +116,17 @@ class EventDetail(BaseModel):
     occurred_at: str | None
     last_updated_at: str
     projection: dict | None
+    lens_briefs: dict[str, str]
+    available_lenses: list[str]
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]
+
+
+class BriefResponse(BaseModel):
+    lens: str
+    brief: str | None
+    cached: bool
 
 
 class QuestionsResponse(BaseModel):
@@ -284,6 +295,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         )
     ).mappings().all()
 
+    projection = event["projection"] or {}
     return EventDetail(
         id=str(event["id"]),
         title=event["title"],
@@ -293,6 +305,8 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         occurred_at=event["occurred_at"].isoformat() if event["occurred_at"] else None,
         last_updated_at=event["last_updated_at"].isoformat(),
         projection=event["projection"],
+        lens_briefs=projection.get("lens_briefs") or {},
+        available_lenses=available_lenses(projection),
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),
@@ -328,6 +342,46 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             for i in impacts
         ],
     )
+
+
+# On-demand lens briefs: any lens on any story — this is what lets a cyber
+# professional pull the cyber read of a war, or a trader the market read of
+# a breach. Generated once, cached on the event projection. Single-flight
+# per (event, lens) so a burst of viewers costs one LLM call.
+_brief_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+
+@app.get("/api/v1/events/{event_id}/brief", response_model=BriefResponse)
+async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(get_db)):
+    if lens not in LENSES:
+        raise HTTPException(status_code=422, detail=f"unknown lens '{lens}'")
+    row = (
+        await db.execute(
+            text("SELECT projection FROM events WHERE id = :eid"), {"eid": str(event_id)}
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="event not found")
+
+    cached = ((row["projection"] or {}).get("lens_briefs") or {}).get(lens)
+    if cached:
+        return BriefResponse(lens=lens, brief=cached, cached=True)
+
+    lock = _brief_locks[f"{event_id}:{lens}"]
+    async with lock:
+        # Re-check under the lock — another request may have generated it.
+        row = (
+            await db.execute(
+                text("SELECT projection FROM events WHERE id = :eid"), {"eid": str(event_id)}
+            )
+        ).mappings().first()
+        cached = ((row["projection"] or {}).get("lens_briefs") or {}).get(lens)
+        if cached:
+            return BriefResponse(lens=lens, brief=cached, cached=True)
+
+        briefs = await generate_briefs(event_id, [lens])
+        await persist_briefs(event_id, briefs)
+        return BriefResponse(lens=lens, brief=briefs.get(lens), cached=False)
 
 
 @app.get("/api/v1/events/{event_id}/questions", response_model=QuestionsResponse)
