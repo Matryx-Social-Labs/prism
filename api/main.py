@@ -23,6 +23,7 @@ from common.config import get_settings
 from common.db import get_db
 from common.lenses import LENSES, get_lens
 from common.logging import get_logger, setup_logging
+from common.taxonomy import TAXONOMY, display_name
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 from personalization.ranking import score_event
 
@@ -50,6 +51,10 @@ class FeedItem(BaseModel):
     title: str
     summary: str | None
     sector: str | None
+    subsector: str | None
+    regions: list[str]
+    image_url: str | None
+    is_regional: bool  # profile region appears in the event's regions
     event_type: str | None
     source_count: int
     cvss_score: float | None
@@ -112,6 +117,8 @@ class EventDetail(BaseModel):
     title: str
     summary: str | None
     sector: str | None
+    subsector: str | None
+    image_url: str | None
     regions: list[str]
     occurred_at: str | None
     last_updated_at: str
@@ -158,25 +165,74 @@ async def get_lenses():
     )
 
 
+class SubsectorOut(BaseModel):
+    slug: str
+    name: str
+
+
+class SectorOut(BaseModel):
+    slug: str
+    name: str
+    subsectors: list[SubsectorOut]
+
+
+class TaxonomyResponse(BaseModel):
+    sectors: list[SectorOut]
+
+
+@app.get("/api/v1/taxonomy", response_model=TaxonomyResponse)
+async def get_taxonomy():
+    return TaxonomyResponse(
+        sectors=[
+            SectorOut(
+                slug=sector,
+                name=display_name(sector),
+                subsectors=[SubsectorOut(slug=sub, name=display_name(sub)) for sub in subs],
+            )
+            for sector, subs in TAXONOMY.items()
+        ]
+    )
+
+
 @app.get("/api/v1/feed", response_model=FeedResponse)
 async def get_feed(
     lens: str | None = None,
     sector: str | None = None,
+    interests: str | None = None,
+    region: str | None = None,
+    sort: str = "latest",
     limit: int = 30,
     db: AsyncSession = Depends(get_db),
 ):
     limit = min(max(limit, 1), 100)
     active_lens = get_lens(lens)
-    # Explicit ?sector= wins; otherwise the lens's sector defaults apply.
-    sectors = [sector] if sector else active_lens.sectors
+    # Interest pairs from the profile: "sports:cricket,politics,technology:ai".
+    # A bare sector means the whole sector; explicit ?sector= wins over both.
+    interest_pairs: dict[str, set[str]] = {}
+    for token in (interests or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        sec, _, sub = token.partition(":")
+        if sec not in TAXONOMY:
+            continue
+        interest_pairs.setdefault(sec, set())
+        if sub and sub in TAXONOMY[sec]:
+            interest_pairs[sec].add(sub)
+    if sector:
+        sectors = [sector]
+    elif interest_pairs:
+        sectors = list(interest_pairs)
+    else:
+        sectors = active_lens.sectors
     # Candidate window is per-sector so a high-churn sector (thousands of
     # CVE updates a day) can't evict everyone else's news before ranking.
     rows = (
         await db.execute(
             text(
                 """
-                SELECT id, title, summary, sector, projection,
-                       last_updated_at, occurred_at
+                SELECT id, title, summary, sector, subsector, regions, image_url,
+                       projection, last_updated_at, occurred_at
                 FROM (
                     SELECT e.*, ROW_NUMBER() OVER (
                         PARTITION BY e.sector ORDER BY e.last_updated_at DESC
@@ -201,6 +257,12 @@ async def get_feed(
         slugs = set(projection.get("source_slugs") or [])
         if slugs and slugs <= cve_only_sources and not active_lens.include_cve_records:
             continue
+        # Subsector narrowing: an interest like sports:cricket drops other
+        # subsectors of that sector (unclassified subsectors stay visible
+        # only when the whole sector was selected).
+        wanted_subs = interest_pairs.get(row["sector"] or "")
+        if wanted_subs and row["subsector"] not in wanted_subs:
+            continue
         cyber = projection.get("cyber") or {}
         finance = projection.get("finance") or {}
         cvss = cyber.get("cvss") or {}
@@ -224,6 +286,10 @@ async def get_feed(
                 title=row["title"],
                 summary=row["summary"],
                 sector=row["sector"],
+                subsector=row["subsector"],
+                regions=row["regions"] or [],
+                image_url=row["image_url"],
+                is_regional=bool(region and region in (row["regions"] or [])),
                 event_type=projection.get("event_type"),
                 source_count=projection.get("source_count", 1),
                 cvss_score=cvss.get("score"),
@@ -237,7 +303,10 @@ async def get_feed(
                 score=score,
             )
         )
-    items.sort(key=lambda i: i.score, reverse=True)
+    if sort == "top":
+        items.sort(key=lambda i: i.score, reverse=True)
+    else:  # latest — a news feed reads newest-first by default
+        items.sort(key=lambda i: i.last_updated_at, reverse=True)
     return FeedResponse(items=items[:limit], lens=active_lens.slug)
 
 
@@ -247,8 +316,8 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         await db.execute(
             text(
                 """
-                SELECT id, title, summary, sector, regions, occurred_at,
-                       last_updated_at, projection
+                SELECT id, title, summary, sector, subsector, image_url, regions,
+                       occurred_at, last_updated_at, projection
                 FROM events WHERE id = :eid
                 """
             ),
@@ -313,12 +382,14 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         title=event["title"],
         summary=event["summary"],
         sector=event["sector"],
+        subsector=event["subsector"],
+        image_url=event["image_url"],
         regions=event["regions"] or [],
         occurred_at=event["occurred_at"].isoformat() if event["occurred_at"] else None,
         last_updated_at=event["last_updated_at"].isoformat(),
         projection=event["projection"],
         lens_briefs=projection.get("lens_briefs") or {},
-        available_lenses=available_lenses(projection),
+        available_lenses=available_lenses(projection, event["sector"]),
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),

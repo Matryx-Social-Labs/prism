@@ -76,6 +76,7 @@ class RawItem(TimestampMixin, Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     raw: Mapped[dict] = mapped_column(JSONB, nullable=False)  # untouched source payload
+    image_url: Mapped[str | None] = mapped_column(Text)
     relevance: Mapped[str] = mapped_column(Text, default="pending", nullable=False)  # pending|relevant|rejected
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     classification: Mapped[dict | None] = mapped_column(JSONB)
@@ -143,7 +144,9 @@ class Event(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str | None] = mapped_column(Text)
     sector: Mapped[str | None] = mapped_column(Text)
+    subsector: Mapped[str | None] = mapped_column(Text)
     regions: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    image_url: Mapped[str | None] = mapped_column(Text)
     occurred_at: Mapped[date | None] = mapped_column(Date)
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -165,6 +168,24 @@ class EventMembership(TimestampMixin, Base):
     match_type: Mapped[str] = mapped_column(Text, nullable=False)  # url_exact|resolved_url|title_time|entity_time|embedding|feed
     match_score: Mapped[float | None] = mapped_column(Float)
     is_survivor: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class EventLink(TimestampMixin, Base):
+    """Cross-event thread edge (war → markets-drop coverage, etc.).
+
+    relation: leads_to | related | none. 'none' rows persist LLM
+    rejections so a candidate pair is never re-asked.
+    """
+
+    __tablename__ = "event_links"
+    __table_args__ = (UniqueConstraint("from_event_id", "to_event_id", name="uq_event_links_pair"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    from_event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id"), nullable=False, index=True)
+    to_event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id"), nullable=False, index=True)
+    relation: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float)
+    rationale: Mapped[str | None] = mapped_column(Text)
 
 
 # ── Perspective and impact graph ─────────────────────────────────────

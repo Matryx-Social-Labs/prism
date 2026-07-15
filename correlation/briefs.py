@@ -175,20 +175,28 @@ async def persist_briefs(event_id: uuid.UUID, briefs: dict[str, str]) -> None:
         )
 
 
-def available_lenses(projection: dict | None) -> list[str]:
-    """Lenses worth offering on this event, primary first, general always.
+def available_lenses(projection: dict | None, sector: str | None = None) -> list[str]:
+    """Lenses with a genuine distinct read for THIS event, general always.
 
-    Every registry lens is switchable (on-demand generation covers the
-    rest); this ordering just drives the default tab order in clients.
+    A lens is offered only when the event evidences it: extracted lens
+    fields, a classifier role-interest hit, a matching sector, or an
+    already-cached brief. Clients render exactly these tabs — a cricket
+    match no longer offers a cyber read.
     """
     projection = projection or {}
     briefs = projection.get("lens_briefs") or {}
-    ordered: list[str] = []
-    for slug in LENSES:
-        has_fields = bool(projection.get("cyber")) and slug == "cyber_grc"
-        has_fields = has_fields or (bool(projection.get("finance")) and slug == "finance_trader")
-        if slug in briefs or has_fields or slug == "general":
-            ordered.append(slug)
-    # remaining registry lenses last (available on demand)
-    ordered += [slug for slug in LENSES if slug not in ordered]
-    return ordered
+    roles = set(projection.get("role_interests") or [])
+    applicable = {
+        "general": True,
+        "cyber_grc": bool(projection.get("cyber"))
+        or "cyber_grc" in roles
+        or sector == "cybersecurity",
+        "finance_trader": bool(projection.get("finance"))
+        or "finance_trader" in roles
+        or sector in ("finance", "business"),
+    }
+    return [
+        slug
+        for slug in LENSES
+        if applicable.get(slug, False) or slug in briefs
+    ]

@@ -25,6 +25,7 @@ QUERIES = {
     "cyber": '(cyberattack OR ransomware OR "data breach" OR "zero-day" OR "vulnerability exploited")',
     "finance": '("earnings report" OR "guidance raise" OR "rate decision" OR "merger agreement" OR "SEC charges" OR "stock plunges" OR "stock surges")',
     "world": '(war OR ceasefire OR election OR summit OR sanctions OR "state of emergency" OR earthquake OR "peace talks")',
+    "india": 'sourcecountry:india (politics OR economy OR cricket OR technology OR "supreme court" OR monsoon)',
 }
 INTER_QUERY_GAP_S = 20  # GDELT free tier rate-limits aggressively
 
@@ -62,6 +63,7 @@ async def collect(timespan: str = "1d", max_records: int = 60) -> int:
                         body=None,  # GDELT gives no body; fetched later
                         language=(article.get("language") or "").lower()[:8] or None,
                         published_at=_parse_seendate(article.get("seendate")),
+                        image_url=article.get("socialimage") or None,
                         raw={**article, "prism_query": query_slug},
                     )
                 )

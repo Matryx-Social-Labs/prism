@@ -62,6 +62,31 @@ SOURCES = [
         "country": "GB",
         "language": "en",
     },
+    # India-first regional coverage
+    {"slug": "thehindu", "name": "The Hindu", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "timesofindia", "name": "The Times of India", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "ndtv", "name": "NDTV", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "hindustantimes", "name": "Hindustan Times", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "livemint", "name": "Mint", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "hindu_businessline", "name": "The Hindu BusinessLine", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "espncricinfo", "name": "ESPNcricinfo", "source_type": "rss", "country": "IN", "language": "en"},
+    # Origin diversity — funding labels surface as chips in the UI
+    # ("state" = state-affiliated editorial control; "public" = publicly
+    # funded with editorial independence).
+    {"slug": "dw", "name": "DW News", "source_type": "rss", "country": "DE", "language": "en",
+     "reliability": {"funding": "public"}},
+    {"slug": "france24", "name": "France 24", "source_type": "rss", "country": "FR", "language": "en",
+     "reliability": {"funding": "public"}},
+    {"slug": "anadolu", "name": "Anadolu Agency", "source_type": "rss", "country": "TR", "language": "en",
+     "reliability": {"funding": "state"}},
+    {"slug": "scmp", "name": "South China Morning Post", "source_type": "rss", "country": "HK", "language": "en"},
+    {"slug": "dawn", "name": "Dawn", "source_type": "rss", "country": "PK", "language": "en"},
+    {"slug": "tass", "name": "TASS", "source_type": "rss", "country": "RU", "language": "en",
+     "reliability": {"funding": "state"}},
+    {"slug": "cgtn", "name": "CGTN", "source_type": "rss", "country": "CN", "language": "en",
+     "reliability": {"funding": "state"}},
+    {"slug": "presstv", "name": "Press TV", "source_type": "rss", "country": "IR", "language": "en",
+     "reliability": {"funding": "state"}},
 ]
 
 

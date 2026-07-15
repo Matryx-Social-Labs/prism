@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     prism_model_gate: str = "deepseek-v4-flash:cloud"
     prism_model_classify: str = "gemma4:31b-cloud"
     prism_model_extract: str = "glm-5.2:cloud"
+    # Cheap extraction for low-stakes sectors (sports/entertainment/health/
+    # science) — the all-sector expansion would blow the GPU quota on glm-5.2.
+    prism_model_extract_light: str = "deepseek-v4-flash:cloud"
     prism_model_correlate: str = "glm-5.2:cloud"
     prism_model_agent: str = "gpt-oss:120b-cloud"
     prism_model_judge: str = "qwen3.5:397b-cloud"

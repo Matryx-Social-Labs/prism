@@ -9,6 +9,10 @@ export interface FeedItem {
   title: string;
   summary: string | null;
   sector: string | null;
+  subsector: string | null;
+  regions: string[];
+  image_url: string | null;
+  is_regional: boolean;
   event_type: string | null;
   source_count: number;
   cvss_score: number | null;
@@ -78,6 +82,8 @@ export interface EventDetail {
   title: string;
   summary: string | null;
   sector: string | null;
+  subsector: string | null;
+  image_url: string | null;
   regions: string[];
   occurred_at: string | null;
   last_updated_at: string;
@@ -95,16 +101,40 @@ export interface EventDetail {
   impacts: ImpactOut[];
 }
 
-export async function fetchFeed(lens?: string, sector?: string): Promise<FeedItem[]> {
+export interface FeedQuery {
+  lens?: string;
+  sector?: string;
+  interests?: string[];
+  region?: string | null;
+  sort?: "latest" | "top";
+}
+
+export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   const params = new URLSearchParams();
-  if (lens) params.set("lens", lens);
-  if (sector) params.set("sector", sector);
+  if (query.lens) params.set("lens", query.lens);
+  if (query.sector) params.set("sector", query.sector);
+  if (query.interests?.length) params.set("interests", query.interests.join(","));
+  if (query.region) params.set("region", query.region);
+  if (query.sort) params.set("sort", query.sort);
   const res = await fetch(`${API_URL}/api/v1/feed?${params}`, {
     next: { revalidate: 60 },
   });
   if (!res.ok) throw new Error(`feed failed: ${res.status}`);
   const data = (await res.json()) as { items: FeedItem[] };
   return data.items;
+}
+
+export interface TaxonomySector {
+  slug: string;
+  name: string;
+  subsectors: { slug: string; name: string }[];
+}
+
+export async function fetchTaxonomy(): Promise<TaxonomySector[]> {
+  const res = await fetch(`${API_URL}/api/v1/taxonomy`, { next: { revalidate: 3600 } });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { sectors: TaxonomySector[] };
+  return data.sectors;
 }
 
 export async function fetchLenses(): Promise<LensInfo[]> {

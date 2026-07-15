@@ -85,7 +85,8 @@ async def handle_enriched_item(payload: dict) -> None:
                 id=uuid.uuid4(),
                 title=title,
                 summary=enrichment.summary,
-                sector=classification.get("sector", "cybersecurity"),
+                sector=classification.get("sector", "other"),
+                subsector=classification.get("subsector"),
                 regions=shared.get("regions") or classification.get("regions") or [],
                 occurred_at=enrichment.occurred_at,
                 embedding=embedding,
@@ -93,6 +94,8 @@ async def handle_enriched_item(payload: dict) -> None:
             session.add(event)
             is_new_event = True
 
+        if event.image_url is None and raw_item is not None and raw_item.image_url:
+            event.image_url = raw_item.image_url
         session.add(
             EventMembership(
                 event_id=event.id,
@@ -182,7 +185,8 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             await session.execute(
                 text(
                     """
-                    SELECT e.shared_fields, e.lens_fields, e.summary, e.event_type, s.slug AS source_slug
+                    SELECT e.shared_fields, e.lens_fields, e.summary, e.event_type, s.slug AS source_slug,
+                           ri.classification AS classification
                     FROM event_memberships em
                     JOIN articles a ON a.id = em.article_id
                     JOIN enrichments e ON e.article_id = a.id
@@ -203,8 +207,10 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         summaries: list[str] = []
         event_types: list[str] = []
         source_slugs: list[str] = []
+        role_interests: set[str] = set()
         for row in rows:
             source_slugs.append(row["source_slug"])
+            role_interests.update((row["classification"] or {}).get("role_interests") or [])
             if row["summary"]:
                 summaries.append(row["summary"])
             if row["event_type"]:
@@ -264,6 +270,7 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             "event_type": max(set(event_types), key=event_types.count) if event_types else None,
             "source_count": len(rows),
             "source_slugs": sorted(set(source_slugs)),
+            "role_interests": sorted(role_interests),
             "cyber": cyber or None,
             "finance": finance or None,
         }

@@ -52,15 +52,18 @@ async def handle_classified_item(payload: dict) -> None:
         url = item.url
         raw = dict(item.raw)
         published_at = item.published_at
+        sector = (item.classification or {}).get("sector")
+        has_image = item.image_url is not None
 
     meta = {"stage": "enrichment", "source_slug": source_slug, "raw_item_id": str(raw_item_id)}
     settings = get_settings()
 
     # 1. Full text
+    og_image: str | None = None
     if source_slug in ("nvd", "cisa_kev"):
         clean_text, tier = (body or title), "body"
     else:
-        clean_text, tier = await retrieve_fulltext(url, body)
+        clean_text, tier, og_image = await retrieve_fulltext(url, body)
         if not clean_text:
             clean_text, tier = title, "title"
 
@@ -74,6 +77,11 @@ async def handle_classified_item(payload: dict) -> None:
         extraction = extract_from_kev(raw)
         model_used = "deterministic:cisa_kev"
     else:
+        extract_model = (
+            settings.prism_model_extract_light
+            if sector in ("sports", "entertainment", "health", "science")
+            else settings.prism_model_extract
+        )
         prompt = fetch_prompt("extract-shared")
         messages = prompt.compile(
             title=title,
@@ -82,14 +90,14 @@ async def handle_classified_item(payload: dict) -> None:
             text=clean_text[:MAX_EXTRACT_CHARS],
         )
         extraction = await structured_chat(
-            model=settings.prism_model_extract,
+            model=extract_model,
             messages=messages,
             output_model=ArticleExtraction,
             trace_name="extract-shared",
             metadata=meta,
             langfuse_prompt=prompt if prompt.version else None,
         )
-        model_used = f"ollama:{settings.prism_model_extract}"
+        model_used = f"ollama:{extract_model}"
         raw_model_output = extraction.model_dump()
 
     # 3. Chunk + embed
@@ -101,6 +109,10 @@ async def handle_classified_item(payload: dict) -> None:
     enrichment_id = uuid.uuid4()
     shared = extraction.shared
     async with session_scope() as session:
+        if og_image and not has_image:
+            item = await session.get(RawItem, raw_item_id)
+            if item is not None:
+                item.image_url = og_image
         session.add(
             Article(
                 id=article_id,

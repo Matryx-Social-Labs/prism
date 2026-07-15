@@ -18,6 +18,7 @@ from classification.schemas import ClassificationResult, GateResult
 from common.config import get_settings
 from common.llm import structured_chat
 from common.observability import fetch_prompt
+from common.taxonomy import prompt_menu, valid_subsector
 
 DATASET_DIR = Path(__file__).parent / "datasets"
 
@@ -62,19 +63,30 @@ def relevance_evaluator(*, input, output, expected_output, **kwargs):
 
 async def classification_task(*, item, **kwargs):
     prompt = fetch_prompt("classifier")
-    messages = prompt.compile(title=item.input["title"], body=item.input["body"])
+    messages = prompt.compile(
+        title=item.input["title"], body=item.input["body"], taxonomy=prompt_menu()
+    )
     result = await structured_chat(
         model=get_settings().prism_model_classify,
         messages=messages,
         output_model=ClassificationResult,
         trace_name="eval-classifier",
     )
+    result.subsector = valid_subsector(result.sector, result.subsector)
     return result.model_dump()
 
 
 def sector_evaluator(*, input, output, expected_output, **kwargs):
     correct = bool(output and output.get("sector") == expected_output["sector"])
     return Evaluation(name="sector_accuracy", value=1.0 if correct else 0.0)
+
+
+def subsector_evaluator(*, input, output, expected_output, **kwargs):
+    expected = expected_output.get("subsector")
+    if expected is None:
+        return None  # unlabeled item — don't count either way
+    correct = bool(output and output.get("subsector") == expected)
+    return Evaluation(name="subsector_accuracy", value=1.0 if correct else 0.0)
 
 
 def role_evaluator(*, input, output, expected_output, **kwargs):
@@ -156,7 +168,7 @@ def run_classification():
         name="classifier",
         description="Sector / role-interest / routing accuracy",
         task=classification_task,
-        evaluators=[sector_evaluator, role_evaluator],
+        evaluators=[sector_evaluator, subsector_evaluator, role_evaluator],
     )
     print(result.format())
 

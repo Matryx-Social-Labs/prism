@@ -17,10 +17,14 @@ logger = get_logger(__name__)
 MIN_USEFUL_CHARS = 400
 
 
-async def retrieve_fulltext(url: str | None, body: str | None) -> tuple[str, str]:
-    """Return (clean_text, retrieval_tier). Prefers an already-complete body."""
+async def retrieve_fulltext(url: str | None, body: str | None) -> tuple[str, str, str | None]:
+    """Return (clean_text, retrieval_tier, og_image). Prefers a complete body.
+
+    og_image comes for free from the metadata of the page we already fetch —
+    never a separate request.
+    """
     if body and len(body) >= MIN_USEFUL_CHARS:
-        return body, "body"
+        return body, "body", None
 
     if url:
         try:
@@ -31,16 +35,20 @@ async def retrieve_fulltext(url: str | None, body: str | None) -> tuple[str, str
             ) as client:
                 response = await client.get(url)
                 response.raise_for_status()
-            extracted = await asyncio.to_thread(
-                trafilatura.extract, response.text, url=url, include_comments=False
+            doc = await asyncio.to_thread(
+                trafilatura.bare_extraction,
+                response.text,
+                url=url,
+                include_comments=False,
+                with_metadata=True,
             )
-            if extracted and len(extracted) >= MIN_USEFUL_CHARS:
-                return extracted, "direct"
-            if extracted and not body:
-                return extracted, "direct"
+            extracted = getattr(doc, "text", None) if doc else None
+            image = getattr(doc, "image", None) if doc else None
+            if extracted and (len(extracted) >= MIN_USEFUL_CHARS or not body):
+                return extracted, "direct", image
         except Exception:
             logger.warning("fulltext_fetch_failed", url=url, exc_info=True)
 
     if body:
-        return body, "body"
-    return "", "none"
+        return body, "body", None
+    return "", "none", None

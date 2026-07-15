@@ -68,6 +68,7 @@ async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
                     body=env.body,
                     language=env.language,
                     published_at=env.published_at,
+                    image_url=env.image_url,
                     raw=env.raw,
                     relevance="pending",
                 )

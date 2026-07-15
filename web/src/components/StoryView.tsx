@@ -16,11 +16,16 @@ export function StoryView({ event }: { event: EventDetail }) {
   const [briefLoading, setBriefLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
 
-  // Default to the reader's own lens once the profile is readable.
+  const offered = event.available_lenses?.length
+    ? LENS_ORDER.filter((slug) => event.available_lenses.includes(slug))
+    : LENS_ORDER;
+
+  // Default to the reader's own lens when it applies to this story.
   useEffect(() => {
     const profile = loadProfile();
-    const preferred = profile?.lens && LENS_ORDER.includes(profile.lens) ? profile.lens : "general";
+    const preferred = profile?.lens && offered.includes(profile.lens) ? profile.lens : "general";
     setLens(preferred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Lens switch: pull the brief (generating+caching server-side if new)
@@ -99,7 +104,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           <span className="mr-1 text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
             Lens
           </span>
-          {LENS_ORDER.map((slug) => {
+          {offered.map((slug) => {
             const m = lensMeta(slug);
             const selected = slug === lens;
             return (

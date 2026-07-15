@@ -21,6 +21,7 @@ class RawItemEnvelope(BaseModel):
     body: str | None = None
     language: str | None = None
     published_at: datetime | None = None
+    image_url: str | None = None  # thumbnail from feed media tags / socialimage
     raw: dict = Field(default_factory=dict)
 
 

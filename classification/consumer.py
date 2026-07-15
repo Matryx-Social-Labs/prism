@@ -17,6 +17,8 @@ from common.logging import get_logger
 from common.models import RawItem, Source
 from common.observability import fetch_prompt, observe
 from common.schemas import ClassifiedItemMessage
+from common.taxonomy import prompt_menu, valid_subsector
+from ingestion.rss import SPEC_BY_SLUG
 
 logger = get_logger(__name__)
 
@@ -42,9 +44,22 @@ async def handle_raw_item(payload: dict) -> None:
 
     meta = {"stage": "classification", "source_slug": source_slug, "raw_item_id": str(raw_item_id)}
 
+    feed_spec = SPEC_BY_SLUG.get(source_slug)
     if source_type == "cve_feed":
         classification = _classify_cve_feed(source_slug, title, body)
         gate = GateResult(is_relevant=True, reason="Authoritative CVE feed record")
+    elif feed_spec is not None and feed_spec.sector is not None:
+        # Single-topic feed: sector known by construction — no LLM spend.
+        classification = ClassificationResult(
+            sector=feed_spec.sector,
+            subsector=feed_spec.subsector,
+            regions=[source_country] if source_country else [],
+            language="en",
+            role_interests=["finance_trader"] if feed_spec.sector in ("finance", "business") else [],
+            route="standard",
+            confidence=0.8,
+        )
+        gate = GateResult(is_relevant=True, reason=f"Single-topic {feed_spec.sector} feed")
     else:
         gate = await _run_gate(title, body, meta)
         classification = None
@@ -88,7 +103,11 @@ async def _run_classifier(
 ) -> ClassificationResult:
     settings = get_settings()
     prompt = fetch_prompt("classifier")
-    messages = prompt.compile(title=title, body=(body or "(no content — title only)")[:MAX_GATE_CHARS])
+    messages = prompt.compile(
+        title=title,
+        body=(body or "(no content — title only)")[:MAX_GATE_CHARS],
+        taxonomy=prompt_menu(),
+    )
     result = await structured_chat(
         model=settings.prism_model_classify,
         messages=messages,
@@ -97,6 +116,7 @@ async def _run_classifier(
         metadata=meta,
         langfuse_prompt=prompt if prompt.version else None,
     )
+    result.subsector = valid_subsector(result.sector, result.subsector)
     if not result.regions and source_country:
         result.regions = [source_country]
     return result
@@ -107,6 +127,7 @@ def _classify_cve_feed(source_slug: str, title: str, body: str | None) -> Classi
     fast_lane = source_slug == "cisa_kev"  # KEV = actively exploited → time-critical
     return ClassificationResult(
         sector="cybersecurity",
+        subsector="vulnerabilities",
         regions=[],
         language="en",
         role_interests=["cyber_grc"],

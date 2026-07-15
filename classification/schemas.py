@@ -19,8 +19,13 @@ class ClassificationResult(BaseModel):
         "technology",
         "sports",
         "health",
+        "entertainment",
+        "science",
         "other",
     ]
+    # Validated against common/taxonomy.py after the LLM call — constrained
+    # decoding can't express per-sector enums, so invalid values become None.
+    subsector: str | None = None
     regions: list[str] = Field(default_factory=list, description="ISO country codes involved")
     language: str = "en"
     role_interests: list[str] = Field(default_factory=list)
