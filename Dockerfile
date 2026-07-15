@@ -24,5 +24,7 @@ RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Default command is the API; the worker service overrides it in Railway.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# One image, two roles: PRISM_SERVICE_ROLE=worker runs the pipeline worker;
+# anything else (default) runs migrations + the API. Lets both Railway
+# services share the image with no per-service start-command override.
+CMD ["sh", "-c", "if [ \"$PRISM_SERVICE_ROLE\" = \"worker\" ]; then exec python -m worker; else alembic upgrade head && exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}; fi"]
