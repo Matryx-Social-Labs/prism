@@ -4,10 +4,12 @@ A one-page strategic summary. The full research report lives in
 [docs/MARKET-RESEARCH.md](./docs/MARKET-RESEARCH.md); the build detail lives in the other docs.
 
 ## The concept
-A role-aware, personalized global news intelligence platform. Onboarding captures each user's
-job role and sector interests, and that profile drives a personalized feed in which every story
-receives the same end-to-end treatment: multi-perspective framing, related news clustered,
-correlation and impact analysis, depth, and a grounded question-answering agent.
+A role-aware AI news intelligence platform for everyone — not a niche professional tool.
+Onboarding captures how each user reads the world (a professional role, or general reader), and
+that drives a personalized feed in which every story receives the same end-to-end treatment:
+multi-perspective framing, related news clustered, correlation and impact analysis, per-lens
+written briefs (the same event as threat forecast, market catalyst, or plain account — switchable
+on any story), and a grounded question-answering agent.
 
 ## The promise, per story
 1. **Both Sides.** Who is saying what, including sources from the countries or parties involved,

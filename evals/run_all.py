@@ -7,7 +7,6 @@ common.config; export them for the Langfuse SDK too). Results appear in the
 Langfuse UI under Datasets → <name> → Runs.
 """
 
-import asyncio
 import json
 import sys
 from pathlib import Path
@@ -41,19 +40,16 @@ def upload(name: str, filename: str) -> None:
 # ── Relevance gate ───────────────────────────────────────────────────
 
 
-def relevance_task(*, item, **kwargs):
-    async def run():
-        prompt = fetch_prompt("relevance-gate")
-        messages = prompt.compile(title=item.input["title"], body=item.input["body"])
-        result = await structured_chat(
-            model=get_settings().prism_model_gate,
-            messages=messages,
-            output_model=GateResult,
-            trace_name="eval-relevance-gate",
-        )
-        return result.model_dump()
-
-    return asyncio.run(run())
+async def relevance_task(*, item, **kwargs):
+    prompt = fetch_prompt("relevance-gate")
+    messages = prompt.compile(title=item.input["title"], body=item.input["body"])
+    result = await structured_chat(
+        model=get_settings().prism_model_gate,
+        messages=messages,
+        output_model=GateResult,
+        trace_name="eval-relevance-gate",
+    )
+    return result.model_dump()
 
 
 def relevance_evaluator(*, input, output, expected_output, **kwargs):
@@ -64,19 +60,16 @@ def relevance_evaluator(*, input, output, expected_output, **kwargs):
 # ── Classifier ───────────────────────────────────────────────────────
 
 
-def classification_task(*, item, **kwargs):
-    async def run():
-        prompt = fetch_prompt("classifier")
-        messages = prompt.compile(title=item.input["title"], body=item.input["body"])
-        result = await structured_chat(
-            model=get_settings().prism_model_classify,
-            messages=messages,
-            output_model=ClassificationResult,
-            trace_name="eval-classifier",
-        )
-        return result.model_dump()
-
-    return asyncio.run(run())
+async def classification_task(*, item, **kwargs):
+    prompt = fetch_prompt("classifier")
+    messages = prompt.compile(title=item.input["title"], body=item.input["body"])
+    result = await structured_chat(
+        model=get_settings().prism_model_classify,
+        messages=messages,
+        output_model=ClassificationResult,
+        trace_name="eval-classifier",
+    )
+    return result.model_dump()
 
 
 def sector_evaluator(*, input, output, expected_output, **kwargs):
@@ -102,42 +95,35 @@ class JudgeVerdict(BaseModel):
     reasoning: str
 
 
-def groundedness_task(*, item, **kwargs):
+async def groundedness_task(*, item, **kwargs):
     """Run the agent-qa prompt over the gold sources (no DB needed)."""
+    from common.llm import plain_chat
 
-    async def run():
-        from common.llm import plain_chat
-
-        prompt = fetch_prompt("agent-qa")
-        messages = prompt.compile(
-            event_title="(eval)",
-            structured="{}",
-            sources=item.input["sources"],
-            question=item.input["question"],
-        )
-        return await plain_chat(
-            model=get_settings().prism_model_agent,
-            messages=messages,
-            trace_name="eval-agent-qa",
-        )
-
-    return asyncio.run(run())
+    prompt = fetch_prompt("agent-qa")
+    messages = prompt.compile(
+        event_title="(eval)",
+        structured="{}",
+        sources=item.input["sources"],
+        question=item.input["question"],
+    )
+    return await plain_chat(
+        model=get_settings().prism_model_agent,
+        messages=messages,
+        trace_name="eval-agent-qa",
+    )
 
 
-def judge_evaluator(*, input, output, expected_output, **kwargs):
-    async def run():
-        prompt = fetch_prompt("judge-groundedness")
-        messages = prompt.compile(
-            sources=input["sources"], question=input["question"], answer=output or ""
-        )
-        return await structured_chat(
-            model=get_settings().prism_model_judge,
-            messages=messages,
-            output_model=JudgeVerdict,
-            trace_name="judge-groundedness",
-        )
-
-    verdict = asyncio.run(run())
+async def judge_evaluator(*, input, output, expected_output, **kwargs):
+    prompt = fetch_prompt("judge-groundedness")
+    messages = prompt.compile(
+        sources=input["sources"], question=input["question"], answer=output or ""
+    )
+    verdict = await structured_chat(
+        model=get_settings().prism_model_judge,
+        messages=messages,
+        output_model=JudgeVerdict,
+        trace_name="judge-groundedness",
+    )
     evals = [
         Evaluation(name="grounded", value=verdict.grounded, comment=verdict.reasoning),
         Evaluation(name="citation_quality", value=verdict.citation_quality),

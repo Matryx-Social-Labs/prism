@@ -1,25 +1,28 @@
-# Prism
+# Prism — One event. Every angle.
 
-**Prism** is a role-aware, personalized global news intelligence platform. It takes worldwide
-news across every sector and, for each story, delivers three things: **Both Sides** (the full
-spectrum of perspectives, including sources from the countries or parties involved), **So What**
-(an end-to-end impact analysis of the affected organizations, companies, and people, plus the
-likely second-order outcomes), and **Ask** (a grounded AI agent that answers a reader's
-follow-up questions from that story's own sources).
+**Prism is a role-aware AI news intelligence platform for everyone.** It clusters worldwide
+coverage into single canonical events, then reads each one through the user's professional
+lens: a war is a humanitarian story for a general reader, a cyber-threat forecast (who's
+exposed, what to check) for a security professional, and a market catalyst (sectors, tickers,
+likely moves) for a trader — the *same event*, switchable on any story. Per story it delivers:
 
-Each user tells Prism their job role and interests at onboarding, and that profile drives a feed
-tailored to them, where every story still receives the full depth treatment.
+- **Lens briefs** — written per-lens analysis of what this event means for *you*, switchable
+  to any other lens to see how the same news changes meaning
+- **Both Sides** — the story's sources grouped by stance and country of origin
+- **So What** — the impact graph: who is affected and the likely second-order outcomes
+- **Ask** — a grounded agent answering follow-ups from that story's own sources, with
+  citations, refusing what the sources don't cover
 
-> "Prism" is a working codename (one event, split into its full spectrum of perspectives and
-> consequences). The final product name is still to be decided.
+The general "keep me informed" reader is a first-class persona, not a fallback: world news
+from origin-diverse outlets, clustered, framed, and answerable.
 
 ## Status
-**Working prototype** (roadmap Milestones 1.1 + 1.2): the cyber-source pipeline runs end to end
-(ingest → gate → classify → enrich → cluster → correlate → serve) with a Next.js web app showing
-the ranked feed and the three-part story view. See the Quickstart below and
-[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) for Railway/Vercel/Langfuse hosting. The research
-report and strategic rationale live in [`BLUEPRINT.md`](./BLUEPRINT.md) and
-[`docs/MARKET-RESEARCH.md`](./docs/MARKET-RESEARCH.md).
+**Live prototype**: pipeline (ingest → gate → classify → enrich → cluster → correlate →
+lens briefs → serve) on Railway, web app on Vercel
+([prism-ivory-two.vercel.app](https://prism-ivory-two.vercel.app)), Langfuse observability
+self-hosted, CI auto-deploy on push. See the Quickstart below and
+[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md). Strategy in [`BLUEPRINT.md`](./BLUEPRINT.md)
+and [`docs/MARKET-RESEARCH.md`](./docs/MARKET-RESEARCH.md).
 
 ## Lineage
 Prism generalizes the pipeline from the author's EduThreat-CTI research (ingest, classify,
@@ -27,11 +30,11 @@ enrich, cluster and canonicalize, correlate into an impact graph, then serve) fr
 domain of education-sector cyber incidents to worldwide news. The proven enrichment and
 correlation logic is ported here rather than the codebase being forked.
 
-## Beachhead
-The first version ships for one role where the team holds an unfair advantage:
-**cybersecurity and GRC professionals** who want fast CVE and security news with a clear read on
-what it means for their controls. Later roles (finance and trading first) are added as lenses on
-the same backbone rather than as new pipelines.
+## Lens depth strategy
+The **cyber/GRC lens is the deepest** (the team's unfair advantage: CVE/CVSS handling,
+exploitation status, control mapping), followed by the finance/trader lens; the general
+reader experience spans all sectors. New roles are added as declarative lenses on the same
+backbone (`common/lenses.py`) — never as new pipelines.
 
 ## Documentation map
 | Doc | What it covers |

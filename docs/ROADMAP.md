@@ -39,6 +39,22 @@ GDELT runs a finance query alongside the cyber one. Remaining: dedicated finance
 (Marketaux; a real-time catalyst feed if needed) and the low-latency fast-lane delivery over the
 streaming transport.
 
+## Phase 3 pull-forward — the multi-lens platform for everyone ✅ (July 2026, founder decision)
+The general reader was promoted from Phase 3 to a first-class persona, and the product
+repositioned from "for cybersecurity professionals" to **role-aware news intelligence for
+everyone** ("One event. Every angle."):
+- **World-news ingestion**: BBC World, Al Jazeera English, Guardian World RSS (origin-diverse
+  outlets feed Both-Sides grouping) + a GDELT world query — the general feed now carries real
+  world news, not only professional stories.
+- **Lens briefs** (the core multi-lens feature): every event carries written per-lens analysis —
+  general always; the story's primary lens generated at pipeline time; any other lens generated
+  on demand and cached. A war story exposes a cyber read (who is exposed, what to check) and a
+  market read (sectors, tickers, direction) on request; CVE records get zero-LLM template briefs.
+- **Web**: spectrum-brand redesign (adaptive dark/light), landing page with a live lens-switch
+  demo, story pages with in-place lens switching.
+Beachhead depth is unchanged — the cyber/GRC lens remains the deepest; lens depth is the moat,
+the multi-lens experience is the product.
+
 ## Phase 3 — Horizontal expansion
 Open personalization to general roles and sectors, add a prosumer graph and public API, and later
 introduce B2B team seats for security, PR, and risk teams. Cross-national both-sides framing widens

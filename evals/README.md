@@ -34,6 +34,21 @@ Requires `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`
 Results land in Langfuse → **Datasets → <name> → Runs**; compare runs after
 changing a prompt version or swapping a `PRISM_MODEL_*` env var.
 
+## Baseline (2026-07-15, first recorded run)
+
+| Metric | Score | Notes |
+|---|---|---|
+| relevance_accuracy | **1.000** | 27 items incl. world-news + finance ground truth |
+| sector_accuracy | 0.889 | 18 items |
+| role_interest_accuracy | 0.833 | misses are borderline dual-lens items |
+| grounded | 0.930 | LLM-as-judge (qwen3.5:397b) |
+| citation_quality | 0.920 | |
+| correct_refusal | 0.667 → **1.000** (agent-qa v2) | refusal boundary sharpened: no outside knowledge even when confident; partial-answer rule. v2 also lifted grounded to 1.000, citation_quality to 0.947 |
+
+Lens-brief groundedness: spot-checked manually (sanctions story: general +
+finance reads correct and grounded; KEV template briefs deterministic). A
+formal judge eval for lens briefs is deferred until a labeled sample exists.
+
 ## Prompt management
 
 `uv run python evals/sync_prompts.py` publishes the in-repo fallback prompts

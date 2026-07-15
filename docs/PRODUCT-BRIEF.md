@@ -8,11 +8,19 @@ problem with higher stakes: a security engineer needs to know within minutes whe
 vulnerability affects their stack and what to do about it, not read ten articles to find out.
 
 ## Product
-Prism is a role-aware, personalized news intelligence platform. A user states their job role and
-interests once, and Prism assembles a feed tailored to them. Every story in that feed is delivered
-with the same depth, regardless of sector.
+Prism is a role-aware AI news intelligence platform **for everyone** — professionals and general
+readers alike. A user states how they read the world once (a job role, or simply "keep me
+informed"), and Prism assembles a feed tailored to them. Every story is delivered with the same
+depth regardless of sector, and — the differentiator — every story can be read through **any
+lens**: a war is a humanitarian story for a reader, a threat forecast for a security team, and a
+market catalyst for a trader. Switching the lens on a story swaps its written brief, its
+structured fields, and the agent's suggested questions.
 
-### The three-part promise, per story
+### The four-part promise, per story
+0. **Lens briefs.** A written read of the event through each professional lens — what it means
+   for defenders (who is exposed, what to check), for markets (sectors, tickers, likely
+   direction), and for anyone staying informed. The user's lens leads; every other lens is one
+   tap away.
 1. **Both Sides.** The story's sources are grouped by stance and by country or party of origin, so
    the reader sees how each side frames the same event. For an international dispute this means
    pulling and translating sources from the parties involved, not only domestic outlets.
@@ -30,8 +38,10 @@ and a `relevance and ranking model` (what to surface and in what order), produci
 ## Positioning
 Not another aggregator that shows more headlines faster. Prism is the product that shows you every
 side of a story, tells you what it means and what happens next, lets you ask, and does all of this
-shaped to your role. The one-line pitch for the beachhead: the security and GRC news feed that
-tells you what a story means for your controls, from both sides, with a briefing you can question.
+shaped to your role — while letting you borrow anyone else's lens on demand. One-line pitch:
+**"One event. Every angle."** Role-specific pitch for the deepest lens: the security and GRC news
+feed that tells you what a story means for your controls, from both sides, with a briefing you can
+question.
 
 ## Target users
 See [PERSONAS.md](./PERSONAS.md). The first release is built for cybersecurity and GRC
