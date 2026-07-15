@@ -154,12 +154,35 @@ async def _handle_one(r, topic: str, group: str, handler, message) -> None:
         await handler(payload)
     except asyncio.CancelledError:
         raise
-    except Exception:
+    except Exception as exc:
+        if _is_transient(exc):
+            # Infrastructure is down, not the message: leave it pending so
+            # XAUTOCLAIM redelivers it, and slow down instead of burning the
+            # queue (a DB outage once acked-and-dropped 885 messages here).
+            logger.warning(
+                "handler_transient_error", topic=topic, entry_id=entry_id, error=str(exc)[:200]
+            )
+            await asyncio.sleep(5)
+            return
         logger.exception(
             "handler_failed",
             topic=topic,
             entry_id=entry_id,
             payload=(fields or {}).get("data", "")[:500],
         )
-    finally:
-        await r.xack(topic, group, entry_id)
+    await r.xack(topic, group, entry_id)
+
+
+def _is_transient(exc: BaseException | None) -> bool:
+    """Connection-level failures anywhere in the exception chain."""
+    seen: set[int] = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if isinstance(exc, (ConnectionError, OSError, TimeoutError)):
+            return True
+        if getattr(exc, "connection_invalidated", False):  # sqlalchemy DBAPIError
+            return True
+        if "connect" in type(exc).__name__.lower():  # asyncpg/redis *Connection* errors
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
