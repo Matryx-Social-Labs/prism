@@ -169,21 +169,79 @@ Local dev can point at this same instance (put the three values in `.env`).
 
 ---
 
-## Part 3 — Web app on Vercel
+## Part 3 — Web app on Vercel (CLI deploy from GitHub Actions)
 
-1. <https://vercel.com/new> → Import **Matryx-Social-Labs/prism**.
-2. **Root Directory**: `web` (critical — the Next.js app lives there).
-   Framework preset: Next.js (auto-detected).
-3. **Environment variables**:
+**Why CI instead of the Vercel GitHub integration:** the Hobby plan blocks the
+GitHub integration on private organization repos, and it only accepts deploys
+whose commit author email matches the Vercel account owner. The workflow in
+`.github/workflows/ci.yml` solves both (same pattern as routeHer/safera): it
+deploys via the Vercel CLI on every push to `main`, and re-authors HEAD inside
+the runner to `contact@matrixsociallabs.com` — the Vercel account email — so
+the owner check passes no matter who authored the commit. The re-author is
+local to the runner; GitHub history is never rewritten. Deploys run only after
+the backend and web verify jobs are green.
 
-   | Variable | Value |
-   |---|---|
-   | `NEXT_PUBLIC_API_URL` | `https://<your-railway-api-domain>` |
+### 3.1 One-time Vercel project setup (local machine)
 
-4. Deploy. Every push to `main` now redeploys production; PRs get preview deploys.
-5. Back in Railway → `api` service → append your production Vercel domain to
-   `CORS_ORIGINS` (comma-separated). Preview `*.vercel.app` domains are already
-   covered by the API's built-in regex.
+```bash
+npm i -g vercel
+vercel login                    # log in as contact@matrixsociallabs.com
+cd <repo-root>
+vercel link                     # create/link project: scope = the account, name = prism
+```
+
+Then in the Vercel dashboard → project **Settings**:
+- **Root Directory**: `web` (critical — the Next.js app lives there)
+- **Environment Variables** (Production): `NEXT_PUBLIC_API_URL` =
+  `https://<your-railway-api-domain>` (no trailing slash)
+
+`vercel link` writes `.vercel/project.json` locally (gitignored) containing the
+two IDs you need next:
+
+```bash
+cat .vercel/project.json   # → {"orgId":"...","projectId":"..."}
+```
+
+### 3.2 GitHub secrets
+
+Create a token at <https://vercel.com/account/settings/tokens> (scope: the
+account that owns the project; no expiry or 1 year). Then add the three
+secrets — either in GitHub UI (repo → Settings → Secrets and variables →
+Actions → New repository secret) or via the CLI:
+
+```bash
+gh secret set VERCEL_TOKEN      --repo Matryx-Social-Labs/prism   # paste the token
+gh secret set VERCEL_ORG_ID     --repo Matryx-Social-Labs/prism   # orgId from project.json
+gh secret set VERCEL_PROJECT_ID --repo Matryx-Social-Labs/prism   # projectId from project.json
+```
+
+| Secret | Where it comes from |
+|---|---|
+| `VERCEL_TOKEN` | vercel.com → Account Settings → Tokens → Create |
+| `VERCEL_ORG_ID` | `.vercel/project.json` → `orgId` (starts `team_` or user id) |
+| `VERCEL_PROJECT_ID` | `.vercel/project.json` → `projectId` (starts `prj_`) |
+
+### 3.3 How the workflow behaves
+
+- **Every push / PR**: `backend` (ruff + import check + tests) and `web`
+  (Next.js production build) must pass.
+- **Push to `main` only**: `deploy-web` re-authors HEAD, runs
+  `vercel pull → vercel build --prod → vercel deploy --prebuilt --prod`,
+  and prints the deployment URL in the run summary. Production deploys are
+  serialized so rapid pushes don't race.
+- Pushing workflow files requires the `workflow` OAuth scope:
+  `gh auth refresh -h github.com -s workflow` once, if a push is rejected
+  with "refusing to allow an OAuth App to … workflow".
+
+### 3.4 After the first deploy
+
+Back in Railway → `api` service → append your production Vercel domain to
+`CORS_ORIGINS` (comma-separated). Preview `*.vercel.app` domains are already
+covered by the API's built-in regex:
+
+```bash
+railway variables --service api --set "CORS_ORIGINS=http://localhost:3000,https://<your-app>.vercel.app"
+```
 
 ---
 
