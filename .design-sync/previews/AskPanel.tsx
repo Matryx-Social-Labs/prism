@@ -7,6 +7,7 @@ export const WithSuggestions = () => (
   <div style={{ maxWidth: 620, padding: 16 }}>
     <AskPanel
       eventId="demo-event"
+      sourceCount={5}
       suggestedQuestions={[
         "What led to this?",
         "Who is affected?",
@@ -21,6 +22,7 @@ export const LensQuestions = () => (
   <div style={{ maxWidth: 620, padding: 16 }}>
     <AskPanel
       eventId="demo-event"
+      sourceCount={5}
       suggestedQuestions={["Which tickers does this move?", "What is the catalyst here?"]}
     />
   </div>

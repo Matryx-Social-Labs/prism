@@ -140,6 +140,7 @@ export interface FeedQuery {
   interests?: string[];
   region?: string | null;
   sort?: "latest" | "top";
+  limit?: number;
 }
 
 export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
@@ -149,6 +150,7 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   if (query.interests?.length) params.set("interests", query.interests.join(","));
   if (query.region) params.set("region", query.region);
   if (query.sort) params.set("sort", query.sort);
+  if (query.limit) params.set("limit", String(query.limit));
   const res = await fetch(`${API_URL}/api/v1/feed?${params}`, {
     next: { revalidate: 60 },
   });

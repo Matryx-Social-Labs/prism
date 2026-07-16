@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fraunces, Space_Grotesk } from "next/font/google";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { HeaderNav } from "@/components/HeaderNav";
+import { PrismMark } from "@/components/PrismMark";
 import "./globals.css";
 
 const display = Fraunces({
@@ -30,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body
-        className={`${display.variable} ${ui.variable} min-h-screen antialiased`}
+        className={`${display.variable} ${ui.variable} flex min-h-screen flex-col antialiased`}
         style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
       >
         <div className="spectrum-bar h-[3px] w-full" aria-hidden />
@@ -38,25 +39,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           className="sticky top-0 z-40 border-b backdrop-blur-md"
           style={{ borderColor: "var(--line)", background: "var(--glass)" }}
         >
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-            <Link href="/" className="group flex items-center gap-2.5">
-              <svg width="22" height="20" viewBox="0 0 24 22" aria-hidden className="shrink-0">
-                <path
-                  d="M12 1 L23 21 L1 21 Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinejoin="round"
-                />
-                <path d="M12 8 L12 21" stroke="url(#hg)" strokeWidth="1.6" />
-                <defs>
-                  <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" />
-                    <stop offset="50%" stopColor="#06b6d4" />
-                    <stop offset="100%" stopColor="#8b5cf6" />
-                  </linearGradient>
-                </defs>
-              </svg>
+          <div className="mx-auto flex max-w-[1080px] items-center justify-between gap-3 px-5 py-[11px]">
+            <Link href="/" className="flex items-center gap-2.5" style={{ color: "var(--ink)" }}>
+              <PrismMark />
               <span
                 className="text-xl font-semibold tracking-tight"
                 style={{ fontFamily: "var(--font-display), serif" }}
@@ -64,31 +49,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Prism
               </span>
             </Link>
-            <nav className="flex items-center gap-3 text-sm">
-              <Link href="/feed" className="font-medium transition hover:opacity-70">
-                Feed
-              </Link>
-              <Link
-                href="/onboarding"
-                className="rounded-full border px-3.5 py-1.5 text-xs font-semibold transition hover:opacity-70"
-                style={{ borderColor: "var(--line-strong)" }}
-              >
-                Choose lens
-              </Link>
-              <ThemeToggle />
-            </nav>
+            <HeaderNav />
           </div>
         </header>
-        <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
-        <footer className="mt-20 border-t" style={{ borderColor: "var(--line)" }}>
+        <main className="w-full flex-1">{children}</main>
+        <footer className="mt-auto border-t" style={{ borderColor: "var(--line)" }}>
           <div
-            className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-xs"
+            className="mx-auto flex max-w-[1080px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs"
             style={{ color: "var(--ink-muted)" }}
           >
-            <span>
-              ◮ Prism — role-aware news intelligence. Every claim traceable to its source.
+            <span>◮ Prism — role-aware news intelligence. Every claim traceable to its source.</span>
+            <span className="flex items-center gap-3.5">
+              <Link href="/about" className="underline underline-offset-[3px]">
+                About &amp; labels
+              </Link>
+              <span style={{ color: "var(--ink-faint)" }}>Prototype · Matryx Social Labs</span>
             </span>
-            <span>Prototype · Matryx Social Labs</span>
           </div>
         </footer>
       </body>

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
 import { LENS_ORDER, lensMeta } from "@/lib/lenses";
@@ -21,6 +22,59 @@ const FUNDING_LABEL: Record<string, string> = {
   public: "Public broadcaster",
 };
 
+function timeAgo(iso: string): string {
+  const hours = Math.floor((Date.now() - new Date(iso).getTime()) / 3_600_000);
+  if (hours < 1) return "just now";
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function Chip({
+  children,
+  bg = "var(--bg-sunken)",
+  color = "var(--ink-muted)",
+  mono = false,
+}: {
+  children: React.ReactNode;
+  bg?: string;
+  color?: string;
+  mono?: boolean;
+}) {
+  return (
+    <span
+      className={`rounded-full px-[9px] py-0.5 text-[11px] font-semibold ${mono ? "font-mono font-medium" : ""}`}
+      style={{ background: bg, color }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function FundingChip({ funding }: { funding: string | null }) {
+  if (!funding || !FUNDING_LABEL[funding]) return null;
+  return (
+    <span
+      className="shrink-0 rounded-full border px-[7px] py-px text-[9.5px] font-semibold uppercase tracking-wide"
+      style={{ borderColor: "var(--line-strong)", color: "var(--ink-faint)" }}
+    >
+      {FUNDING_LABEL[funding]}
+    </span>
+  );
+}
+
+function SectionTitle({ title, hint }: { title: string; hint: string }) {
+  return (
+    <>
+      <h2 className="mb-1.5 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+        {title}
+      </h2>
+      <p className="mb-4 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+        {hint}
+      </p>
+    </>
+  );
+}
+
 export function StoryView({ event }: { event: EventDetail }) {
   const cyber = event.projection?.cyber ?? null;
   const finance = event.projection?.finance ?? null;
@@ -30,21 +84,20 @@ export function StoryView({ event }: { event: EventDetail }) {
   const [briefs, setBriefs] = useState<Record<string, string>>(event.lens_briefs ?? {});
   const [briefLoading, setBriefLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
+  const [myRegion, setMyRegion] = useState<string | null>(null);
 
   const offered = event.available_lenses?.length
     ? LENS_ORDER.filter((slug) => event.available_lenses.includes(slug))
     : LENS_ORDER;
 
-  // Default to the reader's own lens when it applies to this story.
   useEffect(() => {
     const profile = loadProfile();
+    setMyRegion(profile?.region ?? null);
     const preferred = profile?.lens && offered.includes(profile.lens) ? profile.lens : "general";
     setLens(preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Lens switch: pull the brief (generating+caching server-side if new)
-  // and the lens-tuned suggested questions.
   useEffect(() => {
     let cancelled = false;
     fetchQuestions(event.id, lens).then((qs) => !cancelled && setQuestions(qs));
@@ -64,58 +117,85 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   const meta = lensMeta(lens);
   const brief = briefs[lens];
+  const cvss = cyber?.cvss ?? {};
+  const exploitation = cyber?.exploitation ?? {};
+  const coverageEntries = Object.entries(event.coverage?.origins ?? {}).sort((a, b) => b[1] - a[1]);
+  const coveredOrigins = coverageEntries.map(([iso]) => iso);
+  const gapText =
+    myRegion && coverageEntries.length > 0 && !coveredOrigins.includes(myRegion)
+      ? `No ${regionName(myRegion)} outlet has covered this yet.`
+      : null;
 
   return (
-    <article className="space-y-10">
-      {/* Header */}
+    <article className="mx-auto max-w-[780px] px-5 pb-[120px] pt-7">
+      <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
+        ← Back to feed
+      </Link>
+
+      {/* ── Header ─────────────────────────────────────────── */}
       <header>
-        <div className="mb-2.5 flex flex-wrap items-center gap-2 text-xs">
-          {event.sector && (
-            <span className="rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
-              {event.sector}
-            </span>
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {event.subsector ? (
+            <Chip>
+              <span className="uppercase tracking-wide" style={{ fontSize: "10.5px" }}>
+                {event.subsector.replaceAll("_", " ")}
+              </span>
+            </Chip>
+          ) : (
+            event.sector && (
+              <Chip>
+                <span className="uppercase tracking-wide" style={{ fontSize: "10.5px" }}>
+                  {event.sector}
+                </span>
+              </Chip>
+            )
           )}
-          {cyber?.cvss?.score != null && (
-            <span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
-              CVSS {cyber.cvss.score.toFixed(1)} {cyber.cvss.severity ?? ""}
-            </span>
+          {event.coverage?.single_origin && <Chip>⚠ Single-origin</Chip>}
+          {cvss.score != null && (
+            <Chip bg="var(--danger-bg)" color="var(--danger)">
+              CVSS {cvss.score.toFixed(1)} {cvss.severity ?? ""}
+            </Chip>
           )}
-          {cyber?.exploitation?.kev_listed && (
-            <span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: "var(--danger)", color: "#fff" }}>
+          {exploitation.kev_listed && (
+            <Chip bg="var(--danger)" color="#fff">
               ⚠ Actively exploited
-            </span>
+            </Chip>
           )}
           {(cyber?.cve_ids ?? []).slice(0, 3).map((cve) => (
-            <span key={cve} className="rounded-full px-2 py-0.5 font-mono" style={{ background: "var(--bg-sunken)" }}>
+            <Chip key={cve} mono color="var(--ink)">
               {cve}
-            </span>
+            </Chip>
           ))}
           {(finance?.tickers ?? []).slice(0, 4).map((t) => (
-            <span key={t} className="rounded-full px-2 py-0.5 font-mono font-semibold" style={{ background: "var(--lens-finance-bg)", color: "var(--lens-finance)" }}>
+            <Chip key={t} mono bg="var(--lens-finance-bg)" color="var(--lens-finance)">
               ${t}
-            </span>
+            </Chip>
           ))}
-          <span className="ml-auto" style={{ color: "var(--ink-faint)" }}>
-            {event.sources.length} source{event.sources.length === 1 ? "" : "s"}
-            {event.regions.length > 0 && ` · ${event.regions.join(", ")}`}
+          <span className="ml-auto text-xs" style={{ color: "var(--ink-faint)" }}>
+            {event.sources.length} source{event.sources.length === 1 ? "" : "s"} · {timeAgo(event.last_updated_at)}
           </span>
         </div>
-        <h1 className="text-3xl font-semibold leading-tight tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+
+        <h1
+          className="text-[28px] font-semibold leading-[1.15] tracking-tight sm:text-[34px]"
+          style={{ fontFamily: "var(--font-display), serif" }}
+        >
           {event.title}
         </h1>
         {event.summary && (
-          <p className="mt-3 text-[15px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-3.5 text-[15.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
             {event.summary}
           </p>
         )}
+
         {event.image_url && (
-          <div className="relative mt-5 aspect-video overflow-hidden rounded-2xl" style={{ background: "var(--bg-sunken)" }}>
+          <div className="relative mt-5 aspect-video overflow-hidden rounded-[18px]" style={{ background: "var(--bg-sunken)" }}>
             <Image
               src={event.image_url}
               alt=""
               fill
               priority
-              sizes="(max-width: 768px) 100vw, 768px"
+              sizes="(max-width: 780px) 100vw, 740px"
               className="object-cover"
               onError={(e) => {
                 (e.currentTarget.parentElement as HTMLElement).style.display = "none";
@@ -123,109 +203,142 @@ export function StoryView({ event }: { event: EventDetail }) {
             />
           </div>
         )}
+
         {(event.entities.length > 0 || event.regions.length > 0) && (
-          <div className="mt-5 flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
+          <div className="mt-5 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
               Affected
             </span>
             {event.regions.map((r) => (
-              <span key={r} className="rounded-full border px-2 py-0.5" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+              <span key={r} className="rounded-full border px-2.5 py-0.5 text-xs" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
                 ◉ {regionName(r)}
               </span>
             ))}
             {event.entities.map((en) => (
-              <span key={`${en.name}-${en.role}`} className="rounded-full border px-2 py-0.5" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }} title={en.role}>
-                {en.entity_type === "organization" ? "🏢" : en.entity_type === "person" ? "👤" : "▪"} {en.name}
+              <span
+                key={`${en.name}-${en.role}`}
+                title={en.role}
+                className="rounded-full border px-2.5 py-0.5 text-xs"
+                style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
+              >
+                {en.entity_type === "person" ? "◇" : "▪"} {en.name}
               </span>
             ))}
           </div>
         )}
-        {event.coverage && Object.keys(event.coverage.origins).length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
+
+        {coverageEntries.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
               Coverage
             </span>
-            {Object.entries(event.coverage.origins)
-              .sort((a, b) => b[1] - a[1])
-              .map(([iso, n]) => (
-                <span key={iso} className="rounded-full px-2 py-0.5" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
-                  {regionName(iso)} × {n}
-                </span>
-              ))}
-            {event.coverage.single_origin && (
-              <span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: "var(--lens-general-bg, var(--bg-sunken))", color: "var(--lens-general, var(--ink))" }}>
+            {coverageEntries.map(([iso, n]) => (
+              <Chip key={iso}>
+                {regionName(iso)} × {n}
+              </Chip>
+            ))}
+            {event.coverage?.single_origin && (
+              <Chip bg="var(--lens-general-bg)" color="var(--lens-general)">
                 ⚠ Single-origin coverage
-              </span>
+              </Chip>
             )}
           </div>
         )}
+        {gapText && (
+          <p className="mt-3 text-[13px] font-medium" style={{ color: "var(--lens-general)" }}>
+            ◉ {gapText}
+          </p>
+        )}
       </header>
 
-      {/* Lens switcher + brief — the product moment */}
+      {/* ── Lens block — the product moment ─────────────────── */}
       <section
-        className="overflow-hidden rounded-2xl border"
+        className="mt-9 overflow-hidden rounded-[18px] border"
         style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
       >
-        <div className="flex flex-wrap items-center gap-1.5 border-b px-4 py-3" style={{ borderColor: "var(--line)" }} role="tablist" aria-label="Read this story through a lens">
-          <span className="mr-1 text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
-            Lens
-          </span>
-          {offered.map((slug) => {
-            const m = lensMeta(slug);
-            const selected = slug === lens;
-            return (
-              <button
-                key={slug}
-                role="tab"
-                aria-selected={selected}
-                onClick={() => setLens(slug)}
-                className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
-                style={
-                  selected
-                    ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
-                    : { color: "var(--ink-muted)" }
-                }
-              >
-                {m.name}
-              </button>
-            );
-          })}
+        <div className="overflow-x-auto border-b" style={{ borderColor: "var(--line)" }}>
+          <div className="flex w-max items-center gap-1.5 px-4 py-3" role="tablist" aria-label="Read this story through a lens">
+            <span className="mr-1 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+              Lens
+            </span>
+            {offered.map((slug) => {
+              const m = lensMeta(slug);
+              const selected = slug === lens;
+              return (
+                <button
+                  key={slug}
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setLens(slug)}
+                  className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
+                  style={
+                    selected
+                      ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
+                      : { color: "var(--ink-muted)" }
+                  }
+                >
+                  {m.name}
+                </button>
+              );
+            })}
+            {offered.length === 1 && (
+              <span className="px-1.5 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+                Only this lens applies to this story
+              </span>
+            )}
+          </div>
         </div>
 
-        <div key={lens} className="fade-swap space-y-5 p-5">
-          {/* Brief */}
-          {brief ? (
-            <p className="text-[15px] leading-relaxed">
+        <div key={lens} className="fade-swap flex flex-col gap-[18px] px-[22px] py-5">
+          {briefLoading && !brief ? (
+            <div aria-label="Generating lens brief">
+              <div className="pulse-skel h-[13px] rounded-md" style={{ background: "var(--bg-sunken)" }} />
+              <div className="pulse-skel mt-2 h-[13px] w-[92%] rounded-md" style={{ background: "var(--bg-sunken)" }} />
+              <div className="pulse-skel mt-2 h-[13px] w-[78%] rounded-md" style={{ background: "var(--bg-sunken)" }} />
+              <p className="mt-2.5 text-xs" style={{ color: "var(--ink-faint)" }}>
+                Writing the {meta.short} read of this story…
+              </p>
+            </div>
+          ) : brief ? (
+            <p className="text-[14.5px] leading-[1.7]">
               <span className="font-semibold" style={{ color: meta.color }}>
                 Through the {meta.name} lens —{" "}
               </span>
               <span style={{ color: "var(--ink-muted)" }}>{brief}</span>
             </p>
-          ) : briefLoading ? (
-            <div className="space-y-2" aria-label="Generating lens brief">
-              <div className="h-3.5 w-full animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
-              <div className="h-3.5 w-11/12 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
-              <div className="h-3.5 w-4/5 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
-              <p className="pt-1 text-xs" style={{ color: "var(--ink-faint)" }}>
-                Writing the {meta.short} read of this story…
-              </p>
-            </div>
           ) : (
-            <p className="text-sm" style={{ color: "var(--ink-faint)" }}>
-              No {meta.short} read available for this story yet.
+            <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+              The {meta.name} read of this story isn&apos;t available yet.
             </p>
           )}
 
-          {/* Lens-specific structured blocks */}
           {lens === "cyber_grc" && cyber && (
-            <div className="space-y-4">
-              {cyber.affected && cyber.affected.length > 0 && (
+            <div className="flex flex-col gap-3.5">
+              <div className="flex flex-wrap gap-1.5">
+                {cvss.score != null && (
+                  <Chip bg="var(--danger-bg)" color="var(--danger)">
+                    CVSS {cvss.score.toFixed(1)}
+                  </Chip>
+                )}
+                {exploitation.kev_listed && (
+                  <Chip bg="var(--danger)" color="#fff">
+                    ⚠ KEV listed
+                  </Chip>
+                )}
+                {exploitation.poc_public && <Chip color="var(--ink)">PoC public</Chip>}
+                {cvss.vector && (
+                  <Chip mono>
+                    {cvss.vector}
+                  </Chip>
+                )}
+              </div>
+              {(cyber.affected ?? []).length > 0 && (
                 <div>
-                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
+                  <h3 className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
                     Affected products
                   </h3>
-                  <ul className="text-sm" style={{ color: "var(--ink-muted)" }}>
-                    {cyber.affected.slice(0, 6).map((a, i) => (
+                  <ul className="text-[13.5px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
+                    {(cyber.affected ?? []).map((a, i) => (
                       <li key={i}>
                         {a.vendor} {a.product}{" "}
                         {a.versions && <span className="font-mono text-xs">({a.versions})</span>}
@@ -235,26 +348,41 @@ export function StoryView({ event }: { event: EventDetail }) {
                 </div>
               )}
               {cyber.remediation?.action && (
-                <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "var(--lens-cyber)", background: "var(--lens-cyber-bg)" }}>
+                <div
+                  className="rounded-xl border px-4 py-3 text-[13.5px] leading-[1.6]"
+                  style={{ borderColor: "var(--lens-cyber)", background: "var(--lens-cyber-bg)", color: "var(--ink)" }}
+                >
                   <strong>Required action:</strong> {cyber.remediation.action}
                 </div>
               )}
-              {cyber.control_mapping && cyber.control_mapping.length > 0 && (
+              {(cyber.control_mapping ?? []).length > 0 && (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table className="w-full border-collapse text-left text-[13px]">
                     <thead>
-                      <tr className="border-b text-xs uppercase tracking-wide" style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}>
-                        <th className="py-1.5 pr-4">Framework</th>
-                        <th className="py-1.5 pr-4">Control</th>
-                        <th className="py-1.5">Why it matters here</th>
+                      <tr className="text-[10.5px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
+                        <th className="border-b py-1.5 pr-3.5 font-semibold" style={{ borderColor: "var(--line)" }}>
+                          Framework
+                        </th>
+                        <th className="border-b py-1.5 pr-3.5 font-semibold" style={{ borderColor: "var(--line)" }}>
+                          Control
+                        </th>
+                        <th className="border-b py-1.5 font-semibold" style={{ borderColor: "var(--line)" }}>
+                          Why it matters here
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {cyber.control_mapping.map((cm, i) => (
-                        <tr key={i} className="border-b" style={{ borderColor: "var(--line)" }}>
-                          <td className="py-2 pr-4 font-mono text-xs">{cm.framework}</td>
-                          <td className="py-2 pr-4 font-semibold">{cm.control}</td>
-                          <td className="py-2" style={{ color: "var(--ink-muted)" }}>{cm.relevance}</td>
+                      {(cyber.control_mapping ?? []).map((cm, i) => (
+                        <tr key={i}>
+                          <td className="border-b py-2 pr-3.5 font-mono text-xs" style={{ borderColor: "var(--line)" }}>
+                            {cm.framework}
+                          </td>
+                          <td className="border-b py-2 pr-3.5 font-semibold" style={{ borderColor: "var(--line)" }}>
+                            {cm.control}
+                          </td>
+                          <td className="border-b py-2" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+                            {cm.relevance}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -264,51 +392,84 @@ export function StoryView({ event }: { event: EventDetail }) {
             </div>
           )}
 
-          {lens === "finance_trader" && finance && (finance.tickers?.length || finance.price_impact || finance.catalyst) ? (
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "var(--lens-finance)", background: "var(--lens-finance-bg)" }}>
-              {finance.tickers && finance.tickers.length > 0 && (
-                <span><strong>Tickers:</strong> {finance.tickers.map((t) => `$${t}`).join(", ")}</span>
+          {lens === "finance_trader" && finance && (
+            <div
+              className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border px-4 py-3 text-[13.5px]"
+              style={{ borderColor: "var(--lens-finance)", background: "var(--lens-finance-bg)", color: "var(--ink)" }}
+            >
+              {(finance.tickers ?? []).length > 0 && (
+                <span>
+                  <strong>Tickers:</strong>{" "}
+                  <span className="font-mono">{(finance.tickers ?? []).map((t) => `$${t}`).join(", ")}</span>
+                </span>
               )}
-              {finance.sector && <span><strong>Sector:</strong> {finance.sector}</span>}
-              {finance.catalyst && <span><strong>Catalyst:</strong> {finance.catalyst.replaceAll("_", " ")}</span>}
+              {finance.sector && (
+                <span>
+                  <strong>Sector:</strong> {finance.sector}
+                </span>
+              )}
+              {finance.catalyst && (
+                <span>
+                  <strong>Catalyst:</strong> {finance.catalyst.replaceAll("_", " ")}
+                </span>
+              )}
               {finance.price_impact?.direction && (
                 <span>
                   <strong>Price read:</strong>{" "}
                   {finance.price_impact.direction === "up" ? "▲" : finance.price_impact.direction === "down" ? "▼" : "◆"}{" "}
                   {finance.price_impact.magnitude ?? ""}
-                  {finance.price_impact.confidence != null && ` (${(finance.price_impact.confidence * 100).toFixed(0)}% conf.)`}
+                  {finance.price_impact.confidence != null &&
+                    ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
                 </span>
               )}
             </div>
-          ) : null}
+          )}
         </div>
       </section>
 
-      {/* Both Sides */}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-          Both sides
-        </h2>
+      {/* ── Both sides ─────────────────────────────────────── */}
+      <section className="mt-11">
+        <SectionTitle
+          title="Both sides"
+          hint="Coverage grouped by origin country and stance — so you can see who frames it how."
+        />
         {event.perspectives.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--ink-faint)" }}>Perspective analysis pending.</p>
+          <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+            Perspective analysis pending — it generates as coverage from more origins arrives.
+          </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {event.perspectives.map((p, i) => (
-              <div key={i} className="card-hover rounded-2xl border p-5" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>
-                <div className="mb-1.5 flex items-center gap-2">
-                  <span className="font-semibold">{p.label}</span>
-                  {p.origin_country && (
-                    <span className="rounded-full px-1.5 py-0.5 text-xs" style={{ background: "var(--bg-sunken)" }}>{p.origin_country}</span>
+              <div
+                key={i}
+                className="card-hover rounded-[18px] border p-5"
+                style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
+              >
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[14.5px] font-semibold">{p.label}</span>
+                  {p.origin_country && <Chip>{regionName(p.origin_country)}</Chip>}
+                  {p.stance && (
+                    <span className="text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+                      {p.stance}
+                    </span>
                   )}
-                  {p.stance && <span className="text-xs" style={{ color: "var(--ink-faint)" }}>{p.stance}</span>}
                 </div>
-                {p.summary && <p className="text-sm leading-relaxed" style={{ color: "var(--ink-muted)" }}>{p.summary}</p>}
+                {p.summary && (
+                  <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+                    {p.summary}
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {p.article_ids.map((aid) => {
                     const src = sourceById.get(aid);
                     return src ? (
-                      <span key={aid} className="rounded-full px-2 py-0.5 text-xs" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
+                      <span
+                        key={aid}
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px]"
+                        style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}
+                      >
                         {src.source_name}
+                        <FundingChip funding={src.funding} />
                       </span>
                     ) : null;
                   })}
@@ -319,26 +480,41 @@ export function StoryView({ event }: { event: EventDetail }) {
         )}
       </section>
 
+      {/* ── The thread ─────────────────────────────────────── */}
       <ThreadRail thread={event.thread} currentTitle={event.title} />
 
-      {/* What to expect — consequence graph */}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-          What to expect
-        </h2>
+      {/* ── What to expect ─────────────────────────────────── */}
+      <section className="mt-11">
+        <SectionTitle
+          title="What to expect"
+          hint="First-order impacts with their likely second-order effects — direction and horizon per node."
+        />
         {event.impacts.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--ink-faint)" }}>Impact analysis pending.</p>
+          <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+            Impact analysis pending.
+          </p>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="flex flex-col gap-2.5">
             {event.impacts.map((imp) => (
-              <li key={imp.id} className={`flex items-start gap-2.5 text-sm ${imp.parent_impact_id ? "ml-7" : ""}`}>
-                <span aria-hidden style={{ color: imp.direction === "negative" ? "var(--danger)" : imp.direction === "positive" ? "var(--up)" : "var(--lens-general)" }}>
+              <li key={imp.id} className={`flex items-start gap-2.5 ${imp.parent_impact_id ? "ml-7" : ""}`}>
+                <span
+                  aria-hidden
+                  className="shrink-0"
+                  style={{
+                    color:
+                      imp.direction === "negative"
+                        ? "var(--danger)"
+                        : imp.direction === "positive"
+                          ? "var(--up)"
+                          : "var(--lens-general)",
+                  }}
+                >
                   {imp.parent_impact_id ? "↳" : "●"}
                 </span>
-                <span>
+                <span className="text-[13.5px] leading-[1.55]">
                   <strong>{imp.entity_name ?? "Affected party"}</strong>{" "}
-                  <span style={{ color: "var(--ink-muted)" }}>— {imp.effect.replaceAll("_", " ")}</span>
-                  <span style={{ color: "var(--ink-faint)" }}> · {imp.horizon ?? "unknown horizon"}</span>
+                  <span style={{ color: "var(--ink-muted)" }}>— {imp.effect.replaceAll("_", " ")}</span>{" "}
+                  <span style={{ color: "var(--ink-faint)" }}>· {imp.horizon ?? "unknown horizon"}</span>
                 </span>
               </li>
             ))}
@@ -346,44 +522,49 @@ export function StoryView({ event }: { event: EventDetail }) {
         )}
       </section>
 
-      {/* Sources */}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-          Sources <span className="text-base font-normal" style={{ color: "var(--ink-faint)" }}>({event.sources.length})</span>
+      {/* ── Sources ────────────────────────────────────────── */}
+      <section className="mt-11">
+        <h2 className="mb-4 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+          Sources{" "}
+          <span className="text-[15px] font-normal" style={{ color: "var(--ink-faint)" }}>
+            ({event.sources.length})
+          </span>
         </h2>
-        <ul className="space-y-2 text-sm">
-          {event.sources.map((s) => (
-            <li key={s.article_id} className="flex items-baseline gap-2.5">
-              <span className="shrink-0 rounded-full px-2 py-0.5 text-xs" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
+        <ul className="flex flex-col gap-[9px]">
+          {event.sources.map((s, i) => (
+            <li key={s.article_id} className="flex items-baseline gap-2.5 text-[13.5px]">
+              <span className="shrink-0 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                [{i + 1}]
+              </span>
+              <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[11.5px]" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
                 {s.source_name}
               </span>
-              {s.funding && FUNDING_LABEL[s.funding] && (
-                <span className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide" style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}>
-                  {FUNDING_LABEL[s.funding]}
-                </span>
-              )}
+              <FundingChip funding={s.funding} />
               {s.url ? (
-                <a href={s.url} target="_blank" rel="noopener noreferrer" className="truncate underline-offset-4 hover:underline" style={{ color: "var(--lens-cyber)" }}>
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 truncate underline-offset-4 hover:underline"
+                  style={{ color: "var(--ink)" }}
+                >
                   {s.title}
                 </a>
               ) : (
-                <span className="truncate">{s.title}</span>
+                <span className="min-w-0 truncate">{s.title}</span>
+              )}
+              {s.stance && (
+                <span className="ml-auto hidden shrink-0 text-[11.5px] sm:block" style={{ color: "var(--ink-faint)" }}>
+                  {s.stance}
+                </span>
               )}
             </li>
           ))}
         </ul>
       </section>
 
-      {/* Ask */}
-      <section>
-        <h2 className="mb-1.5 text-xl font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-          Ask this story
-        </h2>
-        <p className="mb-4 text-xs" style={{ color: "var(--ink-faint)" }}>
-          Answers come only from this story&apos;s sources, with citations. The agent refuses questions the sources don&apos;t cover.
-        </p>
-        <AskPanel eventId={event.id} suggestedQuestions={questions} />
-      </section>
+      {/* ── Ask — floating agent ───────────────────────────── */}
+      <AskPanel eventId={event.id} sourceCount={event.sources.length} suggestedQuestions={questions} />
     </article>
   );
 }

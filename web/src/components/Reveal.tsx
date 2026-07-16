@@ -7,10 +7,12 @@ export function Reveal({
   children,
   className = "",
   as: Tag = "div",
+  style,
 }: {
   children: React.ReactNode;
   className?: string;
   as?: "div" | "section" | "li";
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLElement | null>(null);
 
@@ -38,7 +40,7 @@ export function Reveal({
 
   return (
     // @ts-expect-error -- polymorphic ref
-    <Tag ref={ref} className={`reveal ${className}`}>
+    <Tag ref={ref} className={`reveal ${className}`} style={style}>
       {children}
     </Tag>
   );

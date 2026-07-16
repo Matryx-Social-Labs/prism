@@ -1,5 +1,8 @@
 "use client";
 
+// The story thread: what led here → this story → what followed, as a
+// dot timeline. Every linked event carries its cited rationale.
+
 import Link from "next/link";
 
 export interface ThreadNode {
@@ -13,32 +16,36 @@ export interface ThreadNode {
   image_url: string | null;
 }
 
-function Node({ node, arrow }: { node: ThreadNode; arrow: "up" | "down" }) {
-  return (
-    <li className="relative pl-7">
-      <span
-        aria-hidden
-        className="absolute left-0 top-1 flex h-5 w-5 items-center justify-center rounded-full border text-[10px]"
-        style={{ borderColor: "var(--line)", color: "var(--ink-faint)", background: "var(--bg-elevated)" }}
-      >
-        {arrow === "up" ? "↑" : "↓"}
-      </span>
-      <Link href={`/story/${node.event_id}`} className="group block">
-        <span className="text-sm font-semibold leading-snug underline-offset-4 group-hover:underline">
-          {node.title}
-        </span>
-        <span className="ml-2 text-xs" style={{ color: "var(--ink-faint)" }}>
-          {node.sector}
-          {node.occurred_at && ` · ${node.occurred_at.slice(0, 10)}`}
-        </span>
-      </Link>
-      {node.rationale && (
-        <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "var(--ink-muted)" }}>
-          {node.rationale}
-        </p>
-      )}
-    </li>
-  );
+interface Row {
+  key: string;
+  title: string;
+  when: string;
+  why: string | null;
+  href: string | null;
+  now: boolean;
+}
+
+function rows(thread: { upstream: ThreadNode[]; downstream: ThreadNode[] }, currentTitle: string): Row[] {
+  const fmt = (n: ThreadNode) => (n.occurred_at ? n.occurred_at.slice(0, 10) : (n.sector ?? "related"));
+  return [
+    ...thread.upstream.map((n) => ({
+      key: n.event_id,
+      title: n.title,
+      when: fmt(n),
+      why: n.rationale,
+      href: `/story/${n.event_id}`,
+      now: false,
+    })),
+    { key: "__now", title: currentTitle, when: "This story", why: null, href: null, now: true },
+    ...thread.downstream.map((n) => ({
+      key: n.event_id,
+      title: n.title,
+      when: fmt(n),
+      why: n.rationale,
+      href: `/story/${n.event_id}`,
+      now: false,
+    })),
+  ];
 }
 
 export function ThreadRail({
@@ -49,46 +56,60 @@ export function ThreadRail({
   currentTitle: string;
 }) {
   if (!thread || (thread.upstream.length === 0 && thread.downstream.length === 0)) return null;
+  const list = rows(thread, currentTitle);
   return (
-    <section>
-      <h2 className="mb-1.5 text-xl font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+    <section className="mt-11">
+      <h2 className="mb-1.5 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         The thread
       </h2>
-      <p className="mb-4 text-xs" style={{ color: "var(--ink-faint)" }}>
-        Connected stories Prism linked to this one — what led here and what followed.
+      <p className="mb-[18px] text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+        What led here, and what followed — each link carries its cited rationale.
       </p>
-      <div
-        className="relative rounded-2xl border p-5"
-        style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
-      >
-        <span
-          aria-hidden
-          className="absolute bottom-5 left-[29px] top-5 w-px"
-          style={{ background: "var(--line)" }}
-        />
-        <ol className="space-y-5">
-          {thread.upstream.map((n) => (
-            <Node key={n.event_id} node={n} arrow="up" />
-          ))}
-          <li className="relative pl-7">
-            <span
-              aria-hidden
-              className="absolute left-0 top-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px]"
-              style={{ background: "var(--ink)", color: "var(--bg)" }}
-            >
-              ●
-            </span>
-            <span className="text-sm font-semibold" style={{ color: "var(--ink-muted)" }}>
-              {currentTitle}
-              <span className="ml-2 text-xs font-normal" style={{ color: "var(--ink-faint)" }}>
-                (this story)
+      <div className="flex flex-col">
+        {list.map((row, i) => (
+          <div key={row.key} className="flex gap-4">
+            <div className="flex w-3.5 shrink-0 flex-col items-center">
+              <span
+                className="mt-[5px] shrink-0 rounded-full"
+                style={{
+                  width: row.now ? 12 : 9,
+                  height: row.now ? 12 : 9,
+                  background: row.now ? "var(--spectrum)" : "var(--line-strong)",
+                }}
+              />
+              {i < list.length - 1 && <span className="min-h-[26px] w-0.5 flex-1" style={{ background: "var(--line)" }} />}
+            </div>
+            <div className="min-w-0 flex-1 pb-[22px]">
+              <span
+                className="text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: row.now ? "var(--lens-general)" : "var(--ink-faint)" }}
+              >
+                {row.when}
               </span>
-            </span>
-          </li>
-          {thread.downstream.map((n) => (
-            <Node key={n.event_id} node={n} arrow="down" />
-          ))}
-        </ol>
+              {row.href ? (
+                <Link
+                  href={row.href}
+                  className="mt-[3px] block text-sm font-semibold leading-[1.4]"
+                  style={{ color: "var(--lens-cyber)" }}
+                >
+                  {row.title} →
+                </Link>
+              ) : (
+                <p
+                  className="mt-[3px] font-semibold leading-[1.4]"
+                  style={{ fontSize: row.now ? "15.5px" : "14px", color: row.now ? "var(--ink)" : "var(--ink-muted)" }}
+                >
+                  {row.title}
+                </p>
+              )}
+              {row.why && (
+                <p className="mt-[5px] text-[12.5px] leading-[1.55]" style={{ color: "var(--ink-faint)" }}>
+                  {row.why}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
