@@ -8,7 +8,12 @@
   "cssEntry": ".ds-tailwind.css",
   "componentSrcMap": {
     "PrismHero": null,
-    "HeroVisual": null
+    "HeroVisual": null,
+    "Reflect": null,
+    "Beam": null,
+    "Rainbow": null,
+    "Flare": null,
+    "PrismGlass": null
   },
   "entry": "web/dist/index.js",
   "buildCmd": "sh .design-sync/build-css.sh",

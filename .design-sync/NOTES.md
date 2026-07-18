@@ -38,3 +38,9 @@
 - `build-css.sh` output is gitignored — a re-sync that skips `cfg.buildCmd` ships stale or
   missing CSS ([CSS entry missing] → converter warns "cssEntry … skipped").
 - Google Fonts is a network dependency of every render — offline captures fall back fonts.
+- 3D hero (`web/src/components/prism3d/`, July 2026): ported from pmndrs/examples
+  `demos/nextjs-prism` (MIT) — Reflect/Beam/Rainbow/Flare + prism.glb + lensflare
+  textures in `web/public/prism3d/`. The demo's LUT (F-6800-STD.cube, IWLTBAP) is
+  proprietary ("cannot be redistributed") — deliberately NOT shipped; the grade is
+  approximated with BrightnessContrast+Vignette. All five prism3d components are
+  componentSrcMap:null in the DS config (three.js must never enter the DS bundle).

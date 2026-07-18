@@ -1,66 +1,179 @@
 "use client";
 
-// Realistic glass prism: MeshTransmissionMaterial with chromatic dispersion,
-// lit by spectrum-colored lightformers (no external HDR — fully offline).
-// Loaded lazily via next/dynamic only for motion-ok, WebGL-capable clients.
+// The landing hero: a beam of light physically strikes a glass prism and
+// splits into a spectrum — Prism's brand story, rendered for real.
+// Scene architecture adapted from pmndrs/examples demos/nextjs-prism (MIT):
+// raycast Beam → GLTF glass prism → Snell-angle Rainbow + Flare + Bloom.
+// The beam follows the pointer over the stage; when idle it sweeps on its own.
 
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Lightformer, MeshTransmissionMaterial } from "@react-three/drei";
-import { useRef } from "react";
-import type { Mesh } from "three";
+import * as THREE from "three";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Bloom, BrightnessContrast, EffectComposer, Vignette } from "@react-three/postprocessing";
+import { Beam } from "@/components/prism3d/Beam";
+import { Flare } from "@/components/prism3d/Flare";
+import { PrismGlass } from "@/components/prism3d/PrismGlass";
+import { Rainbow, type RainbowMaterialImpl } from "@/components/prism3d/Rainbow";
+import type { RayEvent } from "@/components/prism3d/Reflect";
+import type { ReflectApi } from "@/components/prism3d/Reflect";
+import { calculateRefractionAngle, lerp, lerpV3 } from "@/components/prism3d/util";
 
-function Prism() {
-  const mesh = useRef<Mesh>(null);
-  useFrame((state, delta) => {
-    if (!mesh.current) return;
-    mesh.current.rotation.y += delta * 0.25;
-    mesh.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.12;
+function FitZoom() {
+  // Reproduce the reference demo's world scale (~13.5 world units of height)
+  // whatever the panel's pixel size — otherwise beams/flares render oversized.
+  const camera = useThree((s) => s.camera);
+  const height = useThree((s) => s.size.height);
+  useEffect(() => {
+    const ortho = camera as THREE.OrthographicCamera;
+    ortho.zoom = height / 13.5;
+    ortho.updateProjectionMatrix();
+  }, [camera, height]);
+  return null;
+}
+
+function Scene({ pointerActive }: { pointerActive: React.RefObject<boolean> }) {
+  const [isPrismHit, hitPrism] = useState(false);
+  const flare = useRef<THREE.Group>(null);
+  const spot = useRef<THREE.SpotLight>(null);
+  const boxreflect = useRef<ReflectApi>(null);
+  const rainbow = useRef<THREE.Mesh>(null);
+  const rayOrigin = useRef(new THREE.Vector3(-3, 1.2, 0));
+
+  const rainbowMat = () => rainbow.current?.material as RainbowMaterialImpl | undefined;
+
+  const rayOut = useCallback(() => hitPrism(false), []);
+  const rayOver = useCallback((e: RayEvent) => {
+    // Stop the ray at the prism, flash the spectrum on first contact
+    e.stopPropagation();
+    hitPrism(true);
+    const mat = rainbowMat();
+    if (mat) {
+      mat.speed = 1;
+      mat.emissiveIntensity = 20;
+    }
+  }, []);
+
+  const vec = useRef(new THREE.Vector3()).current;
+  const rayMove = useCallback(({ api, position, direction, normal }: RayEvent) => {
+    if (!normal) return;
+    // Extend the beam line to the prism's center
+    vec.toArray(api.positions, api.number++ * 3);
+    flare.current?.position.set(position.x, position.y, -0.5);
+    flare.current?.rotation.set(0, 0, -Math.atan2(direction.x, direction.y));
+    // Snell's law: rotate the rainbow to the refracted exit angle
+    let angleScreenCenter = Math.atan2(-position.y, -position.x);
+    const normalAngle = Math.atan2(normal.y, normal.x);
+    const incidentAngle = angleScreenCenter - normalAngle;
+    const refractionAngle = calculateRefractionAngle(incidentAngle) * 6;
+    angleScreenCenter += refractionAngle;
+    if (rainbow.current) rainbow.current.rotation.z = angleScreenCenter;
+    if (spot.current) {
+      lerpV3(spot.current.target.position, [Math.cos(angleScreenCenter), Math.sin(angleScreenCenter), 0], 0.05);
+      spot.current.target.updateMatrixWorld();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useFrame((state) => {
+    // Beam origin: pointer over the stage steers it; otherwise a slow sweep.
+    const t = state.clock.elapsedTime;
+    const target = new THREE.Vector3();
+    if (pointerActive.current) {
+      target.set((state.pointer.x * state.viewport.width) / 2, (state.pointer.y * state.viewport.height) / 2, 0);
+    } else {
+      target.set(
+        -state.viewport.width * 0.46,
+        Math.sin(t * 0.5) * 1.4 + 0.5,
+        0
+      );
+    }
+    rayOrigin.current.lerp(target, 0.08);
+    boxreflect.current?.setRay([rayOrigin.current.x, rayOrigin.current.y, 0], [0, 0, 0]);
+
+    // Settle the spectrum's intensity after the hit flash
+    const mat = rainbowMat();
+    if (mat) {
+      lerp(mat as unknown as Record<string, number>, "emissiveIntensity", isPrismHit ? 2.5 : 0, 0.1);
+      if (spot.current) spot.current.intensity = mat.emissiveIntensity;
+    }
   });
+
   return (
-    <mesh ref={mesh} rotation={[0.1, 0.4, 0]}>
-      {/* 3 radial segments = triangular prism */}
-      <cylinderGeometry args={[1.15, 1.15, 1.5, 3, 1]} />
-      <MeshTransmissionMaterial
-        transmission={1}
-        thickness={0.9}
-        roughness={0.07}
-        ior={1.5}
-        chromaticAberration={0.55}
-        anisotropicBlur={0.2}
-        samples={6}
-        resolution={256}
-        backside
-      />
-    </mesh>
+    <>
+      <pointLight position={[10, -10, 0]} intensity={0.05 * Math.PI} decay={0} />
+      <pointLight position={[0, 10, 0]} intensity={0.05 * Math.PI} decay={0} />
+      <pointLight position={[-10, 0, 0]} intensity={0.05 * Math.PI} decay={0} />
+      <spotLight ref={spot} intensity={Math.PI} decay={0} distance={7} angle={1} penumbra={1} position={[0, 0, 1]} />
+      <Beam ref={boxreflect} bounce={2} far={20}>
+        <PrismGlass position={[0, -0.4, 0]} onRayOver={rayOver} onRayOut={rayOut} onRayMove={rayMove} />
+      </Beam>
+      <Rainbow ref={rainbow} startRadius={0} endRadius={0.5} fade={0} />
+      <Flare ref={flare} visible={isPrismHit} renderOrder={10} scale={1.25} streak={[12.5, 20, 1]} />
+    </>
   );
 }
 
+const LENS_LABELS = [
+  { name: "Reader", color: "#f59e0b" },
+  { name: "Cyber", color: "#06b6d4" },
+  { name: "Markets", color: "#8b5cf6" },
+];
+
 export default function PrismHero() {
+  const wrapper = useRef<HTMLDivElement>(null);
+  const pointerActive = useRef(false);
+  const [visible, setVisible] = useState(true);
+
+  // Don't burn GPU when the hero is scrolled out of view.
+  useEffect(() => {
+    const node = wrapper.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.05 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="relative mx-auto mt-6 h-64 max-w-xl sm:h-80" aria-hidden>
-      {/* the spectrum beams stay 2D behind the glass — they tell the story */}
-      <svg viewBox="0 0 560 150" className="absolute inset-x-0 top-1/2 w-full -translate-y-1/2" style={{ opacity: 0.85 }}>
-        <defs>
-          <linearGradient id="beamW3d" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
-        <line x1="0" y1="75" x2="215" y2="75" stroke="url(#beamW3d)" strokeWidth="2.5" className="beam-in" />
-        <line x1="345" y1="70" x2="560" y2="22" stroke="#f59e0b" strokeWidth="2.5" className="beam-out" opacity="0.9" />
-        <line x1="345" y1="78" x2="560" y2="78" stroke="#06b6d4" strokeWidth="2.5" className="beam-out" opacity="0.9" />
-        <line x1="345" y1="86" x2="560" y2="134" stroke="#8b5cf6" strokeWidth="2.5" className="beam-out" opacity="0.9" />
-      </svg>
-      <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, 4.6], fov: 40 }} gl={{ alpha: true, antialias: true }}>
-        <Prism />
-        <Environment resolution={64}>
-          {/* spectrum light: what the glass refracts */}
-          <Lightformer intensity={4} position={[0, 2.5, -2]} scale={[8, 2, 1]} color="#ffffff" />
-          <Lightformer intensity={2.5} position={[-4, 0, 2]} scale={[3, 6, 1]} color="#f59e0b" />
-          <Lightformer intensity={2.5} position={[4, 1, 2]} scale={[3, 6, 1]} color="#06b6d4" />
-          <Lightformer intensity={2.2} position={[0, -3, 3]} scale={[6, 2, 1]} color="#8b5cf6" />
-        </Environment>
+    <div
+      ref={wrapper}
+      className="relative h-[340px] w-full overflow-hidden rounded-[22px] border sm:h-[400px]"
+      style={{ borderColor: "var(--line)", background: "#0b0a09" }}
+      onPointerEnter={() => (pointerActive.current = true)}
+      onPointerLeave={() => (pointerActive.current = false)}
+      aria-label="A beam of news split into three lenses"
+      role="img"
+    >
+      <Canvas
+        orthographic
+        frameloop={visible ? "always" : "never"}
+        gl={{ antialias: false }}
+        dpr={[1, 1.5]}
+        camera={{ position: [0, 0, 100], zoom: 30 }}
+      >
+        <color attach="background" args={["#0b0a09"]} />
+        <FitZoom />
+        <Suspense fallback={null}>
+          <Scene pointerActive={pointerActive} />
+          <EffectComposer>
+            <Bloom mipmapBlur levels={9} intensity={1.5} luminanceThreshold={1} luminanceSmoothing={1} />
+            {/* the reference grades with a proprietary LUT (not redistributable);
+                a contrast crush + vignette approximates its deep-black stage */}
+            <BrightnessContrast brightness={-0.07} contrast={0.28} />
+            <Vignette eskil={false} offset={0.18} darkness={0.75} />
+          </EffectComposer>
+        </Suspense>
       </Canvas>
+      {/* the design figure's labeling, carried into 3D */}
+      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: "#8d867d" }}>
+        one event
+      </span>
+      <div className="pointer-events-none absolute bottom-4 right-4 flex gap-3">
+        {LENS_LABELS.map((l) => (
+          <span key={l.name} className="text-xs font-semibold" style={{ color: l.color }}>
+            {l.name}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
