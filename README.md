@@ -1,4 +1,4 @@
-# Prism — One event. Every angle.
+# Prism — One story. Every perspective.
 
 **Prism is a role-aware AI news intelligence platform for everyone.** It clusters worldwide
 coverage into single canonical events, then reads each one through the user's professional
@@ -8,7 +8,7 @@ likely moves) for a trader — the *same event*, switchable on any story. Per st
 
 - **Lens briefs** — written per-lens analysis of what this event means for *you*, switchable
   to any other lens to see how the same news changes meaning
-- **Both Sides** — the story's sources grouped by stance and country of origin
+- **Both Sides** — the story's competing narratives grouped by stance, with outlet origin and affiliation labeled
 - **So What** — the impact graph: who is affected and the likely second-order outcomes
 - **Ask** — a grounded agent answering follow-ups from that story's own sources, with
   citations, refusing what the sources don't cover

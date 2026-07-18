@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
-import { LENS_ORDER, lensMeta } from "@/lib/lenses";
+import { lensMeta, useLenses } from "@/lib/lenses";
 
 interface DemoStory {
   id: string | null; // null = curated example
@@ -52,7 +52,8 @@ export function LensDemo() {
     })();
   }, []);
 
-  const lenses = LENS_ORDER.filter((slug) => story.briefs[slug]);
+  const registry = useLenses();
+  const lenses = registry.map((m) => m.slug).filter((slug) => story.briefs[slug]);
   const meta = lensMeta(active);
   const brief = story.briefs[active] ?? story.briefs[lenses[0]];
 

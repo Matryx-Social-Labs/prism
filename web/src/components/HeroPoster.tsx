@@ -1,37 +1,55 @@
-// Static hero figure: one beam of news refracted into three labeled lenses.
-// Serves as the loading state and the reduced-motion / no-WebGL fallback
-// for the 3D prism, so those users never download the three.js chunk.
+// The hero figure: one story refracted into many perspectives.
+// Animated, label-free, drawn on the page background in the page's own
+// theme — no lens is named (the lens set grows over time). Also serves as
+// the reduced-motion / no-WebGL / light-theme visual, so those users never
+// download the three.js chunk.
+
+const RAYS = [
+  { x2: 560, y2: 12, color: "#f59e0b", delay: "0s" },
+  { x2: 562, y2: 48, color: "#ef4444", delay: "0.12s" },
+  { x2: 564, y2: 80, color: "#10b981", delay: "0.24s" },
+  { x2: 562, y2: 112, color: "#06b6d4", delay: "0.36s" },
+  { x2: 560, y2: 148, color: "#8b5cf6", delay: "0.48s" },
+];
+
 export function HeroPoster() {
   return (
-    <div className="flex justify-center" aria-hidden>
-      <svg
-        viewBox="0 0 360 260"
-        className="w-full max-w-[420px]"
-        aria-label="A beam of news split into three lenses"
-      >
-        <line className="beam-in" x1="0" y1="130" x2="150" y2="130" stroke="var(--ink)" strokeWidth="2" />
+    <div className="mx-auto w-full max-w-[520px] xl:max-w-[560px]" aria-hidden>
+      <svg viewBox="0 0 620 160" className="w-full" role="img" aria-label="One story refracted into many perspectives">
+        <defs>
+          <linearGradient id="hero-beam-in" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="currentColor" stopOpacity="0" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0.9" />
+          </linearGradient>
+        </defs>
+        <line className="beam-in" x1="10" y1="80" x2="255" y2="80" stroke="url(#hero-beam-in)" strokeWidth="2.5" />
         <path
           className="prism-glow"
-          d="M180 55 L235 175 L125 175 Z"
+          d="M288 42 L324 118 L252 118 Z"
           fill="none"
-          stroke="var(--ink)"
+          stroke="currentColor"
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <line className="beam-out" x1="205" y1="120" x2="345" y2="62" stroke="var(--lens-general)" strokeWidth="2.4" />
-        <line className="beam-out" x1="210" y1="138" x2="350" y2="138" stroke="var(--lens-cyber)" strokeWidth="2.4" />
-        <line className="beam-out" x1="205" y1="156" x2="345" y2="214" stroke="var(--lens-finance)" strokeWidth="2.4" />
-        <text x="300" y="50" fontSize="12" fontWeight="600" fill="var(--lens-general)" fontFamily="inherit">
-          Reader
+        {RAYS.map((r) => (
+          <line
+            key={r.color}
+            className="beam-out"
+            x1="318"
+            y1="80"
+            x2={r.x2}
+            y2={r.y2}
+            stroke={r.color}
+            strokeWidth="2.4"
+            opacity="0.9"
+            style={{ animationDelay: r.delay }}
+          />
+        ))}
+        <text x="10" y="66" fontSize="11" fill="var(--ink-faint)" fontFamily="inherit">
+          one story
         </text>
-        <text x="308" y="128" fontSize="12" fontWeight="600" fill="var(--lens-cyber)" fontFamily="inherit">
-          Cyber
-        </text>
-        <text x="296" y="236" fontSize="12" fontWeight="600" fill="var(--lens-finance)" fontFamily="inherit">
-          Markets
-        </text>
-        <text x="8" y="118" fontSize="11" fill="var(--ink-faint)" fontFamily="inherit">
-          one event
+        <text x="486" y="158" fontSize="11" fill="var(--ink-faint)" fontFamily="inherit">
+          every perspective
         </text>
       </svg>
     </div>

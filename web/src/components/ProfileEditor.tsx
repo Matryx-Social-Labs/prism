@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchTaxonomy, type TaxonomySector } from "@/lib/api";
-import { LENS_ORDER, lensMeta } from "@/lib/lenses";
+import { useLenses } from "@/lib/lenses";
 
 export type Picks = Record<string, string[] | null>;
 
@@ -90,10 +90,11 @@ export function RegionGrid({ value, onChange }: { value: string; onChange: (code
 }
 
 export function LensCards({ value, onChange }: { value: string; onChange: (slug: string) => void }) {
+  const lenses = useLenses();
   return (
     <div className="stagger flex flex-col gap-3">
-      {LENS_ORDER.map((slug) => {
-        const m = lensMeta(slug);
+      {lenses.map((m) => {
+        const slug = m.slug;
         const sel = value === slug;
         return (
           <button
@@ -117,7 +118,7 @@ export function LensCards({ value, onChange }: { value: string; onChange: (slug:
               )}
             </span>
             <span className="mt-1.5 block text-[13.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-              {LENS_DETAIL[slug]}
+              {LENS_DETAIL[slug] ?? m.tagline}
             </span>
           </button>
         );
@@ -127,7 +128,7 @@ export function LensCards({ value, onChange }: { value: string; onChange: (slug:
           More lenses on the way
         </span>
         <span className="mt-1 block text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-          Policy · Legal · Health — new roles are added as lenses on the same backbone.
+          New roles are added continuously as lenses on the same backbone.
         </span>
       </div>
     </div>
@@ -135,10 +136,11 @@ export function LensCards({ value, onChange }: { value: string; onChange: (slug:
 }
 
 export function LensPills({ value, onChange }: { value: string; onChange: (slug: string) => void }) {
+  const lenses = useLenses();
   return (
     <div className="flex flex-wrap gap-2">
-      {LENS_ORDER.map((slug) => {
-        const m = lensMeta(slug);
+      {lenses.map((m) => {
+        const slug = m.slug;
         const sel = value === slug;
         return (
           <button

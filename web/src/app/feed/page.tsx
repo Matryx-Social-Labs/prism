@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { StoryRowCard, TopStoryCard } from "@/components/StoryCard";
 import { useTaxonomy } from "@/components/ProfileEditor";
 import { fetchFeed, type FeedItem } from "@/lib/api";
-import { LENS_ORDER, lensMeta } from "@/lib/lenses";
+import { lensMeta, useLenses } from "@/lib/lenses";
 import { loadProfile, saveProfile, type Profile } from "@/lib/profile";
 
 function regionName(code: string): string {
@@ -52,6 +52,7 @@ type Scope = "all" | "region" | "world";
 
 export default function FeedPage() {
   const taxonomy = useTaxonomy();
+  const lenses = useLenses();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [lens, setLens] = useState("general");
   const [sort, setSort] = useState<"latest" | "top">("latest");
@@ -117,7 +118,7 @@ export default function FeedPage() {
   const meta = lensMeta(lens);
 
   return (
-    <div className="mx-auto max-w-[1040px] px-5 pb-20 pt-7">
+    <div className="mx-auto max-w-[1200px] px-5 pb-20 pt-7 sm:px-8">
       <div className="mb-[18px] flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[30px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -132,14 +133,11 @@ export default function FeedPage() {
         </div>
         <div className="max-w-full overflow-x-auto">
           <div className="flex w-max gap-1 rounded-full border p-1" style={{ borderColor: "var(--line)" }} role="tablist" aria-label="Lens">
-            {LENS_ORDER.map((slug) => {
-              const m = lensMeta(slug);
-              return (
-                <Pill key={slug} selected={lens === slug} color={m.color} bg={m.bg} onClick={() => switchLens(slug)}>
-                  {m.short}
-                </Pill>
-              );
-            })}
+            {lenses.map((m) => (
+              <Pill key={m.slug} selected={lens === m.slug} color={m.color} bg={m.bg} onClick={() => switchLens(m.slug)}>
+                {m.short}
+              </Pill>
+            ))}
             <span
               title="More lenses are on the way"
               className="rounded-full border border-dashed px-3 py-1.5 text-xs font-semibold"
@@ -209,7 +207,7 @@ export default function FeedPage() {
             </h2>
             <span className="spectrum-bar h-0.5 flex-1 rounded-sm opacity-50" />
           </div>
-          <div className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3" key={`top-${lens}-${scope}`}>
+          <div className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-5" key={`top-${lens}-${scope}`}>
             {visibleTop.map((item) => (
               <TopStoryCard key={item.id} item={item} lens={lens} />
             ))}

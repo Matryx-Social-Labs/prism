@@ -42,7 +42,7 @@ streaming transport.
 ## Phase 3 pull-forward — the multi-lens platform for everyone ✅ (July 2026, founder decision)
 The general reader was promoted from Phase 3 to a first-class persona, and the product
 repositioned from "for cybersecurity professionals" to **role-aware news intelligence for
-everyone** ("One event. Every angle."):
+everyone** ("One story. Every perspective."):
 - **World-news ingestion**: BBC World, Al Jazeera English, Guardian World RSS (origin-diverse
   outlets feed Both-Sides grouping) + a GDELT world query — the general feed now carries real
   world news, not only professional stories.
@@ -74,6 +74,24 @@ the multi-lens experience is the product.
   fallback), thumbnails on cards, funding chips.
 - Next gates unchanged: auth + server-side profiles (1.4), follows/alerts, mobile (Expo),
   Marketaux fast-lane.
+
+## Next up (planned July 2026) — priority order
+1. **Accounts + synced profiles** (finishes 1.4): lightweight magic-link auth (Auth.js),
+   `user_profiles` table, server-side interests/lens/region sync. localStorage remains the
+   guest mode; accounts unlock cross-device continuity and the mobile app.
+2. **Follows & alerts**: follow entities, sectors, and threads; digest email + web push when a
+   followed thread gains a downstream event ("what followed" notifications — the event-links
+   graph makes this differentiated).
+3. **Search**: Postgres full-text + pgvector semantic search over events; search bar in the feed.
+4. **Lens platform**: registry fully server-driven end-to-end (the web now renders whatever
+   /api/v1/lenses returns, with styling fallbacks — done July 2026); add a "request a lens"
+   affordance; pick the next lens from usage signals (candidates: Policy/Legal, Health).
+5. **Mobile (Expo React Native)** on the same /api/v1; extract the typed client into
+   packages/api-client first.
+6. **Quality & ops**: thread-direction eval 0.75 → ≥0.9 (prompt iteration on thread-link);
+   extraction field-agreement evals; Langfuse cost dashboard per stage; source expansion —
+   fix/replace Press TV, add African + Latin American origins.
+7. **Sharing & SEO**: public story pages with OG images, sitemap, per-story canonical URLs.
 
 ## Phase 3 — Horizontal expansion
 Open personalization to general roles and sectors, add a prosumer graph and public API, and later

@@ -113,12 +113,6 @@ function Scene({ pointerActive }: { pointerActive: React.RefObject<boolean> }) {
   );
 }
 
-const LENS_LABELS = [
-  { name: "Reader", color: "#f59e0b" },
-  { name: "Cyber", color: "#06b6d4" },
-  { name: "Markets", color: "#8b5cf6" },
-];
-
 export default function PrismHero() {
   const wrapper = useRef<HTMLDivElement>(null);
   const pointerActive = useRef(false);
@@ -140,7 +134,7 @@ export default function PrismHero() {
       style={{ borderColor: "var(--line)", background: "#0b0a09" }}
       onPointerEnter={() => (pointerActive.current = true)}
       onPointerLeave={() => (pointerActive.current = false)}
-      aria-label="A beam of news split into three lenses"
+      aria-label="One story refracted into many perspectives"
       role="img"
     >
       <Canvas
@@ -163,17 +157,13 @@ export default function PrismHero() {
           </EffectComposer>
         </Suspense>
       </Canvas>
-      {/* the design figure's labeling, carried into 3D */}
+      {/* the design figure's captions, carried into 3D — no lens is named */}
       <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: "#8d867d" }}>
-        one event
+        one story
       </span>
-      <div className="pointer-events-none absolute bottom-4 right-4 flex gap-3">
-        {LENS_LABELS.map((l) => (
-          <span key={l.name} className="text-xs font-semibold" style={{ color: l.color }}>
-            {l.name}
-          </span>
-        ))}
-      </div>
+      <span className="pointer-events-none absolute bottom-4 right-4 text-[11px]" style={{ color: "#8d867d" }}>
+        every perspective
+      </span>
     </div>
   );
 }

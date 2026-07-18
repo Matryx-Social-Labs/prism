@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
-import { LENS_ORDER, lensMeta } from "@/lib/lenses";
+import { lensMeta, useLenses } from "@/lib/lenses";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { ThreadRail } from "@/components/ThreadRail";
@@ -86,9 +86,11 @@ export function StoryView({ event }: { event: EventDetail }) {
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
 
+  const registry = useLenses();
+  const registrySlugs = registry.map((m) => m.slug);
   const offered = event.available_lenses?.length
-    ? LENS_ORDER.filter((slug) => event.available_lenses.includes(slug))
-    : LENS_ORDER;
+    ? registrySlugs.filter((slug) => event.available_lenses.includes(slug))
+    : registrySlugs;
 
   useEffect(() => {
     const profile = loadProfile();
@@ -127,7 +129,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       : null;
 
   return (
-    <article className="mx-auto max-w-[780px] px-5 pb-[120px] pt-7">
+    <article className="mx-auto max-w-[780px] px-5 sm:px-8 pb-[120px] pt-7">
       <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
@@ -431,7 +433,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       <section className="mt-11">
         <SectionTitle
           title="Both sides"
-          hint="Coverage grouped by origin country and stance — so you can see who frames it how."
+          hint="The story's competing narratives, side by side — grouped by stance, with every outlet's origin and affiliation visible."
         />
         {event.perspectives.length === 0 ? (
           <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>

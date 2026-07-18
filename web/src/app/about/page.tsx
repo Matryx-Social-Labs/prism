@@ -25,7 +25,7 @@ const LABELS = [
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-[640px] px-5 pb-20 pt-11">
+    <div className="mx-auto max-w-[640px] px-5 sm:px-8 pb-20 pt-11">
       <p className="mb-3.5 text-[11.5px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--ink-faint)" }}>
         Why Prism exists
       </p>
@@ -36,10 +36,11 @@ export default function AboutPage() {
         News is one-sided because you only ever see one side.
       </h1>
       <p className="mt-[18px] text-[15.5px] leading-[1.75]" style={{ color: "var(--ink-muted)" }}>
-        Most readers only ever see their own country&apos;s framing of a story. Prism deliberately
-        ingests outlets across many origin countries, merges the many reports of one real event
-        into a single canonical story, and shows you every side — and who is speaking. Then{" "}
-        <strong style={{ color: "var(--ink)" }}>you</strong> decide.
+        A side is a narrative: a political story has two narrations, and most readers only ever
+        hear one of them. Prism merges the many reports of one real event into a single canonical
+        story and shows the competing narratives side by side — backed by deliberately diverse
+        sourcing across many origin countries and transparency labels on every outlet, so you
+        always know who is speaking. Then <strong style={{ color: "var(--ink)" }}>you</strong> decide.
       </p>
 
       <h2 className="mb-3.5 mt-10 text-[22px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>

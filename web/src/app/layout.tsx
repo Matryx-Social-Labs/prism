@@ -17,9 +17,9 @@ const ui = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Prism — One event. Every angle.",
+  title: "Prism — One story. Every perspective.",
   description:
-    "Role-aware AI news intelligence. The same story through your professional lens — cyber, markets, or simply staying informed — with both sides, consequences, and a grounded agent you can ask.",
+    "Role-aware AI news intelligence. The same story through your professional lens — with more lenses added continuously — both sides of the narrative, consequences, and a grounded agent you can ask.",
 };
 
 const themeInit = `(function(){try{var t=localStorage.getItem("prism.theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}})();`;
@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           className="sticky top-0 z-40 border-b backdrop-blur-md"
           style={{ borderColor: "var(--line)", background: "var(--glass)" }}
         >
-          <div className="mx-auto flex max-w-[1080px] items-center justify-between gap-3 px-5 py-[11px]">
+          <div className="mx-auto flex max-w-[1320px] items-center justify-between gap-3 px-5 py-[11px] sm:px-8 xl:px-10">
             <Link href="/" className="flex items-center gap-2.5" style={{ color: "var(--ink)" }}>
               <PrismMark />
               <span
@@ -55,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="w-full flex-1">{children}</main>
         <footer className="mt-auto border-t" style={{ borderColor: "var(--line)" }}>
           <div
-            className="mx-auto flex max-w-[1080px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs"
+            className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
             style={{ color: "var(--ink-muted)" }}
           >
             <span>◮ Prism — role-aware news intelligence. Every claim traceable to its source.</span>

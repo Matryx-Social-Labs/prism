@@ -39,7 +39,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[600px] px-5 pb-20 pt-9">
+    <div className="mx-auto max-w-[600px] px-5 sm:px-8 pb-20 pt-9">
       <div className="mb-[30px] flex items-center justify-between">
         <div className="flex items-center gap-2.5" aria-label={`Step ${step + 1} of 3`}>
           {STEPS.map((label, i) => (

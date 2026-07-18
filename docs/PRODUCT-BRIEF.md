@@ -39,7 +39,7 @@ and a `relevance and ranking model` (what to surface and in what order), produci
 Not another aggregator that shows more headlines faster. Prism is the product that shows you every
 side of a story, tells you what it means and what happens next, lets you ask, and does all of this
 shaped to your role — while letting you borrow anyone else's lens on demand. One-line pitch:
-**"One event. Every angle."** Role-specific pitch for the deepest lens: the security and GRC news
+**"One story. Every perspective."** Role-specific pitch for the deepest lens: the security and GRC news
 feed that tells you what a story means for your controls, from both sides, with a briefing you can
 question.
 

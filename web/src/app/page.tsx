@@ -31,7 +31,7 @@ const HOW_STEPS = [
   {
     n: "03",
     title: "Lens",
-    body: "Written briefs re-read the same event for each profession — reader, cyber, markets. More lenses join the same backbone.",
+    body: "Written briefs re-read the same story for each profession. Lenses are added continuously on the same backbone.",
   },
   {
     n: "04",
@@ -46,7 +46,7 @@ const PERSONAS = [
     name: "For everyone staying informed",
     points: [
       "World news clustered into single stories — not fifty duplicate headlines",
-      "Both sides of every contested story, grouped by stance and origin",
+      "Both sides of every contested story — the competing narratives, not just one framing",
       "What happens next: the consequence graph behind each event",
       "Ask anything — answers cite the story's own sources or say so",
     ],
@@ -84,13 +84,13 @@ const TRUST = [
   },
   {
     title: "Both sides, by design",
-    body: "Sources are grouped by stance and country of origin, so you see how each side frames the same event — before deciding what to believe.",
+    body: "Sources are grouped by stance, so you see how each side tells the same story — with every outlet's origin and affiliation labeled — before deciding what to believe.",
   },
 ];
 
 export default function LandingPage() {
   return (
-    <div className="mx-auto max-w-[1080px] px-5">
+    <div className="mx-auto max-w-[1320px] px-5 sm:px-8 xl:px-10">
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="grid items-center gap-12 pb-14 pt-12 sm:pt-[72px] lg:grid-cols-[1.05fr_0.95fr]">
         <div>
@@ -101,14 +101,14 @@ export default function LandingPage() {
             Role-aware news intelligence
           </p>
           <h1
-            className="text-[42px] font-semibold leading-[1.02] tracking-tight sm:text-[64px]"
+            className="text-[42px] font-semibold leading-[1.02] tracking-tight sm:text-[64px] xl:text-[76px]"
             style={{ fontFamily: "var(--font-display), serif" }}
           >
-            One event.
+            One story.
             <br />
-            <span className="spectrum-text">Every angle.</span>
+            <span className="spectrum-text">Every perspective.</span>
           </h1>
-          <p className="mt-[22px] max-w-[480px] text-[17px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-[22px] max-w-[520px] text-[17px] leading-[1.65] xl:text-lg" style={{ color: "var(--ink-muted)" }}>
             Prism clusters worldwide coverage into single events, then reads each one through{" "}
             <em>your</em> professional lens. A war is a humanitarian story, a cyber-risk window,
             and a market catalyst at once — switch the lens and the same news changes meaning.
@@ -146,7 +146,7 @@ export default function LandingPage() {
             Flip the lens on a real event and watch the read change.
           </p>
         </div>
-        <div className="mx-auto max-w-[680px]">
+        <div className="mx-auto max-w-[680px] xl:max-w-[760px]">
           <LensDemo />
         </div>
         <p className="mt-4 text-center text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
@@ -160,13 +160,14 @@ export default function LandingPage() {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <h2 className="text-[32px] font-semibold leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-              Most people only ever see one country&apos;s version.
+              Most people only ever hear one side of the story.
             </h2>
             <p className="mt-3.5 text-[15px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
-              Prism deliberately ingests outlets across many origin countries, labels
-              state-affiliated and public broadcasters transparently, and measures every story&apos;s
-              coverage-origin balance. You see every side —{" "}
-              <strong style={{ color: "var(--ink)" }}>and who is speaking</strong>.
+              A side is a narrative — a political story has two framings wherever it&apos;s told.
+              Prism shows the competing narratives side by side, and backs it with deliberately
+              diverse sourcing across many origin countries, transparency labels for
+              state-affiliated and public broadcasters, and a coverage-balance measure on every
+              story. You see every side — <strong style={{ color: "var(--ink)" }}>and who is speaking</strong>.
             </p>
           </div>
           <div>
@@ -317,7 +318,8 @@ export default function LandingPage() {
           ))}
         </div>
         <p className="mt-5 text-center text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-          New roles are lenses on the same backbone — not new products. More lenses are on the way.
+          These are today&apos;s lenses. New roles are added continuously on the same backbone — not
+          as new products.
         </p>
       </Reveal>
 

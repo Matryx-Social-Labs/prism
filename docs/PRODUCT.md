@@ -1,6 +1,6 @@
 # Prism — Product placement
 
-*One event. Every angle.* Role-aware AI news intelligence for everyone.
+*One story. Every perspective.* Role-aware AI news intelligence for everyone.
 
 ## The problem
 
