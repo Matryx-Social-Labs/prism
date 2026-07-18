@@ -118,7 +118,7 @@ export default function FeedPage() {
   const meta = lensMeta(lens);
 
   return (
-    <div className="mx-auto max-w-[1200px] px-5 pb-20 pt-7 sm:px-8">
+    <div className="mx-auto max-w-[1320px] px-5 pb-20 pt-7 sm:px-8 xl:px-10">
       <div className="mb-[18px] flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[30px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>

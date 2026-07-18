@@ -19,13 +19,13 @@ import type { ReflectApi } from "@/components/prism3d/Reflect";
 import { calculateRefractionAngle, lerp, lerpV3 } from "@/components/prism3d/util";
 
 function FitZoom() {
-  // Reproduce the reference demo's world scale (~13.5 world units of height)
-  // whatever the panel's pixel size — otherwise beams/flares render oversized.
+  // Match the reference demo's ON-SCREEN prism presence (~40% of panel height —
+  // its full-window canvas renders the prism ~260px; a small panel must zoom in).
   const camera = useThree((s) => s.camera);
   const height = useThree((s) => s.size.height);
   useEffect(() => {
     const ortho = camera as THREE.OrthographicCamera;
-    ortho.zoom = height / 13.5;
+    ortho.zoom = height / 9.5;
     ortho.updateProjectionMatrix();
   }, [camera, height]);
   return null;
@@ -100,13 +100,16 @@ function Scene({ pointerActive }: { pointerActive: React.RefObject<boolean> }) {
 
   return (
     <>
-      <ambientLight intensity={0.08} />
+      <ambientLight intensity={0.12} />
+      {/* frontal key: clearcoat facets need a light to reflect or the glass
+          is invisible against the dark stage */}
+      <pointLight position={[0, 0.5, 3.5]} intensity={0.9} decay={0} />
       <pointLight position={[10, -10, 0]} intensity={0.12 * Math.PI} decay={0} />
       <pointLight position={[0, 10, 0]} intensity={0.12 * Math.PI} decay={0} />
       <pointLight position={[-10, 0, 0]} intensity={0.12 * Math.PI} decay={0} />
       <spotLight ref={spot} intensity={Math.PI} decay={0} distance={7} angle={1} penumbra={1} position={[0, 0, 1]} />
       <Beam ref={boxreflect} bounce={2} far={20}>
-        <PrismGlass position={[0, -0.4, 0]} onRayOver={rayOver} onRayOut={rayOut} onRayMove={rayMove} />
+        <PrismGlass position={[0, -0.3, 0]} onRayOver={rayOver} onRayOut={rayOut} onRayMove={rayMove} />
       </Beam>
       <Rainbow ref={rainbow} startRadius={0} endRadius={0.5} fade={0} />
       <Flare ref={flare} visible={isPrismHit} renderOrder={10} scale={1.25} streak={[12.5, 20, 1]} />

@@ -36,6 +36,11 @@ export function PrismGlass({
       >
         <cylinderGeometry args={[1, 1, 1, 3, 1]} />
       </mesh>
+      {/* smoky body: gives the glass visible substance on the dark stage
+          (the reference demo gets this from its proprietary LUT grade) */}
+      <mesh position={[0, 0, 0.6]} scale={1.97} geometry={nodes.Cone.geometry}>
+        <meshBasicMaterial color="#b5aa9c" transparent opacity={0.06} depthWrite={false} />
+      </mesh>
       {/* visible hi-res beveled prism */}
       <mesh position={[0, 0, 0.6]} renderOrder={10} scale={2} dispose={null} geometry={nodes.Cone.geometry}>
         <MeshTransmissionMaterial
@@ -49,7 +54,8 @@ export function PrismGlass({
         />
         {/* faint facet outline so the glass reads as a prism even before
             the beam lights it (against the dark stage it was invisible) */}
-        <Edges scale={1.002} threshold={20} color="#57514a" />
+        <Edges scale={1.002} threshold={20} color="#cfc6b8" />
+        <Edges scale={1.012} threshold={20} color="#3d3831" />
       </mesh>
     </group>
   );

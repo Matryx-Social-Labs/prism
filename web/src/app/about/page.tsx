@@ -25,7 +25,7 @@ const LABELS = [
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-[640px] px-5 sm:px-8 pb-20 pt-11">
+    <div className="mx-auto max-w-[760px] px-5 pb-20 pt-11 sm:px-8">
       <p className="mb-3.5 text-[11.5px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--ink-faint)" }}>
         Why Prism exists
       </p>

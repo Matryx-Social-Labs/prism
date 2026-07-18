@@ -31,7 +31,7 @@ export default function SectorPage({ params }: { params: Promise<{ slug: string 
   );
 
   return (
-    <div className="mx-auto max-w-[1200px] px-5 pb-20 pt-7 sm:px-8">
+    <div className="mx-auto max-w-[1320px] px-5 pb-20 pt-7 sm:px-8 xl:px-10">
       <Link href="/feed" className="mb-[18px] block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>

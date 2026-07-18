@@ -47,7 +47,7 @@ export default function InterestsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[600px] px-5 sm:px-8 pb-20 pt-9">
+    <div className="mx-auto max-w-[720px] px-5 pb-20 pt-9 sm:px-8">
       <h1 className="text-[30px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
         Your Prism
       </h1>
