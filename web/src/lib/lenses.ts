@@ -64,6 +64,9 @@ export function useLenses(): LensMeta[] {
     fetchLenses()
       .then((list) => {
         if (cancelled || list.length === 0) return;
+        // Reader-first presentation, API order otherwise (the API leads with
+        // the professional beachhead; consumers here address everyone).
+        list = [...list.filter((l) => l.slug === "general"), ...list.filter((l) => l.slug !== "general")];
         setLenses(
           list.map((info, i) => {
             const known = LENS_META[info.slug];
