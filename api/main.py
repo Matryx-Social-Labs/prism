@@ -139,6 +139,7 @@ class EventDetail(BaseModel):
     last_updated_at: str
     projection: dict | None
     lens_briefs: dict[str, str]
+    lens_points: dict[str, list[str]]
     available_lenses: list[str]
     coverage: CoverageOut | None
     entities: list[EntityOut]
@@ -151,6 +152,7 @@ class EventDetail(BaseModel):
 class BriefResponse(BaseModel):
     lens: str
     brief: str | None
+    points: list[str] = []
     cached: bool
 
 
@@ -427,6 +429,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         last_updated_at=event["last_updated_at"].isoformat(),
         projection=event["projection"],
         lens_briefs=projection.get("lens_briefs") or {},
+        lens_points=projection.get("lens_points") or {},
         available_lenses=available_lenses(projection, event["sector"]),
         coverage=projection.get("coverage"),
         entities=[
@@ -490,9 +493,11 @@ async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(g
     if row is None:
         raise HTTPException(status_code=404, detail="event not found")
 
-    cached = ((row["projection"] or {}).get("lens_briefs") or {}).get(lens)
+    projection = row["projection"] or {}
+    cached = (projection.get("lens_briefs") or {}).get(lens)
     if cached:
-        return BriefResponse(lens=lens, brief=cached, cached=True)
+        points = (projection.get("lens_points") or {}).get(lens) or []
+        return BriefResponse(lens=lens, brief=cached, points=points, cached=True)
 
     lock = _brief_locks[f"{event_id}:{lens}"]
     async with lock:
@@ -502,13 +507,18 @@ async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(g
                 text("SELECT projection FROM events WHERE id = :eid"), {"eid": str(event_id)}
             )
         ).mappings().first()
-        cached = ((row["projection"] or {}).get("lens_briefs") or {}).get(lens)
+        projection = row["projection"] or {}
+        cached = (projection.get("lens_briefs") or {}).get(lens)
         if cached:
-            return BriefResponse(lens=lens, brief=cached, cached=True)
+            points = (projection.get("lens_points") or {}).get(lens) or []
+            return BriefResponse(lens=lens, brief=cached, points=points, cached=True)
 
         briefs = await generate_briefs(event_id, [lens])
         await persist_briefs(event_id, briefs)
-        return BriefResponse(lens=lens, brief=briefs.get(lens), cached=False)
+        read = briefs.get(lens) or {}
+        return BriefResponse(
+            lens=lens, brief=read.get("text"), points=read.get("points") or [], cached=False
+        )
 
 
 @app.get("/api/v1/events/{event_id}/questions", response_model=QuestionsResponse)

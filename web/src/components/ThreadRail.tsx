@@ -26,7 +26,9 @@ interface Row {
 }
 
 function rows(thread: { upstream: ThreadNode[]; downstream: ThreadNode[] }, currentTitle: string): Row[] {
-  const fmt = (n: ThreadNode) => (n.occurred_at ? n.occurred_at.slice(0, 10) : (n.sector ?? "related"));
+  const fmt = (n: ThreadNode) =>
+    (n.occurred_at ? n.occurred_at.slice(0, 10) : (n.sector ?? "related")) +
+    (n.relation === "related" ? " · related" : "");
   return [
     ...thread.upstream.map((n) => ({
       key: n.event_id,
@@ -63,7 +65,8 @@ export function ThreadRail({
         The thread
       </h2>
       <p className="mb-[18px] text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-        What led here, and what followed — each link carries its cited rationale.
+        The news chain: what led here and what followed, hop by hop — only confident causal links
+        are shown, each with its rationale.
       </p>
       <div className="flex flex-col">
         {list.map((row, i) => (

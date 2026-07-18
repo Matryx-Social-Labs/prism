@@ -82,6 +82,7 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   const [lens, setLens] = useState("general");
   const [briefs, setBriefs] = useState<Record<string, string>>(event.lens_briefs ?? {});
+  const [points, setPoints] = useState<Record<string, string[]>>(event.lens_points ?? {});
   const [briefLoading, setBriefLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
@@ -109,6 +110,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         if (cancelled) return;
         setBriefLoading(false);
         if (res?.brief) setBriefs((prev) => ({ ...prev, [lens]: res.brief! }));
+        if (res?.points?.length) setPoints((prev) => ({ ...prev, [lens]: res.points! }));
       });
     }
     return () => {
@@ -119,6 +121,9 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   const meta = lensMeta(lens);
   const brief = briefs[lens];
+  const lensPoints = points[lens] ?? [];
+  const pointsHeading =
+    lens === "cyber_grc" ? "What to check" : lens === "finance_trader" ? "What to watch" : "What to watch next";
   const cvss = cyber?.cvss ?? {};
   const exploitation = cyber?.exploitation ?? {};
   const coverageEntries = Object.entries(event.coverage?.origins ?? {}).sort((a, b) => b[1] - a[1]);
@@ -302,12 +307,31 @@ export function StoryView({ event }: { event: EventDetail }) {
               </p>
             </div>
           ) : brief ? (
-            <p className="text-[14.5px] leading-[1.7]">
-              <span className="font-semibold" style={{ color: meta.color }}>
-                Through the {meta.name} lens —{" "}
-              </span>
-              <span style={{ color: "var(--ink-muted)" }}>{brief}</span>
-            </p>
+            <div className="flex flex-col gap-3.5">
+              <p className="text-[14.5px] leading-[1.7]">
+                <span className="font-semibold" style={{ color: meta.color }}>
+                  Through the {meta.name} lens —{" "}
+                </span>
+                <span style={{ color: "var(--ink-muted)" }}>{brief}</span>
+              </p>
+              {lensPoints.length > 0 && (
+                <div>
+                  <h3 className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+                    {pointsHeading}
+                  </h3>
+                  <ul className="flex flex-col gap-1.5">
+                    {lensPoints.map((pt) => (
+                      <li key={pt} className="flex gap-2 text-[13.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
+                        <span aria-hidden style={{ color: meta.color }}>
+                          ◆
+                        </span>
+                        <span>{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           ) : (
             <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
               The {meta.name} read of this story isn&apos;t available yet.

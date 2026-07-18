@@ -25,23 +25,44 @@ class CorrelationResult(BaseModel):
     impacts: list[CorrelatedImpact] = Field(default_factory=list)
 
 
+class LensRead(BaseModel):
+    """One lens's analysis: the written brief + short actionable points."""
+
+    text: str = ""
+    points: list[str] = Field(default_factory=list)
+
+    @field_validator("points", mode="before")
+    @classmethod
+    def _coerce_points(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        return [str(x) for x in v if x]
+
+
 class LensBriefs(BaseModel):
     """Per-lens written analysis of one event ("through the X lens...").
 
     Keys match common/lenses.py slugs. None = not generated for that lens.
     """
 
-    general: str | None = None
-    cyber_grc: str | None = None
-    finance_trader: str | None = None
+    general: LensRead | None = None
+    cyber_grc: LensRead | None = None
+    finance_trader: LensRead | None = None
 
     @field_validator("general", "cyber_grc", "finance_trader", mode="before")
     @classmethod
-    def _coerce_text(cls, v):
+    def _coerce_read(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return {"text": v}
         if isinstance(v, list):
-            return " ".join(str(item) for item in v)
-        if isinstance(v, dict):  # models sometimes wrap: {"text": "..."}
-            return v.get("text") or v.get("brief") or None
+            return {"text": " ".join(str(item) for item in v)}
+        if isinstance(v, dict):
+            text = v.get("text") or v.get("brief") or ""
+            return {"text": text, "points": v.get("points") or v.get("watch") or v.get("checks") or []}
         return v
 
 

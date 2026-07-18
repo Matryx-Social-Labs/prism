@@ -67,3 +67,23 @@ def test_coverage_single_origin_shape():
     assert gdelt_country_to_iso("united states") == "US"
     assert gdelt_country_to_iso("Atlantis") is None
     assert gdelt_country_to_iso(None) is None
+
+
+def test_template_briefs_structured():
+    from correlation.briefs import template_briefs
+
+    b = template_briefs(
+        {
+            "cyber": {
+                "cve_ids": ["CVE-2026-1"],
+                "cvss": {"score": 9.8, "severity": "critical"},
+                "exploitation": {"kev_listed": True},
+                "remediation": {"action": "Upgrade to 7.2.12"},
+                "affected": [{"vendor": "Fortinet", "product": "FortiOS"}],
+                "control_mapping": [{"framework": "NIST", "control": "SI-2"}],
+            }
+        },
+        None,
+    )
+    assert b["general"]["text"] and b["cyber_grc"]["text"]
+    assert "Upgrade to 7.2.12" in b["cyber_grc"]["points"]

@@ -35,7 +35,7 @@ def primary_lens_for(sector: str | None) -> str:
     return SECTOR_PRIMARY_LENS.get(sector or "", "general")
 
 
-def template_briefs(projection: dict, summary: str | None) -> dict[str, str]:
+def template_briefs(projection: dict, summary: str | None) -> dict[str, dict]:
     """Deterministic briefs for authoritative CVE records — no LLM."""
     cyber = projection.get("cyber") or {}
     cvss = cyber.get("cvss") or {}
@@ -75,10 +75,27 @@ def template_briefs(projection: dict, summary: str | None) -> dict[str, str]:
         f"{('Relevant controls: ' + checks + '.') if checks else ''}"
     )
 
-    return {"general": general.strip(), "cyber_grc": cyber_brief.strip()}
+    general_points = [
+        p for p in [
+            "Check whether your organization uses the affected software" if products else None,
+            "Expect a patch or maintenance window from your IT team" if exploited else None,
+        ] if p
+    ]
+    cyber_points = [
+        p for p in [
+            f"Inventory exposure to: {products}" if products else "Inventory exposure to the affected versions",
+            remediation.get("action"),
+            "Treat as emergency patch — KEV-listed, exploitation confirmed" if exploited else "Prioritize by internet exposure",
+            f"Map to controls: {checks}" if checks else None,
+        ] if p
+    ]
+    return {
+        "general": {"text": general.strip(), "points": general_points},
+        "cyber_grc": {"text": cyber_brief.strip(), "points": cyber_points},
+    }
 
 
-async def generate_briefs(event_id: uuid.UUID, lenses: list[str]) -> dict[str, str]:
+async def generate_briefs(event_id: uuid.UUID, lenses: list[str]) -> dict[str, dict]:
     """LLM-generate briefs for the requested lenses; caller persists."""
     async with session_scope() as session:
         event = (
@@ -145,17 +162,33 @@ async def generate_briefs(event_id: uuid.UUID, lenses: list[str]) -> dict[str, s
         langfuse_prompt=prompt if prompt.version else None,
     )
     generated = {
-        slug: text
-        for slug, text in result.model_dump().items()
-        if slug in lenses and text
+        slug: read
+        for slug, read in result.model_dump().items()
+        if slug in lenses and read and read.get("text")
     }
     logger.info("lens_briefs_generated", event_id=str(event_id), lenses=list(generated))
     return generated
 
 
-async def persist_briefs(event_id: uuid.UUID, briefs: dict[str, str]) -> None:
-    """Merge briefs into the event projection (jsonb, concurrency-safe)."""
+async def persist_briefs(event_id: uuid.UUID, briefs: dict[str, dict | str]) -> None:
+    """Merge briefs into the event projection (jsonb, concurrency-safe).
+
+    Texts land in projection.lens_briefs (strings — served/consumed
+    everywhere), action points in projection.lens_points.
+    """
     if not briefs:
+        return
+    texts = {
+        slug: (read["text"] if isinstance(read, dict) else str(read))
+        for slug, read in briefs.items()
+        if (read.get("text") if isinstance(read, dict) else read)
+    }
+    points = {
+        slug: read["points"]
+        for slug, read in briefs.items()
+        if isinstance(read, dict) and read.get("points")
+    }
+    if not texts:
         return
     async with session_scope() as session:
         await session.execute(
@@ -163,15 +196,20 @@ async def persist_briefs(event_id: uuid.UUID, briefs: dict[str, str]) -> None:
                 """
                 UPDATE events
                 SET projection = jsonb_set(
-                    COALESCE(projection, '{}'::jsonb),
-                    '{lens_briefs}',
-                    COALESCE(projection -> 'lens_briefs', '{}'::jsonb) || CAST(:briefs AS jsonb),
+                    jsonb_set(
+                        COALESCE(projection, '{}'::jsonb),
+                        '{lens_briefs}',
+                        COALESCE(projection -> 'lens_briefs', '{}'::jsonb) || CAST(:briefs AS jsonb),
+                        true
+                    ),
+                    '{lens_points}',
+                    COALESCE(projection -> 'lens_points', '{}'::jsonb) || CAST(:points AS jsonb),
                     true
                 )
                 WHERE id = :eid
                 """
             ),
-            {"eid": str(event_id), "briefs": json.dumps(briefs)},
+            {"eid": str(event_id), "briefs": json.dumps(texts), "points": json.dumps(points)},
         )
 
 

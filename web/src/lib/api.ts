@@ -118,6 +118,7 @@ export interface EventDetail {
   occurred_at: string | null;
   last_updated_at: string;
   lens_briefs: Record<string, string>;
+  lens_points: Record<string, string[]>;
   available_lenses: string[];
   coverage: CoverageOut | null;
   entities: EntityOut[];
@@ -200,7 +201,7 @@ export async function fetchQuestions(id: string, lens?: string): Promise<string[
 export async function fetchBrief(
   eventId: string,
   lens: string,
-): Promise<{ lens: string; brief: string | null; cached: boolean } | null> {
+): Promise<{ lens: string; brief: string | null; points?: string[]; cached: boolean } | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/events/${eventId}/brief?lens=${encodeURIComponent(lens)}`, {
       cache: "no-store",

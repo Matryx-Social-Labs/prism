@@ -189,26 +189,74 @@ def format_thread_node(row) -> dict:
     }
 
 
+# Chain traversal: only confident causal edges make the displayed chain —
+# an inaccurate chain is worse than a short one.
+CHAIN_MIN_CONFIDENCE = 0.55
+CHAIN_MAX_DEPTH = 3
+CHAIN_MAX_NODES = 8
+
+
+async def _walk_chain(session, event_id: uuid.UUID, direction: str) -> list[dict]:
+    """Multi-hop walk over leads_to edges (ancestors or descendants)."""
+    frontier = {str(event_id)}
+    seen = {str(event_id)}
+    out: list[dict] = []
+    for _ in range(CHAIN_MAX_DEPTH):
+        if not frontier or len(out) >= CHAIN_MAX_NODES:
+            break
+        near, far = ("to_event_id", "from_event_id") if direction == "up" else ("from_event_id", "to_event_id")
+        rows = (
+            await session.execute(
+                text(
+                    f"""
+                    SELECT e.id, e.title, e.sector, e.occurred_at, e.image_url,
+                           l.relation, l.rationale, l.confidence, l.from_event_id
+                    FROM event_links l
+                    JOIN events e ON e.id = l.{far}
+                    WHERE l.{near} = ANY(CAST(:ids AS uuid[]))
+                      AND l.relation = 'leads_to'
+                      AND COALESCE(l.confidence, 1.0) >= {CHAIN_MIN_CONFIDENCE}
+                    """
+                ),
+                {"ids": list(frontier)},
+            )
+        ).mappings().all()
+        frontier = set()
+        for row in rows:
+            rid = str(row["id"])
+            if rid in seen:
+                continue  # cycle guard
+            seen.add(rid)
+            frontier.add(rid)
+            out.append(format_thread_node(row))
+            if len(out) >= CHAIN_MAX_NODES:
+                break
+    out.sort(key=lambda n: n["occurred_at"] or "")
+    return out
+
+
 async def fetch_thread(event_id: uuid.UUID) -> dict:
-    """Upstream (what led here) and downstream (what followed) linked events."""
-    query = """
-        SELECT e.id, e.title, e.sector, e.occurred_at, e.image_url,
-               l.relation, l.rationale, l.confidence, l.from_event_id
-        FROM event_links l
-        JOIN events e ON e.id = CASE WHEN l.from_event_id = :eid THEN l.to_event_id ELSE l.from_event_id END
-        WHERE (l.from_event_id = :eid OR l.to_event_id = :eid)
-          AND l.relation != 'none'
-        ORDER BY e.occurred_at NULLS LAST
-    """
+    """The event's news chain: multi-hop causal ancestors (what led here),
+    multi-hop descendants (what followed), plus direct 'related' context."""
     async with session_scope() as session:
-        rows = (await session.execute(text(query), {"eid": str(event_id)})).mappings().all()
-    upstream, downstream = [], []
-    for row in rows:
-        node = format_thread_node(row)
-        if row["relation"] == "leads_to" and str(row["from_event_id"]) != str(event_id):
-            upstream.append(node)  # the other event leads to this one
-        elif row["relation"] == "leads_to":
-            downstream.append(node)
-        else:  # 'related' — direction unknown; show as context
-            upstream.append(node)
+        upstream = await _walk_chain(session, event_id, "up")
+        downstream = await _walk_chain(session, event_id, "down")
+        related = (
+            await session.execute(
+                text(
+                    """
+                    SELECT e.id, e.title, e.sector, e.occurred_at, e.image_url,
+                           l.relation, l.rationale, l.confidence, l.from_event_id
+                    FROM event_links l
+                    JOIN events e ON e.id = CASE WHEN l.from_event_id = :eid THEN l.to_event_id ELSE l.from_event_id END
+                    WHERE (l.from_event_id = :eid OR l.to_event_id = :eid)
+                      AND l.relation = 'related'
+                    ORDER BY e.occurred_at NULLS LAST
+                    """
+                ),
+                {"eid": str(event_id)},
+            )
+        ).mappings().all()
+    # Related context rides above the chain (no causal position of its own).
+    upstream = [format_thread_node(r) for r in related] + upstream
     return {"upstream": upstream, "downstream": downstream}
