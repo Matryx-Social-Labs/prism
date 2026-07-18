@@ -5,8 +5,7 @@
 // Reflect raycaster hits (the ray handlers are plain object properties, which
 // is what Reflect looks for — assigned via ref, since they aren't JSX props).
 
-import { useGLTF } from "@react-three/drei";
-import { MeshTransmissionMaterial } from "@react-three/drei";
+import { Edges, MeshTransmissionMaterial, useGLTF } from "@react-three/drei";
 import type { Mesh, BufferGeometry } from "three";
 import type { RayEvent, RayMesh } from "./Reflect";
 
@@ -48,6 +47,9 @@ export function PrismGlass({
           chromaticAberration={1}
           toneMapped={false}
         />
+        {/* faint facet outline so the glass reads as a prism even before
+            the beam lights it (against the dark stage it was invisible) */}
+        <Edges scale={1.002} threshold={20} color="#57514a" />
       </mesh>
     </group>
   );

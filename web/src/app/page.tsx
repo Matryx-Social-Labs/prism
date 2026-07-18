@@ -92,7 +92,7 @@ export default function LandingPage() {
   return (
     <div className="mx-auto max-w-[1320px] px-5 sm:px-8 xl:px-10">
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="grid items-center gap-12 pb-14 pt-12 sm:pt-[72px] lg:grid-cols-[1.05fr_0.95fr]">
+      <section className="mx-auto grid w-full max-w-[1160px] items-center gap-12 pb-14 pt-12 sm:pt-[72px] lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] xl:gap-16">
         <div>
           <p
             className="mb-4 text-[11.5px] font-semibold uppercase tracking-[0.3em]"

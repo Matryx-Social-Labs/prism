@@ -29,7 +29,14 @@ _client: AsyncOpenAI | None = None
 # fail during the window are re-driven by the ingestion requeue.
 _QUOTA_STATUS = {401, 403, 429}
 _COOLDOWN_SECONDS = 120
+_WEEKLY_COOLDOWN_SECONDS = 900  # weekly-limit 429s: don't poke every 2 minutes
 _cooldown_until = 0.0
+
+
+class LlmQuotaError(ConnectionError):
+    """Provider quota exhausted. Subclasses ConnectionError deliberately:
+    stream consumers treat it as transient — the message stays pending and
+    is redelivered, so the pipeline self-heals when the quota resets."""
 
 
 async def _respect_cooldown() -> None:
@@ -41,10 +48,9 @@ async def _respect_cooldown() -> None:
 def _maybe_start_cooldown(error: Exception) -> None:
     global _cooldown_until
     if isinstance(error, APIStatusError) and error.status_code in _QUOTA_STATUS:
-        _cooldown_until = time.monotonic() + _COOLDOWN_SECONDS
-        logger.warning(
-            "llm_quota_cooldown", status=error.status_code, pause_s=_COOLDOWN_SECONDS
-        )
+        pause = _WEEKLY_COOLDOWN_SECONDS if "weekly" in str(error).lower() else _COOLDOWN_SECONDS
+        _cooldown_until = time.monotonic() + pause
+        logger.warning("llm_quota_cooldown", status=error.status_code, pause_s=pause)
 
 
 def get_llm() -> AsyncOpenAI:
@@ -109,6 +115,8 @@ async def structured_chat[T: BaseModel](
             response = await client.chat.completions.create(**kwargs)
         except Exception as e:
             _maybe_start_cooldown(e)
+            if isinstance(e, APIStatusError) and e.status_code in _QUOTA_STATUS:
+                raise LlmQuotaError(f"llm quota exhausted ({e.status_code})") from e
             raise
         content = response.choices[0].message.content or ""
         try:

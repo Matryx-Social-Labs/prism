@@ -95,3 +95,13 @@ class ThreadLinkResult(BaseModel):
         if isinstance(v, dict):  # models sometimes emit {"0": {...}, "1": {...}}
             return list(v.values())
         return v or []
+
+
+class EventAnalysis(CorrelationResult):
+    """One-call analysis: perspectives + impacts + per-lens briefs.
+
+    Halves per-event LLM spend versus separate perspective-impact and
+    lens-brief calls — both share the same grounding inputs anyway.
+    """
+
+    briefs: LensBriefs = Field(default_factory=LensBriefs)

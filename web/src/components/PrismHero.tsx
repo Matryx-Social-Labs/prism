@@ -100,9 +100,10 @@ function Scene({ pointerActive }: { pointerActive: React.RefObject<boolean> }) {
 
   return (
     <>
-      <pointLight position={[10, -10, 0]} intensity={0.05 * Math.PI} decay={0} />
-      <pointLight position={[0, 10, 0]} intensity={0.05 * Math.PI} decay={0} />
-      <pointLight position={[-10, 0, 0]} intensity={0.05 * Math.PI} decay={0} />
+      <ambientLight intensity={0.08} />
+      <pointLight position={[10, -10, 0]} intensity={0.12 * Math.PI} decay={0} />
+      <pointLight position={[0, 10, 0]} intensity={0.12 * Math.PI} decay={0} />
+      <pointLight position={[-10, 0, 0]} intensity={0.12 * Math.PI} decay={0} />
       <spotLight ref={spot} intensity={Math.PI} decay={0} distance={7} angle={1} penumbra={1} position={[0, 0, 1]} />
       <Beam ref={boxreflect} bounce={2} far={20}>
         <PrismGlass position={[0, -0.4, 0]} onRayOver={rayOver} onRayOut={rayOut} onRayMove={rayMove} />

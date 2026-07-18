@@ -32,9 +32,9 @@ from common.models import (
 from common.observability import fetch_prompt, observe
 from common.schemas import EventUpdateMessage
 from common.text import slugify
-from correlation.briefs import generate_briefs, persist_briefs, primary_lens_for, template_briefs
+from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
-from correlation.schemas import CorrelationResult
+from correlation.schemas import CorrelationResult, EventAnalysis
 from correlation.threads import link_event_threads
 
 logger = get_logger(__name__)
@@ -114,9 +114,8 @@ async def handle_enriched_item(payload: dict) -> None:
     # Rebuild projection + run perspective/impact correlation in fresh scopes
     # so a long LLM call doesn't hold the row transaction open.
     await _rebuild_projection(event_id)
-    has_news = await _correlate_event(event_id)
-    await _generate_pipeline_briefs(event_id, has_news)
-    if has_news:
+    has_news, ran_llm = await _analyze_event(event_id)
+    if has_news and ran_llm:
         try:
             await link_event_threads(event_id)
         except Exception:
@@ -301,8 +300,17 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         event.last_updated_at = func.now()
 
 
-async def _correlate_event(event_id: uuid.UUID) -> None:
-    """Perspective grouping + impact propagation over the event's members."""
+# Re-run the (LLM) analysis only when the membership crosses a tier — a
+# burst of near-simultaneous members otherwise re-buys the same analysis
+# once per article. Fibonacci-ish: early members change the story most.
+REGEN_TIERS = {1, 2, 3, 5, 8, 13, 21, 34}
+
+
+async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
+    """One pass per tier: perspectives + impacts + pipeline briefs.
+
+    Returns (has_news, ran_llm/deterministic-analysis).
+    """
     async with session_scope() as session:
         members = (
             await session.execute(
@@ -325,12 +333,25 @@ async def _correlate_event(event_id: uuid.UUID) -> None:
         ).mappings().all()
         event = await session.get(Event, event_id)
         event_summary = event.summary if event else ""
+        event_sector = event.sector if event else None
+        event_regions = list(event.regions or []) if event else []
+        event_projection = dict(event.projection or {}) if event else {}
+        has_perspectives = (
+            await session.execute(
+                text("SELECT 1 FROM perspectives WHERE event_id = :eid LIMIT 1"),
+                {"eid": str(event_id)},
+            )
+        ).first() is not None
     if not members:
-        return False
+        return False, False
 
     settings = get_settings()
     has_news = any(m["source_slug"] not in ("nvd", "cisa_kev") for m in members)
 
+    if len(members) not in REGEN_TIERS and has_perspectives:
+        return has_news, False  # between tiers: keep the existing analysis
+
+    briefs: dict = {}
     if has_news:
         article_lines = []
         for m in members:
@@ -339,18 +360,37 @@ async def _correlate_event(event_id: uuid.UUID) -> None:
                 f"- id={m['article_id']} source={m['source_name']} country={m['source_country'] or '?'} "
                 f"stance={stance.get('label') or 'unknown'} summary={m['summary'] or '(none)'}"
             )
-        prompt = fetch_prompt("perspective-impact")
-        messages = prompt.compile(event_summary=event_summary or "(no summary)", articles="\n".join(article_lines))
-        result = await structured_chat(
+        lenses = ["general"]
+        primary = primary_lens_for(event_sector)
+        if primary != "general":
+            lenses.append(primary)
+        lens_fields = {k: v for k, v in event_projection.items() if k in ("cyber", "finance") and v}
+        prompt = fetch_prompt("event-analysis")
+        messages = prompt.compile(
+            event_summary=event_summary or "(no summary)",
+            sector=event_sector or "unspecified",
+            regions=", ".join(event_regions) or "unspecified",
+            lenses=", ".join(lenses),
+            articles="\n".join(article_lines),
+            lens_fields=json.dumps(lens_fields, default=str)[:2500] or "(none)",
+        )
+        analysis = await structured_chat(
             model=settings.prism_model_correlate,
             messages=messages,
-            output_model=CorrelationResult,
-            trace_name="perspective-impact",
+            output_model=EventAnalysis,
+            trace_name="event-analysis",
             metadata={"stage": "correlation", "event_id": str(event_id)},
             langfuse_prompt=prompt if prompt.version else None,
         )
+        result = analysis
+        briefs = {
+            slug: read
+            for slug, read in analysis.briefs.model_dump().items()
+            if slug in lenses and read and read.get("text")
+        }
     else:
         result = _deterministic_correlation(members)
+        briefs = template_briefs(event_projection, event_summary)
 
     valid_article_ids = {str(m["article_id"]) for m in members}
     async with session_scope() as session:
@@ -393,40 +433,12 @@ async def _correlate_event(event_id: uuid.UUID) -> None:
             )
             impact_ids.append(impact_id)
 
-    return has_news
-
-
-async def _generate_pipeline_briefs(event_id: uuid.UUID, has_news: bool) -> None:
-    """Hybrid brief strategy at pipeline time (regenerated on new members).
-
-    News events: one LLM call for the general brief + the event's primary
-    lens. Other lenses are generated on demand by the API and cached.
-    CVE-record-only events: composed template briefs, zero LLM cost.
-    """
-    async with session_scope() as session:
-        row = (
-            await session.execute(
-                text("SELECT sector, summary, projection FROM events WHERE id = :eid"),
-                {"eid": str(event_id)},
-            )
-        ).mappings().first()
-    if row is None:
-        return
-    projection = row["projection"] or {}
-
     try:
-        if not has_news:
-            briefs = template_briefs(projection, row["summary"])
-        else:
-            lenses = ["general"]
-            primary = primary_lens_for(row["sector"])
-            if primary != "general":
-                lenses.append(primary)
-            briefs = await generate_briefs(event_id, lenses)
         await persist_briefs(event_id, briefs)
     except Exception:
         # Briefs are additive; never fail the correlation stage over them.
         logger.exception("pipeline_briefs_failed", event_id=str(event_id))
+    return has_news, True
 
 
 def _deterministic_correlation(members) -> CorrelationResult:
