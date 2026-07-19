@@ -34,7 +34,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Prism — One story. Every perspective.",
   description:
-    "Role-aware AI news intelligence. The same story through your professional lens — with more lenses added continuously — both sides of the narrative, consequences, and a grounded agent you can ask.",
+    "Role-aware AI news intelligence. The same story through your professional lens — with more lenses added continuously — all sides of the narrative, consequences, and a grounded agent you can ask.",
 };
 
 const themeInit = `(function(){try{var t=localStorage.getItem("prism.theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}})();`;

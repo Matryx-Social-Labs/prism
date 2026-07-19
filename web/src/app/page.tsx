@@ -46,7 +46,7 @@ const PERSONAS = [
     name: "For everyone staying informed",
     points: [
       "World news clustered into single stories — not fifty duplicate headlines",
-      "Both sides of every contested story — the competing narratives, not just one framing",
+      "Every perspective on a contested story — the competing narratives, not just one framing",
       "What happens next: the consequence graph behind each event",
       "Ask anything — answers cite the story's own sources or say so",
     ],
@@ -83,7 +83,7 @@ const TRUST = [
     body: "Answers cite the story's own sources; when the sources don't cover it, the agent says so instead of inventing.",
   },
   {
-    title: "Both sides, by design",
+    title: "Perspectives, by design",
     body: "Sources are grouped by stance, so you see how each side tells the same story — with every outlet's origin and affiliation labeled — before deciding what to believe.",
   },
 ];
@@ -163,7 +163,7 @@ export default function LandingPage() {
               Most people only ever hear one side of the story.
             </h2>
             <p className="mt-3.5 text-[15px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
-              A side is a narrative — a political story has two framings wherever it&apos;s told.
+              A side is a narrative — every story is told differently depending on who&apos;s telling it.
               Prism shows the competing narratives side by side, and backs it with deliberately
               diverse sourcing across many origin countries, transparency labels for
               state-affiliated and public broadcasters, and a coverage-balance measure on every

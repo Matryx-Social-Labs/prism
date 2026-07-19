@@ -21,7 +21,7 @@ export const LENS_META: Record<string, LensMeta> = {
     slug: "general",
     name: "General reader",
     short: "Reader",
-    tagline: "Every story with both sides, consequences, and answers",
+    tagline: "Every story with every perspective, consequences, and answers",
     color: "var(--lens-general)",
     bg: "var(--lens-general-bg)",
   },

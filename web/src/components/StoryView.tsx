@@ -459,10 +459,10 @@ export function StoryView({ event }: { event: EventDetail }) {
         </div>
       </section>
 
-      {/* ── Both sides ─────────────────────────────────────── */}
+      {/* ── Perspectives ─────────────────────────────────────── */}
       <section className="mt-11">
         <SectionTitle
-          title="Both sides"
+          title="Perspectives"
           hint="The story's competing narratives, side by side — grouped by stance, with every outlet's origin and affiliation visible."
         />
         {event.perspectives.length === 0 ? (
