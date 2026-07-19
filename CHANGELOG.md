@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.15.0] - 2026-07-20
+
+### Added
+- Sign-in-gated professional lenses (no paywall — free once signed in): on a
+  story, the general reader lens is open to everyone; the Markets and Cyber
+  lenses show a lock and, on click, send signed-out readers to sign-in. The lens
+  brief panel shows a "sign in to unlock" nudge instead of the pro read, the
+  brief isn't fetched/generated for a locked lens, and a signed-out reader is
+  never left parked on a locked lens (snaps back to general). Signed-in readers
+  switch freely.
+
 ## [0.0.14.0] - 2026-07-20
 
 ### Changed

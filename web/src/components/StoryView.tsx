@@ -4,7 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
+import { useRouter } from "next/navigation";
+
 import { lensMeta, useLenses } from "@/lib/lenses";
+import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { ThreadRail } from "@/components/ThreadRail";
@@ -94,6 +97,12 @@ export function StoryView({ event }: { event: EventDetail }) {
     ? registrySlugs.filter((slug) => event.available_lenses.includes(slug))
     : registrySlugs;
 
+  // Sign-in gate (no paywall — free once signed in): the general reader lens is
+  // open to everyone; the professional lenses (markets, cyber) require an account.
+  const session = useSession();
+  const router = useRouter();
+  const isLocked = (slug: string) => slug !== "general" && !session;
+
   useEffect(() => {
     const profile = loadProfile();
     setMyRegion(profile?.region ?? null);
@@ -104,21 +113,31 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchQuestions(event.id, lens).then((qs) => !cancelled && setQuestions(qs));
-    if (!briefs[lens]) {
-      setBriefLoading(true);
-      fetchBrief(event.id, lens).then((res) => {
-        if (cancelled) return;
-        setBriefLoading(false);
-        if (res?.brief) setBriefs((prev) => ({ ...prev, [lens]: res.brief! }));
-        if (res?.points?.length) setPoints((prev) => ({ ...prev, [lens]: res.points! }));
-      });
+    // Don't fetch (or generate) a locked pro lens for a signed-out reader.
+    if (!isLocked(lens)) {
+      fetchQuestions(event.id, lens).then((qs) => !cancelled && setQuestions(qs));
+      if (!briefs[lens]) {
+        setBriefLoading(true);
+        fetchBrief(event.id, lens).then((res) => {
+          if (cancelled) return;
+          setBriefLoading(false);
+          if (res?.brief) setBriefs((prev) => ({ ...prev, [lens]: res.brief! }));
+          if (res?.points?.length) setPoints((prev) => ({ ...prev, [lens]: res.points! }));
+        });
+      }
     }
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lens, event.id]);
+  }, [lens, event.id, session]);
+
+  // Never leave a signed-out reader parked on a locked pro lens (e.g. their
+  // saved profile lens): snap back to the general reader lens.
+  useEffect(() => {
+    if (isLocked(lens)) setLens("general");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   const meta = lensMeta(lens);
   const brief = briefs[lens];
@@ -281,22 +300,34 @@ export function StoryView({ event }: { event: EventDetail }) {
             {offered.map((slug) => {
               const m = lensMeta(slug);
               const selected = slug === lens;
+              const locked = isLocked(slug);
               return (
                 <button
                   key={slug}
                   role="tab"
                   aria-selected={selected}
                   onClick={() => {
+                    if (locked) {
+                      router.push("/signin");
+                      return;
+                    }
                     setFlipped(true);
                     setLens(slug);
                   }}
-                  className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
+                  title={locked ? `Sign in to read the ${m.name} lens (free)` : undefined}
+                  className="flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
                   style={
                     selected
                       ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
-                      : { color: "var(--ink-muted)" }
+                      : { color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
                   }
                 >
+                  {locked && (
+                    <svg aria-hidden width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.75 }}>
+                      <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2.2" />
+                      <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2.2" />
+                    </svg>
+                  )}
                   {m.name}
                 </button>
               );
@@ -314,7 +345,24 @@ export function StoryView({ event }: { event: EventDetail }) {
           className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden px-[22px] py-5`}
         >
           {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
-          {briefLoading && !brief ? (
+          {isLocked(lens) ? (
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+                The{" "}
+                <span className="font-semibold" style={{ color: meta.color }}>
+                  {meta.name}
+                </span>{" "}
+                read of this story is free with an account — sign in to unlock the professional lenses.
+              </p>
+              <button
+                onClick={() => router.push("/signin")}
+                className="rounded-full px-4 py-2 text-[13px] font-semibold"
+                style={{ background: "var(--ink)", color: "var(--bg)" }}
+              >
+                Sign in to read the {meta.short} lens
+              </button>
+            </div>
+          ) : briefLoading && !brief ? (
             <div aria-label="Generating lens brief">
               <div className="pulse-skel h-[13px] rounded-md" style={{ background: "var(--bg-sunken)" }} />
               <div className="pulse-skel mt-2 h-[13px] w-[92%] rounded-md" style={{ background: "var(--bg-sunken)" }} />
