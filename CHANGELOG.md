@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.12.0] - 2026-07-19
+
+### Changed
+- Catalyst-type badge (design-review E1/D5): the markets catalyst (EARNINGS,
+  REGULATORY, RBI, …) now renders as a proper IBM Plex Mono "evidence" chip on
+  story cards and in the story view — the SEBI-safe reframe (what kind of event
+  is moving this, sourced) rather than a buy/sell direction. Shown on any markets
+  story (was hidden unless the finance lens was active), monochrome by default and
+  the markets hue only when the finance lens is speaking (color-means-lens).
+
 ## [0.0.11.0] - 2026-07-19
 
 ### Changed
