@@ -35,6 +35,15 @@ export function HeaderNav() {
       >
         About
       </Link>
+      {session && (
+        <Link
+          href="/watchlist"
+          className="px-2 py-1.5 text-[13.5px] font-medium"
+          style={{ color: pathname === "/watchlist" ? "var(--ink)" : "var(--ink-muted)" }}
+        >
+          Watchlist
+        </Link>
+      )}
       {m && (
         <Link
           href="/interests"

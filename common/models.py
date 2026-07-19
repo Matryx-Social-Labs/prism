@@ -325,3 +325,19 @@ class Session(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Watchlist(TimestampMixin, Base):
+    """A user's followed ticker or sector — read-only follow (see their events on
+    open). Push/alerts are Phase 2 (need delivery infra). One row per (user, kind,
+    value); unique so following the same thing twice is a no-op."""
+
+    __tablename__ = "watchlist"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kind", "value", name="uq_watchlist_user_kind_value"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)  # ticker | sector
+    value: Mapped[str] = mapped_column(Text, nullable=False)  # e.g. "SBIN" or "finance"

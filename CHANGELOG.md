@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.16.0] - 2026-07-20
+
+### Added
+- Watchlist ("Followed Signals") — read-only follows of tickers and sectors.
+  New `watchlist` table (migration `149182e8b853`) + auth-gated routes: list,
+  follow (idempotent, normalized — tickers upper, sectors lower), unfollow, and
+  a matching-events feed (events whose sector or `finance.tickers` match a
+  follow, via `jsonb_exists_any`). New `/watchlist` page (add/remove follows,
+  see recent stories on your signals) + a header link when signed in. Push and
+  alerts remain Phase 2 (they need delivery infra). Verified end-to-end over
+  HTTP (auth + CRUD + matching + 401) in `tests/test_watchlist.py`.
+
 ## [0.0.15.0] - 2026-07-20
 
 ### Added
