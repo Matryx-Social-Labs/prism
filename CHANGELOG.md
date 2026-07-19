@@ -3,6 +3,21 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.10.0] - 2026-07-19
+
+### Fixed
+- **Backend deploys were failing their healthcheck** and Railway was silently
+  keeping an old (pre-migration) release live. Root cause: the pgvector HNSW
+  index build in migration `51de411d824c` used PARALLEL maintenance workers,
+  whose dynamic-shared-memory segment overflows the small `/dev/shm` on Railway's
+  managed Postgres (`could not resize shared memory segment … No space left on
+  device`) — so `alembic upgrade head` in the start command aborted and the API
+  never booted. Fix: build all indexes `CONCURRENTLY` (they sit on
+  worker-written tables) inside an `autocommit_block`, `IF NOT EXISTS` for
+  idempotency, and `SET max_parallel_maintenance_workers = 0` so the HNSW build
+  runs single-threaded (~12s for 25k rows, no DSM allocation). The valid HNSW
+  index was also built on prod out-of-band so this deploy's migration no-ops it.
+
 ## [0.0.9.0] - 2026-07-19
 
 ### Changed
