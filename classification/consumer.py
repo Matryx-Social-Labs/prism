@@ -9,6 +9,7 @@ are kept with a reason for audit; relevant items emit classified.items.
 import uuid
 
 from classification.schemas import ClassificationResult, GateResult
+from classification.shadow_gate import shadow_score
 from common import stream
 from common.config import get_settings
 from common.db import session_scope
@@ -62,6 +63,8 @@ async def handle_raw_item(payload: dict) -> None:
         gate = GateResult(is_relevant=True, reason=f"Single-topic {feed_spec.sector} feed")
     else:
         gate = await _run_gate(title, body, meta)
+        if get_settings().prism_gate_mode == "shadow":
+            await _log_shadow_gate(title, body, gate, source_slug, str(raw_item_id))
         classification = None
         if gate.is_relevant:
             classification = await _run_classifier(title, body, source_country, meta)
@@ -82,6 +85,28 @@ async def handle_raw_item(payload: dict) -> None:
             stream.CLASSIFIED_ITEMS,
             ClassifiedItemMessage(raw_item_id=str(raw_item_id)).model_dump(),
         )
+
+
+async def _log_shadow_gate(
+    title: str, body: str | None, gate: GateResult, source_slug: str, raw_item_id: str
+) -> None:
+    """Shadow mode: log the embedding relevance score next to the LLM decision so
+    the score band can be calibrated before embeddings ever filter. Behavior-neutral.
+
+    The broad `except` is deliberate: shadow scoring is observability-only and must
+    never break ingestion. It logs the failure with context rather than swallowing.
+    """
+    try:
+        score = await shadow_score(title, body)
+        logger.info(
+            "shadow_gate",
+            score=round(score, 4),
+            llm_relevant=gate.is_relevant,
+            source_slug=source_slug,
+            raw_item_id=raw_item_id,
+        )
+    except Exception as exc:  # noqa: BLE001 — shadow path must not break the pipeline
+        logger.warning("shadow_gate_failed", error=str(exc), raw_item_id=raw_item_id)
 
 
 async def _run_gate(title: str, body: str | None, meta: dict) -> GateResult:
