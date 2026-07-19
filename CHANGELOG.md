@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.9.0] - 2026-07-19
+
+### Changed
+- Hero prism, WebGL: the glass now uses proper `MeshTransmissionMaterial` settings
+  (samples + resolution for smooth non-grainy refraction, `ior` 1.6, dispersion held
+  at an elegant ~0.45 instead of a maxed-out fringe, subtle distortion), antialiasing
+  on, retina `dpr`, and a single soft facet line instead of the hard double CAD
+  wireframe — a premium glass prism rather than an outlined cone.
+- Hero prism, static fallback (no-WebGL / reduced-motion / SSR): the flat hollow
+  triangle is now a glassy filled prism with a soft glow and gradient-faded spectrum
+  rays, so it reads as intentional even without the 3D scene.
+- Renamed "Both Sides" → "Perspectives" across the app (story section title, landing
+  copy, taglines, meta) and reframed "a political story has two framings" to "every
+  story is told differently depending on who's telling it" — accurate to the N-origin
+  reality and consistent with the "One story. Every perspective." tagline.
+
 ## [0.0.8.0] - 2026-07-19
 
 ### Changed

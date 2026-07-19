@@ -27,7 +27,7 @@ export const REGIONS: [string, string][] = [
 
 export const LENS_DETAIL: Record<string, string> = {
   general:
-    "World news clustered into single stories with both sides, consequences, and a grounded agent to ask. The full picture, fast.",
+    "World news clustered into single stories with every perspective, consequences, and a grounded agent to ask. The full picture, fast.",
   cyber_grc:
     "CVEs with CVSS, exploitation status, affected products, and control mapping — plus the cyber read of world events: who's exposed and what to check.",
   finance_trader:

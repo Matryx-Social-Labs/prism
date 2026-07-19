@@ -41,23 +41,32 @@ export function PrismGlass({
       <mesh position={[0, 0, 0.6]} scale={1.96} geometry={nodes.Cone.geometry}>
         <meshBasicMaterial color="#8fa3b8" transparent opacity={0.05} depthWrite={false} toneMapped={false} />
       </mesh>
-      {/* visible hi-res beveled prism */}
+      {/* visible hi-res beveled prism.
+          Tuned per drei MeshTransmissionMaterial guidance: samples+resolution
+          for smooth (non-grainy) refraction, ior 1.6 for a real glass bend, and
+          chromaticAberration held at ~0.45 so the glass fringes elegantly — the
+          dramatic spectrum comes from the separate Rainbow (Snell's law), not a
+          maxed-out material fringe. distortion adds a living, organic surface. */}
       <mesh position={[0, 0, 0.6]} renderOrder={10} scale={2} dispose={null} geometry={nodes.Cone.geometry}>
         <MeshTransmissionMaterial
-          clearcoat={1}
+          samples={12}
+          resolution={512}
           transmission={1}
-          thickness={0.9}
+          clearcoat={1}
+          clearcoatRoughness={0.04}
+          thickness={1.15}
+          ior={1.6}
+          chromaticAberration={0.45}
+          anisotropy={0.15}
           roughness={0}
-          anisotropy={0.1}
-          chromaticAberration={1}
+          distortion={0.14}
+          distortionScale={0.3}
+          temporalDistortion={0.08}
           toneMapped={false}
         />
-        {/* faint facet outline so the glass reads as a prism even before
-            the beam lights it (against the dark stage it was invisible) */}
-        {/* facet edges: a cool bright line + soft outer halo so the prism's
-            triangular form is unmistakable on black */}
-        <Edges scale={1.002} threshold={20} color="#b8c4d4" />
-        <Edges scale={1.01} threshold={20} color="#2e3644" />
+        {/* ONE soft facet line — enough to read the triangular silhouette on the
+            black stage, without the hard double CAD-wireframe look it had before. */}
+        <Edges scale={1.003} threshold={20} color="#5b6678" />
       </mesh>
     </group>
   );

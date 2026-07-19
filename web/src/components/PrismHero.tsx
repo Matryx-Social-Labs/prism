@@ -145,8 +145,8 @@ export default function PrismHero() {
       <Canvas
         orthographic
         frameloop={visible ? "always" : "never"}
-        gl={{ antialias: false }}
-        dpr={[1, 1.5]}
+        gl={{ antialias: true }}
+        dpr={[1, 2]}
         camera={{ position: [0, 0, 100], zoom: 30 }}
       >
         <color attach="background" args={["#0b0a09"]} />
