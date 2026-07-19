@@ -3,7 +3,7 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
-## [0.0.2.0] - 2026-07-19
+## [0.0.4.0] - 2026-07-19
 
 ### Added
 - Relevance-gate shadow scorer: an embedding-based relevance score (fastembed,
@@ -13,6 +13,15 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   step one of the LLM cost fix: calibrate the score band from the logs, then set
   `prism_gate_mode=enforce` so only borderline items reach the LLM. Gated by
   `prism_gate_mode` (shadow | enforce | off; default shadow).
+
+## [0.0.3.0] - 2026-07-19
+
+### Changed
+- Serving layer refactor: `api/main.py` (573 lines) split into `api/routes/`
+  (meta, feed, events, admin) plus `api/schemas.py`. Behavior-identical — the
+  served endpoint set is unchanged (locked by `tests/test_api_routes.py`). This
+  is the refactor-first step before the freemium build adds auth, billing, and
+  watchlist routers, so they land in their own modules instead of one 1000+ line file.
 
 ## [0.0.1.0] - 2026-07-19
 
