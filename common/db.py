@@ -40,6 +40,14 @@ async def session_scope() -> AsyncIterator[AsyncSession]:
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency."""
+    """FastAPI dependency: commit on success so write endpoints (auth, later the
+    paywall gate + watchlist) actually persist. Reads commit an empty tx (no-op).
+    Without this, INSERT/UPDATE in a route silently roll back when the request ends.
+    """
     async with get_session_factory()() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise

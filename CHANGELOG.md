@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.13.0] - 2026-07-19
+
+### Added
+- Sign-in UI (magic link): `/signin` requests a one-time link, `/auth/verify`
+  exchanges it for a bearer session, `/account` shows the account + sign out, and
+  the header shows a sign-in link / account chip. Session is stored client-side
+  (`lib/session.ts`); email is server-side + pluggable, so in dev the link prints
+  to the API logs and the whole flow works with no provider. New sign-ins get the
+  free Markets samples granted automatically.
+
+### Fixed
+- **`get_db` never committed**, so every write endpoint (auth — and later the
+  paywall gate + watchlist) silently rolled back: the magic-link row was never
+  persisted and verify always 401'd, even though the logic-level tests passed
+  (they use `session_scope`, which commits). `get_db` now commits on success /
+  rolls back on error, with a regression test that drives the dependency directly.
+
 ## [0.0.12.0] - 2026-07-19
 
 ### Changed
