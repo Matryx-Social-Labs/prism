@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     prism_embed_model: str = "BAAI/bge-small-en-v1.5"
     prism_embed_dim: int = 384
 
+    # Relevance gate — embedding pre-filter (freemium-lens-model PR0).
+    # shadow: score every LLM-gated item with embeddings and LOG (score,
+    # llm_decision) for calibration, without changing what gets filtered.
+    # Flip to "enforce" only after back-sampling the logs picks a band.
+    prism_gate_mode: str = "shadow"  # shadow | enforce | off
+
     # Langfuse (self-hosted). The SDK also reads LANGFUSE_* env vars directly;
     # these mirror them so app code can check whether tracing is configured.
     langfuse_public_key: str = ""

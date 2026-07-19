@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.2.0] - 2026-07-19
+
+### Added
+- Relevance-gate shadow scorer: an embedding-based relevance score (fastembed,
+  in-process, no new dependency) now runs alongside the LLM relevance gate and
+  logs a `shadow_gate` line with the score and the LLM's pass/fail for every
+  gated news item. Behavior-neutral — it does not filter anything yet. This is
+  step one of the LLM cost fix: calibrate the score band from the logs, then set
+  `prism_gate_mode=enforce` so only borderline items reach the LLM. Gated by
+  `prism_gate_mode` (shadow | enforce | off; default shadow).
+
 ## [0.0.1.0] - 2026-07-19
 
 ### Added
