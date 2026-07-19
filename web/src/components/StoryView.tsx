@@ -10,6 +10,7 @@ import { lensMeta, useLenses } from "@/lib/lenses";
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
+import { BriefPlayer } from "@/components/BriefPlayer";
 import { ThreadRail } from "@/components/ThreadRail";
 
 function regionName(code: string): string {
@@ -372,31 +373,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               </p>
             </div>
           ) : brief ? (
-            <div className="flex flex-col gap-3.5">
-              <p className="text-[14.5px] leading-[1.7]">
-                <span className="font-semibold" style={{ color: meta.color }}>
-                  Through the {meta.name} lens —{" "}
-                </span>
-                <span style={{ color: "var(--ink-muted)" }}>{brief}</span>
-              </p>
-              {lensPoints.length > 0 && (
-                <div>
-                  <h3 className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-                    {pointsHeading}
-                  </h3>
-                  <ul className="flex flex-col gap-1.5">
-                    {lensPoints.map((pt) => (
-                      <li key={pt} className="flex gap-2 text-[13.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
-                        <span aria-hidden style={{ color: meta.color }}>
-                          ◆
-                        </span>
-                        <span>{pt}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <BriefPlayer brief={brief} points={lensPoints} meta={meta} pointsHeading={pointsHeading} />
           ) : (
             <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
               The {meta.name} read of this story isn&apos;t available yet.

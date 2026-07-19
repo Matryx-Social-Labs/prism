@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.17.0] - 2026-07-20
+
+### Added
+- Brief player — a "Listen" control on every lens brief that reads it aloud with
+  sentence-level read-along highlight (the spoken sentence tints in the lens
+  hue). Uses the browser's built-in Web Speech API (`speechSynthesis`) — no
+  server TTS, no model call, no new dependency. Briefs are spoken one sentence
+  at a time so the highlight tracks and long briefs dodge Chrome's ~15s
+  single-utterance cutoff. Pause/resume/stop; hidden where the API is
+  unsupported; narration cancels on lens switch and unmount. Reader-facing
+  accessibility win that also makes the brief-depth work audible.
+
 ## [0.0.16.0] - 2026-07-20
 
 ### Added
