@@ -4,6 +4,10 @@ const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        // .font-mono everywhere = the provenance voice (DESIGN.md)
+        mono: ["var(--font-mono)", "ui-monospace", "Menlo", "monospace"],
+      },
       colors: {
         severity: {
           critical: "#dc2626",

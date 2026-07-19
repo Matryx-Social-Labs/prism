@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Fraunces, Space_Grotesk } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { HeaderNav } from "@/components/HeaderNav";
 import { PrismMark } from "@/components/PrismMark";
 import "./globals.css";
@@ -11,9 +12,23 @@ const display = Fraunces({
   axes: ["opsz", "SOFT", "WONK"],
 });
 
-const ui = Space_Grotesk({
-  subsets: ["latin"],
+// General Sans (ITF Free Font License, self-hosted — see src/fonts/general-sans/LICENSE.md).
+// Replaces Space Grotesk per DESIGN.md: escape the AI-tool font convergence.
+const ui = localFont({
+  src: [
+    { path: "../fonts/general-sans/GeneralSans-400.woff2", weight: "400" },
+    { path: "../fonts/general-sans/GeneralSans-500.woff2", weight: "500" },
+    { path: "../fonts/general-sans/GeneralSans-600.woff2", weight: "600" },
+    { path: "../fonts/general-sans/GeneralSans-700.woff2", weight: "700" },
+  ],
   variable: "--font-ui",
+});
+
+// Provenance voice (DESIGN.md): timestamps, sources, citations, funding labels.
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
@@ -31,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body
-        className={`${display.variable} ${ui.variable} flex min-h-screen flex-col antialiased`}
+        className={`${display.variable} ${ui.variable} ${mono.variable} flex min-h-screen flex-col antialiased`}
         style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
       >
         <div className="spectrum-bar h-[3px] w-full" aria-hidden />
