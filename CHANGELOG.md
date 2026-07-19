@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.21.0] - 2026-07-20
+
+### Added
+- Search — `GET /api/v1/search?q=` (keyword match across event title + summary,
+  recency-ordered, no CVE-only filter since a query is explicit intent) and a
+  `/search` page (debounced, URL-synced, StoryRowCard results) with a header
+  search icon. No LLM.
+
+### Changed
+- Extracted the row→`FeedItem` serialization shared by feed and search into
+  `api/routes/serialization.py` (`build_feed_item`); feed keeps its own curation
+  filters (CVE-only, subsector). Pure refactor — all 21 backend tests pass.
+
 ## [0.0.20.0] - 2026-07-20
 
 ### Added

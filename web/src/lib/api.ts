@@ -160,6 +160,13 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   return data.items;
 }
 
+export async function searchEvents(q: string): Promise<FeedItem[]> {
+  const res = await fetch(`${API_URL}/api/v1/search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { items: FeedItem[] };
+  return data.items;
+}
+
 export interface TaxonomySector {
   slug: string;
   name: string;
