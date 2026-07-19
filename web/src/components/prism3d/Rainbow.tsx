@@ -152,6 +152,9 @@ export const Rainbow = forwardRef<
         endRadius={endRadius}
         ratio={1}
         toneMapped={false}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
       />
     </mesh>
   );

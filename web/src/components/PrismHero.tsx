@@ -25,7 +25,7 @@ function FitZoom() {
   const height = useThree((s) => s.size.height);
   useEffect(() => {
     const ortho = camera as THREE.OrthographicCamera;
-    ortho.zoom = height / 9.5;
+    ortho.zoom = height / 12;
     ortho.updateProjectionMatrix();
   }, [camera, height]);
   return null;
@@ -135,7 +135,7 @@ export default function PrismHero() {
     <div
       ref={wrapper}
       className="relative h-[340px] w-full overflow-hidden rounded-[22px] border sm:h-[400px]"
-      style={{ borderColor: "var(--line)", background: "#0b0a09" }}
+      style={{ borderColor: "var(--line)", background: "#332d27" }}
       onPointerEnter={() => (pointerActive.current = true)}
       onPointerLeave={() => (pointerActive.current = false)}
       aria-label="One story refracted into many perspectives"
@@ -148,7 +148,7 @@ export default function PrismHero() {
         dpr={[1, 1.5]}
         camera={{ position: [0, 0, 100], zoom: 30 }}
       >
-        <color attach="background" args={["#0b0a09"]} />
+        <color attach="background" args={["#332d27"]} />
         <FitZoom />
         <Suspense fallback={null}>
           <Scene pointerActive={pointerActive} />
@@ -156,16 +156,16 @@ export default function PrismHero() {
             <Bloom mipmapBlur levels={9} intensity={1.5} luminanceThreshold={1} luminanceSmoothing={1} />
             {/* the reference grades with a proprietary LUT (not redistributable);
                 a contrast crush + vignette approximates its deep-black stage */}
-            <BrightnessContrast brightness={-0.07} contrast={0.28} />
-            <Vignette eskil={false} offset={0.18} darkness={0.75} />
+            <BrightnessContrast brightness={-0.03} contrast={0.18} />
+            <Vignette eskil={false} offset={0.15} darkness={0.55} />
           </EffectComposer>
         </Suspense>
       </Canvas>
       {/* the design figure's captions, carried into 3D — no lens is named */}
-      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: "#8d867d" }}>
+      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: "#a59c91" }}>
         one story
       </span>
-      <span className="pointer-events-none absolute bottom-4 right-4 text-[11px]" style={{ color: "#8d867d" }}>
+      <span className="pointer-events-none absolute bottom-4 right-4 text-[11px]" style={{ color: "#a59c91" }}>
         every perspective
       </span>
     </div>
