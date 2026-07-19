@@ -8,7 +8,7 @@ middleware, and routers. Response models live in api/schemas.py.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import admin, auth, events, feed, meta
+from api.routes import admin, auth, events, feed, meta, watchlist
 from common.config import get_settings
 from common.logging import setup_logging
 
@@ -37,4 +37,5 @@ app.include_router(meta.router)
 app.include_router(auth.router)
 app.include_router(feed.router)
 app.include_router(events.router)
+app.include_router(watchlist.router)
 app.include_router(admin.router)

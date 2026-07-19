@@ -19,6 +19,10 @@ EXPECTED = {
     ("GET", "/api/v1/events/{event_id}/brief"),
     ("GET", "/api/v1/events/{event_id}/questions"),
     ("POST", "/api/v1/events/{event_id}/ask"),
+    ("GET", "/api/v1/watchlist"),
+    ("POST", "/api/v1/watchlist"),
+    ("DELETE", "/api/v1/watchlist"),
+    ("GET", "/api/v1/watchlist/events"),
     ("POST", "/api/v1/admin/pipeline/run"),
 }
 
