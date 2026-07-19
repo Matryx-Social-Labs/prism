@@ -1,0 +1,94 @@
+"use client";
+
+// Bearer session from magic-link auth, persisted in localStorage (mirrors
+// lib/profile.ts). The raw bearer token lives only here and in the
+// Authorization header; the server stores only its SHA-256 hash. Email
+// delivery is server-side and pluggable — in dev the sign-in link is printed
+// to the API logs (console sender), so the flow works with no email provider.
+
+import { useEffect, useState } from "react";
+
+import { API_URL } from "@/lib/api";
+
+export interface Session {
+  token: string;
+  userId: string;
+  email: string;
+}
+
+const KEY = "prism.session.v1";
+const EVENT = "prism-session";
+
+export function loadSession(): Session | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Partial<Session>;
+    return p.token && p.userId && p.email
+      ? { token: p.token, userId: p.userId, email: p.email }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSession(s: Session): void {
+  window.localStorage.setItem(KEY, JSON.stringify(s));
+  window.dispatchEvent(new Event(EVENT));
+}
+
+export function clearSession(): void {
+  window.localStorage.removeItem(KEY);
+  window.dispatchEvent(new Event(EVENT));
+}
+
+/** Authorization header for gated calls (pro lenses, watchlist, personalized brief). */
+export function authHeader(session: Session | null): Record<string, string> {
+  return session ? { Authorization: `Bearer ${session.token}` } : {};
+}
+
+async function detail(res: Response, fallback: string): Promise<string> {
+  try {
+    const d = (await res.json()) as { detail?: string };
+    return d.detail ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function requestMagicLink(email: string, consent: boolean): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/auth/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, consent }),
+  });
+  if (!res.ok) throw new Error(await detail(res, "Could not send the sign-in link"));
+}
+
+export async function verifyMagicLink(token: string): Promise<Session> {
+  const res = await fetch(`${API_URL}/api/v1/auth/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) throw new Error(await detail(res, "This sign-in link is invalid or expired"));
+  const d = (await res.json()) as { token: string; user_id: string; email: string };
+  return { token: d.token, userId: d.user_id, email: d.email };
+}
+
+/** Reactive session: re-reads on sign-in/out (same tab) and on storage (other tabs). */
+export function useSession(): Session | null {
+  const [session, setSession] = useState<Session | null>(null);
+  useEffect(() => {
+    const sync = () => setSession(loadSession());
+    sync();
+    window.addEventListener(EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+  return session;
+}

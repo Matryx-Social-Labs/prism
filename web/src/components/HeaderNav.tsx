@@ -6,10 +6,12 @@ import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { lensMeta } from "@/lib/lenses";
 import { loadProfile } from "@/lib/profile";
+import { useSession } from "@/lib/session";
 
 export function HeaderNav() {
   const pathname = usePathname();
   const [lens, setLens] = useState<string | null>(null);
+  const session = useSession();
 
   useEffect(() => {
     setLens(loadProfile()?.lens ?? null);
@@ -42,6 +44,24 @@ export function HeaderNav() {
         >
           <span className="h-[7px] w-[7px] rounded-full" style={{ background: m.color }} />
           {m.short}
+        </Link>
+      )}
+      {session ? (
+        <Link
+          href="/account"
+          className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] font-semibold uppercase"
+          style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
+          title={`Signed in as ${session.email}`}
+        >
+          {session.email.slice(0, 1)}
+        </Link>
+      ) : (
+        <Link
+          href="/signin"
+          className="px-2 py-1.5 text-[13.5px] font-medium"
+          style={{ color: pathname === "/signin" ? "var(--ink)" : "var(--ink-muted)" }}
+        >
+          Sign in
         </Link>
       )}
       <ThemeToggle />

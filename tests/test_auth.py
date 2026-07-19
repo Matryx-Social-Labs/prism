@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from common import auth
-from common.db import session_scope
+from common.db import get_db, session_scope
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -121,5 +121,32 @@ async def test_request_is_rate_limited():
         async with session_scope() as s:
             with pytest.raises(auth.RateLimited):
                 await auth.request_magic_link(s, email)
+    finally:
+        await _cleanup(email)
+
+
+async def test_get_db_commits_writes():
+    """Regression: the FastAPI get_db dependency must commit on success, or every
+    write endpoint (auth, the paywall gate, watchlist) silently rolls back. This
+    is what broke the magic-link flow over HTTP while the logic-level tests passed.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database — run `docker compose up -d postgres`")
+    email = f"getdb-{uuid.uuid4()}@example.com"
+    try:
+        # Drive get_db like FastAPI does: take the session, write, then exhaust
+        # the generator so its `async with` exits and commits.
+        gen = get_db()
+        s = await gen.__anext__()
+        await s.execute(
+            text("INSERT INTO users (id, email) VALUES (gen_random_uuid(), :e)"), {"e": email}
+        )
+        with pytest.raises(StopAsyncIteration):
+            await gen.__anext__()
+        # A separate session must see the committed row.
+        async with session_scope() as s2:
+            assert (
+                await s2.execute(text("SELECT 1 FROM users WHERE email = :e"), {"e": email})
+            ).scalar_one_or_none() == 1
     finally:
         await _cleanup(email)
