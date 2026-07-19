@@ -49,7 +49,7 @@ function Scene({ pointerActive }: { pointerActive: React.RefObject<boolean> }) {
     const mat = rainbowMat();
     if (mat) {
       mat.speed = 1;
-      mat.emissiveIntensity = 20;
+      mat.emissiveIntensity = 12;
     }
   }, []);
 
@@ -93,7 +93,7 @@ function Scene({ pointerActive }: { pointerActive: React.RefObject<boolean> }) {
     // Settle the spectrum's intensity after the hit flash
     const mat = rainbowMat();
     if (mat) {
-      lerp(mat as unknown as Record<string, number>, "emissiveIntensity", isPrismHit ? 2.5 : 0, 0.1);
+      lerp(mat as unknown as Record<string, number>, "emissiveIntensity", isPrismHit ? 1.6 : 0, 0.1);
       if (spot.current) spot.current.intensity = mat.emissiveIntensity;
     }
   });
@@ -101,9 +101,10 @@ function Scene({ pointerActive }: { pointerActive: React.RefObject<boolean> }) {
   return (
     <>
       <ambientLight intensity={0.12} />
-      {/* frontal key: clearcoat facets need a light to reflect or the glass
-          is invisible against the dark stage */}
-      <pointLight position={[0, 0.5, 3.5]} intensity={0.9} decay={0} />
+      {/* frontal key + cool rim: the facets carry a specular sheen and the
+          silhouette separates from the black stage */}
+      <pointLight position={[0, 0.5, 3.5]} intensity={0.7} decay={0} />
+      <pointLight position={[1.5, 2.2, -2.5]} intensity={1.1} decay={0} color="#7d8ea8" />
       <pointLight position={[10, -10, 0]} intensity={0.12 * Math.PI} decay={0} />
       <pointLight position={[0, 10, 0]} intensity={0.12 * Math.PI} decay={0} />
       <pointLight position={[-10, 0, 0]} intensity={0.12 * Math.PI} decay={0} />
@@ -135,7 +136,7 @@ export default function PrismHero() {
     <div
       ref={wrapper}
       className="relative h-[340px] w-full overflow-hidden rounded-[22px] border sm:h-[400px]"
-      style={{ borderColor: "var(--line)", background: "#332d27" }}
+      style={{ borderColor: "var(--line)", background: "#0b0a09" }}
       onPointerEnter={() => (pointerActive.current = true)}
       onPointerLeave={() => (pointerActive.current = false)}
       aria-label="One story refracted into many perspectives"
@@ -148,24 +149,24 @@ export default function PrismHero() {
         dpr={[1, 1.5]}
         camera={{ position: [0, 0, 100], zoom: 30 }}
       >
-        <color attach="background" args={["#332d27"]} />
+        <color attach="background" args={["#0b0a09"]} />
         <FitZoom />
         <Suspense fallback={null}>
           <Scene pointerActive={pointerActive} />
           <EffectComposer>
-            <Bloom mipmapBlur levels={9} intensity={1.5} luminanceThreshold={1} luminanceSmoothing={1} />
+            <Bloom mipmapBlur levels={8} intensity={0.9} luminanceThreshold={1} luminanceSmoothing={1} />
             {/* the reference grades with a proprietary LUT (not redistributable);
                 a contrast crush + vignette approximates its deep-black stage */}
-            <BrightnessContrast brightness={-0.03} contrast={0.18} />
-            <Vignette eskil={false} offset={0.15} darkness={0.55} />
+            <BrightnessContrast brightness={-0.05} contrast={0.22} />
+            <Vignette eskil={false} offset={0.18} darkness={0.65} />
           </EffectComposer>
         </Suspense>
       </Canvas>
       {/* the design figure's captions, carried into 3D — no lens is named */}
-      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: "#a59c91" }}>
+      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: "#8d867d" }}>
         one story
       </span>
-      <span className="pointer-events-none absolute bottom-4 right-4 text-[11px]" style={{ color: "#a59c91" }}>
+      <span className="pointer-events-none absolute bottom-4 right-4 text-[11px]" style={{ color: "#8d867d" }}>
         every perspective
       </span>
     </div>
