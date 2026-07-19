@@ -263,3 +263,38 @@ class AgentMessage(TimestampMixin, Base):
     role: Mapped[str] = mapped_column(Text, nullable=False)  # user|assistant
     content: Mapped[str] = mapped_column(Text, nullable=False)
     cited_source_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)))
+
+
+# ── Product & monetization layer (freemium build) ────────────────────
+
+
+class User(TimestampMixin, Base):
+    """Account identity. The magic-link auth flow attaches in a later PR; this is
+    the minimal stable row that quota/subscriptions reference (replaces the
+    AgentSession.user_ref='default' placeholder)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+
+
+class UsageQuota(TimestampMixin, Base):
+    """Per-account pro-lens sample cap (freemium D4/D13 — Markets-only, so one
+    counter per user is enough).
+
+    Decremented with a single atomic ``UPDATE ... WHERE remaining > 0 RETURNING``
+    (see common/quota.py) so two concurrent viewers of the same event+lens can
+    never double-spend the last sample. Server-side + per-account by construction;
+    never device/IP, which would be farmable and reopen the unbounded-LLM-bill hole.
+    """
+
+    __tablename__ = "usage_quota"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_usage_quota_user"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    remaining: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    period_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

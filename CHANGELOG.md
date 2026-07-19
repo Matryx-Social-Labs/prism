@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.6.0] - 2026-07-19
+
+### Added
+- Freemium data model, step one: `users` and `usage_quota` tables (migration
+  `02f6edae6a63`) plus `common/quota.py`. The Markets-lens sample cap is one
+  counter per account, decremented with a single atomic
+  `UPDATE ... WHERE remaining > 0 RETURNING` so concurrent viewers can never
+  double-spend the last sample — the cost wall the paywall depends on. Proven by
+  `tests/test_quota.py`: 25 concurrent consumers of a 5-sample account consume
+  exactly 5 (the test skips cleanly when no database is reachable).
+
 ## [0.0.5.0] - 2026-07-19
 
 ### Added
