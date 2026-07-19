@@ -42,7 +42,7 @@ function Chip({
 }) {
   return (
     <span
-      className={`rounded-full px-[9px] py-0.5 text-[11px] font-semibold ${mono ? "font-mono font-medium" : ""}`}
+      className={`rounded-full px-[9px] py-0.5 text-[11px] ${mono ? "font-mono font-medium" : "font-semibold"}`}
       style={{ background: bg, color }}
     >
       {children}
@@ -54,7 +54,7 @@ function FundingChip({ funding }: { funding: string | null }) {
   if (!funding || !FUNDING_LABEL[funding]) return null;
   return (
     <span
-      className="shrink-0 rounded-full border px-[7px] py-px text-[9.5px] font-semibold uppercase tracking-wide"
+      className="shrink-0 rounded-full border px-[7px] py-px font-mono text-[9px] font-medium uppercase tracking-wide"
       style={{ borderColor: "var(--line-strong)", color: "var(--ink-faint)" }}
     >
       {FUNDING_LABEL[funding]}
@@ -82,6 +82,7 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   const [lens, setLens] = useState("general");
   const [briefs, setBriefs] = useState<Record<string, string>>(event.lens_briefs ?? {});
+  const [flipped, setFlipped] = useState(false);
   const [points, setPoints] = useState<Record<string, string[]>>(event.lens_points ?? {});
   const [briefLoading, setBriefLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
@@ -178,7 +179,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               ${t}
             </Chip>
           ))}
-          <span className="ml-auto text-xs" style={{ color: "var(--ink-faint)" }}>
+          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
             {event.sources.length} source{event.sources.length === 1 ? "" : "s"} · {timeAgo(event.last_updated_at)}
           </span>
         </div>
@@ -240,19 +241,17 @@ export function StoryView({ event }: { event: EventDetail }) {
               Coverage
             </span>
             {coverageEntries.map(([iso, n]) => (
-              <Chip key={iso}>
+              <Chip key={iso} mono>
                 {regionName(iso)} × {n}
               </Chip>
             ))}
             {event.coverage?.single_origin && (
-              <Chip bg="var(--lens-general-bg)" color="var(--lens-general)">
-                ⚠ Single-origin coverage
-              </Chip>
+              <Chip>⚠ Single-origin coverage</Chip>
             )}
           </div>
         )}
         {gapText && (
-          <p className="mt-3 text-[13px] font-medium" style={{ color: "var(--lens-general)" }}>
+          <p className="mt-3 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
             ◉ {gapText}
           </p>
         )}
@@ -276,7 +275,10 @@ export function StoryView({ event }: { event: EventDetail }) {
                   key={slug}
                   role="tab"
                   aria-selected={selected}
-                  onClick={() => setLens(slug)}
+                  onClick={() => {
+                    setFlipped(true);
+                    setLens(slug);
+                  }}
                   className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
                   style={
                     selected
@@ -296,7 +298,11 @@ export function StoryView({ event }: { event: EventDetail }) {
           </div>
         </div>
 
-        <div key={lens} className="fade-swap flex flex-col gap-[18px] px-[22px] py-5">
+        <div
+          key={lens}
+          className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden px-[22px] py-5`}
+        >
+          {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
           {briefLoading && !brief ? (
             <div aria-label="Generating lens brief">
               <div className="pulse-skel h-[13px] rounded-md" style={{ background: "var(--bg-sunken)" }} />
@@ -532,7 +538,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                         ? "var(--danger)"
                         : imp.direction === "positive"
                           ? "var(--up)"
-                          : "var(--lens-general)",
+                          : "var(--ink-faint)",
                   }}
                 >
                   {imp.parent_impact_id ? "↳" : "●"}

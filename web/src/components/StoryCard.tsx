@@ -38,7 +38,7 @@ export function StoryBadges({ item, lens }: { item: FeedItem; lens: string }) {
         </span>
       )}
       {item.is_regional && (
-        <span className={chip} style={{ background: "var(--lens-general-bg)", color: "var(--lens-general)" }}>
+        <span className={chip} style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
           ◉ Your region
         </span>
       )}
@@ -95,7 +95,7 @@ export function StoryRowCard({ item, lens }: { item: FeedItem; lens: string }) {
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="flex flex-wrap items-center gap-[5px]">
           <StoryBadges item={item} lens={lens} />
-          <span className="ml-auto text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
             {itemMeta(item)}
           </span>
         </span>
@@ -159,7 +159,7 @@ export function TopStoryCard({ item, lens }: { item: FeedItem; lens: string }) {
             {item.summary}
           </span>
         )}
-        <span className="mt-auto text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+        <span className="mt-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
           {itemMeta(item)}
         </span>
       </span>

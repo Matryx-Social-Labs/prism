@@ -13,12 +13,12 @@ const LABELS = [
   },
   {
     chip: "⚠ Single-origin",
-    chipStyle: { background: "var(--lens-general-bg)", color: "var(--lens-general)" },
+    chipStyle: { background: "var(--bg-sunken)", color: "var(--ink-muted)" },
     body: "Every source on the story shares one origin country. You're seeing one side because only one side is speaking — the blindspot flag.",
   },
   {
     chip: "◉ Your region",
-    chipStyle: { background: "var(--lens-general-bg)", color: "var(--lens-general)" },
+    chipStyle: { background: "var(--bg-sunken)", color: "var(--ink-muted)" },
     body: "The story involves or is covered from your region. Your feed blends these with international coverage — never one without the other.",
   },
 ];
