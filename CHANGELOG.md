@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.3.0] - 2026-07-19
+
+### Changed
+- Serving layer refactor: `api/main.py` (573 lines) split into `api/routes/`
+  (meta, feed, events, admin) plus `api/schemas.py`. Behavior-identical — the
+  served endpoint set is unchanged (locked by `tests/test_api_routes.py`). This
+  is the refactor-first step before the freemium build adds auth, billing, and
+  watchlist routers, so they land in their own modules instead of one 1000+ line file.
+
 ## [0.0.1.0] - 2026-07-19
 
 ### Added
