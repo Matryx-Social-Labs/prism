@@ -7,7 +7,6 @@ Create Date: 2026-07-19 20:20:37.335468
 """
 from collections.abc import Sequence
 
-import sqlalchemy as sa
 from alembic import op
 
 revision: str = '51de411d824c'
@@ -17,31 +16,48 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Feed candidate window: WHERE sector = ANY(...) + per-sector ORDER BY
-    # last_updated_at DESC (api/routes/feed.py). A single composite btree covers
-    # both the filter and the window.
-    op.create_index(
-        "ix_events_sector_last_updated",
-        "events",
-        ["sector", sa.text("last_updated_at DESC")],
-    )
-    # Event-detail joins by event_id. event_memberships / event_entities already
-    # have event_id as the leading column of a unique index, so only these two
-    # (whose only index is the PK) actually need one.
-    op.create_index("ix_perspectives_event_id", "perspectives", ["event_id"])
-    op.create_index("ix_impacts_event_id", "impacts", ["event_id"])
-    # Agent RAG retrieval orders article_chunks.embedding <=> query (cosine).
-    # Without an ANN index that is a full scan on every question — worse once
-    # paid "unlimited Ask" ships. HNSW (pgvector pg16) matches the <=> operator
-    # via vector_cosine_ops.
-    op.execute(
-        "CREATE INDEX ix_article_chunks_embedding_hnsw "
-        "ON article_chunks USING hnsw (embedding vector_cosine_ops)"
-    )
+    # These tables (events, perspectives, impacts, article_chunks) are written
+    # continuously by the ingestion worker. A plain CREATE INDEX takes a lock
+    # that fights those writes, so at production scale (25k+ article_chunks) the
+    # index build stalls indefinitely — which stalls `alembic upgrade head` in
+    # the deploy start command, so the API never boots and the healthcheck fails.
+    # CONCURRENTLY builds without blocking writes; IF NOT EXISTS makes re-runs
+    # (and pre-created indexes) idempotent. CONCURRENTLY can't run inside a
+    # transaction, hence autocommit_block.
+    #
+    #  - events(sector, last_updated_at DESC): the feed candidate window
+    #  - perspectives/impacts(event_id): event-detail joins (memberships/entities
+    #    already lead a unique index)
+    #  - article_chunks.embedding HNSW (vector_cosine_ops): agent RAG <=> retrieval
+    with op.get_context().autocommit_block():
+        # HNSW's PARALLEL build allocates a dynamic-shared-memory segment that
+        # overflows the small /dev/shm on Railway's managed Postgres container
+        # ("could not resize shared memory segment ... No space left on device"),
+        # which aborts the migration and fails the deploy healthcheck. Building
+        # single-threaded avoids the DSM allocation entirely and is fast at this
+        # scale (~12s for 25k rows). Session-scoped SET applies to the CREATEs below.
+        op.execute("SET max_parallel_maintenance_workers = 0")
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_events_sector_last_updated "
+            "ON events (sector, last_updated_at DESC)"
+        )
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_perspectives_event_id "
+            "ON perspectives (event_id)"
+        )
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_impacts_event_id "
+            "ON impacts (event_id)"
+        )
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_article_chunks_embedding_hnsw "
+            "ON article_chunks USING hnsw (embedding vector_cosine_ops)"
+        )
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX IF EXISTS ix_article_chunks_embedding_hnsw")
-    op.drop_index("ix_impacts_event_id", table_name="impacts")
-    op.drop_index("ix_perspectives_event_id", table_name="perspectives")
-    op.drop_index("ix_events_sector_last_updated", table_name="events")
+    with op.get_context().autocommit_block():
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_article_chunks_embedding_hnsw")
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_impacts_event_id")
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_perspectives_event_id")
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_events_sector_last_updated")
