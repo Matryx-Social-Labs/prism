@@ -13,9 +13,38 @@ concurrency:
 
 jobs:
   backend:
-    name: backend · lint + import + tests
+    name: backend · lint + import + migrate + tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    # Real Postgres (pgvector) + Redis so `alembic upgrade head` runs and the
+    # DB-dependent tests (atomic quota, auth flow, Redis single-flight) actually
+    # execute instead of skipping. A broken migration now fails CI, not Railway.
+    # (Scale/container-specific failures like the HNSW /dev/shm overflow still
+    # won't reproduce on an empty CI DB — this catches migration logic + schema.)
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: prism
+          POSTGRES_PASSWORD: prism
+          POSTGRES_DB: prism
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prism -d prism"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://prism:prism@localhost:5432/prism
+      REDIS_URL: redis://localhost:6379/0
 
     steps:
       - name: Checkout
@@ -41,13 +70,17 @@ jobs:
           import agent.rag, personalization.ranking, common.lenses
           print('all modules import cleanly')"
 
-      - name: Run tests (if any)
+      - name: Migrate (exercises alembic upgrade head + downgrade)
+        # upgrade builds the whole schema; a down/up round-trip proves each
+        # migration's downgrade too. Catches the class of bug that slipped to
+        # Railway (a migration that fails `alembic upgrade head`).
         run: |
-          if ls tests/test_*.py >/dev/null 2>&1; then
-            uv run pytest -q
-          else
-            echo "no tests yet — skipping"
-          fi
+          uv run alembic upgrade head
+          uv run alembic downgrade -1
+          uv run alembic upgrade head
+
+      - name: Run tests (DB + Redis now present, so nothing skips)
+        run: uv run pytest -q
 
   web:
     name: web · typecheck + build

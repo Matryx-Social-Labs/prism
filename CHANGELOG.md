@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.11.0] - 2026-07-19
+
+### Changed
+- CI backend job now runs against real Postgres (pgvector) + Redis services:
+  `alembic upgrade head` (plus a down/up round-trip) runs on every PR, and the
+  DB-dependent tests (atomic quota concurrency, magic-link auth flow, Redis
+  single-flight) actually execute instead of skipping. A migration that fails
+  `alembic upgrade head` now fails CI instead of reaching Railway.
+
 ## [0.0.10.0] - 2026-07-19
 
 ### Fixed
