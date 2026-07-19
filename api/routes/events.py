@@ -5,10 +5,8 @@ PR2). The single-flight lock below is in-process only — PR2 replaces it with a
 Redis lock so it holds across API replicas.
 """
 
-import asyncio
 import json
 import uuid
-from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -29,6 +27,7 @@ from api.schemas import (
 )
 from common.db import get_db
 from common.lenses import LENSES
+from common.locks import single_flight
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 from correlation.threads import fetch_thread
 
@@ -178,17 +177,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     )
 
 
-# On-demand lens briefs: any lens on any story — this is what lets a cyber
-# professional pull the cyber read of a war, or a trader the market read of
-# a breach. Generated once, cached on the event projection. Single-flight
-# per (event, lens) so a burst of viewers costs one LLM call.
-_brief_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-
-
-@router.get("/api/v1/events/{event_id}/brief", response_model=BriefResponse)
-async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(get_db)):
-    if lens not in LENSES:
-        raise HTTPException(status_code=422, detail=f"unknown lens '{lens}'")
+async def _read_cached_brief(db: AsyncSession, event_id: uuid.UUID, lens: str) -> BriefResponse | None:
     row = (
         await db.execute(
             text("SELECT projection FROM events WHERE id = :eid"), {"eid": str(event_id)}
@@ -196,27 +185,34 @@ async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(g
     ).mappings().first()
     if row is None:
         raise HTTPException(status_code=404, detail="event not found")
-
     projection = row["projection"] or {}
     cached = (projection.get("lens_briefs") or {}).get(lens)
     if cached:
         points = (projection.get("lens_points") or {}).get(lens) or []
         return BriefResponse(lens=lens, brief=cached, points=points, cached=True)
+    return None
 
-    lock = _brief_locks[f"{event_id}:{lens}"]
-    async with lock:
-        # Re-check under the lock — another request may have generated it.
-        row = (
-            await db.execute(
-                text("SELECT projection FROM events WHERE id = :eid"), {"eid": str(event_id)}
-            )
-        ).mappings().first()
-        projection = row["projection"] or {}
-        cached = (projection.get("lens_briefs") or {}).get(lens)
+
+# On-demand lens briefs: any lens on any story — this is what lets a cyber
+# professional pull the cyber read of a war, or a trader the market read of a
+# breach. Generated once, cached on the event projection. A Redis single-flight
+# per (event, lens) holds across API replicas so a burst of viewers (and, once
+# the paywall lands, a burst of sample-spenders) costs exactly one LLM call.
+@router.get("/api/v1/events/{event_id}/brief", response_model=BriefResponse)
+async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(get_db)):
+    if lens not in LENSES:
+        raise HTTPException(status_code=422, detail=f"unknown lens '{lens}'")
+    cached = await _read_cached_brief(db, event_id, lens)
+    if cached:
+        return cached
+
+    async with single_flight(f"brief:{event_id}:{lens}"):
+        # Past the single-flight barrier, re-read: the leader may have just
+        # filled the cache while we waited. If it's still empty, generate — that
+        # covers the leader and the fallback case where the leader stalled/died.
+        cached = await _read_cached_brief(db, event_id, lens)
         if cached:
-            points = (projection.get("lens_points") or {}).get(lens) or []
-            return BriefResponse(lens=lens, brief=cached, points=points, cached=True)
-
+            return cached
         briefs = await generate_briefs(event_id, [lens])
         await persist_briefs(event_id, briefs)
         read = briefs.get(lens) or {}
