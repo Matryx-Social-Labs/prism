@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.8.0] - 2026-07-19
+
+### Changed
+- On-demand lens-brief generation now single-flights across API replicas via a
+  Redis lock (`common/locks.py`), replacing the in-process `asyncio.Lock` that
+  only held within one process. A burst of viewers of the same (event, lens) now
+  costs one LLM call fleet-wide, not one per replica — and, once the paywall
+  lands, one sample decrement instead of a double-spend. Falls back to generating
+  if the lock holder stalls, so a request never hangs. Exclusivity proven against
+  live Redis in `tests/test_locks.py`.
+
 ## [0.0.7.0] - 2026-07-19
 
 ### Added
