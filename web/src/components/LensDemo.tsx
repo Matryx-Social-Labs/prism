@@ -29,6 +29,7 @@ const CURATED: DemoStory = {
 export function LensDemo() {
   const [story, setStory] = useState<DemoStory>(CURATED);
   const [active, setActive] = useState("general");
+  const [flipped, setFlipped] = useState(false);
   const [live, setLive] = useState(false);
 
   useEffect(() => {
@@ -84,7 +85,7 @@ export function LensDemo() {
               key={slug}
               role="tab"
               aria-selected={selected}
-              onClick={() => setActive(slug)}
+              onClick={() => { setFlipped(true); setActive(slug); }}
               className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
               style={
                 selected
@@ -98,7 +99,8 @@ export function LensDemo() {
         })}
       </div>
 
-      <div key={active} className="fade-swap px-5 pb-5 pt-3">
+      <div key={active} className={`${flipped ? "flip-body" : ""} relative overflow-hidden px-5 pb-5 pt-3`}>
+          {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
         <p className="text-[15px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
           <span className="font-semibold" style={{ color: meta.color }}>
             Through the {meta.name} lens —{" "}

@@ -1,13 +1,14 @@
 # Prism design system — conventions
 
 Prism is a news-intelligence product: adaptive light/dark, editorial typography, a spectrum
-gradient as the brand accent, and amber/cyan/violet lens colors.
+gradient as the brand accent, and amber/cyan/violet lens colors. The governing rule
+(DESIGN.md): **chrome is monochrome — color only ever means a lens is speaking.**
 
 ## Setup
 
 No provider is required. Theme is controlled by `data-theme="light" | "dark"` on the **root
 element** (`<html>`); without it, `prefers-color-scheme` decides. All tokens and component CSS
-arrive via `styles.css`'s import closure. Fonts (Fraunces for display, Space Grotesk for UI)
+arrive via `styles.css`'s import closure. Fonts (Fraunces for display, General Sans for UI)
 load from the Google Fonts `@import` in the stylesheet and are exposed as `--font-display` and
 `--font-ui`.
 

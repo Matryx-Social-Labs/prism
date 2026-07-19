@@ -159,7 +159,7 @@ export function AskPanel({
                           href={c.url ?? undefined}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-full border px-[9px] py-0.5 text-[10.5px] font-semibold no-underline"
+                          className="rounded-full border px-[9px] py-0.5 font-mono text-[10px] font-medium no-underline"
                           style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
                         >
                           [{c.number}] {c.source_name}

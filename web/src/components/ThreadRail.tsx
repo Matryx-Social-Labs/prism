@@ -84,16 +84,16 @@ export function ThreadRail({
             </div>
             <div className="min-w-0 flex-1 pb-[22px]">
               <span
-                className="text-[11px] font-semibold uppercase tracking-wide"
-                style={{ color: row.now ? "var(--lens-general)" : "var(--ink-faint)" }}
+                className="font-mono text-[10.5px] font-medium uppercase tracking-wide"
+                style={{ color: row.now ? "var(--ink)" : "var(--ink-faint)" }}
               >
                 {row.when}
               </span>
               {row.href ? (
                 <Link
                   href={row.href}
-                  className="mt-[3px] block text-sm font-semibold leading-[1.4]"
-                  style={{ color: "var(--lens-cyber)" }}
+                  className="mt-[3px] block text-sm font-semibold leading-[1.4] underline decoration-[var(--line-strong)] underline-offset-4 hover:decoration-[var(--ink)]"
+                  style={{ color: "var(--ink)" }}
                 >
                   {row.title} →
                 </Link>

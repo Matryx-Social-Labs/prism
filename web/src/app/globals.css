@@ -108,11 +108,49 @@ body {
 }
 
 ::selection {
-  background: var(--lens-cyber);
+  /* chrome is monochrome — color only ever means a lens is speaking */
+  background: var(--ink);
   color: var(--bg);
 }
 
 /* ── Motion primitives (all gated on prefers-reduced-motion) ───────── */
+
+/* The re-typeset flip (DESIGN.md signature): a lens-colored scan line
+   sweeps the lens block while the content re-inks behind it. */
+.flip-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  height: 2px;
+  opacity: 0;
+  pointer-events: none;
+  animation: flipSweep 500ms ease-out forwards;
+}
+@keyframes flipSweep {
+  from {
+    top: -2px;
+    opacity: 1;
+  }
+  to {
+    top: 100%;
+    opacity: 0.85;
+  }
+}
+.flip-body {
+  animation: flipReink 500ms ease-out;
+}
+@keyframes flipReink {
+  0% {
+    opacity: 0.25;
+  }
+  60% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 1;
+  }
+}
 
 .reveal {
   opacity: 0;
@@ -247,6 +285,8 @@ body {
     stroke-dashoffset: 0;
     animation: none;
   }
+  .flip-scanline,
+  .flip-body,
   .pulse-skel,
   .blink-caret,
   .prism-glow,
