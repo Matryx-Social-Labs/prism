@@ -18,9 +18,9 @@ from common.db import session_scope
 from common.quota import grant_samples, remaining_samples, try_consume_sample
 
 # common.db memoizes one async engine; its pool binds to the loop that first
-# used it. Share one loop across this module's tests so that engine stays valid
-# (otherwise a later test on a fresh loop hits "Event loop is closed").
-pytestmark = pytest.mark.asyncio(loop_scope="module")
+# used it. Run all async DB tests on one session-scoped loop so that engine
+# stays valid across modules (a fresh per-module loop hits "Event loop is closed").
+pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 async def _db_reachable() -> bool:
