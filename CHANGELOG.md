@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.20.0] - 2026-07-20
+
+### Added
+- `sitemap.xml` + `robots.txt` (native Next metadata routes) — the sitemap lists
+  public pages and every story URL (from the feed, `lastModified` per event) so
+  crawlers can discover the stories the v0.0.19.0 metadata describes; robots
+  allows public content and disallows the user-specific pages (account, signin,
+  auth, onboarding, interests, watchlist). Sitemap still serves the static pages
+  if the API is down. Completes the crawlability half of SEO.
+
 ## [0.0.19.0] - 2026-07-20
 
 ### Added
