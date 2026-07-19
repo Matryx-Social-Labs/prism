@@ -15,6 +15,7 @@ EXPECTED = {
     ("POST", "/api/v1/auth/verify"),
     ("GET", "/api/v1/auth/me"),
     ("GET", "/api/v1/feed"),
+    ("GET", "/api/v1/search"),
     ("GET", "/api/v1/events/{event_id}"),
     ("GET", "/api/v1/events/{event_id}/brief"),
     ("GET", "/api/v1/events/{event_id}/questions"),
