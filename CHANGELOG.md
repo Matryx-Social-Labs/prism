@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.5.0] - 2026-07-19
+
+### Added
+- Database indexes on the read hot paths (migration `51de411d824c`): a composite
+  `events(sector, last_updated_at DESC)` for the feed window, `event_id` indexes
+  on `perspectives` and `impacts` for event-detail joins, and an **HNSW** ANN
+  index on `article_chunks.embedding` so agent retrieval stops full-scanning the
+  vector column. Applies and reverts cleanly (verified up + down against pg16).
+  Prevents latency getting worse once paid "unlimited Ask" ships.
+
 ## [0.0.4.0] - 2026-07-19
 
 ### Added
