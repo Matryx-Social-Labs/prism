@@ -11,6 +11,7 @@ import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { BriefPlayer } from "@/components/BriefPlayer";
+import { FollowSignals } from "@/components/FollowSignals";
 import { ThreadRail } from "@/components/ThreadRail";
 
 function regionName(code: string): string {
@@ -461,6 +462,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           )}
 
           {lens === "finance_trader" && finance && (
+            <div className="flex flex-col gap-3">
             <div
               className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border px-4 py-3 text-[13.5px]"
               style={{ borderColor: "var(--lens-finance)", background: "var(--lens-finance-bg)", color: "var(--ink)" }}
@@ -490,6 +492,8 @@ export function StoryView({ event }: { event: EventDetail }) {
                     ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
                 </span>
               )}
+            </div>
+            <FollowSignals tickers={finance.tickers ?? []} sector={finance.sector ?? null} />
             </div>
           )}
         </div>

@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.18.0] - 2026-07-20
+
+### Added
+- Follow-from-story — one-tap follow toggles for a story's tickers and sector,
+  inside the Markets lens block. Closes the watchlist loop: discover a signal
+  while reading, follow it in place (no retyping on /watchlist). Lives in the
+  auth-gated pro lens so every viewer can follow; reuses the watchlist API and
+  normalizes to its stored form (ticker upper, sector lower) so toggle state
+  reconciles with the list. Followed chips carry the finance hue.
+
 ## [0.0.17.0] - 2026-07-20
 
 ### Added
