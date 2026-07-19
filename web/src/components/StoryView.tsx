@@ -179,6 +179,17 @@ export function StoryView({ event }: { event: EventDetail }) {
               ${t}
             </Chip>
           ))}
+          {finance?.catalyst && (
+            // Catalyst type — SEBI-safe reframe: what kind of event is moving
+            // this, sourced, instead of a buy/sell "direction". Mono evidence label.
+            <span
+              className="rounded-full border px-[8px] py-px font-mono text-[10px] font-medium uppercase tracking-wide"
+              style={{ borderColor: "var(--lens-finance)", color: "var(--lens-finance)" }}
+              title="Catalyst type — what is moving this story"
+            >
+              {finance.catalyst.replaceAll("_", " ")}
+            </span>
+          )}
           <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
             {event.sources.length} source{event.sources.length === 1 ? "" : "s"} · {timeAgo(event.last_updated_at)}
           </span>

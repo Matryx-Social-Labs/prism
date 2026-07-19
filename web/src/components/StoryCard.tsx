@@ -62,8 +62,19 @@ export function StoryBadges({ item, lens }: { item: FeedItem; lens: string }) {
           ${t}
         </span>
       ))}
-      {item.catalyst && lens === "finance_trader" && (
-        <span className="rounded-full px-[9px] py-0.5 text-[11px] font-medium" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
+      {item.catalyst && (
+        // Catalyst type — a provenance/evidence label (IBM Plex Mono, DESIGN.md).
+        // Monochrome by default; takes the markets hue only when the finance
+        // lens is speaking (color-means-lens). Never a per-catalyst palette.
+        <span
+          className="rounded-full border px-[8px] py-px font-mono text-[10px] font-medium uppercase tracking-wide"
+          style={
+            lens === "finance_trader"
+              ? { borderColor: "var(--lens-finance)", color: "var(--lens-finance)" }
+              : { borderColor: "var(--line-strong)", color: "var(--ink-muted)" }
+          }
+          title="Catalyst type — what is moving this story"
+        >
           {item.catalyst.replaceAll("_", " ")}
         </span>
       )}
