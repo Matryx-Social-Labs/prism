@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.7.0] - 2026-07-19
+
+### Added
+- Magic-link authentication (migration `de000473f0e5`): `POST /api/v1/auth/request`
+  emails a single-use link, `POST /api/v1/auth/verify` exchanges it for a bearer
+  session, `GET /api/v1/auth/me` returns the account. New `users` sign-ins get the
+  free Markets samples granted automatically. Security (eng-review N3): tokens
+  stored only as SHA-256 hashes, single-use + time-limited magic links, bearer
+  sessions (no cookie → no CSRF), per-email rate limiting, and a DPDP consent gate.
+- Pluggable email sender (`common/email.py`) — defaults to a console sender so
+  auth works end-to-end in dev; swap `prism_email_provider` for a real backend later.
+- `api/deps.py::get_current_user` — the bearer dependency the read-time gate,
+  watchlist, and personalized brief will hang off.
+- Full auth flow + security edges (single-use, expiry, rate-limit, bad token)
+  verified against Postgres in `tests/test_auth.py`.
+
 ## [0.0.6.0] - 2026-07-19
 
 ### Added

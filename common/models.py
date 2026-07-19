@@ -298,3 +298,30 @@ class UsageQuota(TimestampMixin, Base):
     period_start: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class AuthToken(TimestampMixin, Base):
+    """Single-use magic-link token. Only the SHA-256 hash is stored — the raw
+    token exists only in the emailed link (N3). Consumed on first successful
+    verify; expired/consumed tokens never authenticate."""
+
+    __tablename__ = "auth_tokens"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    email: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Session(TimestampMixin, Base):
+    """Bearer session. The client holds the raw token; we store its SHA-256 hash.
+    Bearer (not cookie) so there is no CSRF surface (N3). Revocable by deleting
+    the row."""
+
+    __tablename__ = "sessions"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

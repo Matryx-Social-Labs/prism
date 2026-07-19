@@ -50,6 +50,14 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     prism_admin_token: str = "change-me"
 
+    # Auth (magic-link, bearer). Web URL is where the verify link points.
+    prism_web_url: str = "http://localhost:3000"
+    prism_email_provider: str = "console"  # console (dev) | resend | ses | postmark
+    prism_magic_token_ttl_min: int = 15  # magic-link lifetime
+    prism_session_ttl_days: int = 30  # bearer session lifetime
+    prism_magic_request_cooldown_s: int = 30  # per-email rate limit on link requests
+    prism_free_markets_samples: int = 3  # sample grant on signup (D13 Markets-only)
+
     # Sources
     nvd_api_key: str = ""
 
