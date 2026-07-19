@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.19.0] - 2026-07-20
+
+### Added
+- Shareable / SEO story pages — every story now emits per-story `generateMetadata`
+  (title, canonical, OpenGraph `article`, Twitter `summary_large_image` with the
+  event image, published/modified times, section) plus `NewsArticle` JSON-LD.
+  Shares render a real card instead of a blank link; search engines can index
+  and rich-result the pages. Site-wide OG/Twitter defaults + `metadataBase` on
+  the root layout; `SITE_URL` resolves from `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL`
+  → localhost. Distribution win, no LLM.
+
 ## [0.0.18.0] - 2026-07-20
 
 ### Added

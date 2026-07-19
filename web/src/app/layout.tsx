@@ -4,6 +4,7 @@ import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { HeaderNav } from "@/components/HeaderNav";
 import { PrismMark } from "@/components/PrismMark";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const display = Fraunces({
@@ -32,9 +33,25 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Prism — One story. Every perspective.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Prism — One story. Every perspective.",
+    template: "%s — Prism",
+  },
   description:
     "Role-aware AI news intelligence. The same story through your professional lens — with more lenses added continuously — all sides of the narrative, consequences, and a grounded agent you can ask.",
+  openGraph: {
+    type: "website",
+    siteName: "Prism",
+    title: "Prism — One story. Every perspective.",
+    description: "Role-aware AI news intelligence. The same story, through your professional lens.",
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Prism — One story. Every perspective.",
+    description: "Role-aware AI news intelligence. The same story, through your professional lens.",
+  },
 };
 
 const themeInit = `(function(){try{var t=localStorage.getItem("prism.theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}})();`;
