@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.14.0] - 2026-07-20
+
+### Changed
+- Brief depth: the `lens-brief` and `event-analysis` prompts now produce
+  substantive, structured briefs instead of a 3-5 sentence summary — general
+  5-7 sentences (what happened → why it matters → what's contested → what to
+  watch), professional (cyber/markets) 6-9 sentences with second-order effects,
+  because depth is decision-relevant there. Grounding rules explicitly OVERRIDE
+  length: if the event data is thin, state what is not yet known rather than
+  invent detail to fill the brief (the trust failure mode of AI news). Output
+  JSON shape is unchanged (text + points per lens), so no code change; one
+  cached call per event, so cost/latency is ~flat. Runtime prompts live in
+  Langfuse — `evals/sync_prompts.py` publishes these fallbacks to make it live.
+
 ## [0.0.13.0] - 2026-07-19
 
 ### Added
