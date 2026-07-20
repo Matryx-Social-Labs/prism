@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.22.0] - 2026-07-20
+
+### Changed
+- Relevance-gate calibration verdict recorded (n=500 balanced DB-labeled
+  `raw_items`): the embedding score can't safely replace the LLM gate. Max-cosine
+  AUC 0.67; contrastive positive−negative anchors AUC 0.72, but at ≤3% relevant-
+  news loss it gates only ~5% of junk, and ~13% junk-gated costs ~5% of real
+  coverage — fails the "don't degrade content" bar. `enforce` stays unwired; keep
+  the LLM gate. Documented in `common/config.py` + `classification/shadow_gate.py`
+  so the roadmap item is closed rather than left as a stale "calibrate then flip".
+
 ## [0.0.21.0] - 2026-07-20
 
 ### Added
