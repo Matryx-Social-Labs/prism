@@ -35,6 +35,14 @@ async def get_lenses():
     )
 
 
+@router.get("/api/v1/regions")
+async def get_regions():
+    """Indian states/UTs for onboarding (with a `covered` flag per state)."""
+    from common.regions import states_payload
+
+    return {"country": "IN", "states": states_payload()}
+
+
 @router.get("/api/v1/taxonomy", response_model=TaxonomyResponse)
 async def get_taxonomy():
     return TaxonomyResponse(

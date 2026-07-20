@@ -19,6 +19,7 @@ async def get_feed(
     sector: str | None = None,
     interests: str | None = None,
     region: str | None = None,
+    state: str | None = None,  # ISO 3166-2 (e.g. IN-KA) — surfaces the reader's state first
     sort: str = "latest",
     limit: int = 30,
     db: AsyncSession = Depends(get_db),
@@ -82,9 +83,15 @@ async def get_feed(
         wanted_subs = interest_pairs.get(row["sector"] or "")
         if wanted_subs and row["subsector"] not in wanted_subs:
             continue
-        items.append(build_feed_item(row, active_lens, region))
+        # is_regional reflects the state when the reader gave one (India-first
+        # tiering), else the country region.
+        items.append(build_feed_item(row, active_lens, state or region))
     if sort == "top":
         items.sort(key=lambda i: i.score, reverse=True)
     else:  # latest — a news feed reads newest-first by default
         items.sort(key=lambda i: i.last_updated_at, reverse=True)
+    # Geo tier: the reader's state first, then the rest (national). Stable sort
+    # keeps the score/recency order within each band.
+    if state:
+        items.sort(key=lambda i: not i.is_regional)
     return FeedResponse(items=items[:limit], lens=active_lens.slug)

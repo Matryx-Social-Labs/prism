@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   InterestChips,
   LensCards,
-  RegionGrid,
+  StateSelect,
   interestsToPicks,
   picksToInterests,
   useTaxonomy,
@@ -19,7 +19,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const taxonomy = useTaxonomy();
   const [step, setStep] = useState(0);
-  const [region, setRegion] = useState("IN");
+  const [state, setState] = useState("");
   const [lens, setLens] = useState("general");
   const [picks, setPicks] = useState<Picks>({});
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -28,13 +28,13 @@ export default function OnboardingPage() {
     const existing = loadProfile();
     if (existing) {
       setLens(existing.lens);
-      if (existing.region) setRegion(existing.region);
+      if (existing.state) setState(existing.state);
       setPicks(interestsToPicks(existing.interests));
     }
   }, []);
 
   function finish() {
-    saveProfile({ lens, region, interests: picksToInterests(picks) });
+    saveProfile({ lens, region: "IN", state: state || null, interests: picksToInterests(picks) });
     router.push("/feed");
   }
 
@@ -75,14 +75,14 @@ export default function OnboardingPage() {
       {step === 0 && (
         <section>
           <h1 className="text-[32px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-            Where do you read from?
+            Which state are you in?
           </h1>
           <p className="mt-2.5 text-sm leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Your feed blends international coverage with news from your region — and flags stories
-            your region&apos;s outlets haven&apos;t covered yet.
+            Prism leads with news from your state, then the rest of India. Pick your state —
+            you can change it anytime.
           </p>
           <div className="mt-6">
-            <RegionGrid value={region} onChange={setRegion} />
+            <StateSelect value={state} onChange={setState} />
           </div>
         </section>
       )}

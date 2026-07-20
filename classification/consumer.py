@@ -69,6 +69,12 @@ async def handle_raw_item(payload: dict) -> None:
         if gate.is_relevant:
             classification = await _run_classifier(title, body, source_country, meta)
 
+    # Stamp the state (ISO 3166-2) from a state-edition feed onto the regions, so
+    # the feed can tier local(state) -> national. Deterministic from the feed, no LLM.
+    if classification is not None and feed_spec is not None and feed_spec.state:
+        if feed_spec.state not in classification.regions:
+            classification.regions = [*classification.regions, feed_spec.state]
+
     async with session_scope() as session:
         item = await session.get(RawItem, raw_item_id)
         if item is None or item.relevance != "pending":

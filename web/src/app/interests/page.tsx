@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   InterestChips,
   LensPills,
-  RegionGrid,
+  StateSelect,
   interestsToPicks,
   picksToInterests,
   useTaxonomy,
@@ -27,7 +27,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export default function InterestsPage() {
   const router = useRouter();
   const taxonomy = useTaxonomy();
-  const [region, setRegion] = useState("IN");
+  const [state, setState] = useState("");
   const [lens, setLens] = useState("general");
   const [picks, setPicks] = useState<Picks>({});
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -36,13 +36,13 @@ export default function InterestsPage() {
     const existing = loadProfile();
     if (existing) {
       setLens(existing.lens);
-      if (existing.region) setRegion(existing.region);
+      if (existing.state) setState(existing.state);
       setPicks(interestsToPicks(existing.interests));
     }
   }, []);
 
   function save() {
-    saveProfile({ lens, region, interests: picksToInterests(picks) });
+    saveProfile({ lens, region: "IN", state: state || null, interests: picksToInterests(picks) });
     router.push("/feed");
   }
 
@@ -52,12 +52,12 @@ export default function InterestsPage() {
         Your Prism
       </h1>
       <p className="mt-2 text-sm" style={{ color: "var(--ink-muted)" }}>
-        Region, lens, and interests — everything your feed is built from. Stored only in this
+        State, lens, and interests — everything your feed is built from. Stored only in this
         browser.
       </p>
 
-      <SectionLabel>Where you read from</SectionLabel>
-      <RegionGrid value={region} onChange={setRegion} />
+      <SectionLabel>Your state</SectionLabel>
+      <StateSelect value={state} onChange={setState} />
 
       <SectionLabel>Your default lens</SectionLabel>
       <LensPills value={lens} onChange={setLens} />

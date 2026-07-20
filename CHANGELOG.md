@@ -3,6 +3,63 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.30.0] - 2026-07-20
+
+### Changed
+- Multilingual embeddings — swapped `bge-small-en` (384) for
+  `paraphrase-multilingual-mpnet-base-v2` (768) so cross-language coverage of the
+  same story clusters together. Benchmarked + validated on the live CJP story:
+  The Hindu (English) and Aaj Tak (Hindi) coverage of the same Parliament-march
+  crackdown score 0.575 vs 0.179 for an unrelated story (bge-small couldn't
+  separate Hindi at all: 0.56 vs 0.53). Migration `5493a4141cbb` moves the vector
+  columns to 768 and **adds the missing HNSW index on `events.embedding`**
+  (clustering + thread retrieval were doing a sequential cosine scan).
+
+### Added
+- India-language sources — Aaj Tak, Amar Ujala (Hindi), BBC Tamil (Tamil).
+  Ingested + classified correctly (Hindi CJP items → politics).
+
+### Known follow-ups
+- Cross-language pairs (~0.57 sim) sit below the near-duplicate clustering
+  threshold (0.88) — clustering needs a looser cross-language band + entity
+  overlap (Wangchuk/Pradhan/CJP) to merge them, not tight embedding alone.
+- `extract-shared` occasionally fails JSON on `gemini-3.1-flash-lite` (retries
+  exhausted) — needs a sturdier model/prompt for that step.
+- mpnet-base is ~1GB (vs ~130MB) — larger model download + RAM at runtime.
+
+## [0.0.29.0] - 2026-07-20
+
+### Added
+- India-first, state-level geography. Onboarding now asks for your **state**
+  (`/api/v1/regions`, ISO 3166-2, `covered` flag per state); the feed leads with
+  your state, then national (`?state=IN-KA`, stable geo-tier over recency/score).
+  State-edition sources (The Hindu state feeds + TOI metros) stamp their ISO
+  3166-2 code deterministically through classification → `event.regions`, so the
+  reader's local news surfaces first. New `common/regions.py`; `StateSelect`
+  onboarding/interests component; profile gains `state`.
+
+### Changed
+- **Sources are India-only for now** — dropped international general outlets
+  (BBC, Al Jazeera, Guardian, DW, France 24, SCMP, Dawn, TASS, CGTN, Anadolu,
+  Press TV) and GDELT (international + rate-limited). Kept India national + state
+  + the cybersecurity lens. RSS now runs **before** the CVE feeds so the general
+  feed is never starved (CVE feeds stay cyber-lens-only, never in the general
+  feed — a dedicated CVE section under cyber is a follow-up).
+- Bulk pipeline stages (gate/classify/extract) → `google/gemini-3.1-flash-lite`
+  (cheap + reliable structured output; the free `tencent/hy3` returned empty
+  content).
+
+### Verified (local, full pipeline on real India ingest)
+- 827 India items ingested; state feeds tag `[IN, IN-XX]` through classification;
+  correlation merges the state code into `event.regions` (Karnataka article →
+  `[IN, IN-KA]`); feed `?state=IN-KA` surfaces the in-state event first. 28
+  backend tests pass (+2 geo); frontend builds.
+
+### Known follow-ups
+- Correlation throughput is the bottleneck (~40s/event with briefs) — tune before
+  scaling volume. City-level granularity + a separate CVE-advisories section under
+  the cyber lens are next.
+
 ## [0.0.28.1] - 2026-07-20
 
 ### Fixed

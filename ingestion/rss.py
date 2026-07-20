@@ -30,34 +30,39 @@ class FeedSpec:
     url: str
     sector: str | None = None  # set => deterministic classification, no LLM
     subsector: str | None = None
+    state: str | None = None  # ISO 3166-2 (e.g. IN-KA) => stamped on the event's regions
 
 
+# India-first scope: national + state general news, plus the cyber lens beachhead.
+# International general news is intentionally out for now (start focused on India,
+# scale geography vertically later). State feeds carry an ISO 3166-2 code so the
+# feed can tier local(state) -> national.
 FEEDS: list[FeedSpec] = [
-    # Cyber beachhead
-    FeedSpec("thehackernews", "https://feeds.feedburner.com/TheHackersNews"),
-    FeedSpec("bleepingcomputer", "https://www.bleepingcomputer.com/feed/"),
-    # World news (general reader)
-    FeedSpec("bbc_world", "http://feeds.bbci.co.uk/news/world/rss.xml"),
-    FeedSpec("aljazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
-    FeedSpec("guardian_world", "https://www.theguardian.com/world/rss"),
-    # India (mixed feeds — LLM gate + classifier)
+    # ── India national (general — LLM gate + classifier) ──
     FeedSpec("thehindu", "https://www.thehindu.com/news/national/feeder/default.rss"),
     FeedSpec("timesofindia", "https://timesofindia.indiatimes.com/rssfeedstopstories.cms"),
     FeedSpec("ndtv", "https://feeds.feedburner.com/NDTV-LatestNews"),
     FeedSpec("hindustantimes", "https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml"),
-    # India (single-topic — deterministic, zero LLM)
+    # ── India national (single-topic — deterministic, zero LLM) ──
     FeedSpec("livemint", "https://www.livemint.com/rss/news", sector="business"),
     FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss", sector="business"),
     FeedSpec("espncricinfo", "https://www.espncricinfo.com/rss/content/story/feeds/0.xml", sector="sports", subsector="cricket"),
-    # Origin diversity (state affiliation labeled in seed.py)
-    FeedSpec("dw", "https://rss.dw.com/rdf/rss-en-all"),
-    FeedSpec("france24", "https://www.france24.com/en/rss"),
-    FeedSpec("anadolu", "https://www.aa.com.tr/en/rss/default?cat=guncel"),
-    FeedSpec("scmp", "https://www.scmp.com/rss/91/feed"),
-    FeedSpec("dawn", "https://www.dawn.com/feeds/home"),
-    FeedSpec("tass", "https://tass.com/rss/v2.xml"),
-    FeedSpec("cgtn", "https://www.cgtn.com/subscribe/rss/section/world.xml"),
-    FeedSpec("presstv", "https://www.presstv.ir/rss"),
+    # ── India national — other languages (multilingual embedding clusters these
+    # with the English coverage of the same story) ──
+    FeedSpec("aajtak", "https://www.aajtak.in/rssfeeds/?id=home"),
+    FeedSpec("amarujala", "https://www.amarujala.com/rss/breaking-news.xml"),
+    FeedSpec("bbc_tamil", "https://feeds.bbci.co.uk/tamil/rss.xml"),
+    # ── India state editions (The Hindu state feeds + TOI metros) ──
+    FeedSpec("thehindu_tamilnadu", "https://www.thehindu.com/news/national/tamil-nadu/feeder/default.rss", state="IN-TN"),
+    FeedSpec("thehindu_kerala", "https://www.thehindu.com/news/national/kerala/feeder/default.rss", state="IN-KL"),
+    FeedSpec("thehindu_karnataka", "https://www.thehindu.com/news/national/karnataka/feeder/default.rss", state="IN-KA"),
+    FeedSpec("thehindu_andhra", "https://www.thehindu.com/news/national/andhra-pradesh/feeder/default.rss", state="IN-AP"),
+    FeedSpec("thehindu_telangana", "https://www.thehindu.com/news/national/telangana/feeder/default.rss", state="IN-TG"),
+    FeedSpec("toi_delhi", "https://timesofindia.indiatimes.com/rssfeeds/-2128839596.cms", state="IN-DL"),
+    FeedSpec("toi_mumbai", "https://timesofindia.indiatimes.com/rssfeeds/-2128838597.cms", state="IN-MH"),
+    # ── Cybersecurity lens (global by nature — feeds the cyber lens, not the India general feed) ──
+    FeedSpec("thehackernews", "https://feeds.feedburner.com/TheHackersNews"),
+    FeedSpec("bleepingcomputer", "https://www.bleepingcomputer.com/feed/"),
 ]
 
 SPEC_BY_SLUG: dict[str, FeedSpec] = {spec.slug: spec for spec in FEEDS}

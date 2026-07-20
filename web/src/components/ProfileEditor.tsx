@@ -5,7 +5,7 @@
 // Picks shape: { [sector]: null (whole sector) | string[] (subsectors) }.
 
 import { useEffect, useState } from "react";
-import { fetchTaxonomy, type TaxonomySector } from "@/lib/api";
+import { fetchRegions, fetchTaxonomy, type RegionState, type TaxonomySector } from "@/lib/api";
 import { useLenses } from "@/lib/lenses";
 
 export type Picks = Record<string, string[] | null>;
@@ -86,6 +86,44 @@ export function RegionGrid({ value, onChange }: { value: string; onChange: (code
         );
       })}
     </div>
+  );
+}
+
+export function StateSelect({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [states, setStates] = useState<RegionState[]>([]);
+  useEffect(() => {
+    fetchRegions().then(setStates);
+  }, []);
+  // Covered states (we have a local edition) first and marked, then the rest.
+  const covered = states.filter((s) => s.covered);
+  const rest = states.filter((s) => !s.covered);
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-[12px] border px-4 py-3 text-[15px] outline-none"
+      style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: value ? "var(--ink)" : "var(--ink-faint)" }}
+    >
+      <option value="" disabled>
+        Select your state…
+      </option>
+      {covered.length > 0 && (
+        <optgroup label="Local coverage available">
+          {covered.map((s) => (
+            <option key={s.code} value={s.code} style={{ color: "var(--ink)" }}>
+              {s.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+      <optgroup label="All states & UTs">
+        {rest.map((s) => (
+          <option key={s.code} value={s.code} style={{ color: "var(--ink)" }}>
+            {s.name}
+          </option>
+        ))}
+      </optgroup>
+    </select>
   );
 }
 

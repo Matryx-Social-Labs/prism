@@ -5,6 +5,7 @@
 export interface Profile {
   lens: string;
   region: string | null;
+  state: string | null; // ISO 3166-2 (e.g. IN-KA) — surfaces local news first
   interests: string[];
 }
 
@@ -17,8 +18,13 @@ export function loadProfile(): Profile | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Profile>;
     if (!parsed.lens) return null;
-    // migrate legacy {lens}-only profiles
-    return { lens: parsed.lens, region: parsed.region ?? null, interests: parsed.interests ?? [] };
+    // migrate legacy profiles (pre-state)
+    return {
+      lens: parsed.lens,
+      region: parsed.region ?? null,
+      state: parsed.state ?? null,
+      interests: parsed.interests ?? [],
+    };
   } catch {
     return null;
   }

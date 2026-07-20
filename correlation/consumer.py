@@ -96,6 +96,17 @@ async def handle_enriched_item(payload: dict) -> None:
             session.add(event)
             is_new_event = True
 
+        # State codes (ISO 3166-2, e.g. IN-KA) from a state-edition feed must
+        # survive into the event's regions — even when a new event's shared
+        # extraction returned only country-level regions, or an existing event
+        # was matched — so the feed can tier local(state) -> national.
+        state_codes = [r for r in (classification.get("regions") or []) if "-" in r]
+        if state_codes:
+            merged = list(event.regions or [])
+            merged += [c for c in state_codes if c not in merged]
+            if merged != list(event.regions or []):
+                event.regions = merged
+
         if event.image_url is None and raw_item is not None and raw_item.image_url:
             event.image_url = raw_item.image_url
         session.add(

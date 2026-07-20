@@ -140,8 +140,21 @@ export interface FeedQuery {
   sector?: string;
   interests?: string[];
   region?: string | null;
+  state?: string | null;
   sort?: "latest" | "top";
   limit?: number;
+}
+
+export interface RegionState {
+  code: string;
+  name: string;
+  covered: boolean;
+}
+
+export async function fetchRegions(): Promise<RegionState[]> {
+  const res = await fetch(`${API_URL}/api/v1/regions`, { next: { revalidate: 3600 } });
+  if (!res.ok) return [];
+  return ((await res.json()) as { states: RegionState[] }).states;
 }
 
 export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
@@ -150,6 +163,7 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   if (query.sector) params.set("sector", query.sector);
   if (query.interests?.length) params.set("interests", query.interests.join(","));
   if (query.region) params.set("region", query.region);
+  if (query.state) params.set("state", query.state);
   if (query.sort) params.set("sort", query.sort);
   if (query.limit) params.set("limit", String(query.limit));
   const res = await fetch(`${API_URL}/api/v1/feed?${params}`, {
