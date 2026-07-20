@@ -29,6 +29,13 @@ export function HeaderNav() {
         Feed
       </Link>
       <Link
+        href="/pulse"
+        className="px-2 py-1.5 text-[13.5px] font-medium"
+        style={{ color: pathname === "/pulse" ? "var(--ink)" : "var(--ink-muted)" }}
+      >
+        Pulse
+      </Link>
+      <Link
         href="/about"
         className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
         style={{ color: pathname === "/about" ? "var(--ink)" : "var(--ink-muted)" }}
