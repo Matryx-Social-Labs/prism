@@ -20,6 +20,7 @@ from common.embeddings import embed_query
 from common.llm import get_llm
 from common.logging import get_logger
 from common.models import AgentMessage, AgentSession
+from common.moderation import REFUSAL, guard_question
 from common.observability import fetch_prompt
 
 logger = get_logger(__name__)
@@ -91,6 +92,15 @@ async def answer_stream(
     question: str,
 ) -> AsyncIterator[dict]:
     """Yield SSE-ready events: {type: token|citations|done|error, ...}."""
+    # Guardrail: reject explicit/harmful/injection/spam before spending the agent.
+    guard = await guard_question(question)
+    if not guard.allowed:
+        await _persist_turn(session_id, question, REFUSAL, [])
+        yield {"type": "token", "text": REFUSAL}
+        yield {"type": "citations", "citations": []}
+        yield {"type": "done"}
+        return
+
     chunks, projection, title = await retrieve_grounding(event_id, question)
 
     if not chunks:
