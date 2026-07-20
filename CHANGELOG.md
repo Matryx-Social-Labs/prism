@@ -3,6 +3,24 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.27.0] - 2026-07-20
+
+### Added
+- Sign-up profiling — the sign-in form now collects **name + profession**
+  (mandatory) so we can curate professional news lists later. Profession is a
+  structured, sector-wise vocabulary (`common/professions.py`, 33 roles in 7
+  groups, each mapped to a lens + interest sectors), served at
+  `GET /api/v1/professions` and rendered as a grouped dropdown. Profile rides on
+  the magic-link token and is stamped on the new user (migration `9ddbcc3fd269`
+  adds `name`/`profession` to `users` + `auth_tokens`).
+- Branded magic-link email (`common/email_templates.py`) — table-layout,
+  inline-styled HTML following DESIGN.md (serif display, mono provenance, the
+  spectrum bar, ink button), sent as HTML + plaintext via Resend.
+
+### Changed
+- Removed the "email delivery isn't wired" dev note from the sign-in page.
+- Magic-link URL now honours `PRISM_WEB_URL` (set to the Vercel domain in prod).
+
 ## [0.0.26.0] - 2026-07-20
 
 ### Added

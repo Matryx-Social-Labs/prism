@@ -16,6 +16,8 @@ from common import auth
 from common.config import get_settings
 from common.db import get_db
 from common.email import get_email_sender
+from common.email_templates import magic_link_email
+from common.professions import grouped, is_valid_profession
 
 router = APIRouter()
 
@@ -23,6 +25,8 @@ router = APIRouter()
 class MagicLinkRequest(BaseModel):
     email: str
     consent: bool = False  # DPDP: explicit consent to create an account (D12)
+    name: str | None = None  # required for new sign-ups (see request_link)
+    profession: str | None = None  # slug from common.professions
 
 
 class VerifyRequest(BaseModel):
@@ -40,27 +44,35 @@ class MeResponse(BaseModel):
     email: str
 
 
+@router.get("/api/v1/professions")
+async def professions():
+    """Sign-up dropdown vocabulary (grouped by domain)."""
+    return {"groups": grouped()}
+
+
 @router.post("/api/v1/auth/request")
 async def request_link(body: MagicLinkRequest, db: AsyncSession = Depends(get_db)):
     if "@" not in body.email or len(body.email) > 320:
         raise HTTPException(status_code=422, detail="invalid email")
     if not body.consent:
         raise HTTPException(status_code=422, detail="consent required (DPDP)")
+    # Sign-up profile is mandatory (applied only if this creates a new account).
+    name = (body.name or "").strip()
+    if not name or len(name) > 120:
+        raise HTTPException(status_code=422, detail="name required")
+    if not body.profession or not is_valid_profession(body.profession):
+        raise HTTPException(status_code=422, detail="valid profession required")
     settings = get_settings()
     try:
-        raw = await auth.request_magic_link(db, body.email)
+        raw = await auth.request_magic_link(db, body.email, name=name, profession=body.profession)
     except auth.RateLimited:
         # Same response as success — don't reveal that a request was just made
         # for this email (avoids an enumeration / timing side channel).
         return {"ok": True}
     link = f"{settings.prism_web_url}/auth/verify?token={raw}"
+    text, html = magic_link_email(link=link, ttl_min=settings.prism_magic_token_ttl_min, to=body.email)
     await get_email_sender().send(
-        to=body.email,
-        subject="Your Prism sign-in link",
-        body=(
-            f"Sign in to Prism: {link}\n\n"
-            f"This link expires in {settings.prism_magic_token_ttl_min} minutes and can be used once."
-        ),
+        to=body.email, subject="Your Prism sign-in link", body=text, html=html
     )
     return {"ok": True}
 

@@ -277,6 +277,10 @@ class User(TimestampMixin, Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    # Collected at sign-up to curate professional news lists later. profession is
+    # a slug from common.professions; nullable for pre-existing rows.
+    name: Mapped[str | None] = mapped_column(Text)
+    profession: Mapped[str | None] = mapped_column(Text)
 
 
 class UsageQuota(TimestampMixin, Base):
@@ -311,6 +315,10 @@ class AuthToken(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Sign-up profile carried through the magic-link flow, applied when the token
+    # creates a brand-new user.
+    name: Mapped[str | None] = mapped_column(Text)
+    profession: Mapped[str | None] = mapped_column(Text)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

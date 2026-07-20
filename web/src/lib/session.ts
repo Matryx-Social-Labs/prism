@@ -57,13 +57,29 @@ async function detail(res: Response, fallback: string): Promise<string> {
   }
 }
 
-export async function requestMagicLink(email: string, consent: boolean): Promise<void> {
+export async function requestMagicLink(
+  email: string,
+  consent: boolean,
+  name: string,
+  profession: string,
+): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/auth/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, consent }),
+    body: JSON.stringify({ email, consent, name, profession }),
   });
   if (!res.ok) throw new Error(await detail(res, "Could not send the sign-in link"));
+}
+
+export interface ProfessionGroup {
+  group: string;
+  options: { slug: string; label: string }[];
+}
+
+export async function fetchProfessions(): Promise<ProfessionGroup[]> {
+  const res = await fetch(`${API_URL}/api/v1/professions`);
+  if (!res.ok) return [];
+  return ((await res.json()) as { groups: ProfessionGroup[] }).groups;
 }
 
 export async function verifyMagicLink(token: string): Promise<Session> {

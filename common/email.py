@@ -18,14 +18,14 @@ logger = get_logger(__name__)
 
 
 class EmailSender(Protocol):
-    async def send(self, *, to: str, subject: str, body: str) -> None: ...
+    async def send(self, *, to: str, subject: str, body: str, html: str | None = None) -> None: ...
 
 
 class ConsoleEmailSender:
     """Dev sender: logs the message instead of delivering it. The magic link
     appears in the worker/API logs so a developer can complete the flow."""
 
-    async def send(self, *, to: str, subject: str, body: str) -> None:
+    async def send(self, *, to: str, subject: str, body: str, html: str | None = None) -> None:
         logger.info("email_console", to=to, subject=subject, body=body)
 
 
@@ -34,7 +34,7 @@ class ResendEmailSender:
     on a verified domain (PRISM_EMAIL_FROM). Raises on failure so a dropped login
     email is loud, not silent."""
 
-    async def send(self, *, to: str, subject: str, body: str) -> None:
+    async def send(self, *, to: str, subject: str, body: str, html: str | None = None) -> None:
         settings = get_settings()
         if not settings.resend_api_key:
             raise RuntimeError("prism_email_provider=resend but RESEND_API_KEY is unset")
@@ -46,9 +46,8 @@ class ResendEmailSender:
                     "from": settings.prism_email_from,
                     "to": [to],
                     "subject": subject,
-                    # body is a plaintext link message; send as both so clients render it.
-                    "text": body,
-                    "html": f"<p>{body}</p>",
+                    "text": body,  # plaintext fallback
+                    "html": html or f"<p>{body}</p>",
                 },
             )
         if resp.status_code >= 300:
