@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.23.0] - 2026-07-20
+
+### Added
+- Brief groundedness eval (`evals/brief_groundedness.py`) — samples real lens
+  briefs and LLM-judges each against the SAME structured record it was generated
+  from (title, summary, perspectives, impacts, lens fields), flagging invented
+  specifics. Guards the brief-depth work (longer briefs = more room to
+  hallucinate). New `judge-brief-groundedness` judge prompt; verdict schema is
+  alias-tolerant (Ollama doesn't enforce json field names — accepts
+  grounded/score/grounded_score/groundedness_score). Baseline on prod (n=8):
+  mean 0.66; briefs over-reach on thin/single-source records — a grounding gap
+  to tune. Run: `python evals/brief_groundedness.py [N]`.
+
 ## [0.0.22.0] - 2026-07-20
 
 ### Changed
