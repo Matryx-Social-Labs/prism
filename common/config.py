@@ -23,13 +23,14 @@ class Settings(BaseSettings):
     ollama_base_url: str = "https://ollama.com/v1"
 
     # Per-stage models — OpenRouter IDs, every one env-overridable (PRISM_MODEL_*).
-    # Free models rotate weekly, so CONFIRM current IDs on openrouter.ai/models.
-    # Strategy: free for high-volume/low-stakes stages, cheap-paid (~$0.25-0.32/M,
-    # near-free at this volume) for the quality-critical content the product sells.
-    prism_model_gate: str = "tencent/hy3:free"  # binary relevance — high volume, low stakes
-    prism_model_classify: str = "tencent/hy3:free"
-    prism_model_extract: str = "tencent/hy3:free"
-    prism_model_extract_light: str = "tencent/hy3:free"
+    # Confirm current IDs on openrouter.ai/models. Cheap-reliable flash-lite for the
+    # high-volume structured stages (free models proved unreliable at JSON output —
+    # tencent/hy3:free returned empty content), cheap-paid for the content the
+    # product sells. All near-free at India-only volume.
+    prism_model_gate: str = "google/gemini-3.1-flash-lite"  # binary relevance — high volume
+    prism_model_classify: str = "google/gemini-3.1-flash-lite"
+    prism_model_extract: str = "google/gemini-3.1-flash-lite"
+    prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
     prism_model_correlate: str = "qwen/qwen3.7-plus"  # analysis/briefs/digest — content quality
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning

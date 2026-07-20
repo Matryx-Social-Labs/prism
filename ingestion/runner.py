@@ -8,7 +8,7 @@ from common.db import session_scope
 from common.logging import get_logger
 from common.models import RawItem
 from common.schemas import ClassifiedItemMessage, RawItemMessage
-from ingestion import cisa_kev, gdelt, nvd, rss
+from ingestion import cisa_kev, nvd, rss
 from ingestion.seed import seed_sources
 
 logger = get_logger(__name__)
@@ -22,11 +22,13 @@ async def run_all() -> dict[str, int]:
         return {"disabled": 1}
     await seed_sources()
     results: dict[str, int] = {}
+    # RSS (India news) first so the general feed is never starved by the CVE
+    # feeds' volume; CVE feeds run after and only ever surface in the cyber lens.
+    # GDELT is out for now (international + rate-limited) — India-first scope.
     for name, collector in (
+        ("rss", rss.collect),
         ("cisa_kev", cisa_kev.collect),
         ("nvd", nvd.collect),
-        ("gdelt", gdelt.collect),
-        ("rss", rss.collect),
     ):
         try:
             results[name] = await collector()

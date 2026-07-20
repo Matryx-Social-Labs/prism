@@ -8,14 +8,6 @@ import { fetchFeed, type FeedItem } from "@/lib/api";
 import { lensMeta, useLenses } from "@/lib/lenses";
 import { loadProfile, saveProfile, type Profile } from "@/lib/profile";
 
-function regionName(code: string): string {
-  try {
-    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
-
 function Pill({
   selected,
   color,
@@ -74,6 +66,7 @@ export default function FeedPage() {
       lens,
       interests: lens === "general" ? profile?.interests : undefined,
       region: profile?.region,
+      state: profile?.state,
     };
     Promise.all([
       fetchFeed({ ...query, sort }),
@@ -90,18 +83,18 @@ export default function FeedPage() {
   function switchLens(slug: string) {
     setLens(slug);
     if (profile) saveProfile({ ...profile, lens: slug });
-    else saveProfile({ lens: slug, region: null, interests: [] });
+    else saveProfile({ lens: slug, region: null, state: null, interests: [] });
   }
 
   const visible = useMemo(() => {
-    if (!items || scope === "all" || !profile?.region) return items;
+    if (!items || scope === "all" || !profile?.state) return items;
     return items.filter((i) => (scope === "region" ? i.is_regional : !i.is_regional));
   }, [items, scope, profile]);
 
   const topIds = useMemo(() => new Set(top.map((t) => t.id)), [top]);
   const sectionItems = useMemo(() => (visible ?? []).filter((i) => !topIds.has(i.id)), [visible, topIds]);
   const visibleTop = useMemo(() => {
-    if (scope === "all" || !profile?.region) return top;
+    if (scope === "all" || !profile?.state) return top;
     return top.filter((i) => (scope === "region" ? i.is_regional : !i.is_regional));
   }, [top, scope, profile]);
 
@@ -150,13 +143,13 @@ export default function FeedPage() {
       </div>
 
       <div className="mb-[26px] flex flex-wrap items-center gap-2">
-        {profile?.region && (
+        {profile?.state && (
           <div className="flex gap-0.5 rounded-full border p-1" style={{ borderColor: "var(--line)" }} role="tablist" aria-label="Scope">
             {(
               [
                 ["all", "All"],
-                ["region", regionName(profile.region)],
-                ["world", "World"],
+                ["region", "My state"],
+                ["world", "National"],
               ] as [Scope, string][]
             ).map(([value, label]) => (
               <Pill key={value} selected={scope === value} onClick={() => setScope(value)}>
