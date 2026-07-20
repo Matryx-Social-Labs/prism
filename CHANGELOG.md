@@ -3,6 +3,30 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.30.0] - 2026-07-20
+
+### Changed
+- Multilingual embeddings — swapped `bge-small-en` (384) for
+  `paraphrase-multilingual-mpnet-base-v2` (768) so cross-language coverage of the
+  same story clusters together. Benchmarked + validated on the live CJP story:
+  The Hindu (English) and Aaj Tak (Hindi) coverage of the same Parliament-march
+  crackdown score 0.575 vs 0.179 for an unrelated story (bge-small couldn't
+  separate Hindi at all: 0.56 vs 0.53). Migration `5493a4141cbb` moves the vector
+  columns to 768 and **adds the missing HNSW index on `events.embedding`**
+  (clustering + thread retrieval were doing a sequential cosine scan).
+
+### Added
+- India-language sources — Aaj Tak, Amar Ujala (Hindi), BBC Tamil (Tamil).
+  Ingested + classified correctly (Hindi CJP items → politics).
+
+### Known follow-ups
+- Cross-language pairs (~0.57 sim) sit below the near-duplicate clustering
+  threshold (0.88) — clustering needs a looser cross-language band + entity
+  overlap (Wangchuk/Pradhan/CJP) to merge them, not tight embedding alone.
+- `extract-shared` occasionally fails JSON on `gemini-3.1-flash-lite` (retries
+  exhausted) — needs a sturdier model/prompt for that step.
+- mpnet-base is ~1GB (vs ~130MB) — larger model download + RAM at runtime.
+
 ## [0.0.29.0] - 2026-07-20
 
 ### Added

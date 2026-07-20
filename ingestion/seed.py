@@ -22,6 +22,10 @@ SOURCES = [
     {"slug": "livemint", "name": "Mint", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "hindu_businessline", "name": "The Hindu BusinessLine", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "espncricinfo", "name": "ESPNcricinfo", "source_type": "rss", "country": "IN", "language": "en"},
+    # ── India national — other languages (multilingual clustering) ──
+    {"slug": "aajtak", "name": "Aaj Tak", "source_type": "rss", "country": "IN", "language": "hi"},
+    {"slug": "amarujala", "name": "Amar Ujala", "source_type": "rss", "country": "IN", "language": "hi"},
+    {"slug": "bbc_tamil", "name": "BBC Tamil", "source_type": "rss", "country": "IN", "language": "ta", "reliability": {"funding": "public"}},
     # ── India state editions ──
     {"slug": "thehindu_tamilnadu", "name": "The Hindu — Tamil Nadu", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "thehindu_kerala", "name": "The Hindu — Kerala", "source_type": "rss", "country": "IN", "language": "en"},

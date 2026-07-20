@@ -47,6 +47,11 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("livemint", "https://www.livemint.com/rss/news", sector="business"),
     FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss", sector="business"),
     FeedSpec("espncricinfo", "https://www.espncricinfo.com/rss/content/story/feeds/0.xml", sector="sports", subsector="cricket"),
+    # ── India national — other languages (multilingual embedding clusters these
+    # with the English coverage of the same story) ──
+    FeedSpec("aajtak", "https://www.aajtak.in/rssfeeds/?id=home"),
+    FeedSpec("amarujala", "https://www.amarujala.com/rss/breaking-news.xml"),
+    FeedSpec("bbc_tamil", "https://feeds.bbci.co.uk/tamil/rss.xml"),
     # ── India state editions (The Hindu state feeds + TOI metros) ──
     FeedSpec("thehindu_tamilnadu", "https://www.thehindu.com/news/national/tamil-nadu/feeder/default.rss", state="IN-TN"),
     FeedSpec("thehindu_kerala", "https://www.thehindu.com/news/national/kerala/feeder/default.rss", state="IN-KL"),
