@@ -4,9 +4,19 @@ LLM gate decision for calibration. Behavior-neutral: this does NOT filter.
 Plan (freemium-lens-model, PR0 / eng-review E4, D6): the existing LLM
 `relevance-gate` runs an LLM call on *every* ingested news item — the top LLM
 cost line. Before replacing it, run this cheap embedding scorer alongside it in
-shadow mode and log (score, llm_decision) pairs. Later, back-sample the logs to
-pick the score band that reproduces the LLM's pass/fail, then flip
-`prism_gate_mode` to "enforce" so only borderline items fall through to the LLM.
+shadow mode and log (score, llm_decision) pairs. Later, back-sample to pick the
+score band that reproduces the LLM's pass/fail, then flip `prism_gate_mode` to
+"enforce" so only borderline items fall through to the LLM.
+
+Calibration result (2026-07-20, n=500 balanced DB-labeled raw_items): the signal
+is too weak to enforce. Max-cosine-to-positive-anchors AUC=0.67; the contrastive
+upgrade below (positive minus negative anchors) lifts it to AUC=0.72 — but at a
+safe content-loss budget (<=3% of relevant news dropped) that still gates only
+~5% of junk, and reaching ~13% junk-gated costs ~5% of real news. That fails the
+"don't degrade content" bar, so `enforce` is intentionally NOT wired in the
+consumer: keep the LLM gate. A real replacement needs a learned head on the
+logged (embedding, llm_label) pairs or a stronger embedder — not a threshold on
+this score.
 
 Score = max cosine similarity of the item to a set of positive "covered news"
 anchors. fastembed (bge-small) is already in-process for clustering/RAG, so this

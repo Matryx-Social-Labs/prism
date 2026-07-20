@@ -37,8 +37,17 @@ class Settings(BaseSettings):
     # Relevance gate — embedding pre-filter (freemium-lens-model PR0).
     # shadow: score every LLM-gated item with embeddings and LOG (score,
     # llm_decision) for calibration, without changing what gets filtered.
-    # Flip to "enforce" only after back-sampling the logs picks a band.
-    prism_gate_mode: str = "shadow"  # shadow | enforce | off
+    #
+    # Calibration verdict (2026-07-20, n=500 DB-labeled raw_items, balanced):
+    # the embedding score does NOT separate well enough to enforce. Max-cosine-
+    # to-positive-anchors AUC=0.67; contrastive (positive minus negative anchors)
+    # AUC=0.72. At a safe content-loss budget (<=3% of relevant news dropped) it
+    # gates only ~5% of junk — negligible. To gate ~13% of junk it drops ~5% of
+    # real news, which fails the "don't degrade content" bar. So `enforce` stays
+    # UNWIRED and unused: keep the LLM gate. Revisit only with a better signal
+    # (logistic head on logged (embedding, llm_label) pairs, or a stronger
+    # embedder) — not by flipping this flag.
+    prism_gate_mode: str = "shadow"  # shadow | (enforce: not implemented — see above) | off
 
     # Langfuse (self-hosted). The SDK also reads LANGFUSE_* env vars directly;
     # these mirror them so app code can check whether tracing is configured.
