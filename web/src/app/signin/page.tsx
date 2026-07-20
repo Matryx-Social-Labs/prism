@@ -1,23 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
-import { requestMagicLink } from "@/lib/session";
+import { fetchProfessions, type ProfessionGroup, requestMagicLink } from "@/lib/session";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [profession, setProfession] = useState("");
+  const [professions, setProfessions] = useState<ProfessionGroup[]>([]);
   const [consent, setConsent] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetchProfessions().then(setProfessions);
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await requestMagicLink(email.trim(), consent);
+      await requestMagicLink(email.trim(), consent, name.trim(), profession);
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -32,8 +39,8 @@ export default function SignInPage() {
         Sign in to Prism
       </h1>
       <p className="mt-2.5 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-        We&apos;ll email you a one-time link — no password. Your feed and interests
-        move to your account.
+        We&apos;ll email you a one-time link — no password. Tell us your role so we
+        can tune your feed to your profession.
       </p>
 
       {sent ? (
@@ -49,13 +56,51 @@ export default function SignInPage() {
             </span>
             . It expires in 15 minutes.
           </p>
-          <p className="mt-3 font-mono text-[11px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>
-            DEV: email delivery isn&apos;t wired yet — the link is printed in the API
-            server logs (look for <span style={{ color: "var(--ink-muted)" }}>email_console</span>).
-          </p>
         </div>
       ) : (
         <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
+              Name
+            </span>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              className="rounded-[12px] border px-3.5 py-2.5 text-[15px] outline-none"
+              style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
+              Profession
+            </span>
+            <select
+              required
+              value={profession}
+              onChange={(e) => setProfession(e.target.value)}
+              className="rounded-[12px] border px-3.5 py-2.5 text-[15px] outline-none"
+              style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: profession ? "var(--ink)" : "var(--ink-faint)" }}
+            >
+              <option value="" disabled>
+                Select your role…
+              </option>
+              {professions.map((g) => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.options.map((o) => (
+                    <option key={o.slug} value={o.slug} style={{ color: "var(--ink)" }}>
+                      {o.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+
           <label className="flex flex-col gap-1.5">
             <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
               Email
@@ -63,7 +108,6 @@ export default function SignInPage() {
             <input
               type="email"
               required
-              autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
@@ -94,7 +138,7 @@ export default function SignInPage() {
 
           <button
             type="submit"
-            disabled={busy || !consent}
+            disabled={busy || !consent || !name.trim() || !profession}
             className="mt-1 rounded-full px-5 py-2.5 text-[14px] font-semibold transition-opacity disabled:opacity-45"
             style={{ background: "var(--ink)", color: "var(--bg)" }}
           >

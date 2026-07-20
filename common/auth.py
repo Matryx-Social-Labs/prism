@@ -29,9 +29,16 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-async def request_magic_link(session: AsyncSession, email: str) -> str:
+async def request_magic_link(
+    session: AsyncSession,
+    email: str,
+    name: str | None = None,
+    profession: str | None = None,
+) -> str:
     """Create a single-use magic token for `email`; return the RAW token (the
-    caller emails it). Raises RateLimited if one was requested too recently."""
+    caller emails it). name/profession (sign-up profile) ride on the token and
+    are applied only when it creates a brand-new user. Raises RateLimited if one
+    was requested too recently."""
     settings = get_settings()
     email = email.strip().lower()
     recent = (
@@ -49,10 +56,10 @@ async def request_magic_link(session: AsyncSession, email: str) -> str:
     expires = datetime.now(UTC) + timedelta(minutes=settings.prism_magic_token_ttl_min)
     await session.execute(
         text(
-            "INSERT INTO auth_tokens (id, email, token_hash, expires_at) "
-            "VALUES (gen_random_uuid(), :e, :h, :exp)"
+            "INSERT INTO auth_tokens (id, email, token_hash, expires_at, name, profession) "
+            "VALUES (gen_random_uuid(), :e, :h, :exp, :n, :p)"
         ),
-        {"e": email, "h": _hash(raw), "exp": expires},
+        {"e": email, "h": _hash(raw), "exp": expires, "n": name, "p": profession},
     )
     return raw
 
@@ -65,26 +72,29 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
     The UPDATE ... WHERE consumed_at IS NULL ... RETURNING makes consumption
     atomic — a token replayed concurrently is spent exactly once.
     """
-    email = (
+    row = (
         await session.execute(
             text(
                 "UPDATE auth_tokens SET consumed_at = now() "
                 "WHERE token_hash = :h AND consumed_at IS NULL AND expires_at > now() "
-                "RETURNING email"
+                "RETURNING email, name, profession"
             ),
             {"h": _hash(raw_token)},
         )
-    ).scalar_one_or_none()
-    if email is None:
+    ).mappings().first()
+    if row is None:
         return None
-    # Upsert the user; a returned id means this is a brand-new account.
+    email = row["email"]
+    # Upsert the user; a returned id means this is a brand-new account. On first
+    # creation, stamp the sign-up profile carried on the token.
     user_id = (
         await session.execute(
             text(
-                "INSERT INTO users (id, email) VALUES (gen_random_uuid(), :e) "
+                "INSERT INTO users (id, email, name, profession) "
+                "VALUES (gen_random_uuid(), :e, :n, :p) "
                 "ON CONFLICT (email) DO NOTHING RETURNING id"
             ),
-            {"e": email},
+            {"e": email, "n": row["name"], "p": row["profession"]},
         )
     ).scalar_one_or_none()
     if user_id is None:  # existing user
