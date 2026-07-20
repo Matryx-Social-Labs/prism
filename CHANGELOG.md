@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.28.1] - 2026-07-20
+
+### Fixed
+- `.env.example` no longer ships an active `LANGFUSE_TRACING_ENVIRONMENT=development`
+  line — it's commented out so a prod scaffold from the template can't inherit
+  "development". Prod was never actually affected (Railway uses service variables,
+  not this file; the config default is empty), but the template was misleading.
+  Only local gitignored `.env` sets `development`.
+
 ## [0.0.28.0] - 2026-07-20
 
 ### Added
