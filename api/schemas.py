@@ -135,6 +135,19 @@ class QuestionsResponse(BaseModel):
     questions: list[str]
 
 
+class MoverOut(BaseModel):
+    ticker: str
+    note: str = ""
+
+
+class DigestResponse(BaseModel):
+    headline: str
+    narrative: str = ""
+    movers: list[MoverOut] = []
+    event_ids: list[str] = []
+    generated_at: str | None = None
+
+
 class AskRequest(BaseModel):
     question: str
     session_id: str | None = None

@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.24.0] - 2026-07-20
+
+### Added
+- Market Pulse (`/pulse`) — an LLM-*synthesized* read across the day's top
+  market stories (the value the feed's list can't give): a headline, a 2–3
+  paragraph narrative connecting the through-lines, and grounded movers. Backend
+  `GET /api/v1/digest/markets` generates from the top 12 finance/business events,
+  caches in Redis for 3h with cross-replica single-flight (one LLM call per
+  window, no table/migration). Grounding baked into the prompt (never invent
+  numbers), and movers are **post-filtered to tickers that actually appear in the
+  source events** — the LLM can't surface an inferred ticker. New `market-digest`
+  prompt; response schema alias-tolerant. Header **Pulse** link; movers link to
+  search. Generation verified against real prod data.
+
 ## [0.0.23.0] - 2026-07-20
 
 ### Added

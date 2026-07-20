@@ -160,6 +160,20 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   return data.items;
 }
 
+export interface MarketDigest {
+  headline: string;
+  narrative: string;
+  movers: { ticker: string; note: string }[];
+  event_ids: string[];
+  generated_at: string | null;
+}
+
+export async function fetchDigest(): Promise<MarketDigest | null> {
+  const res = await fetch(`${API_URL}/api/v1/digest/markets`, { next: { revalidate: 900 } });
+  if (!res.ok) return null;
+  return (await res.json()) as MarketDigest;
+}
+
 export async function searchEvents(q: string): Promise<FeedItem[]> {
   const res = await fetch(`${API_URL}/api/v1/search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
   if (!res.ok) return [];
