@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.31.0] - 2026-07-20
+
+### Changed
+- Correlation throughput — decoupled the real-time attach from the expensive
+  per-story analysis. Ingest now clusters/attaches an article to its event,
+  merges the projection, and publishes `event.updates` immediately (no LLM), then
+  marks the event dirty; a **debounced sweeper** runs perspectives/impacts/briefs
+  + thread-linking once per story, coalescing a burst of coverage into a single
+  pass (Redis ZSET, 90s leading debounce). **Single-source news skips the LLM
+  entirely** — no competing perspective, and its brief renders on demand on first
+  view. Measured locally: ~6× faster event formation (73 events/200s vs ~12/600s),
+  and the LLM only runs on multi-source stories. New sweeper task in the worker's
+  correlation stage.
+
+### Known follow-ups
+- Enrichment's `extract-shared` is now the bottleneck (flash-lite JSON failures) —
+  needs a sturdier model/prompt.
+- Cross-language / same-story clustering (looser band + entity overlap) so
+  Hindi/Tamil/English coverage merges into one multi-source story.
+
 ## [0.0.30.0] - 2026-07-20
 
 ### Changed

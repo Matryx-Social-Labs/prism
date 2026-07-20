@@ -7,6 +7,7 @@ runs perspective grouping + impact propagation and emits event.updates.
 """
 
 import json
+import time
 import uuid
 
 from sqlalchemy import delete, func, select, text
@@ -31,6 +32,7 @@ from common.models import (
 )
 from common.observability import fetch_prompt, observe
 from common.schemas import EventUpdateMessage
+from common.stream import get_redis
 from common.text import slugify
 from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
@@ -122,17 +124,60 @@ async def handle_enriched_item(payload: dict) -> None:
         await _upsert_entities(session, event.id, shared.get("entities") or [])
         event_id = event.id
 
-    # Rebuild projection + run perspective/impact correlation in fresh scopes
-    # so a long LLM call doesn't hold the row transaction open.
+    # Real-time path: rebuild the served projection (fast, DB-only) and publish so
+    # the feed reflects the new coverage immediately — before any LLM runs.
     await _rebuild_projection(event_id)
+    await stream.publish(stream.EVENT_UPDATES, EventUpdateMessage(event_id=str(event_id)).model_dump())
+    # Defer the expensive per-story analysis (perspectives/impacts/briefs/threads)
+    # to the debounced sweeper: a burst of coverage for one story then costs a
+    # single analysis pass, off the ingest hot path.
+    await mark_event_dirty(event_id)
+
+
+# ── Deferred analysis: real-time attach above, debounced LLM analysis here ──
+
+DIRTY_KEY = "dirty:events"
+ANALYSIS_DEBOUNCE_S = 90  # coalesce a burst of coverage for one story into one pass
+SWEEP_BATCH = 20
+
+
+async def mark_event_dirty(event_id: uuid.UUID) -> None:
+    """Schedule a debounced analysis. Leading debounce (NX): the first article
+    schedules it ANALYSIS_DEBOUNCE_S out; later coverage in the window rides the
+    same pass (the sweeper re-reads all members at fire time)."""
+    try:
+        await get_redis().zadd(DIRTY_KEY, {str(event_id): time.time() + ANALYSIS_DEBOUNCE_S}, nx=True)
+    except Exception:  # noqa: BLE001 — never fail ingest on the dirty-mark
+        logger.exception("mark_event_dirty_failed", event_id=str(event_id))
+
+
+async def run_due_analyses() -> int:
+    """Drain events whose debounce has elapsed and analyze each once."""
+    redis = get_redis()
+    now = time.time()
+    due = await redis.zrangebyscore(DIRTY_KEY, 0, now, start=0, num=SWEEP_BATCH)
+    done = 0
+    for raw in due:
+        eid = raw.decode() if isinstance(raw, (bytes, bytearray)) else raw
+        if not await redis.zrem(DIRTY_KEY, eid):
+            continue  # another sweeper claimed it
+        try:
+            await analyze_event_now(uuid.UUID(eid))
+            done += 1
+        except Exception:
+            logger.exception("deferred_analysis_failed", event_id=eid)
+    return done
+
+
+async def analyze_event_now(event_id: uuid.UUID) -> None:
+    """The deferred work: perspectives/impacts/briefs + thread linking + republish."""
     has_news, ran_llm = await _analyze_event(event_id)
     if has_news and ran_llm:
         try:
             await link_event_threads(event_id)
         except Exception:
-            # Threads are additive; never fail the correlation stage over them.
+            # Threads are additive; never fail analysis over them.
             logger.exception("thread_linking_failed", event_id=str(event_id))
-
     await stream.publish(stream.EVENT_UPDATES, EventUpdateMessage(event_id=str(event_id)).model_dump())
 
 
@@ -314,7 +359,10 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
 # Re-run the (LLM) analysis only when the membership crosses a tier — a
 # burst of near-simultaneous members otherwise re-buys the same analysis
 # once per article. Fibonacci-ish: early members change the story most.
-REGEN_TIERS = {1, 2, 3, 5, 8, 13, 21, 34}
+REGEN_TIERS = {2, 3, 5, 8, 13, 21, 34}
+# Single-source news has no competing perspective and its brief generates on
+# demand — so it never triggers the LLM analysis here (the throughput win).
+MIN_SOURCES_FOR_ANALYSIS = 2
 
 
 async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
@@ -358,6 +406,11 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
 
     settings = get_settings()
     has_news = any(m["source_slug"] not in ("nvd", "cisa_kev") for m in members)
+
+    # Single-source news: no competing perspectives; brief is generated on demand
+    # on first view. Skip the LLM entirely — this is where most events land.
+    if has_news and len(members) < MIN_SOURCES_FOR_ANALYSIS:
+        return has_news, False
 
     if len(members) not in REGEN_TIERS and has_perspectives:
         return has_news, False  # between tiers: keep the existing analysis
