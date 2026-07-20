@@ -25,6 +25,8 @@ PROMPTS = [
     "lens-brief",
     "agent-qa",
     "judge-groundedness",
+    "judge-brief-groundedness",
+    "market-digest",
 ]
 
 

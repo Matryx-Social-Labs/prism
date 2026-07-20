@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.25.0] - 2026-07-20
+
+### Changed
+- Lens-brief grounding tuned — the brief prompt now explicitly forbids supplying
+  names/places/dates/identifiers from the model's own world knowledge (the eval's
+  top failure: naming the Genoa bridge or the Mexican state the record omitted),
+  and pushes thin/single-source events to the shorter end of the range. Paired
+  A/B on prod (same events, old cached vs freshly tuned): mean groundedness
+  0.77 → 0.83, fixing the worst thin-record case (0.30 → 1.00). Published to
+  Langfuse (lens-brief); `judge-brief-groundedness` + `market-digest` added to
+  the sync manifest and published. Applies to newly generated briefs.
+
 ## [0.0.24.0] - 2026-07-20
 
 ### Added
