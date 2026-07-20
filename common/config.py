@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_base_url: str = ""
+    # Tags every trace with an environment so local/dev traces are filterable and
+    # never mixed with prod in the shared Langfuse. Local sets "development";
+    # prod leaves it unset (shows as "default"), so prod config is untouched.
+    langfuse_tracing_environment: str = ""
 
     # API
     cors_origins: str = "http://localhost:3000"
@@ -120,3 +124,5 @@ def _export_langfuse_env(settings: Settings) -> None:
         # v3 SDK reads LANGFUSE_HOST; some tooling reads LANGFUSE_BASE_URL — set both.
         os.environ.setdefault("LANGFUSE_HOST", settings.langfuse_base_url)
         os.environ.setdefault("LANGFUSE_BASE_URL", settings.langfuse_base_url)
+    if settings.langfuse_tracing_environment:
+        os.environ.setdefault("LANGFUSE_TRACING_ENVIRONMENT", settings.langfuse_tracing_environment)

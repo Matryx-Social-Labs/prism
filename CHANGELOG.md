@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.28.0] - 2026-07-20
+
+### Added
+- Langfuse tracing environment — `LANGFUSE_TRACING_ENVIRONMENT` (bridged to the
+  SDK in `common/config._export_langfuse_env`) tags traces so local/dev runs are
+  filterable and never mixed with prod in the shared Langfuse. Local `.env` sets
+  `development`; prod stays unset (`default`), so prod config is untouched.
+
 ## [0.0.27.0] - 2026-07-20
 
 ### Added
