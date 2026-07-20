@@ -25,7 +25,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from classification.consumer import handle_raw_item
 from common import stream
 from common.logging import get_logger, setup_logging
-from correlation.consumer import handle_enriched_item
+from correlation.consumer import handle_enriched_item, run_due_analyses
 from enrichment.consumer import handle_classified_item
 from ingestion.runner import run_all
 
@@ -53,6 +53,19 @@ def parse_stages() -> list[str]:
     if unknown:
         parser.error(f"unknown stages: {', '.join(sorted(unknown))}")
     return stages
+
+
+SWEEP_INTERVAL_S = 5
+
+
+async def _analysis_sweeper() -> None:
+    """Poll for due (debounced) story analyses and run them off the ingest path."""
+    while True:
+        try:
+            await run_due_analyses()
+        except Exception:
+            logger.exception("analysis_sweeper_error")
+        await asyncio.sleep(SWEEP_INTERVAL_S)
 
 
 async def _health_server() -> None:
@@ -137,6 +150,9 @@ async def main(stages: list[str]) -> None:
                 )
             )
         )
+        # Debounced analysis sweeper: attach is real-time (above); the expensive
+        # per-story LLM analysis runs here, coalesced, off the ingest hot path.
+        tasks.append(asyncio.create_task(_analysis_sweeper()))
 
     if len(tasks) <= 1:  # only the health server — no stage selected
         raise SystemExit("no stages selected")
