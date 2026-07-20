@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 TITLE_SIMILARITY_THRESHOLD = 0.6
 EMBEDDING_DISTANCE_THRESHOLD = 0.12  # cosine distance (1 - similarity); near-duplicates only
 TIME_WINDOW_DAYS = 4
+# Cross-language / same-story: shared canonical entities + a looser embedding band.
+# A translated retelling scores ~0.42 distance (vs <0.12 for a near-dup) but shares
+# the key actors — so require >=2 shared entities AND moderate similarity.
+ENTITY_MATCH_MIN_SHARED = 2
+ENTITY_MATCH_LOOSE_DISTANCE = 0.55
 
 
 @dataclass
@@ -39,6 +44,7 @@ async def find_event(
     title: str,
     published_at,
     embedding: list[float] | None,
+    entity_slugs: list[str] | None = None,
     cve_record: bool = False,
 ) -> Match | None:
     if cve_ids:
@@ -64,6 +70,12 @@ async def find_event(
 
     if embedding is not None:
         match = await _match_by_embedding(session, embedding, published_at)
+        if match:
+            return match
+
+    # Cross-language / same-story: same key actors + a looser embedding band.
+    if entity_slugs and embedding is not None:
+        match = await _match_by_entities(session, entity_slugs, embedding, published_at)
         if match:
             return match
 
@@ -128,6 +140,47 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
     row = result.first()
     if row:
         return Match(event_id=row.id, match_type="title_time", match_score=float(row.sim))
+    return None
+
+
+async def _match_by_entities(
+    session: AsyncSession, entity_slugs: list[str], embedding: list[float], published_at
+) -> Match | None:
+    """Recent event sharing >=2 canonical entities with this article and within a
+    looser embedding band — merges cross-language / translated retellings that the
+    near-dup embedding threshold misses."""
+    vector_literal = "[" + ",".join(f"{v:.6f}" for v in embedding) + "]"
+    result = await session.execute(
+        text(
+            f"""
+            SELECT e.id,
+                   count(DISTINCT ent.slug) AS shared,
+                   (e.embedding <=> CAST(:vec AS vector)) AS dist
+            FROM entities ent
+            JOIN event_entities ee ON ee.entity_id = ent.id
+            JOIN events e ON e.id = ee.event_id
+            WHERE ent.slug = ANY(:slugs)
+              AND e.embedding IS NOT NULL
+              AND (e.embedding <=> CAST(:vec AS vector)) <= :dist_threshold
+              AND (CAST(:published_at AS timestamptz) IS NULL
+                   OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
+            GROUP BY e.id, e.embedding
+            HAVING count(DISTINCT ent.slug) >= :min_shared
+            ORDER BY shared DESC, dist ASC
+            LIMIT 1
+            """
+        ),
+        {
+            "vec": vector_literal,
+            "slugs": entity_slugs,
+            "dist_threshold": ENTITY_MATCH_LOOSE_DISTANCE,
+            "min_shared": ENTITY_MATCH_MIN_SHARED,
+            "published_at": published_at,
+        },
+    )
+    row = result.first()
+    if row:
+        return Match(event_id=row.id, match_type="entity_overlap", match_score=1.0 - float(row.dist))
     return None
 
 

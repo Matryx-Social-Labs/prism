@@ -70,6 +70,7 @@ async def handle_enriched_item(payload: dict) -> None:
         cve_record = (enrichment.model or "").startswith("deterministic:")
 
         embedding = await _first_chunk_embedding(session, article_id)
+        entity_slugs = [slugify(e["name"]) for e in (shared.get("entities") or []) if e.get("name")]
 
         match = await find_event(
             session,
@@ -78,6 +79,7 @@ async def handle_enriched_item(payload: dict) -> None:
             title=title,
             published_at=published_at,
             embedding=embedding,
+            entity_slugs=entity_slugs or None,
             cve_record=cve_record,
         )
 
