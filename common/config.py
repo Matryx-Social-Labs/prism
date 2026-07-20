@@ -11,28 +11,45 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://prism:prism@localhost:5432/prism"
     redis_url: str = "redis://localhost:6379/0"
 
-    # Ollama Cloud (OpenAI-compatible)
+    # LLM provider. Both are OpenAI-compatible, so switching is base_url + key +
+    # model IDs. OpenRouter is primary (per-token, no weekly cap, one key for many
+    # models, structured output, provider fallback). Set LLM_PROVIDER=ollama +
+    # override the model IDs below to fall back to Ollama Cloud.
+    llm_provider: str = "openrouter"  # openrouter | ollama
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Ollama Cloud (fallback, OpenAI-compatible)
     ollama_api_key: str = ""
     ollama_base_url: str = "https://ollama.com/v1"
 
-    # Per-stage models (swap based on Langfuse eval scores).
-    # Measured on Ollama Cloud (July 2026): glm-5.2 extracts in ~5s with
-    # quality equal to qwen3.5:397b at ~107s — fast models guard the
-    # high-volume stages; the big model judges evals (low volume).
-    prism_model_gate: str = "deepseek-v4-flash:cloud"
-    prism_model_classify: str = "gemma4:31b-cloud"
-    prism_model_extract: str = "glm-5.2:cloud"
-    # Cheap extraction for low-stakes sectors (sports/entertainment/health/
-    # science) — the all-sector expansion would blow the GPU quota on glm-5.2.
-    prism_model_extract_light: str = "deepseek-v4-flash:cloud"
-    prism_model_correlate: str = "glm-5.2:cloud"
-    prism_model_agent: str = "gpt-oss:120b-cloud"
-    prism_model_judge: str = "qwen3.5:397b-cloud"
+    # Per-stage models — OpenRouter IDs, every one env-overridable (PRISM_MODEL_*).
+    # Free models rotate weekly, so CONFIRM current IDs on openrouter.ai/models.
+    # Strategy: free for high-volume/low-stakes stages, cheap-paid (~$0.25-0.32/M,
+    # near-free at this volume) for the quality-critical content the product sells.
+    prism_model_gate: str = "tencent/hy3:free"  # binary relevance — high volume, low stakes
+    prism_model_classify: str = "tencent/hy3:free"
+    prism_model_extract: str = "tencent/hy3:free"
+    prism_model_extract_light: str = "tencent/hy3:free"
+    prism_model_correlate: str = "qwen/qwen3.7-plus"  # analysis/briefs/digest — content quality
+    prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
+    prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning
+    prism_model_guard: str = "google/gemini-3.1-flash-lite"  # Ask moderation — cheap + fast
 
     # Embeddings (fastembed, in-process). Changing the model to one with a
     # different dimension requires a migration of the vector(...) columns.
     prism_embed_model: str = "BAAI/bge-small-en-v1.5"
     prism_embed_dim: int = 384
+
+    # Ask-agent guardrail — a cheap moderation pre-check rejects explicit/harmful
+    # /off-topic/prompt-injection questions BEFORE the expensive RAG agent runs,
+    # so we neither generate disallowed content nor pay for junk prompts.
+    prism_ask_guard_enabled: bool = True
+
+    # Live ingestion master switch. Set PRISM_INGESTION_ENABLED=false to stop
+    # collectors (and the stalled-item requeue) so no new news is fetched and the
+    # downstream LLM pipeline goes idle — the cost brake while the prototype is
+    # still being built. On-demand briefs/Ask/digest still work.
+    prism_ingestion_enabled: bool = True
 
     # Relevance gate — embedding pre-filter (freemium-lens-model PR0).
     # shadow: score every LLM-gated item with embeddings and LOG (score,
@@ -61,7 +78,9 @@ class Settings(BaseSettings):
 
     # Auth (magic-link, bearer). Web URL is where the verify link points.
     prism_web_url: str = "http://localhost:3000"
-    prism_email_provider: str = "console"  # console (dev) | resend | ses | postmark
+    prism_email_provider: str = "console"  # console (dev) | resend
+    resend_api_key: str = ""
+    prism_email_from: str = "Prism <onboarding@resend.dev>"  # set to a verified domain sender
     prism_magic_token_ttl_min: int = 15  # magic-link lifetime
     prism_session_ttl_days: int = 30  # bearer session lifetime
     prism_magic_request_cooldown_s: int = 30  # per-email rate limit on link requests

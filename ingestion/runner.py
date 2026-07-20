@@ -3,6 +3,7 @@
 from sqlalchemy import select, text
 
 from common import stream
+from common.config import get_settings
 from common.db import session_scope
 from common.logging import get_logger
 from common.models import RawItem
@@ -14,6 +15,11 @@ logger = get_logger(__name__)
 
 
 async def run_all() -> dict[str, int]:
+    # Master switch: when disabled, collect nothing and don't requeue stalled
+    # items, so no new news enters and the LLM pipeline goes idle (the cost brake).
+    if not get_settings().prism_ingestion_enabled:
+        logger.info("ingestion_disabled", reason="prism_ingestion_enabled=false")
+        return {"disabled": 1}
     await seed_sources()
     results: dict[str, int] = {}
     for name, collector in (

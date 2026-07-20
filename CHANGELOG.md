@@ -3,6 +3,28 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.26.0] - 2026-07-20
+
+### Added
+- OpenRouter as primary LLM provider (`LLM_PROVIDER=openrouter`) — one key, no
+  weekly cap, per-token. Client picks base_url/key/headers by provider; Ollama
+  stays as fallback. Per-stage model map moved to OpenRouter ids (free for
+  high-volume/low-stakes stages, cheap-paid for content), all env-overridable.
+- Ask-agent guardrail (`common/moderation.py`) — a cheap moderation pre-check
+  rejects explicit/harmful/prompt-injection/spam questions before the RAG agent
+  runs (no disallowed content, no paid junk prompts). Fails open with the agent's
+  source-grounding as backstop. `PRISM_ASK_GUARD_ENABLED`, `PRISM_MODEL_GUARD`.
+- Resend email sender (`PRISM_EMAIL_PROVIDER=resend`, `RESEND_API_KEY`,
+  `PRISM_EMAIL_FROM`) — wires magic-link delivery to a real provider.
+- Live-ingestion master switch (`PRISM_INGESTION_ENABLED=false`) — stops
+  collectors + stalled-item requeue so no new news enters and the LLM pipeline
+  idles: the cost brake while the prototype is being finished. On-demand
+  briefs/Ask/digest still work.
+
+### Notes
+- New env documented in `.env.example`. Requires `OPENROUTER_API_KEY` (and
+  `RESEND_API_KEY`) set on Railway before the backend deploys.
+
 ## [0.0.25.0] - 2026-07-20
 
 ### Changed

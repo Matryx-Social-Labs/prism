@@ -57,10 +57,16 @@ def get_llm() -> AsyncOpenAI:
     global _client
     if _client is None:
         settings = get_settings()
-        _client = AsyncOpenAI(
-            base_url=settings.ollama_base_url,
-            api_key=settings.ollama_api_key or "ollama",
-        )
+        if settings.llm_provider == "openrouter":
+            base_url = settings.openrouter_base_url
+            api_key = settings.openrouter_api_key or "missing-openrouter-key"
+            # Optional attribution shown on the OpenRouter dashboard.
+            headers = {"HTTP-Referer": settings.prism_web_url, "X-Title": "Prism"}
+        else:  # ollama fallback
+            base_url = settings.ollama_base_url
+            api_key = settings.ollama_api_key or "ollama"
+            headers = None
+        _client = AsyncOpenAI(base_url=base_url, api_key=api_key, default_headers=headers)
     return _client
 
 
