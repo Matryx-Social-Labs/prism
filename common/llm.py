@@ -79,6 +79,7 @@ async def structured_chat[T: BaseModel](
     metadata: dict[str, Any] | None = None,
     langfuse_prompt: Any = None,
     temperature: float | None = None,
+    max_tokens: int = 8192,
     max_retries: int = 2,
 ) -> T:
     """Chat completion constrained to a JSON schema, validated into a Pydantic model.
@@ -106,6 +107,7 @@ async def structured_chat[T: BaseModel](
             "type": "json_schema",
             "json_schema": {"name": output_model.__name__, "schema": schema},
         },
+        "max_tokens": max_tokens,  # headroom so a large nested JSON isn't truncated mid-string
         "name": trace_name,
         "metadata": metadata or {},
     }
