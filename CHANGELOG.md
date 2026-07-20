@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.32.0] - 2026-07-20
+
+### Added
+- Cross-language / same-story clustering — a new `entity_overlap` match tier
+  merges coverage the near-duplicate embedding threshold misses: it requires >=2
+  shared canonical entities plus a looser embedding band (<=0.55 distance) within
+  the time window, so Hindi/Tamil/English retellings of one story become a single
+  multi-source event (which then earns the deferred perspective/brief analysis).
+  Uses the new events HNSW index.
+
+### Changed
+- `extract-shared` now emits all output in **English** and entity names in
+  **canonical romanized form** (e.g. "Sonam Wangchuk", not the native script), so
+  the same actor matches across languages and the feed reads in one language.
+  Published to Langfuse.
+
+### Known follow-ups
+- End-to-end cross-language merge depends on enrichment reliably producing those
+  canonical entities — the `extract-shared` flash-lite JSON reliability fix is the
+  co-requisite before the real HI/EN CJP merge is fully validated on live data.
+
 ## [0.0.31.0] - 2026-07-20
 
 ### Changed
