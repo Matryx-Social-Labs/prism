@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     # never mixed with prod in the shared Langfuse. Local sets "development";
     # prod leaves it unset (shows as "default"), so prod config is untouched.
     langfuse_tracing_environment: str = ""
+    # The SDK's 5s default OTLP-export timeout is too short for a self-hosted
+    # Langfuse (web -> Redis -> worker -> ClickHouse): batches time out and get
+    # dropped ("Failed to export span batch"). Give it room + smaller batches.
+    langfuse_timeout: int = 30  # seconds — OTLP span-export timeout (LANGFUSE_TIMEOUT)
+    langfuse_flush_at: int = 128  # max spans per export batch (LANGFUSE_FLUSH_AT)
 
     # API
     cors_origins: str = "http://localhost:3000"
@@ -132,3 +137,7 @@ def _export_langfuse_env(settings: Settings) -> None:
         os.environ.setdefault("LANGFUSE_BASE_URL", settings.langfuse_base_url)
     if settings.langfuse_tracing_environment:
         os.environ.setdefault("LANGFUSE_TRACING_ENVIRONMENT", settings.langfuse_tracing_environment)
+    # Longer OTLP-export timeout + smaller batches so traces reach a self-hosted
+    # Langfuse instead of timing out and being dropped.
+    os.environ.setdefault("LANGFUSE_TIMEOUT", str(settings.langfuse_timeout))
+    os.environ.setdefault("LANGFUSE_FLUSH_AT", str(settings.langfuse_flush_at))

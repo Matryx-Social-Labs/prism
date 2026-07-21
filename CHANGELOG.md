@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.39.0] - 2026-07-21
+
+### Changed
+- Langfuse trace-export resilience — the SDK's 5s OTLP timeout is too short for a
+  self-hosted instance; bumped `LANGFUSE_TIMEOUT` to 30s and `LANGFUSE_FLUSH_AT`
+  to 128 (smaller batches) via the config bridge, so genuine slow-exports no
+  longer drop traces. NOTE: the current "Failed to export span batch" on api +
+  worker is actually a **500 Internal Server Error** from the self-hosted Langfuse
+  OTLP ingestion endpoint (web health is 200, but the trace-ingestion path errors)
+  — a backend issue in the `langfuse` Railway project (likely S3/MinIO blob
+  storage or ClickHouse), NOT the SDK. This config helps timeouts but the 500
+  needs the langfuse deployment fixed (see the langfuse-web/worker logs).
+
 ## [0.0.38.0] - 2026-07-21
 
 ### Changed
