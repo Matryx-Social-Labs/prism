@@ -135,7 +135,9 @@ async def main(stages: list[str]) -> None:
             asyncio.create_task(
                 stream.consume(
                     stream.CLASSIFIED_ITEMS, "enrichment", handle_classified_item,
-                    consumer_name=f"enr-{CONSUMER_NAME}", concurrency=4,
+                    # Enrichment's cost is the LLM extract (I/O-bound) — parallelize
+                    # it so a slow-but-reliable model keeps up with ingest.
+                    consumer_name=f"enr-{CONSUMER_NAME}", concurrency=12, batch_size=12,
                 )
             )
         )

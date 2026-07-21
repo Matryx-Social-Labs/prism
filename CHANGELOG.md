@@ -3,6 +3,21 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.38.0] - 2026-07-21
+
+### Changed
+- Enrichment throughput — the stage's cost is the reliable-but-slow qwen extract
+  (~42s, but I/O-bound so it parallelizes: 6 concurrent ≈ 1× latency). Raised the
+  enrichment consumer to `concurrency=12` (batch 12) and sized the DB pool for it
+  (`pool_size=20, max_overflow=20`). Roughly doubled local throughput (~4 → ~8
+  items/min); prod gains more since the Langfuse span export is same-network there
+  (locally the export retries were halving throughput).
+
+### Known follow-ups
+- Deeper enrichment throughput: embed (mpnet, CPU) contends at high concurrency;
+  and `extract-shared` re-derives impacts that correlation also computes — trimming
+  the extract schema would cut qwen's output size and latency.
+
 ## [0.0.37.0] - 2026-07-21
 
 ### Added
