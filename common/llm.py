@@ -23,11 +23,15 @@ logger = get_logger(__name__)
 
 _client: AsyncOpenAI | None = None
 
-# Global cooldown: when the provider rejects with 401/403/429 (Ollama Cloud
-# returns 401 while the GPU-time session quota is exhausted), all LLM calls
-# pause instead of hammering the API hundreds of times per minute. Items that
-# fail during the window are re-driven by the ingestion requeue.
-_QUOTA_STATUS = {401, 403, 429}
+# Global cooldown: when the provider rejects for a billing/quota reason, all LLM
+# calls pause instead of hammering the API hundreds of times per minute. Items
+# that fail during the window stay pending on the stream and are redelivered, so
+# the pipeline self-heals once the account recovers.
+#   401/403 — auth/quota (Ollama Cloud returns 401 when GPU-time quota is spent)
+#   402     — OpenRouter "insufficient credits" (manual top-up; treat as a pause,
+#             not a per-message traceback storm)
+#   429     — rate/weekly limit
+_QUOTA_STATUS = {401, 402, 403, 429}
 _COOLDOWN_SECONDS = 120
 _WEEKLY_COOLDOWN_SECONDS = 900  # weekly-limit 429s: don't poke every 2 minutes
 _cooldown_until = 0.0

@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.43.0] - 2026-07-21
+
+### Fixed
+- OpenRouter `402 Insufficient credits` now pauses LLM calls instead of storming.
+  `_QUOTA_STATUS` only covered 401/403/429, so a spent OpenRouter balance raised a
+  full traceback on *every* queued item (gate/classify/enrich) — hundreds per
+  minute — with no cooldown. Added **402** to the quota set: it now trips the
+  global cooldown and raises `LlmQuotaError` (a `ConnectionError`), so the stream
+  leaves the item pending and the pipeline **self-heals on top-up** (no redeploy,
+  no data loss). Test: `tests/test_llm_quota.py`. Operational note: watch the
+  OpenRouter credit balance — a 402 silently stalls the whole pipeline.
+
 ## [0.0.42.0] - 2026-07-21
 
 ### Fixed
