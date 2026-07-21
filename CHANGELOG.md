@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.41.0] - 2026-07-21
+
+### Fixed
+- Classifier over-tagging `cybersecurity` — a Bengaluru triple-murder story (the
+  accused used an AI chatbot to plan it) was filed under `sector=cybersecurity`,
+  which then offered the cyber lens on a crime story. Root cause: the classifier
+  is a stochastic LLM (`gemini-3.1-flash-lite`) and the prompt didn't scope what
+  `cybersecurity` means, so "AI chatbot + conceal evidence" drifted into it (3/5
+  runs on the exact story). The taxonomy has no `crime` bucket, so such stories
+  had nowhere honest to land. Tightened the classifier prompt: classify by the
+  story's SUBSTANCE not incidental tools, `cybersecurity` is only attacks on/
+  defense of systems (breaches, ransomware, CVEs, malware, security policy), and
+  a crime that merely used a phone/app/chatbot is a crime (→ `other`). Verified:
+  the story now classifies `other` 5/5. Prompt-only (Langfuse-managed) — no code,
+  no worker redeploy; republish with `uv run python evals/sync_prompts.py`.
+  Existing mislabeled events keep their sector until re-ingested.
+
 ## [0.0.40.0] - 2026-07-21
 
 ### Changed
