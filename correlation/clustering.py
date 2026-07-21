@@ -26,7 +26,18 @@ TIME_WINDOW_DAYS = 4
 # A translated retelling scores ~0.42 distance (vs <0.12 for a near-dup) but shares
 # the key actors — so require >=2 shared entities AND moderate similarity.
 ENTITY_MATCH_MIN_SHARED = 2
-ENTITY_MATCH_LOOSE_DISTANCE = 0.55
+ENTITY_MATCH_LOOSE_DISTANCE = 0.45  # was 0.55; retellings sit ~0.42, trim the loose tail
+# Only DISTINCTIVE actors count toward the shared threshold. Ubiquitous national
+# figures (Modi, a major party, "Government of India") appear in every day's
+# political story, so "2 shared entities" is trivially met by unrelated events and
+# one event snowballs the whole topic into a blob. Exclude entities that are already
+# central to many distinct events (high document-frequency), and weak-signal types
+# (a place/government is shared across unrelated regional stories).
+# df is counted within the same time window as the match, so "ubiquitous" means
+# recently ubiquitous (self-limiting as the corpus grows) rather than ever-seen.
+# ponytail: fixed cap of 2; swap for a df percentile if a beat's regulars still leak.
+ENTITY_MATCH_MAX_DF = 2
+ENTITY_MATCH_TYPES = ("person", "company", "organization")
 
 
 @dataclass
@@ -146,26 +157,39 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
 async def _match_by_entities(
     session: AsyncSession, entity_slugs: list[str], embedding: list[float], published_at
 ) -> Match | None:
-    """Recent event sharing >=2 canonical entities with this article and within a
-    looser embedding band — merges cross-language / translated retellings that the
-    near-dup embedding threshold misses."""
+    """Recent event sharing >=2 DISTINCTIVE canonical actors with this article and
+    within a looser embedding band — merges cross-language / translated retellings
+    that the near-dup embedding threshold misses. Ubiquitous actors (high document-
+    frequency) and weak types (place/government) don't count, so a shared national
+    politician can't snowball unrelated stories into one blob."""
     vector_literal = "[" + ",".join(f"{v:.6f}" for v in embedding) + "]"
     result = await session.execute(
         text(
             f"""
+            WITH distinctive AS (
+                SELECT ent.id, ent.slug
+                FROM entities ent
+                JOIN event_entities ee ON ee.entity_id = ent.id
+                JOIN events ev ON ev.id = ee.event_id
+                WHERE ent.slug = ANY(:slugs)
+                  AND ent.entity_type = ANY(:types)
+                  AND (CAST(:published_at AS timestamptz) IS NULL
+                       OR ev.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
+                GROUP BY ent.id, ent.slug
+                HAVING count(DISTINCT ee.event_id) <= :max_df
+            )
             SELECT e.id,
-                   count(DISTINCT ent.slug) AS shared,
+                   count(DISTINCT d.slug) AS shared,
                    (e.embedding <=> CAST(:vec AS vector)) AS dist
-            FROM entities ent
-            JOIN event_entities ee ON ee.entity_id = ent.id
+            FROM distinctive d
+            JOIN event_entities ee ON ee.entity_id = d.id
             JOIN events e ON e.id = ee.event_id
-            WHERE ent.slug = ANY(:slugs)
-              AND e.embedding IS NOT NULL
+            WHERE e.embedding IS NOT NULL
               AND (e.embedding <=> CAST(:vec AS vector)) <= :dist_threshold
               AND (CAST(:published_at AS timestamptz) IS NULL
                    OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
             GROUP BY e.id, e.embedding
-            HAVING count(DISTINCT ent.slug) >= :min_shared
+            HAVING count(DISTINCT d.slug) >= :min_shared
             ORDER BY shared DESC, dist ASC
             LIMIT 1
             """
@@ -173,6 +197,8 @@ async def _match_by_entities(
         {
             "vec": vector_literal,
             "slugs": entity_slugs,
+            "types": list(ENTITY_MATCH_TYPES),
+            "max_df": ENTITY_MATCH_MAX_DF,
             "dist_threshold": ENTITY_MATCH_LOOSE_DISTANCE,
             "min_shared": ENTITY_MATCH_MIN_SHARED,
             "published_at": published_at,
