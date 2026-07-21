@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.34.0] - 2026-07-21
+
+### Changed
+- Perspectives are now **actor-based, not origin-based** — the analysis groups
+  coverage by WHO is framing the event (a party, an official/ministry,
+  protesters, "Neutral reporting"), consolidated across all articles and
+  languages, capped at 4 for readability. On a synthetic multi-source CJP input it
+  produced "Cockroach Janta Party / Protesters", "Education Minister Pradhan /
+  Government", and "Neutral reporting" — the competing narratives, not countries.
+- The general brief is now **cumulative** for evolving stories — when member
+  articles span multiple days/developments it writes the current state of the
+  whole arc (began as X → then Y → now Z), so a late arrival gets the full story
+  in one read. `event-analysis` prompt published to Langfuse.
+
 ## [0.0.33.0] - 2026-07-21
 
 ### Fixed
