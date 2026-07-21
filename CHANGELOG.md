@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.33.0] - 2026-07-21
+
+### Fixed
+- Extraction reliability — `structured_chat` now sets a generous `max_tokens`
+  (8192) so a large nested JSON can't truncate mid-string, and the complex
+  `extract-shared` step runs on `google/gemini-3.5-flash` (the cheapest model
+  malformed its JSON). Verified: extract now succeeds where flash-lite failed,
+  and produces **canonical romanized entities from non-English text** — a Hindi
+  article yielded `Abhijeet Dipke`, `Cockroach Janta Party`; another `Sonam
+  Wangchuk`, `Kapil Sibal` — which is what lets cross-language coverage match.
+
 ## [0.0.32.0] - 2026-07-20
 
 ### Added
