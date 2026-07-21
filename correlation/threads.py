@@ -239,11 +239,12 @@ STORY_WINDOW_DAYS = 30
 
 
 async def related_developments(event_id: uuid.UUID, limit: int = 8) -> list[dict]:
-    """Other developments of the same story — events sharing a specific ACTOR
-    (person/organization, e.g. Sonam Wangchuk, Cockroach Janta Party) within the
-    story window. Entity-based (not LLM), so it surfaces the branches of a fast-
-    moving story even when each is single-source and never thread-linked. Places
-    are excluded (too generic); ordered by how many actors are shared.
+    """Other developments of the same story — events sharing >=2 specific ACTORS
+    (persons/organizations, e.g. Sonam Wangchuk + Cockroach Janta Party + Dharmendra
+    Pradhan) within the story window. Entity-based (not LLM), so it surfaces the
+    branches of a fast-moving story even when each is single-source and never
+    thread-linked. Places are excluded (too generic); ordered by how many actors
+    are shared. Works because extraction now pulls the central actors consistently.
 
     ponytail: shared-actor count. Down-weight ubiquitous actors (frequency) to cut
     noise as volume grows.
@@ -264,7 +265,7 @@ async def related_developments(event_id: uuid.UUID, limit: int = 8) -> list[dict
                     WHERE ee1.event_id = :eid
                       AND e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
                     GROUP BY e.id, e.title, e.last_updated_at
-                    HAVING count(DISTINCT ee2.entity_id) >= 1
+                    HAVING count(DISTINCT ee2.entity_id) >= 2
                     ORDER BY shared DESC, e.last_updated_at DESC
                     LIMIT :limit
                     """

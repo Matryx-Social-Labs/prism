@@ -88,23 +88,27 @@ async def test_related_developments_shares_actor():
     if not await _db_reachable():
         pytest.skip("no database")
     tag = uuid.uuid4().hex[:6]
-    e_anchor, e_branch, e_place = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-    person = (uuid.uuid4(), f"wangchuk-{tag}", "person")
+    e_anchor, e_branch, e_weak = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    p1 = (uuid.uuid4(), f"wangchuk-{tag}", "person")
+    p2 = (uuid.uuid4(), f"cjp-{tag}", "organization")
     place = (uuid.uuid4(), f"delhi-{tag}", "place")
     try:
         async with session_scope() as s:
-            for eid in (e_anchor, e_branch, e_place):
+            for eid in (e_anchor, e_branch, e_weak):
                 await s.execute(
                     text("INSERT INTO events (id, title, sector, last_updated_at) VALUES (:i, :t, 'politics', now())"),
                     {"i": str(eid), "t": f"dev {eid}"},
                 )
-            for ent_id, slug, etype in (person, place):
+            for ent_id, slug, etype in (p1, p2, place):
                 await s.execute(
                     text("INSERT INTO entities (id, slug, name, entity_type) VALUES (:i,:s,:n,:et)"),
                     {"i": str(ent_id), "s": slug, "n": slug, "et": etype},
                 )
-            # anchor + branch share the person; anchor + place-event share only a place
-            for eid, ent in ((e_anchor, person), (e_branch, person), (e_anchor, place), (e_place, place)):
+            # anchor+branch share TWO actors; anchor+weak share only one actor + a place
+            links = [(e_anchor, p1), (e_anchor, p2), (e_anchor, place),
+                     (e_branch, p1), (e_branch, p2),
+                     (e_weak, p1), (e_weak, place)]
+            for eid, ent in links:
                 await s.execute(
                     text("INSERT INTO event_entities (id, event_id, entity_id, role) VALUES (:i,:e,:en,'subject')"),
                     {"i": str(uuid.uuid4()), "e": str(eid), "en": str(ent[0])},
@@ -112,12 +116,13 @@ async def test_related_developments_shares_actor():
         from correlation.threads import related_developments
 
         rel = {r["id"] for r in await related_developments(e_anchor)}
-        assert str(e_branch) in rel  # shares the person actor
-        assert str(e_place) not in rel  # only a shared place → excluded
+        assert str(e_branch) in rel  # shares 2 actors
+        assert str(e_weak) not in rel  # shares only 1 actor (+ a place) → below threshold
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"),
-                            {"e": [str(e_anchor), str(e_branch), str(e_place)]})
-            await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"), {"i": [str(person[0]), str(place[0])]})
+                            {"e": [str(e_anchor), str(e_branch), str(e_weak)]})
+            await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
+                            {"i": [str(p1[0]), str(p2[0]), str(place[0])]})
             await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"),
-                            {"e": [str(e_anchor), str(e_branch), str(e_place)]})
+                            {"e": [str(e_anchor), str(e_branch), str(e_weak)]})
