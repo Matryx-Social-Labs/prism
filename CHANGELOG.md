@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.36.0] - 2026-07-21
+
+### Fixed
+- Consistent central-actor extraction — `extract-shared` now instructs the model
+  to always include the PRINCIPAL actors of a story (its main people, parties,
+  organizations) even when an article covers a narrower sub-angle, and runs on
+  **qwen** (gemini-3.5-flash reliably returned an EMPTY entities array under
+  json_schema on the same text; qwen returned all six). Verified: the CJP march
+  (Hindi), hunger strike (Hindi), and AIIMS (English) developments now all extract
+  the same three actors — Cockroach Janta Party, Dharmendra Pradhan, Sonam
+  Wangchuk — so branches share 3 and group into one story. `related_developments`
+  raised to >=2 shared actors now that extraction is consistent.
+
 ## [0.0.35.0] - 2026-07-21
 
 ### Added

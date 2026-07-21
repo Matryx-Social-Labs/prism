@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     prism_model_classify: str = "google/gemini-3.1-flash-lite"
     # Extraction emits a large, nested JSON (entities/claims/impacts/cyber) — the
     # cheapest model truncates/malforms it, so use the reliable-JSON model here.
-    prism_model_extract: str = "google/gemini-3.5-flash"
+    prism_model_extract: str = "qwen/qwen3.7-plus"
     prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
     prism_model_correlate: str = "qwen/qwen3.7-plus"  # analysis/briefs/digest — content quality
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
