@@ -464,7 +464,7 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
         await session.execute(delete(Perspective).where(Perspective.event_id == event_id))
         await session.execute(delete(Impact).where(Impact.event_id == event_id))
 
-        for group in result.perspectives:
+        for group in result.perspectives[:4]:  # cap for readability (prompt also asks for <=4)
             member_ids = [uuid.UUID(a) for a in group.article_ids if a in valid_article_ids]
             session.add(
                 Perspective(
