@@ -16,7 +16,14 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 def get_engine():
     global _engine
     if _engine is None:
-        _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+        # Pool sized for the worker's concurrent consumers (enrichment runs many
+        # I/O-bound LLM extracts in parallel) plus the API's request handlers.
+        _engine = create_async_engine(
+            get_settings().database_url,
+            pool_pre_ping=True,
+            pool_size=20,
+            max_overflow=20,
+        )
     return _engine
 
 
