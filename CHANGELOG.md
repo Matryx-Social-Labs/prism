@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.40.0] - 2026-07-21
+
+### Changed
+- Extract-schema trim — the highest-volume LLM stage (`extract-shared`, one call
+  per relevant article) no longer emits `claims` or `impacts`. Neither had a
+  news-side reader: nothing reads `claims`, and correlation re-derives impacts in
+  `event-analysis` from summaries+stance. `structured_chat` gained a `prune_fields`
+  arg that drops those properties from the JSON schema shown to the model (top
+  level + `$defs`), so it stops generating the `claims[]` + `impacts[{5 fields}]`
+  arrays — fewer output tokens, less mid-JSON truncation (which was the failure
+  mode corrupting `entities`, the clustering signal). The pydantic model keeps the
+  fields (default `[]`); the deterministic `cve_lens` path still populates impacts
+  for CVE records, so the cyber lens is unchanged.
+
+### Deploy
+- Redeploy the worker (the schema prune is code). Republish the prompt so prod's
+  Langfuse-managed `extract-shared` matches the trimmed prose:
+  `uv run python evals/sync_prompts.py`. No env or migration changes.
+
 ## [0.0.39.0] - 2026-07-21
 
 ### Changed

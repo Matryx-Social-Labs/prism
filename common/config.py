@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # product sells. All near-free at India-only volume.
     prism_model_gate: str = "google/gemini-3.1-flash-lite"  # binary relevance — high volume
     prism_model_classify: str = "google/gemini-3.1-flash-lite"
-    # Extraction emits a large, nested JSON (entities/claims/impacts/cyber) — the
+    # Extraction emits a nested JSON (entities/stance/cyber/finance) — the
     # cheapest model truncates/malforms it, so use the reliable-JSON model here.
     prism_model_extract: str = "qwen/qwen3.7-plus"
     prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
