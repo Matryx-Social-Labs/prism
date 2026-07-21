@@ -81,6 +81,7 @@ async def structured_chat[T: BaseModel](
     temperature: float | None = None,
     max_tokens: int = 8192,
     max_retries: int = 2,
+    prune_fields: set[str] | None = None,
 ) -> T:
     """Chat completion constrained to a JSON schema, validated into a Pydantic model.
 
@@ -89,9 +90,16 @@ async def structured_chat[T: BaseModel](
     were observed inventing field names) AND passed as response_format for
     providers that do enforce it. Parsing tolerates markdown fences; retries
     feed the validation error back to the model.
+
+    prune_fields drops optional properties from the schema shown to the model
+    (across the top level and every $def) so it doesn't spend output tokens
+    generating fields the caller discards. Only pass fields that have a default
+    on the model — validation still fills them in.
     """
     client = get_llm()
     schema = output_model.model_json_schema()
+    if prune_fields:
+        _prune_schema_props(schema, prune_fields)
     schema_msg = {
         "role": "system",
         "content": (
@@ -149,6 +157,21 @@ async def structured_chat[T: BaseModel](
                 },
             ]
     raise ValueError(f"structured_chat failed after {max_retries} attempts: {last_err}")
+
+
+def _prune_schema_props(schema: dict[str, Any], fields: set[str]) -> None:
+    """Remove named properties from every object node in a JSON Schema, incl.
+    the $defs pydantic emits for nested models. Mutates in place. The referenced
+    $def (e.g. ExtractedImpact) is left orphaned — harmless, since no property
+    points at it anymore so the model is never asked to produce it."""
+    for node in [schema, *(schema.get("$defs") or {}).values()]:
+        props = node.get("properties")
+        if isinstance(props, dict):
+            for f in fields:
+                props.pop(f, None)
+        req = node.get("required")
+        if isinstance(req, list):
+            node["required"] = [r for r in req if r not in fields]
 
 
 def _parse_json_loose(content: str) -> Any:

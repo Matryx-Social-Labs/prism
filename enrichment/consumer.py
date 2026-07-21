@@ -96,6 +96,12 @@ async def handle_classified_item(payload: dict) -> None:
             trace_name="extract-shared",
             metadata=meta,
             langfuse_prompt=prompt if prompt.version else None,
+            # claims/impacts have no news-side reader — correlation re-derives
+            # impacts in event-analysis and nothing reads claims. Drop them from
+            # the schema so the highest-volume LLM stage emits less (fewer output
+            # tokens, less truncation risk on entities). CVE impacts come from the
+            # deterministic cve_lens path, which still populates these fields.
+            prune_fields={"claims", "impacts"},
         )
         model_used = f"ollama:{extract_model}"
         raw_model_output = extraction.model_dump()
