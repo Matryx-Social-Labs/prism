@@ -3,6 +3,29 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.42.0] - 2026-07-21
+
+### Fixed
+- Entity-overlap over-merge ("KSU railway blockade" event whose brief was about an
+  IIT Roorkee advisory). The `entity_overlap` match tier merged ~5 unrelated
+  political stories into one blob: it required only "≥2 shared entities + embedding
+  ≤0.55", counting *any* entity — so ubiquitous national figures (Rahul Gandhi,
+  Congress, Modi), which appear in every day's political story, trivially satisfied
+  the threshold, and once an event accumulated them it snowballed the whole topic.
+  Fix (`correlation/clustering.py`): the tier now counts only **distinctive**
+  actors — `person`/`organization` entities with document-frequency ≤ 2 within the
+  match window (so recently-ubiquitous figures and weak types like place/government
+  don't count) — and tightens the loose band 0.55 → 0.45. Validated on the live
+  over-merge: KSU, the Kerala Congress march, the IIT gag-order, and the Uttarakhand
+  HC story each separate into their own event, while the genuine Parliament-dharna
+  articles (sharing specific actors) still cluster. Cross-language merging is
+  unaffected (a retelling shares ≥2 low-df story actors at ≤0.42).
+
+### Deploy
+- Redeploy the **worker** (clustering is code). No env/migration. The fresh data
+  already formed with the old tier keeps its over-merges until re-ingested — a
+  wipe + re-ingest after deploy gives fully clean clustering.
+
 ## [0.0.41.0] - 2026-07-21
 
 ### Fixed
