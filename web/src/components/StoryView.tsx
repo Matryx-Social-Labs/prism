@@ -555,6 +555,28 @@ export function StoryView({ event }: { event: EventDetail }) {
       {/* ── The thread ─────────────────────────────────────── */}
       <ThreadRail thread={event.thread} currentTitle={event.title} />
 
+      {/* ── This story's developments (entity-linked branches) ── */}
+      {event.related && event.related.length > 0 && (
+        <section className="mt-11">
+          <SectionTitle
+            title="This story's developments"
+            hint="Other developments in the same story — linked by the people, organizations, and parties they share."
+          />
+          <ul className="flex flex-col divide-y" style={{ borderColor: "var(--line)" }}>
+            {event.related.map((r) => (
+              <li key={r.id} className="py-3">
+                <Link href={`/story/${r.id}`} className="flex items-baseline justify-between gap-3">
+                  <span className="text-[14.5px] font-medium leading-snug">{r.title}</span>
+                  <span className="shrink-0 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+                    {timeAgo(r.last_updated_at)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* ── What to expect ─────────────────────────────────── */}
       <section className="mt-11">
         <SectionTitle

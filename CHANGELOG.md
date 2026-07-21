@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.35.0] - 2026-07-21
+
+### Added
+- Story branches — the event view now shows **"This story's developments"**:
+  other events sharing a specific actor (person/organization, e.g. Sonam Wangchuk,
+  Cockroach Janta Party) within a 30-day window. Entity-based (not LLM), so it
+  surfaces the branches of a fast-moving story even when each is single-source and
+  never thread-linked — and **cross-language** (the English AIIMS development links
+  to the Hindi hunger-strike development via the shared actor). New `related`
+  field on the event detail; `correlation.threads.related_developments`.
+
+### Known follow-ups
+- Down-weight ubiquitous actors by frequency to cut noise as volume grows.
+- Story-level cumulative brief/perspectives across all branches (the events share
+  1 actor today because extraction is fragmented — consistent central-actor
+  extraction would let branches merge and earn a single story brief).
+
 ## [0.0.34.0] - 2026-07-21
 
 ### Changed

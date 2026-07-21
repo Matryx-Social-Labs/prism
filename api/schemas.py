@@ -119,6 +119,7 @@ class EventDetail(BaseModel):
     coverage: CoverageOut | None
     entities: list[EntityOut]
     thread: dict  # {"upstream": [...], "downstream": [...]} of linked events
+    related: list[dict] = []  # story branches — events sharing >=2 entities [{id,title,last_updated_at,shared}]
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]

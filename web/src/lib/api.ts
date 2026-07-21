@@ -123,6 +123,7 @@ export interface EventDetail {
   coverage: CoverageOut | null;
   entities: EntityOut[];
   thread: { upstream: ThreadNodeOut[]; downstream: ThreadNodeOut[] };
+  related: { id: string; title: string; last_updated_at: string; shared: number }[];
   projection: {
     event_type?: string | null;
     source_count?: number;

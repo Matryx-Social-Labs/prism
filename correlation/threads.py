@@ -235,6 +235,54 @@ async def _walk_chain(session, event_id: uuid.UUID, direction: str) -> list[dict
     return out
 
 
+STORY_WINDOW_DAYS = 30
+
+
+async def related_developments(event_id: uuid.UUID, limit: int = 8) -> list[dict]:
+    """Other developments of the same story — events sharing a specific ACTOR
+    (person/organization, e.g. Sonam Wangchuk, Cockroach Janta Party) within the
+    story window. Entity-based (not LLM), so it surfaces the branches of a fast-
+    moving story even when each is single-source and never thread-linked. Places
+    are excluded (too generic); ordered by how many actors are shared.
+
+    ponytail: shared-actor count. Down-weight ubiquitous actors (frequency) to cut
+    noise as volume grows.
+    """
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                text(
+                    f"""
+                    SELECT e.id, e.title, e.last_updated_at,
+                           count(DISTINCT ee2.entity_id) AS shared
+                    FROM event_entities ee1
+                    JOIN entities ent ON ent.id = ee1.entity_id
+                                     AND ent.entity_type IN ('person', 'organization')
+                    JOIN event_entities ee2
+                      ON ee2.entity_id = ee1.entity_id AND ee2.event_id <> ee1.event_id
+                    JOIN events e ON e.id = ee2.event_id
+                    WHERE ee1.event_id = :eid
+                      AND e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                    GROUP BY e.id, e.title, e.last_updated_at
+                    HAVING count(DISTINCT ee2.entity_id) >= 1
+                    ORDER BY shared DESC, e.last_updated_at DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"eid": str(event_id), "limit": limit},
+            )
+        ).mappings().all()
+    return [
+        {
+            "id": str(r["id"]),
+            "title": r["title"],
+            "last_updated_at": r["last_updated_at"].isoformat(),
+            "shared": int(r["shared"]),
+        }
+        for r in rows
+    ]
+
+
 async def fetch_thread(event_id: uuid.UUID) -> dict:
     """The event's news chain: multi-hop causal ancestors (what led here),
     multi-hop descendants (what followed), plus direct 'related' context."""
