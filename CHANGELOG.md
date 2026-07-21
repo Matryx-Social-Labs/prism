@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.37.0] - 2026-07-21
+
+### Added
+- Story trail — a **"The story so far"** timeline on the individual news page: a
+  monochrome, chronological rail of the story's developments (branches) with a
+  "Following" cast strip of the recurring actors, the current article marked
+  in place ("You are here"). DESIGN.md-faithful: hairline rule, IBM Plex Mono
+  dates (provenance), General Sans titles/cast, no lens hue (chrome), reveal-on-
+  scroll stagger collapsing to instant under reduced-motion. Replaces the plain
+  developments list; built from the existing `related` branches + entity cast —
+  populates cross-language (an English politics event links to the Hindi CJP
+  march via 4 shared actors).
+
 ## [0.0.36.0] - 2026-07-21
 
 ### Fixed
