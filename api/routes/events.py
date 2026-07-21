@@ -29,7 +29,7 @@ from common.db import get_db
 from common.lenses import LENSES
 from common.locks import single_flight
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
-from correlation.threads import fetch_thread
+from correlation.threads import fetch_thread, related_developments
 
 router = APIRouter()
 
@@ -118,6 +118,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     ).mappings().all()
 
     thread = await fetch_thread(event_id)
+    related = await related_developments(event_id)
 
     projection = event["projection"] or {}
     return EventDetail(
@@ -139,6 +140,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             EntityOut(name=e["name"], entity_type=e["entity_type"], role=e["role"]) for e in entities
         ],
         thread=thread,
+        related=related,
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),
