@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.45.0] - 2026-07-22
+
+### Fixed
+- Feed/story thumbnails all 404'd. Article images come from arbitrary news CDNs
+  (tosshub, toiimg, thehindu, livemint, hindustantimes…). Next.js's server-side
+  image optimizer (`/_next/image`) fetches them from Vercel's datacenter IPs, which
+  those CDNs block (hotlink/bot protection) → every thumbnail returned a 404 (23 per
+  feed load), showing gray placeholder boxes + flooding the console. Set
+  `images.unoptimized: true` so next/image serves the CDN URL directly to the browser
+  (real UA + referer, which the CDNs allow — verified tosshub 200 direct vs 404 via
+  optimizer). `onError` still hides the few that fail. Trade-off: no server resize,
+  but these are 92–120px JPGs. Also observed: the feed's API-unreachable state renders
+  a clean inline notice (graceful degradation working).
+
 ## [0.0.44.0] - 2026-07-22
 
 ### Changed
