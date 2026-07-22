@@ -120,6 +120,10 @@ class EventDetail(BaseModel):
     entities: list[EntityOut]
     thread: dict  # {"upstream": [...], "downstream": [...]} of linked events
     related: list[dict] = []  # story branches — events sharing >=2 entities [{id,title,last_updated_at,shared}]
+    # Canonical story timeline: {"developments": [{id,title,sector,occurred_at,image_url,
+    # is_current,why}], "cast": [names]} — the same for every development of the story.
+    # Supersedes thread+related once the StoryTimeline component ships (PR 2).
+    story: dict = {"developments": [], "cast": []}
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]
