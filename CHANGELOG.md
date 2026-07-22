@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.50.0] - 2026-07-22
+
+### Changed
+- Story timeline: temporal edge decay + community-detection split. Two refinements to
+  `story_timeline`, both read-path (no LLM cost), prompted by a cross-model design note:
+  - **Temporal decay** — each story edge is now weighted `shared_actors × e^(−0.03·days)`,
+    a softer version of the hard 30-day window: a distant-but-similar event (a protest
+    months ago sharing 2 actors) decays below threshold and can't false-join, while
+    a same-day pair sails through. Live: dropped a stale 2025-10 event that the window
+    let slip into the current Iran story (10 → 9 developments).
+  - **Community detection** — the connected component can span closely-related
+    sub-stories (Iran war + Lebanon peace) joined by a few bridge actors. Modularity
+    (`networkx` greedy_modularity, pure-Python, tiny local graph) now cuts the weak
+    bridges and returns the seed's community, so each development shows its own tight
+    arc. Live: the 9-event component splits into a 6-event Iran-war story and a
+    3-event Lebanon-peace story; an Iran development now shows the 6.
+  Chosen `networkx` greedy-modularity over Leiden/`igraph` (a C-extension) — same
+  modularity objective, no build complexity, validated on live data. Cached with the
+  timeline (5-min TTL). New dep: `networkx`.
+
 ## [0.0.49.0] - 2026-07-22
 
 ### Changed

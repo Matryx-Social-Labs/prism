@@ -8,6 +8,7 @@ to event_links so a pair is never asked twice.
 """
 
 import json
+import math
 import uuid
 
 from sqlalchemy import text
@@ -335,6 +336,14 @@ STORY_MIN_SHARED = 2
 STORY_SIZE_CAP = 24
 STORY_DEPTH_CAP = 4
 STORY_CACHE_TTL = 300  # seconds — the component drifts slowly; brief staleness is fine
+# Temporal decay on each edge: weight = shared_actors * exp(-lambda * days_between).
+# A softer version of the hard window — a distant-but-similar event (a protest months
+# ago that shares 2 actors) decays below the threshold, so it can't false-join, while
+# a same-day pair sails through. At lambda=0.03: 7d -> 0.81x, 21d -> 0.53x, 30d -> 0.41x,
+# so a 2-shared edge survives to ~23d, a 3-shared edge to ~37d. The distinctive-actor
+# floor (>= STORY_MIN_SHARED) still applies first.
+STORY_DECAY_LAMBDA = 0.03
+STORY_MIN_EDGE_WEIGHT = 1.0
 
 _STRONG_NEIGHBOURS_SQL = text(
     f"""
@@ -345,7 +354,9 @@ _STRONG_NEIGHBOURS_SQL = text(
                       AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
         GROUP BY ee.entity_id
     )
-    SELECT e.id
+    SELECT e.id AS id,
+           count(DISTINCT ee1.entity_id) AS shared,
+           coalesce(e.occurred_at::timestamptz, e.last_updated_at) AS d
     FROM event_entities ee1
     JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
     JOIN df ON df.entity_id = ee1.entity_id AND df.d < {STORY_DF_CAP}
@@ -353,31 +364,101 @@ _STRONG_NEIGHBOURS_SQL = text(
     JOIN events e ON e.id = ee2.event_id
                  AND e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
     WHERE ee1.event_id = :eid
-    GROUP BY e.id
+    GROUP BY e.id, e.occurred_at, e.last_updated_at
     HAVING count(DISTINCT ee1.entity_id) >= {STORY_MIN_SHARED}
     """
 )
 
 
+async def _node_date(session, eid: str):
+    row = (
+        await session.execute(
+            text("SELECT coalesce(occurred_at::timestamptz, last_updated_at) AS d FROM events WHERE id = :eid"),
+            {"eid": eid},
+        )
+    ).first()
+    return row[0] if row else None
+
+
 async def _story_component(session, seed: uuid.UUID) -> set[str]:
-    """Bounded connected component of the seed over strong edges."""
-    seen: set[str] = {str(seed)}
-    frontier: set[str] = {str(seed)}
+    """Bounded connected component of the seed over strong, time-decayed edges."""
+    seed_s = str(seed)
+    seen: set[str] = {seed_s}
+    frontier: set[str] = {seed_s}
+    dates: dict[str, object] = {seed_s: await _node_date(session, seed_s)}
     depth = 0
     while frontier and len(seen) < STORY_SIZE_CAP and depth < STORY_DEPTH_CAP:
         nxt: set[str] = set()
         for eid in frontier:
-            rows = (await session.execute(_STRONG_NEIGHBOURS_SQL, {"eid": eid})).scalars().all()
-            for rid in rows:
-                rid = str(rid)
-                if rid not in seen:
-                    seen.add(rid)
-                    nxt.add(rid)
+            node_d = dates.get(eid)
+            rows = (await session.execute(_STRONG_NEIGHBOURS_SQL, {"eid": eid})).mappings().all()
+            for r in rows:
+                rid = str(r["id"])
+                if rid in seen:
+                    continue
+                gap = abs((r["d"] - node_d).days) if (node_d and r["d"]) else 0
+                if r["shared"] * math.exp(-STORY_DECAY_LAMBDA * gap) < STORY_MIN_EDGE_WEIGHT:
+                    continue  # too far apart for this few shared actors — not a story edge
+                seen.add(rid)
+                dates[rid] = r["d"]
+                nxt.add(rid)
                 if len(seen) >= STORY_SIZE_CAP:
                     break
         frontier = nxt
         depth += 1
     return seen
+
+
+_COMPONENT_EDGES_SQL = text(
+    f"""
+    WITH df AS (
+        SELECT ee.entity_id, count(DISTINCT ee.event_id) AS d
+        FROM event_entities ee
+        JOIN events ev ON ev.id = ee.event_id
+                      AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+        GROUP BY ee.entity_id
+    )
+    SELECT ee1.event_id AS a, ee2.event_id AS b, count(DISTINCT ee1.entity_id) AS shared
+    FROM event_entities ee1
+    JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
+    JOIN df ON df.entity_id = ee1.entity_id AND df.d < {STORY_DF_CAP}
+    JOIN event_entities ee2 ON ee2.entity_id = ee1.entity_id AND ee2.event_id > ee1.event_id
+    WHERE ee1.event_id = ANY(CAST(:ids AS uuid[]))
+      AND ee2.event_id = ANY(CAST(:ids AS uuid[]))
+    GROUP BY ee1.event_id, ee2.event_id
+    HAVING count(DISTINCT ee1.entity_id) >= {STORY_MIN_SHARED}
+    """
+)
+
+
+async def _component_edges(session, ids: list[str]) -> list[tuple[str, str, int]]:
+    """All intra-component strong edges (>=2 shared distinctive actors), one query."""
+    if len(ids) < 2:
+        return []
+    rows = (await session.execute(_COMPONENT_EDGES_SQL, {"ids": ids})).mappings().all()
+    return [(str(r["a"]), str(r["b"]), int(r["shared"])) for r in rows]
+
+
+def _seed_community(node_ids: list[str], edges: list[tuple[str, str, int]], seed: uuid.UUID) -> set[str]:
+    """Split the component into topical stories by modularity, return the seed's.
+    A connected component can span closely-related sub-stories (Iran war vs Lebanon
+    peace) linked by a few bridge actors; community detection cuts the weak bridges so
+    each development shows its own tight arc. Falls back to the whole set when there
+    are no edges (single-source) or the seed lands nowhere."""
+    import networkx as nx
+    from networkx.algorithms.community import greedy_modularity_communities
+
+    seed_s = str(seed)
+    graph = nx.Graph()
+    graph.add_nodes_from(node_ids)
+    for a, b, weight in edges:
+        graph.add_edge(a, b, weight=weight)
+    if graph.number_of_edges() == 0:
+        return {seed_s}
+    for community in greedy_modularity_communities(graph, weight="weight"):
+        if seed_s in community:
+            return {str(n) for n in community}
+    return set(node_ids)
 
 
 async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
@@ -467,8 +548,10 @@ async def story_timeline(event_id: uuid.UUID) -> dict:
         redis = None
 
     async with session_scope() as session:
-        ids = list(await _story_component(session, event_id))
-        result = await _assemble_timeline(session, event_id, ids)
+        component = list(await _story_component(session, event_id))
+        edges = await _component_edges(session, component)
+        community = _seed_community(component, edges, event_id)
+        result = await _assemble_timeline(session, event_id, list(community))
 
     if redis is not None:
         try:

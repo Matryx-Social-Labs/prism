@@ -36,13 +36,13 @@ async def test_story_timeline_transitive_strong_component():
         pytest.skip("no database")
     tag = uuid.uuid4().hex[:6]
     s1, s2, s3, noise = (uuid.uuid4() for _ in range(4))
-    actors = {k: uuid.uuid4() for k in ("a1", "a2", "a3", "a4")}
-    # edges: s1-s2 share {a1,a2} (strong); s2-s3 share {a3,a4} (strong);
-    #        s1-s3 share nothing; noise-s1 share {a1} only (weak).
+    actors = {k: uuid.uuid4() for k in ("a1", "a2", "a3")}
+    # s1/s2/s3 each carry all three actors → a dense community that modularity keeps
+    # as one story; noise shares only a1 → a weak edge, excluded before it can join.
     membership = [
-        (s1, "a1"), (s1, "a2"),
-        (s2, "a1"), (s2, "a2"), (s2, "a3"), (s2, "a4"),
-        (s3, "a3"), (s3, "a4"),
+        (s1, "a1"), (s1, "a2"), (s1, "a3"),
+        (s2, "a1"), (s2, "a2"), (s2, "a3"),
+        (s3, "a1"), (s3, "a2"), (s3, "a3"),
         (noise, "a1"),
     ]
     try:
