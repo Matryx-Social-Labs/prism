@@ -383,7 +383,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             </p>
           )}
 
-          {lens === "cyber_grc" && cyber && (
+          {lens === "cyber_grc" && cyber && !isLocked(lens) && (
             <div className="flex flex-col gap-3.5">
               <div className="flex flex-wrap gap-1.5">
                 {cvss.score != null && (
@@ -463,7 +463,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             </div>
           )}
 
-          {lens === "finance_trader" && finance && (
+          {lens === "finance_trader" && finance && !isLocked(lens) && (
             <div className="flex flex-col gap-3">
             <div
               className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border px-4 py-3 text-[13.5px]"

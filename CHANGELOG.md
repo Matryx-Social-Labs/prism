@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.47.0] - 2026-07-22
+
+### Fixed
+- Gate the cyber/finance lens *fields* behind sign-in, not just the lens brief.
+  v0.0.46.0 let a signed-out reader flip to a locked lens in place (good) — but the
+  lens-fields blocks (`lens === "cyber_grc" && cyber`, `lens === "finance_trader" &&
+  finance`) were gated only by lens selection, not `isLocked`. So selecting the locked
+  lens rendered the full pro payload (CVSS, affected products, remediation, the whole
+  NIST/CIS/ISO control-mapping table; tickers/catalyst/price for markets) below the
+  sign-in prompt. Added `!isLocked(lens)` to both blocks so a signed-out reader sees
+  only the flip + the "sign in to unlock" prompt. (The brief was already gated.)
+
 ## [0.0.46.0] - 2026-07-22
 
 ### Changed
