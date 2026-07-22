@@ -3,6 +3,29 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.51.0] - 2026-07-22
+
+### Fixed
+- Story-timeline: IDF-weighted edges instead of a df cutoff — fixes trending-story
+  fragmentation. The df<15 "distinctive actor" cutoff (from the KSU over-merge fix)
+  deleted a *huge trending story's own core* (Cockroach Janta Party df82, Dharmendra
+  Pradhan 76, Sonam Wangchuk 50 — all far above the cutoff), so its developments
+  shared only excluded actors and the story shattered into **~82 orphan events**.
+  Root cause: global document-frequency can't tell "central to one big story" (keep)
+  from "ubiquitous across unrelated stories" (drop). Fix: stop *excluding* high-df
+  actors; keep them all and **weight each shared actor `1/df`** (a magnet contributes
+  ~0.01-0.02, a specific actor ~0.17), require an IDF-weighted (× temporal-decay) edge
+  ≥ 0.15 plus the ≥2-actor floor, and let community detection separate stories by
+  structure. Live: the CJP story regroups into coherent sub-stories (protest / police
+  / legal / opposition); the cast strip now shows the story's real protagonists (was
+  empty — they'd been excluded). Also applies to `_component_edges` and the cast query.
+  **Known limitation:** a *cross-story* magnet that's lower-frequency than a story's
+  own core (Trump df41 < CJP df82) can't be dropped by any frequency rule — one
+  Trump-adjacent event ("tariffs") still joins a Trump-heavy Iran cluster. The real
+  discriminator is cross-sector spread (Trump spans politics+business; CJP stays in
+  politics) — a follow-up. Net: fixes the severe, common case (a story with its own
+  actors) at the cost of a mild over-merge on dominant-cross-figure US-politics stories.
+
 ## [0.0.50.0] - 2026-07-22
 
 ### Changed

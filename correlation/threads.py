@@ -8,7 +8,6 @@ to event_links so a pair is never asked twice.
 """
 
 import json
-import math
 import uuid
 
 from sqlalchemy import text
@@ -316,56 +315,61 @@ async def fetch_thread(event_id: uuid.UUID) -> dict:
 # ── Canonical story timeline ────────────────────────────────────────────────
 # One consistent timeline shown on EVERY development of a story, so navigating
 # between developments no longer collapses the view (a hub had 6 links, a leaf
-# had 1). The story is the connected component over "strong" edges — two events
-# linked iff they share >= STORY_MIN_SHARED DISTINCTIVE actors (person/org with
-# document-frequency < STORY_DF_CAP). Transitivity means a leaf reaches the whole
-# story via its hub; the strong-edge rule means a magnet-only link (two stories
-# sharing just "Donald Trump", df 41) is NOT an edge, so unrelated stories (a
-# tariff story) stay out. Calibrated on live data: a story's own core actors sit
-# at df<=10 (Houthis 10, Rubio 9) while cross-story magnets are df>=20.
+# had 1). The story is the connected component over IDF-weighted, time-decayed
+# actor edges, then split into topical sub-stories by community detection.
 #
-#   leaf B ──strong── hub A ──strong── {Hormuz, tankers, Momeni, ...}   ← one story
+# Edge weight = sum(1/df) over shared person/org actors, x exp(-lambda*days_apart).
+# IDF-weighting (NOT a df cutoff) is the crux: a shared magnet contributes almost
+# nothing (Cockroach Janta Party df82 -> 0.012, Trump df41 -> 0.024) while a specific
+# actor carries the edge (Delhi Metro df6 -> 0.167). We must NOT exclude high-df
+# actors — a huge trending story's OWN core is high-df (CJP 82, Pradhan 76, Wangchuk
+# 50), and a df cutoff deleted exactly those and fragmented the story into dozens of
+# orphans. Down-weight them and let modularity separate stories by structure (a magnet
+# bridges communities weakly; a story's core co-occurs densely). A >=STORY_MIN_SHARED
+# count floor still drops single-actor noise.
+#
+#   leaf B ──idf-strong── hub A ──idf-strong── {Hormuz, tankers, Momeni, ...}   ← one story
 #      │
-#   (only "Trump", df41 → NOT strong) ── tariff story                   ← excluded
+#   (only "Trump", 1/41 → too light) ── tariff story                            ← excluded
 #
-# ponytail: bounded per-node BFS + a 5-min cache; fold into one recursive CTE and
-# graduate to Louvain if closely-related sub-stories (Iran war vs Lebanon peace)
-# need splitting.
-STORY_DF_CAP = 15
-STORY_MIN_SHARED = 2
-STORY_SIZE_CAP = 24
+# ponytail: bounded per-node BFS + a 5-min cache; the df CTE re-scans per node — fold
+# into one recursive CTE / precomputed df if the read path gets hot.
+STORY_MIN_SHARED = 2  # floor: >=2 shared person/org actors (excludes single-actor noise)
+STORY_SIZE_CAP = 30
 STORY_DEPTH_CAP = 4
 STORY_CACHE_TTL = 300  # seconds — the component drifts slowly; brief staleness is fine
-# Temporal decay on each edge: weight = shared_actors * exp(-lambda * days_between).
-# A softer version of the hard window — a distant-but-similar event (a protest months
-# ago that shares 2 actors) decays below the threshold, so it can't false-join, while
-# a same-day pair sails through. At lambda=0.03: 7d -> 0.81x, 21d -> 0.53x, 30d -> 0.41x,
-# so a 2-shared edge survives to ~23d, a 3-shared edge to ~37d. The distinctive-actor
-# floor (>= STORY_MIN_SHARED) still applies first.
-STORY_DECAY_LAMBDA = 0.03
-STORY_MIN_EDGE_WEIGHT = 1.0
+STORY_DECAY_LAMBDA = 0.03  # edge x exp(-lambda*days): 7d -> 0.81x, 30d -> 0.41x
+# Min IDF-weighted, decayed edge weight. 0.15 keeps a specific+magnet pair (Delhi Metro
+# 0.167 + CJP 0.012 = 0.18) but drops a magnets-only pair (2x Trump/Congress ~0.05) —
+# validated on the live CJP (regroups), Iran (splits Iran/Lebanon), and KSU (stays
+# separate) stories.
+STORY_MIN_EDGE_WEIGHT = 0.15
 
 _STRONG_NEIGHBOURS_SQL = text(
     f"""
     WITH df AS (
-        SELECT ee.entity_id, count(DISTINCT ee.event_id) AS d
+        SELECT ee.entity_id, count(DISTINCT ee.event_id)::float AS d
         FROM event_entities ee
         JOIN events ev ON ev.id = ee.event_id
                       AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
         GROUP BY ee.entity_id
     )
     SELECT e.id AS id,
-           count(DISTINCT ee1.entity_id) AS shared,
            coalesce(e.occurred_at::timestamptz, e.last_updated_at) AS d
     FROM event_entities ee1
     JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
-    JOIN df ON df.entity_id = ee1.entity_id AND df.d < {STORY_DF_CAP}
+    JOIN df ON df.entity_id = ee1.entity_id
     JOIN event_entities ee2 ON ee2.entity_id = ee1.entity_id AND ee2.event_id <> ee1.event_id
     JOIN events e ON e.id = ee2.event_id
                  AND e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
     WHERE ee1.event_id = :eid
     GROUP BY e.id, e.occurred_at, e.last_updated_at
-    HAVING count(DISTINCT ee1.entity_id) >= {STORY_MIN_SHARED}
+    HAVING count(DISTINCT ee1.entity_id) >= :min_shared
+       AND sum(1.0 / df.d) * exp(
+               -1.0 * CAST(:lam AS double precision) * coalesce(abs(extract(epoch FROM (
+                   coalesce(e.occurred_at::timestamptz, e.last_updated_at) - CAST(:node_date AS timestamptz)
+               )) / 86400.0), 0)
+           ) >= CAST(:min_weight AS double precision)
     """
 )
 
@@ -381,7 +385,8 @@ async def _node_date(session, eid: str):
 
 
 async def _story_component(session, seed: uuid.UUID) -> set[str]:
-    """Bounded connected component of the seed over strong, time-decayed edges."""
+    """Bounded connected component of the seed over IDF-weighted, time-decayed edges
+    (the count floor, IDF weight, and decay are all enforced in the SQL)."""
     seed_s = str(seed)
     seen: set[str] = {seed_s}
     frontier: set[str] = {seed_s}
@@ -390,15 +395,22 @@ async def _story_component(session, seed: uuid.UUID) -> set[str]:
     while frontier and len(seen) < STORY_SIZE_CAP and depth < STORY_DEPTH_CAP:
         nxt: set[str] = set()
         for eid in frontier:
-            node_d = dates.get(eid)
-            rows = (await session.execute(_STRONG_NEIGHBOURS_SQL, {"eid": eid})).mappings().all()
+            rows = (
+                await session.execute(
+                    _STRONG_NEIGHBOURS_SQL,
+                    {
+                        "eid": eid,
+                        "node_date": dates.get(eid),
+                        "lam": STORY_DECAY_LAMBDA,
+                        "min_shared": STORY_MIN_SHARED,
+                        "min_weight": STORY_MIN_EDGE_WEIGHT,
+                    },
+                )
+            ).mappings().all()
             for r in rows:
                 rid = str(r["id"])
                 if rid in seen:
                     continue
-                gap = abs((r["d"] - node_d).days) if (node_d and r["d"]) else 0
-                if r["shared"] * math.exp(-STORY_DECAY_LAMBDA * gap) < STORY_MIN_EDGE_WEIGHT:
-                    continue  # too far apart for this few shared actors — not a story edge
                 seen.add(rid)
                 dates[rid] = r["d"]
                 nxt.add(rid)
@@ -412,31 +424,36 @@ async def _story_component(session, seed: uuid.UUID) -> set[str]:
 _COMPONENT_EDGES_SQL = text(
     f"""
     WITH df AS (
-        SELECT ee.entity_id, count(DISTINCT ee.event_id) AS d
+        SELECT ee.entity_id, count(DISTINCT ee.event_id)::float AS d
         FROM event_entities ee
         JOIN events ev ON ev.id = ee.event_id
                       AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
         GROUP BY ee.entity_id
     )
-    SELECT ee1.event_id AS a, ee2.event_id AS b, count(DISTINCT ee1.entity_id) AS shared
+    SELECT ee1.event_id AS a, ee2.event_id AS b, sum(1.0 / df.d) AS w
     FROM event_entities ee1
     JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
-    JOIN df ON df.entity_id = ee1.entity_id AND df.d < {STORY_DF_CAP}
+    JOIN df ON df.entity_id = ee1.entity_id
     JOIN event_entities ee2 ON ee2.entity_id = ee1.entity_id AND ee2.event_id > ee1.event_id
     WHERE ee1.event_id = ANY(CAST(:ids AS uuid[]))
       AND ee2.event_id = ANY(CAST(:ids AS uuid[]))
     GROUP BY ee1.event_id, ee2.event_id
-    HAVING count(DISTINCT ee1.entity_id) >= {STORY_MIN_SHARED}
+    HAVING count(DISTINCT ee1.entity_id) >= :min_shared AND sum(1.0 / df.d) >= :min_weight
     """
 )
 
 
-async def _component_edges(session, ids: list[str]) -> list[tuple[str, str, int]]:
-    """All intra-component strong edges (>=2 shared distinctive actors), one query."""
+async def _component_edges(session, ids: list[str]) -> list[tuple[str, str, float]]:
+    """All intra-component edges, IDF-weighted (sum 1/df over shared actors)."""
     if len(ids) < 2:
         return []
-    rows = (await session.execute(_COMPONENT_EDGES_SQL, {"ids": ids})).mappings().all()
-    return [(str(r["a"]), str(r["b"]), int(r["shared"])) for r in rows]
+    rows = (
+        await session.execute(
+            _COMPONENT_EDGES_SQL,
+            {"ids": ids, "min_shared": STORY_MIN_SHARED, "min_weight": STORY_MIN_EDGE_WEIGHT},
+        )
+    ).mappings().all()
+    return [(str(r["a"]), str(r["b"]), float(r["w"])) for r in rows]
 
 
 def _seed_community(node_ids: list[str], edges: list[tuple[str, str, int]], seed: uuid.UUID) -> set[str]:
@@ -488,21 +505,16 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
         )
     ).mappings().all()
     why = {str(row["to_event_id"]): row["rationale"] for row in links if row["rationale"]}
-    # Cast: the recurring distinctive actors that bind the story.
+    # Cast: the story's recurring protagonists (person/org in >=2 of its developments,
+    # most-frequent first). No df filter — the whole point is these ARE the story's
+    # central, high-frequency actors (CJP, Pradhan, Wangchuk).
     cast = (
         await session.execute(
             text(
-                f"""
-                WITH df AS (
-                    SELECT ee.entity_id, count(DISTINCT ee.event_id) AS d FROM event_entities ee
-                    JOIN events ev ON ev.id = ee.event_id
-                                  AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
-                    GROUP BY ee.entity_id
-                )
+                """
                 SELECT ent.name, count(DISTINCT ee.event_id) AS n
                 FROM event_entities ee
                 JOIN entities ent ON ent.id = ee.entity_id AND ent.entity_type IN ('person', 'organization')
-                JOIN df ON df.entity_id = ee.entity_id AND df.d < {STORY_DF_CAP}
                 WHERE ee.event_id = ANY(CAST(:ids AS uuid[]))
                 GROUP BY ent.name HAVING count(DISTINCT ee.event_id) >= 2
                 ORDER BY n DESC LIMIT 8
