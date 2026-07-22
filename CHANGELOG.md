@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.46.0] - 2026-07-22
+
+### Changed
+- Locked lens tabs now flip in place instead of bouncing to /signin. Clicking a pro
+  lens (Cyber/Markets) as a signed-out reader hard-redirected to the sign-in page —
+  losing your place on the story, and the signature re-typeset flip never played.
+  Now the tab flips to the locked lens (scan line + re-ink in the lens hue) and
+  reveals the in-place "sign in to unlock the {lens} lens (free)" prompt that already
+  existed in the component but was unreachable. The reader sees "the memorable thing"
+  and keeps their place; the freemium gate is unchanged (no brief is fetched or
+  generated for a locked lens, so it stays free). `web/src/components/StoryView.tsx`.
+
 ## [0.0.45.0] - 2026-07-22
 
 ### Fixed
