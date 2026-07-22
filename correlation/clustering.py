@@ -27,16 +27,22 @@ TIME_WINDOW_DAYS = 4
 # the key actors — so require >=2 shared entities AND moderate similarity.
 ENTITY_MATCH_MIN_SHARED = 2
 ENTITY_MATCH_LOOSE_DISTANCE = 0.45  # was 0.55; retellings sit ~0.42, trim the loose tail
-# Only DISTINCTIVE actors count toward the shared threshold. Ubiquitous national
-# figures (Modi, a major party, "Government of India") appear in every day's
-# political story, so "2 shared entities" is trivially met by unrelated events and
-# one event snowballs the whole topic into a blob. Exclude entities that are already
-# central to many distinct events (high document-frequency), and weak-signal types
-# (a place/government is shared across unrelated regional stories).
-# df is counted within the same time window as the match, so "ubiquitous" means
-# recently ubiquitous (self-limiting as the corpus grows) rather than ever-seen.
-# ponytail: fixed cap of 2; swap for a df percentile if a beat's regulars still leak.
-ENTITY_MATCH_MAX_DF = 2
+# IDF-weight shared actors (1/df) rather than a df CUTOFF. A magnet (Modi, a major
+# party, Cockroach Janta Party df82) contributes almost nothing; a specific actor
+# carries the match. A cutoff deleted a trending story's OWN core (CJP/Pradhan/Wangchuk
+# at df50-82), so its same-development articles — sharing only those — never merged and
+# the story shattered into dozens of single-source events. Down-weight instead: require
+# >= ENTITY_MATCH_MIN_SHARED actors AND IDF weight >= ENTITY_MATCH_MIN_IDF, so two
+# unrelated events sharing only national magnets (low IDF) still don't merge while a
+# same-development cross-language retelling that shares a specific actor (Delhi Metro
+# df6 -> 0.167) does. The 0.45 embedding band is the outer guard against topic drift;
+# df is window-scoped (recently ubiquitous). Weak types (place/government) still excluded.
+ENTITY_MATCH_MIN_IDF = 0.15
+# Near-dup band: within this distance ONE IDF-strong actor is enough (two Hindi
+# retellings of "16 metro stations shut" sit at ~0.20 and share only "Delhi Metro");
+# in the looser 0.25-0.45 band require >=2, since a single shared actor there is more
+# likely coincidental.
+ENTITY_MATCH_NEAR_DISTANCE = 0.25
 ENTITY_MATCH_TYPES = ("person", "company", "organization")
 
 
@@ -157,17 +163,20 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
 async def _match_by_entities(
     session: AsyncSession, entity_slugs: list[str], embedding: list[float], published_at
 ) -> Match | None:
-    """Recent event sharing >=2 DISTINCTIVE canonical actors with this article and
-    within a looser embedding band — merges cross-language / translated retellings
-    that the near-dup embedding threshold misses. Ubiquitous actors (high document-
-    frequency) and weak types (place/government) don't count, so a shared national
-    politician can't snowball unrelated stories into one blob."""
+    """Recent event within the looser embedding band that shares enough IDF-weighted
+    canonical actors with this article — merges cross-language / translated retellings
+    the near-dup threshold misses. Actors are weighted 1/df, so a shared national magnet
+    counts for almost nothing (two unrelated events sharing only Modi/Congress won't
+    merge) while a specific actor carries a same-development retelling. Requires >=2
+    shared actors in the loose band, but only 1 when the embedding is itself near-dup
+    (<=0.25) — two Hindi retellings of the same event that share only "Delhi Metro".
+    Weak types (place/government) don't count."""
     vector_literal = "[" + ",".join(f"{v:.6f}" for v in embedding) + "]"
     result = await session.execute(
         text(
             f"""
-            WITH distinctive AS (
-                SELECT ent.id, ent.slug
+            WITH ent_df AS (
+                SELECT ent.id, count(DISTINCT ee.event_id)::float AS df
                 FROM entities ent
                 JOIN event_entities ee ON ee.entity_id = ent.id
                 JOIN events ev ON ev.id = ee.event_id
@@ -175,13 +184,12 @@ async def _match_by_entities(
                   AND ent.entity_type = ANY(:types)
                   AND (CAST(:published_at AS timestamptz) IS NULL
                        OR ev.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
-                GROUP BY ent.id, ent.slug
-                HAVING count(DISTINCT ee.event_id) <= :max_df
+                GROUP BY ent.id
             )
             SELECT e.id,
-                   count(DISTINCT d.slug) AS shared,
+                   sum(1.0 / d.df) AS idf,
                    (e.embedding <=> CAST(:vec AS vector)) AS dist
-            FROM distinctive d
+            FROM ent_df d
             JOIN event_entities ee ON ee.entity_id = d.id
             JOIN events e ON e.id = ee.event_id
             WHERE e.embedding IS NOT NULL
@@ -189,8 +197,13 @@ async def _match_by_entities(
               AND (CAST(:published_at AS timestamptz) IS NULL
                    OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
             GROUP BY e.id, e.embedding
-            HAVING count(DISTINCT d.slug) >= :min_shared
-            ORDER BY shared DESC, dist ASC
+            HAVING (
+                       count(DISTINCT d.id) >= :min_shared
+                       OR (count(DISTINCT d.id) >= 1
+                           AND min(e.embedding <=> CAST(:vec AS vector)) <= :near_dist)
+                   )
+                   AND sum(1.0 / d.df) >= :min_idf
+            ORDER BY idf DESC, dist ASC
             LIMIT 1
             """
         ),
@@ -198,9 +211,10 @@ async def _match_by_entities(
             "vec": vector_literal,
             "slugs": entity_slugs,
             "types": list(ENTITY_MATCH_TYPES),
-            "max_df": ENTITY_MATCH_MAX_DF,
+            "min_idf": ENTITY_MATCH_MIN_IDF,
             "dist_threshold": ENTITY_MATCH_LOOSE_DISTANCE,
             "min_shared": ENTITY_MATCH_MIN_SHARED,
+            "near_dist": ENTITY_MATCH_NEAR_DISTANCE,
             "published_at": published_at,
         },
     )

@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.52.0] - 2026-07-22
+
+### Fixed
+- Event clustering (`_match_by_entities`): the **same** df-cutoff bug as the story
+  timeline, one level lower. The `entity_overlap` merge tier excluded actors in
+  > 2 events (my own KSU over-merge fix), so a trending story's same-development
+  cross-language retellings — which share only that story's high-df core — never
+  merged into one event either, compounding the fragmentation before the timeline
+  even ran. Replaced the `df <= 2` cutoff with the same **IDF weighting** (`1/df`):
+  keep every shared actor, require `sum(1/df) ≥ 0.15` plus the ≥2-actor floor. A
+  shared national magnet (Google df49 → 0.02, CJP df82 → 0.01) contributes almost
+  nothing so unrelated events sharing only magnets still don't merge (KSU
+  re-validated: 12 unrelated Android CVEs sharing only "Google" stay separate),
+  while a specific actor carries a genuine retelling.
+- Event clustering: **near-dup single-actor tier**. In the near-dup embedding band
+  (≤ 0.25) one IDF-strong actor is now enough to merge — two Hindi retellings of
+  "16 Delhi Metro stations shut" sit at 0.20 distance but share only "Delhi Metro"
+  (the ≥2-actor floor was splitting them). Above 0.25 the ≥2-actor floor still
+  applies, since a lone shared actor there is more likely coincidental.
+
 ## [0.0.51.0] - 2026-07-22
 
 ### Fixed
