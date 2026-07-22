@@ -92,6 +92,15 @@ export function HeaderNav() {
         </Link>
       )}
       <ThemeToggle />
+      {!session && (
+        <Link
+          href="/onboarding"
+          className="hidden whitespace-nowrap rounded-full px-[18px] py-2 text-[13px] font-semibold transition hover:opacity-85 sm:inline-block"
+          style={{ background: "var(--ink)", color: "var(--bg)" }}
+        >
+          Get your feed
+        </Link>
+      )}
     </nav>
   );
 }

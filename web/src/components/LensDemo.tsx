@@ -30,7 +30,6 @@ export function LensDemo() {
   const [story, setStory] = useState<DemoStory>(CURATED);
   const [active, setActive] = useState("general");
   const [flipped, setFlipped] = useState(false);
-  const [live, setLive] = useState(false);
 
   useEffect(() => {
     // Look for a real story that already has 2+ cached briefs (never
@@ -43,7 +42,6 @@ export function LensDemo() {
           const briefs = detail.lens_briefs ?? {};
           if (Object.keys(briefs).length >= 2) {
             setStory({ id: item.id, title: detail.title, briefs });
-            setLive(true);
             return;
           }
         }
@@ -64,8 +62,8 @@ export function LensDemo() {
       style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
     >
       <div className="flex items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: "var(--line)" }}>
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
-          {live ? "Live story" : "Example story"}
+        <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--ink-faint)" }}>
+          Try it — flip the lens
         </span>
         <span className="spectrum-bar h-1 w-16 rounded-full" aria-hidden />
       </div>
@@ -103,7 +101,7 @@ export function LensDemo() {
           {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
         <p className="text-[15px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
           <span className="font-semibold" style={{ color: meta.color }}>
-            Through the {meta.name} lens —{" "}
+            Through the {meta.short} lens —{" "}
           </span>
           {brief}
         </p>
