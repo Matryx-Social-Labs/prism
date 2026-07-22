@@ -310,10 +310,11 @@ export function StoryView({ event }: { event: EventDetail }) {
                   role="tab"
                   aria-selected={selected}
                   onClick={() => {
-                    if (locked) {
-                      router.push("/signin");
-                      return;
-                    }
+                    // Locked pro lens: flip to it anyway. The re-typeset reveals the
+                    // inline "sign in to unlock" prompt in place (isLocked branch
+                    // below) — so a signed-out reader SEES the signature flip and
+                    // keeps their place on the story instead of a hard bounce to
+                    // /signin. No brief is fetched for a locked lens, so it stays free.
                     setFlipped(true);
                     setLens(slug);
                   }}
