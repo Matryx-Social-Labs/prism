@@ -22,6 +22,7 @@ dependencies = [
     "apscheduler>=3.10",
     "python-dateutil>=2.9",
     "structlog>=26.1.0",
+    "networkx>=3.3",  # story-timeline community detection (pure-Python, small graphs)
 ]
 
 [dependency-groups]
