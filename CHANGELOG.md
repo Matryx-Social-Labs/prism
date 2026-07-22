@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.53.0] - 2026-07-23
+
+### Fixed
+- Actor graph: deduplicate `event_entities` to one row per `(event_id, entity_id)`.
+  The unique key was `(event_id, entity_id, role)`, so the same entity could attach
+  to one event multiple times under different roles (subject/mentioned/affected) as
+  its member articles merged. The IDF-weighted actor-graph queries (`_match_by_entities`
+  clustering + story-timeline edges) `sum(1/df)` over those role-rows **and** multiply
+  seed-rows × neighbour-rows, so a duplicated actor inflated an edge weight N-fold —
+  over-weighting exactly the bridges community detection then failed to cut, leaking
+  unrelated stories into a trending story's timeline. Migration collapses to one row
+  per `(event_id, entity_id)` (prefers the `affected` role for cast ordering) and swaps
+  the unique constraint; the insert path now conflicts on `(event_id, entity_id)`.
+  Validated on a fresh local snapshot: 190 duplicate pairs removed; the CJP story
+  tightened from 23 → 20 developments. (Does not fully resolve mega-story over-grouping
+  — that is a magnet-actor / small-corpus effect needing a cross-sector-spread signal.)
+
 ## [0.0.52.0] - 2026-07-22
 
 ### Fixed

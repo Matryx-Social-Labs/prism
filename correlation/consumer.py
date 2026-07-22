@@ -232,7 +232,7 @@ async def _upsert_entities(session, event_id: uuid.UUID, entities: list[dict]) -
                 role=extracted.get("role", "affected"),
             )
             .on_conflict_do_nothing(
-                index_elements=["event_id", "entity_id", "role"]
+                index_elements=["event_id", "entity_id"]
             )
         )
         await session.execute(link)
