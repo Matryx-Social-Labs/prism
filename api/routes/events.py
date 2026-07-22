@@ -29,7 +29,7 @@ from common.db import get_db
 from common.lenses import LENSES
 from common.locks import single_flight
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
-from correlation.threads import fetch_thread, related_developments
+from correlation.threads import fetch_thread, related_developments, story_timeline
 
 router = APIRouter()
 
@@ -119,6 +119,10 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
     thread = await fetch_thread(event_id)
     related = await related_developments(event_id)
+    # Canonical story timeline (consistent across every development); added
+    # alongside thread+related so the current UI keeps working until the
+    # StoryTimeline component replaces both.
+    story = await story_timeline(event_id)
 
     projection = event["projection"] or {}
     return EventDetail(
@@ -141,6 +145,7 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         ],
         thread=thread,
         related=related,
+        story=story,
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),

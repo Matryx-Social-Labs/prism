@@ -3,6 +3,28 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.48.0] - 2026-07-22
+
+### Added
+- Canonical story timeline API (`story_timeline`, backend of a 2-PR feature). Story
+  pages showed a per-event "thread" (causal `event_links`) that collapsed from 6
+  nodes on a hub to 1 on a leaf, plus a "story so far" that leaked ubiquitous-actor
+  noise ("Trump tariffs" in the Iran-war story via the shared "Donald Trump"). Root
+  cause: no canonical story — each event computed its own neighborhood. Fix: the
+  story is the connected component over **strong** edges — two events linked iff
+  they share ≥2 **distinctive** actors (person/org with document-frequency < 15;
+  calibrated on live data where a story's own core sits at df≤10 and cross-story
+  magnets are df≥20). Transitive, so a leaf reaches the whole story via its hub;
+  magnet-only links (two stories sharing just "Trump") aren't edges, so unrelated
+  stories stay out. Every development yields the identical component → one
+  consistent timeline. Validated on the live Iran story: a clean 10-development
+  Middle-East arc, no tariff noise. On-read + Redis-cached (fail-open, 5-min TTL);
+  bounded BFS (size 24, depth 4). Chosen over on-read Louvain after live validation
+  showed the strong-edge component is enough — Louvain stays a documented refinement
+  if closely-related sub-stories (Iran war vs Lebanon peace) need splitting.
+  Added to `EventDetail.story` **alongside** `thread`+`related` so the current UI is
+  untouched; PR 2 swaps the frontend to one `StoryTimeline` and drops the old fields.
+
 ## [0.0.47.0] - 2026-07-22
 
 ### Fixed

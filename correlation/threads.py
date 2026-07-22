@@ -7,6 +7,7 @@ LLM call confirms/rejects; every verdict — including rejections — persists
 to event_links so a pair is never asked twice.
 """
 
+import json
 import uuid
 
 from sqlalchemy import text
@@ -309,3 +310,169 @@ async def fetch_thread(event_id: uuid.UUID) -> dict:
     # Related context rides above the chain (no causal position of its own).
     upstream = [format_thread_node(r) for r in related] + upstream
     return {"upstream": upstream, "downstream": downstream}
+
+
+# ── Canonical story timeline ────────────────────────────────────────────────
+# One consistent timeline shown on EVERY development of a story, so navigating
+# between developments no longer collapses the view (a hub had 6 links, a leaf
+# had 1). The story is the connected component over "strong" edges — two events
+# linked iff they share >= STORY_MIN_SHARED DISTINCTIVE actors (person/org with
+# document-frequency < STORY_DF_CAP). Transitivity means a leaf reaches the whole
+# story via its hub; the strong-edge rule means a magnet-only link (two stories
+# sharing just "Donald Trump", df 41) is NOT an edge, so unrelated stories (a
+# tariff story) stay out. Calibrated on live data: a story's own core actors sit
+# at df<=10 (Houthis 10, Rubio 9) while cross-story magnets are df>=20.
+#
+#   leaf B ──strong── hub A ──strong── {Hormuz, tankers, Momeni, ...}   ← one story
+#      │
+#   (only "Trump", df41 → NOT strong) ── tariff story                   ← excluded
+#
+# ponytail: bounded per-node BFS + a 5-min cache; fold into one recursive CTE and
+# graduate to Louvain if closely-related sub-stories (Iran war vs Lebanon peace)
+# need splitting.
+STORY_DF_CAP = 15
+STORY_MIN_SHARED = 2
+STORY_SIZE_CAP = 24
+STORY_DEPTH_CAP = 4
+STORY_CACHE_TTL = 300  # seconds — the component drifts slowly; brief staleness is fine
+
+_STRONG_NEIGHBOURS_SQL = text(
+    f"""
+    WITH df AS (
+        SELECT ee.entity_id, count(DISTINCT ee.event_id) AS d
+        FROM event_entities ee
+        JOIN events ev ON ev.id = ee.event_id
+                      AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+        GROUP BY ee.entity_id
+    )
+    SELECT e.id
+    FROM event_entities ee1
+    JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
+    JOIN df ON df.entity_id = ee1.entity_id AND df.d < {STORY_DF_CAP}
+    JOIN event_entities ee2 ON ee2.entity_id = ee1.entity_id AND ee2.event_id <> ee1.event_id
+    JOIN events e ON e.id = ee2.event_id
+                 AND e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+    WHERE ee1.event_id = :eid
+    GROUP BY e.id
+    HAVING count(DISTINCT ee1.entity_id) >= {STORY_MIN_SHARED}
+    """
+)
+
+
+async def _story_component(session, seed: uuid.UUID) -> set[str]:
+    """Bounded connected component of the seed over strong edges."""
+    seen: set[str] = {str(seed)}
+    frontier: set[str] = {str(seed)}
+    depth = 0
+    while frontier and len(seen) < STORY_SIZE_CAP and depth < STORY_DEPTH_CAP:
+        nxt: set[str] = set()
+        for eid in frontier:
+            rows = (await session.execute(_STRONG_NEIGHBOURS_SQL, {"eid": eid})).scalars().all()
+            for rid in rows:
+                rid = str(rid)
+                if rid not in seen:
+                    seen.add(rid)
+                    nxt.add(rid)
+                if len(seen) >= STORY_SIZE_CAP:
+                    break
+        frontier = nxt
+        depth += 1
+    return seen
+
+
+async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
+    events = (
+        await session.execute(
+            text(
+                """
+                SELECT e.id, e.title, e.sector, e.occurred_at, e.last_updated_at, e.image_url
+                FROM events e WHERE e.id = ANY(CAST(:ids AS uuid[]))
+                """
+            ),
+            {"ids": ids},
+        )
+    ).mappings().all()
+    # Causal "why" notes: confident leads_to links between two story members.
+    links = (
+        await session.execute(
+            text(
+                """
+                SELECT to_event_id, rationale FROM event_links
+                WHERE relation = 'leads_to' AND COALESCE(confidence, 1.0) >= 0.55
+                  AND from_event_id = ANY(CAST(:ids AS uuid[]))
+                  AND to_event_id = ANY(CAST(:ids AS uuid[]))
+                """
+            ),
+            {"ids": ids},
+        )
+    ).mappings().all()
+    why = {str(row["to_event_id"]): row["rationale"] for row in links if row["rationale"]}
+    # Cast: the recurring distinctive actors that bind the story.
+    cast = (
+        await session.execute(
+            text(
+                f"""
+                WITH df AS (
+                    SELECT ee.entity_id, count(DISTINCT ee.event_id) AS d FROM event_entities ee
+                    JOIN events ev ON ev.id = ee.event_id
+                                  AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                    GROUP BY ee.entity_id
+                )
+                SELECT ent.name, count(DISTINCT ee.event_id) AS n
+                FROM event_entities ee
+                JOIN entities ent ON ent.id = ee.entity_id AND ent.entity_type IN ('person', 'organization')
+                JOIN df ON df.entity_id = ee.entity_id AND df.d < {STORY_DF_CAP}
+                WHERE ee.event_id = ANY(CAST(:ids AS uuid[]))
+                GROUP BY ent.name HAVING count(DISTINCT ee.event_id) >= 2
+                ORDER BY n DESC LIMIT 8
+                """
+            ),
+            {"ids": ids},
+        )
+    ).mappings().all()
+    developments = sorted(
+        (
+            {
+                "id": str(e["id"]),
+                "title": e["title"],
+                "sector": e["sector"],
+                "occurred_at": (e["occurred_at"] or e["last_updated_at"]).isoformat()
+                if (e["occurred_at"] or e["last_updated_at"])
+                else None,
+                "image_url": e["image_url"],
+                "is_current": str(e["id"]) == str(seed),
+                "why": why.get(str(e["id"])),
+            }
+            for e in events
+        ),
+        key=lambda d: d["occurred_at"] or "",
+    )
+    return {"developments": developments, "cast": [c["name"] for c in cast]}
+
+
+async def story_timeline(event_id: uuid.UUID) -> dict:
+    """The canonical, consistent timeline for the story this event belongs to:
+    every development in the connected component, chronological, with the current
+    event marked and causal 'why' notes on the edges that event_links confirms.
+    Cached (fail-open) since every member computes the identical component."""
+    from common.stream import get_redis
+
+    ckey = f"story_timeline:{event_id}"
+    try:
+        redis = get_redis()
+        cached = await redis.get(ckey)
+        if cached:
+            return json.loads(cached)
+    except Exception:  # noqa: BLE001 — cache is best-effort; compute on any miss/error
+        redis = None
+
+    async with session_scope() as session:
+        ids = list(await _story_component(session, event_id))
+        result = await _assemble_timeline(session, event_id, ids)
+
+    if redis is not None:
+        try:
+            await redis.set(ckey, json.dumps(result), ex=STORY_CACHE_TTL)
+        except Exception:  # noqa: BLE001
+            pass
+    return result
