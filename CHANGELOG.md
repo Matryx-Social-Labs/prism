@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.49.0] - 2026-07-22
+
+### Changed
+- Unified story timeline UI (PR 2 of 2). Replaced the story page's two per-event
+  sections — "The thread" (causal `event_links`, collapsed 6→1 hub-to-leaf) and
+  "The story so far" (actor branches, noisy) — with **one** `StoryTimeline` that
+  renders the canonical `event.story` component from v0.0.48.0: every development of
+  a story now shows the **same** chronological arc, with "you are here" on the
+  current one and the causal "why" folded inline as a `↳` note under the development
+  it explains. Same DESIGN.md treatment (monochrome, IBM Plex Mono dates, hairline
+  rule, reveal-on-scroll). Deleted `ThreadRail.tsx` + `StoryTrail.tsx`.
+  Follow-up (PR 3): drop the now-unused `thread`+`related` API fields and their
+  `fetch_thread`/`related_developments` computation.
+
 ## [0.0.48.0] - 2026-07-22
 
 ### Added

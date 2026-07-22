@@ -107,6 +107,20 @@ export interface FinanceLens {
   price_impact?: { direction?: string; magnitude?: string; confidence?: number };
 }
 
+export interface StoryDevelopment {
+  id: string;
+  title: string;
+  sector: string | null;
+  occurred_at: string | null;
+  image_url: string | null;
+  is_current: boolean;
+  why: string | null;
+}
+export interface StoryTimelineData {
+  developments: StoryDevelopment[];
+  cast: string[];
+}
+
 export interface EventDetail {
   id: string;
   title: string;
@@ -124,6 +138,7 @@ export interface EventDetail {
   entities: EntityOut[];
   thread: { upstream: ThreadNodeOut[]; downstream: ThreadNodeOut[] };
   related: { id: string; title: string; last_updated_at: string; shared: number }[];
+  story: StoryTimelineData;
   projection: {
     event_type?: string | null;
     source_count?: number;

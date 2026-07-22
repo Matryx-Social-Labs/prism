@@ -12,8 +12,7 @@ import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
-import { ThreadRail } from "@/components/ThreadRail";
-import { StoryTrail } from "@/components/StoryTrail";
+import { StoryTimeline } from "@/components/StoryTimeline";
 
 function regionName(code: string): string {
   try {
@@ -554,17 +553,8 @@ export function StoryView({ event }: { event: EventDetail }) {
         )}
       </section>
 
-      {/* ── The thread ─────────────────────────────────────── */}
-      <ThreadRail thread={event.thread} currentTitle={event.title} />
-
-      {/* ── The story so far — trail of developments (branches) ── */}
-      <StoryTrail
-        currentId={event.id}
-        currentTitle={event.title}
-        currentUpdatedAt={event.last_updated_at}
-        related={event.related ?? []}
-        entities={event.entities}
-      />
+      {/* ── The story so far — one canonical, consistent timeline ── */}
+      <StoryTimeline story={event.story} />
 
       {/* ── What to expect ─────────────────────────────────── */}
       <section className="mt-11">
