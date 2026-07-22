@@ -29,10 +29,15 @@ class Settings(BaseSettings):
     # product sells. All near-free at India-only volume.
     prism_model_gate: str = "google/gemini-3.1-flash-lite"  # binary relevance — high volume
     prism_model_classify: str = "google/gemini-3.1-flash-lite"
-    # Extraction emits a nested JSON (entities/stance/cyber/finance) — the
-    # cheapest model truncates/malforms it, so use the reliable-JSON model here.
-    prism_model_extract: str = "qwen/qwen3.7-plus"
-    prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
+    # Extraction emits a nested JSON (entities/stance/cyber/finance). Entities drive
+    # clustering, so the model MUST reliably fill them. Benchmarked on 25 real India
+    # articles (recall vs qwen3.7-plus): gemini-3.1-flash-lite left 40% empty (recall
+    # 0.39), gemini-3.5-flash 96% empty (0.08), deepseek-v4-flash 25% empty + truncation.
+    # qwen3.5-flash is the cheapest that stays reliable — 0 empty, ~0.77 recall — at
+    # ~4.7x lower cost than qwen3.7-plus ($0.07/$0.26 vs $0.32/$1.28 per M). Soft-news
+    # (extract_light) uses it too: gemini-flash-lite was silently emitting no entities.
+    prism_model_extract: str = "qwen/qwen3.5-flash-02-23"
+    prism_model_extract_light: str = "qwen/qwen3.5-flash-02-23"
     prism_model_correlate: str = "qwen/qwen3.7-plus"  # analysis/briefs/digest — content quality
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning

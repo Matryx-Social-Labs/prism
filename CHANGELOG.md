@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.44.0] - 2026-07-22
+
+### Changed
+- Extraction moved to a ~4.7× cheaper model. Extraction is ~66% of LLM spend
+  (Langfuse: $4.87 of $6.50 in a day) — all on `qwen/qwen3.7-plus` ($0.32/$1.28 per
+  M). Benchmarked cheaper models on 25 real India articles for entity reliability
+  (entities drive clustering): gemini-3.1-flash-lite left **40% of articles with no
+  entities** (recall 0.39), gemini-3.5-flash 96% empty, deepseek-v4-flash 25% empty +
+  truncation — all unusable. **`qwen/qwen3.5-flash-02-23`** ($0.07/$0.26 per M) was
+  the cheapest that stayed reliable: **0 empty, ~0.77 recall** vs qwen3.7-plus.
+  Switched `prism_model_extract` and `prism_model_extract_light` to it (soft-news was
+  on gemini-flash-lite, silently emitting no entities → those sectors couldn't cluster
+  by entity). Projected: extraction ~$4.87/day → ~$1.0/day; total ~$6.5 → ~$2.6/day.
+  Trade-off: ~23% fewer *peripheral* entities than qwen-plus; principal actors (the
+  clustering signal) are retained. Analysis/brief/agent stay on qwen3.7-plus (quality,
+  low volume). No code path change — config only.
+
 ## [0.0.43.0] - 2026-07-21
 
 ### Fixed
