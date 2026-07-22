@@ -224,6 +224,76 @@ export async function fetchTaxonomy(): Promise<TaxonomySector[]> {
   return data.sectors;
 }
 
+export interface ProfessionOption {
+  slug: string;
+  label: string;
+  lens: string; // one of general | cyber_grc | finance_trader
+  interests: string[]; // default interest sector slugs
+}
+
+export interface ProfessionGroup {
+  group: string;
+  options: ProfessionOption[];
+}
+
+// Mirror of common/professions.py lens + interest mapping. /api/v1/professions
+// currently returns only {slug,label}, so onboarding's lens/interest auto-map
+// lives here. ponytail: duplicated table — delete once grouped() emits
+// lens+interests (fetchProfessions already prefers API-provided values).
+const PROFESSION_META: Record<string, { lens: string; interests: string[] }> = {
+  trader: { lens: "finance_trader", interests: ["finance"] },
+  investor: { lens: "finance_trader", interests: ["finance", "business"] },
+  financial_analyst: { lens: "finance_trader", interests: ["finance", "business"] },
+  banker: { lens: "finance_trader", interests: ["finance"] },
+  wealth_advisor: { lens: "finance_trader", interests: ["finance"] },
+  accountant: { lens: "finance_trader", interests: ["finance", "business"] },
+  security_analyst: { lens: "cyber_grc", interests: ["cybersecurity"] },
+  ciso: { lens: "cyber_grc", interests: ["cybersecurity"] },
+  grc: { lens: "cyber_grc", interests: ["cybersecurity"] },
+  it_admin: { lens: "cyber_grc", interests: ["cybersecurity", "technology"] },
+  pentester: { lens: "cyber_grc", interests: ["cybersecurity"] },
+  devsecops: { lens: "cyber_grc", interests: ["cybersecurity", "technology"] },
+  software_engineer: { lens: "general", interests: ["technology"] },
+  product_manager: { lens: "general", interests: ["technology", "business"] },
+  data_scientist: { lens: "general", interests: ["technology"] },
+  designer: { lens: "general", interests: ["technology"] },
+  tech_founder: { lens: "general", interests: ["technology", "business", "finance"] },
+  policy_analyst: { lens: "general", interests: ["politics"] },
+  civil_servant: { lens: "general", interests: ["politics"] },
+  lawyer: { lens: "general", interests: ["politics", "business"] },
+  journalist: { lens: "general", interests: ["politics", "business"] },
+  diplomat: { lens: "general", interests: ["politics"] },
+  executive: { lens: "finance_trader", interests: ["business", "finance"] },
+  consultant: { lens: "general", interests: ["business", "finance"] },
+  entrepreneur: { lens: "general", interests: ["business", "finance"] },
+  marketer: { lens: "general", interests: ["business"] },
+  operations: { lens: "general", interests: ["business"] },
+  healthcare: { lens: "general", interests: ["health"] },
+  researcher: { lens: "general", interests: ["science"] },
+  pharma_biotech: { lens: "general", interests: ["health", "science", "business"] },
+  student: { lens: "general", interests: [] },
+  educator: { lens: "general", interests: [] },
+  other: { lens: "general", interests: [] },
+};
+
+/** Grouped profession vocabulary for onboarding, enriched with lens + interests. */
+export async function fetchProfessions(): Promise<ProfessionGroup[]> {
+  const res = await fetch(`${API_URL}/api/v1/professions`, { next: { revalidate: 3600 } });
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    groups: { group: string; options: { slug: string; label: string; lens?: string; interests?: string[] }[] }[];
+  };
+  return data.groups.map((g) => ({
+    group: g.group,
+    options: g.options.map((o) => ({
+      slug: o.slug,
+      label: o.label,
+      lens: o.lens ?? PROFESSION_META[o.slug]?.lens ?? "general",
+      interests: o.interests ?? PROFESSION_META[o.slug]?.interests ?? [],
+    })),
+  }));
+}
+
 export async function fetchLenses(): Promise<LensInfo[]> {
   const res = await fetch(`${API_URL}/api/v1/lenses`, { next: { revalidate: 3600 } });
   if (!res.ok) return [];

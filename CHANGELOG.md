@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.54.0] - 2026-07-23
+
+### Changed
+- Mobile-first design refresh (v2). New mobile-only `BottomTabBar` (Feed / Pulse /
+  Search / Saved) for app-like navigation on the core browsing routes, hidden on
+  desktop (lg+) and on marketing/flow/story routes. Onboarding gains a profession
+  picker backed by `fetchProfessions()` (`/api/v1/professions`). Refreshed landing,
+  feed, sector, onboarding, StoryView, AskPanel, HeaderNav, PrismMark, LensDemo, and
+  BriefPlayer. Frontend-only; deploys to Vercel on merge.
+
 ## [0.0.53.0] - 2026-07-23
 
 ### Fixed

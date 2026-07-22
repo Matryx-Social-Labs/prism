@@ -23,12 +23,16 @@ export function AskPanel({
   eventId,
   sourceCount,
   suggestedQuestions,
+  docked = false,
 }: {
   eventId: string;
   sourceCount: number;
   suggestedQuestions: string[];
+  // docked: render inline (in the story rail) instead of a floating pill — no
+  // fixed positioning, always open, and the rail card supplies the header.
+  docked?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(docked);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,7 +79,7 @@ export function AskPanel({
   const thinking = busy && turns.length > 0 && turns[turns.length - 1].text === "";
 
   return (
-    <div className="fixed bottom-[18px] right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)]">
+    <div className={docked ? "w-full" : "fixed bottom-[18px] right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)]"}>
       {!open ? (
         <button
           onClick={() => setOpen(true)}
@@ -94,31 +98,46 @@ export function AskPanel({
         </button>
       ) : (
         <div
-          className="flex flex-col overflow-hidden rounded-[20px] border"
-          style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}
+          className={`flex flex-col overflow-hidden ${docked ? "" : "rounded-[20px] border"}`}
+          style={
+            docked
+              ? undefined
+              : { borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }
+          }
         >
-          <div className="flex items-center gap-2.5 border-b px-[18px] py-3.5" style={{ borderColor: "var(--line)" }}>
-            <span className="spectrum-text text-base" aria-hidden>
-              ◮
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Ask this story</p>
-              <p className="text-[11px]" style={{ color: "var(--ink-faint)" }}>
-                Answers only from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"} — with
-                citations.
-              </p>
+          {!docked && (
+            <div className="flex items-center gap-2.5 border-b px-[18px] py-3.5" style={{ borderColor: "var(--line)" }}>
+              <span className="spectrum-text text-base" aria-hidden>
+                ◮
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Ask this story</p>
+                <p className="text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                  Answers only from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"} — with
+                  citations.
+                </p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="px-1.5 py-0.5 text-base"
+                style={{ color: "var(--ink-faint)" }}
+              >
+                ✕
+              </button>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="Close"
-              className="px-1.5 py-0.5 text-base"
-              style={{ color: "var(--ink-faint)" }}
-            >
-              ✕
-            </button>
-          </div>
+          )}
 
-          <div ref={scrollRef} className="flex max-h-80 flex-col gap-3.5 overflow-y-auto px-[18px] py-4">
+          <div
+            ref={scrollRef}
+            className={`flex flex-col gap-3.5 overflow-y-auto ${docked ? "max-h-64 px-4 pt-3" : "max-h-80 px-[18px] py-4"}`}
+          >
+            {docked && turns.length === 0 && (
+              <p className="text-[12px] leading-[1.55]" style={{ color: "var(--ink-faint)" }}>
+                Ask anything about this story — every answer cites this story&apos;s own sources, or
+                says it can&apos;t.
+              </p>
+            )}
             {turns.map((t, i) =>
               t.role === "u" ? (
                 <div key={i} className="max-w-[85%] self-end">
@@ -177,7 +196,7 @@ export function AskPanel({
             )}
           </div>
 
-          <div className="flex flex-wrap gap-1.5 px-[18px] pb-3">
+          <div className={`flex flex-wrap gap-1.5 pb-3 ${docked ? "px-4 pt-3" : "px-[18px]"}`}>
             {suggestedQuestions.map((q) => (
               <button
                 key={q}
@@ -190,7 +209,7 @@ export function AskPanel({
             ))}
           </div>
 
-          <div className="flex gap-2 border-t px-[18px] pb-4 pt-3" style={{ borderColor: "var(--line)" }}>
+          <div className={`flex gap-2 border-t pt-3 ${docked ? "px-4 pb-4" : "px-[18px] pb-4"}`} style={{ borderColor: "var(--line)" }}>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}

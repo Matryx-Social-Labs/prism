@@ -155,12 +155,52 @@ export function StoryView({ event }: { event: EventDetail }) {
       ? `No ${regionName(myRegion)} outlet has covered this yet.`
       : null;
 
+  // ── "On this story" section nav ────────────────────────
+  const sourceCount = event.sources.length;
+  const storyCount = event.story.developments.filter((d) => !d.is_current).length;
+  const balanceText = event.coverage?.single_origin
+    ? "⚠ Single-origin — one perspective only."
+    : coverageEntries.length > 0
+      ? `Balanced coverage — ${coverageEntries.length} origin${coverageEntries.length === 1 ? "" : "s"}, no blindspot flag.`
+      : null;
+  const navItems: { id: string; label: string; count?: number }[] = [
+    { id: "lens-brief", label: "Lens brief" },
+    { id: "perspectives", label: "Perspectives", count: event.perspectives.length },
+    ...(storyCount > 0 ? [{ id: "story-so-far", label: "The story so far", count: storyCount }] : []),
+    { id: "what-to-expect", label: "What to expect", count: event.impacts.length },
+    { id: "sources", label: "Sources", count: sourceCount },
+  ];
+
+  // Lightweight scroll-spy so the rail nav + mobile chips highlight the section
+  // in view. Anchors still jump on click; this only drives the active border.
+  const [activeSection, setActiveSection] = useState("lens-brief");
+  useEffect(() => {
+    const els = navItems
+      .map((n) => document.getElementById(n.id))
+      .filter((el): el is HTMLElement => el != null);
+    if (els.length === 0) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActiveSection(visible[0].target.id);
+      },
+      { rootMargin: "-15% 0px -75% 0px" }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event.id, storyCount]);
+
   return (
-    <article className="mx-auto max-w-[880px] px-5 pb-[120px] pt-7 sm:px-8">
+    <div className="mx-auto max-w-[1240px] px-5 pb-[120px] pt-7 sm:px-8">
       <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
 
+      <div className="grid gap-10 lg:grid-cols-[1fr_300px] lg:items-start">
+        <article>
       {/* ── Header ─────────────────────────────────────────── */}
       <header>
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -267,31 +307,35 @@ export function StoryView({ event }: { event: EventDetail }) {
           </div>
         )}
 
-        {coverageEntries.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-              Coverage
-            </span>
-            {coverageEntries.map(([iso, n]) => (
-              <Chip key={iso} mono>
-                {regionName(iso)} × {n}
-              </Chip>
-            ))}
-            {event.coverage?.single_origin && (
-              <Chip>⚠ Single-origin coverage</Chip>
-            )}
-          </div>
-        )}
-        {gapText && (
-          <p className="mt-3 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
-            ◉ {gapText}
-          </p>
-        )}
       </header>
+
+      {/* ── Mobile section nav — sticky anchor chips ────────── */}
+      <nav
+        className="sticky top-0 z-20 -mx-5 mt-5 flex gap-1.5 overflow-x-auto border-b px-5 py-2.5 sm:-mx-8 sm:px-8 lg:hidden"
+        style={{ borderColor: "var(--line)", background: "var(--bg)" }}
+        aria-label="On this story"
+      >
+        {navItems.map((n) => (
+          <a
+            key={n.id}
+            href={`#${n.id}`}
+            className="flex-none rounded-full px-3 py-1.5 text-[11px] font-semibold"
+            style={
+              activeSection === n.id
+                ? { background: "var(--bg-sunken)", color: "var(--ink)" }
+                : { color: "var(--ink-muted)" }
+            }
+          >
+            {n.label}
+            {n.count != null && <span className="ml-1 font-mono text-[10px]" style={{ color: "var(--ink-faint)" }}>{n.count}</span>}
+          </a>
+        ))}
+      </nav>
 
       {/* ── Lens block — the product moment ─────────────────── */}
       <section
-        className="mt-9 overflow-hidden rounded-[18px] border"
+        id="lens-brief"
+        className="mt-9 scroll-mt-24 overflow-hidden rounded-[18px] border"
         style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
       >
         <div className="overflow-x-auto border-b" style={{ borderColor: "var(--line)" }}>
@@ -331,7 +375,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                       <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2.2" />
                     </svg>
                   )}
-                  {m.name}
+                  {m.short}
                 </button>
               );
             })}
@@ -501,7 +545,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       </section>
 
       {/* ── Perspectives ─────────────────────────────────────── */}
-      <section className="mt-11">
+      <section id="perspectives" className="mt-11 scroll-mt-24">
         <SectionTitle
           title="Perspectives"
           hint="The story's competing narratives, side by side — grouped by stance, with every outlet's origin and affiliation visible."
@@ -554,10 +598,12 @@ export function StoryView({ event }: { event: EventDetail }) {
       </section>
 
       {/* ── The story so far — one canonical, consistent timeline ── */}
-      <StoryTimeline story={event.story} />
+      <div id="story-so-far" className="scroll-mt-24">
+        <StoryTimeline story={event.story} />
+      </div>
 
       {/* ── What to expect ─────────────────────────────────── */}
-      <section className="mt-11">
+      <section id="what-to-expect" className="mt-11 scroll-mt-24">
         <SectionTitle
           title="What to expect"
           hint="First-order impacts with their likely second-order effects — direction and horizon per node."
@@ -596,7 +642,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       </section>
 
       {/* ── Sources ────────────────────────────────────────── */}
-      <section className="mt-11">
+      <section id="sources" className="mt-11 scroll-mt-24">
         <h2 className="mb-4 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
           Sources{" "}
           <span className="text-[15px] font-normal" style={{ color: "var(--ink-faint)" }}>
@@ -635,9 +681,111 @@ export function StoryView({ event }: { event: EventDetail }) {
           ))}
         </ul>
       </section>
+        </article>
 
-      {/* ── Ask — floating agent ───────────────────────────── */}
-      <AskPanel eventId={event.id} sourceCount={event.sources.length} suggestedQuestions={questions} />
-    </article>
+        {/* ── Right rail — desktop only ─────────────────────── */}
+        <aside className="sticky top-16 hidden flex-col gap-3.5 lg:flex">
+          {/* On this story */}
+          <div
+            className="rounded-[18px] border px-[18px] py-4"
+            style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
+          >
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+              On this story
+            </span>
+            <div className="mt-2.5 flex flex-col gap-px">
+              {navItems.map((n) => {
+                const active = activeSection === n.id;
+                return (
+                  <a
+                    key={n.id}
+                    href={`#${n.id}`}
+                    className="px-3 py-1.5 text-[13px] no-underline"
+                    style={{
+                      borderLeft: `2px solid ${active ? "var(--ink)" : "var(--line)"}`,
+                      fontWeight: active ? 600 : 500,
+                      color: active ? "var(--ink)" : "var(--ink-muted)",
+                    }}
+                  >
+                    {n.label}
+                    {n.count != null && (
+                      <span className="ml-1.5 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+                        {n.count}
+                      </span>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Coverage */}
+          {coverageEntries.length > 0 && (
+            <div
+              className="rounded-[18px] border px-[18px] py-4"
+              style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
+            >
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+                Coverage
+              </span>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {coverageEntries.map(([iso, n]) => (
+                  <Chip key={iso} mono>
+                    {regionName(iso)} × {n}
+                  </Chip>
+                ))}
+              </div>
+              {balanceText && (
+                <p className="mt-2.5 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+                  {balanceText}
+                </p>
+              )}
+              {gapText && (
+                <p className="mt-1.5 text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                  ◉ {gapText}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Ask Prism — docked (real AskPanel, un-floated into the rail) */}
+          <div
+            className="overflow-hidden rounded-[18px] border"
+            style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
+          >
+            <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-full border"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <span className="spectrum-text text-[12px]" aria-hidden>
+                  ◮
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13.5px] font-semibold">
+                  Ask Prism
+                  <span
+                    className="ml-1.5 rounded-full border px-[7px] py-px font-mono text-[9px] uppercase tracking-wide"
+                    style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+                  >
+                    AI
+                  </span>
+                </p>
+                <p className="text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+                  Answers from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"} only
+                </p>
+              </div>
+            </div>
+            <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} docked />
+          </div>
+        </aside>
+      </div>
+
+      {/* ── Ask — floating pill (mobile) ────────────────────── */}
+      <div className="lg:hidden">
+        <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} />
+      </div>
+    </div>
   );
 }

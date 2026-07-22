@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { HeaderNav } from "@/components/HeaderNav";
 import { PrismMark } from "@/components/PrismMark";
 import { SITE_URL } from "@/lib/site";
@@ -85,6 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="w-full flex-1">{children}</main>
+        <BottomTabBar />
         <footer className="mt-auto border-t" style={{ borderColor: "var(--line)" }}>
           <div
             className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
