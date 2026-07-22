@@ -205,7 +205,7 @@ class Entity(TimestampMixin, Base):
 class EventEntity(TimestampMixin, Base):
     __tablename__ = "event_entities"
     __table_args__ = (
-        UniqueConstraint("event_id", "entity_id", "role", name="uq_event_entities_event_entity_role"),
+        UniqueConstraint("event_id", "entity_id", name="uq_event_entities_event_entity"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
