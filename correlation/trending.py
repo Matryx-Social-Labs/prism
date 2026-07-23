@@ -52,6 +52,24 @@ def _overlap(a: set[str], b: set[str]) -> float:
     return len(a & b) / min(len(a), len(b))
 
 
+def _cast_jaccard(a: list[str], b: list[str]) -> float:
+    """Overlap of two casts. A community's protagonists are STABLE even when the
+    member set isn't — story_timeline's 30-event BFS cap gives different 30-subsets
+    of a huge cluster (all of CJP) per seed, so member-overlap alone splits one story
+    into many. Cast identity fixes that: same protagonists → same story."""
+    sa, sb = set(a), set(b)
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
+CAST_SAME_STORY = 0.5  # cast Jaccard at/above which two communities are the same story
+
+
+def _same_story(members_a: set[str], cast_a: list[str], members_b: set[str], cast_b: list[str]) -> bool:
+    return _overlap(members_a, members_b) >= OVERLAP_THRESHOLD or _cast_jaccard(cast_a, cast_b) >= CAST_SAME_STORY
+
+
 async def _candidate_events(session: AsyncSession) -> list[dict]:
     """Recent news events ranked by trending signal. Velocity = DISTINCT NEWS source
     slugs added in the window (not raw membership rows — a backfill or one chatty source
@@ -163,17 +181,19 @@ async def detect_trending_communities(session: AsyncSession) -> list[dict]:
     Ordered by aggregate signal (recent sources × 2 + total sources) descending."""
     candidates = await _candidate_events(session)
     communities: list[dict] = []
-    covered: list[set[str]] = []  # member-sets already claimed by a higher-ranked community
+    covered: list[dict] = []  # {members, cast} already claimed by a higher-ranked candidate
     for cand in candidates:
         members = await _story_component(session, uuid.UUID(cand["id"]))
         mset = {str(m) for m in members}
-        if any(_overlap(mset, c) >= OVERLAP_THRESHOLD for c in covered):
-            continue  # same story as a higher-ranked candidate
         facts = await _community_facts(session, list(mset))
+        # Same story as a higher-ranked candidate? Member OR cast overlap (cast catches
+        # the size-capped-subset case where member sets diverge but protagonists don't).
+        if any(_same_story(mset, facts["cast"], c["members"], c["cast"]) for c in covered):
+            continue
         # min-support: a real story, not a transient blip.
         if facts["total_sources"] < MIN_SUPPORT_SOURCES or len(mset) < MIN_SUPPORT_MEMBERS:
             continue
-        covered.append(mset)
+        covered.append({"members": mset, "cast": facts["cast"]})
         communities.append({"member_ids": sorted(mset), **facts})
     communities.sort(key=lambda c: c["recent_sources"] * 2 + c["total_sources"], reverse=True)
     return communities
@@ -241,32 +261,39 @@ async def reconcile_stories(session: AsyncSession) -> int:
     communities = await detect_trending_communities(session)
     rows = (
         await session.execute(
-            text("SELECT id, member_event_ids, first_seen_at FROM stories WHERE merged_into IS NULL")
+            text('SELECT id, member_event_ids, "cast", first_seen_at FROM stories WHERE merged_into IS NULL')
         )
     ).mappings().all()
     stories = {
-        str(r["id"]): {"members": {str(m) for m in (r["member_event_ids"] or [])}, "first": r["first_seen_at"]}
+        str(r["id"]): {
+            "members": {str(m) for m in (r["member_event_ids"] or [])},
+            "cast": r["cast"] or [],
+            "first": r["first_seen_at"],
+        }
         for r in rows
     }
     claimed: set[str] = set()
     seen: set[str] = set()
     for c in communities:
         cmembers = set(c["member_ids"])
+        ccast = c["cast"]
         matches = [
             sid for sid, s in stories.items()
-            if sid not in claimed and _overlap(cmembers, s["members"]) >= OVERLAP_THRESHOLD
+            if sid not in claimed and _same_story(cmembers, ccast, s["members"], s["cast"])
         ]
         if not matches:
             sid = await _create_story(session, c)
-            stories[sid] = {"members": cmembers, "first": None}
+            stories[sid] = {"members": cmembers, "cast": ccast, "first": None}
         elif len(matches) == 1:
             sid = matches[0]
             await _update_story(session, sid, c)
             stories[sid]["members"] = cmembers
+            stories[sid]["cast"] = ccast
         else:  # MERGE: oldest survives; younger point at it and go dormant → their URL 301s
             canonical = min(matches, key=lambda x: (stories[x]["first"] or _MAX_TS))
             await _update_story(session, canonical, c)
             stories[canonical]["members"] = cmembers
+            stories[canonical]["cast"] = ccast
             for other in matches:
                 if other == canonical:
                     continue
