@@ -194,7 +194,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   }, [event.id, storyCount]);
 
   return (
-    <div className="mx-auto max-w-[1320px] px-5 pb-[120px] pt-7 sm:px-8 xl:px-10">
+    <div className="mx-auto max-w-[1280px] px-5 pb-[120px] pt-7 sm:px-8 xl:px-10">
       <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>

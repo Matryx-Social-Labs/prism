@@ -100,6 +100,13 @@
   --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 48px -16px rgb(0 0 0 / 0.6);
 }
 
+/* Always reserve the vertical-scrollbar gutter so the viewport width is
+   constant across pages — otherwise the centered header/nav shifts sideways
+   between scrolling and non-scrolling pages. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--bg);
   color: var(--ink);

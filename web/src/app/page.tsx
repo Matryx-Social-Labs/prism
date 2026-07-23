@@ -84,7 +84,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 // Centered content shell — matches the global header/footer width so every
 // section's left edge lines up with the nav. Full-bleed bands wrap this shell.
-const SHELL = "mx-auto w-full max-w-[1320px] px-5 sm:px-8 xl:px-10";
+const SHELL = "mx-auto w-full max-w-[1280px] px-5 sm:px-8 xl:px-10";
 
 export default function LandingPage() {
   return (
