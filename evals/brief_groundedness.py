@@ -67,9 +67,9 @@ async def _sample(n: int) -> list[dict]:
                     """
                     SELECT id, title, summary, sector, regions, projection
                     FROM events
-                    WHERE projection->'lens_briefs'->>'general' IS NOT NULL
+                    WHERE projection->'lens_briefs'->>'reader' IS NOT NULL
                       AND summary IS NOT NULL
-                      AND length(projection->'lens_briefs'->>'general') > 400
+                      AND length(projection->'lens_briefs'->>'reader') > 400
                     ORDER BY random() LIMIT :n
                     """
                 ),
@@ -101,7 +101,7 @@ async def _sample(n: int) -> list[dict]:
                 {
                     "id": str(ev["id"]),
                     "title": ev["title"],
-                    "brief": ev["projection"]["lens_briefs"]["general"],
+                    "brief": ev["projection"]["lens_briefs"]["reader"],
                     "record": _record(ev, perspectives, impacts),
                 }
             )

@@ -22,7 +22,7 @@ async def search(
     # Neutral lens for serialization — search spans sectors; results order by
     # recency, not lens score. No CVE-only filter here: an explicit query is
     # intent, so a searched CVE record should surface.
-    active_lens = get_lens("general")
+    active_lens = get_lens("reader")
     pattern = f"%{q.strip()}%"  # ponytail: ILIKE full-scan; add pg_trgm/tsvector index if the corpus grows
     rows = (
         await db.execute(

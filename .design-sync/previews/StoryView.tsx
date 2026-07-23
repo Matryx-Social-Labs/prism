@@ -15,12 +15,12 @@ const event = {
   occurred_at: "2026-07-13",
   last_updated_at: "2026-07-13T14:00:00Z",
   lens_briefs: {
-    general:
+    reader:
       "Shipping companies have stopped sending tankers through the Black Sea after drone attacks hit 17 vessels. The pause chokes a major oil export route, and insurers are already repricing the risk — expect knock-on effects at the pump and pressure for a naval escort arrangement.",
-    finance_trader:
+    markets:
       "A two-million-barrel-per-day corridor going offline is a supply shock: expect Brent risk premia, wider tanker rates, and pressure on Russian export names. Watch insurers with Black Sea marine books and energy importers with spot exposure.",
   },
-  available_lenses: ["general", "finance_trader"],
+  available_lenses: ["reader", "markets"],
   coverage: {
     origins: { GB: 2, IN: 1, RU: 1, QA: 1 },
     unknown: 0,

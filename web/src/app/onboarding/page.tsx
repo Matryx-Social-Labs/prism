@@ -19,17 +19,17 @@ const STEPS = ["Where you are", "What you do", "What you follow"] as const;
 // What each lens unlocks — shown on the "Your lens" preview card. Keyed by the
 // three real lens slugs; professions never map to anything outside these.
 const LENS_UNLOCKS: Record<string, string[]> = {
-  general: [
+  reader: [
     "Every perspective, consequence & follow-up on a story",
     "Feed clustered into whole stories, not scattered headlines",
     'Agent asks: "What’s the full picture here?"',
   ],
-  cyber_grc: [
+  cyber: [
     "CVEs, CVSS & exploitation status on every story",
     "Feed weighted to incidents, exposure & control impact",
     'Agent asks: "Who’s exposed and what do I check?"',
   ],
-  finance_trader: [
+  markets: [
     "Tickers, catalysts & price reads on every story",
     "Feed weighted to market-moving news",
     'Agent asks: "Which tickers does this move?"',
@@ -41,7 +41,7 @@ export default function OnboardingPage() {
   const taxonomy = useTaxonomy();
   const [step, setStep] = useState(0);
   const [state, setState] = useState("");
-  const [lens, setLens] = useState("general");
+  const [lens, setLens] = useState("reader");
   const [picks, setPicks] = useState<Picks>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [groups, setGroups] = useState<ProfessionGroup[]>([]);
@@ -197,7 +197,7 @@ export default function OnboardingPage() {
                 {meta.short}
               </p>
               <div className="mt-3 flex flex-col gap-[7px] text-[12.5px] leading-[1.5]" style={{ color: "var(--ink-muted)" }}>
-                {(LENS_UNLOCKS[lens] ?? LENS_UNLOCKS.general).map((line) => (
+                {(LENS_UNLOCKS[lens] ?? LENS_UNLOCKS.reader).map((line) => (
                   <span key={line}>◆ {line}</span>
                 ))}
               </div>

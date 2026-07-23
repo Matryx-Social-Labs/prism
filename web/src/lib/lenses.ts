@@ -17,24 +17,24 @@ export interface LensMeta {
 }
 
 export const LENS_META: Record<string, LensMeta> = {
-  general: {
-    slug: "general",
+  reader: {
+    slug: "reader",
     name: "General reader",
     short: "Reader",
     tagline: "Every story with every perspective, consequences, and answers",
     color: "var(--lens-general)",
     bg: "var(--lens-general-bg)",
   },
-  cyber_grc: {
-    slug: "cyber_grc",
+  cyber: {
+    slug: "cyber",
     name: "Cybersecurity / GRC",
     short: "Cyber",
     tagline: "CVEs, incidents, and what they mean for your controls",
     color: "var(--lens-cyber)",
     bg: "var(--lens-cyber-bg)",
   },
-  finance_trader: {
-    slug: "finance_trader",
+  markets: {
+    slug: "markets",
     name: "Finance / Trader",
     short: "Markets",
     tagline: "Market-moving news with tickers, catalysts, and price reads",
@@ -43,7 +43,7 @@ export const LENS_META: Record<string, LensMeta> = {
   },
 };
 
-export const LENS_ORDER = ["general", "cyber_grc", "finance_trader"];
+export const LENS_ORDER = ["reader", "cyber", "markets"];
 
 // Styling fallback for lenses the client doesn't know yet.
 const FALLBACK_PALETTE: [string, string][] = [
@@ -54,7 +54,7 @@ const FALLBACK_PALETTE: [string, string][] = [
 ];
 
 export function lensMeta(slug: string): LensMeta {
-  return LENS_META[slug] ?? LENS_META.general;
+  return LENS_META[slug] ?? LENS_META.reader;
 }
 
 export function useLenses(): LensMeta[] {
@@ -66,7 +66,7 @@ export function useLenses(): LensMeta[] {
         if (cancelled || list.length === 0) return;
         // Reader-first presentation, API order otherwise (the API leads with
         // the professional beachhead; consumers here address everyone).
-        list = [...list.filter((l) => l.slug === "general"), ...list.filter((l) => l.slug !== "general")];
+        list = [...list.filter((l) => l.slug === "reader"), ...list.filter((l) => l.slug !== "reader")];
         setLenses(
           list.map((info, i) => {
             const known = LENS_META[info.slug];

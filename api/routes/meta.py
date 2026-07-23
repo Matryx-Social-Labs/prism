@@ -12,7 +12,7 @@ from api.schemas import (
     TaxonomyResponse,
 )
 from common.db import get_db
-from common.lenses import LENSES
+from common.lenses import DEFAULT_LENS, active_lenses
 from common.taxonomy import TAXONOMY, display_name
 
 router = APIRouter()
@@ -29,9 +29,9 @@ async def get_lenses():
     return LensesResponse(
         lenses=[
             LensOut(slug=lens.slug, name=lens.name, tagline=lens.tagline)
-            for lens in LENSES.values()
+            for lens in active_lenses()  # shipped lenses only; upcoming drafts excluded
         ],
-        default="cyber_grc",
+        default=DEFAULT_LENS,
     )
 
 

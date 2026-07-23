@@ -58,7 +58,7 @@ function SearchInner() {
           </p>
         )}
         {results.map((item) => (
-          <StoryRowCard key={item.id} item={item} lens="general" />
+          <StoryRowCard key={item.id} item={item} lens="reader" />
         ))}
       </div>
     </main>

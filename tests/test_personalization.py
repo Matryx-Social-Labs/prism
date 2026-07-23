@@ -11,27 +11,27 @@ def test_valid_subsector():
     assert valid_subsector("other", None) is None
 
 
-def test_available_lenses_cricket_story_offers_general_only():
+def test_available_lenses_cricket_story_offers_reader_only():
     projection = {"source_slugs": ["espncricinfo"], "role_interests": []}
-    assert available_lenses(projection, "sports") == ["general"]
+    assert available_lenses(projection, "sports") == ["reader"]
 
 
 def test_available_lenses_cyber_fields():
     projection = {"cyber": {"cve_ids": ["CVE-2026-1"]}}
-    assert "cyber_grc" in available_lenses(projection, "politics")
+    assert "cyber" in available_lenses(projection, "politics")
 
 
 def test_available_lenses_role_interest():
-    projection = {"role_interests": ["finance_trader"]}
+    projection = {"role_interests": ["markets"]}
     lenses = available_lenses(projection, "politics")
-    assert "finance_trader" in lenses and "cyber_grc" not in lenses
+    assert "markets" in lenses and "cyber" not in lenses
 
 
 def test_available_lenses_sector_and_cached_brief():
-    assert "cyber_grc" in available_lenses({}, "cybersecurity")
-    assert "finance_trader" in available_lenses({}, "business")
+    assert "cyber" in available_lenses({}, "cybersecurity")
+    assert "markets" in available_lenses({}, "business")
     # a cached brief keeps a lens offered even without current evidence
-    assert "finance_trader" in available_lenses({"lens_briefs": {"finance_trader": "x"}}, "sports")
+    assert "markets" in available_lenses({"lens_briefs": {"markets": "x"}}, "sports")
 
 
 def test_every_lens_slug_known():
@@ -85,5 +85,5 @@ def test_template_briefs_structured():
         },
         None,
     )
-    assert b["general"]["text"] and b["cyber_grc"]["text"]
-    assert "Upgrade to 7.2.12" in b["cyber_grc"]["points"]
+    assert b["reader"]["text"] and b["cyber"]["text"]
+    assert "Upgrade to 7.2.12" in b["cyber"]["points"]

@@ -426,9 +426,9 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
                 f"- id={m['article_id']} source={m['source_name']} country={m['source_country'] or '?'} "
                 f"stance={stance.get('label') or 'unknown'} summary={m['summary'] or '(none)'}"
             )
-        lenses = ["general"]
+        lenses = ["reader"]
         primary = primary_lens_for(event_sector)
-        if primary != "general":
+        if primary != "reader":
             lenses.append(primary)
         lens_fields = {k: v for k, v in event_projection.items() if k in ("cyber", "finance") and v}
         prompt = fetch_prompt("event-analysis")

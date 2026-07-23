@@ -47,11 +47,11 @@ class LensBriefs(BaseModel):
     Keys match common/lenses.py slugs. None = not generated for that lens.
     """
 
-    general: LensRead | None = None
-    cyber_grc: LensRead | None = None
-    finance_trader: LensRead | None = None
+    reader: LensRead | None = None
+    cyber: LensRead | None = None
+    markets: LensRead | None = None
 
-    @field_validator("general", "cyber_grc", "finance_trader", mode="before")
+    @field_validator("reader", "cyber", "markets", mode="before")
     @classmethod
     def _coerce_read(cls, v):
         if v is None:

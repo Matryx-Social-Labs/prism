@@ -227,7 +227,7 @@ export async function fetchTaxonomy(): Promise<TaxonomySector[]> {
 export interface ProfessionOption {
   slug: string;
   label: string;
-  lens: string; // one of general | cyber_grc | finance_trader
+  lens: string; // one of general | cyber | markets
   interests: string[]; // default interest sector slugs
 }
 
@@ -241,39 +241,39 @@ export interface ProfessionGroup {
 // lives here. ponytail: duplicated table — delete once grouped() emits
 // lens+interests (fetchProfessions already prefers API-provided values).
 const PROFESSION_META: Record<string, { lens: string; interests: string[] }> = {
-  trader: { lens: "finance_trader", interests: ["finance"] },
-  investor: { lens: "finance_trader", interests: ["finance", "business"] },
-  financial_analyst: { lens: "finance_trader", interests: ["finance", "business"] },
-  banker: { lens: "finance_trader", interests: ["finance"] },
-  wealth_advisor: { lens: "finance_trader", interests: ["finance"] },
-  accountant: { lens: "finance_trader", interests: ["finance", "business"] },
-  security_analyst: { lens: "cyber_grc", interests: ["cybersecurity"] },
-  ciso: { lens: "cyber_grc", interests: ["cybersecurity"] },
-  grc: { lens: "cyber_grc", interests: ["cybersecurity"] },
-  it_admin: { lens: "cyber_grc", interests: ["cybersecurity", "technology"] },
-  pentester: { lens: "cyber_grc", interests: ["cybersecurity"] },
-  devsecops: { lens: "cyber_grc", interests: ["cybersecurity", "technology"] },
-  software_engineer: { lens: "general", interests: ["technology"] },
-  product_manager: { lens: "general", interests: ["technology", "business"] },
-  data_scientist: { lens: "general", interests: ["technology"] },
-  designer: { lens: "general", interests: ["technology"] },
-  tech_founder: { lens: "general", interests: ["technology", "business", "finance"] },
-  policy_analyst: { lens: "general", interests: ["politics"] },
-  civil_servant: { lens: "general", interests: ["politics"] },
-  lawyer: { lens: "general", interests: ["politics", "business"] },
-  journalist: { lens: "general", interests: ["politics", "business"] },
-  diplomat: { lens: "general", interests: ["politics"] },
-  executive: { lens: "finance_trader", interests: ["business", "finance"] },
-  consultant: { lens: "general", interests: ["business", "finance"] },
-  entrepreneur: { lens: "general", interests: ["business", "finance"] },
-  marketer: { lens: "general", interests: ["business"] },
-  operations: { lens: "general", interests: ["business"] },
-  healthcare: { lens: "general", interests: ["health"] },
-  researcher: { lens: "general", interests: ["science"] },
-  pharma_biotech: { lens: "general", interests: ["health", "science", "business"] },
-  student: { lens: "general", interests: [] },
-  educator: { lens: "general", interests: [] },
-  other: { lens: "general", interests: [] },
+  trader: { lens: "markets", interests: ["finance"] },
+  investor: { lens: "markets", interests: ["finance", "business"] },
+  financial_analyst: { lens: "markets", interests: ["finance", "business"] },
+  banker: { lens: "markets", interests: ["finance"] },
+  wealth_advisor: { lens: "markets", interests: ["finance"] },
+  accountant: { lens: "markets", interests: ["finance", "business"] },
+  security_analyst: { lens: "cyber", interests: ["cybersecurity"] },
+  ciso: { lens: "cyber", interests: ["cybersecurity"] },
+  grc: { lens: "cyber", interests: ["cybersecurity"] },
+  it_admin: { lens: "cyber", interests: ["cybersecurity", "technology"] },
+  pentester: { lens: "cyber", interests: ["cybersecurity"] },
+  devsecops: { lens: "cyber", interests: ["cybersecurity", "technology"] },
+  software_engineer: { lens: "reader", interests: ["technology"] },
+  product_manager: { lens: "reader", interests: ["technology", "business"] },
+  data_scientist: { lens: "reader", interests: ["technology"] },
+  designer: { lens: "reader", interests: ["technology"] },
+  tech_founder: { lens: "reader", interests: ["technology", "business", "finance"] },
+  policy_analyst: { lens: "reader", interests: ["politics"] },
+  civil_servant: { lens: "reader", interests: ["politics"] },
+  lawyer: { lens: "reader", interests: ["politics", "business"] },
+  journalist: { lens: "reader", interests: ["politics", "business"] },
+  diplomat: { lens: "reader", interests: ["politics"] },
+  executive: { lens: "markets", interests: ["business", "finance"] },
+  consultant: { lens: "reader", interests: ["business", "finance"] },
+  entrepreneur: { lens: "reader", interests: ["business", "finance"] },
+  marketer: { lens: "reader", interests: ["business"] },
+  operations: { lens: "reader", interests: ["business"] },
+  healthcare: { lens: "reader", interests: ["health"] },
+  researcher: { lens: "reader", interests: ["science"] },
+  pharma_biotech: { lens: "reader", interests: ["health", "science", "business"] },
+  student: { lens: "reader", interests: [] },
+  educator: { lens: "reader", interests: [] },
+  other: { lens: "reader", interests: [] },
 };
 
 /** Grouped profession vocabulary for onboarding, enriched with lens + interests. */
@@ -288,7 +288,7 @@ export async function fetchProfessions(): Promise<ProfessionGroup[]> {
     options: g.options.map((o) => ({
       slug: o.slug,
       label: o.label,
-      lens: o.lens ?? PROFESSION_META[o.slug]?.lens ?? "general",
+      lens: o.lens ?? PROFESSION_META[o.slug]?.lens ?? "reader",
       interests: o.interests ?? PROFESSION_META[o.slug]?.interests ?? [],
     })),
   }));

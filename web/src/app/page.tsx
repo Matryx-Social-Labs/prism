@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LensDemo } from "@/components/LensDemo";
+import { HeroLensDemo } from "@/components/HeroLensDemo";
 import { Reveal } from "@/components/Reveal";
 
 // The three lenses live in the product today (mirrors /api/v1/lenses).
@@ -124,13 +124,8 @@ export default function LandingPage() {
             Every value traces to a source. Free while we build — no account needed.
           </p>
         </div>
-        {/* Right: the live lens-flip demo IS the hero visual. */}
-        <div>
-          <LensDemo />
-          <p className="mt-3 px-1 text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            More lenses ship as registry entries, not new products.
-          </p>
-        </div>
+        {/* Right: the lens-flip demo IS the hero visual (exact 2a content). */}
+        <HeroLensDemo />
       </section>
 
       {/* ── Open lens registry ───────────────────────────────── */}
