@@ -12,6 +12,7 @@ import {
 } from "@/components/ProfileEditor";
 import { loadProfile, saveProfile } from "@/lib/profile";
 import { fetchProfessions, type ProfessionGroup, type ProfessionOption } from "@/lib/api";
+import { fetchLanguages, type LanguageOption, setProfile, useSession } from "@/lib/session";
 import { lensMeta } from "@/lib/lenses";
 
 const STEPS = ["Where you are", "What you do", "What you follow"] as const;
@@ -46,6 +47,12 @@ export default function OnboardingPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [groups, setGroups] = useState<ProfessionGroup[]>([]);
   const [profession, setProfession] = useState<ProfessionOption | null>(null);
+  const session = useSession();
+  const [name, setName] = useState("");
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [langOptions, setLangOptions] = useState<LanguageOption[]>([]);
+  const [consent, setConsent] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const existing = loadProfile();
@@ -58,7 +65,17 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     fetchProfessions().then(setGroups).catch(() => setGroups([]));
+    fetchLanguages()
+      .then((r) => {
+        setLangOptions(r.languages);
+        setLanguages((cur) => (cur.length ? cur : r.default));
+      })
+      .catch(() => {});
   }, []);
+
+  function toggleLanguage(code: string) {
+    setLanguages((cur) => (cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code]));
+  }
 
   function pickProfession(p: ProfessionOption) {
     setProfession(p);
@@ -66,8 +83,32 @@ export default function OnboardingPage() {
     setPicks(interestsToPicks(p.interests));
   }
 
-  function finish() {
-    saveProfile({ lens, region: "IN", state: state || null, interests: picksToInterests(picks) });
+  async function finish() {
+    // Client profile (lens/interests/state/languages) drives feed personalization locally.
+    saveProfile({
+      lens,
+      region: "IN",
+      state: state || null,
+      interests: picksToInterests(picks),
+      languages: languages.length ? languages : undefined,
+    });
+    // Account profile (name/profession/state/languages/consent) persists server-side
+    // once the reader is signed in. Non-blocking: a failure never traps them here.
+    if (session && name.trim() && profession && consent) {
+      setSaving(true);
+      try {
+        await setProfile(session, {
+          name: name.trim(),
+          profession: profession.slug,
+          state: state || null,
+          languages,
+          consent,
+        });
+      } catch {
+        /* client profile is already saved; let them into the app */
+      }
+      setSaving(false);
+    }
     router.push("/feed");
   }
 
@@ -121,6 +162,54 @@ export default function OnboardingPage() {
           <div className="mt-6">
             <StateSelect value={state} onChange={setState} />
           </div>
+
+          {langOptions.length > 0 && (
+            <div className="mt-9">
+              <p
+                className="text-[10.5px] font-semibold uppercase tracking-[0.12em]"
+                style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
+              >
+                Languages you read
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                {langOptions.map((l) => {
+                  const idx = languages.indexOf(l.code);
+                  const sel = idx >= 0;
+                  return (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onClick={() => toggleLanguage(l.code)}
+                      aria-pressed={sel}
+                      aria-label={`${l.name}${sel ? `, preference ${idx + 1}` : ""}`}
+                      className="flex min-h-[44px] items-center gap-2 rounded-full border px-4 text-[15px] transition"
+                      style={{
+                        borderColor: sel ? "var(--ink)" : "var(--line-strong)",
+                        background: sel ? "var(--ink)" : "transparent",
+                        color: sel ? "var(--bg)" : "var(--ink)",
+                      }}
+                    >
+                      {l.native}
+                      {sel && (
+                        <span
+                          className="text-[11px]"
+                          style={{ fontFamily: "var(--font-mono), monospace", opacity: 0.7 }}
+                        >
+                          {idx + 1}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p
+                className="mt-2.5 text-[10.5px] uppercase tracking-[0.08em]"
+                style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
+              >
+                First pick = your primary. English stays a fallback so you never miss a story.
+              </p>
+            </div>
+          )}
         </section>
       )}
 
@@ -133,6 +222,22 @@ export default function OnboardingPage() {
             Your profession picks your lens — how stories are ranked, which fields are extracted,
             what the agent asks. Every other lens stays one tap away.
           </p>
+          <label className="mt-6 flex flex-col gap-1.5">
+            <span
+              className="text-[10.5px] font-semibold uppercase tracking-[0.12em]"
+              style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
+            >
+              Your name
+            </span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Sagar"
+              className="w-full max-w-[360px] rounded-[12px] border px-3.5 py-3 text-[16px] outline-none"
+              style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
+            />
+          </label>
           <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">
             {/* Grouped profession list */}
             <div
@@ -230,6 +335,21 @@ export default function OnboardingPage() {
               onExpanded={setExpanded}
             />
           </div>
+
+          {session && (
+            <label className="mt-8 flex items-start gap-2.5 text-[13px] leading-[1.5]" style={{ color: "var(--ink-muted)" }}>
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0"
+              />
+              <span>
+                I agree to the Terms and to Prism creating an account for me and processing my
+                email per the privacy policy.
+              </span>
+            </label>
+          )}
         </section>
       )}
 
@@ -245,14 +365,17 @@ export default function OnboardingPage() {
         )}
         <button
           onClick={() => (step < 2 ? setStep(step + 1) : finish())}
-          className="flex-1 rounded-full px-7 py-[13px] text-sm font-semibold transition hover:opacity-85"
+          disabled={saving || (step === 2 && !!session && (!name.trim() || !profession || !consent))}
+          className="flex-1 rounded-full px-7 py-[13px] text-sm font-semibold transition hover:opacity-85 disabled:opacity-45"
           style={{ background: "var(--ink)", color: "var(--bg)" }}
         >
-          {step < 2 ? "Continue →" : "Build my feed →"}
+          {saving ? "Saving…" : step < 2 ? "Continue →" : "Build my feed →"}
         </button>
       </div>
       <p className="mt-3 text-center text-xs" style={{ color: "var(--ink-faint)" }}>
-        No account needed — your profile lives in this browser.
+        {session
+          ? `Signed in as ${session.email} — this sets up your feed.`
+          : "No account needed — your profile lives in this browser."}
       </p>
     </div>
   );

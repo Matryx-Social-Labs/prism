@@ -12,6 +12,8 @@ export const API_URL =
 export interface FeedItem {
   id: string;
   title: string;
+  headline_lang: string | null; // language of `title`; UI tags it when not the reader's primary
+  available_languages: string[];
   summary: string | null;
   sector: string | null;
   subsector: string | null;
@@ -157,6 +159,7 @@ export interface FeedQuery {
   interests?: string[];
   region?: string | null;
   state?: string | null;
+  languages?: string[];
   sort?: "latest" | "top";
   limit?: number;
 }
@@ -180,6 +183,7 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   if (query.interests?.length) params.set("interests", query.interests.join(","));
   if (query.region) params.set("region", query.region);
   if (query.state) params.set("state", query.state);
+  if (query.languages?.length) params.set("languages", query.languages.join(","));
   if (query.sort) params.set("sort", query.sort);
   if (query.limit) params.set("limit", String(query.limit));
   const res = await fetch(`${API_URL}/api/v1/feed?${params}`, {

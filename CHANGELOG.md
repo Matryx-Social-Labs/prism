@@ -3,6 +3,33 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.56.0] - 2026-07-23
+
+### Added
+- **Phase 1: language-aware onboarding + feed** (Bangalore launch, en/hi/kn).
+  - **Email-first auth (fixes a live bug).** `/auth/request` is now email-only and
+    always returns the same 200 (enumeration-safe); the account is created only on a
+    *verified* email; the profile (name, profession, state, languages, consent) is
+    collected AFTER verify via `POST /auth/profile`. Verify returns `needs_profile` so
+    new readers route to onboarding and returning readers land straight in the app —
+    no more re-entering name/profession on every sign-in.
+  - **Reader languages** (`users.languages[]`, ordered by preference; `state`,
+    `consented_at`). `GET /api/v1/languages` serves the picker (native-script labels).
+  - **Language-aware feed (rank, don't filter).** `_rebuild_projection` now stores
+    `languages[]` + per-language `headlines[]`; the feed ranks preferred-language
+    coverage up and renders each reader the headline in their top language, falling
+    back to English (never hides an English-only story). The cluster stays
+    cross-language; only display is localised — no re-clustering, no LLM.
+  - **Onboarding UI**: email-only signin; two-step post-verify onboarding with a
+    monochrome native-script language picker (order = tap sequence, primary first;
+    language is not a lens so it carries no colour, per DESIGN.md) + explicit consent.
+  - **Kannada sources**: Prajavani + TV9 Kannada RSS (validated Kannada, fresh).
+
+  Deferred (documented): hard language-filter toggle + its GIN index (rank-not-filter
+  needs no SQL array-overlap query yet); per-development timeline headline localisation
+  (reuses the same `headlines[]` + `_pick_headline`); async batched projection backfill
+  (existing events fall back to the event title until re-projected/re-ingested).
+
 ## [0.0.55.0] - 2026-07-23
 
 ### Changed

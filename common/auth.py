@@ -29,16 +29,12 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-async def request_magic_link(
-    session: AsyncSession,
-    email: str,
-    name: str | None = None,
-    profession: str | None = None,
-) -> str:
+async def request_magic_link(session: AsyncSession, email: str) -> str:
     """Create a single-use magic token for `email`; return the RAW token (the
-    caller emails it). name/profession (sign-up profile) ride on the token and
-    are applied only when it creates a brand-new user. Raises RateLimited if one
-    was requested too recently."""
+    caller emails it). Email-only: the sign-up profile (name/profession/languages)
+    is collected AFTER the link is verified (see set_profile), so this transactional
+    link needs nothing but an email and creates no account. Raises RateLimited if
+    one was requested too recently."""
     settings = get_settings()
     email = email.strip().lower()
     recent = (
@@ -56,10 +52,10 @@ async def request_magic_link(
     expires = datetime.now(UTC) + timedelta(minutes=settings.prism_magic_token_ttl_min)
     await session.execute(
         text(
-            "INSERT INTO auth_tokens (id, email, token_hash, expires_at, name, profession) "
-            "VALUES (gen_random_uuid(), :e, :h, :exp, :n, :p)"
+            "INSERT INTO auth_tokens (id, email, token_hash, expires_at) "
+            "VALUES (gen_random_uuid(), :e, :h, :exp)"
         ),
-        {"e": email, "h": _hash(raw), "exp": expires, "n": name, "p": profession},
+        {"e": email, "h": _hash(raw), "exp": expires},
     )
     return raw
 
@@ -72,29 +68,28 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
     The UPDATE ... WHERE consumed_at IS NULL ... RETURNING makes consumption
     atomic — a token replayed concurrently is spent exactly once.
     """
-    row = (
+    email = (
         await session.execute(
             text(
                 "UPDATE auth_tokens SET consumed_at = now() "
                 "WHERE token_hash = :h AND consumed_at IS NULL AND expires_at > now() "
-                "RETURNING email, name, profession"
+                "RETURNING email"
             ),
             {"h": _hash(raw_token)},
         )
-    ).mappings().first()
-    if row is None:
+    ).scalar_one_or_none()
+    if email is None:
         return None
-    email = row["email"]
-    # Upsert the user; a returned id means this is a brand-new account. On first
-    # creation, stamp the sign-up profile carried on the token.
+    # Create the account only now, on a verified email (no unverified/junk rows).
+    # The profile (name/profession/languages) is filled in the next step; a
+    # returned id means this is a brand-new account.
     user_id = (
         await session.execute(
             text(
-                "INSERT INTO users (id, email, name, profession) "
-                "VALUES (gen_random_uuid(), :e, :n, :p) "
+                "INSERT INTO users (id, email) VALUES (gen_random_uuid(), :e) "
                 "ON CONFLICT (email) DO NOTHING RETURNING id"
             ),
-            {"e": email, "n": row["name"], "p": row["profession"]},
+            {"e": email},
         )
     ).scalar_one_or_none()
     if user_id is None:  # existing user
@@ -104,6 +99,37 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
     else:  # new user — grant the free Markets samples once
         await grant_samples(session, user_id, get_settings().prism_free_markets_samples)
     return user_id
+
+
+async def profile_complete(session: AsyncSession, user_id: UUID) -> bool:
+    """A profile is complete once the reader has picked a profession (the gate the
+    onboarding step fills). Drives the `needs_profile` flag returned on verify."""
+    profession = (
+        await session.execute(
+            text("SELECT profession FROM users WHERE id = :i"), {"i": str(user_id)}
+        )
+    ).scalar_one_or_none()
+    return profession is not None
+
+
+async def set_profile(
+    session: AsyncSession,
+    user_id: UUID,
+    *,
+    name: str,
+    profession: str,
+    state: str | None,
+    languages: list[str],
+) -> None:
+    """Persist the onboarding profile + stamp consent. Consent is recorded here
+    (not at the email step) because that's where the reader agrees to the terms."""
+    await session.execute(
+        text(
+            "UPDATE users SET name = :n, profession = :p, state = :s, "
+            "languages = CAST(:langs AS text[]), consented_at = now() WHERE id = :i"
+        ),
+        {"n": name, "p": profession, "s": state, "langs": languages, "i": str(user_id)},
+    )
 
 
 async def create_session(session: AsyncSession, user_id: UUID) -> str:

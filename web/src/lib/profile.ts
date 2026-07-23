@@ -7,6 +7,7 @@ export interface Profile {
   region: string | null;
   state: string | null; // ISO 3166-2 (e.g. IN-KA) — surfaces local news first
   interests: string[];
+  languages?: string[]; // preference order; ranks + localises the feed (never filters)
 }
 
 const KEY = "prism.profile.v1";
@@ -24,6 +25,7 @@ export function loadProfile(): Profile | null {
       region: parsed.region ?? null,
       state: parsed.state ?? null,
       interests: parsed.interests ?? [],
+      languages: parsed.languages,
     };
   } catch {
     return null;

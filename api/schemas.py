@@ -16,6 +16,8 @@ class CoverageOut(BaseModel):
 class FeedItem(BaseModel):
     id: str
     title: str
+    headline_lang: str | None = None  # language of `title`; frontend tags non-primary
+    available_languages: list[str] = []  # languages this story is covered in
     summary: str | None
     sector: str | None
     subsector: str | None

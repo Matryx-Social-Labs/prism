@@ -281,6 +281,11 @@ class User(TimestampMixin, Base):
     # a slug from common.professions; nullable for pre-existing rows.
     name: Mapped[str | None] = mapped_column(Text)
     profession: Mapped[str | None] = mapped_column(Text)
+    # Onboarding (collected after magic-link verify). languages is ordered by
+    # preference — languages[0] is the reader's primary. state is ISO 3166-2.
+    languages: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    state: Mapped[str | None] = mapped_column(Text)
+    consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class UsageQuota(TimestampMixin, Base):
