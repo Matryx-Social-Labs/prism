@@ -65,9 +65,76 @@ def _cast_jaccard(a: list[str], b: list[str]) -> float:
 
 CAST_SAME_STORY = 0.5  # cast Jaccard at/above which two communities are the same story
 
+# A mega-story fragments (BFS cap) into subsets whose FULL casts diverge — each
+# 30-event window surfaces different SECONDARY actors, and even the DOMINANT few
+# get re-ranked, so no fixed top-K window is stable. But the INTERSECTION is: the
+# CJP/NEET protest split into 4 cards that every pair shared exactly {Cockroach
+# Janta Party, Dharmendra Pradhan, Delhi Police} — 3 of 8 cast (Jaccard 0.23–0.45,
+# under CAST_SAME_STORY). So also call it one story when the casts share >= N
+# members outright, regardless of rank.
+SHARED_CAST_MIN = 3  # >= this many cast members in common → same story
+# ponytail: absolute count, so ubiquitous actors (Modi/BJP appear everywhere) could
+# in theory over-merge two distinct saturated-politics stories. Acceptable at the
+# trending-dedup stage (one card beats 4 dupes); tighten to 1/df-weighted overlap
+# if it bites (see the IDF clustering fix).
+
+
+def _dominant_cast_match(cast_a: list[str], cast_b: list[str]) -> bool:
+    return len(set(cast_a) & set(cast_b)) >= SHARED_CAST_MIN
+
 
 def _same_story(members_a: set[str], cast_a: list[str], members_b: set[str], cast_b: list[str]) -> bool:
-    return _overlap(members_a, members_b) >= OVERLAP_THRESHOLD or _cast_jaccard(cast_a, cast_b) >= CAST_SAME_STORY
+    return (
+        _overlap(members_a, members_b) >= OVERLAP_THRESHOLD
+        or _cast_jaccard(cast_a, cast_b) >= CAST_SAME_STORY
+        or _dominant_cast_match(cast_a, cast_b)
+    )
+
+
+async def _converge_existing(session: AsyncSession, stories: dict) -> None:
+    """Self-healing merge of active stories that are the same story as each OTHER.
+
+    reconcile only ever compares a freshly-detected community to the existing
+    stories — never two existing stories to each other. So two stories created
+    in separate passes (before a dedup improvement, or when their shared cluster
+    stops trending and no longer surfaces a community to re-match them) never
+    collapse; they linger as near-duplicate cards until the 24h dormant timer.
+
+    Union-find over `_same_story`, oldest first_seen survives; the younger point
+    at it and go dormant (their URL 301s, same as the merge path). Mutates
+    `stories` in place, dropping merged ids so the community loop won't touch them.
+
+    ponytail: O(n²) over the active set (bounded to the trending list, ~tens),
+    fine at this scale; index it if the active set ever grows unbounded.
+    """
+    ids = list(stories)
+    parent = {i: i for i in ids}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            a, b = find(ids[i]), find(ids[j])
+            if a == b:
+                continue
+            if _same_story(stories[a]["members"], stories[a]["cast"], stories[b]["members"], stories[b]["cast"]):
+                # attach the younger root under the older, so the root is always the oldest
+                old, new = sorted((a, b), key=lambda x: (stories[x]["first"] or _MAX_TS))
+                parent[new] = old
+
+    for sid in ids:
+        root = find(sid)
+        if root == sid:
+            continue
+        await session.execute(
+            text("UPDATE stories SET merged_into = :into, status = 'dormant', last_updated_at = now() WHERE id = :sid"),
+            {"into": root, "sid": sid},
+        )
+        del stories[sid]
 
 
 async def _candidate_events(session: AsyncSession) -> list[dict]:
@@ -272,6 +339,9 @@ async def reconcile_stories(session: AsyncSession) -> int:
         }
         for r in rows
     }
+    # Collapse any existing active stories that are already the same story as each
+    # other (self-healing; see _converge_existing) BEFORE matching new communities.
+    await _converge_existing(session, stories)
     claimed: set[str] = set()
     seen: set[str] = set()
     for c in communities:
