@@ -49,7 +49,7 @@ export default function FeedPage() {
   const lenses = useLenses();
   const session = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [lens, setLens] = useState("general");
+  const [lens, setLens] = useState("reader");
   const [sort, setSort] = useState<"latest" | "top">("latest");
   const [scope, setScope] = useState<Scope>("all");
   const [items, setItems] = useState<FeedItem[] | null>(null);
@@ -81,7 +81,7 @@ export default function FeedPage() {
     setError(null);
     const query = {
       lens,
-      interests: lens === "general" ? profile?.interests : undefined,
+      interests: lens === "reader" ? profile?.interests : undefined,
       region: profile?.region,
       state: profile?.state,
     };
@@ -147,7 +147,7 @@ export default function FeedPage() {
   );
 
   const meta = lensMeta(lens);
-  const pulse = lensMeta("finance_trader");
+  const pulse = lensMeta("markets");
 
   const railItem =
     "flex items-center justify-between rounded-[10px] px-3 py-2 text-[13.5px] transition";

@@ -17,7 +17,7 @@ async function load(id: string): Promise<EventDetail | null> {
 }
 
 function metaDescription(event: EventDetail): string {
-  const text = event.summary ?? event.lens_briefs?.general ?? event.title;
+  const text = event.summary ?? event.lens_briefs?.reader ?? event.title;
   return text.length > 200 ? `${text.slice(0, 197).trimEnd()}…` : text;
 }
 

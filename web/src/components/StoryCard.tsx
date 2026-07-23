@@ -69,7 +69,7 @@ export function StoryBadges({ item, lens }: { item: FeedItem; lens: string }) {
         <span
           className="rounded-full border px-[8px] py-px font-mono text-[10px] font-medium uppercase tracking-wide"
           style={
-            lens === "finance_trader"
+            lens === "markets"
               ? { borderColor: "var(--lens-finance)", color: "var(--lens-finance)" }
               : { borderColor: "var(--line-strong)", color: "var(--ink-muted)" }
           }

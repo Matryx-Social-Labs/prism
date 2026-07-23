@@ -17,18 +17,18 @@ const CURATED: DemoStory = {
   id: null,
   title: "Armed conflict escalates along disputed border after failed ceasefire talks",
   briefs: {
-    general:
+    reader:
       "Fighting resumed overnight after mediated negotiations collapsed, displacing tens of thousands of residents near the border. Both governments blame each other for the breakdown, and aid agencies warn of a worsening humanitarian situation. Watch for emergency talks called by regional powers this week.",
-    cyber_grc:
+    cyber:
       "Armed conflicts of this kind are historically followed by surges in state-aligned cyber activity: expect elevated phishing, DDoS, and wiper risk for government, energy, logistics, and media organizations operating in or near the involved regions. Defenders at organizations with suppliers or infrastructure in the area should review geo-blocking, patch cadence on internet-facing systems, and incident response readiness.",
-    finance_trader:
+    markets:
       "Markets typically price regional conflict through energy, defense, and insurance channels: watch crude and gas futures, defense primes, and shipping/war-risk insurance rates. Local-currency assets and neighboring-market ETFs face pressure while safe havens (gold, USD, treasuries) usually catch a bid. Key signal to watch: any disruption to physical trade routes or pipelines.",
   },
 };
 
 export function LensDemo() {
   const [story, setStory] = useState<DemoStory>(CURATED);
-  const [active, setActive] = useState("general");
+  const [active, setActive] = useState("reader");
   const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function LensDemo() {
     // trigger generation from the landing page).
     (async () => {
       try {
-        const feed = await fetch(`${API_URL}/api/v1/feed?lens=general&limit=8`).then((r) => r.json());
+        const feed = await fetch(`${API_URL}/api/v1/feed?lens=reader&limit=8`).then((r) => r.json());
         for (const item of feed.items ?? []) {
           const detail = await fetch(`${API_URL}/api/v1/events/${item.id}`).then((r) => r.json());
           const briefs = detail.lens_briefs ?? {};

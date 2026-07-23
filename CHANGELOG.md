@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.55.0] - 2026-07-23
+
+### Changed
+- Single-word lens slugs, consistent across API and frontend: `general`→`reader`,
+  `cyber_grc`→`cyber`, `finance_trader`→`markets`. One key now refers to a lens on
+  both sides (`common/lenses.py` registry, projections, prompts, professions, agent
+  question seeding, and the whole frontend). The extraction `lens_fields` keys
+  (`cyber`, `finance`) are unchanged. A data migration remaps the lens-keyed fields
+  in existing event projections (`lens_briefs`/`lens_points` keys, `role_interests`)
+  so the renamed frontend finds briefs without re-ingestion.
+- Prompt fallbacks (classifier, lens-brief, event-analysis) emit the new keys. The
+  live Langfuse prompts must be republished (`uv run python evals/sync_prompts.py`)
+  or the LLM keeps emitting old keys and briefs render empty until it runs.
+
+### Added
+- Drafted (not yet shipped) **Health** and **Policy** lenses in the registry with an
+  `upcoming` flag — kept for future work, excluded from `/api/v1/lenses` and never
+  activating extraction, so the live picker still offers only Reader/Cyber/Markets.
+
 ## [0.0.54.0] - 2026-07-23
 
 ### Changed

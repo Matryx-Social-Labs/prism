@@ -60,7 +60,7 @@ async def test_feed_state_tiering():
     e_nat = await _seed_event("National budget session begins", "politics", ["IN"], newer=True)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
-            items = (await ac.get("/api/v1/feed", params={"lens": "general", "state": "IN-KA", "limit": 100})).json()["items"]
+            items = (await ac.get("/api/v1/feed", params={"lens": "reader", "state": "IN-KA", "limit": 100})).json()["items"]
         by_id = {i["id"]: i for i in items}
         assert str(e_state) in by_id and str(e_nat) in by_id
         assert by_id[str(e_state)]["is_regional"] is True

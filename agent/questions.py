@@ -15,14 +15,14 @@ def suggested_questions(projection: dict | None, lens_slug: str | None = None) -
 
     lens = get_lens(lens_slug)
     # If the user's lens has no fields on this story, show the story's own lens.
-    if lens.slug == "cyber_grc" and not cyber and finance:
-        lens = LENSES["finance_trader"]
-    elif lens.slug == "finance_trader" and not finance and cyber:
-        lens = LENSES["cyber_grc"]
-    elif lens.slug != "general" and not cyber and not finance:
-        lens = LENSES["general"]
+    if lens.slug == "cyber" and not cyber and finance:
+        lens = LENSES["markets"]
+    elif lens.slug == "markets" and not finance and cyber:
+        lens = LENSES["cyber"]
+    elif lens.slug != "reader" and not cyber and not finance:
+        lens = LENSES["reader"]
 
     questions = list(lens.suggested_questions)
-    if lens.slug == "cyber_grc" and (cyber or {}).get("exploitation", {}).get("kev_listed"):
+    if lens.slug == "cyber" and (cyber or {}).get("exploitation", {}).get("kev_listed"):
         questions[1] = "How is this being exploited in the wild?"
     return questions

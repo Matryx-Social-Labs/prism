@@ -20,17 +20,19 @@ export function HeaderNav() {
   const m = lens ? lensMeta(lens) : null;
 
   return (
-    <nav className="flex items-center gap-2">
+    <nav className="flex items-center gap-1 sm:gap-2">
+      {/* Text links live on desktop only; on mobile the bottom tab bar owns
+          Feed / Pulse / Search / Saved, so the header stays uncluttered. */}
       <Link
         href="/feed"
-        className="px-2 py-1.5 text-[13.5px] font-medium"
+        className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
         style={{ color: pathname === "/feed" ? "var(--ink)" : "var(--ink-muted)" }}
       >
         Feed
       </Link>
       <Link
         href="/pulse"
-        className="px-2 py-1.5 text-[13.5px] font-medium"
+        className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
         style={{ color: pathname === "/pulse" ? "var(--ink)" : "var(--ink-muted)" }}
       >
         Pulse
@@ -45,7 +47,7 @@ export function HeaderNav() {
       <Link
         href="/search"
         aria-label="Search"
-        className="flex h-8 w-8 items-center justify-center rounded-full"
+        className="hidden h-8 w-8 items-center justify-center rounded-full sm:flex"
         style={{ color: pathname === "/search" ? "var(--ink)" : "var(--ink-muted)" }}
       >
         <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -56,7 +58,7 @@ export function HeaderNav() {
       {session && (
         <Link
           href="/watchlist"
-          className="px-2 py-1.5 text-[13.5px] font-medium"
+          className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
           style={{ color: pathname === "/watchlist" ? "var(--ink)" : "var(--ink-muted)" }}
         >
           Watchlist
@@ -73,6 +75,18 @@ export function HeaderNav() {
           {m.short}
         </Link>
       )}
+      {/* Sign-in text link is desktop-only; on mobile the "Get your feed" CTA
+          is the single entry point (matches the mockup's mobile header). */}
+      {!session && (
+        <Link
+          href="/signin"
+          className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
+          style={{ color: pathname === "/signin" ? "var(--ink)" : "var(--ink-muted)" }}
+        >
+          Sign in
+        </Link>
+      )}
+      <ThemeToggle />
       {session ? (
         <Link
           href="/account"
@@ -84,18 +98,8 @@ export function HeaderNav() {
         </Link>
       ) : (
         <Link
-          href="/signin"
-          className="px-2 py-1.5 text-[13.5px] font-medium"
-          style={{ color: pathname === "/signin" ? "var(--ink)" : "var(--ink-muted)" }}
-        >
-          Sign in
-        </Link>
-      )}
-      <ThemeToggle />
-      {!session && (
-        <Link
           href="/onboarding"
-          className="hidden whitespace-nowrap rounded-full px-[18px] py-2 text-[13px] font-semibold transition hover:opacity-85 sm:inline-block"
+          className="whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition hover:opacity-85 sm:px-[18px]"
           style={{ background: "var(--ink)", color: "var(--bg)" }}
         >
           Get your feed

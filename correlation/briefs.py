@@ -25,14 +25,14 @@ from correlation.schemas import LensBriefs
 logger = get_logger(__name__)
 
 SECTOR_PRIMARY_LENS = {
-    "cybersecurity": "cyber_grc",
-    "finance": "finance_trader",
-    "business": "finance_trader",
+    "cybersecurity": "cyber",
+    "finance": "markets",
+    "business": "markets",
 }
 
 
 def primary_lens_for(sector: str | None) -> str:
-    return SECTOR_PRIMARY_LENS.get(sector or "", "general")
+    return SECTOR_PRIMARY_LENS.get(sector or "", "reader")
 
 
 def template_briefs(projection: dict, summary: str | None) -> dict[str, dict]:
@@ -90,8 +90,8 @@ def template_briefs(projection: dict, summary: str | None) -> dict[str, dict]:
         ] if p
     ]
     return {
-        "general": {"text": general.strip(), "points": general_points},
-        "cyber_grc": {"text": cyber_brief.strip(), "points": cyber_points},
+        "reader": {"text": general.strip(), "points": general_points},
+        "cyber": {"text": cyber_brief.strip(), "points": cyber_points},
     }
 
 
@@ -225,16 +225,16 @@ def available_lenses(projection: dict | None, sector: str | None = None) -> list
     briefs = projection.get("lens_briefs") or {}
     roles = set(projection.get("role_interests") or [])
     applicable = {
-        "general": True,
-        "cyber_grc": bool(projection.get("cyber"))
-        or "cyber_grc" in roles
+        "reader": True,
+        "cyber": bool(projection.get("cyber"))
+        or "cyber" in roles
         or sector == "cybersecurity",
-        "finance_trader": bool(projection.get("finance"))
-        or "finance_trader" in roles
+        "markets": bool(projection.get("finance"))
+        or "markets" in roles
         or sector in ("finance", "business"),
     }
     return [
         slug
-        for slug in LENSES
-        if applicable.get(slug, False) or slug in briefs
+        for slug, lens in LENSES.items()
+        if not lens.upcoming and (applicable.get(slug, False) or slug in briefs)
     ]

@@ -14,7 +14,7 @@ export default function SectorPage({ params }: { params: Promise<{ slug: string 
   const lenses = useLenses();
   const [items, setItems] = useState<FeedItem[] | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
-  const [lens, setLens] = useState("general");
+  const [lens, setLens] = useState("reader");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

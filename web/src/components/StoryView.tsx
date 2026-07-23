@@ -85,7 +85,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   const finance = event.projection?.finance ?? null;
   const sourceById = new Map(event.sources.map((s) => [s.article_id, s]));
 
-  const [lens, setLens] = useState("general");
+  const [lens, setLens] = useState("reader");
   const [briefs, setBriefs] = useState<Record<string, string>>(event.lens_briefs ?? {});
   const [flipped, setFlipped] = useState(false);
   const [points, setPoints] = useState<Record<string, string[]>>(event.lens_points ?? {});
@@ -103,12 +103,12 @@ export function StoryView({ event }: { event: EventDetail }) {
   // open to everyone; the professional lenses (markets, cyber) require an account.
   const session = useSession();
   const router = useRouter();
-  const isLocked = (slug: string) => slug !== "general" && !session;
+  const isLocked = (slug: string) => slug !== "reader" && !session;
 
   useEffect(() => {
     const profile = loadProfile();
     setMyRegion(profile?.region ?? null);
-    const preferred = profile?.lens && offered.includes(profile.lens) ? profile.lens : "general";
+    const preferred = profile?.lens && offered.includes(profile.lens) ? profile.lens : "reader";
     setLens(preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -137,7 +137,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Never leave a signed-out reader parked on a locked pro lens (e.g. their
   // saved profile lens): snap back to the general reader lens.
   useEffect(() => {
-    if (isLocked(lens)) setLens("general");
+    if (isLocked(lens)) setLens("reader");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
@@ -145,7 +145,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   const brief = briefs[lens];
   const lensPoints = points[lens] ?? [];
   const pointsHeading =
-    lens === "cyber_grc" ? "What to check" : lens === "finance_trader" ? "What to watch" : "What to watch next";
+    lens === "cyber" ? "What to check" : lens === "markets" ? "What to watch" : "What to watch next";
   const cvss = cyber?.cvss ?? {};
   const exploitation = cyber?.exploitation ?? {};
   const coverageEntries = Object.entries(event.coverage?.origins ?? {}).sort((a, b) => b[1] - a[1]);
@@ -426,7 +426,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             </p>
           )}
 
-          {lens === "cyber_grc" && cyber && !isLocked(lens) && (
+          {lens === "cyber" && cyber && !isLocked(lens) && (
             <div className="flex flex-col gap-3.5">
               <div className="flex flex-wrap gap-1.5">
                 {cvss.score != null && (
@@ -506,7 +506,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             </div>
           )}
 
-          {lens === "finance_trader" && finance && !isLocked(lens) && (
+          {lens === "markets" && finance && !isLocked(lens) && (
             <div className="flex flex-col gap-3">
             <div
               className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border px-4 py-3 text-[13.5px]"

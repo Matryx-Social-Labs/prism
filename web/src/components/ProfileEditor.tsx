@@ -26,11 +26,11 @@ export const REGIONS: [string, string][] = [
 ];
 
 export const LENS_DETAIL: Record<string, string> = {
-  general:
+  reader:
     "World news clustered into single stories with every perspective, consequences, and a grounded agent to ask. The full picture, fast.",
-  cyber_grc:
+  cyber:
     "CVEs with CVSS, exploitation status, affected products, and control mapping — plus the cyber read of world events: who's exposed and what to check.",
-  finance_trader:
+  markets:
     "Tickers, catalysts, and evidence-based price reads on market-moving news — plus the market read of everything else that happens in the world.",
 };
 

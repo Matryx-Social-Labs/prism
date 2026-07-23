@@ -28,7 +28,7 @@ export default function InterestsPage() {
   const router = useRouter();
   const taxonomy = useTaxonomy();
   const [state, setState] = useState("");
-  const [lens, setLens] = useState("general");
+  const [lens, setLens] = useState("reader");
   const [picks, setPicks] = useState<Picks>({});
   const [expanded, setExpanded] = useState<string | null>(null);
 

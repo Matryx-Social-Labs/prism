@@ -56,7 +56,7 @@ async def handle_raw_item(payload: dict) -> None:
             subsector=feed_spec.subsector,
             regions=[source_country] if source_country else [],
             language="en",
-            role_interests=["finance_trader"] if feed_spec.sector in ("finance", "business") else [],
+            role_interests=["markets"] if feed_spec.sector in ("finance", "business") else [],
             route="standard",
             confidence=0.8,
         )
@@ -161,7 +161,7 @@ def _classify_cve_feed(source_slug: str, title: str, body: str | None) -> Classi
         subsector="vulnerabilities",
         regions=[],
         language="en",
-        role_interests=["cyber_grc"],
+        role_interests=["cyber"],
         route="fast_lane" if fast_lane else "standard",
         confidence=1.0,
     )
