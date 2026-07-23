@@ -17,6 +17,7 @@ def score_event(
     lens: Lens,
     reference_time: datetime,
     projection: dict | None,
+    languages: list[str] | None = None,
 ) -> float:
     now = datetime.now(UTC)
     ref = reference_time if reference_time.tzinfo else reference_time.replace(tzinfo=UTC)
@@ -43,5 +44,16 @@ def score_event(
 
     source_count = projection.get("source_count", 1)
     score += min(source_count - 1, 4) * weights.corroboration
+
+    # Language: RANK preferred-language coverage up, never filter it out — an
+    # English-only major story must still reach a Hindi/Kannada reader, just lower
+    # (a news app can't hide the news). Primary language gets the bigger nudge.
+    if languages:
+        event_langs = set(projection.get("languages") or [])
+        if event_langs:
+            if languages[0] in event_langs:
+                score += 0.3
+            elif event_langs & set(languages):
+                score += 0.15
 
     return round(score, 4)

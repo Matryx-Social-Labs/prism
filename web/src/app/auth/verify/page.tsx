@@ -19,10 +19,12 @@ function Verify() {
     }
     let cancelled = false;
     verifyMagicLink(token)
-      .then((s) => {
+      .then(({ session, needsProfile }) => {
         if (cancelled) return;
-        saveSession(s);
-        router.replace("/feed");
+        saveSession(session);
+        // New readers finish onboarding (name/profession/languages); returning
+        // readers land straight in the app.
+        router.replace(needsProfile ? "/onboarding" : "/feed");
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Sign-in failed.");

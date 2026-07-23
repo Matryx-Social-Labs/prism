@@ -251,7 +251,8 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
                 text(
                     """
                     SELECT e.shared_fields, e.lens_fields, e.summary, e.event_type, s.slug AS source_slug,
-                           s.country AS source_country,
+                           s.country AS source_country, s.language AS source_language,
+                           ri.title AS article_title, ri.published_at AS published_at,
                            ri.raw ->> 'sourcecountry' AS gdelt_country,
                            ri.classification AS classification
                     FROM event_memberships em
@@ -277,9 +278,31 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         role_interests: set[str] = set()
         origins: dict[str, int] = {}
         unknown_origins = 0
+        languages: set[str] = set()
+        best_headline: dict[str, dict] = {}  # lang -> most-recent member headline
         for row in rows:
             source_slugs.append(row["source_slug"])
             role_interests.update((row["classification"] or {}).get("role_interests") or [])
+            # Per-language display headline: the cluster stays cross-language; the
+            # feed renders each reader the headline in their preferred language (or
+            # falls back to English). Keep the most recent title per language.
+            lang = row["source_language"]
+            if lang:
+                languages.add(lang)
+                title = row["article_title"]
+                if title:
+                    pub = row["published_at"]
+                    cur = best_headline.get(lang)
+                    if cur is None or (
+                        pub is not None and (cur["_pub"] is None or pub > cur["_pub"])
+                    ):
+                        best_headline[lang] = {
+                            "lang": lang,
+                            "title": title,
+                            "source_slug": row["source_slug"],
+                            "published_at": pub.isoformat() if pub else None,
+                            "_pub": pub,
+                        }
             origin = row["source_country"] or gdelt_country_to_iso(row["gdelt_country"])
             if origin:
                 origins[origin] = origins.get(origin, 0) + 1
@@ -345,6 +368,13 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             "source_count": len(rows),
             "source_slugs": sorted(set(source_slugs)),
             "role_interests": sorted(role_interests),
+            # Languages this event is covered in + the per-language display headline
+            # (drop the internal sort key). Feed filters/ranks + localises on these.
+            "languages": sorted(languages),
+            "headlines": [
+                {k: v for k, v in h.items() if k != "_pub"}
+                for h in sorted(best_headline.values(), key=lambda x: x["lang"])
+            ],
             # Origin-country distribution of the coverage — the axis Prism
             # measures balance on (vs. Ground News' US left/right axis).
             "coverage": {

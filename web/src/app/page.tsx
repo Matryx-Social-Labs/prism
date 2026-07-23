@@ -82,11 +82,15 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Centered content shell — matches the global header/footer width so every
+// section's left edge lines up with the nav. Full-bleed bands wrap this shell.
+const SHELL = "mx-auto w-full max-w-[1320px] px-5 sm:px-8 xl:px-10";
+
 export default function LandingPage() {
   return (
-    <div className="mx-auto max-w-[1160px] px-5 sm:px-8 xl:px-10">
+    <div className="w-full">
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="grid items-center gap-10 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)] lg:gap-14 lg:pb-14 lg:pt-[76px]">
+      <section className={`${SHELL} grid items-center gap-10 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)] lg:gap-14 lg:pb-14 lg:pt-[76px]`}>
         <div>
           <p className="mb-4 text-[11.5px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--ink-faint)" }}>
             Role-aware news intelligence
@@ -128,13 +132,13 @@ export default function LandingPage() {
         <HeroLensDemo />
       </section>
 
-      {/* ── Open lens registry ───────────────────────────────── */}
+      {/* ── Open lens registry (full-bleed band) ─────────────── */}
       <Reveal
         as="section"
         className="border-y py-11 lg:py-12"
         style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
       >
-        <div className="grid items-center gap-10 lg:grid-cols-[360px_1fr] lg:gap-14">
+        <div className={`${SHELL} grid items-center gap-10 lg:grid-cols-[360px_1fr] lg:gap-14`}>
           <div>
             <h2 className="text-[26px] font-semibold leading-tight sm:text-[32px]" style={{ fontFamily: "var(--font-display), serif" }}>
               Your profession is a lens — and lenses are an open set.
@@ -181,7 +185,7 @@ export default function LandingPage() {
       </Reveal>
 
       {/* ── Both Sides ───────────────────────────────────────── */}
-      <Reveal as="section" className="grid items-center gap-10 py-16 lg:grid-cols-[420px_1fr] lg:gap-14">
+      <Reveal as="section" className={`${SHELL} grid items-center gap-10 py-16 lg:grid-cols-[420px_1fr] lg:gap-14`}>
         <div>
           <Eyebrow>Both Sides</Eyebrow>
           <h2 className="text-[28px] font-semibold leading-tight sm:text-[34px]" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -223,7 +227,7 @@ export default function LandingPage() {
       </Reveal>
 
       {/* ── How it works ─────────────────────────────────────── */}
-      <Reveal as="section" className="pb-16">
+      <Reveal as="section" className={`${SHELL} pb-16`}>
         <h2 className="mb-[26px] text-center text-[28px] font-semibold tracking-tight sm:text-[32px]" style={{ fontFamily: "var(--font-display), serif" }}>
           How Prism reads the news
         </h2>
@@ -243,7 +247,7 @@ export default function LandingPage() {
       </Reveal>
 
       {/* ── So What ──────────────────────────────────────────── */}
-      <Reveal as="section" className="grid items-center gap-10 pb-16 lg:grid-cols-[420px_1fr] lg:gap-14">
+      <Reveal as="section" className={`${SHELL} grid items-center gap-10 pb-16 lg:grid-cols-[420px_1fr] lg:gap-14`}>
         <div>
           <Eyebrow>So What</Eyebrow>
           <h2 className="text-[28px] font-semibold leading-tight sm:text-[34px]" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -276,7 +280,7 @@ export default function LandingPage() {
       </Reveal>
 
       {/* ── Blindspots + Ask ─────────────────────────────────── */}
-      <Reveal as="section" className="grid gap-6 pb-16 lg:grid-cols-2">
+      <Reveal as="section" className={`${SHELL} grid gap-6 pb-16 lg:grid-cols-2`}>
         <Card pop className="p-8">
           <Eyebrow>Blindspots</Eyebrow>
           <h2 className="text-[24px] font-semibold leading-tight sm:text-[26px]" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -362,7 +366,7 @@ export default function LandingPage() {
       </Reveal>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <section className="pb-[72px]">
+      <section className={`${SHELL} pb-[72px]`}>
         <div className="relative overflow-hidden rounded-[22px] border px-6 py-11 text-center" style={{ borderColor: "var(--line)" }}>
           <div className="spectrum-bar absolute inset-x-0 top-0 h-[3px]" aria-hidden />
           <h2 className="text-[28px] font-semibold tracking-tight sm:text-[32px]" style={{ fontFamily: "var(--font-display), serif" }}>

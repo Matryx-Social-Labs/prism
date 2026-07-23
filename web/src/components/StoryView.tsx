@@ -194,13 +194,16 @@ export function StoryView({ event }: { event: EventDetail }) {
   }, [event.id, storyCount]);
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-[120px] pt-7 sm:px-8">
+    <div className="mx-auto max-w-[1320px] px-5 pb-[120px] pt-7 sm:px-8 xl:px-10">
       <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
 
-      <div className="grid gap-10 lg:grid-cols-[1fr_300px] lg:items-start">
-        <article>
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+        {/* min-w-0: without it a grid item's default min-width:auto lets the
+            inner horizontal scrollers (lens-tab strip, mobile anchor nav, cyber
+            table) stretch the column past the viewport — the mobile right-bleed. */}
+        <article className="min-w-0">
       {/* ── Header ─────────────────────────────────────────── */}
       <header>
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -684,7 +687,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         </article>
 
         {/* ── Right rail — desktop only ─────────────────────── */}
-        <aside className="sticky top-16 hidden flex-col gap-3.5 lg:flex">
+        <aside className="sticky top-16 hidden min-w-0 flex-col gap-3.5 lg:flex">
           {/* On this story */}
           <div
             className="rounded-[18px] border px-[18px] py-4"

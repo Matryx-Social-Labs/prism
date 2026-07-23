@@ -57,16 +57,14 @@ async function detail(res: Response, fallback: string): Promise<string> {
   }
 }
 
-export async function requestMagicLink(
-  email: string,
-  consent: boolean,
-  name: string,
-  profession: string,
-): Promise<void> {
+/** Email-first: we always send a link (same response for new + returning readers,
+ * so an onlooker can't tell whether an email is registered). The profile is
+ * collected after verify, so this call needs nothing but an email. */
+export async function requestMagicLink(email: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/auth/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, consent, name, profession }),
+    body: JSON.stringify({ email }),
   });
   if (!res.ok) throw new Error(await detail(res, "Could not send the sign-in link"));
 }
@@ -82,15 +80,54 @@ export async function fetchProfessions(): Promise<ProfessionGroup[]> {
   return ((await res.json()) as { groups: ProfessionGroup[] }).groups;
 }
 
-export async function verifyMagicLink(token: string): Promise<Session> {
+export interface LanguageOption {
+  code: string;
+  name: string;
+  native: string;
+}
+
+export async function fetchLanguages(): Promise<{ languages: LanguageOption[]; default: string[] }> {
+  const res = await fetch(`${API_URL}/api/v1/languages`);
+  if (!res.ok) return { languages: [], default: [] };
+  return (await res.json()) as { languages: LanguageOption[]; default: string[] };
+}
+
+export interface VerifyResult {
+  session: Session;
+  needsProfile: boolean;
+}
+
+export async function verifyMagicLink(token: string): Promise<VerifyResult> {
   const res = await fetch(`${API_URL}/api/v1/auth/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token }),
   });
   if (!res.ok) throw new Error(await detail(res, "This sign-in link is invalid or expired"));
-  const d = (await res.json()) as { token: string; user_id: string; email: string };
-  return { token: d.token, userId: d.user_id, email: d.email };
+  const d = (await res.json()) as {
+    token: string;
+    user_id: string;
+    email: string;
+    needs_profile: boolean;
+  };
+  return {
+    session: { token: d.token, userId: d.user_id, email: d.email },
+    needsProfile: d.needs_profile,
+  };
+}
+
+/** Complete onboarding for the signed-in reader (name, profession, location,
+ * languages ordered by preference, consent). Requires a verified session. */
+export async function setProfile(
+  session: Session,
+  body: { name: string; profession: string; state: string | null; languages: string[]; consent: boolean },
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/auth/profile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader(session) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await detail(res, "Could not save your profile"));
 }
 
 /** Reactive session: re-reads on sign-in/out (same tab) and on storage (other tabs). */

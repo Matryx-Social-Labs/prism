@@ -26,6 +26,8 @@ SOURCES = [
     {"slug": "aajtak", "name": "Aaj Tak", "source_type": "rss", "country": "IN", "language": "hi"},
     {"slug": "amarujala", "name": "Amar Ujala", "source_type": "rss", "country": "IN", "language": "hi"},
     {"slug": "bbc_tamil", "name": "BBC Tamil", "source_type": "rss", "country": "IN", "language": "ta", "reliability": {"funding": "public"}},
+    {"slug": "prajavani", "name": "Prajavani", "source_type": "rss", "country": "IN", "language": "kn"},
+    {"slug": "tv9kannada", "name": "TV9 Kannada", "source_type": "rss", "country": "IN", "language": "kn"},
     # ── India state editions ──
     {"slug": "thehindu_tamilnadu", "name": "The Hindu — Tamil Nadu", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "thehindu_kerala", "name": "The Hindu — Kerala", "source_type": "rss", "country": "IN", "language": "en"},

@@ -20,12 +20,14 @@ async def get_feed(
     interests: str | None = None,
     region: str | None = None,
     state: str | None = None,  # ISO 3166-2 (e.g. IN-KA) — surfaces the reader's state first
+    languages: str | None = None,  # comma-sep, preference order; ranks + localises (never filters)
     sort: str = "latest",
     limit: int = 30,
     db: AsyncSession = Depends(get_db),
 ):
     limit = min(max(limit, 1), 100)
     active_lens = get_lens(lens)
+    langs = [c.strip() for c in (languages or "").split(",") if c.strip()] or None
     # Interest pairs from the profile: "sports:cricket,politics,technology:ai".
     # A bare sector means the whole sector; explicit ?sector= wins over both.
     interest_pairs: dict[str, set[str]] = {}
@@ -85,7 +87,7 @@ async def get_feed(
             continue
         # is_regional reflects the state when the reader gave one (India-first
         # tiering), else the country region.
-        items.append(build_feed_item(row, active_lens, state or region))
+        items.append(build_feed_item(row, active_lens, state or region, langs))
     if sort == "top":
         items.sort(key=lambda i: i.score, reverse=True)
     else:  # latest — a news feed reads newest-first by default

@@ -52,6 +52,9 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("aajtak", "https://www.aajtak.in/rssfeeds/?id=home"),
     FeedSpec("amarujala", "https://www.amarujala.com/rss/breaking-news.xml"),
     FeedSpec("bbc_tamil", "https://feeds.bbci.co.uk/tamil/rss.xml"),
+    # Kannada (Bangalore launch). Validated: 5/5 Kannada titles, fresh dailies.
+    FeedSpec("prajavani", "https://www.prajavani.net/feed", state="IN-KA"),
+    FeedSpec("tv9kannada", "https://tv9kannada.com/feed", state="IN-KA"),
     # ── India state editions (The Hindu state feeds + TOI metros) ──
     FeedSpec("thehindu_tamilnadu", "https://www.thehindu.com/news/national/tamil-nadu/feeder/default.rss", state="IN-TN"),
     FeedSpec("thehindu_kerala", "https://www.thehindu.com/news/national/kerala/feeder/default.rss", state="IN-KL"),
