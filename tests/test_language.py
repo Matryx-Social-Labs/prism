@@ -55,3 +55,13 @@ def test_language_boost_ranks_preferred_up_without_filtering():
     assert english_only_for_hi_reader > 0
     # But a story covered in the reader's PRIMARY language ranks above it.
     assert top > english_only_for_hi_reader >= base
+
+
+def test_default_lens_is_general_reader():
+    """Missing OR unknown lens must fall back to the general reader (all sectors),
+    not a narrow professional lens. Regression: DEFAULT_LENS="cyber" served a
+    general visitor cybersecurity-only when no/stale lens slug was sent."""
+    for slug in (None, "", "general", "some-old-slug"):
+        lens = get_lens(slug)
+        assert lens.slug == "reader"
+        assert lens.sectors == []  # [] = all sectors, i.e. every story
