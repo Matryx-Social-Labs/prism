@@ -215,6 +215,34 @@ class EventEntity(TimestampMixin, Base):
     provenance: Mapped[dict | None] = mapped_column(JSONB)
 
 
+class Story(TimestampMixin, Base):
+    """A trending community promoted to a durable, shareable identity. See
+    correlation/trending.py for how the reconciliation pass keeps `slug` stable
+    across coverage growth (match by overlap; merges point `merged_into` at the
+    oldest; stops-trending → status='dormant', never deleted)."""
+
+    __tablename__ = "stories"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)  # frozen at creation
+    label: Mapped[str] = mapped_column(Text, nullable=False)  # extractive cast (refines over time)
+    cast_: Mapped[list] = mapped_column("cast", JSONB, nullable=False)  # protagonist names
+    member_event_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
+    hero_event_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    sector: Mapped[str | None] = mapped_column(Text)
+    regions: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    source_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    velocity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    status: Mapped[str] = mapped_column(Text, default="active", nullable=False)  # active|dormant
+    merged_into: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class Perspective(TimestampMixin, Base):
     __tablename__ = "perspectives"
 

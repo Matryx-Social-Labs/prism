@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
+import { TrendingBlock } from "@/components/TrendingBlock";
 import { useTaxonomy } from "@/components/ProfileEditor";
 import { fetchDigest, fetchFeed, type FeedItem, type MarketDigest } from "@/lib/api";
 import { lensMeta, useLenses } from "@/lib/lenses";
@@ -266,6 +267,8 @@ export default function FeedPage() {
             ))}
           </div>
         </div>
+
+        <TrendingBlock state={profile?.state} />
 
         {error && (
           <div className="rounded-[18px] border p-5 text-sm" style={{ borderColor: "var(--danger)", background: "var(--danger-bg)", color: "var(--danger)" }}>

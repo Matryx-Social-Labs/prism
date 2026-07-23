@@ -68,6 +68,24 @@ async def _analysis_sweeper() -> None:
         await asyncio.sleep(SWEEP_INTERVAL_S)
 
 
+TRENDING_INTERVAL_S = int(os.environ.get("PRISM_TRENDING_INTERVAL_S", "600"))
+
+
+async def _trending_reconciler() -> None:
+    """Reconcile trending stories on an interval, off the ingest path. Keeps the
+    /trending slugs stable (see correlation/trending.py)."""
+    from common.db import session_scope
+    from correlation.trending import reconcile_stories
+
+    while True:
+        await asyncio.sleep(TRENDING_INTERVAL_S)
+        try:
+            async with session_scope() as session:
+                await reconcile_stories(session)
+        except Exception:
+            logger.exception("trending_reconciler_error")
+
+
 async def _health_server() -> None:
     """Minimal HTTP 200 responder on $PORT.
 
@@ -155,6 +173,7 @@ async def main(stages: list[str]) -> None:
         # Debounced analysis sweeper: attach is real-time (above); the expensive
         # per-story LLM analysis runs here, coalesced, off the ingest hot path.
         tasks.append(asyncio.create_task(_analysis_sweeper()))
+        tasks.append(asyncio.create_task(_trending_reconciler()))
 
     if len(tasks) <= 1:  # only the health server — no stage selected
         raise SystemExit("no stages selected")

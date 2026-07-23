@@ -3,6 +3,31 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.57.0] - 2026-07-23
+
+### Added
+- **Trending stories** — persistent, shareable communities in the top slot (the thesis:
+  "one story, not scattered headlines"). Replaces the old multi-source-event "Top Stories".
+  - **Engine** (`correlation/trending.py`, no LLM): rank events by velocity (distinct NEW
+    news outlets in 6h, CVE/raw feeds excluded) → group via the existing per-event
+    community detection → dedupe by member-set overlap ≥ 0.6. A community earns a durable
+    `stories` row only past a min-support gate (≥2 outlets, ≥2 events).
+  - **Stable identity** — the reconciliation state machine keeps `/trending/<slug>` from
+    silently changing meaning: match ≥0.6 → UPDATE (id + slug persist); no match → CREATE
+    (slug frozen at creation from the cast); ≥2 matches → MERGE (oldest wins, the younger
+    points `merged_into` and its URL resolves to the canonical); stops trending → `dormant`,
+    never deleted (shared links never 404). Runs every 10 min off the ingest path.
+  - **API**: `GET /api/v1/trending?state=&sector=` (scoped, ranked) + `GET /api/v1/trending/{slug}`
+    (follows merges → `canonical_slug`, returns the live start→now timeline).
+  - **Frontend**: feed "Trending now" block with a geo toggle (near-me / India) + auto-scope
+    on sector pages; a `/trending` list page; `/trending/[slug]` shareable permalinks.
+  - **Shareable** (D2:A): an auto-generated **`next/og`** social card per story (label + cast
+    + outlet count + brand spectrum) so a forwarded link renders a premium preview — the
+    WhatsApp-first India growth loop. Web Share API + copy-link affordance.
+
+  Deferred: LLM "X vs Y" labels (extractive cast for now); pretty slugs beyond `label-<id6>`;
+  per-story share-count analytics; the "what's new since you looked" badge.
+
 ## [0.0.56.0] - 2026-07-23
 
 ### Added
