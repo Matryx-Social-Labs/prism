@@ -82,21 +82,28 @@ def _format(stories: list[dict]) -> str:
     return "\n".join(lines)
 
 
-async def _generate() -> dict:
+async def _generate() -> dict | None:
     now = datetime.now(UTC).isoformat()
     stories = await _top_stories()
     if not stories:
         return {"headline": "Markets are quiet", "narrative": "No market-moving stories yet.", "movers": [], "event_ids": [], "generated_at": now}
     prompt = fetch_prompt("market-digest")
     messages = prompt.compile(stories=_format(stories))
-    result = await structured_chat(
-        model=get_settings().prism_model_correlate,
-        messages=messages,
-        output_model=MarketDigestLLM,
-        trace_name="market-digest",
-        metadata={"stage": "market-digest", "n": len(stories)},
-        langfuse_prompt=prompt if prompt.version else None,
-    )
+    try:
+        result = await structured_chat(
+            model=get_settings().prism_model_correlate,
+            messages=messages,
+            output_model=MarketDigestLLM,
+            trace_name="market-digest",
+            metadata={"stage": "market-digest", "n": len(stories)},
+            langfuse_prompt=prompt if prompt.version else None,
+        )
+    except Exception:
+        # The Pulse is a pure LLM synthesis — if the model is unavailable (quota
+        # exhausted, timeout), degrade to no-digest so the endpoint 204s and the
+        # feed hides the card, instead of surfacing a 500 to every reader.
+        logger.warning("market_digest_unavailable", stories=len(stories), exc_info=True)
+        return None
     # Ground the movers: keep only tickers that actually appear in the source
     # events, so the digest can't surface a ticker the LLM inferred from context.
     real_tickers = {t.upper() for st in stories for t in st["tickers"]}
@@ -113,8 +120,10 @@ async def _generate() -> dict:
     }
 
 
-async def get_market_digest() -> dict:
-    """Cached digest; regenerates once per TTL, single-flighted across replicas."""
+async def get_market_digest() -> dict | None:
+    """Cached digest; regenerates once per TTL, single-flighted across replicas.
+    Returns None when synthesis is unavailable (the route 204s and the feed hides
+    the Pulse card) — never cache a failure, so it retries on the next request."""
     redis = get_redis()
     cached = await redis.get(CACHE_KEY)
     if cached:
@@ -126,6 +135,7 @@ async def get_market_digest() -> dict:
             if cached:
                 return json.loads(cached)
         digest = await _generate()
-        # generated_at stamped by the caller side via Redis? Keep it in payload:
+        if digest is None:
+            return None
         await redis.set(CACHE_KEY, json.dumps(digest), ex=CACHE_TTL)
         return digest

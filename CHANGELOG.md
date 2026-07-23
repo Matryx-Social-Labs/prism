@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.62.0] - 2026-07-23
+
+### Fixed
+- Design-review findings on the live feed v3:
+  - **Per-card language tags now render.** The API returns `headline_lang: null`
+    for every item, so the हिंदी/ಕನ್ನಡ tag never showed. Cards now fall back to
+    Unicode-script detection (`detectScript`) from the headline text — a Devanagari
+    or Kannada headline is tagged immediately, no backend dependency.
+  - **Market Pulse no longer 500s.** `/api/v1/digest/markets` is a pure LLM
+    synthesis; with the model quota exhausted it threw an unhandled 500 (which the
+    browser reported as a CORS failure). It now degrades: LLM unavailable → the
+    digest route 204s and the feed hides the Pulse card. Failures are never cached,
+    so it recovers on the next request once the model is back.
+
 ## [0.0.61.0] - 2026-07-23
 
 ### Changed

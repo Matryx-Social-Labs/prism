@@ -249,7 +249,7 @@ export interface MarketDigest {
 
 export async function fetchDigest(): Promise<MarketDigest | null> {
   const res = await fetch(`${API_URL}/api/v1/digest/markets`, { next: { revalidate: 900 } });
-  if (!res.ok) return null;
+  if (!res.ok || res.status === 204) return null; // 204 = synthesis unavailable → hide the card
   return (await res.json()) as MarketDigest;
 }
 
