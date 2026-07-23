@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { FeedItem } from "@/lib/api";
+import { langName, langNative } from "@/lib/languages";
 
 export function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -16,10 +17,23 @@ export function itemMeta(item: FeedItem): string {
   return `${item.source_count} source${item.source_count === 1 ? "" : "s"} · ${timeAgo(item.last_updated_at)}`;
 }
 
-export function StoryBadges({ item, lens }: { item: FeedItem; lens: string }) {
+export function StoryBadges({ item, lens, primaryLang = "en" }: { item: FeedItem; lens: string; primaryLang?: string }) {
   const chip = "rounded-full px-[9px] py-0.5 text-[11px] font-semibold whitespace-nowrap";
+  // Tag the headline's language only when it isn't the reader's primary — so a
+  // Hindi/Kannada headline reads as "translation available" rather than a
+  // surprise (design v3). Bordered + UI font (a locale tag, not provenance).
+  const showLang = item.headline_lang && item.headline_lang !== primaryLang;
   return (
     <>
+      {showLang && (
+        <span
+          className={`${chip} border`}
+          style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+          title={`Headline is in ${langName(item.headline_lang!)}${item.available_languages.includes(primaryLang) ? " — translation available" : ""}`}
+        >
+          {langNative(item.headline_lang!)}
+        </span>
+      )}
       {item.sector && (
         <span
           className={`${chip} uppercase tracking-wide`}
@@ -96,7 +110,7 @@ export function StoryBadges({ item, lens }: { item: FeedItem; lens: string }) {
   );
 }
 
-export function StoryRowCard({ item, lens }: { item: FeedItem; lens: string }) {
+export function StoryRowCard({ item, lens, primaryLang }: { item: FeedItem; lens: string; primaryLang?: string }) {
   return (
     <Link
       href={`/story/${item.id}`}
@@ -105,7 +119,7 @@ export function StoryRowCard({ item, lens }: { item: FeedItem; lens: string }) {
     >
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="flex flex-wrap items-center gap-[5px]">
-          <StoryBadges item={item} lens={lens} />
+          <StoryBadges item={item} lens={lens} primaryLang={primaryLang} />
           <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
             {itemMeta(item)}
           </span>
@@ -137,7 +151,7 @@ export function StoryRowCard({ item, lens }: { item: FeedItem; lens: string }) {
   );
 }
 
-export function TopStoryCard({ item, lens }: { item: FeedItem; lens: string }) {
+export function TopStoryCard({ item, lens, primaryLang }: { item: FeedItem; lens: string; primaryLang?: string }) {
   return (
     <Link
       href={`/story/${item.id}`}
@@ -160,7 +174,7 @@ export function TopStoryCard({ item, lens }: { item: FeedItem; lens: string }) {
       )}
       <span className="flex flex-1 flex-col gap-[9px] px-[18px] pb-[18px] pt-4">
         <span className="flex flex-wrap gap-[5px]">
-          <StoryBadges item={item} lens={lens} />
+          <StoryBadges item={item} lens={lens} primaryLang={primaryLang} />
         </span>
         <span className="text-[15.5px] font-semibold leading-[1.4]" style={{ color: "var(--ink)" }}>
           {item.title}

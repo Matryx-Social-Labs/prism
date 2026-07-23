@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -32,8 +33,8 @@ export default function TrendingPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[820px] px-5 pb-24 pt-8 sm:px-8">
-      <h1 className="text-[30px] font-semibold leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+    <div className="mx-auto max-w-[720px] px-8 pb-24 pt-10">
+      <h1 className="text-[30px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         Trending now
       </h1>
       <p className="mt-2 text-[14px]" style={{ color: "var(--ink-muted)" }}>
@@ -42,28 +43,31 @@ export default function TrendingPage() {
 
       {tabs.length > 1 && (
         <div className="mt-5 flex gap-2">
-          {tabs.map((t) => (
-            <button
-              key={t.k}
-              onClick={() => setScope(t.k as "local" | "india")}
-              className="min-h-[36px] rounded-full border px-4 text-[13px] font-medium transition"
-              style={{
-                borderColor: scope === t.k ? "var(--ink)" : "var(--line-strong)",
-                background: scope === t.k ? "var(--ink)" : "transparent",
-                color: scope === t.k ? "var(--bg)" : "var(--ink)",
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            const active = scope === t.k;
+            return (
+              <button
+                key={t.k}
+                onClick={() => setScope(t.k as "local" | "india")}
+                className="rounded-full border px-[18px] py-2 text-[13px] font-semibold transition"
+                style={{
+                  borderColor: active ? "var(--ink)" : "var(--line-strong)",
+                  background: active ? "var(--ink)" : "transparent",
+                  color: active ? "var(--bg)" : "var(--ink)",
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <div className="mt-7 flex flex-col divide-y" style={{ borderColor: "var(--line)" }}>
+      <div className="mt-5 flex flex-col">
         {stories === null ? (
-          <p className="py-8 text-[13px]" style={{ color: "var(--ink-faint)" }}>Loading…</p>
+          [0, 1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)
         ) : stories.length === 0 ? (
-          <p className="py-8 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="py-4 text-[13px]" style={{ color: "var(--ink-faint)" }}>
             No trending stories here right now — check back soon.
           </p>
         ) : (
@@ -76,24 +80,65 @@ export default function TrendingPage() {
 
 function StoryRow({ story, rank }: { story: TrendingStory; rank: number }) {
   return (
-    <Link href={`/trending/${story.slug}`} className="flex items-start gap-4 py-4" style={{ borderColor: "var(--line)" }}>
-      <span className="mt-0.5 w-6 shrink-0 text-[15px] font-semibold" style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}>
+    <Link
+      href={`/trending/${story.slug}`}
+      className="flex items-start gap-4 border-b py-4"
+      style={{ borderColor: "var(--line)" }}
+    >
+      <span
+        className="w-6 shrink-0 text-[15px] font-semibold"
+        style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
+      >
         {rank}
       </span>
-      {story.hero_image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={story.hero_image} alt="" width={72} height={72} className="h-[72px] w-[72px] shrink-0 rounded-[10px] object-cover" />
-      )}
+      <span
+        className="relative block h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[10px]"
+        style={{ background: "var(--bg-sunken)" }}
+      >
+        {story.hero_image && (
+          <Image
+            src={story.hero_image}
+            alt=""
+            fill
+            sizes="72px"
+            className="object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLElement).style.display = "none";
+            }}
+          />
+        )}
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[16px] font-semibold leading-snug" style={{ fontFamily: "var(--font-display), serif" }}>
+        <p className="text-[16px] font-semibold leading-[1.4]" style={{ fontFamily: "var(--font-display), serif" }}>
           {story.label}
         </p>
-        <p className="mt-1.5 text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}>
+        <p
+          className="mt-1.5 text-[11px] uppercase tracking-[0.08em]"
+          style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
+        >
           {story.source_count} outlets · {story.developments} developments
-          {story.velocity > 0 ? " · developing now" : ""}
+          {story.velocity > 0 && (
+            <>
+              {" · "}
+              <span style={{ color: "var(--up)" }}>developing now</span>
+            </>
+          )}
         </p>
       </div>
     </Link>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="flex items-start gap-4 border-b py-4" style={{ borderColor: "var(--line)" }}>
+      <span className="w-6 shrink-0" />
+      <span className="block h-[72px] w-[72px] shrink-0 animate-pulse rounded-[10px]" style={{ background: "var(--bg-sunken)" }} />
+      <div className="min-w-0 flex-1 space-y-2 pt-1">
+        <span className="block h-[14px] w-3/4 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
+        <span className="block h-[10px] w-2/5 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
+      </div>
+    </div>
   );
 }
 

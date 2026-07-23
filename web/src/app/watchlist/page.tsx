@@ -61,7 +61,7 @@ export default function WatchlistPage() {
   if (!session) return null;
 
   return (
-    <div className="mx-auto w-full max-w-[720px] px-5 py-12">
+    <div className="mx-auto w-full max-w-[640px] px-8 pt-11 pb-24">
       <h1 className="text-[30px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         Followed signals
       </h1>
@@ -69,11 +69,11 @@ export default function WatchlistPage() {
         Follow tickers and sectors; their market-moving stories collect here when you open Prism.
       </p>
 
-      <form onSubmit={add} className="mt-6 flex flex-wrap items-center gap-2">
+      <form onSubmit={add} className="mt-[22px] flex gap-2">
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value)}
-          className="rounded-[10px] border px-3 py-2 text-[14px]"
+          className="rounded-[10px] border px-3.5 py-2.5 text-[14px]"
           style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
         >
           <option value="ticker">Ticker</option>
@@ -83,12 +83,12 @@ export default function WatchlistPage() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={kind === "ticker" ? "e.g. RELIANCE" : "e.g. finance"}
-          className="flex-1 rounded-[10px] border px-3 py-2 text-[14px] outline-none"
+          className="flex-1 rounded-[10px] border px-3.5 py-2.5 text-[14px] outline-none"
           style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
         />
         <button
           type="submit"
-          className="rounded-full px-4 py-2 text-[13px] font-semibold"
+          className="rounded-full px-5 py-2.5 text-[13px] font-semibold"
           style={{ background: "var(--ink)", color: "var(--bg)" }}
         >
           Follow
@@ -96,11 +96,11 @@ export default function WatchlistPage() {
       </form>
 
       {items.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3.5 flex flex-wrap gap-2">
           {items.map((it) => (
             <span
               key={it.id}
-              className="flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11.5px]"
+              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11.5px]"
               style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
             >
               {it.kind === "sector" ? it.value : `$${it.value}`}
@@ -112,39 +112,61 @@ export default function WatchlistPage() {
         </div>
       )}
 
-      <h2 className="mt-10 text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+      <h2
+        className="mt-9 text-[12px] font-semibold uppercase tracking-[0.14em]"
+        style={{ color: "var(--ink-faint)" }}
+      >
         Recent on your signals
       </h2>
       {ready && events.length === 0 ? (
-        <p className="mt-3 text-[14px]" style={{ color: "var(--ink-muted)" }}>
+        <p className="mt-2 text-[14px]" style={{ color: "var(--ink-muted)" }}>
           {items.length === 0
             ? "Follow a ticker or sector above to start seeing its stories."
             : "No recent stories on your followed signals yet."}
         </p>
       ) : (
-        <ul className="mt-3 flex flex-col divide-y" style={{ borderColor: "var(--line)" }}>
-          {events.map((ev) => (
-            <li key={ev.id} className="py-3.5">
-              <Link href={`/story/${ev.id}`} className="flex flex-col gap-1.5">
-                <span className="text-[15px] font-medium leading-snug">{ev.title}</span>
-                <span className="flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-                  {ev.catalyst && <span>{ev.catalyst.replaceAll("_", " ")}</span>}
-                  {ev.tickers.slice(0, 3).map((t) => (
-                    <span key={t} style={{ color: "var(--lens-finance)" }}>
-                      ${t}
-                    </span>
-                  ))}
-                  <span>· {timeAgo(ev.last_updated_at)}</span>
-                </span>
+        <div className="mt-2 flex flex-col">
+          {events.map((ev) => {
+            const isTicker = ev.tickers.length > 0;
+            return (
+              <Link
+                key={ev.id}
+                href={`/story/${ev.id}`}
+                className="flex items-baseline gap-[14px] border-b py-3.5"
+                style={{ borderColor: "var(--line)" }}
+              >
+                {isTicker ? (
+                  <span
+                    className="flex-none rounded-full px-[9px] py-0.5 font-mono text-[11px] font-semibold"
+                    style={{ background: "var(--lens-finance-bg)", color: "var(--lens-finance)" }}
+                  >
+                    ${ev.tickers[0]}
+                  </span>
+                ) : ev.sector ? (
+                  <span
+                    className="flex-none rounded-full px-[9px] py-0.5 text-[11px] font-semibold"
+                    style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}
+                  >
+                    {ev.sector}
+                  </span>
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-semibold leading-[1.4]">{ev.title}</p>
+                  <p className="mt-[3px] font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+                    {timeAgo(ev.last_updated_at)}
+                    {ev.catalyst && (
+                      <>
+                        {" · "}
+                        <span style={{ color: "var(--up)" }}>▲ {ev.catalyst.replaceAll("_", " ")}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
               </Link>
-            </li>
-          ))}
-        </ul>
+            );
+          })}
+        </div>
       )}
-
-      <Link href="/feed" className="mt-8 inline-block text-[13px]" style={{ color: "var(--ink-faint)" }}>
-        ← Back to your feed
-      </Link>
     </div>
   );
 }

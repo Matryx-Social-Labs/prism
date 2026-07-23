@@ -2,86 +2,54 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { lensMeta } from "@/lib/lenses";
-import { loadProfile } from "@/lib/profile";
 import { useSession } from "@/lib/session";
+
+const NAV = [
+  { href: "/feed", label: "Feed" },
+  { href: "/trending", label: "Trending" },
+  { href: "/pulse", label: "Pulse" },
+  { href: "/watchlist", label: "Watchlist" },
+];
 
 export function HeaderNav() {
   const pathname = usePathname();
-  const [lens, setLens] = useState<string | null>(null);
   const session = useSession();
 
-  useEffect(() => {
-    setLens(loadProfile()?.lens ?? null);
-  }, [pathname]);
-
-  const m = lens ? lensMeta(lens) : null;
+  const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <nav className="flex items-center gap-1 sm:gap-2">
       {/* Text links live on desktop only; on mobile the bottom tab bar owns
-          Feed / Pulse / Search / Saved, so the header stays uncluttered. */}
-      <Link
-        href="/feed"
-        className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
-        style={{ color: pathname === "/feed" ? "var(--ink)" : "var(--ink-muted)" }}
-      >
-        Feed
-      </Link>
-      <Link
-        href="/pulse"
-        className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
-        style={{ color: pathname === "/pulse" ? "var(--ink)" : "var(--ink-muted)" }}
-      >
-        Pulse
-      </Link>
-      <Link
-        href="/about"
-        className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
-        style={{ color: pathname === "/about" ? "var(--ink)" : "var(--ink-muted)" }}
-      >
-        About
-      </Link>
+          navigation, so the header stays uncluttered. No lens control here:
+          the lens is set in "Your Prism" (/interests) and flipped per-story
+          in the story view — the header stays monochrome chrome. */}
+      {NAV.map((n) => (
+        <Link
+          key={n.href}
+          href={n.href}
+          className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
+          style={{ color: active(n.href) ? "var(--ink)" : "var(--ink-muted)" }}
+        >
+          {n.label}
+        </Link>
+      ))}
       <Link
         href="/search"
         aria-label="Search"
         className="hidden h-8 w-8 items-center justify-center rounded-full sm:flex"
-        style={{ color: pathname === "/search" ? "var(--ink)" : "var(--ink-muted)" }}
+        style={{ color: active("/search") ? "var(--ink)" : "var(--ink-muted)" }}
       >
         <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none">
           <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
           <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </Link>
-      {session && (
-        <Link
-          href="/watchlist"
-          className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
-          style={{ color: pathname === "/watchlist" ? "var(--ink)" : "var(--ink-muted)" }}
-        >
-          Watchlist
-        </Link>
-      )}
-      {m && (
-        <Link
-          href="/interests"
-          className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold"
-          style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
-          title="Your region, lens, and interests"
-        >
-          <span className="h-[7px] w-[7px] rounded-full" style={{ background: m.color }} />
-          {m.short}
-        </Link>
-      )}
-      {/* Sign-in text link is desktop-only; on mobile the "Get your feed" CTA
-          is the single entry point (matches the mockup's mobile header). */}
       {!session && (
         <Link
           href="/signin"
           className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
-          style={{ color: pathname === "/signin" ? "var(--ink)" : "var(--ink-muted)" }}
+          style={{ color: active("/signin") ? "var(--ink)" : "var(--ink-muted)" }}
         >
           Sign in
         </Link>

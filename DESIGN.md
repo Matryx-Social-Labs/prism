@@ -69,8 +69,10 @@ flip is the only colorful event on the page — that is what makes it the memora
 
 ## Layout
 - **Approach:** Hybrid — grid-disciplined app, poster-style landing.
-- **Max content width:** shell/landing 1320px, feed/sector 1200px, story 880px,
-  about 760px, onboarding/interests 720px; padding `px-5 sm:px-8 xl:px-10`.
+- **Max content width:** header/footer chrome 1280px; content shells
+  (landing/feed/sector/story) 1240px so their columns share a left edge; the story
+  reading column sits ~880px inside its rail layout; about 760px,
+  onboarding/interests 720px; padding `px-5 sm:px-8 xl:px-10`.
 - **Border radius:** chips/pills 9999px, cards 18px, panels 22px, thumbnails 12px.
 - **Alignment:** hard left edges for content; centered only for marketing section heads.
 
@@ -100,6 +102,9 @@ flip is the only colorful event on the page — that is what makes it the memora
 | 2026-07-19 | Memorable thing = the lens flip | Founder choice (D2) |
 | 2026-07-19 | Keep light+dark, keep lens hues, keep WebGL prism hero | Founder's prior explicit calls; contrarian "Night Desk" dark-only direction declined |
 | 2026-07-19 | Space Grotesk → General Sans; add IBM Plex Mono provenance layer | Anti-convergence + both design voices agreed |
+| 2026-07-23 | Feed v3: remove feed lens pills; scope selector (All / <state> / National) + language chip replace them; Trending joins the nav | Lens is a per-story flip, not a feed filter; quieter chrome at rest (Prism UI Design.dc.html, frame 3a) |
+| 2026-07-23 | No global lens switcher in the header chrome | Founder call (B): lens is set in "Your Prism" and flipped per-story; deliberate departure from design v3, which kept a header lens chip |
+| 2026-07-23 | Content shells unified to 1240px (header/footer 1280px) | Column left-edges line up across landing/feed/sector/story |
 
 ## Preview artifact
 `~/.gstack/projects/Matryx-Social-Labs-prism/designs/design-system-20260719/prism-design-preview.html`
