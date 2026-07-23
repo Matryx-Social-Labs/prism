@@ -72,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           className="sticky top-0 z-40 border-b backdrop-blur-md"
           style={{ borderColor: "var(--line)", background: "var(--glass)" }}
         >
-          <div className="mx-auto flex max-w-[1320px] items-center justify-between gap-3 px-5 py-[11px] sm:px-8 xl:px-10">
+          <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 px-5 py-[11px] sm:px-8 xl:px-10">
             <Link href="/" className="flex items-center gap-2.5" style={{ color: "var(--ink)" }}>
               <PrismMark />
               <span
@@ -89,7 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomTabBar />
         <footer className="mt-auto border-t" style={{ borderColor: "var(--line)" }}>
           <div
-            className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
+            className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
             style={{ color: "var(--ink-muted)" }}
           >
             <span>◮ Prism — role-aware news intelligence. Every claim traceable to its source.</span>

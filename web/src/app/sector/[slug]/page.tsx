@@ -33,7 +33,7 @@ export default function SectorPage({ params }: { params: Promise<{ slug: string 
   );
 
   return (
-    <div className="mx-auto grid max-w-[1320px] items-start gap-8 px-5 pb-24 pt-6 sm:px-8 lg:grid-cols-[200px_1fr] lg:pb-20 xl:px-10">
+    <div className="mx-auto grid max-w-[1280px] items-start gap-8 px-5 pb-24 pt-6 sm:px-8 lg:grid-cols-[200px_1fr] lg:pb-20 xl:px-10">
       {/* Sections rail — carries over from the feed. Hidden on mobile. */}
       <aside className="sticky top-4 hidden flex-col gap-0.5 lg:flex">
         <span
