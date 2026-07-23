@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.60.0] - 2026-07-23
+
+### Fixed
+- Feed default lens: **general reader, not cybersecurity**. `DEFAULT_LENS` was `"cyber"`,
+  and `get_lens()` falls back to it for a missing OR unknown slug — so a visitor whose
+  request carried no lens, or a stale pre-rename lens in localStorage, was served
+  `/api/v1/feed` filtered to **cybersecurity-only** (all CVEs, single left-rail section)
+  until a lens was re-sent. Confirmed on prod: no-lens feed returned 40/40 cybersecurity
+  items; `lens=reader` returned the full sector mix. Default is now `"reader"` (sectors=[]
+  → every story). The picker still leads with the professional beachhead (lens order is
+  unchanged); only the ambiguous-case fallback moved.
+
 ## [0.0.59.0] - 2026-07-23
 
 ### Fixed

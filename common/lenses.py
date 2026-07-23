@@ -120,7 +120,13 @@ LENSES: dict[str, Lens] = {
     ),
 }
 
-DEFAULT_LENS = "cyber"
+# The fallback for a missing OR unknown lens slug. MUST be the general reader
+# (sectors=[] → all news): the feed calls get_lens() for every request, so any
+# absent/stale slug (e.g. a pre-rename lens in a returning visitor's localStorage)
+# lands here — defaulting to a narrow professional lens like "cyber" would serve a
+# general visitor cybersecurity-only. The picker still LEADS with the professional
+# beachhead (active_lenses order); that's presentation, not this fallback.
+DEFAULT_LENS = "reader"
 
 
 def get_lens(slug: str | None) -> Lens:
