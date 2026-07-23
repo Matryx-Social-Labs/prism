@@ -3,6 +3,21 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.61.0] - 2026-07-23
+
+### Changed
+- Feed **v3** (design `Prism UI Design.dc.html`, frame 3a): the feed's lens pills are
+  gone — lens is a per-story flip, not a feed filter. In their place: a scope selector
+  (All / <your state> / National) + a language-preference chip; Trending joins the nav
+  (header, left rail, bottom tab bar) and the right rail gains a "Trending now" block.
+- Removed the global lens switcher from the header chrome — the lens is set in "Your
+  Prism" (/interests) and flipped per-story. Header stays monochrome (a deliberate
+  departure from design v3, which kept a header lens chip; see DESIGN.md decisions).
+- Cards tag their headline language (हिंदी / ಕನ್ನಡ) when it isn't the reader's primary,
+  with a "translation available" hint. Scope tab shows the real state name (Karnataka).
+- "Your Prism" (/interests) now manages reading languages; content shells unified to
+  1240px (header/footer 1280px). Removed the standalone TrendingBlock component.
+
 ## [0.0.60.0] - 2026-07-23
 
 ### Fixed

@@ -194,7 +194,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   }, [event.id, storyCount]);
 
   return (
-    <div className="mx-auto max-w-[1280px] px-5 pb-[120px] pt-7 sm:px-8 xl:px-10">
+    <div className="mx-auto max-w-[1240px] px-5 pb-[120px] pt-7 sm:px-8 xl:px-10">
       <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
@@ -687,7 +687,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         </article>
 
         {/* ── Right rail — desktop only ─────────────────────── */}
-        <aside className="sticky top-16 hidden min-w-0 flex-col gap-3.5 lg:flex">
+        <aside className="sticky top-[72px] hidden min-w-0 flex-col gap-3.5 lg:flex">
           {/* On this story */}
           <div
             className="rounded-[18px] border px-[18px] py-4"

@@ -84,13 +84,16 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 // Centered content shell — matches the global header/footer width so every
 // section's left edge lines up with the nav. Full-bleed bands wrap this shell.
-const SHELL = "mx-auto w-full max-w-[1280px] px-5 sm:px-8 xl:px-10";
+// Wide-page content frame (1240 container − 40px padding = 1160 content),
+// shared by landing/feed/sector/story so their columns line up. The header
+// canvas is wider (1280) per the layout spec. Full-bleed bands wrap this shell.
+const SHELL = "mx-auto w-full max-w-[1240px] px-5 sm:px-8 xl:px-10";
 
 export default function LandingPage() {
   return (
     <div className="w-full">
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className={`${SHELL} grid items-center gap-10 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)] lg:gap-14 lg:pb-14 lg:pt-[76px]`}>
+      <section className={`${SHELL} grid items-center gap-10 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_500px] lg:gap-14 lg:pb-14 lg:pt-[76px]`}>
         <div>
           <p className="mb-4 text-[11.5px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--ink-faint)" }}>
             Role-aware news intelligence

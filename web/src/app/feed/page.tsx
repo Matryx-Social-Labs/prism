@@ -3,24 +3,28 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
-import { TrendingBlock } from "@/components/TrendingBlock";
 import { useTaxonomy } from "@/components/ProfileEditor";
-import { fetchDigest, fetchFeed, type FeedItem, type MarketDigest } from "@/lib/api";
-import { lensMeta, useLenses } from "@/lib/lenses";
-import { loadProfile, saveProfile, type Profile } from "@/lib/profile";
+import {
+  fetchDigest,
+  fetchFeed,
+  fetchRegions,
+  fetchTrending,
+  type FeedItem,
+  type MarketDigest,
+  type TrendingStory,
+} from "@/lib/api";
+import { langNative } from "@/lib/languages";
+import { lensMeta } from "@/lib/lenses";
+import { loadProfile, type Profile } from "@/lib/profile";
 import { useSession } from "@/lib/session";
 import { watchlistEvents, type WatchEvent } from "@/lib/watchlist";
 
 function Pill({
   selected,
-  color,
-  bg,
   onClick,
   children,
 }: {
   selected: boolean;
-  color?: string;
-  bg?: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -30,13 +34,7 @@ function Pill({
       aria-selected={selected}
       onClick={onClick}
       className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
-      style={
-        selected
-          ? color
-            ? { background: bg, color, boxShadow: `inset 0 0 0 1.5px ${color}` }
-            : { background: "var(--ink)", color: "var(--bg)" }
-          : { color: "var(--ink-muted)" }
-      }
+      style={selected ? { background: "var(--ink)", color: "var(--bg)" } : { color: "var(--ink-muted)" }}
     >
       {children}
     </button>
@@ -47,16 +45,19 @@ type Scope = "all" | "region" | "world";
 
 export default function FeedPage() {
   const taxonomy = useTaxonomy();
-  const lenses = useLenses();
   const session = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
+  // Lens is read from the saved profile only. The feed no longer filters by lens,
+  // and there's no lens switcher in the chrome — the lens is set in "Your Prism"
+  // (/interests) and flipped per-story in the story view.
   const [lens, setLens] = useState("reader");
-  const [sort, setSort] = useState<"latest" | "top">("latest");
   const [scope, setScope] = useState<Scope>("all");
+  const [stateName, setStateName] = useState<string | null>(null);
   const [items, setItems] = useState<FeedItem[] | null>(null);
   const [top, setTop] = useState<FeedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [digest, setDigest] = useState<MarketDigest | null>(null);
+  const [trending, setTrending] = useState<TrendingStory[]>([]);
   const [watch, setWatch] = useState<WatchEvent[]>([]);
 
   useEffect(() => {
@@ -65,9 +66,22 @@ export default function FeedPage() {
     if (p?.lens) setLens(p.lens);
   }, []);
 
+  // Resolve the reader's state code (IN-KA) to its display name (Karnataka) for
+  // the scope tab; falls back to "My state" if the regions list is unavailable.
+  useEffect(() => {
+    if (!profile?.state) return;
+    fetchRegions()
+      .then((rs) => setStateName(rs.find((r) => r.code === profile.state)?.name ?? null))
+      .catch(() => setStateName(null));
+  }, [profile?.state]);
+
   useEffect(() => {
     fetchDigest().then(setDigest).catch(() => setDigest(null));
   }, []);
+
+  useEffect(() => {
+    fetchTrending({ state: profile?.state, limit: 3 }).then(setTrending).catch(() => setTrending([]));
+  }, [profile?.state]);
 
   useEffect(() => {
     if (!session) {
@@ -88,8 +102,8 @@ export default function FeedPage() {
       languages: profile?.languages,
     };
     Promise.all([
-      fetchFeed({ ...query, sort }),
-      // The "Top stories" block is always score-ranked, whatever the list sort.
+      fetchFeed({ ...query, sort: "latest" }),
+      // The lead block is always score-ranked, whatever the list order.
       fetchFeed({ ...query, sort: "top" }),
     ])
       .then(([list, ranked]) => {
@@ -97,13 +111,7 @@ export default function FeedPage() {
         setTop(ranked.slice(0, 3));
       })
       .catch(() => setError("The Prism API is unreachable right now. Refresh in a moment."));
-  }, [lens, sort, profile]);
-
-  function switchLens(slug: string) {
-    setLens(slug);
-    if (profile) saveProfile({ ...profile, lens: slug });
-    else saveProfile({ lens: slug, region: null, state: null, interests: [] });
-  }
+  }, [lens, profile]);
 
   const visible = useMemo(() => {
     if (!items || scope === "all" || !profile?.state) return items;
@@ -129,8 +137,7 @@ export default function FeedPage() {
     return [...bySector.entries()].map(([slug, list]) => ({ slug, title: nameOf(slug), items: list }));
   }, [sectionItems, taxonomy]);
 
-  // Full per-sector counts (includes the stories pulled into the lead block) for
-  // the rail and the "All N →" headers.
+  // Full per-sector counts (includes stories pulled into the lead block).
   const sectorCount = useMemo(() => {
     const m = new Map<string, number>();
     for (const i of visible ?? []) {
@@ -143,19 +150,16 @@ export default function FeedPage() {
   const lead = visibleTop[0] ?? null;
   const secondary = visibleTop.slice(1, 3);
 
-  const blindspots = useMemo(
-    () => (visible ?? []).filter((i) => i.coverage?.single_origin).slice(0, 2),
-    [visible],
-  );
-
-  const meta = lensMeta(lens);
   const pulse = lensMeta("markets");
+  const languages = profile?.languages?.length ? profile.languages : ["en"];
+  const primaryLang = languages[0];
+  const languageLabel = languages.slice(0, 3).map(langNative).join(" · ");
 
   const railItem =
     "flex items-center justify-between rounded-[10px] px-3 py-2 text-[13.5px] transition";
 
   return (
-    <div className="mx-auto max-w-[1280px] px-5 pb-24 pt-5 sm:px-8 lg:grid lg:grid-cols-[200px_1fr_300px] lg:items-start lg:gap-8 lg:pb-20 lg:pt-6 xl:px-10">
+    <div className="mx-auto max-w-[1240px] px-5 pb-24 pt-6 sm:px-8 lg:grid lg:grid-cols-[200px_1fr_300px] lg:items-start lg:gap-8 lg:pb-20 xl:px-10">
       {/* Mobile sector chip rail */}
       <div
         className="sticky top-[52px] z-30 -mx-5 mb-3 flex gap-1.5 overflow-x-auto border-b px-5 py-2.5 sm:-mx-8 sm:px-8 lg:hidden"
@@ -181,7 +185,7 @@ export default function FeedPage() {
       </div>
 
       {/* Left sector rail */}
-      <aside className="hidden flex-col gap-0.5 lg:sticky lg:top-20 lg:flex">
+      <aside className="hidden flex-col gap-0.5 lg:sticky lg:top-[72px] lg:flex">
         <span
           className="px-3 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.14em]"
           style={{ color: "var(--ink-faint)" }}
@@ -191,6 +195,9 @@ export default function FeedPage() {
         <a href="#for-you" className={`${railItem} font-semibold`} style={{ background: "var(--bg-sunken)", color: "var(--ink)" }}>
           For you
         </a>
+        <Link href="/trending" className={`${railItem} font-medium`} style={{ color: "var(--ink-muted)" }}>
+          Trending
+        </Link>
         {sections.length > 0 && <span className="mx-3 my-2 h-px" style={{ background: "var(--line)" }} />}
         {sections.map((sec) => (
           <Link
@@ -217,58 +224,36 @@ export default function FeedPage() {
           <h1 className="text-[26px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
             For you
           </h1>
-          <div className="max-w-full overflow-x-auto">
-            <div className="flex w-max gap-1 rounded-full border p-1" style={{ borderColor: "var(--line)" }} role="tablist" aria-label="Lens">
-              {lenses.map((m) => (
-                <Pill key={m.slug} selected={lens === m.slug} color={m.color} bg={m.bg} onClick={() => switchLens(m.slug)}>
-                  {m.short}
-                </Pill>
-              ))}
-              <span
-                title="More lenses are on the way"
-                className="rounded-full border border-dashed px-3 py-1.5 text-xs font-semibold"
-                style={{ borderColor: "var(--line-strong)", color: "var(--ink-faint)" }}
-              >
-                +
-              </span>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {profile?.state && (
+              <div className="flex gap-0.5 rounded-full border p-1" style={{ borderColor: "var(--line)" }} role="tablist" aria-label="Scope">
+                {(
+                  [
+                    ["all", "All"],
+                    ["region", stateName ?? "My state"],
+                    ["world", "National"],
+                  ] as [Scope, string][]
+                ).map(([value, label]) => (
+                  <Pill key={value} selected={scope === value} onClick={() => setScope(value)}>
+                    {label}
+                  </Pill>
+                ))}
+              </div>
+            )}
+            <Link
+              href="/interests"
+              title="Language preferences — rank the feed, never filter it"
+              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold"
+              style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
+            >
+              <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9s1.3-6.4 3.8-9Z" />
+              </svg>
+              {languageLabel}
+            </Link>
           </div>
         </div>
-
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <p className="text-[13px]" style={{ color: "var(--ink-muted)" }}>
-            {meta.tagline}.
-          </p>
-          {profile?.state && (
-            <div className="flex gap-0.5 rounded-full border p-1" style={{ borderColor: "var(--line)" }} role="tablist" aria-label="Scope">
-              {(
-                [
-                  ["all", "All"],
-                  ["region", "My state"],
-                  ["world", "National"],
-                ] as [Scope, string][]
-              ).map(([value, label]) => (
-                <Pill key={value} selected={scope === value} onClick={() => setScope(value)}>
-                  {label}
-                </Pill>
-              ))}
-            </div>
-          )}
-          <div className="ml-auto flex gap-0.5 rounded-full border p-1" style={{ borderColor: "var(--line)" }} role="tablist" aria-label="Sort">
-            {(
-              [
-                ["latest", "Latest"],
-                ["top", "Top"],
-              ] as ["latest" | "top", string][]
-            ).map(([value, label]) => (
-              <Pill key={value} selected={sort === value} onClick={() => setSort(value)}>
-                {label}
-              </Pill>
-            ))}
-          </div>
-        </div>
-
-        <TrendingBlock state={profile?.state} />
 
         {error && (
           <div className="rounded-[18px] border p-5 text-sm" style={{ borderColor: "var(--danger)", background: "var(--danger-bg)", color: "var(--danger)" }}>
@@ -298,11 +283,11 @@ export default function FeedPage() {
 
         {!error && visible !== null && lead && (
           <div className="stagger" key={`top-${lens}-${scope}`}>
-            <TopStoryCard item={lead} lens={lens} />
+            <TopStoryCard item={lead} lens={lens} primaryLang={primaryLang} />
             {secondary.length > 0 && (
               <div className="mt-3.5 grid gap-3.5 sm:grid-cols-2">
                 {secondary.map((item) => (
-                  <TopStoryCard key={item.id} item={item} lens={lens} />
+                  <TopStoryCard key={item.id} item={item} lens={lens} primaryLang={primaryLang} />
                 ))}
               </div>
             )}
@@ -327,7 +312,7 @@ export default function FeedPage() {
               </div>
               <div className="flex flex-col gap-2.5">
                 {sec.items.map((item) => (
-                  <StoryRowCard key={item.id} item={item} lens={lens} />
+                  <StoryRowCard key={item.id} item={item} lens={lens} primaryLang={primaryLang} />
                 ))}
               </div>
             </section>
@@ -335,7 +320,38 @@ export default function FeedPage() {
       </div>
 
       {/* Right context rail */}
-      <aside className="hidden flex-col gap-3.5 lg:sticky lg:top-20 lg:flex">
+      <aside className="hidden flex-col gap-3.5 lg:sticky lg:top-[72px] lg:flex">
+        {trending.length > 0 && (
+          <div className="rounded-[18px] border p-5" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+              Trending now
+            </span>
+            <div className="mt-2.5 flex flex-col gap-2.5">
+              {trending.slice(0, 3).map((t, i) => (
+                <Link key={t.slug} href={`/trending/${t.slug}`} className="flex items-baseline gap-2.5">
+                  <span className="shrink-0 font-mono text-[12px]" style={{ color: "var(--ink-faint)" }}>
+                    {i + 1}
+                  </span>
+                  <span className="text-[13px] font-semibold leading-[1.4]" style={{ color: "var(--ink)" }}>
+                    {t.hero_title ?? t.label}
+                    {t.velocity >= 3 && (
+                      <span
+                        className="ml-1.5 whitespace-nowrap rounded-full px-[7px] py-px text-[9.5px] font-semibold"
+                        style={{ background: "var(--up-bg)", color: "var(--up)" }}
+                      >
+                        developing
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <Link href="/trending" className="mt-2.5 block text-[12px] font-semibold" style={{ color: "var(--ink)" }}>
+              All trending →
+            </Link>
+          </div>
+        )}
+
         {digest && (
           <Link
             href="/pulse"
@@ -359,26 +375,6 @@ export default function FeedPage() {
               Read today&rsquo;s pulse →
             </p>
           </Link>
-        )}
-
-        {blindspots.length > 0 && (
-          <div className="rounded-[18px] border p-5" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-              Blindspot watch
-            </span>
-            <div className="mt-2.5 flex flex-col gap-3">
-              {blindspots.map((i) => (
-                <Link key={i.id} href={`/story/${i.id}`} className="block">
-                  <p className="text-[13px] font-semibold leading-[1.45]" style={{ color: "var(--ink)" }}>
-                    {i.title}
-                  </p>
-                  <p className="mt-1 text-[11.5px] leading-[1.45]" style={{ color: "var(--ink-faint)" }}>
-                    ⚠ Single-origin — {i.source_count} source{i.source_count === 1 ? "" : "s"}, one country so far.
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </div>
         )}
 
         <div className="rounded-[18px] border p-5" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>

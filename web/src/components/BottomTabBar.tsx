@@ -9,13 +9,14 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/feed", label: "Feed", glyph: "◮" },
+  { href: "/trending", label: "Trending", glyph: "▲" },
   { href: "/pulse", label: "Pulse", glyph: "◉" },
   { href: "/search", label: "Search", glyph: "⌕" },
-  { href: "/watchlist", label: "Saved", glyph: "◇" },
+  { href: "/watchlist", label: "Watchlist", glyph: "◇" },
 ];
 
 // Route prefixes where the tab bar is shown.
-const SHOW_ON = ["/feed", "/pulse", "/search", "/watchlist", "/sector"];
+const SHOW_ON = ["/feed", "/trending", "/pulse", "/search", "/watchlist", "/sector"];
 
 export function BottomTabBar() {
   const pathname = usePathname();
