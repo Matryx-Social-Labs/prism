@@ -248,9 +248,16 @@ export interface MarketDigest {
 }
 
 export async function fetchDigest(): Promise<MarketDigest | null> {
-  const res = await fetch(`${API_URL}/api/v1/digest/markets`, { next: { revalidate: 900 } });
-  if (!res.ok || res.status === 204) return null; // 204 = synthesis unavailable → hide the card
-  return (await res.json()) as MarketDigest;
+  try {
+    const res = await fetch(`${API_URL}/api/v1/digest/markets`, { next: { revalidate: 900 } });
+    if (!res.ok || res.status === 204) return null; // 204 = synthesis unavailable → hide the card
+    return (await res.json()) as MarketDigest;
+  } catch {
+    // A cross-origin 5xx is blocked as a CORS error and rejects the fetch. Return
+    // null instead of throwing so /pulse resolves to its empty state rather than
+    // hanging forever on "Composing today's market pulse…".
+    return null;
+  }
 }
 
 export async function searchEvents(q: string): Promise<FeedItem[]> {

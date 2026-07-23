@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.63.0] - 2026-07-23
+
+### Fixed
+- QA (end-to-end) findings — both from LLM endpoints failing during the credit stall:
+  - **/pulse no longer hangs on "Composing today's market pulse…".** A cross-origin
+    5xx from the digest endpoint is blocked as a CORS error and *rejects* the fetch,
+    so `fetchDigest` threw and the page's `setLoading(false)` never ran. `fetchDigest`
+    now catches and returns null → /pulse resolves to its "not available right now"
+    empty state.
+  - **Story lens brief returns an empty brief, not a 500.** `/events/{id}/brief` is an
+    on-demand LLM synthesis; with the model quota exhausted it 500'd (the story page
+    already degraded to "the <lens> read isn't available yet", but the 500 was noisy).
+    It now catches the failure and returns an empty brief — same UI, no 500.
+
 ## [0.0.62.0] - 2026-07-23
 
 ### Fixed

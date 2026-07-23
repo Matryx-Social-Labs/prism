@@ -28,9 +28,11 @@ from api.schemas import (
 from common.db import get_db
 from common.lenses import LENSES
 from common.locks import single_flight
+from common.logging import get_logger
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 from correlation.threads import fetch_thread, related_developments, story_timeline
 
+logger = get_logger(__name__)
 router = APIRouter()
 
 
@@ -220,9 +222,16 @@ async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(g
         cached = await _read_cached_brief(db, event_id, lens)
         if cached:
             return cached
-        briefs = await generate_briefs(event_id, [lens])
-        await persist_briefs(event_id, briefs)
-        read = briefs.get(lens) or {}
+        try:
+            briefs = await generate_briefs(event_id, [lens])
+            await persist_briefs(event_id, briefs)
+            read = briefs.get(lens) or {}
+        except Exception:
+            # The brief is an on-demand LLM synthesis. If the model is unavailable
+            # (quota exhausted, timeout), return an empty brief so the story page
+            # shows "the <lens> read isn't available yet" — never a 500.
+            logger.warning("brief_unavailable", event_id=str(event_id), lens=lens, exc_info=True)
+            read = {}
         return BriefResponse(
             lens=lens, brief=read.get("text"), points=read.get("points") or [], cached=False
         )
