@@ -194,6 +194,51 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   return data.items;
 }
 
+export interface TrendingStory {
+  slug: string;
+  label: string;
+  cast: string[];
+  source_count: number;
+  velocity: number; // distinct new outlets in the last 6h
+  developments: number;
+  sector: string | null;
+  hero_title: string | null;
+  hero_image: string | null;
+}
+
+export async function fetchTrending(
+  opts: { state?: string | null; sector?: string | null; limit?: number } = {},
+): Promise<TrendingStory[]> {
+  const p = new URLSearchParams();
+  if (opts.state) p.set("state", opts.state);
+  if (opts.sector) p.set("sector", opts.sector);
+  if (opts.limit) p.set("limit", String(opts.limit));
+  const res = await fetch(`${API_URL}/api/v1/trending?${p}`, { next: { revalidate: 120 } });
+  if (!res.ok) return [];
+  return ((await res.json()) as { stories: TrendingStory[] }).stories;
+}
+
+export interface TrendingStoryDetail {
+  slug: string;
+  canonical_slug: string;
+  label: string;
+  cast: string[];
+  sector: string | null;
+  source_count: number;
+  velocity: number;
+  status: string;
+  developments: StoryDevelopment[];
+  timeline_cast: string[];
+}
+
+export async function fetchTrendingStory(slug: string): Promise<TrendingStoryDetail | null> {
+  const res = await fetch(`${API_URL}/api/v1/trending/${encodeURIComponent(slug)}`, {
+    next: { revalidate: 120 },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as TrendingStoryDetail;
+}
+
 export interface MarketDigest {
   headline: string;
   narrative: string;
