@@ -5,8 +5,9 @@ import { fetchTrendingStory } from "@/lib/api";
 // Auto-generated social card per trending story — the thing that makes a
 // forwarded /trending/<slug> link render a premium, on-brand preview (the India
 // WhatsApp growth loop). Monochrome + a spectrum accent (color = a lens speaking;
-// this bar is the brand mark, not a lens). Edge-rendered, no LLM.
-export const runtime = "edge";
+// this bar is the brand mark, not a lens). No LLM. Runs on the default Node.js
+// runtime — next/og's ImageResponse supports it, and our Vercel "services" deploy
+// rejects Edge Function output.
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
