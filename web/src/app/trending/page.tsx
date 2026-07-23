@@ -32,7 +32,7 @@ export default function TrendingPage() {
   );
 
   return (
-    <main className="mx-auto max-w-[820px] px-5 pb-24 pt-8 sm:px-8">
+    <div className="mx-auto max-w-[820px] px-5 pb-24 pt-8 sm:px-8">
       <h1 className="text-[30px] font-semibold leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
         Trending now
       </h1>
@@ -70,7 +70,7 @@ export default function TrendingPage() {
           stories.map((s, i) => <StoryRow key={s.slug} story={s} rank={i + 1} />)
         )}
       </div>
-    </main>
+    </div>
   );
 }
 

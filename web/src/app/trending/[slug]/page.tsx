@@ -46,7 +46,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
   if (s.canonical_slug !== slug) redirect(`/trending/${s.canonical_slug}`);
 
   return (
-    <main className="mx-auto max-w-[820px] px-5 pb-24 pt-8 sm:px-8">
+    <div className="mx-auto max-w-[820px] px-5 pb-24 pt-8 sm:px-8">
       <Link href="/trending" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Trending
       </Link>
@@ -77,6 +77,6 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
       <div className="mt-8">
         <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
       </div>
-    </main>
+    </div>
   );
 }

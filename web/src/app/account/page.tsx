@@ -25,7 +25,7 @@ export default function AccountPage() {
   if (!session) return null;
 
   return (
-    <main className="mx-auto flex min-h-[60vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
+    <div className="mx-auto flex min-h-[60vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
       <h1 className="text-[28px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         Your account
       </h1>
@@ -50,6 +50,6 @@ export default function AccountPage() {
       <Link href="/feed" className="mt-6 text-[13px]" style={{ color: "var(--ink-faint)" }}>
         ← Back to your feed
       </Link>
-    </main>
+    </div>
   );
 }

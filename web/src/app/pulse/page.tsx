@@ -25,7 +25,7 @@ export default function PulsePage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-[720px] px-5 py-12">
+    <div className="mx-auto w-full max-w-[720px] px-5 py-12">
       <div className="flex items-center gap-2">
         <span className="h-[9px] w-[9px] rounded-full" style={{ background: "var(--lens-finance)" }} aria-hidden />
         <span className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--lens-finance)" }}>
@@ -89,6 +89,6 @@ export default function PulsePage() {
           </Link>
         </>
       )}
-    </main>
+    </div>
   );
 }
