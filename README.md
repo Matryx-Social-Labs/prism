@@ -37,19 +37,23 @@ reader experience spans all sectors. New roles are added as declarative lenses o
 backbone (`common/lenses.py`) — never as new pipelines.
 
 ## Documentation map
-| Doc | What it covers |
-| --- | --- |
-| [BLUEPRINT.md](./BLUEPRINT.md) | One-page strategy: concept, differentiation, decisions, phasing |
-| [docs/PRODUCT-BRIEF.md](./docs/PRODUCT-BRIEF.md) | Problem, promise, positioning, success metrics |
-| [docs/MARKET-RESEARCH.md](./docs/MARKET-RESEARCH.md) | Market size, competitor landscape, demand signals, the gap |
-| [docs/PERSONAS.md](./docs/PERSONAS.md) | Role-driven personas and the personalization model |
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Streaming-first architecture, pipeline phases, tech stack |
-| [docs/DATA-SOURCES.md](./docs/DATA-SOURCES.md) | Hybrid ingestion strategy and source catalog |
-| [docs/INGESTION-CLASSIFICATION.md](./docs/INGESTION-CLASSIFICATION.md) | Collection, relevance gate, and routing detail |
-| [docs/ENRICHMENT-SCHEMA.md](./docs/ENRICHMENT-SCHEMA.md) | Shared extraction schema plus role lenses (with the cyber lens) |
-| [docs/DB-SCHEMA.md](./docs/DB-SCHEMA.md) | Database tables, keys, relationships, and stream topics |
-| [docs/AGENT.md](./docs/AGENT.md) | The per-story grounded question-answering agent |
-| [docs/ROADMAP.md](./docs/ROADMAP.md) | Phasing, milestones, and the first end-to-end slice |
+Full index, organized by [Diataxis](https://diataxis.fr) quadrant:
+**[docs/README.md](./docs/README.md)**. The essentials:
+
+| Doc | Kind | What it covers |
+| --- | --- | --- |
+| [docs/TUTORIAL.md](./docs/TUTORIAL.md) | Tutorial | Run Prism locally and flip a lens — zero to working |
+| [docs/HOWTO.md](./docs/HOWTO.md) | How-to | Add a source / lens / language, trigger ingestion, inspect prod |
+| [docs/API.md](./docs/API.md) | Reference | Every `/api/v1` endpoint, params, and response shape |
+| [docs/STORY-GRAPH.md](./docs/STORY-GRAPH.md) | Explanation | How stories form and stay coherent — clustering, story timeline, trending |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Explanation | Streaming-first architecture, pipeline phases, tech stack |
+| [docs/ENRICHMENT-SCHEMA.md](./docs/ENRICHMENT-SCHEMA.md) | Reference | Shared extraction schema plus role lenses (with the cyber lens) |
+| [docs/DB-SCHEMA.md](./docs/DB-SCHEMA.md) | Reference | Database tables, keys, relationships, and stream topics |
+| [docs/DATA-SOURCES.md](./docs/DATA-SOURCES.md) · [docs/INGESTION-CLASSIFICATION.md](./docs/INGESTION-CLASSIFICATION.md) | Explanation | Ingestion strategy, source catalog, relevance gate, routing |
+| [docs/AGENT.md](./docs/AGENT.md) | Explanation | The per-story grounded question-answering agent |
+| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) · [docs/LOCAL_DEV.md](./docs/LOCAL_DEV.md) | How-to | Railway + Vercel deploy; local infra + observability |
+| [BLUEPRINT.md](./BLUEPRINT.md) · [docs/PRODUCT-BRIEF.md](./docs/PRODUCT-BRIEF.md) · [docs/PRODUCT.md](./docs/PRODUCT.md) | Strategy | One-page strategy, problem/promise/positioning |
+| [docs/PERSONAS.md](./docs/PERSONAS.md) · [docs/MARKET-RESEARCH.md](./docs/MARKET-RESEARCH.md) · [docs/ROADMAP.md](./docs/ROADMAP.md) | Strategy | Personas, market, phasing & milestones |
 
 ## Code layout
 ```
