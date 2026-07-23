@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.58.0] - 2026-07-23
+
+### Fixed
+- Trending stories: dedupe by **cast identity**, not just member-set overlap. On prod
+  the CJP cluster (>30 events) exceeded `story_timeline`'s 30-event BFS cap, so each seed
+  produced a different 30-member subset; member-overlap fell below 0.6 and one story
+  fragmented into **6 near-duplicate trending cards**. Two communities are now the same
+  story when member-overlap ≥ 0.6 **OR** cast (protagonist) Jaccard ≥ 0.5 — the
+  protagonists are stable even when the capped member window shifts. Verified on prod:
+  10 → 4 clean stories (the 6 CJP variants collapse to 1). Applies to both detection
+  dedup and the reconciliation match.
+
 ## [0.0.57.0] - 2026-07-23
 
 ### Added

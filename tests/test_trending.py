@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from api.main import app
 from common.db import session_scope
-from correlation.trending import _overlap, reconcile_stories
+from correlation.trending import _cast_jaccard, _overlap, _same_story, reconcile_stories
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -30,6 +30,18 @@ def test_overlap_ratio():
     assert _overlap({"1", "2"}, {"3", "4"}) == 0.0  # disjoint → different
     assert _overlap({"1", "2", "3"}, {"1"}) == 1.0  # subset → same
     assert _overlap(set(), {"1"}) == 0.0  # empty guard
+
+
+def test_cast_identity_dedup():
+    # story_timeline's 30-event cap gives divergent member subsets of one big cluster
+    # per seed, so member-overlap alone splits it. Cast (stable protagonists) fixes it.
+    cjp_a = ["Cockroach Janta Party", "Pradhan", "Delhi Police", "Modi"]
+    cjp_b = ["Pradhan", "Cockroach Janta Party", "Delhi Police", "Wangchuk"]
+    assert _cast_jaccard(cjp_a, cjp_b) >= 0.5  # 3 shared / 5 union
+    # members barely overlap (0.33 < 0.6) but cast marks them the SAME story.
+    assert _same_story({"1", "2", "3"}, cjp_a, {"3", "4", "5"}, cjp_b)
+    # a genuinely different story: disjoint cast + members → NOT merged.
+    assert not _same_story({"1", "2"}, cjp_a, {"9", "8"}, ["Donald Trump", "Marco Rubio"])
 
 
 async def test_reconcile_is_idempotent():
