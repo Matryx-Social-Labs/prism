@@ -32,7 +32,7 @@ function SearchInner() {
   }, [q, router]);
 
   return (
-    <main className="mx-auto w-full max-w-[760px] px-5 py-10">
+    <div className="mx-auto w-full max-w-[760px] px-5 py-10">
       <h1 className="text-[28px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         Search
       </h1>
@@ -61,7 +61,7 @@ function SearchInner() {
           <StoryRowCard key={item.id} item={item} lens="reader" />
         ))}
       </div>
-    </main>
+    </div>
   );
 }
 

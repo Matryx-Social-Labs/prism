@@ -61,10 +61,10 @@ function Verify() {
 
 export default function VerifyPage() {
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-[420px] items-center justify-center px-5">
+    <div className="mx-auto flex min-h-[70vh] w-full max-w-[420px] items-center justify-center px-5">
       <Suspense fallback={<p className="font-mono text-[15px]" style={{ color: "var(--ink-muted)" }}>Loading…</p>}>
         <Verify />
       </Suspense>
-    </main>
+    </div>
   );
 }

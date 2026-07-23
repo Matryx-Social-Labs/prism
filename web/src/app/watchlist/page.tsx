@@ -61,7 +61,7 @@ export default function WatchlistPage() {
   if (!session) return null;
 
   return (
-    <main className="mx-auto w-full max-w-[720px] px-5 py-12">
+    <div className="mx-auto w-full max-w-[720px] px-5 py-12">
       <h1 className="text-[30px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         Followed signals
       </h1>
@@ -145,6 +145,6 @@ export default function WatchlistPage() {
       <Link href="/feed" className="mt-8 inline-block text-[13px]" style={{ color: "var(--ink-faint)" }}>
         ← Back to your feed
       </Link>
-    </main>
+    </div>
   );
 }

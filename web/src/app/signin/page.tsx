@@ -26,7 +26,7 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
+    <div className="mx-auto flex min-h-[70vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
       <h1 className="text-[30px] font-semibold leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
         Sign in to Prism
       </h1>
@@ -87,6 +87,6 @@ export default function SignInPage() {
       <Link href="/feed" className="mt-8 text-[13px]" style={{ color: "var(--ink-faint)" }}>
         ← Keep browsing without an account
       </Link>
-    </main>
+    </div>
   );
 }
