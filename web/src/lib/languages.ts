@@ -11,3 +11,20 @@ export const LANG_NAME: Record<string, string> = {
 
 export const langNative = (code: string): string => LANG_NATIVE[code] ?? code.toUpperCase();
 export const langName = (code: string): string => LANG_NAME[code] ?? code.toUpperCase();
+
+// Fallback when the API doesn't tag a headline's language: infer it from the
+// script. Covers the launch Indian languages (each has a distinct Unicode block);
+// returns null for Latin script (treated as English/unknown, no tag). Devanagari
+// maps to Hindi — it's also Marathi's script, but Hindi is the common label.
+const SCRIPT_RANGES: [RegExp, string][] = [
+  [/[ऀ-ॿ]/, "hi"], // Devanagari
+  [/[ಀ-೿]/, "kn"], // Kannada
+  [/[஀-௿]/, "ta"], // Tamil
+  [/[ఀ-౿]/, "te"], // Telugu
+  [/[ঀ-৿]/, "bn"], // Bengali
+];
+
+export function detectScript(text: string): string | null {
+  for (const [re, lang] of SCRIPT_RANGES) if (re.test(text)) return lang;
+  return null;
+}

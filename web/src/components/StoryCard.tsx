@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { FeedItem } from "@/lib/api";
-import { langName, langNative } from "@/lib/languages";
+import { detectScript, langName, langNative } from "@/lib/languages";
 
 export function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -22,16 +22,18 @@ export function StoryBadges({ item, lens, primaryLang = "en" }: { item: FeedItem
   // Tag the headline's language only when it isn't the reader's primary — so a
   // Hindi/Kannada headline reads as "translation available" rather than a
   // surprise (design v3). Bordered + UI font (a locale tag, not provenance).
-  const showLang = item.headline_lang && item.headline_lang !== primaryLang;
+  // Fall back to script detection when the API doesn't tag the language.
+  const headlineLang = item.headline_lang ?? detectScript(item.title);
+  const showLang = headlineLang && headlineLang !== primaryLang;
   return (
     <>
       {showLang && (
         <span
           className={`${chip} border`}
           style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-          title={`Headline is in ${langName(item.headline_lang!)}${item.available_languages.includes(primaryLang) ? " — translation available" : ""}`}
+          title={`Headline is in ${langName(headlineLang)}${item.available_languages.includes(primaryLang) ? " — translation available" : ""}`}
         >
-          {langNative(item.headline_lang!)}
+          {langNative(headlineLang)}
         </span>
       )}
       {item.sector && (
