@@ -3,6 +3,28 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.64.0] - 2026-07-24
+
+### Fixed
+- Story timeline ("the story so far") no longer explodes across unrelated stories.
+  A Cauvery-water story was pulling in 14 unrelated Tamil Nadu items (ammonia leak,
+  school fees, cow slaughter, census…). Two causes, two fixes in the story graph
+  (`correlation/threads.py`), both validated live:
+  - **Roundup/live-blog exclusion.** "Tamil Nadu Today: …" / "… LIVE:" events pack
+    many unrelated actors into one body and bridge everything. Excluded from the
+    graph by a title marker AND a high entity count (the count keeps single-topic
+    "… Q1 Results Today:" items, which have few entities, in the graph — and never
+    touches real big stories, which carry no marker).
+  - **Seed-relative topical-coherence gate.** A member must be embedding-close to
+    the *seed*, not just its BFS neighbour — otherwise a legitimate dual-topic bridge
+    ("CM Vijay reviews Mekedatu", water AND politics) leaks a whole cluster in one
+    hop. A raised IDF bar can't do this (a mega-story's core actors are high-df
+    magnets, so it would also drop cross-state links). Gate at cosine 0.55.
+  - Result on prod: the Cauvery story goes 16 → 2 developments (both real water
+    events) while the CJP/NEET story keeps its cross-state branches (Delhi / Mumbai /
+    Patna), 13 → 12. Read-path change — every existing timeline benefits on deploy,
+    no re-processing.
+
 ## [0.0.63.0] - 2026-07-23
 
 ### Fixed

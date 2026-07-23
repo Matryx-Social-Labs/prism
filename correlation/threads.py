@@ -255,6 +255,7 @@ async def related_developments(event_id: uuid.UUID, limit: int = 8) -> list[dict
             await session.execute(
                 text(
                     f"""
+                    WITH {_ROUNDUP_CTE}
                     SELECT e.id, e.title, e.last_updated_at,
                            count(DISTINCT ee2.entity_id) AS shared
                     FROM event_entities ee1
@@ -265,6 +266,7 @@ async def related_developments(event_id: uuid.UUID, limit: int = 8) -> list[dict
                     JOIN events e ON e.id = ee2.event_id
                     WHERE ee1.event_id = :eid
                       AND e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                      AND e.id NOT IN (SELECT id FROM roundup)
                     GROUP BY e.id, e.title, e.last_updated_at
                     HAVING count(DISTINCT ee2.entity_id) >= 2
                     ORDER BY shared DESC, e.last_updated_at DESC
@@ -344,6 +346,36 @@ STORY_DECAY_LAMBDA = 0.03  # edge x exp(-lambda*days): 7d -> 0.81x, 30d -> 0.41x
 # validated on the live CJP (regroups), Iran (splits Iran/Lebanon), and KSU (stays
 # separate) stories.
 STORY_MIN_EDGE_WEIGHT = 0.15
+# Topical-coherence ceiling: a member must be embedding-close to the SEED, not just
+# to its BFS neighbour. Same actors aren't enough — a dual-topic bridge event (e.g.
+# "CM Vijay reviews Mekedatu", legitimately water AND TN-politics) is close to the
+# Cauvery seed (0.47) yet also close to Vijay's unrelated politics, so an edge-relative
+# gate leaks the whole TN-politics cluster in one hop. A raised IDF bar can't help
+# either — a mega-story's core actors are high-df magnets (CJP df82 → 0.012), so any
+# weight that drops the Cauvery↔politics bridge also drops CJP's cross-state links.
+# Seed-relative embedding distance separates them: on live data Cauvery's real members
+# are ≤0.47 and its contamination ≥0.62, while CJP's cross-state developments span
+# 0.0–0.64. 0.55 cleans Cauvery to its 2 water events and keeps ~28/31 CJP developments
+# (it trims only a duplicate and the Wangchuk-hospital tail at 0.64). Skip the gate
+# when either event lacks an embedding (fall back to actor overlap).
+STORY_MAX_EMBED_DIST = 0.55
+
+# Roundup / live-blog events ("Tamil Nadu Today: …", "… LIVE:") pack many unrelated
+# actors into one body, so they bridge unrelated stories through the shared-actor
+# graph (a daily digest mentioning Vijay + Cauvery + an ammonia leak links all three).
+# Exclude them from the story component: a structural title marker AND a high entity
+# count. The count is what keeps single-topic items like "IndusInd Q1 Results Today:"
+# (few entities) in the graph while dropping "Tamil Nadu Today: …" digests (10-44) —
+# and it never touches genuine big stories, which carry no digest/LIVE marker.
+ROUNDUP_TITLE_RE = r"(\ylive\y|\y(today|digest|round-?up|briefing|bulletin|recap|wrap|highlights)\y)\s*:"
+ROUNDUP_MIN_ENTITIES = 8
+_ROUNDUP_CTE = f"""roundup AS (
+        SELECT ev.id
+        FROM events ev JOIN event_entities ee ON ee.event_id = ev.id
+        WHERE ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+          AND ev.title ~* '{ROUNDUP_TITLE_RE}'
+        GROUP BY ev.id HAVING count(*) >= {ROUNDUP_MIN_ENTITIES}
+    )"""
 
 _STRONG_NEIGHBOURS_SQL = text(
     f"""
@@ -353,7 +385,8 @@ _STRONG_NEIGHBOURS_SQL = text(
         JOIN events ev ON ev.id = ee.event_id
                       AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
         GROUP BY ee.entity_id
-    )
+    ),
+    {_ROUNDUP_CTE}
     SELECT e.id AS id,
            coalesce(e.occurred_at::timestamptz, e.last_updated_at) AS d
     FROM event_entities ee1
@@ -363,6 +396,12 @@ _STRONG_NEIGHBOURS_SQL = text(
     JOIN events e ON e.id = ee2.event_id
                  AND e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
     WHERE ee1.event_id = :eid
+      AND e.id NOT IN (SELECT id FROM roundup)
+      AND (
+          e.embedding IS NULL
+          OR (SELECT embedding FROM events WHERE id = :seed) IS NULL
+          OR (e.embedding <=> (SELECT embedding FROM events WHERE id = :seed)) <= CAST(:max_dist AS double precision)
+      )
     GROUP BY e.id, e.occurred_at, e.last_updated_at
     HAVING count(DISTINCT ee1.entity_id) >= :min_shared
        AND sum(1.0 / df.d) * exp(
@@ -400,10 +439,12 @@ async def _story_component(session, seed: uuid.UUID) -> set[str]:
                     _STRONG_NEIGHBOURS_SQL,
                     {
                         "eid": eid,
+                        "seed": seed_s,
                         "node_date": dates.get(eid),
                         "lam": STORY_DECAY_LAMBDA,
                         "min_shared": STORY_MIN_SHARED,
                         "min_weight": STORY_MIN_EDGE_WEIGHT,
+                        "max_dist": STORY_MAX_EMBED_DIST,
                     },
                 )
             ).mappings().all()
