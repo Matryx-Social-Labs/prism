@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.59.0] - 2026-07-23
+
+### Fixed
+- Trending stories: **self-healing convergence** + a stronger same-story signal.
+  Cast-identity dedup (0.0.58.0) still left the CJP/NEET mega-story as 4 cards: its
+  8-member casts diverged per BFS window (Jaccard 0.23–0.45, under the 0.5 bar) and
+  even the top-3 protagonists got re-ranked, so no fixed window matched. But the cast
+  *intersection* is stable — every fragment shared exactly `{Cockroach Janta Party,
+  Dharmendra Pradhan, Delhi Police}`. Two fixes: (1) `_same_story` now also matches when
+  casts share ≥ 3 members outright (rank-independent); (2) reconcile runs a union-find
+  **cross-story merge pass** so existing active stories that are the same story as *each
+  other* collapse into the oldest — previously they could only merge against a freshly
+  detected community, so once a cluster stopped trending its duplicates lingered 24h.
+  Verified on prod: 6 → 1 CJP card, idempotent across passes.
+
+### Notes
+- Root-caused a separate prod symptom (stale/thin feed since ~02:09): **OpenRouter
+  credits exhausted** → classification stage 402-ing → ~1189 raw items stuck unclassified
+  (no data loss; they retry on cooldown and drain once credits return). Not a code change.
+
 ## [0.0.58.0] - 2026-07-23
 
 ### Fixed
