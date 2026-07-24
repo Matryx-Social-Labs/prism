@@ -33,7 +33,7 @@ from common.models import (
 from common.observability import fetch_prompt, observe
 from common.schemas import EventUpdateMessage
 from common.stream import get_redis
-from common.text import slugify
+from common.text import entity_slug
 from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
@@ -70,7 +70,7 @@ async def handle_enriched_item(payload: dict) -> None:
         cve_record = (enrichment.model or "").startswith("deterministic:")
 
         embedding = await _first_chunk_embedding(session, article_id)
-        entity_slugs = [slugify(e["name"]) for e in (shared.get("entities") or []) if e.get("name")]
+        entity_slugs = [entity_slug(e["name"]) for e in (shared.get("entities") or []) if e.get("name")]
 
         match = await find_event(
             session,
@@ -140,6 +140,7 @@ async def handle_enriched_item(payload: dict) -> None:
 
 DIRTY_KEY = "dirty:events"
 ANALYSIS_DEBOUNCE_S = 90  # coalesce a burst of coverage for one story into one pass
+ANALYSIS_RETRY_BACKOFF_S = 300  # re-queue a failed analysis this far out (self-heals credit stalls)
 SWEEP_BATCH = 20
 
 
@@ -168,6 +169,16 @@ async def run_due_analyses() -> int:
             done += 1
         except Exception:
             logger.exception("deferred_analysis_failed", event_id=eid)
+            # The event was already claimed (zrem above), so a transient failure — LLM
+            # timeout, or credits exhausted mid-run — would otherwise leave it PERMANENTLY
+            # un-analyzed (no perspectives/briefs) unless a new member happens to join.
+            # Re-queue with backoff so it retries and self-heals when the LLM recovers.
+            # ponytail: unbounded retry every ANALYSIS_RETRY_BACKOFF_S; add a cap only if a
+            # poison event ever loops (the deferred_analysis_failed log will show it).
+            try:
+                await redis.zadd(DIRTY_KEY, {eid: now + ANALYSIS_RETRY_BACKOFF_S}, nx=True)
+            except Exception:
+                logger.exception("analysis_requeue_failed", event_id=eid)
     return done
 
 
@@ -204,7 +215,7 @@ async def _upsert_entities(session, event_id: uuid.UUID, entities: list[dict]) -
         name = (extracted.get("name") or "").strip()
         if not name:
             continue
-        slug = slugify(name)
+        slug = entity_slug(name)
         stmt = (
             pg_insert(Entity)
             .values(
@@ -573,6 +584,6 @@ def _deterministic_correlation(members) -> CorrelationResult:
 
 
 async def _resolve_entity(session, name: str) -> uuid.UUID | None:
-    slug = slugify(name)
+    slug = entity_slug(name)
     result = await session.execute(select(Entity.id).where(Entity.slug == slug))
     return result.scalar_one_or_none()

@@ -243,6 +243,65 @@ class Story(TimestampMixin, Base):
     )
 
 
+class PartitionRun(TimestampMixin, Base):
+    """One global storyline-partition pass (see correlation/partition.py).
+
+    A *base* run (base_run_id NULL) is the cheap, frequent Leiden L2 boundary; an
+    *overlay* run (base_run_id set) is the slow grounded-veto refinement of a base.
+    Runs are immutable once written — the veto publishes a NEW overlay run and flips
+    `status` to 'current' only if its base is still current (compare-and-swap). A
+    partial-unique index (see the migration) enforces exactly one status='current';
+    readers join `event_story` to that run. Old runs go 'superseded', pruned by a
+    retention pass (keep last K)."""
+
+    __tablename__ = "partition_runs"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    base_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("partition_runs.id"))  # NULL = base run
+    status: Mapped[str] = mapped_column(Text, default="building", nullable=False)  # building|current|superseded
+    veto_state: Mapped[str] = mapped_column(Text, default="pending", nullable=False)  # pending|applied
+    resolution: Mapped[float | None] = mapped_column(Float)
+    stats: Mapped[dict | None] = mapped_column(JSONB)  # {events, edges, stories, veto_calls}
+
+
+class EventStory(Base):
+    """An event's story membership within one partition run. Written en masse per
+    run; readers select WHERE run_id = <the current run>. `story_label` is a per-run
+    Leiden label — ephemeral, never a cross-run identity. `branch_parent_id` +
+    `off_spine` carry the L3 branch tree, persisted ahead of the UI that renders it."""
+
+    __tablename__ = "event_story"
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("partition_runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("events.id", ondelete="CASCADE"), primary_key=True
+    )
+    story_label: Mapped[int] = mapped_column(Integer, nullable=False)
+    branch_parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    off_spine: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class StoryVeto(TimestampMixin, Base):
+    """A cached grounded-veto verdict, reused across runs while a story's identity is
+    unchanged (skips re-calling the LLM — see correlation/partition.py). `signature`
+    is the versioned, label-INDEPENDENT story identity (root + recurring cast + config:
+    algo·prompt·model·resolution·window·stoplist); reuse keys on (signature,
+    candidate_event_id). `base_run_id`/`version` are provenance for audit."""
+
+    __tablename__ = "story_veto"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    signature: Mapped[str] = mapped_column(Text, nullable=False)
+    candidate_event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    same_story: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float)
+    reason: Mapped[str | None] = mapped_column(Text)
+    base_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("partition_runs.id", ondelete="SET NULL"))
+    version: Mapped[str] = mapped_column(Text, nullable=False)  # config/prompt version tag
+
+
 class Perspective(TimestampMixin, Base):
     __tablename__ = "perspectives"
 

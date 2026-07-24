@@ -3,6 +3,65 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.67.0] - 2026-07-24
+
+### Added
+- **Storyline partitioner wired into serving.** The global Leiden partition + grounded
+  veto (staged in v0.0.66.0) now persists to durable, versioned runs and serves the
+  canonical story timeline — replacing the entry-dependent per-seed BFS with a boundary
+  that is consistent by construction. `story_timeline` reads the partition (BFS only as a
+  fallback for events not yet in a run) and caches per `(current run, event)` so a run
+  flip invalidates instantly.
+  - **Immutable base/overlay runs with atomic cutover.** A cheap frequent Leiden pass
+    publishes an immutable *base* run (`partition_runs`, `event_story`); the slow LLM veto
+    publishes an *overlay* derived from a base and cuts over only if that base is still
+    current (compare-and-swap). A partial-unique index guarantees exactly one live run;
+    publishing takes a Postgres advisory lock. Old runs are pruned (keep last N).
+  - **Veto verdicts cached and reused** (`story_veto`) keyed on a label-independent,
+    versioned story signature, so an unchanged story skips the LLM. The veto prompt is now
+    a Langfuse-managed prompt (`story-veto`) with a local fallback, and has a gold eval in
+    `evals/run_all.py` (`veto` target) seeded from the validation run.
+  - **Shareable trending stories keep their earned identity.** `/api/v1/trending/{slug}`
+    now assembles from the story's frozen `member_event_ids` instead of recomputing live,
+    so a shared link isn't silently repointed when the global partition shifts.
+  - Worker runs a frequent `_partition_reconciler` (base) and a slow `_veto_reconciler`
+    (overlay). Adds `event_entities(entity_id)` index for the partition's actor-graph join.
+
+## [0.0.66.0] - 2026-07-24
+
+### Fixed
+- **Deferred analysis no longer drops events on failure.** `run_due_analyses` claims an
+  event off the dirty set (`zrem`) *before* analyzing, but a failure — LLM timeout or
+  **credits exhausted mid-run** — only logged and never re-queued, leaving the event
+  permanently un-analyzed (no perspectives, no briefs). Found on live data: 35 multi-source
+  events (e.g. an 8-source "WordPress wp2shell" cyber story) had zero perspectives/briefs.
+  Failures now re-queue with a backoff so analysis self-heals when the LLM recovers.
+- **Entity resolution** now folds trivial punctuation/acronym spelling variants so one
+  real-world entity is one row. `D.K. Shivakumar`/`DK Shivakumar`, `J.P. Nadda`/`JP Nadda`
+  and `Cockroach Janta Party (CJP)`/`Cockroach Janta Party` were separate entities, which
+  quietly fragmented the story cast, the actor graph, and clustering. `entity_slug` (in
+  `common/text.py`) canonicalises before slugify — deterministic and conservative, never
+  fuzzy (fuzzy once over-merged 1638 CVEs into 7; `CPI(M)`≠`CPI`, `Janta`≠`Janata` stay
+  distinct). A one-time backfill (`scripts/backfill_entity_slugs.py`) merged 24 duplicate
+  groups on live data, re-pointing `event_entities`/`impacts` and preserving variants as aliases.
+- **Relevance gate** scope broadened. The prompt was stale — scoped to "professional roles
+  (cybersecurity/GRC and finance/markets)" only — so the gate dropped real general-interest
+  Indian news: sampling the rejects surfaced *Assam floods death toll*, *SC orders special
+  courts*, ministerial *resignations*, and protest news wrongly rejected. The rewritten
+  `relevance-gate` covers politics, courts, protests, disasters, health, science, sports and
+  the professional lenses, and clarifies that statements/demands/rulings by newsworthy actors
+  **are** events (while still rejecting opinion columns, ads, listicles, gossip). Committed as
+  the local fallback and staged in Langfuse (v12, `staging`); production label unchanged pending
+  a check on the production model.
+
+### Added
+- **Storyline partitioner** (`correlation/partition.py`), staged and validated read-only, not
+  yet wired to serving. Three layers per docs/STORYLINE-DESIGN.md: a global **Leiden** story
+  boundary (consistency by construction — every development reads the same boundary), a
+  spine-anchored branch tree, and a **grounded LLM veto** that separates entangled-politics
+  over-merges (validated: cuts NEET/SIR/parliament out of the CJP protest story). Awaits the
+  capable veto model before it replaces the on-read story graph.
+
 ## [0.0.65.0] - 2026-07-24
 
 ### Fixed
