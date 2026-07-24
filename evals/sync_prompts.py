@@ -22,6 +22,7 @@ PROMPTS = [
     "perspective-impact",
     "event-analysis",
     "thread-link",
+    "story-veto",
     "lens-brief",
     "agent-qa",
     "judge-groundedness",
