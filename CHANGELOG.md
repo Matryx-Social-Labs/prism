@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.69.0] - 2026-07-25
+
+### Changed
+- **Entity extraction now names people by personal name only.** The `extract-shared`
+  prompt normalized script/language but not titles, so the LLM emitted
+  `Union Education Minister Dharmendra Pradhan` alongside `Dharmendra Pradhan` — two
+  entity rows for one person, which fragmented clustering, story-linking, and the
+  trending merge. Added a rule to strip titles/offices/ranks/honorifics from PEOPLE
+  (organizations kept whole). Verified empirically on real articles: titles stripped,
+  entity recall preserved or improved. Published as Langfuse `extract-shared` v14
+  (fallback in `common/prompts/fallbacks/` kept in sync). Only affects new extractions.
+
 ## [0.0.68.0] - 2026-07-25
 
 ### Changed
