@@ -140,6 +140,7 @@ async def handle_enriched_item(payload: dict) -> None:
 
 DIRTY_KEY = "dirty:events"
 ANALYSIS_DEBOUNCE_S = 90  # coalesce a burst of coverage for one story into one pass
+ANALYSIS_RETRY_BACKOFF_S = 300  # re-queue a failed analysis this far out (self-heals credit stalls)
 SWEEP_BATCH = 20
 
 
@@ -168,6 +169,16 @@ async def run_due_analyses() -> int:
             done += 1
         except Exception:
             logger.exception("deferred_analysis_failed", event_id=eid)
+            # The event was already claimed (zrem above), so a transient failure — LLM
+            # timeout, or credits exhausted mid-run — would otherwise leave it PERMANENTLY
+            # un-analyzed (no perspectives/briefs) unless a new member happens to join.
+            # Re-queue with backoff so it retries and self-heals when the LLM recovers.
+            # ponytail: unbounded retry every ANALYSIS_RETRY_BACKOFF_S; add a cap only if a
+            # poison event ever loops (the deferred_analysis_failed log will show it).
+            try:
+                await redis.zadd(DIRTY_KEY, {eid: now + ANALYSIS_RETRY_BACKOFF_S}, nx=True)
+            except Exception:
+                logger.exception("analysis_requeue_failed", event_id=eid)
     return done
 
 

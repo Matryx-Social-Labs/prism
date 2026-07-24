@@ -6,6 +6,12 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 ## [0.0.66.0] - 2026-07-24
 
 ### Fixed
+- **Deferred analysis no longer drops events on failure.** `run_due_analyses` claims an
+  event off the dirty set (`zrem`) *before* analyzing, but a failure — LLM timeout or
+  **credits exhausted mid-run** — only logged and never re-queued, leaving the event
+  permanently un-analyzed (no perspectives, no briefs). Found on live data: 35 multi-source
+  events (e.g. an 8-source "WordPress wp2shell" cyber story) had zero perspectives/briefs.
+  Failures now re-queue with a backoff so analysis self-heals when the LLM recovers.
 - **Entity resolution** now folds trivial punctuation/acronym spelling variants so one
   real-world entity is one row. `D.K. Shivakumar`/`DK Shivakumar`, `J.P. Nadda`/`JP Nadda`
   and `Cockroach Janta Party (CJP)`/`Cockroach Janta Party` were separate entities, which
