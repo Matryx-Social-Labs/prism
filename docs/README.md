@@ -27,7 +27,11 @@ Complete, factual, code-accurate.
 Why the design is what it is.
 - [**How stories form and stay coherent**](./STORY-GRAPH.md) — clustering, the
   story-timeline graph (IDF weighting, roundup exclusion, embedding coherence),
-  trending, and lens briefs. The product's crux.
+  trending, and lens briefs. The product's crux (current implementation).
+- [**Storyline graph — design proposal**](./STORYLINE-DESIGN.md) — the three-layer
+  redesign (events → stories → branches): Leiden communities, a coherence metric, and
+  the root→branch→sub-branch tree. Grounded in the metro-maps / event-evolution
+  literature. Supersedes the on-read graph when staged in.
 - [Architecture](./ARCHITECTURE.md) — streaming-first pipeline, phases, tech stack.
 - [Ingestion & classification](./INGESTION-CLASSIFICATION.md) — collection, the
   relevance gate, routing.
