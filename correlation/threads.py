@@ -261,6 +261,7 @@ async def related_developments(event_id: uuid.UUID, limit: int = 8) -> list[dict
                     FROM event_entities ee1
                     JOIN entities ent ON ent.id = ee1.entity_id
                                      AND ent.entity_type IN ('person', 'organization')
+                                     AND ent.name <> ALL(:stop)
                     JOIN event_entities ee2
                       ON ee2.entity_id = ee1.entity_id AND ee2.event_id <> ee1.event_id
                     JOIN events e ON e.id = ee2.event_id
@@ -273,7 +274,7 @@ async def related_developments(event_id: uuid.UUID, limit: int = 8) -> list[dict
                     LIMIT :limit
                     """
                 ),
-                {"eid": str(event_id), "limit": limit},
+                {"eid": str(event_id), "limit": limit, "stop": _STORY_STOP_LIST},
             )
         ).mappings().all()
     return [
@@ -360,6 +361,30 @@ STORY_MIN_EDGE_WEIGHT = 0.15
 # when either event lacks an embedding (fall back to actor overlap).
 STORY_MAX_EMBED_DIST = 0.55
 
+# Story-graph stopwords: generic responders and national bodies that appear across
+# unrelated stories (a flood, a tunnel collapse, and a stampede all name the NDRF,
+# the Army, Fire & Emergency Services). They are never a story's own protagonist, so
+# they must not carry a story edge — two events sharing only these are NOT one story.
+# IDF (1/df) is meant to suppress them, but a small corpus gives them a high 1/df
+# (NDRF on 4 events → 0.25), so a flood links a tunnel collapse. This makes the rule
+# explicit and immediate; it self-corrects at scale but we don't wait for scale.
+# Deliberately NARROW: keep specific bodies like "Delhi Police" (they DO identify a
+# story) and investigative bodies like the ED/CBI (often a case's central actor).
+STORY_STOP_ENTITIES = {
+    "National Disaster Response Force", "NDRF",
+    "State Disaster Response Force", "SDRF",
+    "National Disaster Management Authority", "NDMA",
+    "Fire and Emergency Services", "Fire and Rescue Services", "Fire Department",
+    "Army", "Indian Army", "Air Force", "Indian Air Force", "Navy", "Indian Navy",
+    "Coast Guard", "Indian Coast Guard",
+    "Border Security Force", "BSF", "Central Reserve Police Force", "CRPF",
+    "Central Industrial Security Force", "CISF", "Assam Rifles", "ITBP",
+    "India Meteorological Department", "Indian Meteorological Department",
+    "Meteorological Department", "IMD",
+    "Central Water Commission", "Directorate General of Mines Safety",
+}
+_STORY_STOP_LIST = sorted(STORY_STOP_ENTITIES)
+
 # Roundup / live-blog events ("Tamil Nadu Today: …", "… LIVE:") pack many unrelated
 # actors into one body, so they bridge unrelated stories through the shared-actor
 # graph (a daily digest mentioning Vijay + Cauvery + an ammonia leak links all three).
@@ -391,6 +416,7 @@ _STRONG_NEIGHBOURS_SQL = text(
            coalesce(e.occurred_at::timestamptz, e.last_updated_at) AS d
     FROM event_entities ee1
     JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
+                     AND ent.name <> ALL(:stop)
     JOIN df ON df.entity_id = ee1.entity_id
     JOIN event_entities ee2 ON ee2.entity_id = ee1.entity_id AND ee2.event_id <> ee1.event_id
     JOIN events e ON e.id = ee2.event_id
@@ -445,6 +471,7 @@ async def _story_component(session, seed: uuid.UUID) -> set[str]:
                         "min_shared": STORY_MIN_SHARED,
                         "min_weight": STORY_MIN_EDGE_WEIGHT,
                         "max_dist": STORY_MAX_EMBED_DIST,
+                        "stop": _STORY_STOP_LIST,
                     },
                 )
             ).mappings().all()
@@ -474,6 +501,7 @@ _COMPONENT_EDGES_SQL = text(
     SELECT ee1.event_id AS a, ee2.event_id AS b, sum(1.0 / df.d) AS w
     FROM event_entities ee1
     JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
+                     AND ent.name <> ALL(:stop)
     JOIN df ON df.entity_id = ee1.entity_id
     JOIN event_entities ee2 ON ee2.entity_id = ee1.entity_id AND ee2.event_id > ee1.event_id
     WHERE ee1.event_id = ANY(CAST(:ids AS uuid[]))
@@ -491,7 +519,7 @@ async def _component_edges(session, ids: list[str]) -> list[tuple[str, str, floa
     rows = (
         await session.execute(
             _COMPONENT_EDGES_SQL,
-            {"ids": ids, "min_shared": STORY_MIN_SHARED, "min_weight": STORY_MIN_EDGE_WEIGHT},
+            {"ids": ids, "min_shared": STORY_MIN_SHARED, "min_weight": STORY_MIN_EDGE_WEIGHT, "stop": _STORY_STOP_LIST},
         )
     ).mappings().all()
     return [(str(r["a"]), str(r["b"]), float(r["w"])) for r in rows]
@@ -556,12 +584,13 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
                 SELECT ent.name, count(DISTINCT ee.event_id) AS n
                 FROM event_entities ee
                 JOIN entities ent ON ent.id = ee.entity_id AND ent.entity_type IN ('person', 'organization')
+                                 AND ent.name <> ALL(:stop)
                 WHERE ee.event_id = ANY(CAST(:ids AS uuid[]))
                 GROUP BY ent.name HAVING count(DISTINCT ee.event_id) >= 2
                 ORDER BY n DESC LIMIT 8
                 """
             ),
-            {"ids": ids},
+            {"ids": ids, "stop": _STORY_STOP_LIST},
         )
     ).mappings().all()
     developments = sorted(

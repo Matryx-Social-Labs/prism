@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.65.0] - 2026-07-24
+
+### Fixed
+- Story graph: a **generic-entity stoplist** stops unrelated disasters/stories from
+  linking through shared responders. On live data the Assam flood story pulled in
+  the Sikkim tunnel collapse because both name `NDRF` / `Fire and Emergency Services`
+  / the `Army` — agencies that respond to everything and are never a story's own
+  protagonist. Their `df` is low in a small corpus, so IDF didn't suppress them and
+  the embedding gate didn't either (a flood and a tunnel collapse embed close: both
+  are "N dead, rescue ongoing, NDRF responds"). These entities are now story-graph
+  stopwords — two events sharing only them are not one story. The list is deliberately
+  narrow: specific bodies like `Delhi Police` (carries the CJP protest edge) and
+  investigative bodies like the ED are kept. Verified on prod: Assam flood → its own
+  story (Sikkim gone), CJP → all 12 cross-state developments intact. No LLM cost;
+  self-corrects further at corpus scale.
+
 ## [0.0.64.0] - 2026-07-24
 
 ### Fixed
