@@ -23,6 +23,8 @@ dependencies = [
     "python-dateutil>=2.9",
     "structlog>=26.1.0",
     "networkx>=3.3",  # story-timeline community detection (pure-Python, small graphs)
+    "igraph>=1.0.0",
+    "leidenalg>=0.12.0",
 ]
 
 [dependency-groups]
