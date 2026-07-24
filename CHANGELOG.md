@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.68.0] - 2026-07-25
+
+### Changed
+- **Trending detection now reads the global partition instead of per-seed BFS.**
+  `detect_trending_communities` sources story membership from `_partitioned_members`
+  (BFS only as a fallback for events not yet in a run), so trending communities match the
+  boundaries `/events` serves — removing the last per-seed BFS caller.
+- **Magnet-blind cast merge replaced with an IDF-weighted one.** The old "≥3 shared cast
+  members → same story" rule (built for the BFS 30-event cap) would re-merge stories the
+  veto deliberately SEPARATED when they shared 3 national magnets (Modi/Congress). It's
+  replaced with a 1/df-weighted shared-cast overlap (per the IDF principle): distinctive
+  protagonists (Cockroach Janta Party, Delhi Police) drive merges, ubiquitous actors don't.
+  Genuine Leiden over-splits still re-merge; veto-separated stories stay separate.
+  - Known limit: matching is on resolved entity names, so un-folded aliases (`Janta`/`Janata`,
+    titled `Union Education Minister Dharmendra Pradhan` vs `Dharmendra Pradhan`) can miss a
+    merge (a duplicate card) — never cause a wrong merge. Best fixed at extraction.
+
 ## [0.0.67.0] - 2026-07-24
 
 ### Added
