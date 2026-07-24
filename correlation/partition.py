@@ -20,6 +20,8 @@ for the validation harness (no writes).
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -31,13 +33,14 @@ from common.config import get_settings
 from common.db import session_scope
 from common.llm import structured_chat
 from common.logging import get_logger
+from common.observability import fetch_prompt
 from correlation.threads import (
-    STORY_MIN_EDGE_WEIGHT,
-    STORY_MIN_SHARED,
-    STORY_MAX_EMBED_DIST,
-    STORY_WINDOW_DAYS,
     _ROUNDUP_CTE,
     _STORY_STOP_LIST,
+    STORY_MAX_EMBED_DIST,
+    STORY_MIN_EDGE_WEIGHT,
+    STORY_MIN_SHARED,
+    STORY_WINDOW_DAYS,
 )
 
 logger = get_logger(__name__)
@@ -305,21 +308,9 @@ def build_branch_tree(
 VETO_MIN_STORY_SIZE = 4   # only vet blobs big enough to over-merge
 VETO_MAX_MEMBERS = 25     # cap LLM calls per story
 VETO_CONCURRENCY = 3
-
-_VETO_SYS = (
-    "You group news into ongoing stories. You are given a STORY (its lead event and "
-    "recurring cast) and a CANDIDATE event. Decide whether the CANDIDATE is PART OF THE "
-    "SAME STORY.\n"
-    "SAME STORY (same_story = true) — be inclusive here — covers: the core event and its "
-    "continuations; its DIRECT CONSEQUENCES (police action at it, metro/transit closures "
-    "it caused, arrests, court cases about its participants); REACTIONS to it by leaders, "
-    "parties, lawyers, or institutions; and the story SPREADING to other cities or states "
-    "(the same movement or cause elsewhere).\n"
-    "SEPARATE STORY (same_story = false): a DIFFERENT event that only shares people, "
-    "parties, police, a location, or a broad theme — e.g. an unrelated protest about a "
-    "different cause, a routine administrative or electoral matter, or a parliamentary "
-    "dispute on another subject."
-)
+# The veto system prompt is a Langfuse-managed prompt `story-veto` (local fallback
+# common/prompts/fallbacks/story-veto.json) — same pattern as every other stage, so
+# the eval runs the exact prompt production runs and it iterates without a redeploy.
 
 
 class _StoryVeto(BaseModel):
@@ -370,21 +361,19 @@ async def llm_prune_story(session, root: Node, members: list[Node], model: str) 
     # Vet the most-corroborated members first; keep the tail unvetted if huge.
     to_vet = sorted((m for m in members if m.id != root.id), key=lambda n: -n.source_count)[:VETO_MAX_MEMBERS]
     sem = asyncio.Semaphore(VETO_CONCURRENCY)
+    prompt = fetch_prompt("story-veto")
 
     async def vet(m: Node) -> tuple[Node, _StoryVeto | None]:
         c = ev.get(m.id, {})
+        candidate = f"{c.get('title')}\n{(c.get('summary') or '')[:320]}"
         async with sem:
             try:
                 r = await structured_chat(
                     model=model,
-                    messages=[
-                        {"role": "system", "content": _VETO_SYS},
-                        {"role": "user", "content":
-                            f"{grounding}\n\nCANDIDATE: {c.get('title')}\n{(c.get('summary') or '')[:320]}\n\n"
-                            "Is CANDIDATE part of the SAME story?"},
-                    ],
+                    messages=prompt.compile(grounding=grounding, candidate=candidate),
                     output_model=_StoryVeto,
                     trace_name="story-veto",
+                    langfuse_prompt=prompt,
                     metadata={"stage": "partition", "story_root": root.id},
                     temperature=0.0,  # deterministic verdicts run-to-run
                     max_retries=1,
@@ -412,6 +401,60 @@ async def llm_prune_story(session, root: Node, members: list[Node], model: str) 
 
 
 # ── Orchestration ────────────────────────────────────────────────────────────
+def _group_by_story(labels: dict[str, int], nodes: dict[str, Node]) -> dict[int, list[Node]]:
+    by_story: dict[int, list[Node]] = defaultdict(list)
+    for eid, label in labels.items():
+        by_story[label].append(nodes[eid])
+    return by_story
+
+
+async def _apply_veto(session, by_story: dict[int, list[Node]], model: str, *,
+                      version: str | None = None, base_run_id: str | None = None) -> list[dict]:
+    """Prune each over-merged story with the grounded veto; a dropped member splits off
+    as its own story. When version+base_run_id are given, verdicts are cached in / reused
+    from story_veto so an unchanged story skips the LLM (A2:B / C2:A)."""
+    veto_log: list[dict] = []
+    next_label = max(by_story) + 1 if by_story else 0
+    for label in list(by_story):
+        members = by_story[label]
+        if len(members) < VETO_MIN_STORY_SIZE:
+            continue
+        root = _root(members)
+        if version is not None:
+            keep, verdicts = await _vet_with_reuse(session, root, members, model, version, base_run_id)
+        else:
+            keep, verdicts = await llm_prune_story(session, root, members, model)
+        veto_log.append({"story": label, "root": root.title, "verdicts": verdicts})
+        dropped = [m for m in members if m.id not in keep]
+        if dropped:
+            by_story[label] = [m for m in members if m.id in keep]
+            for m in dropped:
+                by_story[next_label] = [m]
+                next_label += 1
+    return veto_log
+
+
+async def _finalize_stories(session, by_story: dict[int, list[Node]], edge_w) -> list[dict]:
+    """Build each story's branch tree — the shared tail of compute + overlay."""
+    stories = []
+    for label, members in by_story.items():
+        ids = [m.id for m in members]
+        embed = await _embed_dists(session, ids) if len(ids) > 1 else {}
+        spine = _spine(members)
+        root_id, parent, off_spine = build_branch_tree(members, edge_w, embed, spine)
+        stories.append(
+            {
+                "story_label": label,
+                "root_id": root_id,
+                "size": len(members),
+                "members": members,
+                "parent": parent,
+                "off_spine": off_spine,
+            }
+        )
+    return stories
+
+
 async def compute_partition(resolution: float = LEIDEN_RESOLUTION, llm_veto: bool = False) -> dict:
     """Load the graph, partition into stories, build each story's branch tree.
     Read-only; returns a structured result for validation or persistence."""
@@ -420,48 +463,192 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION, llm_veto: boo
         edges = await _load_edges(session)
         labels = leiden_partition(nodes, edges, resolution)
         edge_w = _edge_weight_map(edges)
+        by_story = _group_by_story(labels, nodes)
+        veto_log = await _apply_veto(session, by_story, get_settings().prism_model_gate) if llm_veto else []
+        stories = await _finalize_stories(session, by_story, edge_w)
+    return {"nodes": nodes, "edges": edges, "stories": stories, "veto_log": veto_log}
 
-        by_story: dict[int, list[Node]] = defaultdict(list)
-        for eid, label in labels.items():
-            by_story[label].append(nodes[eid])
 
-        # LLM veto (L3): prune over-merged blobs. A pruned member splits off as its
-        # own story (a later partition pass re-clusters the pruned set if it coheres).
-        veto_log: list[dict] = []
-        if llm_veto:
-            model = get_settings().prism_model_gate  # fast relevance-style judgment
-            next_label = max(by_story) + 1 if by_story else 0
-            for label in list(by_story):
-                members = by_story[label]
-                if len(members) < VETO_MIN_STORY_SIZE:
-                    continue
-                root = _root(members)
-                keep, verdicts = await llm_prune_story(session, root, members, model)
-                veto_log.append({"story": label, "root": root.title, "verdicts": verdicts})
-                dropped = [m for m in members if m.id not in keep]
-                if dropped:
-                    by_story[label] = [m for m in members if m.id in keep]
-                    for m in dropped:
-                        by_story[next_label] = [m]
-                        next_label += 1
+# ── Verdict signature + reuse (A2:B / C2:A) ──────────────────────────────────
+# A story's veto identity is label-INDEPENDENT (sorted member ids) folded with a
+# config version, so a prompt/model/resolution/window/stoplist change re-vets while
+# unchanged stories reuse. codex #5/#6/#9: never keys on the ephemeral Leiden label.
+def veto_config_version() -> str:
+    s = get_settings()
+    raw = f"gate={s.prism_model_gate}|res={LEIDEN_RESOLUTION}|win={STORY_WINDOW_DAYS}|stop={len(_STORY_STOP_LIST)}|v1"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
-        stories = []
-        for label, members in by_story.items():
-            ids = [m.id for m in members]
-            embed = await _embed_dists(session, ids) if len(ids) > 1 else {}
-            spine = _spine(members)
-            root_id, parent, off_spine = build_branch_tree(members, edge_w, embed, spine)
-            stories.append(
-                {
-                    "story_label": label,
-                    "root_id": root_id,
-                    "size": len(members),
-                    "members": members,
-                    "parent": parent,
-                    "off_spine": off_spine,
-                }
+
+def story_signature(members: list[Node], version: str) -> str:
+    ids = "|".join(sorted(m.id for m in members))
+    return hashlib.sha256(f"{ids}||{version}".encode()).hexdigest()[:32]
+
+
+async def _vet_with_reuse(session, root: Node, members: list[Node], model: str,
+                          version: str, base_run_id: str | None) -> tuple[set[str], list[dict]]:
+    """Reuse cached verdicts for a story whose signature (membership+version) is
+    unchanged; only call the LLM for candidates never judged at this signature."""
+    sig = story_signature(members, version)
+    cand = [m for m in members if m.id != root.id]
+    rows = (
+        await session.execute(
+            text(
+                "SELECT candidate_event_id::text AS cid, same_story FROM story_veto "
+                "WHERE signature = :sig AND candidate_event_id = ANY(CAST(:ids AS uuid[]))"
+            ),
+            {"sig": sig, "ids": [m.id for m in cand]},
+        )
+    ).all()
+    cached: dict[str, bool] = {cid: same for cid, same in rows}
+    reused = set(cached)
+    uncached = [m for m in cand if m.id not in cached]
+    if uncached:  # LLM only for the never-judged tail; root included for grounding
+        fresh_keep, fresh_verdicts = await llm_prune_story(session, root, [root, *uncached], model)
+        by_id = {v["id"]: v for v in fresh_verdicts}
+        for m in uncached:
+            same = m.id in fresh_keep
+            v = by_id.get(m.id, {})
+            await session.execute(
+                text(
+                    "INSERT INTO story_veto (id, signature, candidate_event_id, same_story, "
+                    "confidence, reason, base_run_id, version) VALUES (:id,:sig,:cid,:same,:conf,:reason,:brid,:ver) "
+                    "ON CONFLICT (signature, candidate_event_id) DO UPDATE SET "
+                    "same_story=EXCLUDED.same_story, confidence=EXCLUDED.confidence, "
+                    "reason=EXCLUDED.reason, base_run_id=EXCLUDED.base_run_id"
+                ),
+                {"id": uuid.uuid4(), "sig": sig, "cid": m.id, "same": same,
+                 "conf": v.get("confidence"), "reason": (v.get("reason") or "")[:500] or None,
+                 "brid": base_run_id, "ver": version},
             )
-    return {"nodes": nodes, "edges": edges, "stories": stories, "veto_log": veto_log if llm_veto else []}
+            cached[m.id] = same
+    keep = {root.id}
+    verdicts: list[dict] = []
+    for m in cand:
+        same = cached.get(m.id, True)  # fail-open
+        if same:
+            keep.add(m.id)
+        verdicts.append({"id": m.id, "same": same, "reused": m.id in reused})
+    return keep, verdicts
+
+
+# ── Persistence: immutable base/overlay runs + atomic cutover (A1:A/D1:A) ─────
+# One pg advisory lock namespaces the *publish* (never held across LLM calls); a
+# partial-unique index on partition_runs(status='current') is the hard invariant.
+_PARTITION_LOCK_KEY = 0x50415254  # "PART"
+PARTITION_RETENTION = 8           # keep this many recent runs; prune older ones
+
+
+def _stats_json(**kw) -> str:
+    return json.dumps(kw)
+
+
+async def _write_event_story(session, run_id: uuid.UUID, stories: list[dict]) -> int:
+    params = [
+        {"r": run_id, "e": m.id, "l": s["story_label"],
+         "p": s["parent"].get(m.id), "o": m.id in s["off_spine"]}
+        for s in stories for m in s["members"]
+    ]
+    if params:
+        await session.execute(
+            text("INSERT INTO event_story (run_id, event_id, story_label, branch_parent_id, off_spine) "
+                 "VALUES (:r, :e, :l, :p, :o)"),
+            params,  # executemany — one batched round trip
+        )
+    return len(params)
+
+
+async def _flip_current(session, run_id: uuid.UUID) -> None:
+    # Vacate the old current BEFORE claiming the new one (partial-unique index).
+    await session.execute(text("UPDATE partition_runs SET status='superseded', updated_at=now() WHERE status='current'"))
+    await session.execute(text("UPDATE partition_runs SET status='current', updated_at=now() WHERE id=:id"), {"id": run_id})
+
+
+async def _prune_runs(session, keep: int = PARTITION_RETENTION) -> None:
+    """Keep the `keep` most-recent non-current runs; delete older ones (event_story
+    CASCADEs, story_veto.base_run_id SET NULL so verdicts survive for audit)."""
+    old = (
+        await session.execute(
+            text("SELECT id FROM partition_runs WHERE status <> 'current' ORDER BY created_at DESC OFFSET :k"),
+            {"k": keep},
+        )
+    ).scalars().all()
+    if old:
+        await session.execute(
+            text("DELETE FROM partition_runs WHERE id = ANY(CAST(:ids AS uuid[]))"),
+            {"ids": [str(i) for i in old]},
+        )
+        logger.info("partition_runs_pruned", dropped=len(old))
+
+
+async def persist_base_run(resolution: float = LEIDEN_RESOLUTION) -> str:
+    """Compute a fresh Leiden L2 partition and publish it as a new immutable base run
+    (veto pending). The frequent worker path — cheap, no LLM."""
+    res = await compute_partition(resolution=resolution, llm_veto=False)
+    async with session_scope() as session:
+        await session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _PARTITION_LOCK_KEY})
+        run_id = uuid.uuid4()
+        await session.execute(
+            text("INSERT INTO partition_runs (id, status, veto_state, resolution, stats) "
+                 "VALUES (:id, 'building', 'pending', :res, CAST(:stats AS jsonb))"),
+            {"id": run_id, "res": resolution,
+             "stats": _stats_json(events=len(res["nodes"]), edges=len(res["edges"]), stories=len(res["stories"]))},
+        )
+        await _write_event_story(session, run_id, res["stories"])
+        await _flip_current(session, run_id)
+        await _prune_runs(session)
+    logger.info("partition_base_published", run_id=str(run_id), stories=len(res["stories"]))
+    return str(run_id)
+
+
+async def persist_veto_overlay() -> str | None:
+    """Refine the current base run with the grounded veto and publish an overlay run.
+    LLM calls run OUTSIDE the lock; the publish CAS-checks that the base is still
+    current (else a newer base won the race — discard). The slow worker path."""
+    version = veto_config_version()
+    model = get_settings().prism_model_gate
+    # Phase 1 (no lock): read the current base, run the veto, finalize. Verdicts persist.
+    async with session_scope() as session:
+        base = (
+            await session.execute(text("SELECT id::text AS id, veto_state FROM partition_runs WHERE status='current'"))
+        ).mappings().first()
+        if base is None or base["veto_state"] == "applied":
+            return None  # nothing current, or already refined
+        base_id = base["id"]
+        nodes = await _load_nodes(session)
+        edges = await _load_edges(session)
+        edge_w = _edge_weight_map(edges)
+        rows = (
+            await session.execute(
+                text("SELECT event_id::text AS e, story_label AS l FROM event_story WHERE run_id=:r"),
+                {"r": base_id},
+            )
+        ).all()
+        by_story: dict[int, list[Node]] = defaultdict(list)
+        for e, label in rows:
+            n = nodes.get(e)
+            if n is not None:
+                by_story[label].append(n)
+        veto_log = await _apply_veto(session, by_story, model, version=version, base_run_id=base_id)
+        stories = await _finalize_stories(session, by_story, edge_w)
+    # Phase 2 (lock + CAS): publish only if the base is still current.
+    async with session_scope() as session:
+        await session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _PARTITION_LOCK_KEY})
+        still = (await session.execute(text("SELECT id::text FROM partition_runs WHERE status='current'"))).scalar()
+        if still != base_id:
+            logger.info("veto_overlay_discarded_stale_base", base=base_id, current=still)
+            return None
+        run_id = uuid.uuid4()
+        await session.execute(
+            text("INSERT INTO partition_runs (id, base_run_id, status, veto_state, resolution, stats) "
+                 "VALUES (:id, :base, 'building', 'applied', :res, CAST(:stats AS jsonb))"),
+            {"id": run_id, "base": base_id, "res": LEIDEN_RESOLUTION,
+             "stats": _stats_json(stories=len(stories), vetoed=len(veto_log))},
+        )
+        await _write_event_story(session, run_id, stories)
+        await _flip_current(session, run_id)
+        await _prune_runs(session)
+    logger.info("partition_overlay_published", run_id=str(run_id), base=base_id, vetoed=len(veto_log))
+    return str(run_id)
 
 
 # ── Validation harness (read-only) ───────────────────────────────────────────

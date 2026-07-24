@@ -96,11 +96,15 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         if story is None:
             raise HTTPException(status_code=404, detail="no such story")
 
-    from correlation.threads import story_timeline
+    from correlation.threads import story_timeline_from_members
 
     timeline = {"developments": [], "cast": []}
     if story["hero_event_id"]:
-        timeline = await story_timeline(uuid.UUID(str(story["hero_event_id"])))
+        # Pin the share view to the member set this slug EARNED, not the live global
+        # partition — a shared link keeps its identity as coverage/boundaries shift.
+        timeline = await story_timeline_from_members(
+            uuid.UUID(str(story["hero_event_id"])), story["member_event_ids"]
+        )
     return {
         "slug": story["slug"],
         "canonical_slug": story["slug"],  # if != the requested slug, the client should redirect

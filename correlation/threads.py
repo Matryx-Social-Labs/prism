@@ -613,14 +613,48 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
     return {"developments": developments, "cast": [c["name"] for c in cast]}
 
 
+async def _current_run_id(session) -> str | None:
+    return (await session.execute(text("SELECT id::text FROM partition_runs WHERE status='current'"))).scalar()
+
+
+async def _partitioned_members(session, event_id: uuid.UUID) -> set[str] | None:
+    """Members of this event's story in the CURRENT partition run (correlation/
+    partition.py), or None if the event isn't in the current run yet (created since
+    the last pass → the caller falls back to the BFS component). Two indexed lookups:
+    the event's (run, label), then that label's members — the global partition already
+    fixed the boundary, so this is consistent from any member and needs no re-split."""
+    row = (
+        await session.execute(
+            text("SELECT es.run_id::text AS r, es.story_label AS l FROM event_story es "
+                 "JOIN partition_runs pr ON pr.id = es.run_id AND pr.status = 'current' "
+                 "WHERE es.event_id = :eid"),
+            {"eid": str(event_id)},
+        )
+    ).first()
+    if row is None:
+        return None
+    run_id, label = row
+    rows = (
+        await session.execute(
+            text("SELECT event_id::text FROM event_story WHERE run_id = :r AND story_label = :l"),
+            {"r": run_id, "l": label},
+        )
+    ).scalars().all()
+    return set(rows)
+
+
 async def story_timeline(event_id: uuid.UUID) -> dict:
     """The canonical, consistent timeline for the story this event belongs to:
-    every development in the connected component, chronological, with the current
-    event marked and causal 'why' notes on the edges that event_links confirms.
-    Cached (fail-open) since every member computes the identical component."""
+    every development in the story, chronological, with the current event marked and
+    causal 'why' notes on the edges that event_links confirms. Reads the global
+    partition (consistent boundary by construction); falls back to the per-seed BFS
+    component for events not yet in a partition run. Cached per (current run, event)
+    so a run flip invalidates instantly (fail-open)."""
     from common.stream import get_redis
 
-    ckey = f"story_timeline:{event_id}"
+    async with session_scope() as session:
+        run_id = await _current_run_id(session)
+    ckey = f"story_timeline:{run_id or 'bfs'}:{event_id}"
     try:
         redis = get_redis()
         cached = await redis.get(ckey)
@@ -630,10 +664,14 @@ async def story_timeline(event_id: uuid.UUID) -> dict:
         redis = None
 
     async with session_scope() as session:
-        component = list(await _story_component(session, event_id))
-        edges = await _component_edges(session, component)
-        community = _seed_community(component, edges, event_id)
-        result = await _assemble_timeline(session, event_id, list(community))
+        members = await _partitioned_members(session, event_id)
+        if members is not None:
+            result = await _assemble_timeline(session, event_id, list(members))
+        else:  # not partitioned yet — the original per-seed BFS component + split
+            component = list(await _story_component(session, event_id))
+            edges = await _component_edges(session, component)
+            community = _seed_community(component, edges, event_id)
+            result = await _assemble_timeline(session, event_id, list(community))
 
     if redis is not None:
         try:
@@ -641,3 +679,14 @@ async def story_timeline(event_id: uuid.UUID) -> dict:
         except Exception:  # noqa: BLE001
             pass
     return result
+
+
+async def story_timeline_from_members(seed: uuid.UUID, member_ids: list) -> dict:
+    """Assemble a timeline for a GIVEN frozen member set rather than recomputing the
+    boundary — keeps a /trending/<slug> share link pinned to the identity it EARNED
+    even as the global partition shifts (codex #4). Used by the trending share route."""
+    ids = [str(m) for m in (member_ids or [])]
+    if str(seed) not in ids:
+        ids.append(str(seed))
+    async with session_scope() as session:
+        return await _assemble_timeline(session, seed, ids)

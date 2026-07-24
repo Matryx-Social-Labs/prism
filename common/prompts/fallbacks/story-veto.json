@@ -1,0 +1,10 @@
+[
+  {
+    "role": "system",
+    "content": "You group news into ongoing stories. You are given a STORY (its lead event and recurring cast) and a CANDIDATE event. Decide whether the CANDIDATE is PART OF THE SAME STORY.\nSAME STORY (same_story = true) — be inclusive here — covers: the core event and its continuations; its DIRECT CONSEQUENCES (police action at it, metro/transit closures it caused, arrests, court cases about its participants); REACTIONS to it by leaders, parties, lawyers, or institutions; and the story SPREADING to other cities or states (the same movement or cause elsewhere).\nSEPARATE STORY (same_story = false): a DIFFERENT event that only shares people, parties, police, a location, or a broad theme — e.g. an unrelated protest about a different cause, a routine administrative or electoral matter, or a parliamentary dispute on another subject. Respond with JSON only."
+  },
+  {
+    "role": "user",
+    "content": "{{grounding}}\n\nCANDIDATE: {{candidate}}\n\nIs CANDIDATE part of the SAME story?"
+  }
+]

@@ -86,6 +86,38 @@ async def _trending_reconciler() -> None:
             logger.exception("trending_reconciler_error")
 
 
+PARTITION_INTERVAL_S = int(os.environ.get("PRISM_PARTITION_INTERVAL_S", "900"))  # base L2 pass (cheap)
+VETO_INTERVAL_S = int(os.environ.get("PRISM_VETO_INTERVAL_S", "3600"))  # overlay veto pass (LLM)
+
+
+async def _partition_reconciler() -> None:
+    """Republish the global storyline partition (base L2) on an interval — the
+    consistent boundary every story_timeline reads (correlation/partition.py). Cheap,
+    no LLM; the veto refines it separately below."""
+    from correlation.partition import persist_base_run
+
+    while True:
+        await asyncio.sleep(PARTITION_INTERVAL_S)
+        try:
+            await persist_base_run()
+        except Exception:
+            logger.exception("partition_reconciler_error")
+
+
+async def _veto_reconciler() -> None:
+    """Refine the current base run with the grounded LLM veto on a slower cadence,
+    publishing an overlay run only if its base is still current (correlation/
+    partition.py::persist_veto_overlay)."""
+    from correlation.partition import persist_veto_overlay
+
+    while True:
+        await asyncio.sleep(VETO_INTERVAL_S)
+        try:
+            await persist_veto_overlay()
+        except Exception:
+            logger.exception("veto_reconciler_error")
+
+
 async def _health_server() -> None:
     """Minimal HTTP 200 responder on $PORT.
 
@@ -174,6 +206,8 @@ async def main(stages: list[str]) -> None:
         # per-story LLM analysis runs here, coalesced, off the ingest hot path.
         tasks.append(asyncio.create_task(_analysis_sweeper()))
         tasks.append(asyncio.create_task(_trending_reconciler()))
+        tasks.append(asyncio.create_task(_partition_reconciler()))
+        tasks.append(asyncio.create_task(_veto_reconciler()))
 
     if len(tasks) <= 1:  # only the health server — no stage selected
         raise SystemExit("no stages selected")

@@ -3,6 +3,30 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.67.0] - 2026-07-24
+
+### Added
+- **Storyline partitioner wired into serving.** The global Leiden partition + grounded
+  veto (staged in v0.0.66.0) now persists to durable, versioned runs and serves the
+  canonical story timeline — replacing the entry-dependent per-seed BFS with a boundary
+  that is consistent by construction. `story_timeline` reads the partition (BFS only as a
+  fallback for events not yet in a run) and caches per `(current run, event)` so a run
+  flip invalidates instantly.
+  - **Immutable base/overlay runs with atomic cutover.** A cheap frequent Leiden pass
+    publishes an immutable *base* run (`partition_runs`, `event_story`); the slow LLM veto
+    publishes an *overlay* derived from a base and cuts over only if that base is still
+    current (compare-and-swap). A partial-unique index guarantees exactly one live run;
+    publishing takes a Postgres advisory lock. Old runs are pruned (keep last N).
+  - **Veto verdicts cached and reused** (`story_veto`) keyed on a label-independent,
+    versioned story signature, so an unchanged story skips the LLM. The veto prompt is now
+    a Langfuse-managed prompt (`story-veto`) with a local fallback, and has a gold eval in
+    `evals/run_all.py` (`veto` target) seeded from the validation run.
+  - **Shareable trending stories keep their earned identity.** `/api/v1/trending/{slug}`
+    now assembles from the story's frozen `member_event_ids` instead of recomputing live,
+    so a shared link isn't silently repointed when the global partition shifts.
+  - Worker runs a frequent `_partition_reconciler` (base) and a slow `_veto_reconciler`
+    (overlay). Adds `event_entities(entity_id)` index for the partition's actor-graph join.
+
 ## [0.0.66.0] - 2026-07-24
 
 ### Fixed

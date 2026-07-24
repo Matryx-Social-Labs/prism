@@ -178,6 +178,42 @@ def thread_direction_evaluator(*, input, output, expected_output, **kwargs):
     return Evaluation(name="thread_direction_accuracy", value=1.0 if correct else 0.0)
 
 
+# ── Story veto (grounded same-story judgment) ────────────────────────
+
+
+async def veto_task(*, item, **kwargs):
+    from correlation.partition import _StoryVeto
+
+    prompt = fetch_prompt("story-veto")
+    result = await structured_chat(
+        model=get_settings().prism_model_gate,
+        messages=prompt.compile(grounding=item.input["grounding"], candidate=item.input["candidate"]),
+        output_model=_StoryVeto,
+        trace_name="eval-story-veto",
+        langfuse_prompt=prompt,
+    )
+    return result.model_dump()
+
+
+def veto_evaluator(*, input, output, expected_output, **kwargs):
+    correct = bool(output and output.get("same_story") == expected_output["same_story"])
+    return Evaluation(name="veto_accuracy", value=1.0 if correct else 0.0)
+
+
+def veto_keep_evaluator(*, input, output, expected_output, **kwargs):
+    """Keep-precision: only scores the genuine developments (expected same_story=true)."""
+    if not expected_output["same_story"]:
+        return None
+    return Evaluation(name="veto_keep_precision", value=1.0 if output and output.get("same_story") else 0.0)
+
+
+def veto_separate_evaluator(*, input, output, expected_output, **kwargs):
+    """Separation: only scores the contaminants (expected same_story=false)."""
+    if expected_output["same_story"]:
+        return None
+    return Evaluation(name="veto_separation", value=1.0 if output and not output.get("same_story") else 0.0)
+
+
 # ── Runner ───────────────────────────────────────────────────────────
 
 
@@ -229,11 +265,24 @@ def run_groundedness():
     print(result.format())
 
 
+def run_veto():
+    upload("prism-story-veto", "story_veto.jsonl")
+    dataset = langfuse.get_dataset("prism-story-veto")
+    result = dataset.run_experiment(
+        name="story-veto",
+        description="Grounded veto: keep genuine developments, separate contaminants",
+        task=veto_task,
+        evaluators=[veto_evaluator, veto_keep_evaluator, veto_separate_evaluator],
+    )
+    print(result.format())
+
+
 RUNS = {
     "relevance": run_relevance,
     "classification": run_classification,
     "threads": run_threads,
     "groundedness": run_groundedness,
+    "veto": run_veto,
 }
 
 
