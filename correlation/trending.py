@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.logging import get_logger
 from common.text import slugify
-from correlation.threads import _story_component
+from correlation.threads import STORY_WINDOW_DAYS, _partitioned_members, _story_component
 
 logger = get_logger(__name__)
 
@@ -65,33 +65,63 @@ def _cast_jaccard(a: list[str], b: list[str]) -> float:
 
 CAST_SAME_STORY = 0.5  # cast Jaccard at/above which two communities are the same story
 
-# A mega-story fragments (BFS cap) into subsets whose FULL casts diverge — each
-# 30-event window surfaces different SECONDARY actors, and even the DOMINANT few
-# get re-ranked, so no fixed top-K window is stable. But the INTERSECTION is: the
-# CJP/NEET protest split into 4 cards that every pair shared exactly {Cockroach
-# Janta Party, Dharmendra Pradhan, Delhi Police} — 3 of 8 cast (Jaccard 0.23–0.45,
-# under CAST_SAME_STORY). So also call it one story when the casts share >= N
-# members outright, regardless of rank.
-SHARED_CAST_MIN = 3  # >= this many cast members in common → same story
-# ponytail: absolute count, so ubiquitous actors (Modi/BJP appear everywhere) could
-# in theory over-merge two distinct saturated-politics stories. Acceptable at the
-# trending-dedup stage (one card beats 4 dupes); tighten to 1/df-weighted overlap
-# if it bites (see the IDF clustering fix).
+# The global partition can still split ONE real story into two communities (a protest
+# and its offshoot) whose members are disjoint but that share the SPECIFIC cast (Cockroach
+# Janta Party, Delhi Police). We want to re-merge those — but NOT two stories the veto
+# deliberately SEPARATED that merely share national magnets (Modi, Congress). An absolute
+# shared-cast count is magnet-blind and does the wrong thing; IDF-weight it instead
+# (1/df — see [[prism-idf-not-df-cutoff]]) so distinctive protagonists count and ubiquitous
+# ones vanish. Merge when the summed 1/df over shared cast clears the floor.
+SPECIFIC_CAST_MIN = 0.12  # summed 1/df over shared cast at/above which → same story
 
 
-def _dominant_cast_match(cast_a: list[str], cast_b: list[str]) -> bool:
-    return len(set(cast_a) & set(cast_b)) >= SHARED_CAST_MIN
+def _idf_cast_overlap(cast_a: list[str], cast_b: list[str], df: dict[str, float]) -> float:
+    """Shared cast weighted by 1/df — a couple of distinctive protagonists clear the bar,
+    a fistful of magnets (Modi/Congress, df in the hundreds) barely register.
+
+    Matches on resolved entity names (entity_slug folds punctuation variants at ingest,
+    e.g. 'Cockroach Janta Party (CJP)' == '…Party'), but NOT fuzzy aliases ('Janta'/
+    'Janata', bare 'CJP') — those stay distinct by design. So aliasing can only UNDER-count
+    the overlap → a missed merge (a duplicate card), never a wrong merge. Safe direction."""
+    return sum(1.0 / df[n] for n in set(cast_a) & set(cast_b) if df.get(n))
 
 
-def _same_story(members_a: set[str], cast_a: list[str], members_b: set[str], cast_b: list[str]) -> bool:
+def _same_story(
+    members_a: set[str], cast_a: list[str], members_b: set[str], cast_b: list[str],
+    df: dict[str, float] | None = None,
+) -> bool:
     return (
         _overlap(members_a, members_b) >= OVERLAP_THRESHOLD
         or _cast_jaccard(cast_a, cast_b) >= CAST_SAME_STORY
-        or _dominant_cast_match(cast_a, cast_b)
+        or (df is not None and _idf_cast_overlap(cast_a, cast_b, df) >= SPECIFIC_CAST_MIN)
     )
 
 
-async def _converge_existing(session: AsyncSession, stories: dict) -> None:
+async def _cast_df(session: AsyncSession, names: list[str]) -> dict[str, float]:
+    """Global document frequency (events in the story window) per entity name — the
+    IDF weights for magnet-aware shared-cast merges."""
+    if not names:
+        return {}
+    rows = (
+        await session.execute(
+            text(
+                f"""
+                SELECT ent.name, count(DISTINCT ee.event_id)::float AS df
+                FROM event_entities ee
+                JOIN entities ent ON ent.id = ee.entity_id
+                JOIN events ev ON ev.id = ee.event_id
+                              AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                WHERE ent.name = ANY(:names)
+                GROUP BY ent.name
+                """
+            ),
+            {"names": names},
+        )
+    ).all()
+    return {n: d for n, d in rows}
+
+
+async def _converge_existing(session: AsyncSession, stories: dict, df: dict[str, float]) -> None:
     """Self-healing merge of active stories that are the same story as each OTHER.
 
     reconcile only ever compares a freshly-detected community to the existing
@@ -121,7 +151,7 @@ async def _converge_existing(session: AsyncSession, stories: dict) -> None:
             a, b = find(ids[i]), find(ids[j])
             if a == b:
                 continue
-            if _same_story(stories[a]["members"], stories[a]["cast"], stories[b]["members"], stories[b]["cast"]):
+            if _same_story(stories[a]["members"], stories[a]["cast"], stories[b]["members"], stories[b]["cast"], df):
                 # attach the younger root under the older, so the root is always the oldest
                 old, new = sorted((a, b), key=lambda x: (stories[x]["first"] or _MAX_TS))
                 parent[new] = old
@@ -250,12 +280,14 @@ async def detect_trending_communities(session: AsyncSession) -> list[dict]:
     communities: list[dict] = []
     covered: list[dict] = []  # {members, cast} already claimed by a higher-ranked candidate
     for cand in candidates:
-        members = await _story_component(session, uuid.UUID(cand["id"]))
+        members = await _partitioned_members(session, uuid.UUID(cand["id"]))
+        if members is None:  # event not in the current partition run yet → per-seed fallback
+            members = await _story_component(session, uuid.UUID(cand["id"]))
         mset = {str(m) for m in members}
         facts = await _community_facts(session, list(mset))
-        # Same story as a higher-ranked candidate? Member OR cast overlap (cast catches
-        # the size-capped-subset case where member sets diverge but protagonists don't).
-        if any(_same_story(mset, facts["cast"], c["members"], c["cast"]) for c in covered):
+        # The global partition gives stable, disjoint stories, so member overlap dedups
+        # exactly — two candidates in one story share members; different stories don't.
+        if any(_overlap(mset, c["members"]) >= OVERLAP_THRESHOLD for c in covered):
             continue
         # min-support: a real story, not a transient blip.
         if facts["total_sources"] < MIN_SUPPORT_SOURCES or len(mset) < MIN_SUPPORT_MEMBERS:
@@ -339,9 +371,13 @@ async def reconcile_stories(session: AsyncSession) -> int:
         }
         for r in rows
     }
+    # IDF weights for magnet-aware shared-cast merges: df over every cast name in play
+    # (fresh communities + existing stories), fetched once per pass.
+    cast_names = {n for c in communities for n in c["cast"]} | {n for s in stories.values() for n in s["cast"]}
+    df = await _cast_df(session, list(cast_names))
     # Collapse any existing active stories that are already the same story as each
     # other (self-healing; see _converge_existing) BEFORE matching new communities.
-    await _converge_existing(session, stories)
+    await _converge_existing(session, stories, df)
     claimed: set[str] = set()
     seen: set[str] = set()
     for c in communities:
@@ -349,7 +385,7 @@ async def reconcile_stories(session: AsyncSession) -> int:
         ccast = c["cast"]
         matches = [
             sid for sid, s in stories.items()
-            if sid not in claimed and _same_story(cmembers, ccast, s["members"], s["cast"])
+            if sid not in claimed and _same_story(cmembers, ccast, s["members"], s["cast"], df)
         ]
         if not matches:
             sid = await _create_story(session, c)

@@ -51,13 +51,34 @@ def test_cast_identity_dedup():
     assert not _same_story({"1", "2"}, cjp_a, {"9", "8"}, ["Donald Trump", "Marco Rubio"])
 
 
+def test_same_story_idf_magnet_aware():
+    """IDF-weighted shared cast re-merges a Leiden over-split (two communities sharing
+    SPECIFIC actors) but refuses to re-merge veto-separated stories that share only
+    national MAGNETS — the failure mode an absolute shared-cast count had."""
+    df = {
+        "Cockroach Janta Party": 8.0, "Delhi Police": 15.0,
+        "Narendra Modi": 200.0, "Indian National Congress": 150.0, "Bharatiya Janata Party": 180.0,
+    }
+    # Genuine over-split: disjoint members, but share the specific CJP + Delhi Police.
+    a = ["Cockroach Janta Party", "Delhi Police", "Narendra Modi", "X", "Y"]
+    b = ["Cockroach Janta Party", "Delhi Police", "Narendra Modi", "P", "Q"]
+    assert _same_story({"1"}, a, {"2"}, b, df)  # merged via specific actors (IDF)
+    # Veto-separated: share exactly 3 MAGNETS, distinct otherwise (cast Jaccard 3/13<0.5).
+    cjp = ["Narendra Modi", "Indian National Congress", "Bharatiya Janata Party",
+           "Cockroach Janta Party", "Delhi Police", "A", "B", "C"]
+    neet = ["Narendra Modi", "Indian National Congress", "Bharatiya Janata Party",
+            "D", "E", "F", "G", "H"]
+    assert not _same_story({"1"}, cjp, {"2"}, neet, df)  # magnets don't clear the IDF floor
+
+
 async def test_converge_existing_collapses_duplicate_stories():
     """The self-healing pass: active stories that are the same story as each other
     (not just vs a fresh community) must collapse into the oldest, and genuinely
-    distinct stories must survive. Grounded in the real prod bug — one CJP/NEET
-    mega-story fragmented into 4 cards whose FULL casts share only 3 of 8 members
-    (Jaccard 0.23–0.45, under CAST_SAME_STORY) but whose TOP-3 protagonists match.
-    The detect→match loop could never re-merge them once CJP stopped trending."""
+    distinct stories must survive. Grounded in the real prod bug — one CJP story
+    fragmented into cards whose FULL casts share only 3 of 8 members (Jaccard
+    0.23–0.45, under CAST_SAME_STORY) but whose SPECIFIC protagonists (Cockroach Janta
+    Party, Delhi Police) match. IDF-weighted shared cast re-merges them; a story that
+    shares only national MAGNETS (Modi/BJP/Congress) must NOT merge (veto separation)."""
 
     class _StubSession:
         def __init__(self):
@@ -69,6 +90,15 @@ async def test_converge_existing_collapses_duplicate_stories():
 
     def ts(minute):
         return datetime(2026, 7, 23, 14, minute, tzinfo=UTC)
+
+    # IDF weights: CJP-specific actors are rare (low df), national magnets are ubiquitous.
+    df = {
+        "Cockroach Janta Party": 8.0, "Dharmendra Pradhan": 12.0, "Delhi Police": 15.0,
+        "Sonam Wangchuk": 10.0, "Rahul Gandhi": 80.0, "Akhilesh Yadav": 50.0,
+        "C. Joseph Vijay": 20.0, "Tamilaga Vettri Kazhagam": 18.0,
+        "Narendra Modi": 200.0, "Bharatiya Janata Party": 180.0, "Indian National Congress": 150.0,
+        "Amit Shah": 90.0, "Lok Sabha": 100.0,
+    }
 
     # The four cards' actual casts, most-covered-first. Pairwise cast Jaccard is
     # 0.23–0.45 (secondary actors diverge per BFS window) — only the dominant
@@ -90,11 +120,16 @@ async def test_converge_existing_collapses_duplicate_stories():
         "edu": {"members": {"80"}, "first": ts(12), "cast": ["Dharmendra Pradhan", "NCERT", "CBSE"]},
         # wholly unrelated → stays
         "trump": {"members": {"77"}, "first": ts(3), "cast": ["Donald Trump", "Marco Rubio", "White House"]},
+        # shares only NATIONAL MAGNETS (Modi/BJP/Congress/Amit Shah) with the CJP cards —
+        # the old absolute-count merge would wrongly fold it in; IDF must keep it separate.
+        "neet": {"members": {"90"}, "first": ts(12),
+                 "cast": ["Narendra Modi", "Bharatiya Janata Party", "Indian National Congress", "Amit Shah"]},
     }
     session = _StubSession()
-    await _converge_existing(session, stories)
+    await _converge_existing(session, stories, df)
 
-    assert set(stories) == {"old", "edu", "trump"}  # 3 CJP dupes merged away; distinct stories kept
+    # CJP dupes merged (shared SPECIFIC cast); distinct + magnet-only stories survive.
+    assert set(stories) == {"old", "edu", "trump", "neet"}
     assert all(into == "old" for _, into in session.merged)  # oldest is the canonical survivor
     assert {sid for sid, _ in session.merged} == {"vijay", "modi", "wangchuk"}
 
