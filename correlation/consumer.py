@@ -33,7 +33,7 @@ from common.models import (
 from common.observability import fetch_prompt, observe
 from common.schemas import EventUpdateMessage
 from common.stream import get_redis
-from common.text import slugify
+from common.text import entity_slug
 from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
@@ -70,7 +70,7 @@ async def handle_enriched_item(payload: dict) -> None:
         cve_record = (enrichment.model or "").startswith("deterministic:")
 
         embedding = await _first_chunk_embedding(session, article_id)
-        entity_slugs = [slugify(e["name"]) for e in (shared.get("entities") or []) if e.get("name")]
+        entity_slugs = [entity_slug(e["name"]) for e in (shared.get("entities") or []) if e.get("name")]
 
         match = await find_event(
             session,
@@ -204,7 +204,7 @@ async def _upsert_entities(session, event_id: uuid.UUID, entities: list[dict]) -
         name = (extracted.get("name") or "").strip()
         if not name:
             continue
-        slug = slugify(name)
+        slug = entity_slug(name)
         stmt = (
             pg_insert(Entity)
             .values(
@@ -573,6 +573,6 @@ def _deterministic_correlation(members) -> CorrelationResult:
 
 
 async def _resolve_entity(session, name: str) -> uuid.UUID | None:
-    slug = slugify(name)
+    slug = entity_slug(name)
     result = await session.execute(select(Entity.id).where(Entity.slug == slug))
     return result.scalar_one_or_none()

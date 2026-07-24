@@ -3,6 +3,35 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.66.0] - 2026-07-24
+
+### Fixed
+- **Entity resolution** now folds trivial punctuation/acronym spelling variants so one
+  real-world entity is one row. `D.K. Shivakumar`/`DK Shivakumar`, `J.P. Nadda`/`JP Nadda`
+  and `Cockroach Janta Party (CJP)`/`Cockroach Janta Party` were separate entities, which
+  quietly fragmented the story cast, the actor graph, and clustering. `entity_slug` (in
+  `common/text.py`) canonicalises before slugify — deterministic and conservative, never
+  fuzzy (fuzzy once over-merged 1638 CVEs into 7; `CPI(M)`≠`CPI`, `Janta`≠`Janata` stay
+  distinct). A one-time backfill (`scripts/backfill_entity_slugs.py`) merged 24 duplicate
+  groups on live data, re-pointing `event_entities`/`impacts` and preserving variants as aliases.
+- **Relevance gate** scope broadened. The prompt was stale — scoped to "professional roles
+  (cybersecurity/GRC and finance/markets)" only — so the gate dropped real general-interest
+  Indian news: sampling the rejects surfaced *Assam floods death toll*, *SC orders special
+  courts*, ministerial *resignations*, and protest news wrongly rejected. The rewritten
+  `relevance-gate` covers politics, courts, protests, disasters, health, science, sports and
+  the professional lenses, and clarifies that statements/demands/rulings by newsworthy actors
+  **are** events (while still rejecting opinion columns, ads, listicles, gossip). Committed as
+  the local fallback and staged in Langfuse (v12, `staging`); production label unchanged pending
+  a check on the production model.
+
+### Added
+- **Storyline partitioner** (`correlation/partition.py`), staged and validated read-only, not
+  yet wired to serving. Three layers per docs/STORYLINE-DESIGN.md: a global **Leiden** story
+  boundary (consistency by construction — every development reads the same boundary), a
+  spine-anchored branch tree, and a **grounded LLM veto** that separates entangled-politics
+  over-merges (validated: cuts NEET/SIR/parliament out of the CJP protest story). Awaits the
+  capable veto model before it replaces the on-read story graph.
+
 ## [0.0.65.0] - 2026-07-24
 
 ### Fixed
