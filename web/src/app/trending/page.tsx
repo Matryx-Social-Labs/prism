@@ -65,9 +65,11 @@ export default function TrendingPage() {
   );
 
   return (
-    <div className="relative mx-auto max-w-[620px] pb-28">
+    // Same Stone grid + same regression fix as the feed: this was
+    // max-w-[620px] with no breakpoint.
+    <div className="relative mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:px-10 lg:pb-20">
       <div
-        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md"
+        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md lg:static lg:border-0 lg:px-0"
         style={{ borderColor: "var(--line)", background: "var(--glass)" }}
       >
         <h1 className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
