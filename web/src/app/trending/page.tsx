@@ -12,8 +12,12 @@ type Scope = "region" | "world";
 const SECTORS = [
   { slug: null as string | null, label: "All sectors" },
   { slug: "politics", label: "Politics" },
-  { slug: "markets", label: "Markets" },
-  { slug: "cybersecurity", label: "Cyber" },
+  // "finance", not "markets": the API filters on the taxonomy sector slug
+  // (common/taxonomy.py), where markets is a SUBSECTOR of finance — so
+  // sector=markets matched nothing and the chip was a dead end.
+  { slug: "finance", label: "Markets" },
+  // No Cyber chip: correlation/trending.py excludes cybersecurity from trending
+  // candidates entirely, so that chip could never return a story.
   { slug: "health", label: "Health" },
 ];
 

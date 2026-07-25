@@ -8,7 +8,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist"],
+      // "/you" folds account + interests + watchlist into one hub and renders the
+      // signed-in email, so it belongs alongside its siblings here.
+      disallow: ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist", "/you"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,
