@@ -27,7 +27,7 @@ export default function AboutPage() {
   return (
     <div className="mx-auto max-w-[760px] px-5 pb-20 pt-11 sm:px-8">
       <p className="mb-3.5 text-[11.5px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--ink-faint)" }}>
-        Why Prism exists
+        Why Parse exists
       </p>
       <h1
         className="text-[36px] font-semibold leading-[1.15] tracking-tight"
@@ -37,7 +37,7 @@ export default function AboutPage() {
       </h1>
       <p className="mt-[18px] text-[15.5px] leading-[1.75]" style={{ color: "var(--ink-muted)" }}>
         A side is a narrative: a political story has two narrations, and most readers only ever
-        hear one of them. Prism merges the many reports of one real event into a single canonical
+        hear one of them. Parse merges the many reports of one real event into a single canonical
         story and shows the competing narratives side by side — backed by deliberately diverse
         sourcing across many origin countries and transparency labels on every outlet, so you
         always know who is speaking. Then <strong style={{ color: "var(--ink)" }}>you</strong> decide.

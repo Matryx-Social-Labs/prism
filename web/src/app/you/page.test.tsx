@@ -70,7 +70,7 @@ describe("You — signed in", () => {
   });
 });
 
-describe("You — Your Prism", () => {
+describe("You — Your Parse", () => {
   it("shows the reader's saved lens", async () => {
     loadProfile.mockReturnValue({ lens: "markets" });
     render(<YouPage />);
@@ -87,7 +87,7 @@ describe("You — Your Prism", () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     fetchRegions.mockRejectedValue(new Error("down"));
     render(<YouPage />);
-    expect(await screen.findByText(/Your Prism/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Your Parse/i)).toBeInTheDocument();
   });
 
   it("defaults to English when no language is saved", async () => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PrismMark } from "@/components/PrismMark";
+import { ParseMark } from "@/components/ParseMark";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
 import { useTaxonomy } from "@/components/ProfileEditor";
 import {
@@ -110,7 +110,7 @@ export default function FeedPage() {
         setTop(ranked.slice(0, 3));
       })
       .catch(() => {
-        if (!cancelled) setError("The Prism API is unreachable right now. Refresh in a moment.");
+        if (!cancelled) setError("The Parse API is unreachable right now. Refresh in a moment.");
       });
     return () => {
       cancelled = true;
@@ -183,9 +183,9 @@ export default function FeedPage() {
         style={{ borderColor: "var(--line)", background: "var(--glass)" }}
       >
         <Link href="/" className="flex items-center gap-2" style={{ color: "var(--ink)" }}>
-          <PrismMark />
+          <ParseMark />
           <span className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-            Prism
+            Parse
           </span>
         </Link>
         <button

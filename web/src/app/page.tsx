@@ -54,7 +54,7 @@ const BLINDSPOTS = [
   {
     tags: ["⚠ One-sided coverage", "Elections"],
     title: "State assembly passes contested electoral-roll revision bill",
-    note: "7 sources · all aligned with the ruling party — the opposition's framing hasn't been picked up. Prism pulls it in and shows both.",
+    note: "7 sources · all aligned with the ruling party — the opposition's framing hasn't been picked up. Parse pulls it in and shows both.",
   },
   {
     tags: ["⚠ Single-origin", "Trade"],
@@ -107,7 +107,7 @@ export default function LandingPage() {
             <span className="spectrum-text">Every perspective.</span>
           </h1>
           <p className="mt-5 max-w-[480px] text-[15px] leading-[1.6] sm:text-[17px] sm:leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Prism clusters worldwide coverage into single events, then reads each one through{" "}
+            Parse clusters worldwide coverage into single events, then reads each one through{" "}
             <em>your</em> professional lens — whatever your profession is. Switch the lens and the
             same news changes meaning.
           </p>
@@ -195,7 +195,7 @@ export default function LandingPage() {
             The same ruling is two different stories.
           </h2>
           <p className="mt-4 text-[15px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
-            Prism groups a story&apos;s sources by stance, side by side, with every outlet&apos;s
+            Parse groups a story&apos;s sources by stance, side by side, with every outlet&apos;s
             origin and affiliation labeled. You see every framing —{" "}
             <strong style={{ color: "var(--ink)" }}>and who is speaking</strong>.
           </p>
@@ -232,7 +232,7 @@ export default function LandingPage() {
       {/* ── How it works ─────────────────────────────────────── */}
       <Reveal as="section" className={`${SHELL} pb-16`}>
         <h2 className="mb-[26px] text-center text-[28px] font-semibold tracking-tight sm:text-[32px]" style={{ fontFamily: "var(--font-display), serif" }}>
-          How Prism reads the news
+          How Parse reads the news
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {HOW_STEPS.map((s) => (
@@ -291,7 +291,7 @@ export default function LandingPage() {
           </h2>
           <p className="mt-3 text-sm leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
             A blindspot is any story where only one side is speaking — every source from one
-            country, or every outlet aligned with one party. Prism measures who&apos;s telling each
+            country, or every outlet aligned with one party. Parse measures who&apos;s telling each
             story and flags what&apos;s missing.
           </p>
           {BLINDSPOTS.map((b, i) => (
@@ -321,7 +321,7 @@ export default function LandingPage() {
           <div className="flex flex-col gap-3 px-8 pb-6 pt-4">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border px-[11px] py-[3px] text-[11px] font-semibold" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
-                <span className="spectrum-text">◮</span>Prism AI agent
+                <span className="spectrum-text">◮</span>Parse AI agent
               </span>
               <span className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
                 Grounded in 9 sources

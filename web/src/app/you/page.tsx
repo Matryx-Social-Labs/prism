@@ -70,9 +70,9 @@ export default function YouPage() {
         )}
       </div>
 
-      {/* Your Prism */}
+      {/* Your Parse */}
       <h2 className={H2} style={{ color: "var(--ink-muted)" }}>
-        Your Prism
+        Your Parse
       </h2>
       <div className={CARD} style={CARD_STYLE}>
         <Row label="Default lens">

@@ -802,7 +802,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             </div>
           )}
 
-          {/* Ask Prism — docked (real AskPanel, un-floated into the rail) */}
+          {/* Ask Parse — docked (real AskPanel, un-floated into the rail) */}
           <div
             className="overflow-hidden rounded-[18px] border"
             style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
@@ -818,7 +818,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13.5px] font-semibold">
-                  Ask Prism
+                  Ask Parse
                   <span
                     className="ml-1.5 rounded-full border px-[7px] py-px font-mono text-[9px] uppercase tracking-wide"
                     style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}

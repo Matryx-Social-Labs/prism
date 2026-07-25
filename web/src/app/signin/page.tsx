@@ -28,7 +28,7 @@ export default function SignInPage() {
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
       <h1 className="text-[30px] font-semibold leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-        Sign in to Prism
+        Sign in to Parse
       </h1>
       <p className="mt-2.5 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
         Enter your email and we&apos;ll send a one-time sign-in link — no password.

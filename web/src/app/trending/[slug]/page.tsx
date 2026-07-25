@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!s) return { title: "Story not found" };
   const description = blurb(s);
   return {
-    title: `${s.label} — Prism`,
+    title: `${s.label} — Parse`,
     description,
     alternates: { canonical: `/trending/${s.canonical_slug}` },
     openGraph: { type: "article", title: s.label, description, url: `/trending/${s.canonical_slug}` },
