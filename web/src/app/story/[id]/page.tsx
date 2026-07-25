@@ -81,7 +81,14 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {/* Escape `<`: JSON.stringify handles quotes and backslashes but not the
+          closing-tag sequence, so a headline containing `</script>` would break
+          out of this element. Titles come from scraped publisher copy and LLM
+          extraction, so they are not trusted input. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <StoryView event={event} />
     </>
   );

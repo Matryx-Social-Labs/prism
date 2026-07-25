@@ -358,7 +358,7 @@ export async function fetchLenses(): Promise<LensInfo[]> {
 }
 
 export async function fetchEvent(id: string): Promise<EventDetail> {
-  const res = await fetch(`${API_URL}/api/v1/events/${id}`, {
+  const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(id)}`, {
     next: { revalidate: 60 },
   });
   if (!res.ok) throw new Error(`event failed: ${res.status}`);
@@ -367,7 +367,7 @@ export async function fetchEvent(id: string): Promise<EventDetail> {
 
 export async function fetchQuestions(id: string, lens?: string): Promise<string[]> {
   const params = lens ? `?lens=${encodeURIComponent(lens)}` : "";
-  const res = await fetch(`${API_URL}/api/v1/events/${id}/questions${params}`, {
+  const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(id)}/questions${params}`, {
     cache: "no-store",
   });
   if (!res.ok) return [];
@@ -380,7 +380,7 @@ export async function fetchBrief(
   lens: string,
 ): Promise<{ lens: string; brief: string | null; points?: string[]; cached: boolean } | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/events/${eventId}/brief?lens=${encodeURIComponent(lens)}`, {
+    const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/brief?lens=${encodeURIComponent(lens)}`, {
       cache: "no-store",
     });
     if (!res.ok) return null;
@@ -412,7 +412,7 @@ export async function askQuestion(
   sessionId: string | null,
   callbacks: AskCallbacks,
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/events/${eventId}/ask`, {
+  const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, session_id: sessionId }),
