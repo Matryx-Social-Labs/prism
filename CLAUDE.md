@@ -1,4 +1,4 @@
-# Prism — agent instructions
+# Parse — agent instructions
 
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.

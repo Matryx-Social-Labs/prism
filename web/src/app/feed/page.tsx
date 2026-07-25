@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PrismMark } from "@/components/PrismMark";
+import { ParseMark } from "@/components/ParseMark";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
 import { useTaxonomy } from "@/components/ProfileEditor";
 import {
@@ -110,7 +110,7 @@ export default function FeedPage() {
         setTop(ranked.slice(0, 3));
       })
       .catch(() => {
-        if (!cancelled) setError("The Prism API is unreachable right now. Refresh in a moment.");
+        if (!cancelled) setError("The Parse API is unreachable right now. Refresh in a moment.");
       });
     return () => {
       cancelled = true;
@@ -176,16 +176,24 @@ export default function FeedPage() {
   ];
 
   return (
-    <div className="relative mx-auto min-w-0 max-w-[620px] pb-28">
-      {/* header: scope chip + language */}
+    // The Stone grid (Parse Desktop.dc.html): 104px mono ledger rail + 1240px
+    // field = 1376. Below lg this collapses to the shipped mobile column.
+    //
+    // REGRESSION FIX: this was `max-w-[620px]` with no breakpoint, so at 1440px
+    // desktop readers got the phone layout stranded in the middle of the screen
+    // with 410px of dead ivory each side. StoryView kept its 1240px shell, which
+    // is why Story survived and Feed/Trending did not.
+    <div className="relative mx-auto min-w-0 max-w-[620px] pb-28 lg:max-w-[1376px] lg:pb-20">
+      {/* header: scope chip + language. Hidden on desktop — SiteHeader owns the
+          brand bar there, and two stacked wordmarks was the original bug. */}
       <div
-        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md"
+        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md lg:hidden"
         style={{ borderColor: "var(--line)", background: "var(--glass)" }}
       >
         <Link href="/" className="flex items-center gap-2" style={{ color: "var(--ink)" }}>
-          <PrismMark />
+          <ParseMark />
           <span className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-            Prism
+            Parse
           </span>
         </Link>
         <button
@@ -229,6 +237,19 @@ export default function FeedPage() {
           No stories here yet — widen your interests or check back shortly.
         </div>
       )}
+
+      {/* ── The Stone: 104px mono ledger rail + field (desktop only) ──
+          Extra width buys simultaneity, not longer lines: the river keeps its
+          proven ~710px measure and the rail carries provenance beside it. */}
+      <div className="lg:grid lg:grid-cols-[104px_minmax(0,710px)_minmax(0,1fr)] lg:gap-8 lg:px-10 lg:pt-6">
+        <aside className="hidden lg:block">
+          <div className="sticky top-[76px] font-mono text-[10.5px] uppercase leading-[1.9] tracking-[0.12em]" style={{ color: "var(--ink-faint)" }}>
+            <div>{scopeLabel}</div>
+            <div>{(visible ?? []).length} stories</div>
+            <div>{sections.length} sectors</div>
+          </div>
+        </aside>
+        <div className="min-w-0">
 
       {/* lead story */}
       {!error && lead && (
@@ -370,6 +391,12 @@ export default function FeedPage() {
           </div>
         </section>
       )}
+
+        </div>
+        {/* right column reserved for Pulse / What's moving — moved in a
+            follow-up so the river fix ships without restructuring the sections. */}
+        <div className="hidden lg:block" />
+      </div>
 
       {/* scope bottom sheet */}
       {scopeOpen && (

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { StoryRowCard } from "@/components/StoryCard";
-import { searchEvents, type FeedItem } from "@/lib/api";
+import { fetchTrending, searchEvents, type FeedItem } from "@/lib/api";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
 function SearchInner() {
@@ -17,6 +17,15 @@ function SearchInner() {
   // previous query's results as "ready" and restores that key's offset
   // before its own results exist.
   const [resultsTerm, setResultsTerm] = useState("");
+  // Real entities off the live trending cast — a hardcoded list would go stale
+  // and, on a product that sells provenance, would be quietly dishonest.
+  const [entities, setEntities] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchTrending({ limit: 6 })
+      .then((s) => setEntities([...new Set(s.flatMap((x) => x.cast ?? []))].slice(0, 6)))
+      .catch(() => setEntities([]));
+  }, []);
 
   useEffect(() => {
     const term = q.trim();
@@ -57,20 +66,69 @@ function SearchInner() {
   // a reader who is still typing (the input autofocuses).
   useScrollRestore(`search:${q.trim()}:scrollY`, resultsTerm === q.trim() && results.length > 0);
 
+  const term = q.trim();
+
   return (
-    <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9">
-      <h1 className="text-[28px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-        Search
-      </h1>
+    <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9 lg:max-w-[1240px] lg:px-10">
+      {/* The query sets in the display voice — the thing you typed is the headline
+          of this screen (Parse Desktop.dc.html). */}
       <input
         autoFocus
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search stories, companies, tickers…"
-        aria-label="Search stories"
-        className="mt-4 w-full rounded-[12px] border px-4 py-3 text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
-        style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
+        onKeyDown={(e) => e.key === "Escape" && setQ("")}
+        placeholder="Search"
+        aria-label="Search stories, entities and sources"
+        className="w-full border-0 bg-transparent p-0 text-[28px] leading-tight tracking-[-0.02em] outline-none placeholder:opacity-40 sm:text-[34px]"
+        style={{ fontFamily: "var(--font-display), serif", fontWeight: 400, color: "var(--ink)" }}
       />
+      <div className="mt-3 border-b" style={{ borderColor: "var(--line)" }} />
+
+      {/* What is searchable, in the provenance voice. */}
+      <p className="mt-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+        stories · entities · tickers · CVE ids
+      </p>
+
+      {/* EMPTY STATE — the screen used to be blank until you typed, which is the
+          emptiest surface in the app. Give the reader somewhere to start. */}
+      {term.length < 2 && !loading && (
+        <div className="mt-8 flex flex-col gap-8 lg:flex-row lg:gap-16">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+              Trending entities
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {entities.map((e) => (
+                <button
+                  key={e}
+                  onClick={() => setQ(e)}
+                  className="rounded-full border px-3 py-[7px] text-[13px] transition hover:opacity-70"
+                  style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+              Try
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {["RELIANCE", "CVE-2026-62144", "Kerala"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setQ(t)}
+                  className="rounded-full border px-3 py-[7px] font-mono text-[11.5px] transition hover:opacity-70"
+                  style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 flex flex-col gap-3">
         {loading && (
@@ -80,7 +138,7 @@ function SearchInner() {
         )}
         {!loading && searched && results.length === 0 && (
           <p className="text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            No stories match “{q.trim()}”.
+            No stories match “{term}”.
           </p>
         )}
         {results.map((item) => (

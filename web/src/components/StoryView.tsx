@@ -185,14 +185,36 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Picking a lens from the pinned rail must SHOW the result: the brief is
   // off-screen behind the reader's scroll position, so the re-typeset flip
   // happens where nobody can see it and the tap reads as a dead button.
-  function pickLens(slug: string) {
+  function pickLens(slug: string, scroll = true) {
     setFlipped(true);
     setLens(slug);
+    if (!scroll) return;
     document.getElementById("lens-brief")?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       block: "start",
     });
   }
+
+  // Desktop has no thumb zone, so the flip binds to the keyboard: 1 / 2 / 3, no
+  // modifier (Parse Desktop.dc.html — the brief header prints "PRESS 1 · 2 · 3").
+  // Zero-travel and repeatable — a reader hits 1-2-3-2-1 in two seconds, and
+  // repeatability is what turns the flip from a trick into the thing they show a
+  // colleague. No scroll on a key press: the brief is already in view, and
+  // yanking the page would contradict "layout never moves".
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      const idx = Number(e.key) - 1;
+      if (!Number.isInteger(idx) || idx < 0 || idx >= offered.length) return;
+      e.preventDefault();
+      pickLens(offered[idx], false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offered]);
   useEffect(() => {
     const els = navItems
       .map((n) => document.getElementById(n.id))
@@ -392,8 +414,8 @@ export function StoryView({ event }: { event: EventDetail }) {
         className="mt-9 scroll-mt-24 overflow-hidden rounded-[18px] border"
         style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
       >
-        <div className="hidden overflow-x-auto border-b lg:block" style={{ borderColor: "var(--line)" }}>
-          <div className="flex w-max items-center gap-1.5 px-4 py-3" role="tablist" aria-label="Read this story through a lens">
+        <div className="hidden border-b lg:block" style={{ borderColor: "var(--line)" }}>
+          <div className="flex items-center gap-1.5 px-4 py-3" role="tablist" aria-label="Read this story through a lens">
             <span className="mr-1 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
               Lens
             </span>
@@ -436,6 +458,17 @@ export function StoryView({ event }: { event: EventDetail }) {
             {offered.length === 1 && (
               <span className="px-1.5 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
                 Only this lens applies to this story
+              </span>
+            )}
+            {/* Discoverability for the keyboard flip. Provenance voice, far right,
+                quiet — it teaches the shortcut without competing with the tabs. */}
+            {offered.length > 1 && (
+              <span
+                className="ml-auto pl-4 font-mono text-[10.5px] uppercase tracking-[0.12em]"
+                style={{ color: "var(--ink-faint)" }}
+                aria-hidden
+              >
+                Press {offered.map((_, i) => i + 1).join(" · ")}
               </span>
             )}
           </div>
@@ -802,7 +835,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             </div>
           )}
 
-          {/* Ask Prism — docked (real AskPanel, un-floated into the rail) */}
+          {/* Ask Parse — docked (real AskPanel, un-floated into the rail) */}
           <div
             className="overflow-hidden rounded-[18px] border"
             style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
@@ -818,7 +851,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13.5px] font-semibold">
-                  Ask Prism
+                  Ask Parse
                   <span
                     className="ml-1.5 rounded-full border px-[7px] py-px font-mono text-[9px] uppercase tracking-wide"
                     style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}

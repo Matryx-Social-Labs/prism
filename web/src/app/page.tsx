@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Dateline } from "@/components/Dateline";
 import { HeroLensDemo } from "@/components/HeroLensDemo";
 import { Reveal } from "@/components/Reveal";
 
@@ -54,7 +55,7 @@ const BLINDSPOTS = [
   {
     tags: ["⚠ One-sided coverage", "Elections"],
     title: "State assembly passes contested electoral-roll revision bill",
-    note: "7 sources · all aligned with the ruling party — the opposition's framing hasn't been picked up. Prism pulls it in and shows both.",
+    note: "7 sources · all aligned with the ruling party — the opposition's framing hasn't been picked up. Parse pulls it in and shows both.",
   },
   {
     tags: ["⚠ Single-origin", "Trade"],
@@ -89,50 +90,81 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 // canvas is wider (1280) per the layout spec. Full-bleed bands wrap this shell.
 const SHELL = "mx-auto w-full max-w-[1240px] px-5 sm:px-8 xl:px-10";
 
-export default function LandingPage() {
+export default async function LandingPage() {
   return (
-    <div className="w-full">
+    <div className="w-full pb-[84px] lg:pb-0">
+      {/* Sticky bottom CTA (phones only) — the one piece of fixed chrome. */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t px-5 pt-3 backdrop-blur-md lg:hidden"
+        style={{
+          borderColor: "var(--line)",
+          background: "var(--glass)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
+        }}
+      >
+        <Link
+          href="/onboarding"
+          className="block rounded-full py-[15px] text-center text-[15.5px] font-medium"
+          style={{ background: "var(--ink)", color: "var(--bg)" }}
+        >
+          Get your feed
+        </Link>
+      </div>
+
+      {/* ── Dateline: the masthead line, real counts ────────── */}
+      <div className={`${SHELL} border-b pb-3 pt-4`} style={{ borderColor: "var(--line)" }}>
+        <Dateline />
+      </div>
+
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className={`${SHELL} grid items-center gap-10 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_500px] lg:gap-14 lg:pb-14 lg:pt-[76px]`}>
-        <div>
-          <p className="mb-4 text-[11.5px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--ink-faint)" }}>
-            Role-aware news intelligence
-          </p>
+        <div className="contents lg:block">
+          <div className="order-1 lg:contents">
           <h1
-            className="text-[40px] font-semibold leading-[1.04] tracking-tight sm:text-[56px] lg:text-[68px] lg:leading-[1.02]"
-            style={{ fontFamily: "var(--font-display), serif" }}
+            className="text-[40px] leading-[1.02] tracking-[-0.03em] sm:text-[56px] lg:text-[76px] lg:leading-[0.98]"
+            style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}
           >
             One story.
             <br />
-            <span className="spectrum-text">Every perspective.</span>
+            {/* Ink-muted, NOT spectrum-text: the gradient belongs to the 3px brand
+                bar alone. A gradient headline would read as a lens speaking. */}
+            <span style={{ color: "var(--ink-muted)" }}>Every perspective.</span>
           </h1>
-          <p className="mt-5 max-w-[480px] text-[15px] leading-[1.6] sm:text-[17px] sm:leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Prism clusters worldwide coverage into single events, then reads each one through{" "}
+          <p className="mt-6 max-w-[52ch] text-[15px] leading-[1.6] sm:text-[17px] lg:text-[18px] lg:leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
+            Parse clusters worldwide coverage into single events, then reads each one through{" "}
             <em>your</em> professional lens — whatever your profession is. Switch the lens and the
             same news changes meaning.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          </div>
+          {/* order-3: after the demo on mobile, back in place on desktop */}
+          <div className="order-3 mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:mt-8">
             <Link
               href="/onboarding"
-              className="rounded-full px-7 py-[13px] text-sm font-semibold transition hover:opacity-85"
+              className="rounded-full px-7 py-[15px] text-center text-[15.5px] font-medium transition hover:opacity-85 sm:py-[13px] sm:text-sm sm:font-semibold"
               style={{ background: "var(--ink)", color: "var(--bg)" }}
             >
               Get your feed
             </Link>
             <Link
               href="/feed"
-              className="rounded-full border px-7 py-[13px] text-sm font-semibold transition hover:opacity-70"
+              className="rounded-full border px-7 py-[14px] text-center text-[15.5px] font-medium transition hover:opacity-70 sm:py-[13px] sm:text-sm sm:font-semibold"
               style={{ borderColor: "var(--line-strong)" }}
             >
               Browse the news
             </Link>
+            {/* Provenance voice: a claim about the record, so it sets in mono. */}
+            <p
+              className="mt-[6px] basis-full font-mono text-[10.5px] uppercase tracking-[0.14em] sm:mt-[12px]"
+              style={{ color: "var(--ink-faint)" }}
+            >
+              Every value traces to a source · Free while we build · No account needed
+            </p>
           </div>
-          <p className="mt-[18px] text-xs" style={{ color: "var(--ink-faint)" }}>
-            Every value traces to a source. Free while we build — no account needed.
-          </p>
         </div>
-        {/* Right: the lens-flip demo IS the hero visual (exact 2a content). */}
-        <HeroLensDemo />
+        {/* Right on desktop; order-2 on mobile so the flip is felt before the ask. */}
+        <div className="order-2 lg:order-none">
+          <HeroLensDemo />
+        </div>
       </section>
 
       {/* ── Open lens registry (full-bleed band) ─────────────── */}
@@ -143,7 +175,7 @@ export default function LandingPage() {
       >
         <div className={`${SHELL} grid items-center gap-10 lg:grid-cols-[360px_1fr] lg:gap-14`}>
           <div>
-            <h2 className="text-[26px] font-semibold leading-tight sm:text-[32px]" style={{ fontFamily: "var(--font-display), serif" }}>
+            <h2 className="text-[28px] leading-tight sm:text-[34px] lg:text-[42px]" style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}>
               Your profession is a lens — and lenses are an open set.
             </h2>
             <p className="mt-3.5 text-[14.5px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
@@ -191,11 +223,11 @@ export default function LandingPage() {
       <Reveal as="section" className={`${SHELL} grid items-center gap-10 py-16 lg:grid-cols-[420px_1fr] lg:gap-14`}>
         <div>
           <Eyebrow>Both Sides</Eyebrow>
-          <h2 className="text-[28px] font-semibold leading-tight sm:text-[34px]" style={{ fontFamily: "var(--font-display), serif" }}>
+          <h2 className="text-[28px] leading-tight sm:text-[34px] lg:text-[42px]" style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}>
             The same ruling is two different stories.
           </h2>
           <p className="mt-4 text-[15px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
-            Prism groups a story&apos;s sources by stance, side by side, with every outlet&apos;s
+            Parse groups a story&apos;s sources by stance, side by side, with every outlet&apos;s
             origin and affiliation labeled. You see every framing —{" "}
             <strong style={{ color: "var(--ink)" }}>and who is speaking</strong>.
           </p>
@@ -231,8 +263,8 @@ export default function LandingPage() {
 
       {/* ── How it works ─────────────────────────────────────── */}
       <Reveal as="section" className={`${SHELL} pb-16`}>
-        <h2 className="mb-[26px] text-center text-[28px] font-semibold tracking-tight sm:text-[32px]" style={{ fontFamily: "var(--font-display), serif" }}>
-          How Prism reads the news
+        <h2 className="mb-[26px] text-center text-[28px] tracking-tight sm:text-[34px] lg:text-[42px]" style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}>
+          How Parse reads the news
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {HOW_STEPS.map((s) => (
@@ -253,7 +285,7 @@ export default function LandingPage() {
       <Reveal as="section" className={`${SHELL} grid items-center gap-10 pb-16 lg:grid-cols-[420px_1fr] lg:gap-14`}>
         <div>
           <Eyebrow>So What</Eyebrow>
-          <h2 className="text-[28px] font-semibold leading-tight sm:text-[34px]" style={{ fontFamily: "var(--font-display), serif" }}>
+          <h2 className="text-[28px] leading-tight sm:text-[34px] lg:text-[42px]" style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}>
             What happens next — spelled out.
           </h2>
           <p className="mt-4 text-[15px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
@@ -286,12 +318,12 @@ export default function LandingPage() {
       <Reveal as="section" className={`${SHELL} grid gap-6 pb-16 lg:grid-cols-2`}>
         <Card pop className="p-8">
           <Eyebrow>Blindspots</Eyebrow>
-          <h2 className="text-[24px] font-semibold leading-tight sm:text-[26px]" style={{ fontFamily: "var(--font-display), serif" }}>
+          <h2 className="text-[28px] leading-tight sm:text-[34px] lg:text-[42px]" style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}>
             Some stories you only ever hear one way.
           </h2>
           <p className="mt-3 text-sm leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
             A blindspot is any story where only one side is speaking — every source from one
-            country, or every outlet aligned with one party. Prism measures who&apos;s telling each
+            country, or every outlet aligned with one party. Parse measures who&apos;s telling each
             story and flags what&apos;s missing.
           </p>
           {BLINDSPOTS.map((b, i) => (
@@ -314,14 +346,14 @@ export default function LandingPage() {
         <Card pop className="overflow-hidden">
           <div className="px-8 pt-8">
             <Eyebrow>Ask</Eyebrow>
-            <h2 className="text-[24px] font-semibold leading-tight sm:text-[26px]" style={{ fontFamily: "var(--font-display), serif" }}>
+            <h2 className="text-[28px] leading-tight sm:text-[34px] lg:text-[42px]" style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}>
               Ask anything. Get sources — or honesty.
             </h2>
           </div>
           <div className="flex flex-col gap-3 px-8 pb-6 pt-4">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border px-[11px] py-[3px] text-[11px] font-semibold" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
-                <span className="spectrum-text">◮</span>Prism AI agent
+                <span className="spectrum-text">◮</span>Parse AI agent
               </span>
               <span className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
                 Grounded in 9 sources
@@ -372,7 +404,7 @@ export default function LandingPage() {
       <section className={`${SHELL} pb-[72px]`}>
         <div className="relative overflow-hidden rounded-[22px] border px-6 py-11 text-center" style={{ borderColor: "var(--line)" }}>
           <div className="spectrum-bar absolute inset-x-0 top-0 h-[3px]" aria-hidden />
-          <h2 className="text-[28px] font-semibold tracking-tight sm:text-[32px]" style={{ fontFamily: "var(--font-display), serif" }}>
+          <h2 className="text-[28px] tracking-tight sm:text-[34px] lg:text-[42px]" style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}>
             Pick your lens. Keep the whole spectrum.
           </h2>
           <p className="mx-auto mt-2.5 max-w-[420px] text-sm" style={{ color: "var(--ink-muted)" }}>

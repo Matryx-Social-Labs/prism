@@ -1,6 +1,6 @@
 # How-to guides
 
-Task-focused recipes for extending and operating Prism. Each assumes you have the
+Task-focused recipes for extending and operating Parse. Each assumes you have the
 app running locally ([TUTORIAL.md](./TUTORIAL.md)) and know the layout
 ([ARCHITECTURE.md](./ARCHITECTURE.md)). For the "why" behind these systems, see
 [STORY-GRAPH.md](./STORY-GRAPH.md).

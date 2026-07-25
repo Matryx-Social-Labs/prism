@@ -1,4 +1,4 @@
-# Prism — Blueprint
+# Parse — Blueprint
 
 A one-page strategic summary. The full research report lives in
 [docs/MARKET-RESEARCH.md](./docs/MARKET-RESEARCH.md); the build detail lives in the other docs.
@@ -53,7 +53,7 @@ on the same backbone.
   later, B2B team seats.
 
 ## Open naming and scope questions (not blockers)
-- Final product name (working codename "Prism").
+- Final product name (working codename "Parse").
 - Exact streaming backbone (Kafka/Redpanda vs NATS) and search store.
 - Which news-event API to license first, and the initial region and language priority.
 - Whether this also seeds a second research paper, which would raise the measurement rigor baked
