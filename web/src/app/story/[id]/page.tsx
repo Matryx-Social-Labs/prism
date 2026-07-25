@@ -28,26 +28,32 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const description = metaDescription(event);
   const url = `/story/${id}`;
-  const images = event.image_url ? [event.image_url] : undefined;
+  // Only set `images` when the story has a publisher photo. An explicit
+  // `images: undefined` still counts as the page defining its own images, which
+  // suppresses the opengraph-image.tsx fallback — shipping a share card with no
+  // image at all in the common case, since most stories carry no photo.
+  const images = event.image_url ? { images: [event.image_url] } : {};
   return {
     title: event.title,
     description,
     alternates: { canonical: url },
     openGraph: {
       type: "article",
+      siteName: "Prism",
       title: event.title,
       description,
       url,
-      images,
+      ...images,
       publishedTime: event.occurred_at ?? undefined,
       modifiedTime: event.last_updated_at,
       section: event.sector ?? undefined,
     },
     twitter: {
-      card: images ? "summary_large_image" : "summary",
+      // Always large: either the publisher photo or the generated 1200x630 card.
+      card: "summary_large_image",
       title: event.title,
       description,
-      images,
+      ...images,
     },
   };
 }

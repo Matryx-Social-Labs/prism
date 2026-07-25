@@ -60,7 +60,9 @@ export default async function Image({ params }: { params: { slug: string } }) {
             display: "flex",
           }}
         >
-          ◮ PRISM · TRENDING · {sources} OUTLETS · DEVELOPING
+          {/* No ◮ mark: next/og's default font has no glyph for it, so it
+              rendered as a tofu box in every share preview. */}
+          PRISM · TRENDING · {sources} OUTLETS · DEVELOPING
         </div>
         <div style={{ marginTop: 28, fontSize: 62, lineHeight: 1.12, fontWeight: 600, display: "flex" }}>
           {label.length > 90 ? `${label.slice(0, 88)}…` : label}
