@@ -12,12 +12,20 @@ export function ShareButton({ url, title, fill }: { url: string; title: string; 
     const absolute = url.startsWith("http")
       ? url
       : `${typeof window !== "undefined" ? window.location.origin : ""}${url}`;
+    // Native sheet (WhatsApp/Instagram/…) wherever the browser offers it. It is
+    // secure-context-only: over plain http:// — a LAN IP in dev — navigator.share
+    // is undefined and we fall back to copying the link.
     if (nav?.share) {
       try {
-        await nav.share({ title, url: absolute });
+        // `text` too: most chat apps ignore `title` and paste only text+url, so
+        // without it the headline is lost and the share is a naked link.
+        await nav.share({ title, text: title, url: absolute });
         return;
-      } catch {
-        /* user dismissed — fall through to copy */
+      } catch (err) {
+        // Dismissing the sheet is a decision, not a failure — copying the link
+        // behind their back (and flashing "Link copied") ignores it.
+        if ((err as Error)?.name === "AbortError") return;
+        /* anything else — fall through to copy */
       }
     }
     try {
