@@ -12,6 +12,12 @@ export interface LensMeta {
   name: string;
   short: string;
   tagline: string;
+  // Plain-language "what this lens tells you", for prose read by people who
+  // aren't from that profession. `name` ("Cybersecurity / GRC") and `tagline`
+  // ("CVEs … your controls") are role-targeted jargon — right as picker labels
+  // for a pro scanning for their own row, wrong in a sentence aimed at
+  // everyone. Optional: lenses the client doesn't know fall back to `tagline`.
+  plain?: string;
   color: string; // CSS var reference
   bg: string;
 }
@@ -22,6 +28,7 @@ export const LENS_META: Record<string, LensMeta> = {
     name: "General reader",
     short: "Reader",
     tagline: "Every story with every perspective, consequences, and answers",
+    plain: "what happened, and why it matters",
     color: "var(--lens-general)",
     bg: "var(--lens-general-bg)",
   },
@@ -30,6 +37,7 @@ export const LENS_META: Record<string, LensMeta> = {
     name: "Cybersecurity / GRC",
     short: "Cyber",
     tagline: "CVEs, incidents, and what they mean for your controls",
+    plain: "who's exposed by this, and what to fix first",
     color: "var(--lens-cyber)",
     bg: "var(--lens-cyber-bg)",
   },
@@ -38,6 +46,7 @@ export const LENS_META: Record<string, LensMeta> = {
     name: "Finance / Trader",
     short: "Markets",
     tagline: "Market-moving news with tickers, catalysts, and price reads",
+    plain: "what this moves in the market, and why",
     color: "var(--lens-finance)",
     bg: "var(--lens-finance-bg)",
   },

@@ -410,7 +410,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                     setFlipped(true);
                     setLens(slug);
                   }}
-                  title={locked ? `Sign in to read the ${m.name} lens (free)` : undefined}
+                  title={locked ? `Sign in to read the ${m.short} lens — ${m.plain ?? m.tagline} (free)` : undefined}
                   className="flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
                   style={
                     selected
@@ -444,18 +444,18 @@ export function StoryView({ event }: { event: EventDetail }) {
           {isLocked(lens) ? (
             <div className="flex flex-col items-start gap-3">
               <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-                The{" "}
+                Read this story through the{" "}
                 <span className="font-semibold" style={{ color: meta.color }}>
-                  {meta.name}
+                  {meta.short} lens
                 </span>{" "}
-                read of this story is free with an account — sign in to unlock the professional lenses.
+                — {meta.plain ?? meta.tagline}. Free with an account.
               </p>
               <button
                 onClick={() => router.push("/signin")}
                 className="rounded-full px-4 py-2 text-[13px] font-semibold"
                 style={{ background: "var(--ink)", color: "var(--bg)" }}
               >
-                Sign in to read the {meta.short} lens
+                Sign in to unlock
               </button>
             </div>
           ) : briefLoading && !brief ? (
@@ -471,7 +471,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             <BriefPlayer brief={brief} points={lensPoints} meta={meta} pointsHeading={pointsHeading} />
           ) : (
             <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-              The {meta.name} read of this story isn&apos;t available yet.
+              No {meta.short} read of this story yet.
             </p>
           )}
 
