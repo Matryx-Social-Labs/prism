@@ -22,17 +22,21 @@ export async function Dateline() {
     /* no counts rather than invented ones */
   }
 
-  const date = new Date()
-    .toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
-    .replace(/,/g, ",");
+  const now = new Date();
+  const full = now.toLocaleDateString("en-IN", {
+    weekday: "short", day: "2-digit", month: "short", year: "numeric",
+  });
+  // Phones drop the weekday and year — the line has to survive 390px.
+  const short = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 
   return (
     <p
-      className="font-mono text-[10.5px] uppercase tracking-[0.16em]"
+      className="font-mono text-[10px] uppercase tracking-[0.14em] sm:text-[10.5px] sm:tracking-[0.16em]"
       style={{ color: "var(--ink-faint)" }}
       suppressHydrationWarning
     >
-      {date}
+      <span className="sm:hidden">{short}</span>
+      <span className="hidden sm:inline">{full}</span>
       {counts ? ` · ${counts}` : ""}
     </p>
   );

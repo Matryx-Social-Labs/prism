@@ -92,7 +92,25 @@ const SHELL = "mx-auto w-full max-w-[1240px] px-5 sm:px-8 xl:px-10";
 
 export default async function LandingPage() {
   return (
-    <div className="w-full">
+    <div className="w-full pb-[84px] lg:pb-0">
+      {/* Sticky bottom CTA (phones only) — the one piece of fixed chrome. */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t px-5 pt-3 backdrop-blur-md lg:hidden"
+        style={{
+          borderColor: "var(--line)",
+          background: "var(--glass)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)",
+        }}
+      >
+        <Link
+          href="/onboarding"
+          className="block rounded-full py-[15px] text-center text-[15.5px] font-medium"
+          style={{ background: "var(--ink)", color: "var(--bg)" }}
+        >
+          Get your feed
+        </Link>
+      </div>
+
       {/* ── Dateline: the masthead line, real counts ────────── */}
       <div className={`${SHELL} border-b pb-3 pt-4`} style={{ borderColor: "var(--line)" }}>
         <Dateline />
@@ -100,7 +118,8 @@ export default async function LandingPage() {
 
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className={`${SHELL} grid items-center gap-10 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_500px] lg:gap-14 lg:pb-14 lg:pt-[76px]`}>
-        <div>
+        <div className="contents lg:block">
+          <div className="order-1 lg:contents">
           <h1
             className="text-[40px] leading-[1.02] tracking-[-0.03em] sm:text-[56px] lg:text-[76px] lg:leading-[0.98]"
             style={{ fontFamily: "var(--font-display), serif", fontWeight: 400 }}
@@ -116,32 +135,36 @@ export default async function LandingPage() {
             <em>your</em> professional lens — whatever your profession is. Switch the lens and the
             same news changes meaning.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          </div>
+          {/* order-3: after the demo on mobile, back in place on desktop */}
+          <div className="order-3 mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:mt-8">
             <Link
               href="/onboarding"
-              className="rounded-full px-7 py-[13px] text-sm font-semibold transition hover:opacity-85"
+              className="rounded-full px-7 py-[15px] text-center text-[15.5px] font-medium transition hover:opacity-85 sm:py-[13px] sm:text-sm sm:font-semibold"
               style={{ background: "var(--ink)", color: "var(--bg)" }}
             >
               Get your feed
             </Link>
             <Link
               href="/feed"
-              className="rounded-full border px-7 py-[13px] text-sm font-semibold transition hover:opacity-70"
+              className="rounded-full border px-7 py-[14px] text-center text-[15.5px] font-medium transition hover:opacity-70 sm:py-[13px] sm:text-sm sm:font-semibold"
               style={{ borderColor: "var(--line-strong)" }}
             >
               Browse the news
             </Link>
+            {/* Provenance voice: a claim about the record, so it sets in mono. */}
+            <p
+              className="mt-[6px] basis-full font-mono text-[10.5px] uppercase tracking-[0.14em] sm:mt-[12px]"
+              style={{ color: "var(--ink-faint)" }}
+            >
+              Every value traces to a source · Free while we build · No account needed
+            </p>
           </div>
-          {/* Provenance voice: this is a claim about the record, so it sets in mono. */}
-          <p
-            className="mt-[18px] font-mono text-[10.5px] uppercase tracking-[0.14em]"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            Every value traces to a source · Free while we build · No account needed
-          </p>
         </div>
-        {/* Right: the lens-flip demo IS the hero visual (exact 2a content). */}
-        <HeroLensDemo />
+        {/* Right on desktop; order-2 on mobile so the flip is felt before the ask. */}
+        <div className="order-2 lg:order-none">
+          <HeroLensDemo />
+        </div>
       </section>
 
       {/* ── Open lens registry (full-bleed band) ─────────────── */}
