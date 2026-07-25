@@ -126,6 +126,10 @@ density, which DESIGN.md already calls "homework"); ft.com blocked the capture.
 | 2026-07-25 | Feed is a ruled editorial river, never a card grid | Prism sells canonical understanding, not abundance — a grid optimizes browsing volume, which is the wrong promise (Codex design voice, agreed) |
 | 2026-07-25 | Desktop lens control lives on the lens brief's top edge, sticky only while the brief is in view — never in the header or rail | With no thumb zone the flip needs proximity, not size; putting the lens in global chrome turns a comprehension event into settings |
 | 2026-07-25 | Storyline Map (branch tree): monochrome, status by line style not color, clicking a branch re-typesets a branch brief in place rather than navigating | Branches are partitions of ONE canonical story — navigating away would break that; color stays reserved for lenses |
+| 2026-07-25 | Desktop direction "The Stone": 104px mono ledger rail outside the 1240 field; provenance evicted from prose into the margin, baseline-aligned | Gives IBM Plex Mono a job worthy of a third family, and stops AI-written prose being interrupted by chips. One place on screen means "is this true?" |
+| 2026-07-25 | No cards on desktop app surfaces — rules and type only | A card is a mobile tap target; at 1440px it is a box drawn around content whitespace already separated. Every competitor is a card grid |
+| 2026-07-25 | Desktop flip: keys 1/2/3, scan line spans the full 1240 field, and the ledger rail re-inks at t=60 | With no thumb the flip needs repeatability, not proximity; re-inking the rail means the flip changes what counts as EVIDENCE, not just prose |
+| 2026-07-25 | Branch tree ships with a computed shape readout (`N DEVELOPMENTS · N BRANCHES · N SATELLITES · SPAN`), not an LLM branch summary | Countable structure should be counted — an AI product that refuses to summarize what it can count is a trust argument competitors can't copy |
 
 ## Preview artifact
 `~/.gstack/projects/Matryx-Social-Labs-prism/designs/design-system-20260719/prism-design-preview.html`
