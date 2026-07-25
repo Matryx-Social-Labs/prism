@@ -24,6 +24,9 @@ export function AskPanel({
   sourceCount,
   suggestedQuestions,
   docked = false,
+  open: openProp,
+  onOpenChange,
+  launcher = true,
 }: {
   eventId: string;
   sourceCount: number;
@@ -31,46 +34,82 @@ export function AskPanel({
   // docked: render inline (in the story rail) instead of a floating pill — no
   // fixed positioning, always open, and the rail card supplies the header.
   docked?: boolean;
+  // Controlled open + no built-in launcher: the story's pinned thumb-zone Ask
+  // button opens it; the chat still floats above the lens rail as before.
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  launcher?: boolean;
 }) {
-  const [open, setOpen] = useState(docked);
+  const [openState, setOpenState] = useState(docked);
+  const open = openProp !== undefined ? openProp : openState;
+  const setOpen = (v: boolean) => (onOpenChange ? onOpenChange(v) : setOpenState(v));
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const sessionRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // `busy` state is read from a render closure, so two taps in the same React
+  // batch both see false. A ref latches synchronously.
+  const busyRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns]);
 
+  // Stop the stream when the panel unmounts — otherwise it keeps consuming the
+  // response and setting state on a dead component.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   async function submit(question: string) {
     const q = question.trim();
-    if (!q || busy) return;
+    if (!q || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setInput("");
     setOpen(true);
-    setTurns((prev) => [
-      ...prev,
-      { role: "u", text: q, citations: [], streaming: false },
-      { role: "a", text: "", citations: [], streaming: true },
-    ]);
+
+    // Capture THIS answer's index at submit time. Targeting `prev.length - 1`
+    // meant a second question's turn could receive the first's tokens, and its
+    // citations would then be overwritten — attributing one answer's text to
+    // another's sources, in a product whose whole claim is grounded citations.
+    let answerIndex = -1;
+    setTurns((prev) => {
+      answerIndex = prev.length + 1;
+      return [
+        ...prev,
+        { role: "u", text: q, citations: [], streaming: false },
+        { role: "a", text: "", citations: [], streaming: true },
+      ];
+    });
 
     const update = (fn: (t: Turn) => Turn) =>
-      setTurns((prev) => prev.map((t, i) => (i === prev.length - 1 ? fn(t) : t)));
+      setTurns((prev) => prev.map((t, i) => (i === answerIndex ? fn(t) : t)));
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      await askQuestion(eventId, q, sessionRef.current, {
-        onSession: (sid) => {
-          sessionRef.current = sid;
+      await askQuestion(
+        eventId,
+        q,
+        sessionRef.current,
+        {
+          onSession: (sid) => {
+            sessionRef.current = sid;
+          },
+          onToken: (text) => update((t) => ({ ...t, text: t.text + text })),
+          onCitations: (citations) => update((t) => ({ ...t, citations })),
+          onDone: () => update((t) => ({ ...t, streaming: false })),
+          onError: (message) => update((t) => ({ ...t, error: message, streaming: false })),
         },
-        onToken: (text) => update((t) => ({ ...t, text: t.text + text })),
-        onCitations: (citations) => update((t) => ({ ...t, citations })),
-        onDone: () => update((t) => ({ ...t, streaming: false })),
-        onError: (message) => update((t) => ({ ...t, error: message, streaming: false })),
-      });
+        controller.signal,
+      );
     } catch {
-      update((t) => ({ ...t, error: "Connection failed.", streaming: false }));
+      if (!controller.signal.aborted) {
+        update((t) => ({ ...t, error: "Connection failed.", streaming: false }));
+      }
     } finally {
+      busyRef.current = false;
       setBusy(false);
       update((t) => ({ ...t, streaming: false }));
     }
@@ -79,23 +118,25 @@ export function AskPanel({
   const thinking = busy && turns.length > 0 && turns[turns.length - 1].text === "";
 
   return (
-    <div className={docked ? "w-full" : "fixed bottom-[18px] right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)]"}>
+    <div className={docked ? "w-full" : "fixed right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)] bottom-[calc(env(safe-area-inset-bottom)+124px)] lg:bottom-[18px]"}>
       {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="float-right flex items-center gap-2 rounded-full border px-5 py-3 text-[13.5px] font-semibold transition hover:opacity-90"
-          style={{
-            borderColor: "var(--line-strong)",
-            background: "var(--ink)",
-            color: "var(--bg)",
-            boxShadow: "var(--shadow-pop)",
-          }}
-        >
-          <span className="spectrum-text text-[15px]" aria-hidden>
-            ◮
-          </span>
-          Ask this story
-        </button>
+        launcher ? (
+          <button
+            onClick={() => setOpen(true)}
+            className="float-right flex items-center gap-2 rounded-full border px-5 py-3 text-[13.5px] font-semibold transition hover:opacity-90"
+            style={{
+              borderColor: "var(--line-strong)",
+              background: "var(--ink)",
+              color: "var(--bg)",
+              boxShadow: "var(--shadow-pop)",
+            }}
+          >
+            <span className="spectrum-text text-[15px]" aria-hidden>
+              ◮
+            </span>
+            Ask this story
+          </button>
+        ) : null
       ) : (
         <div
           className={`flex flex-col overflow-hidden ${docked ? "" : "rounded-[20px] border"}`}
@@ -213,9 +254,13 @@ export function AskPanel({
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit(input)}
+              // isComposing: for Devanagari/Tamil/Telugu IMEs, Enter confirms the
+              // candidate. Submitting on it sends a half-composed question.
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) submit(input);
+              }}
               placeholder="Ask anything about this story…"
-              className="min-w-0 flex-1 rounded-full border px-4 py-[9px] text-[13px] outline-none"
+              className="min-w-0 flex-1 rounded-full border px-4 py-[9px] text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
               style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--ink)" }}
             />
             <button

@@ -83,7 +83,7 @@ jobs:
         run: uv run pytest -q
 
   web:
-    name: web · typecheck + build
+    name: web · test + typecheck + build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -103,6 +103,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Test (vitest)
+        run: npm test
 
       - name: Build (same as Vercel)
         # Catches Next.js prerender / type / lint errors before Vercel does.

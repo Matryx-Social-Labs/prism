@@ -11,7 +11,9 @@ and a rendered preview approved via the interactive flip demo.
   cyber/GRC and markets readers; more lenses added continuously.
 - **Space/industry:** Perspective/news-intelligence apps (Ground News, Particle, Semafor,
   Inshorts adjacency).
-- **Project type:** Consumer web app + marketing landing (Next.js); mobile later.
+- **Project type:** Consumer web app + marketing landing (Next.js). The app surfaces
+  (Feed, Story, Trending, You) are mobile-first as of 2026-07-25; the marketing landing
+  stays desktop-led.
 
 ## The Memorable Thing
 **"The same story changed meaning when I flipped the lens."**
@@ -105,6 +107,8 @@ flip is the only colorful event on the page — that is what makes it the memora
 | 2026-07-23 | Feed v3: remove feed lens pills; scope selector (All / <state> / National) + language chip replace them; Trending joins the nav | Lens is a per-story flip, not a feed filter; quieter chrome at rest (Prism UI Design.dc.html, frame 3a) |
 | 2026-07-23 | No global lens switcher in the header chrome | Founder call (B): lens is set in "Your Prism" and flipped per-story; deliberate departure from design v3, which kept a header lens chip |
 | 2026-07-23 | Content shells unified to 1240px (header/footer 1280px) | Column left-edges line up across landing/feed/sector/story |
+| 2026-07-25 | App surfaces rebuilt mobile-first: bottom tab bar (Feed · Trending · Pulse · Search · You) is the nav spine on phones; global brand header hidden on app routes; footer hidden behind the tab bar | A phone reader was getting a shrunk desktop site with two stacked headers (Prism Mobile.dc.html) |
+| 2026-07-25 | On Story, the lens rail + Share/Ask pin to the thumb zone instead of a desktop sidebar | The flip is the memorable thing — it has to be reachable one-handed, and the flip must scroll the brief into view to stay visible |
 
 ## Preview artifact
 `~/.gstack/projects/Matryx-Social-Labs-prism/designs/design-system-20260719/prism-design-preview.html`

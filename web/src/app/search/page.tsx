@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { StoryRowCard } from "@/components/StoryCard";
 import { searchEvents, type FeedItem } from "@/lib/api";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 
 function SearchInner() {
   const params = useSearchParams();
@@ -12,6 +13,10 @@ function SearchInner() {
   const [results, setResults] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  // Which term produced `results`. Without it, a new query inherits the
+  // previous query's results as "ready" and restores that key's offset
+  // before its own results exist.
+  const [resultsTerm, setResultsTerm] = useState("");
 
   useEffect(() => {
     const term = q.trim();
@@ -21,18 +26,39 @@ function SearchInner() {
       return;
     }
     setLoading(true);
+    // clearTimeout cancels the timer, not an in-flight request — without the
+    // flag a slow response for an abandoned query overwrites a newer one.
+    let cancelled = false;
     const t = setTimeout(async () => {
-      const items = await searchEvents(term);
-      setResults(items);
-      setLoading(false);
-      setSearched(true);
-      router.replace(`/search?q=${encodeURIComponent(term)}`, { scroll: false });
+      try {
+        const items = await searchEvents(term);
+        if (cancelled) return;
+        setResults(items);
+        setResultsTerm(term);
+        setSearched(true);
+        router.replace(`/search?q=${encodeURIComponent(term)}`, { scroll: false });
+      } catch {
+        // A network failure REJECTS (searchEvents only swallows !res.ok), and an
+        // escaped rejection left setLoading(true) — "Searching…" forever, which
+        // is the common case on a flaky mobile connection.
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [q, router]);
 
+  // Keyed per query: with a route-wide key, the first results for a NEW search
+  // would restore a previous search's offset and jump the page out from under
+  // a reader who is still typing (the input autofocuses).
+  useScrollRestore(`search:${q.trim()}:scrollY`, resultsTerm === q.trim() && results.length > 0);
+
   return (
-    <div className="mx-auto w-full max-w-[760px] px-5 py-10">
+    <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9">
       <h1 className="text-[28px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         Search
       </h1>
@@ -42,7 +68,7 @@ function SearchInner() {
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search stories, companies, tickers…"
         aria-label="Search stories"
-        className="mt-4 w-full rounded-[12px] border px-4 py-3 text-[15px] outline-none"
+        className="mt-4 w-full rounded-[12px] border px-4 py-3 text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
         style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
       />
 

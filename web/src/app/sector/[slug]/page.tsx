@@ -7,6 +7,7 @@ import { useTaxonomy } from "@/components/ProfileEditor";
 import { fetchFeed, type FeedItem } from "@/lib/api";
 import { useLenses } from "@/lib/lenses";
 import { loadProfile } from "@/lib/profile";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 
 export default function SectorPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -20,10 +21,27 @@ export default function SectorPage({ params }: { params: Promise<{ slug: string 
   useEffect(() => {
     const p = loadProfile();
     if (p?.lens) setLens(p.lens);
+    // Slug changes are user-driven and rapid (the sector rail is a list of
+    // links), so without this a slow response for sector A lands after B and
+    // renders A's stories under B's heading. Resetting items/error also stops
+    // the previous sector's list showing under the new title, and stops one
+    // transient failure pinning the error banner for every later sector.
+    let cancelled = false;
+    setItems(null);
+    setError(null);
     fetchFeed({ sector: slug, region: p?.region, sort: "latest", limit: 50 })
-      .then(setItems)
-      .catch(() => setError("The Prism API is unreachable right now. Refresh in a moment."));
+      .then((list) => {
+        if (!cancelled) setItems(list);
+      })
+      .catch(() => {
+        if (!cancelled) setError("The Prism API is unreachable right now. Refresh in a moment.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
+
+  useScrollRestore(`sector:${slug}:scrollY`, items !== null);
 
   const sec = taxonomy.find((s) => s.slug === slug);
   const title = sec?.name ?? slug.replaceAll("_", " ");

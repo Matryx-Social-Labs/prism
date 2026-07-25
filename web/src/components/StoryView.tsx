@@ -10,6 +10,7 @@ import { lensMeta, useLenses } from "@/lib/lenses";
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
+import { ShareButton } from "@/components/ShareButton";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
 import { StoryTimeline } from "@/components/StoryTimeline";
@@ -138,8 +139,13 @@ export function StoryView({ event }: { event: EventDetail }) {
   // saved profile lens): snap back to the general reader lens.
   useEffect(() => {
     if (isLocked(lens)) setLens("reader");
+    // `lens` in the deps, not just `session`: the profile effect sets the saved
+    // lens AFTER this runs, and for a signed-out reader `session` stays null
+    // forever — so on [session] alone this never fired again and every reader
+    // with a saved pro lens got the sign-in wall as the whole story. That is
+    // the first thing a mobile visitor from a shared link sees.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, lens]);
 
   const meta = lensMeta(lens);
   const brief = briefs[lens];
@@ -174,6 +180,19 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Lightweight scroll-spy so the rail nav + mobile chips highlight the section
   // in view. Anchors still jump on click; this only drives the active border.
   const [activeSection, setActiveSection] = useState("lens-brief");
+  const [askOpen, setAskOpen] = useState(false);
+
+  // Picking a lens from the pinned rail must SHOW the result: the brief is
+  // off-screen behind the reader's scroll position, so the re-typeset flip
+  // happens where nobody can see it and the tap reads as a dead button.
+  function pickLens(slug: string) {
+    setFlipped(true);
+    setLens(slug);
+    document.getElementById("lens-brief")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }
   useEffect(() => {
     const els = navItems
       .map((n) => document.getElementById(n.id))
@@ -194,8 +213,8 @@ export function StoryView({ event }: { event: EventDetail }) {
   }, [event.id, storyCount]);
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-[120px] pt-7 sm:px-8 xl:px-10">
-      <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
+    <div className="mx-auto max-w-[1240px] px-5 pb-[164px] pt-7 sm:px-8 lg:pb-[120px] xl:px-10">
+      <Link href="/feed" scroll={false} className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
 
@@ -254,7 +273,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               {finance.catalyst.replaceAll("_", " ")}
             </span>
           )}
-          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
+          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }} suppressHydrationWarning>
             {event.sources.length} source{event.sources.length === 1 ? "" : "s"} · {timeAgo(event.last_updated_at)}
           </span>
         </div>
@@ -313,6 +332,38 @@ export function StoryView({ event }: { event: EventDetail }) {
       </header>
 
       {/* ── Mobile section nav — sticky anchor chips ────────── */}
+      {/* Coverage bar — mobile: the verify layer, promoted from the desktop rail. */}
+      {coverageEntries.length > 0 && (
+        <div
+          className="mt-5 rounded-[14px] border px-3.5 py-3 lg:hidden"
+          style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
+        >
+          <span className="font-mono text-[11px]" style={{ color: "var(--ink)" }}>
+            ⌗ {sourceCount} outlet{sourceCount === 1 ? "" : "s"} · {coverageEntries.length} origin
+            {coverageEntries.length === 1 ? "" : "s"} ·{" "}
+            <span style={{ color: event.coverage?.single_origin ? "var(--danger)" : "var(--up)" }}>
+              {event.coverage?.single_origin ? "Single-origin" : "Balanced"}
+            </span>
+          </span>
+          {gapText && (
+            <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--danger)" }}>
+              ◉ {gapText}
+            </p>
+          )}
+          <div className="mt-2.5 flex flex-wrap gap-1.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
+            {coverageEntries.map(([iso, n]) => (
+              <span
+                key={iso}
+                className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+                style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}
+              >
+                {regionName(iso)} × {n}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <nav
         className="sticky top-0 z-20 -mx-5 mt-5 flex gap-1.5 overflow-x-auto border-b px-5 py-2.5 sm:-mx-8 sm:px-8 lg:hidden"
         style={{ borderColor: "var(--line)", background: "var(--bg)" }}
@@ -341,7 +392,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         className="mt-9 scroll-mt-24 overflow-hidden rounded-[18px] border"
         style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
       >
-        <div className="overflow-x-auto border-b" style={{ borderColor: "var(--line)" }}>
+        <div className="hidden overflow-x-auto border-b lg:block" style={{ borderColor: "var(--line)" }}>
           <div className="flex w-max items-center gap-1.5 px-4 py-3" role="tablist" aria-label="Read this story through a lens">
             <span className="mr-1 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
               Lens
@@ -364,7 +415,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                     setFlipped(true);
                     setLens(slug);
                   }}
-                  title={locked ? `Sign in to read the ${m.name} lens (free)` : undefined}
+                  title={locked ? `Sign in to read the ${m.short} lens — ${m.plain ?? m.tagline} (free)` : undefined}
                   className="flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
                   style={
                     selected
@@ -398,18 +449,18 @@ export function StoryView({ event }: { event: EventDetail }) {
           {isLocked(lens) ? (
             <div className="flex flex-col items-start gap-3">
               <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-                The{" "}
+                Read this story through the{" "}
                 <span className="font-semibold" style={{ color: meta.color }}>
-                  {meta.name}
+                  {meta.short} lens
                 </span>{" "}
-                read of this story is free with an account — sign in to unlock the professional lenses.
+                — {meta.plain ?? meta.tagline}. Free with an account.
               </p>
               <button
                 onClick={() => router.push("/signin")}
                 className="rounded-full px-4 py-2 text-[13px] font-semibold"
                 style={{ background: "var(--ink)", color: "var(--bg)" }}
               >
-                Sign in to read the {meta.short} lens
+                Sign in to unlock
               </button>
             </div>
           ) : briefLoading && !brief ? (
@@ -425,7 +476,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             <BriefPlayer brief={brief} points={lensPoints} meta={meta} pointsHeading={pointsHeading} />
           ) : (
             <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-              The {meta.name} read of this story isn&apos;t available yet.
+              No {meta.short} read of this story yet.
             </p>
           )}
 
@@ -785,9 +836,64 @@ export function StoryView({ event }: { event: EventDetail }) {
         </aside>
       </div>
 
-      {/* ── Ask — floating pill (mobile) ────────────────────── */}
+      {/* ── Pinned thumb zone (mobile): lens rail + Share ───── */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
+        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+      >
+        <div className="hide-scroll flex gap-1.5 overflow-x-auto">
+          {offered.map((slug) => {
+            const m = lensMeta(slug);
+            const selected = slug === lens;
+            const locked = isLocked(slug);
+            return (
+              <button
+                key={slug}
+                onClick={() => pickLens(slug)}
+                className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
+                style={
+                  selected
+                    ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
+                    : { border: "1px solid var(--line-strong)", background: "var(--bg-elevated)", color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
+                }
+              >
+                {m.short}
+                {locked && (
+                  <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <ShareButton url={`/story/${event.id}`} title={event.title} fill />
+          </div>
+          <button
+            onClick={() => setAskOpen(true)}
+            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
+            style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
+          >
+            <span className="spectrum-text text-[15px]" aria-hidden>◮</span>
+            Ask
+            <span className="whitespace-nowrap font-mono text-[10.5px] font-normal opacity-70">{sourceCount} sources</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Ask chat — floats above the pinned lens rail when opened ── */}
       <div className="lg:hidden">
-        <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} />
+        <AskPanel
+          eventId={event.id}
+          sourceCount={sourceCount}
+          suggestedQuestions={questions}
+          open={askOpen}
+          onOpenChange={setAskOpen}
+          launcher={false}
+        />
       </div>
     </div>
   );
