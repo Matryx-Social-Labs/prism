@@ -192,14 +192,22 @@ Prod Postgres is reachable over Railway's public TCP proxy with `asyncpg`.
 ## How to run the tests
 
 ```bash
-uv run pytest -q                    # full suite
+uv run pytest -q                    # backend suite
 uv run pytest tests/test_trending.py -q
 uv run ruff check .                 # lint (CI gate)
+cd web && npm test                  # frontend suite, vitest + jsdom (CI gate)
+cd web && npm run test:watch        # same, re-runs on save
 cd web && npm run build             # frontend typecheck + build (CI gate)
 ```
 DB-dependent tests skip automatically when no database is reachable. CI runs
-`ruff` + `pytest` + `next build` on every PR; the route surface is guarded by
-`tests/test_api_routes.py`.
+`ruff` + `pytest` for the backend and `vitest` + `next build` for the web app on
+every PR; the API route surface is guarded by `tests/test_api_routes.py`.
+
+Frontend tests sit next to the code they cover (`web/src/**/*.test.ts`,
+`*.test.tsx`); the runner config is `web/vitest.config.ts` and the jsdom shims
+(ResizeObserver, a `scrollTo` that actually moves `scrollY`) are in
+`web/vitest.setup.ts`. See CLAUDE.md for the jsdom traps that make a frontend
+test pass without testing anything.
 
 ## Related
 - [DEPLOYMENT.md](./DEPLOYMENT.md) — Railway + Vercel deploy, gated backend approval.
