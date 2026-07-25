@@ -96,15 +96,20 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         if story is None:
             raise HTTPException(status_code=404, detail="no such story")
 
-    from correlation.threads import story_timeline_from_members
+    from correlation.threads import branch_tree_for_members, story_timeline_from_members
 
     timeline = {"developments": [], "cast": []}
+    branches = None
     if story["hero_event_id"]:
         # Pin the share view to the member set this slug EARNED, not the live global
         # partition — a shared link keeps its identity as coverage/boundaries shift.
         timeline = await story_timeline_from_members(
             uuid.UUID(str(story["hero_event_id"])), story["member_event_ids"]
         )
+        # The L3 branch tree for the SAME frozen member set. None when the story
+        # predates the current partition run — the client falls back to the flat
+        # timeline it already renders, so this is additive with no regression.
+        branches = await branch_tree_for_members(story["member_event_ids"])
     return {
         "slug": story["slug"],
         "canonical_slug": story["slug"],  # if != the requested slug, the client should redirect
@@ -116,4 +121,5 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         "status": story["status"],
         "developments": timeline.get("developments", []),
         "timeline_cast": timeline.get("cast", []),
+        "branches": branches,
     }

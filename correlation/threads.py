@@ -10,7 +10,9 @@ to event_links so a pair is never asked twice.
 import json
 import uuid
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from common.config import get_settings
 from common.db import session_scope
@@ -690,3 +692,79 @@ async def story_timeline_from_members(seed: uuid.UUID, member_ids: list) -> dict
         ids.append(str(seed))
     async with session_scope() as session:
         return await _assemble_timeline(session, seed, ids)
+
+
+async def branch_tree_for_members(member_ids: list) -> dict | None:
+    """The persisted L3 branch tree for a FROZEN member set, shaped for the client.
+
+    correlation/partition.py has been writing `event_story.branch_parent_id` and
+    `.off_spine` every run since the storyline partitioner shipped, and nothing has
+    ever read them — `_partitioned_members` selects only `story_label` and flattens.
+    This is the read side.
+
+    Returns `{root_id, nodes: [{id, parent_id, off_spine, depth}], shape: {...}}`,
+    or None when the story predates the current run (the client then renders the
+    flat timeline it renders today — no regression).
+
+    The member set is the one the slug EARNED, not the live partition, so a shared
+    link keeps its identity. That means a parent can be missing from the set: those
+    nodes are re-attached to the root rather than dropped, otherwise the tree would
+    silently lose developments the page is already showing.
+    """
+    ids = [str(m) for m in (member_ids or [])]
+    if not ids:
+        return None
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT es.event_id::text AS id, es.branch_parent_id::text AS parent, es.off_spine AS off "
+                    "FROM event_story es "
+                    "JOIN partition_runs pr ON pr.id = es.run_id AND pr.status = 'current' "
+                    "WHERE es.event_id = ANY(:ids)"
+                ).bindparams(bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
+                {"ids": [uuid.UUID(i) for i in ids]},
+            )
+        ).mappings().all()
+    if not rows:
+        return None
+
+    present = {r["id"] for r in rows}
+    # Root: branch_parent_id IS NULL, or the frozen set cut the parent off.
+    root_id = next((r["id"] for r in rows if r["parent"] is None), None)
+    if root_id is None:
+        root_id = next((r["id"] for r in rows if r["parent"] not in present), rows[0]["id"])
+
+    parent: dict[str, str | None] = {}
+    for r in rows:
+        p = r["parent"]
+        parent[r["id"]] = None if r["id"] == root_id or p not in present else p
+
+    def depth_of(node: str) -> int:
+        d, seen = 0, {node}
+        cur = parent.get(node)
+        while cur is not None and cur not in seen:  # `seen` guards a cycle we should never write
+            seen.add(cur)
+            d += 1
+            cur = parent.get(cur)
+        return d
+
+    nodes = [
+        {"id": r["id"], "parent_id": parent[r["id"]], "off_spine": bool(r["off"]), "depth": depth_of(r["id"])}
+        for r in rows
+    ]
+    nodes.sort(key=lambda n: (n["depth"], n["id"]))
+
+    # The shape readout is COUNTED, never summarized — no LLM, nothing to hallucinate.
+    children: dict[str, int] = {}
+    for n in nodes:
+        if n["parent_id"]:
+            children[n["parent_id"]] = children.get(n["parent_id"], 0) + 1
+    shape = {
+        "developments": len(nodes),
+        # A branch is a fork: a node whose parent has more than one child.
+        "branches": sum(1 for n in nodes if n["parent_id"] and children.get(n["parent_id"], 0) > 1),
+        "satellites": sum(1 for n in nodes if n["off_spine"]),
+        "max_depth": max((n["depth"] for n in nodes), default=0),
+    }
+    return {"root_id": root_id, "nodes": nodes, "shape": shape}
