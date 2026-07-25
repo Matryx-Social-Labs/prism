@@ -176,6 +176,18 @@ export function StoryView({ event }: { event: EventDetail }) {
   // in view. Anchors still jump on click; this only drives the active border.
   const [activeSection, setActiveSection] = useState("lens-brief");
   const [askOpen, setAskOpen] = useState(false);
+
+  // Picking a lens from the pinned rail must SHOW the result: the brief is
+  // off-screen behind the reader's scroll position, so the re-typeset flip
+  // happens where nobody can see it and the tap reads as a dead button.
+  function pickLens(slug: string) {
+    setFlipped(true);
+    setLens(slug);
+    document.getElementById("lens-brief")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }
   useEffect(() => {
     const els = navItems
       .map((n) => document.getElementById(n.id))
@@ -832,10 +844,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             return (
               <button
                 key={slug}
-                onClick={() => {
-                  setFlipped(true);
-                  setLens(slug);
-                }}
+                onClick={() => pickLens(slug)}
                 className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
                 style={
                   selected
