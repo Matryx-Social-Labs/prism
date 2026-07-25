@@ -120,6 +120,11 @@ export default function FeedPage() {
   // Mirror the feed DATA into the module cache so a return navigation renders
   // instantly (no skeleton). Scroll lives in sessionStorage (survives everything).
   useEffect(() => {
+    // Only cache once there's actually a feed. Writing on the first mount
+    // installs a non-null-but-empty cache, which makes every later mount think
+    // it restored — silently losing the reader's state-default scope for the
+    // rest of the session.
+    if (items === null) return;
     feedCache = { items, top, digest, trending, scope };
   }, [items, top, digest, trending, scope]);
 

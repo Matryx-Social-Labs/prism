@@ -18,7 +18,10 @@ const STOP_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
 // A throw inside an effect unwinds React and blanks the route, so never let one out.
 function readY(key: string): number {
   try {
-    return Number(sessionStorage.getItem(key) || 0);
+    const y = Number(sessionStorage.getItem(key) || 0);
+    // A corrupt value yields NaN, which slips past a `y <= 0` guard and then
+    // holds the restore open — suppressing every save — for the full settle.
+    return Number.isFinite(y) ? y : 0;
   } catch {
     return 0;
   }
@@ -57,6 +60,16 @@ export function useScrollRestore(key: string, ready: boolean) {
   }, [key]);
 
   const restored = useRef(false);
+  // Next does not remount a client component when only a dynamic segment
+  // changes, so /sector/a -> /sector/b keeps these refs. Without re-arming on
+  // the key, sector B never restores its own offset (and, inside the settle
+  // window, could restore it onto A's still-rendered list).
+  const lastKey = useRef(key);
+  if (lastKey.current !== key) {
+    lastKey.current = key;
+    restored.current = false;
+  }
+
   useEffect(() => {
     if (restored.current || !ready) return;
     restored.current = true;

@@ -22,17 +22,35 @@ function SearchInner() {
       return;
     }
     setLoading(true);
+    // clearTimeout cancels the timer, not an in-flight request — without the
+    // flag a slow response for an abandoned query overwrites a newer one.
+    let cancelled = false;
     const t = setTimeout(async () => {
-      const items = await searchEvents(term);
-      setResults(items);
-      setLoading(false);
-      setSearched(true);
-      router.replace(`/search?q=${encodeURIComponent(term)}`, { scroll: false });
+      try {
+        const items = await searchEvents(term);
+        if (cancelled) return;
+        setResults(items);
+        setSearched(true);
+        router.replace(`/search?q=${encodeURIComponent(term)}`, { scroll: false });
+      } catch {
+        // A network failure REJECTS (searchEvents only swallows !res.ok), and an
+        // escaped rejection left setLoading(true) — "Searching…" forever, which
+        // is the common case on a flaky mobile connection.
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [q, router]);
 
-  useScrollRestore("search:scrollY", results.length > 0);
+  // Keyed per query: with a route-wide key, the first results for a NEW search
+  // would restore a previous search's offset and jump the page out from under
+  // a reader who is still typing (the input autofocuses).
+  useScrollRestore(`search:${q.trim()}:scrollY`, results.length > 0);
 
   return (
     <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9">

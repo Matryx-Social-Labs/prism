@@ -139,8 +139,13 @@ export function StoryView({ event }: { event: EventDetail }) {
   // saved profile lens): snap back to the general reader lens.
   useEffect(() => {
     if (isLocked(lens)) setLens("reader");
+    // `lens` in the deps, not just `session`: the profile effect sets the saved
+    // lens AFTER this runs, and for a signed-out reader `session` stays null
+    // forever — so on [session] alone this never fired again and every reader
+    // with a saved pro lens got the sign-in wall as the whole story. That is
+    // the first thing a mobile visitor from a shared link sees.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, lens]);
 
   const meta = lensMeta(lens);
   const brief = briefs[lens];

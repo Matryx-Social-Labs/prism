@@ -16,13 +16,17 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   let title = "One story. Every perspective.";
   let sources = 0;
   let sector = "";
+  let degraded = false;
   try {
     const e = await fetchEvent(id);
     title = e.title;
     sources = e.sources?.length ?? 0;
     sector = e.sector ?? "";
   } catch {
-    /* fall back to defaults */
+    // Serving the generic card as a 200 is worse than failing: social scrapers
+    // fetch a URL once and cache the preview for days, so one API blip would
+    // permanently burn the preview for every story shared during it.
+    degraded = true;
   }
 
   const eyebrow = ["PRISM", sector.replaceAll("_", " "), sources ? `${sources} SOURCES` : ""]
@@ -72,6 +76,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         <div style={{ fontSize: 24, color: "#9ca3af", display: "flex" }}>One story. Every perspective.</div>
       </div>
     ),
-    size,
+    {
+      ...size,
+      // Don't let a scraper cache a card we built from nothing.
+      headers: degraded ? { "cache-control": "no-store" } : undefined,
+    },
   );
 }

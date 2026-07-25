@@ -133,6 +133,38 @@ describe("useScrollRestore — regressions", () => {
     expect(window.scrollY).toBe(0); // 700 here means the stale-offset bug is back
   });
 
+  // Next keeps the component mounted when only a dynamic segment changes, so
+  // /sector/a -> /sector/b reuses these refs. Latching on the instance instead
+  // of the key meant sector B never restored its own offset.
+  it("re-arms when the key changes, as on /sector/a -> /sector/b", () => {
+    sessionStorage.setItem("sector:a:scrollY", "400");
+    sessionStorage.setItem("sector:b:scrollY", "900");
+    const { rerender } = renderHook(({ k }) => useScrollRestore(k, true), {
+      initialProps: { k: "sector:a:scrollY" },
+    });
+    expect(window.scrollY).toBe(400);
+
+    // Settle sector A first — the reader touching the page is what makes this
+    // bite. While unsettled the teardown's re-arm masks it, so a test that
+    // switches keys immediately passes with or without the key latch.
+    act(() => {
+      window.dispatchEvent(new Event("touchstart"));
+    });
+
+    rerender({ k: "sector:b:scrollY" });
+    expect(window.scrollY).toBe(900); // 400 => the key latch is back
+  });
+
+  it("does not restore a key that has nothing saved", () => {
+    sessionStorage.setItem("sector:a:scrollY", "400");
+    const { rerender } = renderHook(({ k }) => useScrollRestore(k, true), {
+      initialProps: { k: "sector:a:scrollY" },
+    });
+    expect(window.scrollY).toBe(400);
+    rerender({ k: "sector:fresh:scrollY" });
+    expect(window.scrollY).toBe(400); // no saved offset => leave the page alone
+  });
+
   // The other half of the same branch: StrictMode's dev double-mount tears the
   // restore down before it settles, and the re-arm is what lets the remount
   // finish it. Without this, scroll restore could be dead in dev unnoticed.
