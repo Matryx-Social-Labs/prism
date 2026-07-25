@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PrismMark } from "@/components/PrismMark";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
 import { useTaxonomy } from "@/components/ProfileEditor";
@@ -22,6 +22,19 @@ import { watchlistEvents, type WatchEvent } from "@/lib/watchlist";
 
 type Scope = "all" | "region" | "world";
 
+// Session-scoped cache so returning from a story restores the feed instantly at
+// the reader's scroll position (no reload/skeleton, no scroll-to-top). Lives at
+// module scope: survives client navigations, cleared on a full page reload.
+type FeedCache = {
+  items: FeedItem[] | null;
+  top: FeedItem[];
+  digest: MarketDigest | null;
+  trending: TrendingStory[];
+  scope: Scope;
+  scrollY: number;
+};
+let feedCache: FeedCache | null = null;
+
 // Sector → lens hue for the tiny section marker dot (color only ever means a lens).
 function sectorLens(slug: string): string | null {
   if (/(market|financ|business|econom)/i.test(slug)) return "var(--lens-finance)";
@@ -34,21 +47,22 @@ export default function FeedPage() {
   const session = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [lens, setLens] = useState("reader");
-  const [scope, setScope] = useState<Scope>("all");
+  const [scope, setScope] = useState<Scope>(() => feedCache?.scope ?? "all");
   const [scopeOpen, setScopeOpen] = useState(false);
   const [stateName, setStateName] = useState<string | null>(null);
-  const [items, setItems] = useState<FeedItem[] | null>(null);
-  const [top, setTop] = useState<FeedItem[]>([]);
+  const [items, setItems] = useState<FeedItem[] | null>(() => feedCache?.items ?? null);
+  const [top, setTop] = useState<FeedItem[]>(() => feedCache?.top ?? []);
   const [error, setError] = useState<string | null>(null);
-  const [digest, setDigest] = useState<MarketDigest | null>(null);
-  const [trending, setTrending] = useState<TrendingStory[]>([]);
+  const [digest, setDigest] = useState<MarketDigest | null>(() => feedCache?.digest ?? null);
+  const [trending, setTrending] = useState<TrendingStory[]>(() => feedCache?.trending ?? []);
   const [watch, setWatch] = useState<WatchEvent[]>([]);
+  const restoredCache = useRef(feedCache !== null);
 
   useEffect(() => {
     const p = loadProfile();
     setProfile(p);
     if (p?.lens) setLens(p.lens);
-    if (p?.state) setScope("region"); // default to the reader's state, per the mobile design
+    if (p?.state && !restoredCache.current) setScope("region"); // default to the reader's state (unless restored)
   }, []);
 
   useEffect(() => {
@@ -75,7 +89,8 @@ export default function FeedPage() {
   }, [session]);
 
   useEffect(() => {
-    setItems(null);
+    // Keep showing cached/previous items while re-fetching (stale-while-revalidate)
+    // so returning from a story doesn't flash a skeleton or lose the reader's place.
     setError(null);
     const query = {
       lens,
@@ -91,6 +106,49 @@ export default function FeedPage() {
       })
       .catch(() => setError("The Prism API is unreachable right now. Refresh in a moment."));
   }, [lens, profile]);
+
+  // Mirror the feed DATA into the module cache so a return navigation renders
+  // instantly (no skeleton). Scroll lives in sessionStorage (survives everything).
+  useEffect(() => {
+    feedCache = { items, top, digest, trending, scope, scrollY: 0 };
+  }, [items, top, digest, trending, scope]);
+
+  // Persist scroll position as the reader scrolls.
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        // Never persist 0: navigating to a story scrolls the still-mounted feed to
+        // top, and that spurious 0 would clobber the reader's real position.
+        if (window.scrollY > 0) sessionStorage.setItem("feed:scrollY", String(window.scrollY));
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  // Restore the saved position ONCE the feed content is present (cache or fetch).
+  // Re-assert for a short window: it beats the router's post-navigation scroll
+  // reset AND survives content still growing (scrollTo caps until the page is tall).
+  const restoredScroll = useRef(false);
+  useEffect(() => {
+    if (restoredScroll.current || items === null) return;
+    restoredScroll.current = true;
+    const y = Number(sessionStorage.getItem("feed:scrollY") || 0);
+    if (y <= 0) return;
+    const start = performance.now();
+    const tick = () => {
+      window.scrollTo(0, y);
+      if (performance.now() - start < 300 && Math.abs(window.scrollY - y) > 2) {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  }, [items]);
 
   const visible = useMemo(() => {
     if (!items || scope === "all" || !profile?.state) return items;
