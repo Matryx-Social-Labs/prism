@@ -44,8 +44,8 @@ export function BottomTabBar() {
       style={{
         borderColor: "var(--line)",
         background: "var(--glass)",
-        paddingTop: 7,
-        paddingBottom: "max(1.75rem, env(safe-area-inset-bottom))",
+        paddingTop: 6,
+        paddingBottom: "calc(env(safe-area-inset-bottom) + 6px)",
       }}
       aria-label="Primary"
     >

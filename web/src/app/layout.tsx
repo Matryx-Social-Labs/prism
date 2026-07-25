@@ -87,7 +87,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="w-full flex-1">{children}</main>
         <BottomTabBar />
-        <footer className="mt-auto border-t" style={{ borderColor: "var(--line)" }}>
+        {/* Footer is desktop-only — on mobile the bottom tab bar is the chrome,
+            and the marketing footer would just hide behind it. */}
+        <footer className="mt-auto hidden border-t lg:block" style={{ borderColor: "var(--line)" }}>
           <div
             className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
             style={{ color: "var(--ink-muted)" }}

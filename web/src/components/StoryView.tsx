@@ -255,7 +255,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               {finance.catalyst.replaceAll("_", " ")}
             </span>
           )}
-          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
+          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }} suppressHydrationWarning>
             {event.sources.length} source{event.sources.length === 1 ? "" : "s"} · {timeAgo(event.last_updated_at)}
           </span>
         </div>
@@ -821,7 +821,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       {/* ── Pinned thumb zone (mobile): lens rail + Share ───── */}
       <div
         className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
-        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
       >
         <div className="hide-scroll flex gap-1.5 overflow-x-auto">
           {offered.map((slug) => {
