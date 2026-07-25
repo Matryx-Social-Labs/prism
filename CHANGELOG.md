@@ -46,7 +46,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
 ### Infrastructure
 - **The web app has tests for the first time** — vitest, jsdom and Testing
-  Library, wired into CI so every PR runs them. 37 tests cover the scroll
+  Library, wired into CI so every PR runs them. 39 tests cover the scroll
   restoration, sharing, navigation and header logic; each regression test is
   mutation-verified, meaning it was confirmed to fail when the bug it guards is
   put back.

@@ -39,3 +39,50 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
 ## Broader unit metrics (feed the cost cockpit, E3)
 - Track cost per acquired user, per active free user, per trial, per paid subscriber, and
   worst-case Ask abuse — not just cost per served event (P2).
+
+## Mobile web (deferred from /ship 2026-07-25, v0.0.70.0 — review findings not fixed in that branch)
+- **Feed thumbnails download full-resolution publisher images** (P1). `next.config.ts` sets
+  `images.unoptimized: true` (news CDNs block Vercel's optimizer via hotlink protection), and
+  the mobile redesign made `StoryRowCard` thumbs visible below 640px. Measured on the live
+  feed: natural width 1200px painted into a 64px box — roughly 350x the pixels needed, per
+  visible row, on the India-first mid-range-Android target. `loading="lazy"` bounds it to what
+  the reader actually scrolls past, so it is not catastrophic, but it is the largest payload
+  regression in the redesign. Fix needs a thumbnail proxy/resizer we control (the CDNs allow
+  browser requests but not datacenter ones), or per-CDN URL size params.
+  Files: `web/next.config.ts`, `web/src/components/StoryCard.tsx`.
+- **Scope chip claims to apply everywhere but doesn't** (P2). The bottom sheet says "Applies
+  everywhere — Feed, Trending, Pulse and Search", but scope is per-page local state: Feed and
+  Trending each hold their own, with different option sets, and Pulse/Search have no scope at
+  all. Set "Your state" on Feed, tap Trending, silently get National. Either lift scope into
+  shared state (profile/localStorage + a `useScope()` hook) or change the copy.
+  Files: `web/src/app/feed/page.tsx`, `web/src/app/trending/page.tsx`.
+- **Feed and Trending fire throwaway requests on every mount** (P2). `loadProfile()` is a
+  synchronous localStorage read but is called inside a mount effect, so the fetch effects run
+  once with `profile: null` and again with the profile — ~3 discarded round trips per feed
+  mount, and the module cache means Feed re-mounts on every return from a story. The race is
+  already handled with a `cancelled` flag; this is the wasted mobile data, not correctness.
+  Gate the fetches on a `profileLoaded` flag. Files: `web/src/app/feed/page.tsx`,
+  `web/src/app/trending/page.tsx`.
+- **OG share cards are off-brand and Latin-only** (P2). Both card routes use cool Tailwind
+  greys on pure white with Georgia + generic monospace, not the warm DESIGN.md palette or
+  Fraunces/IBM Plex Mono, and pass no `fonts` to `ImageResponse` — so a Hindi/Tamil/Telugu
+  headline renders as tofu boxes. This is the most-seen brand surface in the WhatsApp share
+  loop. Files: `web/src/app/story/[id]/opengraph-image.tsx`,
+  `web/src/app/trending/[slug]/opengraph-image.tsx`.
+- **Three stacked `backdrop-blur` layers on the scrolling feed** (P2). Sticky header + sticky
+  sector rail + bottom tab bar all composite a translucent blur every frame; stacked
+  backdrop-filter is a reliable source of scroll jank on mid-range Android GPUs. Drop the blur
+  from the secondary layers and use an opaque background. Verify with a throttled trace.
+  Files: `web/src/app/feed/page.tsx`, `web/src/components/BottomTabBar.tsx`.
+- **Frontend coverage is ~33%** (P2). vitest now covers the pure-logic surface (scroll
+  restore, sharing, tab bar, header). The page components — Feed, Trending, Story, You — are
+  untested; they need fetch/session/router mocking or, better, Playwright E2E for the
+  return-navigation and share flows. Files: `web/src/app/**`.
+- **Duplicated mobile UI logic** (P3). The scope bottom sheet is copy-pasted between Feed and
+  Trending and has already drifted; the lens pill is duplicated between the desktop strip and
+  the mobile rail (the mobile one dropped `role="tab"`/`aria-selected` and the locked-lens
+  tooltip); `SiteHeader.APP_ROUTES` and `BottomTabBar.SHOW_ON` are two route lists with the
+  same matcher written three times; `stateLabel` hardcodes seven Indian states while Feed
+  resolves names from `fetchRegions()`. Files: `web/src/app/feed/page.tsx`,
+  `web/src/app/trending/page.tsx`, `web/src/components/StoryView.tsx`,
+  `web/src/components/SiteHeader.tsx`, `web/src/components/BottomTabBar.tsx`.
