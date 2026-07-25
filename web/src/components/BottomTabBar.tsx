@@ -56,8 +56,11 @@ export function BottomTabBar() {
             key={t.href}
             href={t.href}
             aria-current={active ? "page" : undefined}
-            className="flex min-h-[44px] flex-col items-center justify-center gap-[3px] text-[10px]"
-            style={{ color: active ? "var(--ink)" : "var(--ink-faint)", fontWeight: active ? 600 : 500 }}
+            // --ink-faint at 10px measures 2.57:1 on light — under WCAG AA (4.5:1)
+            // for the app's primary navigation. --ink-muted is 5.28:1, and weight
+            // plus full-strength ink still carry the active state.
+            className="flex min-h-[44px] flex-col items-center justify-center gap-[3px] text-[11px]"
+            style={{ color: active ? "var(--ink)" : "var(--ink-muted)", fontWeight: active ? 600 : 500 }}
           >
             <span aria-hidden>{t.icon}</span>
             {t.label}

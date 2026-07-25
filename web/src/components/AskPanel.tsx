@@ -89,7 +89,7 @@ export function AskPanel({
   const thinking = busy && turns.length > 0 && turns[turns.length - 1].text === "";
 
   return (
-    <div className={docked ? "w-full" : "fixed bottom-[112px] right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)] lg:bottom-[18px]"}>
+    <div className={docked ? "w-full" : "fixed right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)] bottom-[calc(env(safe-area-inset-bottom)+124px)] lg:bottom-[18px]"}>
       {!open ? (
         launcher ? (
           <button
@@ -227,7 +227,7 @@ export function AskPanel({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit(input)}
               placeholder="Ask anything about this story…"
-              className="min-w-0 flex-1 rounded-full border px-4 py-[9px] text-[13px] outline-none"
+              className="min-w-0 flex-1 rounded-full border px-4 py-[9px] text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
               style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--ink)" }}
             />
             <button

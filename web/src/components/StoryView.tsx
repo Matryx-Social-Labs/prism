@@ -845,7 +845,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               <button
                 key={slug}
                 onClick={() => pickLens(slug)}
-                className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
+                className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
                 style={
                   selected
                     ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
@@ -874,7 +874,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           >
             <span className="spectrum-text text-[15px]" aria-hidden>◮</span>
             Ask
-            <span className="font-mono text-[10.5px] font-normal opacity-70">grounded in {sourceCount} source{sourceCount === 1 ? "" : "s"}</span>
+            <span className="whitespace-nowrap font-mono text-[10.5px] font-normal opacity-70">{sourceCount} sources</span>
           </button>
         </div>
       </div>

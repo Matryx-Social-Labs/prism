@@ -45,7 +45,7 @@ function SearchInner() {
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search stories, companies, tickers…"
         aria-label="Search stories"
-        className="mt-4 w-full rounded-[12px] border px-4 py-3 text-[15px] outline-none"
+        className="mt-4 w-full rounded-[12px] border px-4 py-3 text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
         style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
       />
 
