@@ -13,6 +13,10 @@ function SearchInner() {
   const [results, setResults] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  // Which term produced `results`. Without it, a new query inherits the
+  // previous query's results as "ready" and restores that key's offset
+  // before its own results exist.
+  const [resultsTerm, setResultsTerm] = useState("");
 
   useEffect(() => {
     const term = q.trim();
@@ -30,6 +34,7 @@ function SearchInner() {
         const items = await searchEvents(term);
         if (cancelled) return;
         setResults(items);
+        setResultsTerm(term);
         setSearched(true);
         router.replace(`/search?q=${encodeURIComponent(term)}`, { scroll: false });
       } catch {
@@ -50,7 +55,7 @@ function SearchInner() {
   // Keyed per query: with a route-wide key, the first results for a NEW search
   // would restore a previous search's offset and jump the page out from under
   // a reader who is still typing (the input autofocuses).
-  useScrollRestore(`search:${q.trim()}:scrollY`, results.length > 0);
+  useScrollRestore(`search:${q.trim()}:scrollY`, resultsTerm === q.trim() && results.length > 0);
 
   return (
     <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9">

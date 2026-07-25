@@ -45,6 +45,49 @@ describe("useScrollRestore — saving", () => {
     expect(sessionStorage.getItem(KEY)).toBe("640");
   });
 
+  // The `> 0` guard rejects the router's spurious zero, but an intentional
+  // scroll back to top is also zero. Ignoring it stranded the reader at a stale
+  // offset when they returned. Dwell tells them apart.
+  it("forgets the saved offset when the reader scrolls back to top and stays", async () => {
+    vi.useFakeTimers();
+    try {
+      renderHook(() => useScrollRestore(KEY, true));
+      scrollTo(640);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20);
+      });
+      expect(sessionStorage.getItem(KEY)).toBe("640");
+
+      scrollTo(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(sessionStorage.getItem(KEY)).toBeNull(); // "640" => stale offset survives
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the offset when the router yanks the list to top on nav away", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderHook(() => useScrollRestore(KEY, true));
+      scrollTo(640);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20);
+      });
+
+      scrollTo(0); // router resets the still-mounted list
+      unmount(); // ...and immediately tears it down — no dwell at 0
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(sessionStorage.getItem(KEY)).toBe("640");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not let a mid-restore clamped position overwrite the target", async () => {
     sessionStorage.setItem(KEY, "900");
     renderHook(() => useScrollRestore(KEY, true));

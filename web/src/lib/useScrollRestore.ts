@@ -26,6 +26,13 @@ function readY(key: string): number {
     return 0;
   }
 }
+function clearY(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* storage blocked */
+  }
+}
 function writeY(key: string, y: number) {
   try {
     sessionStorage.setItem(key, String(y));
@@ -46,16 +53,30 @@ export function useScrollRestore(key: string, ready: boolean) {
 
   useEffect(() => {
     let raf = 0;
+    let zeroTimer: ReturnType<typeof setTimeout> | undefined;
     const onScroll = () => {
       cancelAnimationFrame(raf);
+      clearTimeout(zeroTimer);
       raf = requestAnimationFrame(() => {
-        if (!restoring.current && window.scrollY > 0) writeY(key, window.scrollY);
+        if (restoring.current) return;
+        if (window.scrollY > 0) {
+          writeY(key, window.scrollY);
+          return;
+        }
+        // Two different zeros reach here: the reader deliberately scrolling back
+        // to top, and the router yanking the still-mounted list to top as they
+        // tap into a story. Persisting the second would clobber their place;
+        // ignoring the first strands them at a stale offset on return. Tell them
+        // apart by dwell — the router's zero is followed immediately by unmount,
+        // which clears this timer, while a real scroll-to-top stays at 0.
+        zeroTimer = setTimeout(() => clearY(key), 200);
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(raf);
+      clearTimeout(zeroTimer);
     };
   }, [key]);
 
