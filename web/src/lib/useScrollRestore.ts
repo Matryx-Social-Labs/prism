@@ -13,20 +13,40 @@ import { useEffect, useRef } from "react";
 // we never fight their input.
 const SETTLE_MS = 3000; // hard stop: nothing should still be growing after this
 const STOP_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+// Storage throws instead of returning null when it's blocked — in-app webviews
+// (the WhatsApp/Instagram browsers this app is shared into) do exactly that.
+// A throw inside an effect unwinds React and blanks the route, so never let one out.
+function readY(key: string): number {
+  try {
+    return Number(sessionStorage.getItem(key) || 0);
+  } catch {
+    return 0;
+  }
+}
+function writeY(key: string, y: number) {
+  try {
+    sessionStorage.setItem(key, String(y));
+  } catch {
+    /* storage blocked — scroll restore is a nicety, not worth a crash */
+  }
+}
 
 export function useScrollRestore(key: string, ready: boolean) {
   // While restoring, scrollTo may clamp to a still-short page; that intermediate
   // position must not overwrite the saved target.
   const restoring = useRef(false);
+  // Latest `ready`, readable from the effect cleanup (which closes over the OLD
+  // value). Refs update during render, before cleanup runs — so this tells the
+  // cleanup WHY it fired. See the re-arm note below.
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
 
   useEffect(() => {
     let raf = 0;
     const onScroll = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        if (!restoring.current && window.scrollY > 0) {
-          sessionStorage.setItem(key, String(window.scrollY));
-        }
+        if (!restoring.current && window.scrollY > 0) writeY(key, window.scrollY);
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -40,7 +60,7 @@ export function useScrollRestore(key: string, ready: boolean) {
   useEffect(() => {
     if (restored.current || !ready) return;
     restored.current = true;
-    const y = Number(sessionStorage.getItem(key) || 0);
+    const y = readY(key);
     if (y <= 0) return;
 
     restoring.current = true;
@@ -70,9 +90,12 @@ export function useScrollRestore(key: string, ready: boolean) {
     return () => {
       teardown();
       // Torn down before the restore settled — StrictMode's double-mount does
-      // exactly this. Re-arm so the remount restores instead of silently
-      // leaving the reader wherever the first, pre-image-load scrollTo landed.
-      if (!settled) restored.current = false;
+      // exactly this, so re-arm and let the remount finish the restore.
+      // But `ready` ALSO flips true->false when the reader changes a filter
+      // (trending/sector re-fetch), and re-arming there would yank the new,
+      // differently-sized list back to the old list's offset. readyRef tells
+      // the two apart: still true => remount/unmount, false => the list changed.
+      if (!settled && readyRef.current) restored.current = false;
     };
   }, [key, ready]);
 }

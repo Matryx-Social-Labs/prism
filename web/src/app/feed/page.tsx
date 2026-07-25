@@ -32,7 +32,6 @@ type FeedCache = {
   digest: MarketDigest | null;
   trending: TrendingStory[];
   scope: Scope;
-  scrollY: number;
 };
 let feedCache: FeedCache | null = null;
 
@@ -100,18 +99,28 @@ export default function FeedPage() {
       state: profile?.state,
       languages: profile?.languages,
     };
+    // Profile loads after the first render, so two fetches are in flight on mount.
+    // Without this flag a slow un-personalized response can land last and overwrite
+    // the personalized one — national stories under a "Your state" chip.
+    let cancelled = false;
     Promise.all([fetchFeed({ ...query, sort: "latest" }), fetchFeed({ ...query, sort: "top" })])
       .then(([list, ranked]) => {
+        if (cancelled) return;
         setItems(list);
         setTop(ranked.slice(0, 3));
       })
-      .catch(() => setError("The Prism API is unreachable right now. Refresh in a moment."));
+      .catch(() => {
+        if (!cancelled) setError("The Prism API is unreachable right now. Refresh in a moment.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [lens, profile]);
 
   // Mirror the feed DATA into the module cache so a return navigation renders
   // instantly (no skeleton). Scroll lives in sessionStorage (survives everything).
   useEffect(() => {
-    feedCache = { items, top, digest, trending, scope, scrollY: 0 };
+    feedCache = { items, top, digest, trending, scope };
   }, [items, top, digest, trending, scope]);
 
   // Restore scroll on return from a story (data comes from the module cache above).

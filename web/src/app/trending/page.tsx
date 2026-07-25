@@ -34,9 +34,19 @@ export default function TrendingPage() {
 
   useEffect(() => {
     setStories(null);
+    // Mount fires world-scope then region-scope once the profile loads; if the
+    // first lands last the list disagrees with the scope chip above it.
+    let cancelled = false;
     fetchTrending({ state: scope === "region" ? state : null, sector, limit: 24 })
-      .then(setStories)
-      .catch(() => setStories([]));
+      .then((s) => {
+        if (!cancelled) setStories(s);
+      })
+      .catch(() => {
+        if (!cancelled) setStories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [scope, state, sector]);
 
   useScrollRestore("trending:scrollY", stories !== null);

@@ -28,8 +28,13 @@ export function ShareButton({ url, title, fill }: { url: string; title: string; 
         /* anything else — fall through to copy */
       }
     }
+    // Check clipboard exists before claiming success: `nav?.clipboard?.writeText()`
+    // short-circuits to undefined when the API is absent (it's secure-context-only
+    // too), and `await undefined` resolves happily — so the old code flashed
+    // "Link copied" on http origins having copied nothing at all.
+    if (!nav?.clipboard) return;
     try {
-      await nav?.clipboard?.writeText(absolute);
+      await nav.clipboard.writeText(absolute);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
