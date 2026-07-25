@@ -1,4 +1,8 @@
-# Design System — Prism
+# Design System — Parse
+
+> Renamed from **Prism** on 2026-07-25 (v0.0.71.0). The design system did not
+> change; only the name and the mark did. Historical entries below still describe
+> decisions made under the old name.
 
 Created by `/design-consultation` (2026-07-19): live competitive research (Ground News,
 Semafor, Particle, Inshorts captured in-browser), an independent contrarian design voice,
@@ -117,13 +121,13 @@ density, which DESIGN.md already calls "homework"); ft.com blocked the capture.
 | 2026-07-19 | Memorable thing = the lens flip | Founder choice (D2) |
 | 2026-07-19 | Keep light+dark, keep lens hues, keep WebGL prism hero | Founder's prior explicit calls; contrarian "Night Desk" dark-only direction declined |
 | 2026-07-19 | Space Grotesk → General Sans; add IBM Plex Mono provenance layer | Anti-convergence + both design voices agreed |
-| 2026-07-23 | Feed v3: remove feed lens pills; scope selector (All / <state> / National) + language chip replace them; Trending joins the nav | Lens is a per-story flip, not a feed filter; quieter chrome at rest (Prism UI Design.dc.html, frame 3a) |
-| 2026-07-23 | No global lens switcher in the header chrome | Founder call (B): lens is set in "Your Prism" and flipped per-story; deliberate departure from design v3, which kept a header lens chip |
+| 2026-07-23 | Feed v3: remove feed lens pills; scope selector (All / <state> / National) + language chip replace them; Trending joins the nav | Lens is a per-story flip, not a feed filter; quieter chrome at rest (Parse UI Design.dc.html, frame 3a) |
+| 2026-07-23 | No global lens switcher in the header chrome | Founder call (B): lens is set in "Your Parse" and flipped per-story; deliberate departure from design v3, which kept a header lens chip |
 | 2026-07-23 | Content shells unified to 1240px (header/footer 1280px) | Column left-edges line up across landing/feed/sector/story |
-| 2026-07-25 | App surfaces rebuilt mobile-first: bottom tab bar (Feed · Trending · Pulse · Search · You) is the nav spine on phones; global brand header hidden on app routes; footer hidden behind the tab bar | A phone reader was getting a shrunk desktop site with two stacked headers (Prism Mobile.dc.html) |
+| 2026-07-25 | App surfaces rebuilt mobile-first: bottom tab bar (Feed · Trending · Pulse · Search · You) is the nav spine on phones; global brand header hidden on app routes; footer hidden behind the tab bar | A phone reader was getting a shrunk desktop site with two stacked headers (Parse Mobile.dc.html) |
 | 2026-07-25 | On Story, the lens rail + Share/Ask pin to the thumb zone instead of a desktop sidebar | The flip is the memorable thing — it has to be reachable one-handed, and the flip must scroll the brief into view to stay visible |
 | 2026-07-25 | Desktop width rule: extra width buys simultaneity (ambient evidence), not longer lines | Reading measure is already correct; the phone's drill-down evidence layer becomes visible-at-once on desktop (research: Ground News ambience minus its density) |
-| 2026-07-25 | Feed is a ruled editorial river, never a card grid | Prism sells canonical understanding, not abundance — a grid optimizes browsing volume, which is the wrong promise (Codex design voice, agreed) |
+| 2026-07-25 | Feed is a ruled editorial river, never a card grid | Parse sells canonical understanding, not abundance — a grid optimizes browsing volume, which is the wrong promise (Codex design voice, agreed) |
 | 2026-07-25 | Desktop lens control lives on the lens brief's top edge, sticky only while the brief is in view — never in the header or rail | With no thumb zone the flip needs proximity, not size; putting the lens in global chrome turns a comprehension event into settings |
 | 2026-07-25 | Storyline Map (branch tree): monochrome, status by line style not color, clicking a branch re-typesets a branch brief in place rather than navigating | Branches are partitions of ONE canonical story — navigating away would break that; color stays reserved for lenses |
 | 2026-07-25 | Desktop direction "The Stone": 104px mono ledger rail outside the 1240 field; provenance evicted from prose into the margin, baseline-aligned | Gives IBM Plex Mono a job worthy of a third family, and stops AI-written prose being interrupted by chips. One place on screen means "is this true?" |
@@ -134,3 +138,5 @@ density, which DESIGN.md already calls "homework"); ft.com blocked the capture.
 ## Preview artifact
 `~/.gstack/projects/Matryx-Social-Labs-prism/designs/design-system-20260719/prism-design-preview.html`
 (interactive flip demo; open in any browser)
+| 2026-07-25 | Renamed Prism → Parse; prism triangle → the bracketed record | "Prism" collides with the NSA surveillance programme (unwinnable for a transparency product, and an SEO ceiling) and was squatted across every TLD. "Parse" names the method — break the record into structure, issue no verdict. The mark is a citation bracket holding three rules: one record, three readings, the last shorter because the story is open |
+| 2026-07-25 | Desktop lens flip binds to keys 1/2/3 | No thumb zone on desktop; the flip needs repeatability, not proximity. A key press does NOT scroll — the brief is already in view and moving the page would contradict "layout never moves" |

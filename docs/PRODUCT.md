@@ -1,4 +1,4 @@
-# Prism — Product placement
+# Parse — Product placement
 
 *One story. Every perspective.* Role-aware AI news intelligence for everyone.
 
@@ -9,7 +9,7 @@ outlet tells its side; most readers only ever see the coverage of one country's 
 **relevance** (a war is a humanitarian story, a cyber-risk window, and a market catalyst at once —
 but every publication picks one framing and discards the rest).
 
-## What Prism is
+## What Parse is
 
 A pipeline that clusters worldwide coverage into **canonical events**, then serves each event
 through **professional lenses**:
@@ -29,7 +29,7 @@ through **professional lenses**:
 ## Breaking one-sided coverage (the mission)
 
 Global news framing is dominated by a handful of media systems; the other side of a story often
-never reaches the reader. Prism measures balance on an **origin-country axis** — not the US
+never reaches the reader. Parse measures balance on an **origin-country axis** — not the US
 left/right axis Ground News uses:
 
 - Sources span origins deliberately: IN (7 outlets), GB, QA, DE, FR, TR, HK, PK, RU, CN, IR + GDELT.

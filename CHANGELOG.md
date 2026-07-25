@@ -3,6 +3,42 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.71.0] - 2026-07-25
+
+### Changed
+- **The product is now called Parse.** "Prism" collided with the NSA's PRISM
+  surveillance programme — an unwinnable association for a product whose whole
+  pitch is transparency — and was squatted across every TLD. The new mark is a
+  citation bracket holding three rules: one record, read three ways, the last
+  line shorter because the story is still open. It replaces the prism triangle,
+  which was the one place a gradient was allowed to sit permanently; the 3px
+  spectrum bar is now the only coloured brand object.
+
+### Fixed
+- **Desktop was serving the phone layout.** Feed and Trending pinned a 620px
+  column with no breakpoint, so on a 1440px screen readers got a narrow strip
+  with 410px of dead space on each side, under two stacked brand headers. Both
+  now use the full width, with provenance moved into a mono ledger rail in the
+  left margin so the prose runs clean.
+- **Search opened as a blank screen.** It now starts with trending entities
+  pulled from live coverage, example queries, and the query itself set in the
+  display face.
+
+### Added
+- **Flip lenses from the keyboard on desktop.** Press 1, 2 or 3. The phone has a
+  thumb rail for this; a desktop reader had nothing, and the flip is the thing
+  worth showing someone.
+- **The landing page states the record up front** — a dateline carrying real
+  source, story and origin counts, the way a newspaper masthead does.
+- On phones the landing now shows the lens demo *before* asking you to sign up.
+- **The story-branch structure is now served by the API.** Storylines have been
+  splitting into branches and satellites since the partitioner shipped, and the
+  shape was computed every run but never read by anything. `/trending/{slug}`
+  now returns it, counted rather than summarised: developments, forks,
+  satellites, depth. One real storyline reports 29 developments across 20 forks
+  with 3 loosely-attached satellites — structure a flat list cannot show. The UI
+  for it lands next.
+
 ## [0.0.70.0] - 2026-07-25
 
 ### Added
