@@ -90,6 +90,19 @@ flip is the only colorful event on the page — that is what makes it the memora
 - **Duration:** micro 50–100ms, short 150–250ms, medium 250–400ms, flip 500ms.
 - **Reduced motion:** every animation (including the flip) collapses to an instant swap.
 
+## Desktop — the width rule (2026-07-25)
+**Extra width goes to simultaneity, never to longer lines.** The reading measure is
+already right at ~620–680px for 15.5px text; widening it makes the product worse. On
+a phone the evidence layer (outlet count, origins, single-origin flag, what else is
+moving) is a drill-down behind a tap. On desktop it becomes **ambient** — visible
+beside the story without a click. Every desktop app screen is therefore a
+proven-measure reading river flanked by context that was previously buried. Rails
+carry evidence and orientation, never decoration.
+
+Research behind it: semafor.com (3-zone masthead on full-bleed ivory — the calm to
+match), ground.news (evidence inline on every row — take the ambience, reject the
+density, which DESIGN.md already calls "homework"); ft.com blocked the capture.
+
 ## Named Risks (deliberate departures)
 1. **Color-is-a-lens discipline** — quieter feed at rest; the flip becomes the only
    colorful event. Non-lens colored chips get re-inked.
@@ -109,6 +122,10 @@ flip is the only colorful event on the page — that is what makes it the memora
 | 2026-07-23 | Content shells unified to 1240px (header/footer 1280px) | Column left-edges line up across landing/feed/sector/story |
 | 2026-07-25 | App surfaces rebuilt mobile-first: bottom tab bar (Feed · Trending · Pulse · Search · You) is the nav spine on phones; global brand header hidden on app routes; footer hidden behind the tab bar | A phone reader was getting a shrunk desktop site with two stacked headers (Prism Mobile.dc.html) |
 | 2026-07-25 | On Story, the lens rail + Share/Ask pin to the thumb zone instead of a desktop sidebar | The flip is the memorable thing — it has to be reachable one-handed, and the flip must scroll the brief into view to stay visible |
+| 2026-07-25 | Desktop width rule: extra width buys simultaneity (ambient evidence), not longer lines | Reading measure is already correct; the phone's drill-down evidence layer becomes visible-at-once on desktop (research: Ground News ambience minus its density) |
+| 2026-07-25 | Feed is a ruled editorial river, never a card grid | Prism sells canonical understanding, not abundance — a grid optimizes browsing volume, which is the wrong promise (Codex design voice, agreed) |
+| 2026-07-25 | Desktop lens control lives on the lens brief's top edge, sticky only while the brief is in view — never in the header or rail | With no thumb zone the flip needs proximity, not size; putting the lens in global chrome turns a comprehension event into settings |
+| 2026-07-25 | Storyline Map (branch tree): monochrome, status by line style not color, clicking a branch re-typesets a branch brief in place rather than navigating | Branches are partitions of ONE canonical story — navigating away would break that; color stays reserved for lenses |
 
 ## Preview artifact
 `~/.gstack/projects/Matryx-Social-Labs-prism/designs/design-system-20260719/prism-design-preview.html`
