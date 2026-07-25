@@ -175,6 +175,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Lightweight scroll-spy so the rail nav + mobile chips highlight the section
   // in view. Anchors still jump on click; this only drives the active border.
   const [activeSection, setActiveSection] = useState("lens-brief");
+  const [askOpen, setAskOpen] = useState(false);
   useEffect(() => {
     const els = navItems
       .map((n) => document.getElementById(n.id))
@@ -853,12 +854,32 @@ export function StoryView({ event }: { event: EventDetail }) {
             );
           })}
         </div>
-        <ShareButton url={`/story/${event.id}`} title={event.title} fill />
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <ShareButton url={`/story/${event.id}`} title={event.title} fill />
+          </div>
+          <button
+            onClick={() => setAskOpen(true)}
+            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-xl text-[13.5px] font-semibold"
+            style={{ background: "var(--ink)", color: "var(--bg)" }}
+          >
+            <span className="spectrum-text text-[15px]" aria-hidden>◮</span>
+            Ask
+            <span className="font-mono text-[10.5px] font-normal opacity-70">grounded in {sourceCount} source{sourceCount === 1 ? "" : "s"}</span>
+          </button>
+        </div>
       </div>
 
-      {/* ── Ask — floating pill (mobile), sits above the pinned bar ── */}
+      {/* ── Ask chat — floats above the pinned lens rail when opened ── */}
       <div className="lg:hidden">
-        <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} />
+        <AskPanel
+          eventId={event.id}
+          sourceCount={sourceCount}
+          suggestedQuestions={questions}
+          open={askOpen}
+          onOpenChange={setAskOpen}
+          launcher={false}
+        />
       </div>
     </div>
   );

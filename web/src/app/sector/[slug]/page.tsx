@@ -7,6 +7,7 @@ import { useTaxonomy } from "@/components/ProfileEditor";
 import { fetchFeed, type FeedItem } from "@/lib/api";
 import { useLenses } from "@/lib/lenses";
 import { loadProfile } from "@/lib/profile";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 
 export default function SectorPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -24,6 +25,8 @@ export default function SectorPage({ params }: { params: Promise<{ slug: string 
       .then(setItems)
       .catch(() => setError("The Prism API is unreachable right now. Refresh in a moment."));
   }, [slug]);
+
+  useScrollRestore(`sector:${slug}:scrollY`, items !== null);
 
   const sec = taxonomy.find((s) => s.slug === slug);
   const title = sec?.name ?? slug.replaceAll("_", " ");

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { StoryRowCard } from "@/components/StoryCard";
 import { searchEvents, type FeedItem } from "@/lib/api";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 
 function SearchInner() {
   const params = useSearchParams();
@@ -30,6 +31,8 @@ function SearchInner() {
     }, 250);
     return () => clearTimeout(t);
   }, [q, router]);
+
+  useScrollRestore("search:scrollY", results.length > 0);
 
   return (
     <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9">

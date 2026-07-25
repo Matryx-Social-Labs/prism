@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 
 type Scope = "region" | "world";
 const SECTORS = [
@@ -37,6 +38,8 @@ export default function TrendingPage() {
       .then(setStories)
       .catch(() => setStories([]));
   }, [scope, state, sector]);
+
+  useScrollRestore("trending:scrollY", stories !== null);
 
   const scopeLabel = scope === "region" ? stateLabel(state) ?? "Your state" : "National";
   const scopeOpts: [Scope, string][] = useMemo(

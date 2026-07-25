@@ -24,6 +24,9 @@ export function AskPanel({
   sourceCount,
   suggestedQuestions,
   docked = false,
+  open: openProp,
+  onOpenChange,
+  launcher = true,
 }: {
   eventId: string;
   sourceCount: number;
@@ -31,8 +34,15 @@ export function AskPanel({
   // docked: render inline (in the story rail) instead of a floating pill — no
   // fixed positioning, always open, and the rail card supplies the header.
   docked?: boolean;
+  // Controlled open + no built-in launcher: the story's pinned thumb-zone Ask
+  // button opens it; the chat still floats above the lens rail as before.
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  launcher?: boolean;
 }) {
-  const [open, setOpen] = useState(docked);
+  const [openState, setOpenState] = useState(docked);
+  const open = openProp !== undefined ? openProp : openState;
+  const setOpen = (v: boolean) => (onOpenChange ? onOpenChange(v) : setOpenState(v));
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,21 +91,23 @@ export function AskPanel({
   return (
     <div className={docked ? "w-full" : "fixed bottom-[112px] right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)] lg:bottom-[18px]"}>
       {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="float-right flex items-center gap-2 rounded-full border px-5 py-3 text-[13.5px] font-semibold transition hover:opacity-90"
-          style={{
-            borderColor: "var(--line-strong)",
-            background: "var(--ink)",
-            color: "var(--bg)",
-            boxShadow: "var(--shadow-pop)",
-          }}
-        >
-          <span className="spectrum-text text-[15px]" aria-hidden>
-            ◮
-          </span>
-          Ask this story
-        </button>
+        launcher ? (
+          <button
+            onClick={() => setOpen(true)}
+            className="float-right flex items-center gap-2 rounded-full border px-5 py-3 text-[13.5px] font-semibold transition hover:opacity-90"
+            style={{
+              borderColor: "var(--line-strong)",
+              background: "var(--ink)",
+              color: "var(--bg)",
+              boxShadow: "var(--shadow-pop)",
+            }}
+          >
+            <span className="spectrum-text text-[15px]" aria-hidden>
+              ◮
+            </span>
+            Ask this story
+          </button>
+        ) : null
       ) : (
         <div
           className={`flex flex-col overflow-hidden ${docked ? "" : "rounded-[20px] border"}`}

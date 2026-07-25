@@ -17,6 +17,7 @@ import {
 import { langNative } from "@/lib/languages";
 import { lensMeta } from "@/lib/lenses";
 import { loadProfile, type Profile } from "@/lib/profile";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useSession } from "@/lib/session";
 import { watchlistEvents, type WatchEvent } from "@/lib/watchlist";
 
@@ -113,42 +114,8 @@ export default function FeedPage() {
     feedCache = { items, top, digest, trending, scope, scrollY: 0 };
   }, [items, top, digest, trending, scope]);
 
-  // Persist scroll position as the reader scrolls.
-  useEffect(() => {
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        // Never persist 0: navigating to a story scrolls the still-mounted feed to
-        // top, and that spurious 0 would clobber the reader's real position.
-        if (window.scrollY > 0) sessionStorage.setItem("feed:scrollY", String(window.scrollY));
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
-
-  // Restore the saved position ONCE the feed content is present (cache or fetch).
-  // Re-assert for a short window: it beats the router's post-navigation scroll
-  // reset AND survives content still growing (scrollTo caps until the page is tall).
-  const restoredScroll = useRef(false);
-  useEffect(() => {
-    if (restoredScroll.current || items === null) return;
-    restoredScroll.current = true;
-    const y = Number(sessionStorage.getItem("feed:scrollY") || 0);
-    if (y <= 0) return;
-    const start = performance.now();
-    const tick = () => {
-      window.scrollTo(0, y);
-      if (performance.now() - start < 300 && Math.abs(window.scrollY - y) > 2) {
-        requestAnimationFrame(tick);
-      }
-    };
-    requestAnimationFrame(tick);
-  }, [items]);
+  // Restore scroll on return from a story (data comes from the module cache above).
+  useScrollRestore("feed:scrollY", items !== null);
 
   const visible = useMemo(() => {
     if (!items || scope === "all" || !profile?.state) return items;
