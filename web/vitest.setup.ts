@@ -18,20 +18,29 @@ class MockResizeObserver implements ResizeObserver {
     this.entry.disconnected = true;
   }
 }
-vi.stubGlobal("ResizeObserver", MockResizeObserver);
+// Plain assignment, not vi.stubGlobal: the afterEach below calls
+// vi.unstubAllGlobals(), which would rip these setup-level fakes out too.
+(globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = MockResizeObserver;
 
 // jsdom's scrollTo is a no-op that warns; make it actually move scrollY so the
 // hook's "did the position stick?" check exercises real logic.
-vi.stubGlobal("scrollTo", (x: number | ScrollToOptions, y?: number) => {
+(globalThis as unknown as { scrollTo: unknown }).scrollTo = (
+  x: number | ScrollToOptions,
+  y?: number
+) => {
   const top = typeof x === "number" ? y ?? 0 : x?.top ?? 0;
   Object.defineProperty(window, "scrollY", { value: top, writable: true, configurable: true });
   window.dispatchEvent(new Event("scroll"));
-});
+};
 
 afterEach(() => {
   cleanup();
   resizeObservers.length = 0;
   Object.defineProperty(window, "scrollY", { value: 0, writable: true, configurable: true });
-  sessionStorage.clear();
   vi.restoreAllMocks();
+  // restoreAllMocks does NOT undo vi.stubGlobal. Without this, a test that stubs
+  // a throwing sessionStorage leaks it into every test that runs after it — the
+  // suite then passes or fails on file ordering.
+  vi.unstubAllGlobals();
+  sessionStorage.clear();
 });

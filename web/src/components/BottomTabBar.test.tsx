@@ -48,6 +48,27 @@ describe("BottomTabBar — active tab", () => {
     expect(screen.getByRole("link", { name: /trending/i })).toHaveAttribute("aria-current", "page");
   });
 
+  // Asserting only the positive case lets an over-matching isActive ship green
+  // (`() => true` lights every tab and still passes). Pin the count and a sibling.
+  it("marks exactly one tab, and leaves the others alone", () => {
+    at("/trending");
+    render(<BottomTabBar />);
+    const current = screen
+      .getAllByRole("link")
+      .filter((l) => l.getAttribute("aria-current") === "page");
+    expect(current).toHaveLength(1);
+    expect(screen.getByRole("link", { name: /feed/i })).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks no tab on a route that belongs to none of them", () => {
+    at("/sector/markets");
+    render(<BottomTabBar />);
+    const current = screen
+      .getAllByRole("link")
+      .filter((l) => l.getAttribute("aria-current") === "page");
+    expect(current).toHaveLength(0);
+  });
+
   it("keeps You active across the routes that fold into it", () => {
     for (const path of ["/you", "/account", "/interests", "/watchlist"]) {
       at(path);

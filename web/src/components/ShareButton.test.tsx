@@ -62,6 +62,18 @@ describe("ShareButton", () => {
     expect(await screen.findByText(/link copied/i)).toBeInTheDocument();
   });
 
+  it("does not claim success when the clipboard write is denied", async () => {
+    // Denied writes are routine: no document focus, permission refused, in-app
+    // webviews. Reporting success there is the same lie as the bug below.
+    const writeText = vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+    stubNavigator({ clipboard: { writeText } });
+    render(<ShareButton {...STORY} />);
+    await clickShare();
+
+    expect(writeText).toHaveBeenCalledOnce();
+    expect(screen.queryByText(/link copied/i)).not.toBeInTheDocument();
+  });
+
   // REGRESSION: `nav?.clipboard?.writeText()` short-circuits to undefined when
   // the API is absent, and `await undefined` resolves — so the old code reported
   // success having copied nothing. Both APIs are secure-context-only, so this is

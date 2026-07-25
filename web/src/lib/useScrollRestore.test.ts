@@ -32,11 +32,16 @@ describe("useScrollRestore — saving", () => {
   });
 
   it("never persists 0 — the router scrolls the still-mounted list to top on nav away", async () => {
-    sessionStorage.setItem(KEY, "640");
+    // Nothing saved, so the restore never arms and `restoring` stays false —
+    // otherwise the restore guard blocks the write and this passes without ever
+    // exercising the `> 0` check it claims to cover.
     renderHook(() => useScrollRestore(KEY, true));
-    scrollTo(0);
+    scrollTo(640);
     await flushSave();
-    // A spurious 0 must not clobber the real position.
+    expect(sessionStorage.getItem(KEY)).toBe("640");
+
+    scrollTo(0); // tapping into a story yanks the still-mounted list to top
+    await flushSave();
     expect(sessionStorage.getItem(KEY)).toBe("640");
   });
 
@@ -90,9 +95,21 @@ describe("useScrollRestore — restoring", () => {
     expect(window.scrollY).toBe(300);
   });
 
-  it("skips restore when nothing was saved", () => {
+  // teardown() clears `restoring`. Without that, the flag stays true forever
+  // after the first restore, the save guard drops every later scroll, and the
+  // NEXT return-nav restores a stale offset — the exact failure this hook exists
+  // to prevent.
+  it("resumes saving once the reader takes over", async () => {
+    sessionStorage.setItem(KEY, "1200");
     renderHook(() => useScrollRestore(KEY, true));
-    expect(window.scrollY).toBe(0);
+    expect(window.scrollY).toBe(1200);
+
+    act(() => {
+      window.dispatchEvent(new Event("touchstart"));
+    });
+    scrollTo(300);
+    await flushSave();
+    expect(sessionStorage.getItem(KEY)).toBe("300");
   });
 });
 
@@ -114,6 +131,29 @@ describe("useScrollRestore — regressions", () => {
     rerender({ ready: true }); // filtered results arrive
 
     expect(window.scrollY).toBe(0); // 700 here means the stale-offset bug is back
+  });
+
+  // The other half of the same branch: StrictMode's dev double-mount tears the
+  // restore down before it settles, and the re-arm is what lets the remount
+  // finish it. Without this, scroll restore could be dead in dev unnoticed.
+  it("still restores through StrictMode's double-mount", () => {
+    sessionStorage.setItem(KEY, "700");
+    function Feed() {
+      useScrollRestore(KEY, true);
+      return React.createElement("main", null, "story list");
+    }
+    render(React.createElement(Feed), { reactStrictMode: true });
+    expect(window.scrollY).toBe(700);
+
+    // Asserting the position alone proves nothing: the FIRST mount already set
+    // it. What the re-arm actually buys is a live observer on the second mount,
+    // so late-loading images still get corrected. Drift the position and grow
+    // the document — only a connected observer pulls it back.
+    act(() => {
+      Object.defineProperty(window, "scrollY", { value: 250, writable: true, configurable: true });
+    });
+    growDocument();
+    expect(window.scrollY).toBe(700);
   });
 
   // Blocked storage throws instead of returning null (in-app webviews — the
