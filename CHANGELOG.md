@@ -3,6 +3,54 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.70.0] - 2026-07-25
+
+### Added
+- **Prism on a phone is now a real app, not a shrunk desktop site.** Feed, Story,
+  Trending and a new You hub were rebuilt mobile-first, with a bottom tab bar
+  (Feed · Trending · Pulse · Search · You) as the navigation spine and a unified
+  scope chip that opens a bottom sheet. Reading a story now puts the lens rail
+  and Share/Ask in the thumb zone where you can reach them one-handed, and the
+  coverage bar — how many outlets, how many origins, whether it's single-origin —
+  is promoted onto the phone instead of hiding in a desktop sidebar.
+- **You keep your place.** Returning from a story lands you exactly where you
+  were on Feed, Trending, Search and Sector, with the list still populated
+  instead of reloading from the top.
+- **Every shared story now previews with an image.** Stories without a publisher
+  photo — well over half of them — used to land in WhatsApp as a bare text link;
+  they now get a generated card carrying the headline, sector and source count.
+
+### Changed
+- **Lens copy reads in plain language.** The sign-in prompt said "The
+  Cybersecurity / GRC read of this story", which means nothing to anyone outside
+  that profession. Lenses now describe what they tell you — "who's exposed by
+  this, and what to fix first" — while pickers keep the role names.
+- Sharing sends the headline rather than a naked link, and dismissing the share
+  sheet no longer copies the link behind your back.
+
+### Fixed
+- **Tap targets, contrast and iOS zoom on the phone.** Lens pills were under the
+  44px minimum, bottom-tab labels failed WCAG AA contrast, and both text inputs
+  were small enough that iOS zoomed the page on focus and left it zoomed. The Ask
+  chat also sat behind the pinned rail on notched iPhones.
+- Tapping a lens scrolls the brief into view, so the re-typeset flip happens
+  where you can see it instead of reading as a dead button.
+- Two Trending filters could never return a story: Markets queried a subsector
+  the API doesn't filter on, and Cyber is excluded from trending entirely.
+- The phone no longer shows two stacked headers, a footer buried behind the tab
+  bar, or a story timestamp that flickered on load.
+- Hardened story pages: a headline containing markup can no longer break out of
+  the structured-data block, and event ids are escaped in API paths.
+- `/you` is excluded from search-engine indexing, alongside the account pages it
+  replaces.
+
+### Infrastructure
+- **The web app has tests for the first time** — vitest, jsdom and Testing
+  Library, wired into CI so every PR runs them. 37 tests cover the scroll
+  restoration, sharing, navigation and header logic; each regression test is
+  mutation-verified, meaning it was confirmed to fail when the bug it guards is
+  put back.
+
 ## [0.0.69.0] - 2026-07-25
 
 ### Changed
