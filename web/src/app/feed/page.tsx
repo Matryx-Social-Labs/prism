@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { PrismMark } from "@/components/PrismMark";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
 import { useTaxonomy } from "@/components/ProfileEditor";
 import {
@@ -142,9 +143,12 @@ export default function FeedPage() {
         className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md"
         style={{ borderColor: "var(--line)", background: "var(--glass)" }}
       >
-        <h1 className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-          For you
-        </h1>
+        <Link href="/" className="flex items-center gap-2" style={{ color: "var(--ink)" }}>
+          <PrismMark />
+          <span className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+            Prism
+          </span>
+        </Link>
         <button
           onClick={() => setScopeOpen(true)}
           className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"

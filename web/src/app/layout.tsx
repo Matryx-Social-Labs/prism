@@ -3,8 +3,7 @@ import Link from "next/link";
 import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { BottomTabBar } from "@/components/BottomTabBar";
-import { HeaderNav } from "@/components/HeaderNav";
-import { PrismMark } from "@/components/PrismMark";
+import { SiteHeader } from "@/components/SiteHeader";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -67,24 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${display.variable} ${ui.variable} ${mono.variable} flex min-h-screen flex-col antialiased`}
         style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
       >
-        <div className="spectrum-bar h-[3px] w-full" aria-hidden />
-        <header
-          className="sticky top-0 z-40 border-b backdrop-blur-md"
-          style={{ borderColor: "var(--line)", background: "var(--glass)" }}
-        >
-          <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 px-5 py-[11px] sm:px-8 xl:px-10">
-            <Link href="/" className="flex items-center gap-2.5" style={{ color: "var(--ink)" }}>
-              <PrismMark />
-              <span
-                className="text-xl font-semibold tracking-tight"
-                style={{ fontFamily: "var(--font-display), serif" }}
-              >
-                Prism
-              </span>
-            </Link>
-            <HeaderNav />
-          </div>
-        </header>
+        <SiteHeader />
         <main className="w-full flex-1">{children}</main>
         <BottomTabBar />
         {/* Footer is desktop-only — on mobile the bottom tab bar is the chrome,
