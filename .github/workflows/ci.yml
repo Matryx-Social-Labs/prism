@@ -165,14 +165,20 @@ jobs:
       - name: Inject public build env
         # The Vercel team forces env vars to "Sensitive", and sensitive
         # values pull as EMPTY strings outside Vercel's own builders — so a
-        # prebuilt CI deploy would bake "" into the client bundle. This var
-        # is public by definition (NEXT_PUBLIC_* ships in the JS), so pin it
+        # prebuilt CI deploy would bake "" into the client bundle. These vars
+        # are public by definition (NEXT_PUBLIC_* ships in the JS), so pin them
         # here deterministically instead.
+        #
+        # SITE_URL matters as much as the API URL: it is the base for og:url,
+        # canonical and the sitemap. Unset, lib/site.ts falls back to VERCEL_URL
+        # (the per-DEPLOYMENT host, which changes every push, so shared links rot)
+        # and then to localhost — which is what the sitemap was actually serving.
         run: |
           for f in .vercel/.env.production.local web/.vercel/.env.production.local; do
             [ -f "$f" ] || continue
-            grep -v '^NEXT_PUBLIC_API_URL=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            grep -vE '^(NEXT_PUBLIC_API_URL|NEXT_PUBLIC_SITE_URL)=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
             echo 'NEXT_PUBLIC_API_URL="https://prism-production-6747.up.railway.app"' >> "$f"
+            echo 'NEXT_PUBLIC_SITE_URL="https://prism-ivory-two.vercel.app"' >> "$f"
             echo "patched $f"
           done
 
