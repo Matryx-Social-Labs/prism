@@ -48,39 +48,68 @@ export function AskPanel({
   const [busy, setBusy] = useState(false);
   const sessionRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // `busy` state is read from a render closure, so two taps in the same React
+  // batch both see false. A ref latches synchronously.
+  const busyRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns]);
 
+  // Stop the stream when the panel unmounts — otherwise it keeps consuming the
+  // response and setting state on a dead component.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   async function submit(question: string) {
     const q = question.trim();
-    if (!q || busy) return;
+    if (!q || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setInput("");
     setOpen(true);
-    setTurns((prev) => [
-      ...prev,
-      { role: "u", text: q, citations: [], streaming: false },
-      { role: "a", text: "", citations: [], streaming: true },
-    ]);
+
+    // Capture THIS answer's index at submit time. Targeting `prev.length - 1`
+    // meant a second question's turn could receive the first's tokens, and its
+    // citations would then be overwritten — attributing one answer's text to
+    // another's sources, in a product whose whole claim is grounded citations.
+    let answerIndex = -1;
+    setTurns((prev) => {
+      answerIndex = prev.length + 1;
+      return [
+        ...prev,
+        { role: "u", text: q, citations: [], streaming: false },
+        { role: "a", text: "", citations: [], streaming: true },
+      ];
+    });
 
     const update = (fn: (t: Turn) => Turn) =>
-      setTurns((prev) => prev.map((t, i) => (i === prev.length - 1 ? fn(t) : t)));
+      setTurns((prev) => prev.map((t, i) => (i === answerIndex ? fn(t) : t)));
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      await askQuestion(eventId, q, sessionRef.current, {
-        onSession: (sid) => {
-          sessionRef.current = sid;
+      await askQuestion(
+        eventId,
+        q,
+        sessionRef.current,
+        {
+          onSession: (sid) => {
+            sessionRef.current = sid;
+          },
+          onToken: (text) => update((t) => ({ ...t, text: t.text + text })),
+          onCitations: (citations) => update((t) => ({ ...t, citations })),
+          onDone: () => update((t) => ({ ...t, streaming: false })),
+          onError: (message) => update((t) => ({ ...t, error: message, streaming: false })),
         },
-        onToken: (text) => update((t) => ({ ...t, text: t.text + text })),
-        onCitations: (citations) => update((t) => ({ ...t, citations })),
-        onDone: () => update((t) => ({ ...t, streaming: false })),
-        onError: (message) => update((t) => ({ ...t, error: message, streaming: false })),
-      });
+        controller.signal,
+      );
     } catch {
-      update((t) => ({ ...t, error: "Connection failed.", streaming: false }));
+      if (!controller.signal.aborted) {
+        update((t) => ({ ...t, error: "Connection failed.", streaming: false }));
+      }
     } finally {
+      busyRef.current = false;
       setBusy(false);
       update((t) => ({ ...t, streaming: false }));
     }
@@ -225,7 +254,11 @@ export function AskPanel({
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit(input)}
+              // isComposing: for Devanagari/Tamil/Telugu IMEs, Enter confirms the
+              // candidate. Submitting on it sends a half-composed question.
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) submit(input);
+              }}
               placeholder="Ask anything about this story…"
               className="min-w-0 flex-1 rounded-full border px-4 py-[9px] text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
               style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--ink)" }}

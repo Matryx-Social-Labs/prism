@@ -24,6 +24,13 @@ class MockResizeObserver implements ResizeObserver {
 
 // jsdom's scrollTo is a no-op that warns; make it actually move scrollY so the
 // hook's "did the position stick?" check exercises real logic.
+// jsdom implements neither window.scrollTo nor Element.prototype.scrollTo. The
+// element one is a no-op here (AskPanel just pins its transcript to the bottom);
+// the window one below actually moves scrollY so useScrollRestore is exercised.
+if (!Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = () => {};
+}
+
 (globalThis as unknown as { scrollTo: unknown }).scrollTo = (
   x: number | ScrollToOptions,
   y?: number

@@ -411,11 +411,16 @@ export async function askQuestion(
   question: string,
   sessionId: string | null,
   callbacks: AskCallbacks,
+  // Without this, navigating away mid-answer leaves the read loop consuming the
+  // stream: connection held open on metered mobile data, setState on a dead
+  // component, and the server generating tokens nobody will ever read.
+  signal?: AbortSignal,
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, session_id: sessionId }),
+    signal,
   });
   if (!res.ok || !res.body) {
     callbacks.onError(`Request failed (${res.status})`);
@@ -427,6 +432,10 @@ export async function askQuestion(
   let buffer = "";
 
   while (true) {
+    if (signal?.aborted) {
+      await reader.cancel().catch(() => {});
+      return;
+    }
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
