@@ -860,8 +860,8 @@ export function StoryView({ event }: { event: EventDetail }) {
           </div>
           <button
             onClick={() => setAskOpen(true)}
-            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-xl text-[13.5px] font-semibold"
-            style={{ background: "var(--ink)", color: "var(--bg)" }}
+            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
+            style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
           >
             <span className="spectrum-text text-[15px]" aria-hidden>◮</span>
             Ask
