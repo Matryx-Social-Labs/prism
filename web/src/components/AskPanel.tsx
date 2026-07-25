@@ -79,7 +79,7 @@ export function AskPanel({
   const thinking = busy && turns.length > 0 && turns[turns.length - 1].text === "";
 
   return (
-    <div className={docked ? "w-full" : "fixed bottom-[18px] right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)]"}>
+    <div className={docked ? "w-full" : "fixed bottom-[112px] right-[18px] z-[70] w-[396px] max-w-[calc(100vw-24px)] lg:bottom-[18px]"}>
       {!open ? (
         <button
           onClick={() => setOpen(true)}

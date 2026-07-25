@@ -10,6 +10,7 @@ import { lensMeta, useLenses } from "@/lib/lenses";
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
+import { ShareButton } from "@/components/ShareButton";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
 import { StoryTimeline } from "@/components/StoryTimeline";
@@ -194,7 +195,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   }, [event.id, storyCount]);
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-[120px] pt-7 sm:px-8 xl:px-10">
+    <div className="mx-auto max-w-[1240px] px-5 pb-[164px] pt-7 sm:px-8 lg:pb-[120px] xl:px-10">
       <Link href="/feed" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
@@ -313,6 +314,38 @@ export function StoryView({ event }: { event: EventDetail }) {
       </header>
 
       {/* ── Mobile section nav — sticky anchor chips ────────── */}
+      {/* Coverage bar — mobile: the verify layer, promoted from the desktop rail. */}
+      {coverageEntries.length > 0 && (
+        <div
+          className="mt-5 rounded-[14px] border px-3.5 py-3 lg:hidden"
+          style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
+        >
+          <span className="font-mono text-[11px]" style={{ color: "var(--ink)" }}>
+            ⌗ {sourceCount} outlet{sourceCount === 1 ? "" : "s"} · {coverageEntries.length} origin
+            {coverageEntries.length === 1 ? "" : "s"} ·{" "}
+            <span style={{ color: event.coverage?.single_origin ? "var(--danger)" : "var(--up)" }}>
+              {event.coverage?.single_origin ? "Single-origin" : "Balanced"}
+            </span>
+          </span>
+          {gapText && (
+            <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--danger)" }}>
+              ◉ {gapText}
+            </p>
+          )}
+          <div className="mt-2.5 flex flex-wrap gap-1.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
+            {coverageEntries.map(([iso, n]) => (
+              <span
+                key={iso}
+                className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+                style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}
+              >
+                {regionName(iso)} × {n}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <nav
         className="sticky top-0 z-20 -mx-5 mt-5 flex gap-1.5 overflow-x-auto border-b px-5 py-2.5 sm:-mx-8 sm:px-8 lg:hidden"
         style={{ borderColor: "var(--line)", background: "var(--bg)" }}
@@ -341,7 +374,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         className="mt-9 scroll-mt-24 overflow-hidden rounded-[18px] border"
         style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
       >
-        <div className="overflow-x-auto border-b" style={{ borderColor: "var(--line)" }}>
+        <div className="hidden overflow-x-auto border-b lg:block" style={{ borderColor: "var(--line)" }}>
           <div className="flex w-max items-center gap-1.5 px-4 py-3" role="tablist" aria-label="Read this story through a lens">
             <span className="mr-1 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
               Lens
@@ -785,7 +818,45 @@ export function StoryView({ event }: { event: EventDetail }) {
         </aside>
       </div>
 
-      {/* ── Ask — floating pill (mobile) ────────────────────── */}
+      {/* ── Pinned thumb zone (mobile): lens rail + Share ───── */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
+        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="hide-scroll flex gap-1.5 overflow-x-auto">
+          {offered.map((slug) => {
+            const m = lensMeta(slug);
+            const selected = slug === lens;
+            const locked = isLocked(slug);
+            return (
+              <button
+                key={slug}
+                onClick={() => {
+                  setFlipped(true);
+                  setLens(slug);
+                }}
+                className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
+                style={
+                  selected
+                    ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
+                    : { border: "1px solid var(--line-strong)", background: "var(--bg-elevated)", color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
+                }
+              >
+                {m.short}
+                {locked && (
+                  <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <ShareButton url={`/story/${event.id}`} title={event.title} fill />
+      </div>
+
+      {/* ── Ask — floating pill (mobile), sits above the pinned bar ── */}
       <div className="lg:hidden">
         <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} />
       </div>

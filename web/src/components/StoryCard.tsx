@@ -116,32 +116,32 @@ export function StoryRowCard({ item, lens, primaryLang }: { item: FeedItem; lens
   return (
     <Link
       href={`/story/${item.id}`}
-      className="card-hover flex items-start gap-4 rounded-[18px] border px-5 py-[18px]"
-      style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
+      className="flex items-start gap-3 border-b px-5 py-[13px]"
+      style={{ borderColor: "var(--line)" }}
     >
-      <span className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="flex flex-wrap items-center gap-[5px]">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="mb-1 flex flex-wrap items-center gap-[5px]">
           <StoryBadges item={item} lens={lens} primaryLang={primaryLang} />
-          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
+          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
             {itemMeta(item)}
           </span>
         </span>
-        <span className="text-[15.5px] font-semibold leading-[1.4]" style={{ color: "var(--ink)" }}>
+        <span className="text-[15.5px] font-semibold leading-[1.35]" style={{ color: "var(--ink)" }}>
           {item.title}
         </span>
         {item.summary && (
-          <span className="line-clamp-2 text-[13px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
+          <span className="mt-1 line-clamp-2 text-[13.5px] leading-[1.45]" style={{ color: "var(--ink-muted)" }}>
             {item.summary}
           </span>
         )}
       </span>
       {item.image_url && (
-        <span className="relative hidden h-[92px] w-[92px] shrink-0 overflow-hidden rounded-xl sm:block" style={{ background: "var(--bg-sunken)" }}>
+        <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border" style={{ background: "var(--bg-sunken)", borderColor: "var(--line)" }}>
           <Image
             src={item.image_url}
             alt=""
             fill
-            sizes="92px"
+            sizes="64px"
             className="object-cover"
             onError={(e) => {
               (e.currentTarget.parentElement as HTMLElement).style.display = "none";

@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbars on horizontal rails (What's moving, sector chips, lens rail). */
+.hide-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Prism design tokens ─────────────────────────────────────────────
    Adaptive light/dark. `data-theme` on <html> (set pre-paint in layout)
    wins over the system preference. Spectrum = the brand: one beam of

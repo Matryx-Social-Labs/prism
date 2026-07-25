@@ -7,141 +7,174 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
 
+type Scope = "region" | "world";
+const SECTORS = [
+  { slug: null as string | null, label: "All sectors" },
+  { slug: "politics", label: "Politics" },
+  { slug: "markets", label: "Markets" },
+  { slug: "cybersecurity", label: "Cyber" },
+  { slug: "health", label: "Health" },
+];
+
 export default function TrendingPage() {
   const [state, setState] = useState<string | null>(null);
-  const [scope, setScope] = useState<"local" | "india">("india");
+  const [scope, setScope] = useState<Scope>("world");
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [sector, setSector] = useState<string | null>(null);
   const [stories, setStories] = useState<TrendingStory[] | null>(null);
 
   useEffect(() => {
     const p = loadProfile();
     if (p?.state) {
       setState(p.state);
-      setScope("local"); // default to the reader's area when we know it
+      setScope("region");
     }
   }, []);
 
   useEffect(() => {
     setStories(null);
-    fetchTrending({ state: scope === "local" ? state : null, limit: 24 })
+    fetchTrending({ state: scope === "region" ? state : null, sector, limit: 24 })
       .then(setStories)
       .catch(() => setStories([]));
-  }, [scope, state]);
+  }, [scope, state, sector]);
 
-  const tabs = useMemo(
-    () => (state ? [{ k: "local", label: stateLabel(state) }, { k: "india", label: "India" }] : [{ k: "india", label: "India" }]),
+  const scopeLabel = scope === "region" ? stateLabel(state) ?? "Your state" : "National";
+  const scopeOpts: [Scope, string][] = useMemo(
+    () => [
+      ["region", state ? `Your state — ${stateLabel(state)}` : "Your state"],
+      ["world", "National"],
+    ],
     [state],
   );
 
   return (
-    <div className="mx-auto max-w-[720px] px-8 pb-24 pt-10">
-      <h1 className="text-[30px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-        Trending now
-      </h1>
-      <p className="mt-2 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-        The stories the most outlets are covering right now — each a whole story, start to now.
-      </p>
+    <div className="relative mx-auto max-w-[620px] pb-28">
+      <div
+        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md"
+        style={{ borderColor: "var(--line)", background: "var(--glass)" }}
+      >
+        <h1 className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+          Trending
+        </h1>
+        <button
+          onClick={() => setScopeOpen(true)}
+          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
+          style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
+        >
+          ◉ {scopeLabel} <span style={{ color: "var(--ink-faint)" }}>▾</span>
+        </button>
+      </div>
 
-      {tabs.length > 1 && (
-        <div className="mt-5 flex gap-2">
-          {tabs.map((t) => {
-            const active = scope === t.k;
-            return (
-              <button
-                key={t.k}
-                onClick={() => setScope(t.k as "local" | "india")}
-                className="rounded-full border px-[18px] py-2 text-[13px] font-semibold transition"
-                style={{
-                  borderColor: active ? "var(--ink)" : "var(--line-strong)",
-                  background: active ? "var(--ink)" : "transparent",
-                  color: active ? "var(--bg)" : "var(--ink)",
-                }}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* sector chips */}
+      <div className="hide-scroll flex gap-2 overflow-x-auto border-b px-5 py-2.5" style={{ borderColor: "var(--line)" }}>
+        {SECTORS.map((s) => {
+          const active = sector === s.slug;
+          return (
+            <button
+              key={s.label}
+              onClick={() => setSector(s.slug)}
+              className="flex-none whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-semibold"
+              style={active ? { background: "var(--ink)", color: "var(--bg)" } : { border: "1px solid var(--line-strong)", color: "var(--ink-muted)" }}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <div className="mt-5 flex flex-col">
+      <div className="flex flex-col">
         {stories === null ? (
           [0, 1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)
         ) : stories.length === 0 ? (
-          <p className="py-4 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="px-5 py-5 text-[13px]" style={{ color: "var(--ink-faint)" }}>
             No trending stories here right now — check back soon.
           </p>
         ) : (
           stories.map((s, i) => <StoryRow key={s.slug} story={s} rank={i + 1} />)
         )}
       </div>
+
+      {scopeOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "rgba(15,14,12,.4)" }} />
+          <div className="relative rounded-t-[22px] px-5 pb-11 pt-3" style={{ background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}>
+            <div className="mx-auto mb-3.5 h-1 w-9 rounded-full" style={{ background: "var(--line-strong)" }} />
+            <h3 className="text-[18px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+              Scope
+            </h3>
+            <p className="mb-3 mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+              Applies everywhere — Feed, Trending, Pulse and Search.
+            </p>
+            {scopeOpts.map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => {
+                  setScope(value);
+                  setScopeOpen(false);
+                }}
+                disabled={value === "region" && !state}
+                className="flex min-h-[48px] w-full items-center gap-2.5 border-b px-1 text-left text-[14.5px] disabled:opacity-40"
+                style={{ borderColor: "var(--line)", color: "var(--ink)", fontWeight: scope === value ? 600 : 500 }}
+              >
+                <span>{label}</span>
+                {scope === value && <span className="ml-auto">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function StoryRow({ story, rank }: { story: TrendingStory; rank: number }) {
   return (
-    <Link
-      href={`/trending/${story.slug}`}
-      className="flex items-start gap-4 border-b py-4"
-      style={{ borderColor: "var(--line)" }}
-    >
+    <Link href={`/trending/${story.slug}`} className="flex items-start gap-3 border-b px-5 py-[13px]" style={{ borderColor: "var(--line)" }}>
       <span
-        className="w-6 shrink-0 text-[15px] font-semibold"
-        style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
+        className="w-[26px] shrink-0 text-[24px] font-semibold leading-none"
+        style={{ fontFamily: "var(--font-display), serif", color: rank === 1 ? "var(--ink)" : "var(--ink-faint)" }}
       >
         {rank}
       </span>
-      <span
-        className="relative block h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[10px]"
-        style={{ background: "var(--bg-sunken)" }}
-      >
+      <div className="min-w-0 flex-1">
+        <p className="text-[15.5px] font-semibold leading-[1.35]">{story.hero_title ?? story.label}</p>
+        <p className="mt-1 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+          {story.source_count} outlets ·{" "}
+          {story.velocity > 0 ? <span style={{ color: "var(--up)" }}>developing</span> : `${story.developments} updates`}
+        </p>
+      </div>
+      <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-xl border" style={{ background: "var(--bg-sunken)", borderColor: "var(--line)" }}>
         {story.hero_image && (
           <Image
             src={story.hero_image}
             alt=""
             fill
-            sizes="72px"
+            sizes="56px"
             className="object-cover"
             onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = "none";
+              (e.currentTarget.parentElement as HTMLElement).style.display = "none";
             }}
           />
         )}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[16px] font-semibold leading-[1.4]" style={{ fontFamily: "var(--font-display), serif" }}>
-          {story.label}
-        </p>
-        <p
-          className="mt-1.5 text-[11px] uppercase tracking-[0.08em]"
-          style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
-        >
-          {story.source_count} outlets · {story.developments} developments
-          {story.velocity > 0 && (
-            <>
-              {" · "}
-              <span style={{ color: "var(--up)" }}>developing now</span>
-            </>
-          )}
-        </p>
-      </div>
     </Link>
   );
 }
 
 function SkeletonRow() {
   return (
-    <div className="flex items-start gap-4 border-b py-4" style={{ borderColor: "var(--line)" }}>
-      <span className="w-6 shrink-0" />
-      <span className="block h-[72px] w-[72px] shrink-0 animate-pulse rounded-[10px]" style={{ background: "var(--bg-sunken)" }} />
+    <div className="flex items-start gap-3 border-b px-5 py-[13px]" style={{ borderColor: "var(--line)" }}>
+      <span className="w-[26px] shrink-0" />
       <div className="min-w-0 flex-1 space-y-2 pt-1">
         <span className="block h-[14px] w-3/4 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
         <span className="block h-[10px] w-2/5 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
       </div>
+      <span className="block h-14 w-14 shrink-0 animate-pulse rounded-xl" style={{ background: "var(--bg-sunken)" }} />
     </div>
   );
 }
 
-function stateLabel(code: string): string {
+function stateLabel(code: string | null): string | null {
+  if (!code) return null;
   return { "IN-KA": "Karnataka", "IN-TN": "Tamil Nadu", "IN-MH": "Maharashtra", "IN-DL": "Delhi", "IN-KL": "Kerala", "IN-TG": "Telangana", "IN-AP": "Andhra" }[code] ?? code;
 }

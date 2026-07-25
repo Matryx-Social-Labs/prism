@@ -32,7 +32,7 @@ function SearchInner() {
   }, [q, router]);
 
   return (
-    <div className="mx-auto w-full max-w-[760px] px-5 py-10">
+    <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9">
       <h1 className="text-[28px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
         Search
       </h1>
