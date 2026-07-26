@@ -170,13 +170,13 @@ body {
   }
 }
 
-.reveal {
+.js .reveal {
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 640ms cubic-bezier(0.22, 1, 0.36, 1),
     transform 640ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.reveal.is-visible {
+.js .reveal.is-visible {
   opacity: 1;
   transform: none;
 }
@@ -291,7 +291,7 @@ body {
 .stagger > *:nth-child(n + 9) { animation-delay: 440ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal,
+  .js .reveal,
   .stagger > * {
     opacity: 1;
     transform: none;
