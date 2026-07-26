@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+
+import { CARD_W, THUMB_W, thumbUrl } from "@/lib/thumb";
 import Link from "next/link";
 import type { FeedItem } from "@/lib/api";
 import { detectScript, langName, langNative } from "@/lib/languages";
@@ -138,7 +140,7 @@ export function StoryRowCard({ item, lens, primaryLang }: { item: FeedItem; lens
       {item.image_url && (
         <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border" style={{ background: "var(--bg-sunken)", borderColor: "var(--line)" }}>
           <Image
-            src={item.image_url}
+            src={thumbUrl(item.image_url, THUMB_W)}
             alt=""
             fill
             sizes="64px"
@@ -163,7 +165,7 @@ export function TopStoryCard({ item, lens, primaryLang }: { item: FeedItem; lens
       {item.image_url && (
         <span className="relative block h-[120px]" style={{ background: "var(--bg-sunken)" }}>
           <Image
-            src={item.image_url}
+            src={thumbUrl(item.image_url, CARD_W)}
             alt=""
             fill
             sizes="(max-width: 880px) 100vw, 340px"

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
+import { THUMB_W, thumbUrl } from "@/lib/thumb";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
 // Trending has no "all" tier — National IS everything here. Narrowed from the
@@ -193,7 +194,7 @@ function StoryRow({ story, rank }: { story: TrendingStory; rank: number }) {
       <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-xl border" style={{ background: "var(--bg-sunken)", borderColor: "var(--line)" }}>
         {story.hero_image && (
           <Image
-            src={story.hero_image}
+            src={thumbUrl(story.hero_image, THUMB_W)}
             alt=""
             fill
             sizes="56px"
