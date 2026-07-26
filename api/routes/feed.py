@@ -63,6 +63,14 @@ async def get_feed(
         sectors = None
     # Candidate window is per-sector so a high-churn sector (thousands of
     # CVE updates a day) can't evict everyone else's news before ranking.
+    #
+    # It also splits raw database records from news WITHIN a sector, because the
+    # include_cve_records filter below runs in Python — after this window. The
+    # cybersecurity corpus is 5.6k CVE records against ~70 real stories, so a
+    # window ranked on recency alone came back 120/120 CVE: the general lens
+    # dropped all of them and showed zero cybersecurity, while the cyber lens
+    # kept all of them and showed a CVE dump with no journalism in it. Giving
+    # each kind its own quota means real cyber news reaches the ranker at all.
     rows = (
         await db.execute(
             text(
@@ -71,7 +79,11 @@ async def get_feed(
                        projection, last_updated_at, occurred_at
                 FROM (
                     SELECT e.*, ROW_NUMBER() OVER (
-                        PARTITION BY e.sector ORDER BY e.last_updated_at DESC
+                        PARTITION BY e.sector, (
+                            COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
+                            AND (e.projection->'source_slugs') <@ CAST(:cve_only AS jsonb)
+                        )
+                        ORDER BY e.last_updated_at DESC
                     ) AS rn
                     FROM events e
                     WHERE (CAST(:sectors AS text[]) IS NULL
@@ -80,19 +92,23 @@ async def get_feed(
                 WHERE rn <= 120
                 """
             ),
-            {"sectors": sectors or None},
+            {"sectors": sectors or None, "cve_only": '["nvd", "cisa_kev"]'},
         )
     ).mappings().all()
 
     cve_only_sources = {"nvd", "cisa_kev"}
     items: list[FeedItem] = []
+    cve_record_ids: set[str] = set()
     for row in rows:
         projection = row["projection"] or {}
         # Raw database records (no news coverage) only surface for lenses
         # that want them (cyber/GRC); they're noise for readers and traders.
         slugs = set(projection.get("source_slugs") or [])
-        if slugs and slugs <= cve_only_sources and not active_lens.include_cve_records:
+        is_cve_record = bool(slugs) and slugs <= cve_only_sources
+        if is_cve_record and not active_lens.include_cve_records:
             continue
+        if is_cve_record:
+            cve_record_ids.add(str(row["id"]))
         # Subsector narrowing: an interest like sports:cricket drops other
         # subsectors of that sector (unclassified subsectors stay visible
         # only when the whole sector was selected).
@@ -106,6 +122,25 @@ async def get_feed(
         items.sort(key=lambda i: i.score, reverse=True)
     else:  # latest — a news feed reads newest-first by default
         items.sort(key=lambda i: i.last_updated_at, reverse=True)
+    # Raw records are machine-written and re-stamped on every scan, so they are
+    # permanently "newer" than journalism — for a lens that wants them, a latest
+    # sort handed back a page of pure CVE changelog with no news on it. They stay
+    # (a GRC reader is here for them), but they no longer own the whole page.
+    # Capping alone left them clustered at the top (they sort newest), so the
+    # reader's whole first screen was still changelog. Two stories, then a
+    # record, keeps the page recognisably a news feed at any scroll depth.
+    if cve_record_ids:
+        records = [i for i in items if str(i.id) in cve_record_ids][: max(1, limit // 3)]
+        news = [i for i in items if str(i.id) not in cve_record_ids]
+        merged: list[FeedItem] = []
+        n = r = 0
+        while n < len(news) or r < len(records):
+            merged.extend(news[n : n + 2])
+            n += 2
+            if r < len(records):
+                merged.append(records[r])
+                r += 1
+        items = merged
     # Geo tier: the reader's state first, then the rest (national). Stable sort
     # keeps the score/recency order within each band.
     if state:

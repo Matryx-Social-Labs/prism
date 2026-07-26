@@ -132,13 +132,57 @@ async def test_lens_ranks_the_world_it_does_not_filter_it():
         pytest.skip("needs at least two classified sectors")
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://t") as c:
-        r = await c.get("/api/v1/feed", params={"lens": "cyber", "limit": 60, "sort": "top"})
-        assert r.status_code == 200
-        sectors = {i["sector"] for i in r.json()["items"] if i["sector"]}
+    # Both sorts, because they collapse for different reasons and "top" alone
+    # missed the live bug: latest is the DEFAULT the app actually requests, and
+    # under it raw CVE records — machine-stamped, so permanently newest — owned
+    # every slot even after the sector filter was removed.
+    for sort in ("top", "latest"):
+        async with AsyncClient(transport=transport, base_url="http://t") as c:
+            r = await c.get("/api/v1/feed", params={"lens": "cyber", "limit": 60, "sort": sort})
+            assert r.status_code == 200
+            sectors = {i["sector"] for i in r.json()["items"] if i["sector"]}
 
-    # The exact mix depends on the corpus; the invariant is that a pro lens never
-    # collapses the feed to its own sector.
-    assert sectors - {"cybersecurity"}, (
-        f"cyber lens returned only {sectors} — the lens is filtering the feed, not ranking it"
+        # The exact mix depends on the corpus; the invariant is that a pro lens never
+        # collapses the feed to its own sector.
+        assert sectors - {"cybersecurity"}, (
+            f"cyber lens sort={sort} returned only {sectors} — "
+            "the lens is filtering the feed, not ranking it"
+        )
+
+
+async def test_cyber_news_survives_a_corpus_dominated_by_raw_records():
+    """Real cybersecurity journalism must reach the reader, not just CVE rows.
+
+    REGRESSION: the candidate window (rn <= 120 per sector) ran in SQL while the
+    include_cve_records filter ran in Python afterwards. With ~5.6k CVE records
+    against ~70 cyber stories, the window came back 120/120 records — so the
+    general lens dropped all of them and showed ZERO cybersecurity, while the
+    cyber lens showed a changelog with no journalism in it. The window now gives
+    records and news separate quotas within the sector.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async with session_scope() as session:
+        news = (
+            await session.execute(
+                text(
+                    "SELECT count(*) FROM events WHERE sector = 'cybersecurity' AND NOT ("
+                    "  COALESCE(jsonb_array_length(projection->'source_slugs'), 0) > 0"
+                    "  AND (projection->'source_slugs') <@ '[\"nvd\", \"cisa_kev\"]'::jsonb)"
+                )
+            )
+        ).scalar()
+    if not news:
+        pytest.skip("no non-record cybersecurity events in the corpus")
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://t") as c:
+        r = await c.get("/api/v1/feed", params={"lens": "general", "limit": 60})
+        assert r.status_code == 200
+        items = r.json()["items"]
+
+    assert any(i["sector"] == "cybersecurity" for i in items), (
+        "no cybersecurity story reached the general reader — raw records are "
+        "filling the candidate window before the CVE filter can run"
     )
