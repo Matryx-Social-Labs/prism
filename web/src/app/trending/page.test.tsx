@@ -5,8 +5,9 @@ import TrendingPage from "@/app/trending/page";
 import type { TrendingStory } from "@/lib/api";
 
 const fetchTrending = vi.hoisted(() => vi.fn());
+const fetchRegions = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ fetchTrending }));
+vi.mock("@/lib/api", () => ({ fetchTrending, fetchRegions }));
 vi.mock("@/lib/profile", () => ({ loadProfile }));
 
 function story(over: Partial<TrendingStory> = {}): TrendingStory {
@@ -25,6 +26,13 @@ function story(over: Partial<TrendingStory> = {}): TrendingStory {
 }
 
 beforeEach(() => {
+  // Trending resolves state names from /api/v1/regions now, like the Feed,
+  // instead of a hand-written seven-state map.
+  fetchRegions.mockReset().mockResolvedValue([
+    { code: "IN-KL", name: "Kerala" },
+    { code: "IN-KA", name: "Karnataka" },
+    { code: "IN-BR", name: "Bihar" },
+  ]);
   fetchTrending.mockReset().mockResolvedValue([story()]);
   loadProfile.mockReset().mockReturnValue(null);
 });
@@ -41,7 +49,8 @@ describe("Trending — scope", () => {
   it("opens on the reader's own state when they have one", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<TrendingPage />);
-    expect(await screen.findByText(/Kerala/)).toBeInTheDocument();
+    // The chip specifically: the story fixture headline also says "Kerala".
+    expect(await screen.findByRole("button", { name: /Kerala/ })).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ state: "IN-KL" }))
     );
@@ -58,7 +67,7 @@ describe("Trending — scope", () => {
   it("switches to National from the scope sheet", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<TrendingPage />);
-    await screen.findByText(/Kerala/);
+    await screen.findByRole("button", { name: /Kerala/ });
 
     await userEvent.click(screen.getByRole("button", { name: /Kerala/ }));
     await userEvent.click(await screen.findByRole("button", { name: "National" }));
@@ -122,5 +131,22 @@ describe("Trending — the list", () => {
     fetchTrending.mockRejectedValue(new Error("unreachable"));
     render(<TrendingPage />);
     expect(await screen.findByText("Trending")).toBeInTheDocument();
+  });
+});
+
+describe("Trending — state names", () => {
+  // REGRESSION: this page carried a hand-written map of seven Indian states, so
+  // a reader in any of the other ~29 saw the raw ISO code in the scope chip —
+  // while the Feed, one tab away, resolved the same code from /api/v1/regions.
+  it("names a state that the old seven-state map never covered", async () => {
+    loadProfile.mockReturnValue({ state: "IN-BR" });
+    render(<TrendingPage />);
+    expect(await screen.findByRole("button", { name: /Bihar/ })).toBeInTheDocument();
+  });
+
+  it("falls back to the code when the API doesn't know it", async () => {
+    loadProfile.mockReturnValue({ state: "IN-XX" });
+    render(<TrendingPage />);
+    expect(await screen.findByRole("button", { name: /IN-XX/ })).toBeInTheDocument();
   });
 });

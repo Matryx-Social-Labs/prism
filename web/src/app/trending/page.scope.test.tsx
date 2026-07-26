@@ -4,12 +4,20 @@ import userEvent from "@testing-library/user-event";
 import TrendingPage from "@/app/trending/page";
 
 const fetchTrending = vi.hoisted(() => vi.fn());
+const fetchRegions = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ fetchTrending }));
+vi.mock("@/lib/api", () => ({ fetchTrending, fetchRegions }));
 vi.mock("@/lib/profile", () => ({ loadProfile }));
 // @/lib/scope is deliberately NOT mocked: the point is the real persisted value.
 
 beforeEach(() => {
+  // Trending resolves state names from /api/v1/regions now, like the Feed,
+  // instead of a hand-written seven-state map.
+  fetchRegions.mockReset().mockResolvedValue([
+    { code: "IN-KL", name: "Kerala" },
+    { code: "IN-KA", name: "Karnataka" },
+    { code: "IN-BR", name: "Bihar" },
+  ]);
   fetchTrending.mockReset().mockResolvedValue([]);
   loadProfile.mockReset().mockReturnValue(null);
   // The suite-wide afterEach clears sessionStorage only, and this page now READS

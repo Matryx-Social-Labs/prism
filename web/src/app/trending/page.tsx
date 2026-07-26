@@ -4,11 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { ScopeSheet } from "@/components/ScopeSheet";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
 import { THUMB_W, thumbUrl } from "@/lib/thumb";
 import { useScrollRestore } from "@/lib/useScrollRestore";
+import { useStateName } from "@/lib/useStateName";
 
 // Trending has no "all" tier — National IS everything here. Narrowed from the
 // shared union so adding a member forces a decision at this call site.
@@ -35,6 +37,7 @@ export default function TrendingPage() {
   // first render sees null and the fetch below would fire once national and again
   // scoped. Wait for it instead of paying for a throwaway round trip.
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const stateName = useStateName(state);
 
   useEffect(() => {
     const p = loadProfile();
@@ -79,13 +82,13 @@ export default function TrendingPage() {
 
   useScrollRestore("trending:scrollY", stories !== null);
 
-  const scopeLabel = scope === "region" ? stateLabel(state) ?? "Your state" : "National";
+  const scopeLabel = scope === "region" ? stateName ?? "Your state" : "National";
   const scopeOpts: [Scope, string][] = useMemo(
     () => [
-      ["region", state ? `Your state — ${stateLabel(state)}` : "Your state"],
+      ["region", stateName ? `Your state — ${stateName}` : "Your state"],
       ["national", "National"],
     ],
-    [state],
+    [stateName],
   );
 
   return (
@@ -137,40 +140,14 @@ export default function TrendingPage() {
         )}
       </div>
 
-      {scopeOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "var(--scrim)" }} />
-          <div className="relative rounded-t-[22px] px-5 pb-11 pt-3" style={{ background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}>
-            <div className="mx-auto mb-3.5 h-1 w-9 rounded-full" style={{ background: "var(--line-strong)" }} />
-            <h3 className="text-[18px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-              Scope
-            </h3>
-            <p className="mb-3 mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-              Applies everywhere — Feed, Trending, Pulse and Search.
-            </p>
-            {scopeOpts.map(([value, label]) => (
-              <button
-                key={value}
-                onClick={() => {
-                  chooseScope(value);
-                  setScopeOpen(false);
-                }}
-                disabled={value === "region" && !state}
-                title={
-                  value === "region" && !state
-                    ? "Add your state in Your Parse to filter by region"
-                    : undefined
-                }
-                className="flex min-h-[48px] w-full items-center gap-2.5 border-b px-1 text-left text-[14.5px] disabled:opacity-40"
-                style={{ borderColor: "var(--line)", color: "var(--ink)", fontWeight: scope === value ? 600 : 500 }}
-              >
-                <span>{label}</span>
-                {scope === value && <span className="ml-auto">✓</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <ScopeSheet
+        open={scopeOpen}
+        onClose={() => setScopeOpen(false)}
+        options={scopeOpts}
+        selected={scope}
+        onSelect={chooseScope}
+        disabledReason={(v) => (v === "region" && !state ? "Add your state in Your Parse to filter by region" : null)}
+      />
     </div>
   );
 }
@@ -222,7 +199,3 @@ function SkeletonRow() {
   );
 }
 
-function stateLabel(code: string | null): string | null {
-  if (!code) return null;
-  return { "IN-KA": "Karnataka", "IN-TN": "Tamil Nadu", "IN-MH": "Maharashtra", "IN-DL": "Delhi", "IN-KL": "Kerala", "IN-TG": "Telangana", "IN-AP": "Andhra" }[code] ?? code;
-}
