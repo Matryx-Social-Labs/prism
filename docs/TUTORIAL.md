@@ -65,9 +65,11 @@ curl -s "http://localhost:8000/api/v1/feed?lens=cyber&limit=5" | \
   python3 -c "import sys,json; [print('•', i['title'][:70]) for i in json.load(sys.stdin)['items']]"
 ```
 
-The cyber lens is the one that lets raw CVE records in, so you'll see them mixed
-into the page — two stories to every record, never a wall of them. It is still a
-whole-world feed: a lens **ranks**, it never filters, so cyber-relevant items rise
+The cyber lens is the one that lets raw CVE records in, so you'll see them here.
+Once there's journalism to weave them between they hold to one record per two
+stories; this early, with only the deterministic feeds ingesting, records are
+most of what exists, so that's most of what you get. It is still a whole-world
+feed either way: a lens **ranks**, it never filters, so cyber-relevant items rise
 to the top while elections and markets stay on the page. (Want cybersecurity only?
 That's `?sector=cybersecurity`.)
 
