@@ -17,7 +17,11 @@ The Next.js app has a test suite as of v0.0.70.0: `cd web && npm test` (vitest +
 Testing Library; `npm run test:watch` while iterating). Tests live beside the code as
 `web/src/**/*.test.ts(x)`, config in `web/vitest.config.ts`, jsdom shims in
 `web/vitest.setup.ts`. CI runs it in the `web` job, so a failing test blocks the PR.
-Backend tests are unchanged: `uv run pytest -q`.
+Backend tests: `uv run pytest -q`. As of v0.0.72.0 the suite hard-exits (code 2, not a skip)
+if `DATABASE_URL` points anywhere but `localhost`/`127.0.0.1`/`db`/`postgres` or a `*_test`
+database — the DB tests insert events and supersede partition runs, and this repo reaches prod
+over the Railway proxy for admin queries, so a leftover exported URL was a live path to
+corrupting production. Guard is `tests/conftest.py`.
 
 Two jsdom traps that make a test pass without testing anything — both cost real debugging
 time here, so check for them when writing or reviewing web tests:

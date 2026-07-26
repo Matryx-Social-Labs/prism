@@ -59,8 +59,9 @@ the new slug.
 
 ## How to add a lens
 
-A lens is a declarative role — a slug, the sectors it cares about, its ranking
-weights, and its questions. It is never a new pipeline.
+A lens is a declarative role — a slug, its ranking weights, the extraction it
+activates, and its questions. It is never a new pipeline, and it is never a
+filter: a lens re-ranks the whole feed, it does not shrink it.
 
 ### Steps
 1. Add an entry to `LENSES` in `common/lenses.py`:
@@ -70,8 +71,8 @@ weights, and its questions. It is never a new pipeline.
        name="Legal / Compliance",
        tagline="Rulings, precedent, and what it changes",
        role_interest="legal",
-       sectors=["politics"],              # [] = all sectors
-       ranking=RankingWeights(recency=1.2, corroboration=0.1),
+       sectors=["politics"],              # declarative only — does NOT scope the feed
+       ranking=RankingWeights(recency=1.2, corroboration=0.1),  # this is the real lever
        suggested_questions=["What precedent does this set?", …],
        upcoming=True,                     # drafted: kept in the registry, not served
    ),
@@ -88,10 +89,16 @@ curl -s "localhost:8000/api/v1/feed?lens=legal" | jq '.lens' # echoes "legal"
 ```
 
 ### Troubleshooting
-- **Feed comes back cyber-only / wrong sectors** — check `sectors`. `[]` means all
-  sectors (the reader default); a specific list restricts the feed. `DEFAULT_LENS`
-  must stay `reader` so a missing/unknown lens falls back to all news, not one
-  sector.
+- **Your lens's stories don't rank high enough** — tune `ranking`, not `sectors`.
+  As of v0.0.72.0 the feed ignores `Lens.sectors` entirely: it used to scope the
+  candidate query, which turned the cyber lens into a cybersecurity-only feed
+  with no elections, markets, or world news in it. Only an explicit `?sector=` or
+  the reader's `?interests=` narrows the feed now.
+- **Raw NVD/KEV records show up (or don't)** — that's `include_cve_records`, the
+  one lens flag that still changes *which* events are eligible. Records come from
+  their own bounded query and are woven in two stories to one record, so a
+  record-including lens reads as news rather than a changelog. `sort=top` skips
+  the interleave and returns pure score order.
 
 ---
 
@@ -199,6 +206,14 @@ cd web && npm test                  # frontend suite, vitest + jsdom (CI gate)
 cd web && npm run test:watch        # same, re-runs on save
 cd web && npm run build             # frontend typecheck + build (CI gate)
 ```
+The backend suite refuses to start against a non-local `DATABASE_URL`
+(`tests/conftest.py`): the DB tests insert events and supersede partition runs,
+so pointing them at prod — easy to do after [inspecting the production
+database](#how-to-inspect-the-production-database) leaves `DATABASE_URL`
+exported — would corrupt it. Use `localhost`/`127.0.0.1`, or name the database
+with a `_test` suffix. It exits with code 2 rather than skipping, because a skip
+reads as a pass in CI.
+
 DB-dependent tests skip automatically when no database is reachable. CI runs
 `ruff` + `pytest` for the backend and `vitest` + `next build` for the web app on
 every PR; the API route surface is guarded by `tests/test_api_routes.py`.

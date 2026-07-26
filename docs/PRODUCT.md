@@ -45,7 +45,7 @@ left/right axis Ground News uses:
 The first target audience is the Indian reader: dense regional source coverage (The Hindu, TOI,
 NDTV, Hindustan Times, Mint, BusinessLine, ESPNcricinfo), cricket and entertainment sub-domains
 that mainstream news intelligence ignores, a GDELT India query, region-aware feed scoping
-(All / India / World), and Singapore hosting for latency. Indian English-language news is
+(All / your state / National), and Singapore hosting for latency. Indian English-language news is
 globally under-served by aggregation products that treat "world news" as US/UK news.
 
 ## Personas

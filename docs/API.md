@@ -73,7 +73,7 @@ The personalized, lens-shaped feed of canonical events.
 |---|---|---|---|
 | `lens` | string | `reader` | Lens whose RANKING shapes the feed — it no longer filters by sector, so `?lens=cyber` returns every sector, not cybersecurity only. Unknown → `reader`. |
 | `sector` | string | — | Restrict to one sector slug. |
-| `interests` | csv | — | Interest slugs (reader lens only) to boost. |
+| `interests` | csv | — | Interest slugs (the web app sends these for the reader lens only). These *do* narrow the feed: `sector` keeps the whole sector, `sector:subsector` keeps only that subsector. |
 | `region` | string | — | Country code; marks matching events `is_regional`. |
 | `state` | string | — | Sub-national code; local news ranks up. |
 | `languages` | csv | `en` | Preference order; ranks coverage + picks the served headline. |
