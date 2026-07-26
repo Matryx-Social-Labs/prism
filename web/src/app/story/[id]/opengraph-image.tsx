@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
 import { fetchEvent } from "@/lib/api";
+import { OG_COLORS, displayStack, ogFonts } from "@/lib/ogFonts";
 
 // Social card for a shared /story/<id> link. Most stories carry no publisher
 // photo (image_url is null well over half the time), and without this those
@@ -29,10 +30,13 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     degraded = true;
   }
 
-  const eyebrow = ["PRISM", sector.replaceAll("_", " "), sources ? `${sources} SOURCES` : ""]
+  const eyebrow = ["PARSE", sector.replaceAll("_", " "), sources ? `${sources} SOURCES` : ""]
     .filter(Boolean)
     .join(" · ")
     .toUpperCase();
+  const headline = title.length > 120 ? `${title.slice(0, 118)}…` : title;
+  // Every string the card draws — see ogFonts: an omitted glyph vanishes.
+  const fonts = await ogFonts(headline, eyebrow, "One story. Every perspective.");
 
   return new ImageResponse(
     (
@@ -42,18 +46,18 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           width: "100%",
           display: "flex",
           flexDirection: "column",
-          background: "#ffffff",
-          color: "#1a1a1a",
+          background: OG_COLORS.ground,
+          color: OG_COLORS.ink,
           padding: "64px 72px",
-          fontFamily: "Georgia, serif",
+          fontFamily: displayStack(headline),
         }}
       >
-        {/* spectrum accent (brand mark) */}
+        {/* Spectrum accent, the one place DESIGN.md still allows a gradient —
+            and only as a 2–3px hairline. This was an 8px slab. */}
         <div
           style={{
-            height: 8,
+            height: 3,
             width: "100%",
-            borderRadius: 4,
             background: "linear-gradient(90deg,#F59E0B,#06B6D4,#8B5CF6)",
           }}
         />
@@ -62,22 +66,25 @@ export default async function Image({ params }: { params: Promise<{ id: string }
             marginTop: 40,
             fontSize: 22,
             letterSpacing: 4,
-            color: "#6b7280",
-            fontFamily: "monospace",
+            color: OG_COLORS.inkMuted,
+            fontFamily: "IBM Plex Mono, monospace",
             display: "flex",
           }}
         >
           {eyebrow}
         </div>
         <div style={{ marginTop: 28, fontSize: 58, lineHeight: 1.14, fontWeight: 600, display: "flex" }}>
-          {title.length > 120 ? `${title.slice(0, 118)}…` : title}
+          {headline}
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ fontSize: 24, color: "#9ca3af", display: "flex" }}>One story. Every perspective.</div>
+        <div style={{ fontSize: 24, color: OG_COLORS.inkFaint, display: "flex" }}>
+          One story. Every perspective.
+        </div>
       </div>
     ),
     {
       ...size,
+      fonts: fonts.length ? fonts : undefined,
       // Don't let a scraper cache a card we built from nothing.
       headers: degraded ? { "cache-control": "no-store" } : undefined,
     },
