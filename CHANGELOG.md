@@ -3,6 +3,44 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.72.0] - 2026-07-26
+
+### Fixed
+- **The lens flip works again.** Tapping Cyber or Markets on a story did nothing
+  at all if you weren't signed in — no re-typeset, no prompt, nothing — and the
+  same was true of the pinned rail on a phone and the 1/2/3 keys on a desktop.
+  The product's signature interaction was a dead button for every signed-out
+  reader. It now flips, shows the story re-typeset through that lens, and offers
+  to unlock it (still free, still just an account).
+- **The feed reads as news again for cyber readers.** Choosing the Cyber lens
+  turned the whole feed into a vulnerability changelog: no elections, no markets,
+  no world news, and — stranger still — no cybersecurity *journalism* either,
+  because raw CVE records are re-stamped every few minutes and buried the real
+  reporting under them. Records now sit alongside stories two-to-one, so the page
+  reads as a feed at any scroll depth. Readers on every other lens had been
+  seeing no cybersecurity coverage at all for the same reason; they do now.
+- **Your scope choice survives a refresh.** Picking a wider view and reloading
+  snapped straight back to your state, and the sheet's "Applies everywhere"
+  promise wasn't true between Feed and Trending. It is now.
+- **The scope chip no longer names a filter it isn't applying.** With no state
+  set it still read "Your state" or "National" over completely unfiltered
+  stories, with the option greyed out so you couldn't correct it.
+- Trending no longer quietly narrows a scope set on the Feed, which had been
+  hiding your own state's news without being asked.
+- The feed always returns a full page. A vulnerability-heavy sector could hand
+  back a third of one, and there is no way to ask for the rest.
+- Sorting by top is score-ordered again, so the lead story is the top-ranked one.
+
+### Changed
+- Scope tiers read **All / \<state\> / National** everywhere, matching the design
+  system. The Feed called the widest tier "World" while Trending called the same
+  thing "National" one tap away. Your saved scope resets once.
+- Scope chips are a full-size tap target on phones.
+- Greyed-out scope options and locked lenses now say why they are unavailable
+  instead of reading as broken controls — including to screen readers.
+- The feed's candidate query keeps its index scan: an earlier cut of the
+  cybersecurity fix made every request sort ~10MB to temp files.
+
 ## [0.0.71.0] - 2026-07-25
 
 ### Changed
