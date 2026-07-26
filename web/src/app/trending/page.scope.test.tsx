@@ -44,6 +44,22 @@ describe("Trending — the scope the reader chose elsewhere", () => {
     expect(screen.queryByText(/Your state/)).not.toBeInTheDocument();
   });
 
+  // The other half of the round-trip the sheet promises: a reader who picked
+  // their state on the Feed must land on it here, chip AND query. Trending is
+  // the surface where "region" is a real filter (its own default is National),
+  // so a dropped saved scope shows up as the wrong list, not just a wrong label.
+  it("opens on the reader's state when that is what they saved", async () => {
+    localStorage.setItem("parse.scope.v1", "region");
+    loadProfile.mockReturnValue({ state: "IN-KL" });
+
+    render(<TrendingPage />);
+
+    expect(await screen.findByRole("button", { name: /Kerala/ })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ state: "IN-KL" })),
+    );
+  });
+
   it("persists the pick so the Feed agrees on the next visit", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<TrendingPage />);

@@ -152,3 +152,31 @@ async def test_shape_readout_counts_forks_and_satellites():
         chain = await branch_tree_for_members([str(i) for i in ids2])
         assert chain["shape"]["branches"] == 0
         assert chain["shape"]["satellites"] == 0
+
+
+async def test_setup_failure_hands_the_current_run_back():
+    """The fixture retires the developer's current partition run BEFORE its yield,
+    and `finally` only covers what happens after it. A setup that died in between
+    would leave this database with no current run at all — every storyline the
+    local trending page reads, detached, by a test that never ran.
+
+    It doesn't, but only because the retire and the inserts share one
+    transaction and session_scope rolls back on the way out. That is the property
+    worth pinning: it breaks the moment anyone commits mid-setup.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async def snapshot() -> tuple[uuid.UUID | None, int]:
+        async with session_scope() as s:
+            run = (await s.execute(text("SELECT id FROM partition_runs WHERE status='current'"))).scalar()
+            events = (await s.execute(text("SELECT count(*) FROM events"))).scalar()
+            return run, events
+
+    before = await snapshot()
+    # A parent index no shape row can satisfy: dies inside setup, after the retire.
+    with pytest.raises(IndexError):
+        async with _story([(0, 9, False)]):
+            pass  # never reached
+
+    assert await snapshot() == before, "a failed fixture setup left the database changed"

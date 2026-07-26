@@ -6,6 +6,12 @@ import { cleanup } from "@testing-library/react";
 // need to drive it grab the instances out of this registry and fire them.
 export const resizeObservers: Array<{ cb: ResizeObserverCallback; disconnected: boolean }> = [];
 
+// Setup files run under the node environment too (scope.node.test.ts, where the
+// SSR guards live — jsdom always defines window, so they're unreachable here).
+// Every DOM shim below has nothing to shim there, and touching `window` at all
+// would fail the file before it collects a test.
+const DOM = typeof window !== "undefined";
+
 class MockResizeObserver implements ResizeObserver {
   private entry: { cb: ResizeObserverCallback; disconnected: boolean };
   constructor(cb: ResizeObserverCallback) {
@@ -25,7 +31,7 @@ class MockResizeObserver implements ResizeObserver {
 // jsdom has neither. StoryView reads matchMedia to honour prefers-reduced-motion
 // on the lens flip, and drives its section nav off an IntersectionObserver —
 // without these the component throws on mount and every test of it is dead.
-if (typeof window.matchMedia !== "function") {
+if (DOM && typeof window.matchMedia !== "function") {
   window.matchMedia = ((query: string) => ({
     matches: false, // tests run as though motion is allowed
     media: query,
@@ -59,7 +65,7 @@ class MockIntersectionObserver implements IntersectionObserver {
 // exists as an object with no methods, so anything touching it (the profile, the
 // session, the scope preference) would throw or silently no-op in tests rather
 // than exercise the real code path. Give it a working implementation.
-if (typeof window.localStorage?.setItem !== "function") {
+if (DOM && typeof window.localStorage?.setItem !== "function") {
   const store = new Map<string, string>();
   Object.defineProperty(window, "localStorage", {
     configurable: true,
@@ -79,7 +85,7 @@ if (typeof window.localStorage?.setItem !== "function") {
 // jsdom implements neither window.scrollTo nor Element.prototype.scrollTo. The
 // element one is a no-op here (AskPanel just pins its transcript to the bottom);
 // the window one below actually moves scrollY so useScrollRestore is exercised.
-if (!Element.prototype.scrollTo) {
+if (DOM && !Element.prototype.scrollTo) {
   Element.prototype.scrollTo = () => {};
 }
 
@@ -93,6 +99,7 @@ if (!Element.prototype.scrollTo) {
 };
 
 afterEach(() => {
+  if (!DOM) return; // node environment: nothing rendered, nothing stored
   cleanup();
   resizeObservers.length = 0;
   Object.defineProperty(window, "scrollY", { value: 0, writable: true, configurable: true });

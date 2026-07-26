@@ -84,6 +84,42 @@ describe("lens flip — keyboard", () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
+  // ⌘2 is "second browser tab", ⌥2 types a character — and the handler calls
+  // preventDefault(), so a missing modifier guard doesn't just flip the lens,
+  // it eats the reader's own shortcut. ⌘1 can't show this: index 0 is Reader,
+  // which is already selected, so both branches look identical.
+  it.each(["{Meta>}2{/Meta}", "{Control>}2{/Control}", "{Alt>}2{/Alt}"])(
+    "ignores %s — the modifier belongs to the browser",
+    async (keys) => {
+      render(<StoryView event={event()} />);
+      expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+
+      await userEvent.keyboard(keys);
+
+      expect(screen.getAllByRole("tab", { name: /Reader/ })[0]).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getByText(READER_BRIEF)).toBeInTheDocument();
+    },
+  );
+
+  // The header prints the keys this story actually offers. Anything outside that
+  // range must fall through to the page — pickLens(offered[8]) is `undefined`,
+  // which reads as "no lens" and empties the brief the reader was reading.
+  it.each(["0", "9"])("ignores %s, which is no lens at all", async (key) => {
+    render(<StoryView event={event()} />);
+    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+
+    await userEvent.keyboard(key);
+
+    expect(screen.getByText(READER_BRIEF)).toBeInTheDocument();
+    expect(screen.getAllByRole("tab", { name: /Reader/ })[0]).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
   it("leaves the keys alone while the reader is typing", async () => {
     render(
       <>
