@@ -102,4 +102,10 @@ afterEach(() => {
   // suite then passes or fails on file ordering.
   vi.unstubAllGlobals();
   sessionStorage.clear();
+  // localStorage too, and for the same reason. The scope preference, profile and
+  // session all live here now, and the Feed/Trending pages READ them on mount —
+  // so one test's saved scope leaked into the next file and the suite passed or
+  // failed on execution order. Caught with `vitest run --sequence.shuffle.tests`,
+  // which is the only way this class of bug shows up.
+  localStorage.clear();
 });

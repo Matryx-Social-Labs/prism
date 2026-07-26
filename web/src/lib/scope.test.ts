@@ -56,10 +56,19 @@ describe("scope / profile desync", () => {
     expect(loadScope(true)).toBe("region");
   });
 
-  it("leaves the non-region scopes alone regardless of state", () => {
+  // "National" is state-relative too — it means everything that is NOT my state.
+  // A stateless reader could reach it from Trending (where National is absolute
+  // and the option is enabled) and land back on a Feed labelled "National" over
+  // unfiltered stories, with the Feed's own option greyed out.
+  it("ignores a saved world scope when the reader has no state", () => {
     saveScope("world");
-    expect(loadScope(false)).toBe("world");
+    expect(loadScope(false)).toBeNull();
+    expect(loadScope(true)).toBe("world");
+  });
+
+  it("keeps 'all' regardless of state — the whole world needs no state", () => {
     saveScope("all");
     expect(loadScope(false)).toBe("all");
+    expect(loadScope(true)).toBe("all");
   });
 });

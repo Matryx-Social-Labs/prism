@@ -150,23 +150,37 @@ async def test_vet_fail_open_keeps_member(monkeypatch):
 async def test_persist_base_run_invariant_and_read():
     if not await _db_reachable():
         pytest.skip("no database")
-    run_id = await persist_base_run()
+    # This one publishes REAL runs over the whole corpus — that is the behaviour
+    # under test, so it can't use the throwaway fixtures above. But publishing
+    # retires the developer's current run, which is what the local trending page
+    # reads, so it hands that run back at the end.
     async with session_scope() as s:
-        assert (await s.execute(text("SELECT count(*) FROM partition_runs WHERE status='current'"))).scalar() == 1
-        assert await _current_run_id(s) == run_id
-        rows = (await s.execute(text("SELECT count(*) FROM event_story WHERE run_id=:r"), {"r": run_id})).scalar()
-        assert rows >= 0  # every windowed event got a membership row
-        # a member reads its own story's full set from any entry point
-        sample = (await s.execute(text("SELECT event_id FROM event_story WHERE run_id=:r LIMIT 1"), {"r": run_id})).scalar()
-        if sample is not None:
-            members = await _partitioned_members(s, sample)
-            assert members is not None and str(sample) in members
-    # republish → exactly one current still (atomic cutover), old superseded
-    run2 = await persist_base_run()
-    async with session_scope() as s:
-        assert (await s.execute(text("SELECT count(*) FROM partition_runs WHERE status='current'"))).scalar() == 1
-        assert (await s.execute(text("SELECT status FROM partition_runs WHERE id=:r"), {"r": run_id})).scalar() == "superseded"
-    assert run2 != run_id
+        prior = (await s.execute(text("SELECT id FROM partition_runs WHERE status='current'"))).scalar()
+    try:
+        run_id = await persist_base_run()
+        async with session_scope() as s:
+            assert (await s.execute(text("SELECT count(*) FROM partition_runs WHERE status='current'"))).scalar() == 1
+            assert await _current_run_id(s) == run_id
+            rows = (await s.execute(text("SELECT count(*) FROM event_story WHERE run_id=:r"), {"r": run_id})).scalar()
+            assert rows >= 0  # every windowed event got a membership row
+            # a member reads its own story's full set from any entry point
+            sample = (await s.execute(text("SELECT event_id FROM event_story WHERE run_id=:r LIMIT 1"), {"r": run_id})).scalar()
+            if sample is not None:
+                members = await _partitioned_members(s, sample)
+                assert members is not None and str(sample) in members
+        # republish → exactly one current still (atomic cutover), old superseded
+        run2 = await persist_base_run()
+        async with session_scope() as s:
+            assert (await s.execute(text("SELECT count(*) FROM partition_runs WHERE status='current'"))).scalar() == 1
+            assert (await s.execute(text("SELECT status FROM partition_runs WHERE id=:r"), {"r": run_id})).scalar() == "superseded"
+        assert run2 != run_id
+    finally:
+        if prior:
+            async with session_scope() as s:
+                await s.execute(text("UPDATE partition_runs SET status='superseded' WHERE status='current'"))
+                await s.execute(
+                    text("UPDATE partition_runs SET status='current' WHERE id = :p"), {"p": str(prior)}
+                )
 
 
 async def test_partitioned_members_none_for_unknown_event():
