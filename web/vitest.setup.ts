@@ -22,6 +22,37 @@ class MockResizeObserver implements ResizeObserver {
 // vi.unstubAllGlobals(), which would rip these setup-level fakes out too.
 (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = MockResizeObserver;
 
+// jsdom has neither. StoryView reads matchMedia to honour prefers-reduced-motion
+// on the lens flip, and drives its section nav off an IntersectionObserver —
+// without these the component throws on mount and every test of it is dead.
+if (typeof window.matchMedia !== "function") {
+  window.matchMedia = ((query: string) => ({
+    matches: false, // tests run as though motion is allowed
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+}
+
+class MockIntersectionObserver implements IntersectionObserver {
+  readonly root = null;
+  readonly rootMargin = "";
+  readonly thresholds: ReadonlyArray<number> = [];
+  constructor(_cb: IntersectionObserverCallback) {}
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver =
+  MockIntersectionObserver;
+
 // jsdom's scrollTo is a no-op that warns; make it actually move scrollY so the
 // hook's "did the position stick?" check exercises real logic.
 // This jsdom build ships sessionStorage but NOT localStorage — window.localStorage

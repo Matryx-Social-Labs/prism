@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -93,6 +93,9 @@ export function StoryView({ event }: { event: EventDetail }) {
   const [briefLoading, setBriefLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
+  // Did the READER ask for this lens, or did it come back from their profile?
+  // The locked-lens guard below has to tell those apart, and `lens` alone can't.
+  const readerPicked = useRef(false);
 
   const registry = useLenses();
   const registrySlugs = registry.map((m) => m.slug);
@@ -138,12 +141,19 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Never leave a signed-out reader parked on a locked pro lens (e.g. their
   // saved profile lens): snap back to the general reader lens.
   useEffect(() => {
-    if (isLocked(lens)) setLens("reader");
+    if (isLocked(lens) && !readerPicked.current) setLens("reader");
     // `lens` in the deps, not just `session`: the profile effect sets the saved
     // lens AFTER this runs, and for a signed-out reader `session` stays null
     // forever — so on [session] alone this never fired again and every reader
     // with a saved pro lens got the sign-in wall as the whole story. That is
     // the first thing a mobile visitor from a shared link sees.
+    //
+    // But watching `lens` also caught the reader TAPPING a pro lens: the tab
+    // set it and this reverted it in the same commit, so every lens control on
+    // the page — tabs, pinned rail, keyboard 1/2/3 — was a dead button for a
+    // signed-out reader. The whole point of flipping to a locked lens is to
+    // show the re-typeset and the inline unlock prompt, so a deliberate pick
+    // is exempt; only a profile-restored lens gets snapped back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, lens]);
 
@@ -186,6 +196,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   // off-screen behind the reader's scroll position, so the re-typeset flip
   // happens where nobody can see it and the tap reads as a dead button.
   function pickLens(slug: string, scroll = true) {
+    readerPicked.current = true;
     setFlipped(true);
     setLens(slug);
     if (!scroll) return;
@@ -434,8 +445,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                     // below) — so a signed-out reader SEES the signature flip and
                     // keeps their place on the story instead of a hard bounce to
                     // /signin. No brief is fetched for a locked lens, so it stays free.
-                    setFlipped(true);
-                    setLens(slug);
+                    pickLens(slug, false);
                   }}
                   title={locked ? `Sign in to read the ${m.short} lens — ${m.plain ?? m.tagline} (free)` : undefined}
                   className="flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
