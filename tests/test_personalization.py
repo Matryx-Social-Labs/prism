@@ -1,7 +1,25 @@
 """Milestone A checks: taxonomy validation, lens applicability, interests parsing."""
 
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+
+from api.main import app
+from common.db import session_scope
 from common.taxonomy import TAXONOMY, valid_subsector
 from correlation.briefs import available_lenses
+
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+
+async def _db_reachable() -> bool:
+    try:
+        async with session_scope() as s:
+            await s.execute(text("SELECT 1"))
+        return True
+    except (SQLAlchemyError, OSError):
+        return False
 
 
 def test_valid_subsector():
@@ -87,3 +105,40 @@ def test_template_briefs_structured():
     )
     assert b["reader"]["text"] and b["cyber"]["text"]
     assert "Upgrade to 7.2.12" in b["cyber"]["points"]
+
+
+async def test_lens_ranks_the_world_it_does_not_filter_it():
+    """A lens is a way of RE-READING the world, not a filter that shrinks it.
+
+    REGRESSION: the feed used `sectors = active_lens.sectors` as a hard SQL
+    filter when the reader had no explicit interests. The cyber lens declares
+    sectors=["cybersecurity"], so every signed-in cyber reader got a
+    cybersecurity-only feed — no elections, no markets, no world news. The lens
+    must shape the feed through ranking weights instead.
+
+    Same principle already settled for languages: hard-filtering a news feed
+    hides major events entirely.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                text("SELECT DISTINCT sector FROM events WHERE sector IS NOT NULL LIMIT 3")
+            )
+        ).scalars().all()
+    if len(rows) < 2:
+        pytest.skip("needs at least two classified sectors")
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://t") as c:
+        r = await c.get("/api/v1/feed", params={"lens": "cyber", "limit": 60, "sort": "top"})
+        assert r.status_code == 200
+        sectors = {i["sector"] for i in r.json()["items"] if i["sector"]}
+
+    # The exact mix depends on the corpus; the invariant is that a pro lens never
+    # collapses the feed to its own sector.
+    assert sectors - {"cybersecurity"}, (
+        f"cyber lens returned only {sectors} — the lens is filtering the feed, not ranking it"
+    )

@@ -42,11 +42,25 @@ async def get_feed(
         if sub and sub in TAXONOMY[sec]:
             interest_pairs[sec].add(sub)
     if sector:
+        # An explicit ?sector= is the reader asking for exactly that — honour it.
         sectors = [sector]
     elif interest_pairs:
         sectors = list(interest_pairs)
     else:
-        sectors = active_lens.sectors
+        # NOT active_lens.sectors. A lens is a way of RE-READING the world, not a
+        # filter that shrinks it: the cyber lens declares sectors=["cybersecurity"],
+        # so this line turned the entire feed into a cybersecurity-only feed for a
+        # signed-in cyber reader — no elections, no markets, no world news at all.
+        #
+        # The lens still shapes the feed through score_event()'s RankingWeights
+        # (severity, exploited, price_impact), which is the right lever: it moves
+        # relevant stories UP without making everything else disappear. Raw CVE
+        # records are still gated separately by include_cve_records below.
+        #
+        # Same principle already settled for languages: hard-filtering a news feed
+        # hides major events from the reader entirely. Rank, don't filter; leave
+        # hard filters to explicit user action.
+        sectors = None
     # Candidate window is per-sector so a high-churn sector (thousands of
     # CVE updates a day) can't evict everyone else's news before ranking.
     rows = (

@@ -24,6 +24,27 @@ class MockResizeObserver implements ResizeObserver {
 
 // jsdom's scrollTo is a no-op that warns; make it actually move scrollY so the
 // hook's "did the position stick?" check exercises real logic.
+// This jsdom build ships sessionStorage but NOT localStorage — window.localStorage
+// exists as an object with no methods, so anything touching it (the profile, the
+// session, the scope preference) would throw or silently no-op in tests rather
+// than exercise the real code path. Give it a working implementation.
+if (typeof window.localStorage?.setItem !== "function") {
+  const store = new Map<string, string>();
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => void store.set(k, String(v)),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+      key: (i: number) => [...store.keys()][i] ?? null,
+      get length() {
+        return store.size;
+      },
+    },
+  });
+}
+
 // jsdom implements neither window.scrollTo nor Element.prototype.scrollTo. The
 // element one is a no-op here (AskPanel just pins its transcript to the bottom);
 // the window one below actually moves scrollY so useScrollRestore is exercised.

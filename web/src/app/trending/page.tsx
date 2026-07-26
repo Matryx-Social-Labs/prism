@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
+import { loadScope, saveScope } from "@/lib/scope";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
 type Scope = "region" | "world";
@@ -30,11 +31,19 @@ export default function TrendingPage() {
 
   useEffect(() => {
     const p = loadProfile();
-    if (p?.state) {
-      setState(p.state);
-      setScope("region");
-    }
+    if (p?.state) setState(p.state);
+    // Honour the scope the reader chose on the Feed — the sheet says it applies
+    // everywhere, so it has to. Trending has no "all" tier, so the world-wide
+    // choice lands on its closest equivalent (national).
+    const saved = loadScope();
+    if (saved) setScope(saved === "region" ? "region" : "world");
+    else if (p?.state) setScope("region");
   }, []);
+
+  const chooseScope = (next: Scope) => {
+    setScope(next);
+    saveScope(next);
+  };
 
   useEffect(() => {
     setStories(null);
@@ -128,7 +137,7 @@ export default function TrendingPage() {
               <button
                 key={value}
                 onClick={() => {
-                  setScope(value);
+                  chooseScope(value);
                   setScopeOpen(false);
                 }}
                 disabled={value === "region" && !state}

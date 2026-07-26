@@ -17,6 +17,7 @@ import {
 import { langNative } from "@/lib/languages";
 import { lensMeta } from "@/lib/lenses";
 import { loadProfile, type Profile } from "@/lib/profile";
+import { loadScope, saveScope } from "@/lib/scope";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useSession } from "@/lib/session";
 import { watchlistEvents, type WatchEvent } from "@/lib/watchlist";
@@ -62,7 +63,12 @@ export default function FeedPage() {
     const p = loadProfile();
     setProfile(p);
     if (p?.lens) setLens(p.lens);
-    if (p?.state && !restoredCache.current) setScope("region"); // default to the reader's state (unless restored)
+    // A SAVED scope always wins. Only fall back to "your state" when the reader
+    // has never chosen — otherwise picking World and reloading snapped straight
+    // back to region, because this ran on every fresh mount.
+    const saved = loadScope();
+    if (saved) setScope(saved);
+    else if (p?.state && !restoredCache.current) setScope("region");
   }, []);
 
   useEffect(() => {
@@ -116,6 +122,12 @@ export default function FeedPage() {
       cancelled = true;
     };
   }, [lens, profile]);
+
+  // Persist the reader's choice so it survives a reload and carries to Trending.
+  const chooseScope = (next: Scope) => {
+    setScope(next);
+    saveScope(next);
+  };
 
   // Mirror the feed DATA into the module cache so a return navigation renders
   // instantly (no skeleton). Scroll lives in sessionStorage (survives everything).
@@ -414,7 +426,7 @@ export default function FeedPage() {
               <button
                 key={value}
                 onClick={() => {
-                  setScope(value);
+                  chooseScope(value);
                   setScopeOpen(false);
                 }}
                 disabled={value !== "all" && !profile?.state}
