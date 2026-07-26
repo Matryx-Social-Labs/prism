@@ -11,7 +11,7 @@ import { useScrollRestore } from "@/lib/useScrollRestore";
 
 // Trending has no "all" tier — National IS everything here. Narrowed from the
 // shared union so adding a member forces a decision at this call site.
-type Scope = Extract<SharedScope, "region" | "world">;
+type Scope = Extract<SharedScope, "region" | "national">;
 const SECTORS = [
   { slug: null as string | null, label: "All sectors" },
   { slug: "politics", label: "Politics" },
@@ -26,7 +26,7 @@ const SECTORS = [
 
 export default function TrendingPage() {
   const [state, setState] = useState<string | null>(null);
-  const [scope, setScope] = useState<Scope>("world");
+  const [scope, setScope] = useState<Scope>("national");
   const [scopeOpen, setScopeOpen] = useState(false);
   const [sector, setSector] = useState<string | null>(null);
   const [stories, setStories] = useState<TrendingStory[] | null>(null);
@@ -35,22 +35,22 @@ export default function TrendingPage() {
     const p = loadProfile();
     if (p?.state) setState(p.state);
     // Honour the scope the reader chose on the Feed — the sheet says it applies
-    // everywhere, so it has to. Trending has no "all" tier, so the world-wide
+    // everywhere, so it has to. Trending has no "all" tier, so the everything
     // choice lands on its closest equivalent (national).
     const saved = loadScope(Boolean(p?.state));
-    if (saved) setScope(saved === "region" ? "region" : "world");
+    if (saved) setScope(saved === "region" ? "region" : "national");
     else if (p?.state) setScope("region");
   }, []);
 
   const chooseScope = (next: Scope) => {
     setScope(next);
-    // Trending only speaks two tiers, the Feed speaks three. Writing "world"
+    // Trending only speaks two tiers, the Feed speaks three. Writing "national"
     // back over a Feed-saved "all" silently narrowed it: on the Feed "all" is
-    // everything, while "world" EXCLUDES the reader's own state — so tapping
+    // everything, while "national" EXCLUDES the reader's own state — so tapping
     // National here quietly hid their state's news over there, which they never
     // asked for. Both render as National on this page, so keeping the wider
     // value is invisible here and lossless there.
-    saveScope(next === "world" && loadScope() === "all" ? "all" : next);
+    saveScope(next === "national" && loadScope() === "all" ? "all" : next);
   };
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function TrendingPage() {
   const scopeOpts: [Scope, string][] = useMemo(
     () => [
       ["region", state ? `Your state — ${stateLabel(state)}` : "Your state"],
-      ["world", "National"],
+      ["national", "National"],
     ],
     [state],
   );
@@ -94,7 +94,7 @@ export default function TrendingPage() {
         </h1>
         <button
           onClick={() => setScopeOpen(true)}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
+          className="ml-auto inline-flex h-11 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
           style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
         >
           ◉ {scopeLabel} <span style={{ color: "var(--ink-faint)" }}>▾</span>

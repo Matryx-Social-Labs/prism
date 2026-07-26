@@ -19,6 +19,6 @@ describe("scope on the server", () => {
 
   // A throw here is a 500 on the server render, not a degraded preference.
   it("swallows a write instead of crashing the render", () => {
-    expect(() => saveScope("world")).not.toThrow();
+    expect(() => saveScope("national")).not.toThrow();
   });
 });

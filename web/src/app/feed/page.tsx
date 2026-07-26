@@ -178,12 +178,12 @@ export default function FeedPage() {
   const pulse = lensMeta("markets");
   const languages = profile?.languages?.length ? profile.languages : ["en"];
   const primaryLang = languages[0];
-  const scopeLabel = scope === "region" ? stateName ?? "Your state" : scope === "world" ? "National" : "World";
+  const scopeLabel = scope === "region" ? stateName ?? "Your state" : scope === "national" ? "National" : "All";
 
   const scopeOpts: [Scope, string][] = [
     ["region", stateName ? `Your state — ${stateName}` : "Your state"],
-    ["world", "National"],
-    ["all", "World"],
+    ["national", "National"],
+    ["all", "All"],
   ];
 
   return (
@@ -209,7 +209,7 @@ export default function FeedPage() {
         </Link>
         <button
           onClick={() => setScopeOpen(true)}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
+          className="ml-auto inline-flex h-11 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
           style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
         >
           ◉ {scopeLabel} <span style={{ color: "var(--ink-faint)" }}>▾</span>
@@ -217,7 +217,7 @@ export default function FeedPage() {
         <Link
           href="/interests"
           title="Language preferences — rank the feed, never filter it"
-          className="flex h-9 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold"
+          className="flex h-11 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold"
           style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
         >
           <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

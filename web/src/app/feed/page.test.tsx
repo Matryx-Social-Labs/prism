@@ -35,14 +35,14 @@ beforeEach(() => {
 
 describe("Feed — scope", () => {
   // REGRESSION: scope was per-page state re-seeded from the profile on every
-  // mount, so picking World and reloading snapped straight back to your state.
-  it("keeps the World the reader picked instead of snapping back to their state", async () => {
-    localStorage.setItem("parse.scope.v1", "all");
+  // mount, so picking All and reloading snapped straight back to your state.
+  it("keeps the All the reader picked instead of snapping back to their state", async () => {
+    localStorage.setItem("parse.scope.v2", "all");
     loadProfile.mockReturnValue({ state: "IN-KL" });
 
     render(<FeedPage />);
 
-    expect(await screen.findByRole("button", { name: /World/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /All/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Kerala/ })).not.toBeInTheDocument();
   });
 
@@ -52,11 +52,11 @@ describe("Feed — scope", () => {
   // unfiltered feed, and the sheet's own option was disabled so the reader was
   // stuck with a label that lied.
   it("does not claim Your state when the reader has no state", async () => {
-    localStorage.setItem("parse.scope.v1", "region");
+    localStorage.setItem("parse.scope.v2", "region");
 
     render(<FeedPage />);
 
-    expect(await screen.findByRole("button", { name: /World/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /All/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Your state/ })).not.toBeInTheDocument();
   });
 
@@ -75,6 +75,6 @@ describe("Feed — scope", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Kerala/ }));
     await userEvent.click(await screen.findByRole("button", { name: "National" }));
 
-    expect(localStorage.getItem("parse.scope.v1")).toBe("world");
+    expect(localStorage.getItem("parse.scope.v2")).toBe("national");
   });
 });

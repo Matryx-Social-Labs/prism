@@ -66,7 +66,7 @@ describe("Feed — the module cache on a return navigation", () => {
   // module cache is the only memory the Feed has — and the mount effect's
   // "no saved scope, so default to their state" fallback would overwrite it on
   // every return from a story, silently dragging the reader back to Kerala
-  // after they asked for World. `restoredCache` is what stops that.
+  // after they asked for All. `restoredCache` is what stops that.
   it("keeps a pick that could not be persisted when the reader comes back", async () => {
     const boom = () => {
       throw new DOMException("denied", "SecurityError");
@@ -80,13 +80,13 @@ describe("Feed — the module cache on a return navigation", () => {
     await screen.findByText(ITEM.title);
 
     await userEvent.click(screen.getByRole("button", { name: /Kerala/ }));
-    await userEvent.click(await screen.findByRole("button", { name: "World" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /World/ })).toBeInTheDocument());
+    await userEvent.click(await screen.findByRole("button", { name: "All" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /All/ })).toBeInTheDocument());
 
     first.unmount(); // tap a story…
     render(<FeedPage />); // …and come back
 
-    expect(await screen.findByRole("button", { name: /World/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /All/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Kerala/ })).not.toBeInTheDocument();
     // Restored from the module cache, so the reader's place is there immediately.
     expect(screen.getByText(ITEM.title)).toBeInTheDocument();

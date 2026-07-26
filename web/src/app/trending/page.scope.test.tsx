@@ -21,7 +21,7 @@ describe("Trending — the scope the reader chose elsewhere", () => {
   // The scope sheet promises "Applies everywhere". Trending has no "all" tier,
   // so the world-wide choice has to land on its closest equivalent.
   it("opens on National when the reader picked World on the Feed", async () => {
-    localStorage.setItem("parse.scope.v1", "all");
+    localStorage.setItem("parse.scope.v2", "all");
     loadProfile.mockReturnValue({ state: "IN-KL" });
 
     render(<TrendingPage />);
@@ -36,7 +36,7 @@ describe("Trending — the scope the reader chose elsewhere", () => {
   // unfiltered list, and the sheet's own option was disabled so the reader
   // could not correct it.
   it("does not claim Your state when the reader has no state", async () => {
-    localStorage.setItem("parse.scope.v1", "region");
+    localStorage.setItem("parse.scope.v2", "region");
 
     render(<TrendingPage />);
 
@@ -49,7 +49,7 @@ describe("Trending — the scope the reader chose elsewhere", () => {
   // the surface where "region" is a real filter (its own default is National),
   // so a dropped saved scope shows up as the wrong list, not just a wrong label.
   it("opens on the reader's state when that is what they saved", async () => {
-    localStorage.setItem("parse.scope.v1", "region");
+    localStorage.setItem("parse.scope.v2", "region");
     loadProfile.mockReturnValue({ state: "IN-KL" });
 
     render(<TrendingPage />);
@@ -67,6 +67,6 @@ describe("Trending — the scope the reader chose elsewhere", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Kerala/ }));
     await userEvent.click(await screen.findByRole("button", { name: "National" }));
 
-    expect(localStorage.getItem("parse.scope.v1")).toBe("world");
+    expect(localStorage.getItem("parse.scope.v2")).toBe("national");
   });
 });

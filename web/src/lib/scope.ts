@@ -12,9 +12,14 @@
 // identity, and writing it shouldn't churn the profile object the feed query
 // depends on.
 
-export type Scope = "all" | "region" | "world";
+export type Scope = "all" | "region" | "national";
 
-const KEY = "parse.scope.v1";
+// v2: the member formerly called "world" is now "national". The old name was
+// the inverse of what it meant — "world" was the tier that EXCLUDES everything
+// outside your state, while "all" was the worldwide one — so a raw value in
+// devtools read backwards. Bumping the key rather than migrating: a view
+// preference re-defaulting once is cheaper than a migration path to maintain.
+const KEY = "parse.scope.v2";
 
 /**
  * `hasState` — whether the reader currently has a state on their profile.
@@ -25,22 +30,22 @@ const KEY = "parse.scope.v1";
  * actually unfiltered — a label naming a filter that isn't applied, and the
  * sheet's own option is disabled so the reader can't correct it.
  *
- * Both "region" AND "world" are state-relative on the Feed: region is my state,
- * world is "National" — everything that is NOT my state. Neither means anything
+ * Both "region" AND "national" are state-relative on the Feed: region is my
+ * state, national is everything that is NOT my state. Neither means anything
  * without one, and the Feed's filter short-circuits on `!profile.state`. So a
  * stateless reader who picked National on Trending (enabled there, because
  * Trending's National is absolute) walked back to a Feed labelled "National"
- * over unfiltered stories with the option greyed out. Only "all" — the whole
- * world, no tiering — still means something with no state.
+ * over unfiltered stories with the option greyed out. Only "all" — everything,
+ * no tiering — still means something with no state.
  *
- * Nulling "world" costs Trending nothing: its own default is already "world",
+ * Nulling "national" costs Trending nothing: that is already its own default,
  * so a stateless reader still lands on National, just not via a stored value.
  */
 export function loadScope(hasState = true): Scope | null {
   if (typeof window === "undefined") return null; // SSR: caller keeps its default
   try {
     const v = window.localStorage.getItem(KEY);
-    if (v !== "all" && v !== "region" && v !== "world") return null;
+    if (v !== "all" && v !== "region" && v !== "national") return null;
     if (!hasState && v !== "all") return null;
     return v;
   } catch {

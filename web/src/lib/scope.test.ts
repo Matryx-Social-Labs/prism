@@ -11,8 +11,8 @@ describe("scope persistence", () => {
   // re-defaulted to "region" on every fresh mount. Picking World and refreshing
   // snapped straight back to your state.
   it("survives a reload", () => {
-    saveScope("world");
-    expect(loadScope()).toBe("world");
+    saveScope("national");
+    expect(loadScope()).toBe("national");
   });
 
   it("returns null when the reader has never chosen, so the caller can default", () => {
@@ -20,11 +20,11 @@ describe("scope persistence", () => {
   });
 
   it("ignores a corrupt value rather than trusting it", () => {
-    localStorage.setItem("parse.scope.v1", "everywhere");
+    localStorage.setItem("parse.scope.v2", "everywhere");
     expect(loadScope()).toBeNull();
   });
 
-  it.each(["all", "region", "world"] as const)("round-trips %s", (s) => {
+  it.each(["all", "region", "national"] as const)("round-trips %s", (s) => {
     saveScope(s);
     expect(loadScope()).toBe(s);
   });
@@ -35,7 +35,7 @@ describe("scope persistence", () => {
       throw new DOMException("denied", "SecurityError");
     };
     vi.stubGlobal("localStorage", { getItem: boom, setItem: boom });
-    expect(() => saveScope("world")).not.toThrow();
+    expect(() => saveScope("national")).not.toThrow();
     expect(loadScope()).toBeNull();
   });
 });
@@ -60,10 +60,10 @@ describe("scope / profile desync", () => {
   // A stateless reader could reach it from Trending (where National is absolute
   // and the option is enabled) and land back on a Feed labelled "National" over
   // unfiltered stories, with the Feed's own option greyed out.
-  it("ignores a saved world scope when the reader has no state", () => {
-    saveScope("world");
+  it("ignores a saved national scope when the reader has no state", () => {
+    saveScope("national");
     expect(loadScope(false)).toBeNull();
-    expect(loadScope(true)).toBe("world");
+    expect(loadScope(true)).toBe("national");
   });
 
   it("keeps 'all' regardless of state — the whole world needs no state", () => {
