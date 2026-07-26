@@ -1,7 +1,79 @@
 """Milestone A checks: taxonomy validation, lens applicability, interests parsing."""
 
+import contextlib
+import json
+import uuid
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+
+from api.main import app
+from common.db import session_scope
 from common.taxonomy import TAXONOMY, valid_subsector
 from correlation.briefs import available_lenses
+
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+
+async def _db_reachable() -> bool:
+    try:
+        async with session_scope() as s:
+            await s.execute(text("SELECT 1"))
+        return True
+    except (SQLAlchemyError, OSError):
+        return False
+
+
+# source_slugs shapes the candidate window has to tell apart. Only a set of
+# slugs that is non-empty AND wholly inside the record feeds is a raw record.
+_NEWS_SHAPES: dict[str, list[str] | None] = {
+    "newsroom": ["reuters"],
+    "mixed": ["nvd", "reuters"],  # NVD *plus* a newsroom is coverage, not a record
+    "empty": [],  # '[]' <@ anything is TRUE in jsonb — hence the length guard
+    "absent": None,  # no source_slugs key at all
+}
+
+
+@contextlib.asynccontextmanager
+async def _cyber_corpus(records: int = 200):
+    """Seed cybersecurity: `records` raw CVE rows plus one event per news shape.
+
+    Records are stamped NEWER than the news, which is the production shape — NVD
+    re-scans and re-stamps thousands of rows a day, so raw records are
+    permanently "latest". Everything is deleted again on exit: DATABASE_URL is
+    the developer's own database, there is no test DB, and rows left behind show
+    up as fake stories in the local feed.
+    """
+    record_ids = [uuid.uuid4() for _ in range(records)]
+    news_ids = {shape: uuid.uuid4() for shape in _NEWS_SHAPES}
+    insert = text(
+        "INSERT INTO events (id,title,summary,sector,projection,last_updated_at) VALUES "
+        "(:i,:t,'s','cybersecurity',CAST(:p AS jsonb), now() + CAST(:age AS int) * interval '1 minute')"
+    )
+    async with session_scope() as s:
+        for i, eid in enumerate(record_ids):
+            await s.execute(
+                insert,
+                {"i": str(eid), "t": f"CVE-2099-{i:04d}", "age": 10,
+                 "p": json.dumps({"source_slugs": ["nvd"]})},
+            )
+        for shape, eid in news_ids.items():
+            slugs = _NEWS_SHAPES[shape]
+            await s.execute(
+                insert,
+                {"i": str(eid), "t": f"cyber newsroom story ({shape})", "age": 5,
+                 "p": json.dumps({} if slugs is None else {"source_slugs": slugs})},
+            )
+    try:
+        yield news_ids, record_ids
+    finally:
+        async with session_scope() as s:
+            await s.execute(
+                text("DELETE FROM events WHERE id = ANY(CAST(:e AS uuid[]))"),
+                {"e": [str(i) for i in (*record_ids, *news_ids.values())]},
+            )
 
 
 def test_valid_subsector():
@@ -87,3 +159,143 @@ def test_template_briefs_structured():
     )
     assert b["reader"]["text"] and b["cyber"]["text"]
     assert "Upgrade to 7.2.12" in b["cyber"]["points"]
+
+
+async def test_lens_ranks_the_world_it_does_not_filter_it():
+    """A lens is a way of RE-READING the world, not a filter that shrinks it.
+
+    REGRESSION: the feed used `sectors = active_lens.sectors` as a hard SQL
+    filter when the reader had no explicit interests. The cyber lens declares
+    sectors=["cybersecurity"], so every signed-in cyber reader got a
+    cybersecurity-only feed — no elections, no markets, no world news. The lens
+    must shape the feed through ranking weights instead.
+
+    Same principle already settled for languages: hard-filtering a news feed
+    hides major events entirely.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                text("SELECT DISTINCT sector FROM events WHERE sector IS NOT NULL LIMIT 3")
+            )
+        ).scalars().all()
+    if len(rows) < 2:
+        pytest.skip("needs at least two classified sectors")
+
+    transport = ASGITransport(app=app)
+    # Both sorts, because they collapse for different reasons and "top" alone
+    # missed the live bug: latest is the DEFAULT the app actually requests, and
+    # under it raw CVE records — machine-stamped, so permanently newest — owned
+    # every slot even after the sector filter was removed.
+    for sort in ("top", "latest"):
+        async with AsyncClient(transport=transport, base_url="http://t") as c:
+            r = await c.get("/api/v1/feed", params={"lens": "cyber", "limit": 60, "sort": sort})
+            assert r.status_code == 200
+            sectors = {i["sector"] for i in r.json()["items"] if i["sector"]}
+
+        # The exact mix depends on the corpus; the invariant is that a pro lens never
+        # collapses the feed to its own sector.
+        assert sectors - {"cybersecurity"}, (
+            f"cyber lens sort={sort} returned only {sectors} — "
+            "the lens is filtering the feed, not ranking it"
+        )
+
+
+async def test_cyber_news_survives_a_corpus_dominated_by_raw_records():
+    """Real cybersecurity journalism must reach the reader, not just CVE rows.
+
+    REGRESSION: the candidate window (rn <= 120 per sector) ran in SQL while the
+    include_cve_records filter ran in Python afterwards. With ~5.6k CVE records
+    against ~70 cyber stories, the window came back 120/120 records — so the
+    general lens dropped all of them and showed ZERO cybersecurity, while the
+    cyber lens showed a changelog with no journalism in it. The window now gives
+    records and news separate quotas within the sector.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async with session_scope() as session:
+        news = (
+            await session.execute(
+                text(
+                    "SELECT count(*) FROM events WHERE sector = 'cybersecurity' AND NOT ("
+                    "  COALESCE(jsonb_array_length(projection->'source_slugs'), 0) > 0"
+                    "  AND (projection->'source_slugs') <@ '[\"nvd\", \"cisa_kev\"]'::jsonb)"
+                )
+            )
+        ).scalar()
+    if not news:
+        pytest.skip("no non-record cybersecurity events in the corpus")
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://t") as c:
+        r = await c.get("/api/v1/feed", params={"lens": "general", "limit": 60})
+        assert r.status_code == 200
+        items = r.json()["items"]
+
+    assert any(i["sector"] == "cybersecurity" for i in items), (
+        "no cybersecurity story reached the general reader — raw records are "
+        "filling the candidate window before the CVE filter can run"
+    )
+
+
+async def _feed(**params) -> list[dict]:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.get("/api/v1/feed", params=params)
+    assert r.status_code == 200, r.text
+    return r.json()["items"]
+
+
+async def test_seeded_record_flood_cannot_evict_the_news_beside_it():
+    """The same regression as the corpus test above, but it seeds its own flood.
+
+    The corpus version skips on an empty database, so CI — which runs Postgres
+    and `alembic upgrade head` but no ingestion — has been proving nothing about
+    this SQL on every PR. This one plants 200 raw CVE rows newer than everything
+    else in the database and checks the four real cyber stories still arrive.
+
+    Under a plain `PARTITION BY e.sector` window the 200 records own all 120
+    candidate slots, the Python CVE filter drops every one of them, and the
+    reader sees zero cybersecurity.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async with _cyber_corpus() as (news_ids, record_ids):
+        # lens=reader is the general reader (DEFAULT_LENS): include_cve_records=False.
+        ids = {i["id"] for i in await _feed(lens="reader", sector="cybersecurity", limit=60)}
+
+    missing = sorted(shape for shape, eid in news_ids.items() if str(eid) not in ids)
+    assert not missing, (
+        f"cyber news {missing} never reached the general reader — 200 raw records "
+        "are filling the candidate window before the CVE filter can run"
+    )
+    assert not ids & {str(i) for i in record_ids}, "raw CVE records leaked to the general reader"
+
+
+async def test_only_wholly_record_sourced_events_count_as_records():
+    """`<@` containment, both halves of it.
+
+    An event sourced from NVD alone is a database row. The same CVE once Reuters
+    writes it up is a story, and mixed sourcing is the only signal we have for
+    that. `[]`/absent is not a record either — which needs saying twice, because
+    in jsonb `'[]' <@ anything` is TRUE, so without the array-length guard every
+    unsourced event would be filed as a record and evicted with them.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async with _cyber_corpus() as (news_ids, record_ids):
+        general = {i["id"] for i in await _feed(lens="reader", sector="cybersecurity", limit=60)}
+        cyber = {i["id"] for i in await _feed(lens="cyber", sector="cybersecurity", limit=100)}
+
+    for shape in _NEWS_SHAPES:
+        assert str(news_ids[shape]) in general, (
+            f"source_slugs={_NEWS_SHAPES[shape]!r} was classified as a raw record"
+        )
+    # The lens that wants records still gets them — the split is a classification,
+    # not a second way of hiding cyber content.
+    assert cyber & {str(i) for i in record_ids}, "the cyber lens lost its raw records"

@@ -21,7 +21,8 @@ with citations and refusal, verified against live multi-source events.
 
 **Milestone 1.3 — Personalization. ◐ in progress** Done: onboarding captures the role and selects
 a lens (localStorage profile); a declarative lens registry (`common/lenses.py`) drives per-lens
-feed ranking, sector defaults, and suggested questions; landing page + lens switcher. Remaining:
+feed ranking and suggested questions (ranking only — a lens never scopes the feed by sector);
+landing page + lens switcher. Remaining:
 real accounts, follow rules for specific vendors/products/CVEs/tickers, and alerts.
 
 **Milestone 1.4 — Prosumer subscription.** Accounts, plans, and billing for individual security and

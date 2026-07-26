@@ -17,11 +17,11 @@ import {
 import { langNative } from "@/lib/languages";
 import { lensMeta } from "@/lib/lenses";
 import { loadProfile, type Profile } from "@/lib/profile";
+import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useSession } from "@/lib/session";
 import { watchlistEvents, type WatchEvent } from "@/lib/watchlist";
 
-type Scope = "all" | "region" | "world";
 
 // Session-scoped cache so returning from a story restores the feed instantly at
 // the reader's scroll position (no reload/skeleton, no scroll-to-top). Lives at
@@ -62,7 +62,12 @@ export default function FeedPage() {
     const p = loadProfile();
     setProfile(p);
     if (p?.lens) setLens(p.lens);
-    if (p?.state && !restoredCache.current) setScope("region"); // default to the reader's state (unless restored)
+    // A SAVED scope always wins. Only fall back to "your state" when the reader
+    // has never chosen — otherwise picking World and reloading snapped straight
+    // back to region, because this ran on every fresh mount.
+    const saved = loadScope(Boolean(p?.state));
+    if (saved) setScope(saved);
+    else if (p?.state && !restoredCache.current) setScope("region");
   }, []);
 
   useEffect(() => {
@@ -117,6 +122,12 @@ export default function FeedPage() {
     };
   }, [lens, profile]);
 
+  // Persist the reader's choice so it survives a reload and carries to Trending.
+  const chooseScope = (next: Scope) => {
+    setScope(next);
+    saveScope(next);
+  };
+
   // Mirror the feed DATA into the module cache so a return navigation renders
   // instantly (no skeleton). Scroll lives in sessionStorage (survives everything).
   useEffect(() => {
@@ -167,12 +178,12 @@ export default function FeedPage() {
   const pulse = lensMeta("markets");
   const languages = profile?.languages?.length ? profile.languages : ["en"];
   const primaryLang = languages[0];
-  const scopeLabel = scope === "region" ? stateName ?? "Your state" : scope === "world" ? "National" : "World";
+  const scopeLabel = scope === "region" ? stateName ?? "Your state" : scope === "national" ? "National" : "All";
 
   const scopeOpts: [Scope, string][] = [
     ["region", stateName ? `Your state — ${stateName}` : "Your state"],
-    ["world", "National"],
-    ["all", "World"],
+    ["national", "National"],
+    ["all", "All"],
   ];
 
   return (
@@ -198,7 +209,7 @@ export default function FeedPage() {
         </Link>
         <button
           onClick={() => setScopeOpen(true)}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
+          className="ml-auto inline-flex h-11 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
           style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
         >
           ◉ {scopeLabel} <span style={{ color: "var(--ink-faint)" }}>▾</span>
@@ -206,7 +217,7 @@ export default function FeedPage() {
         <Link
           href="/interests"
           title="Language preferences — rank the feed, never filter it"
-          className="flex h-9 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold"
+          className="flex h-11 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold"
           style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
         >
           <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -401,7 +412,7 @@ export default function FeedPage() {
       {/* scope bottom sheet */}
       {scopeOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end lg:absolute">
-          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "rgba(15,14,12,.4)" }} />
+          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "var(--scrim)" }} />
           <div className="relative rounded-t-[22px] px-5 pb-11 pt-3" style={{ background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}>
             <div className="mx-auto mb-3.5 h-1 w-9 rounded-full" style={{ background: "var(--line-strong)" }} />
             <h3 className="text-[18px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -414,10 +425,18 @@ export default function FeedPage() {
               <button
                 key={value}
                 onClick={() => {
-                  setScope(value);
+                  chooseScope(value);
                   setScopeOpen(false);
                 }}
                 disabled={value !== "all" && !profile?.state}
+                // A greyed row with no reason reads as a broken control, and
+                // disabled buttons leave the tab order so a screen reader gets
+                // nothing at all. Say why, and where to fix it.
+                title={
+                  value !== "all" && !profile?.state
+                    ? "Add your state in Your Parse to filter by region"
+                    : undefined
+                }
                 className="flex min-h-[48px] w-full items-center gap-2.5 border-b px-1 text-left text-[14.5px] disabled:opacity-40"
                 style={{ borderColor: "var(--line)", color: "var(--ink)", fontWeight: scope === value ? 600 : 500 }}
               >

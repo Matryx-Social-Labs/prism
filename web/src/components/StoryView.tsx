@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -93,6 +93,12 @@ export function StoryView({ event }: { event: EventDetail }) {
   const [briefLoading, setBriefLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
+  // Did the READER ask for this lens, or did it come back from their profile?
+  // The locked-lens guard below has to tell those apart, and `lens` alone can't.
+  const readerPicked = useRef(false);
+  // Tracks the previous session so the guard below can spot a sign-OUT rather
+  // than the steady state of never having been signed in.
+  const wasSignedIn = useRef(false);
 
   const registry = useLenses();
   const registrySlugs = registry.map((m) => m.slug);
@@ -135,15 +141,34 @@ export function StoryView({ event }: { event: EventDetail }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lens, event.id, session]);
 
-  // Never leave a signed-out reader parked on a locked pro lens (e.g. their
-  // saved profile lens): snap back to the general reader lens.
+  // Snap back to the reader lens only when a locked pro lens arrived from the
+  // PROFILE rather than from a tap. A deliberate pick is allowed to stay so the
+  // reader sees the flip and the inline unlock prompt.
   useEffect(() => {
-    if (isLocked(lens)) setLens("reader");
+    // The exemption belongs to the session it was granted under. useSession
+    // subscribes to the `storage` event, so signing out in ANOTHER tab flips
+    // this one to signed-out on a mounted story — without the reset, a stale
+    // readerPicked left that reader parked on a locked lens with the sign-in
+    // wall as the whole story, which is the exact thing this guard prevents.
+    //
+    // Keyed on the transition, not on `!session`: a signed-out reader is null
+    // the whole time, so resetting on the steady state cancelled their tap in
+    // the same commit and made every lens control dead again.
+    if (wasSignedIn.current && !session) readerPicked.current = false;
+    wasSignedIn.current = Boolean(session);
+    if (isLocked(lens) && !readerPicked.current) setLens("reader");
     // `lens` in the deps, not just `session`: the profile effect sets the saved
     // lens AFTER this runs, and for a signed-out reader `session` stays null
     // forever — so on [session] alone this never fired again and every reader
     // with a saved pro lens got the sign-in wall as the whole story. That is
     // the first thing a mobile visitor from a shared link sees.
+    //
+    // But watching `lens` also caught the reader TAPPING a pro lens: the tab
+    // set it and this reverted it in the same commit, so every lens control on
+    // the page — tabs, pinned rail, keyboard 1/2/3 — was a dead button for a
+    // signed-out reader. The whole point of flipping to a locked lens is to
+    // show the re-typeset and the inline unlock prompt, so a deliberate pick
+    // is exempt; only a profile-restored lens gets snapped back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, lens]);
 
@@ -186,6 +211,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   // off-screen behind the reader's scroll position, so the re-typeset flip
   // happens where nobody can see it and the tap reads as a dead button.
   function pickLens(slug: string, scroll = true) {
+    readerPicked.current = true;
     setFlipped(true);
     setLens(slug);
     if (!scroll) return;
@@ -434,8 +460,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                     // below) — so a signed-out reader SEES the signature flip and
                     // keeps their place on the story instead of a hard bounce to
                     // /signin. No brief is fetched for a locked lens, so it stays free.
-                    setFlipped(true);
-                    setLens(slug);
+                    pickLens(slug, false);
                   }}
                   title={locked ? `Sign in to read the ${m.short} lens — ${m.plain ?? m.tagline} (free)` : undefined}
                   className="flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
@@ -883,6 +908,12 @@ export function StoryView({ event }: { event: EventDetail }) {
               <button
                 key={slug}
                 onClick={() => pickLens(slug)}
+                // The lock is carried only by a faint colour and an aria-hidden
+                // glyph, so the accessible name was just "Markets" — identical to
+                // an unlocked lens. The desktop tab says it via title=, but a
+                // title is useless on touch, and this rail is the primary flip
+                // surface on a phone.
+                aria-label={locked ? `${m.short} lens — sign in to unlock, free` : undefined}
                 className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
                 style={
                   selected

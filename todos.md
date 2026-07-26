@@ -50,12 +50,6 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   regression in the redesign. Fix needs a thumbnail proxy/resizer we control (the CDNs allow
   browser requests but not datacenter ones), or per-CDN URL size params.
   Files: `web/next.config.ts`, `web/src/components/StoryCard.tsx`.
-- **Scope chip claims to apply everywhere but doesn't** (P2). The bottom sheet says "Applies
-  everywhere — Feed, Trending, Pulse and Search", but scope is per-page local state: Feed and
-  Trending each hold their own, with different option sets, and Pulse/Search have no scope at
-  all. Set "Your state" on Feed, tap Trending, silently get National. Either lift scope into
-  shared state (profile/localStorage + a `useScope()` hook) or change the copy.
-  Files: `web/src/app/feed/page.tsx`, `web/src/app/trending/page.tsx`.
 - **Feed and Trending fire throwaway requests on every mount** (P2). `loadProfile()` is a
   synchronous localStorage read but is called inside a mount effect, so the fetch effects run
   once with `profile: null` and again with the profile — ~3 discarded round trips per feed
@@ -86,3 +80,11 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   resolves names from `fetchRegions()`. Files: `web/src/app/feed/page.tsx`,
   `web/src/app/trending/page.tsx`, `web/src/components/StoryView.tsx`,
   `web/src/components/SiteHeader.tsx`, `web/src/components/BottomTabBar.tsx`.
+
+## Completed
+- **Scope chip claims to apply everywhere but doesn't** (was P2). Scope now lives in
+  `web/src/lib/scope.ts` (localStorage, `parse.scope.v2`) and is read by both Feed and
+  Trending, so the sheet's promise holds. The tiers were also unified to All / <state> /
+  National — the Feed had been calling the widest tier "World" while Trending called the same
+  thing "National" one tap away.
+  **Completed:** v0.0.72.0 (2026-07-26)

@@ -6,9 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
+import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
-type Scope = "region" | "world";
+// Trending has no "all" tier — National IS everything here. Narrowed from the
+// shared union so adding a member forces a decision at this call site.
+type Scope = Extract<SharedScope, "region" | "national">;
 const SECTORS = [
   { slug: null as string | null, label: "All sectors" },
   { slug: "politics", label: "Politics" },
@@ -23,18 +26,32 @@ const SECTORS = [
 
 export default function TrendingPage() {
   const [state, setState] = useState<string | null>(null);
-  const [scope, setScope] = useState<Scope>("world");
+  const [scope, setScope] = useState<Scope>("national");
   const [scopeOpen, setScopeOpen] = useState(false);
   const [sector, setSector] = useState<string | null>(null);
   const [stories, setStories] = useState<TrendingStory[] | null>(null);
 
   useEffect(() => {
     const p = loadProfile();
-    if (p?.state) {
-      setState(p.state);
-      setScope("region");
-    }
+    if (p?.state) setState(p.state);
+    // Honour the scope the reader chose on the Feed — the sheet says it applies
+    // everywhere, so it has to. Trending has no "all" tier, so the everything
+    // choice lands on its closest equivalent (national).
+    const saved = loadScope(Boolean(p?.state));
+    if (saved) setScope(saved === "region" ? "region" : "national");
+    else if (p?.state) setScope("region");
   }, []);
+
+  const chooseScope = (next: Scope) => {
+    setScope(next);
+    // Trending only speaks two tiers, the Feed speaks three. Writing "national"
+    // back over a Feed-saved "all" silently narrowed it: on the Feed "all" is
+    // everything, while "national" EXCLUDES the reader's own state — so tapping
+    // National here quietly hid their state's news over there, which they never
+    // asked for. Both render as National on this page, so keeping the wider
+    // value is invisible here and lossless there.
+    saveScope(next === "national" && loadScope() === "all" ? "all" : next);
+  };
 
   useEffect(() => {
     setStories(null);
@@ -59,7 +76,7 @@ export default function TrendingPage() {
   const scopeOpts: [Scope, string][] = useMemo(
     () => [
       ["region", state ? `Your state — ${stateLabel(state)}` : "Your state"],
-      ["world", "National"],
+      ["national", "National"],
     ],
     [state],
   );
@@ -77,7 +94,7 @@ export default function TrendingPage() {
         </h1>
         <button
           onClick={() => setScopeOpen(true)}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
+          className="ml-auto inline-flex h-11 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
           style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
         >
           ◉ {scopeLabel} <span style={{ color: "var(--ink-faint)" }}>▾</span>
@@ -115,7 +132,7 @@ export default function TrendingPage() {
 
       {scopeOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "rgba(15,14,12,.4)" }} />
+          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "var(--scrim)" }} />
           <div className="relative rounded-t-[22px] px-5 pb-11 pt-3" style={{ background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}>
             <div className="mx-auto mb-3.5 h-1 w-9 rounded-full" style={{ background: "var(--line-strong)" }} />
             <h3 className="text-[18px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -128,10 +145,15 @@ export default function TrendingPage() {
               <button
                 key={value}
                 onClick={() => {
-                  setScope(value);
+                  chooseScope(value);
                   setScopeOpen(false);
                 }}
                 disabled={value === "region" && !state}
+                title={
+                  value === "region" && !state
+                    ? "Add your state in Your Parse to filter by region"
+                    : undefined
+                }
                 className="flex min-h-[48px] w-full items-center gap-2.5 border-b px-1 text-left text-[14.5px] disabled:opacity-40"
                 style={{ borderColor: "var(--line)", color: "var(--ink)", fontWeight: scope === value ? 600 : 500 }}
               >
