@@ -52,6 +52,11 @@
   --shadow-card: 0 1px 2px rgb(25 22 19 / 0.05), 0 8px 24px -12px rgb(25 22 19 / 0.12);
   /* Sheet/modal scrim. Was the raw dark ground copy-pasted into two sheets. */
   --scrim: rgba(15, 14, 12, 0.4);
+  /* Mobile app header height. The feed's sector rail sticks directly beneath it,
+     and the two were coupled by a hardcoded 53px — so bumping the scope chip to a
+     44px tap target silently left a 12px band of content scrolling through behind
+     the rail. Both read this now. */
+  --app-header-h: 65px;
   --shadow-pop: 0 2px 6px rgb(25 22 19 / 0.07), 0 20px 44px -16px rgb(25 22 19 / 0.22);
 }
 
