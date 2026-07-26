@@ -35,7 +35,7 @@ export default function TrendingPage() {
     // Honour the scope the reader chose on the Feed — the sheet says it applies
     // everywhere, so it has to. Trending has no "all" tier, so the world-wide
     // choice lands on its closest equivalent (national).
-    const saved = loadScope();
+    const saved = loadScope(Boolean(p?.state));
     if (saved) setScope(saved === "region" ? "region" : "world");
     else if (p?.state) setScope("region");
   }, []);

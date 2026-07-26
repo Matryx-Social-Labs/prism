@@ -16,11 +16,23 @@ export type Scope = "all" | "region" | "world";
 
 const KEY = "parse.scope.v1";
 
-export function loadScope(): Scope | null {
+/**
+ * `hasState` — whether the reader currently has a state on their profile.
+ *
+ * Scope and profile live under separate keys, so they can drift: pick "Your
+ * state", later clear the state in your profile, and the saved "region" scope
+ * outlives the thing it referred to. The chip then reads "Your state" while the
+ * feed is actually unfiltered — a label naming a filter that isn't applied, and
+ * the sheet's own "Your state" option is disabled so the reader can't correct
+ * it. Treat a region scope with no state as not-a-choice and fall back.
+ */
+export function loadScope(hasState = true): Scope | null {
   if (typeof window === "undefined") return null; // SSR: caller keeps its default
   try {
     const v = window.localStorage.getItem(KEY);
-    return v === "all" || v === "region" || v === "world" ? v : null;
+    if (v !== "all" && v !== "region" && v !== "world") return null;
+    if (v === "region" && !hasState) return null;
+    return v;
   } catch {
     return null; // storage blocked (in-app webviews) — scope just won't persist
   }

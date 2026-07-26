@@ -39,3 +39,27 @@ describe("scope persistence", () => {
     expect(loadScope()).toBeNull();
   });
 });
+
+describe("scope / profile desync", () => {
+  // REGRESSION (ISSUE-001, found by /qa): scope and profile are separate keys, so
+  // they drift. Pick "Your state", later clear your state, and the saved "region"
+  // scope outlived it — the chip read "Your state" while the feed was actually
+  // unfiltered, and the sheet's own "Your state" option was disabled so the
+  // reader could not correct it.
+  it("ignores a saved region scope when the reader has no state", () => {
+    saveScope("region");
+    expect(loadScope(false)).toBeNull(); // caller falls back to its own default
+  });
+
+  it("still honours a region scope when the reader does have a state", () => {
+    saveScope("region");
+    expect(loadScope(true)).toBe("region");
+  });
+
+  it("leaves the non-region scopes alone regardless of state", () => {
+    saveScope("world");
+    expect(loadScope(false)).toBe("world");
+    saveScope("all");
+    expect(loadScope(false)).toBe("all");
+  });
+});

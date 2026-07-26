@@ -66,7 +66,7 @@ export default function FeedPage() {
     // A SAVED scope always wins. Only fall back to "your state" when the reader
     // has never chosen — otherwise picking World and reloading snapped straight
     // back to region, because this ran on every fresh mount.
-    const saved = loadScope();
+    const saved = loadScope(Boolean(p?.state));
     if (saved) setScope(saved);
     else if (p?.state && !restoredCache.current) setScope("region");
   }, []);
