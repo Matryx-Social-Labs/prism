@@ -30,6 +30,10 @@ export default function TrendingPage() {
   const [scopeOpen, setScopeOpen] = useState(false);
   const [sector, setSector] = useState<string | null>(null);
   const [stories, setStories] = useState<TrendingStory[] | null>(null);
+  // Same gate as the Feed: the profile is a client-only localStorage read, so the
+  // first render sees null and the fetch below would fire once national and again
+  // scoped. Wait for it instead of paying for a throwaway round trip.
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   useEffect(() => {
     const p = loadProfile();
@@ -40,6 +44,7 @@ export default function TrendingPage() {
     const saved = loadScope(Boolean(p?.state));
     if (saved) setScope(saved === "region" ? "region" : "national");
     else if (p?.state) setScope("region");
+    setProfileLoaded(true);
   }, []);
 
   const chooseScope = (next: Scope) => {
@@ -54,6 +59,7 @@ export default function TrendingPage() {
   };
 
   useEffect(() => {
+    if (!profileLoaded) return;
     setStories(null);
     // Mount fires world-scope then region-scope once the profile loads; if the
     // first lands last the list disagrees with the scope chip above it.
@@ -68,7 +74,7 @@ export default function TrendingPage() {
     return () => {
       cancelled = true;
     };
-  }, [scope, state, sector]);
+  }, [scope, state, sector, profileLoaded]);
 
   useScrollRestore("trending:scrollY", stories !== null);
 
