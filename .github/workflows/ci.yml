@@ -79,7 +79,7 @@ jobs:
           uv run alembic downgrade -1
           uv run alembic upgrade head
 
-      - name: Run tests (DB + Redis now present, so nothing skips)
+      - name: Run tests (DB + Redis present; 2 legacy corpus tests still skip on empty data)
         run: uv run pytest -q
 
   web:
