@@ -59,8 +59,6 @@ class MockIntersectionObserver implements IntersectionObserver {
 (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver =
   MockIntersectionObserver;
 
-// jsdom's scrollTo is a no-op that warns; make it actually move scrollY so the
-// hook's "did the position stick?" check exercises real logic.
 // This jsdom build ships sessionStorage but NOT localStorage — window.localStorage
 // exists as an object with no methods, so anything touching it (the profile, the
 // session, the scope preference) would throw or silently no-op in tests rather

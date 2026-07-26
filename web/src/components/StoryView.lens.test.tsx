@@ -92,3 +92,29 @@ describe("lens flip", () => {
     expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
   });
 });
+
+describe("lens flip — signing out mid-read", () => {
+  // REVIEW (maintainability + design, multi-specialist): readerPicked was set
+  // once and never cleared, so it meant "touched a lens control at some point",
+  // not "the current lens is a deliberate pick". useSession subscribes to the
+  // `storage` event, so signing out in ANOTHER tab flips this one to signed-out
+  // on a mounted story — and the stale ref left that reader parked on a locked
+  // lens with the sign-in wall as the whole story, the exact state the guard
+  // exists to prevent.
+  it("snaps back to reader when the session disappears from another tab", async () => {
+    localStorage.setItem(
+      "prism.session.v1",
+      JSON.stringify({ token: "t", userId: "u", email: "e@x.dev" }),
+    );
+    render(<StoryView event={EVENT} />);
+    await userEvent.click(screen.getAllByRole("tab", { name: /Cyber/ })[0]);
+    expect(await screen.findByText(CYBER_BRIEF)).toBeInTheDocument();
+
+    // Another tab signs out: the key goes away and `storage` fires.
+    localStorage.removeItem("prism.session.v1");
+    window.dispatchEvent(new StorageEvent("storage", { key: "prism.session.v1" }));
+
+    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+    expect(screen.queryByText(CYBER_BRIEF)).not.toBeInTheDocument();
+  });
+});

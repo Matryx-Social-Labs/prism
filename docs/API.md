@@ -71,14 +71,14 @@ The personalized, lens-shaped feed of canonical events.
 
 | Param | Type | Default | Effect |
 |---|---|---|---|
-| `lens` | string | `reader` | Lens whose sectors/ranking shape the feed. Unknown → `reader`. |
+| `lens` | string | `reader` | Lens whose RANKING shapes the feed — it no longer filters by sector, so `?lens=cyber` returns every sector, not cybersecurity only. Unknown → `reader`. |
 | `sector` | string | — | Restrict to one sector slug. |
 | `interests` | csv | — | Interest slugs (reader lens only) to boost. |
 | `region` | string | — | Country code; marks matching events `is_regional`. |
 | `state` | string | — | Sub-national code; local news ranks up. |
 | `languages` | csv | `en` | Preference order; ranks coverage + picks the served headline. |
-| `sort` | `latest`\|`top` | `latest` | `latest` = recency, `top` = personalization score. |
-| `limit` | int | 40 | Page size. |
+| `sort` | `latest`\|`top` | `latest` | `latest` = recency, then raw records (NVD/KEV) woven in two-stories-to-one so a record-including lens doesn't return a changelog. `top` = personalization score, never interleaved. |
+| `limit` | int | 30 | Maximum page size, clamped to 100. Best-effort: a thin corpus returns fewer. |
 
 `FeedResponse` = `{ "items": [FeedItem], "lens": "reader" }`. **FeedItem:**
 ```

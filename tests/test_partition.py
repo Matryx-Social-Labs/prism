@@ -175,8 +175,20 @@ async def test_persist_base_run_invariant_and_read():
             assert (await s.execute(text("SELECT status FROM partition_runs WHERE id=:r"), {"r": run_id})).scalar() == "superseded"
         assert run2 != run_id
     finally:
-        if prior:
-            async with session_scope() as s:
+        async with session_scope() as s:
+            # Only hand the old run back if it still EXISTS. persist_base_run
+            # prunes to PARTITION_RETENTION, and this test publishes two runs per
+            # call, so `prior` ages out of the keep-window after a few runs.
+            # Retiring the live run and then failing to restore a deleted one
+            # left the database with ZERO current runs — worse than the drift
+            # this teardown exists to undo. A freshly computed run is a perfectly
+            # valid current; only reclaim the old one when it's really there.
+            still_there = prior and (
+                await s.execute(
+                    text("SELECT 1 FROM partition_runs WHERE id = :p"), {"p": str(prior)}
+                )
+            ).scalar()
+            if still_there:
                 await s.execute(text("UPDATE partition_runs SET status='superseded' WHERE status='current'"))
                 await s.execute(
                     text("UPDATE partition_runs SET status='current' WHERE id = :p"), {"p": str(prior)}

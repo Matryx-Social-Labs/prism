@@ -6,10 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
-import { loadScope, saveScope } from "@/lib/scope";
+import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
-type Scope = "region" | "world";
+// Trending has no "all" tier — National IS everything here. Narrowed from the
+// shared union so adding a member forces a decision at this call site.
+type Scope = Extract<SharedScope, "region" | "world">;
 const SECTORS = [
   { slug: null as string | null, label: "All sectors" },
   { slug: "politics", label: "Politics" },
@@ -42,7 +44,13 @@ export default function TrendingPage() {
 
   const chooseScope = (next: Scope) => {
     setScope(next);
-    saveScope(next);
+    // Trending only speaks two tiers, the Feed speaks three. Writing "world"
+    // back over a Feed-saved "all" silently narrowed it: on the Feed "all" is
+    // everything, while "world" EXCLUDES the reader's own state — so tapping
+    // National here quietly hid their state's news over there, which they never
+    // asked for. Both render as National on this page, so keeping the wider
+    // value is invisible here and lossless there.
+    saveScope(next === "world" && loadScope() === "all" ? "all" : next);
   };
 
   useEffect(() => {
@@ -124,7 +132,7 @@ export default function TrendingPage() {
 
       {scopeOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "rgba(15,14,12,.4)" }} />
+          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "var(--scrim)" }} />
           <div className="relative rounded-t-[22px] px-5 pb-11 pt-3" style={{ background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}>
             <div className="mx-auto mb-3.5 h-1 w-9 rounded-full" style={{ background: "var(--line-strong)" }} />
             <h3 className="text-[18px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -141,6 +149,11 @@ export default function TrendingPage() {
                   setScopeOpen(false);
                 }}
                 disabled={value === "region" && !state}
+                title={
+                  value === "region" && !state
+                    ? "Add your state in Your Parse to filter by region"
+                    : undefined
+                }
                 className="flex min-h-[48px] w-full items-center gap-2.5 border-b px-1 text-left text-[14.5px] disabled:opacity-40"
                 style={{ borderColor: "var(--line)", color: "var(--ink)", fontWeight: scope === value ? 600 : 500 }}
               >
