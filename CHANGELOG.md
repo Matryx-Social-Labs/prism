@@ -16,8 +16,8 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   turned the whole feed into a vulnerability changelog: no elections, no markets,
   no world news, and — stranger still — no cybersecurity *journalism* either,
   because raw CVE records are re-stamped every few minutes and buried the real
-  reporting under them. Records now sit alongside stories two-to-one, so the page
-  reads as a feed at any scroll depth. Readers on every other lens had been
+  reporting under them. Records now sit alongside stories roughly two-to-one for
+  as long as there are stories to pace them. Readers on every other lens had been
   seeing no cybersecurity coverage at all for the same reason; they do now.
 - **Your scope choice survives a refresh.** Picking a wider view and reloading
   snapped straight back to your state, and the sheet's "Applies everywhere"
@@ -27,8 +27,9 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   stories, with the option greyed out so you couldn't correct it.
 - Trending no longer quietly narrows a scope set on the Feed, which had been
   hiding your own state's news without being asked.
-- The feed always returns a full page. A vulnerability-heavy sector could hand
-  back a third of one, and there is no way to ask for the rest.
+- The feed fills the page it is asked for whenever the corpus can supply it. A
+  vulnerability-heavy sector used to hand back a third of one, and there is no
+  way to ask for the rest.
 - Sorting by top is score-ordered again, so the lead story is the top-ranked one.
 
 ### Changed
