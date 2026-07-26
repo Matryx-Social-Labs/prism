@@ -6,6 +6,7 @@ Pure-logic tests need no DB. The persistence/read tests run against the local DB
 grounded veto is exercised deterministically and for free.
 """
 
+import contextlib
 import datetime as dt
 import uuid
 
@@ -33,6 +34,30 @@ UTC = dt.UTC
 def _n(i: str, actors: dict | None = None, srcs: int = 1) -> Node:
     return Node(id=i, title=f"t-{i}", sector=None, regions=[], occurred_at=dt.datetime(2026, 7, 1, tzinfo=UTC),
                 source_count=srcs, actors=actors or {})
+
+
+@contextlib.asynccontextmanager
+async def _events(titles: list[str]):
+    """Insert throwaway events and remove them again.
+
+    DATABASE_URL here is the developer's own database — there is no separate test
+    DB — so events left behind show up as fake developments in the local feed.
+    """
+    ids = [uuid.uuid4() for _ in titles]
+    async with session_scope() as s:
+        for eid, title in zip(ids, titles, strict=True):
+            await s.execute(
+                text("INSERT INTO events (id,title,summary,last_updated_at) VALUES (:i,:t,'s',now())"),
+                {"i": str(eid), "t": title},
+            )
+    try:
+        yield ids
+    finally:
+        async with session_scope() as s:
+            await s.execute(
+                text("DELETE FROM events WHERE id = ANY(CAST(:e AS uuid[]))"),
+                {"e": [str(i) for i in ids]},
+            )
 
 
 async def _db_reachable() -> bool:
@@ -82,16 +107,6 @@ def test_build_branch_tree_spine_gate():
 async def test_vet_with_reuse_caches_then_skips_llm(monkeypatch):
     if not await _db_reachable():
         pytest.skip("no database")
-    ids = [uuid.uuid4() for _ in range(4)]
-    async with session_scope() as s:
-        for i, eid in enumerate(ids):
-            await s.execute(
-                text("INSERT INTO events (id,title,summary,last_updated_at) VALUES (:i,:t,:m,now())"),
-                {"i": str(eid), "t": f"story dev {i}", "m": "summary"},
-            )
-    members = [_n(str(e), srcs=10 - i) for i, e in enumerate(ids)]
-    root = members[0]
-
     calls = {"n": 0}
 
     async def fake_chat(**kwargs):
@@ -100,39 +115,35 @@ async def test_vet_with_reuse_caches_then_skips_llm(monkeypatch):
 
     monkeypatch.setattr("correlation.partition.structured_chat", fake_chat)
     ver = "test-v1"
-    async with session_scope() as s:
-        keep1, v1 = await _vet_with_reuse(s, root, members, "m", ver, None)
-    assert calls["n"] == 3  # three candidates judged by the LLM
-    assert keep1 == {m.id for m in members}  # all same_story=True
-    assert not any(x["reused"] for x in v1)
+    async with _events([f"story dev {i}" for i in range(4)]) as ids:
+        members = [_n(str(e), srcs=10 - i) for i, e in enumerate(ids)]
+        root = members[0]
+        async with session_scope() as s:
+            keep1, v1 = await _vet_with_reuse(s, root, members, "m", ver, None)
+        assert calls["n"] == 3  # three candidates judged by the LLM
+        assert keep1 == {m.id for m in members}  # all same_story=True
+        assert not any(x["reused"] for x in v1)
 
-    # Same signature (same members+version) → verdicts reused, LLM NOT called again.
-    async with session_scope() as s:
-        keep2, v2 = await _vet_with_reuse(s, root, members, "m", ver, None)
-    assert calls["n"] == 3  # unchanged
-    assert keep2 == keep1
-    assert all(x["reused"] for x in v2)
+        # Same signature (same members+version) → verdicts reused, LLM NOT called again.
+        async with session_scope() as s:
+            keep2, v2 = await _vet_with_reuse(s, root, members, "m", ver, None)
+        assert calls["n"] == 3  # unchanged
+        assert keep2 == keep1
+        assert all(x["reused"] for x in v2)
 
 
 async def test_vet_fail_open_keeps_member(monkeypatch):
     if not await _db_reachable():
         pytest.skip("no database")
-    ids = [uuid.uuid4() for _ in range(2)]
-    async with session_scope() as s:
-        for i, eid in enumerate(ids):
-            await s.execute(
-                text("INSERT INTO events (id,title,summary,last_updated_at) VALUES (:i,:t,'s',now())"),
-                {"i": str(eid), "t": f"dev {i}"},
-            )
-    members = [_n(str(e), srcs=5 - i) for i, e in enumerate(ids)]
-
     async def boom(**kwargs):
         raise RuntimeError("llm down")
 
     monkeypatch.setattr("correlation.partition.structured_chat", boom)
-    async with session_scope() as s:
-        keep, _ = await _vet_with_reuse(s, members[0], members, "m", "fail-v", None)
-    assert keep == {m.id for m in members}  # fail-open: a failed veto keeps the member
+    async with _events([f"dev {i}" for i in range(2)]) as ids:
+        members = [_n(str(e), srcs=5 - i) for i, e in enumerate(ids)]
+        async with session_scope() as s:
+            keep, _ = await _vet_with_reuse(s, members[0], members, "m", "fail-v", None)
+        assert keep == {m.id for m in members}  # fail-open: a failed veto keeps the member
 
 
 # ── Persist invariant + read (DB) ────────────────────────────────────────────
