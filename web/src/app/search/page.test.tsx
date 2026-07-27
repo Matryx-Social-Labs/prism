@@ -216,3 +216,36 @@ describe("Search — a failed request", () => {
     expect(screen.queryByText(/unreachable/i)).not.toBeInTheDocument();
   });
 });
+
+describe("Search — clearing the box", () => {
+  // REGRESSION: clearing WHILE a request was in flight stranded `loading` at
+  // true. The effect cleanup cancels, and the in-flight `finally` is guarded by
+  // `if (!cancelled)`, so nothing ever reset it — the reader sat on "Searching…"
+  // forever and the start screen stayed hidden behind the same !loading gate.
+  //
+  // The timing is the whole bug: clear AFTER the request settles and the page
+  // recovers fine, which is why this has to hold the promise open by hand.
+  it("returns to the start screen when cleared mid-request", async () => {
+    let release!: (v: unknown) => void;
+    searchEvents.mockImplementation(() => new Promise((res) => (release = res)));
+
+    render(<SearchPage />);
+    const box = screen.getByRole("textbox");
+    await userEvent.type(box, "kerala");
+    expect(await screen.findByText(/Searching/i)).toBeInTheDocument();
+    // Wait past the 250ms debounce so the request is genuinely OPEN — clearing
+    // before it fires is a different (and already-working) path.
+    await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("kerala"));
+
+    // Reader gives up and empties the box while the request is still open.
+    await userEvent.clear(box);
+
+    await waitFor(() => expect(screen.queryByText(/Searching/i)).not.toBeInTheDocument());
+    expect(screen.getByText(/Trending entities/i)).toBeInTheDocument();
+
+    // The abandoned response landing later must not resurrect anything.
+    release([]);
+    await waitFor(() => expect(screen.getByText(/Trending entities/i)).toBeInTheDocument());
+    expect(screen.queryByText(/Searching/i)).not.toBeInTheDocument();
+  });
+});
