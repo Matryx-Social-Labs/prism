@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.75.1] - 2026-07-27
+
+### Fixed
+- **Apostrophes in headlines showed up as `&#039;`.** Feeds hand us HTML-escaped
+  text and nothing decoded it, so punctuation arrived as raw codes mid-sentence.
+  Every affected headline was Hindi. New stories read correctly from now on;
+  already-stored ones need a one-off pass.
+
 ## [0.0.75.0] - 2026-07-27
 
 ### Fixed
