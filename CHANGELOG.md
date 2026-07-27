@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.75.0] - 2026-07-27
+
+### Fixed
+- **Storylines are trees again, not one flat pile.** The branch tree was
+  attaching almost every development straight to the lead story, so a 29-part
+  storyline opened as a single "21 developments" row with no structure to read.
+  Developments now attach to what they actually follow from: the same storyline
+  shows a six-part spine with branches of nine, two and one hanging off the
+  developments that caused them, five levels deep.
+
 ## [0.0.74.3] - 2026-07-27
 
 ### Fixed

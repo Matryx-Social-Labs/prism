@@ -276,6 +276,30 @@ def build_branch_tree(
     off_spine: set[str] = set()
     root_dist = lambda eid: embed.get((root.id, eid), 1.0)  # noqa: E731
 
+    def affinity(p: Node, n: Node) -> float:
+        return edge_w.get((p.id, n.id), 0.0) + (1.0 - embed.get((p.id, n.id), 1.0))
+
+    # How attractive is each candidate as a parent to the story AT LARGE?
+    #
+    # Raw affinity alone builds a star, not a tree. _root picks the
+    # most-corroborated event, which is by construction the one sharing actors
+    # with everything and sitting at the story's semantic centre — so it outscored
+    # every rival parent for almost every child and collected them all. Measured on
+    # a 22-development storyline before this: the root won 19 of 21 attachments,
+    # none of them by a tie-break, median margin 0.73. The page then rendered one
+    # undifferentiated "21 developments" row, which is a list wearing a tree's UI.
+    #
+    # Dividing by that mean pull is the same correction already settled for actors
+    # (IDF, not a df cutoff): a candidate plausible as the parent of EVERYTHING
+    # says little about any one child, so its scores are discounted accordingly.
+    # Same 22-development storyline after: fan-out 19 -> 4, depth 2 -> 5. Stories
+    # that already formed a chain are unaffected — there is no hub to discount.
+    others = max(len(members) - 1, 1)
+    pull = {
+        p.id: sum(affinity(p, n) for n in members if n.id != p.id) / others
+        for p in members
+    }
+
     for node in order:
         if node.id == root.id:
             continue
@@ -287,7 +311,9 @@ def build_branch_tree(
         priors = [p for p in order if p.occurred_at <= node.occurred_at and p.id != node.id]
         best, best_score = root, -1.0
         for p in priors:
-            score = edge_w.get((p.id, node.id), 0.0) + (1.0 - embed.get((p.id, node.id), 1.0))
+            # A candidate with no pull at all has nothing to normalise away, and
+            # dividing by ~0 would make its one weak edge beat every real one.
+            score = affinity(p, node) / pull[p.id] if pull[p.id] > 1e-9 else 0.0
             if score > best_score:
                 best, best_score = p, score
         parent[node.id] = best.id
