@@ -190,3 +190,75 @@ async def test_serving_scope_and_merge_redirect():
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM stories WHERE id = ANY(:ids)"), {"ids": [str(canonical), str(merged)]})
+
+
+async def test_two_communities_of_one_story_fold_instead_of_minting_duplicates(monkeypatch):
+    """REGRESSION: trending fragmented without bound — a merge/re-create treadmill.
+
+    Leiden routinely splits one real story into several communities (a protest and
+    its offshoots). The matching loop claimed a story for the first community; the
+    rest then found `matches` empty — the only story they matched was already
+    claimed — and CREATED duplicates. `_converge_existing` collapsed those on the
+    next pass, and this loop minted them again from the same communities, forever.
+
+    Observed in production over 90 minutes: one protest grew from 4 to 7 of 17
+    trending slots, with 6 pairs that `_same_story` already called identical and
+    two slugs differing only in the trailing hash.
+    """
+    created: list[dict] = []
+    updated: list[tuple[str, list[str]]] = []
+
+    cast = ["Cockroach Janta Party", "Dharmendra Pradhan", "Delhi Police"]
+    # Two slices of ONE story: disjoint members, same protagonists. That is exactly
+    # the shape cast-identity matching exists to re-join.
+    communities = [
+        {"member_ids": ["1", "2"], "cast": cast, "hero_title": "a", "hero_event_id": None,
+         "sector": "politics", "regions": ["IN"], "total_sources": 9, "recent_sources": 4},
+        {"member_ids": ["3", "4"], "cast": cast, "hero_title": "b", "hero_event_id": None,
+         "sector": "politics", "regions": ["IN"], "total_sources": 7, "recent_sources": 3},
+    ]
+
+    class _Stub:
+        async def execute(self, _clause, params=None):
+            class _R:
+                def mappings(self):
+                    return self
+                def all(self):
+                    # One existing story that both communities match.
+                    return [{"id": "S", "member_event_ids": ["1", "2"], "cast": cast,
+                             "first_seen_at": datetime(2026, 7, 23, 14, 0, tzinfo=UTC)}]
+                def scalar(self):
+                    return None
+            return _R()
+
+    import correlation.trending as T
+    monkeypatch.setattr(T, "detect_trending_communities", lambda _s: _aw(communities))
+    monkeypatch.setattr(T, "_cast_df", lambda _s, _n: _aw({}))
+    monkeypatch.setattr(T, "_converge_existing", lambda *_a: _aw(None))
+    monkeypatch.setattr(T, "_community_facts", lambda _s, ids: _aw(
+        {"cast": cast, "hero_title": "a", "hero_event_id": None, "sector": "politics",
+         "regions": ["IN"], "total_sources": 16, "recent_sources": 7}))
+
+    async def fake_create(_s, c):
+        created.append(c)
+        return "NEW"
+
+    async def fake_update(_s, sid, c):
+        updated.append((sid, list(c["member_ids"])))
+
+    monkeypatch.setattr(T, "_create_story", fake_create)
+    monkeypatch.setattr(T, "_update_story", fake_update)
+
+    await T.reconcile_stories(_Stub())
+
+    assert created == [], f"minted {len(created)} duplicate story/ies for one real story"
+    assert [sid for sid, _ in updated] == ["S", "S"], "both slices must land on the same story"
+    # And the fold keeps every member, rather than the second slice overwriting the first.
+    assert set(updated[-1][1]) == {"1", "2", "3", "4"}
+
+
+def _aw(value):
+    """Wrap a plain value in an awaitable, for monkeypatching async collaborators."""
+    async def _inner(*_a, **_k):
+        return value
+    return _inner()

@@ -388,6 +388,36 @@ async def reconcile_stories(session: AsyncSession) -> int:
             if sid not in claimed and _same_story(cmembers, ccast, s["members"], s["cast"], df)
         ]
         if not matches:
+            # Before minting a new story, check whether this community belongs to
+            # one we ALREADY handled this pass.
+            #
+            # Leiden routinely splits one real story into several communities (a
+            # protest and its offshoots). The first claims the story; the rest
+            # then found `matches` empty — because the only thing they matched was
+            # claimed — and created duplicates. _converge_existing collapsed those
+            # on the next pass, and this loop minted them again from the same
+            # communities: a merge/re-create treadmill that never converged and
+            # ratcheted the count up. Observed in production: one protest occupying
+            # 7 of 17 trending slots, with 6 pairs that _same_story already called
+            # identical, two of them differing only in the trailing slug hash.
+            #
+            # Folding instead of creating is also why the union matters: the story
+            # keeps every member it has gathered this pass, rather than the last
+            # community overwriting the first.
+            fold = [
+                sid for sid in claimed
+                if sid in stories
+                and _same_story(cmembers, ccast, stories[sid]["members"], stories[sid]["cast"], df)
+            ]
+            if fold:
+                sid = min(fold, key=lambda x: (stories[x]["first"] or _MAX_TS))
+                merged = sorted(stories[sid]["members"] | cmembers)
+                c = {"member_ids": merged, **await _community_facts(session, merged)}
+                await _update_story(session, sid, c)
+                stories[sid]["members"] = set(merged)
+                stories[sid]["cast"] = c["cast"]
+                seen.add(sid)
+                continue
             sid = await _create_story(session, c)
             stories[sid] = {"members": cmembers, "cast": ccast, "first": None}
         elif len(matches) == 1:
