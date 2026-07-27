@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.76.1] - 2026-07-27
+
+### Changed
+- **The desktop Feed is a desktop layout now**, not the phone column stretched
+  wide. A lead story with its own frame, the four next-biggest stories beside it,
+  then each sector in its own band — with every source count, timestamp and origin
+  moved out to a margin rail so the headlines read uninterrupted. (This shipped in
+  0.0.76.0; that entry described only the trending fix it rode along with.)
+
 ## [0.0.76.0] - 2026-07-27
 
 ### Fixed
