@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.74.3] - 2026-07-27
+
+### Fixed
+- **Clearing the search box left you stuck on "Searching…".** If you emptied the
+  field while a search was still running, the page never came back — the spinner
+  stayed and the trending entities and suggestions never returned. Clearing now
+  always takes you back to the start screen.
+
 ## [0.0.74.2] - 2026-07-27
 
 ### Fixed

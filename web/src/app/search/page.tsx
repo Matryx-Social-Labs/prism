@@ -39,6 +39,12 @@ function SearchInner() {
       setResults([]);
       setSearched(false);
       setFailed(false);
+      // Clearing the box while a request is still in flight used to strand
+      // `loading` at true: the cleanup below cancels, and the in-flight finally
+      // is guarded by `if (!cancelled)` so it never resets it. The reader was
+      // left on "Searching…" forever, with the start screen hidden behind the
+      // same !loading gate — an empty box that never came back.
+      setLoading(false);
       return;
     }
     setLoading(true);
