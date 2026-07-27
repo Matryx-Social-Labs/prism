@@ -3,6 +3,13 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.74.1] - 2026-07-26
+
+### Fixed
+- **The sign-in email said Prism.** Subject, wordmark, button and sign-off — the
+  first thing a new reader sees with our name on it, months after the rename.
+  Its palette had also drifted cool against every other surface.
+
 ## [0.0.74.0] - 2026-07-26
 
 ### Added
