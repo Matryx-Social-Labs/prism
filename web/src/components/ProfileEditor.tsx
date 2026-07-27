@@ -92,7 +92,12 @@ export function RegionGrid({ value, onChange }: { value: string; onChange: (code
 export function StateSelect({ value, onChange }: { value: string; onChange: (code: string) => void }) {
   const [states, setStates] = useState<RegionState[]>([]);
   useEffect(() => {
-    fetchRegions().then(setStates);
+    // .catch matters as much here as on useTaxonomy above: without it a down
+    // /api/v1/regions is an unhandled rejection AND the dropdown silently shows
+    // nothing but its disabled placeholder, with no hint that anything failed.
+    fetchRegions()
+      .then(setStates)
+      .catch(() => setStates([]));
   }, []);
   // Covered states (we have a local edition) first and marked, then the rest.
   const covered = states.filter((s) => s.covered);
@@ -101,6 +106,9 @@ export function StateSelect({ value, onChange }: { value: string; onChange: (cod
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      // The language select beside it is labelled; this one had no accessible
+      // name at all, so a screen reader announced an unlabelled combobox.
+      aria-label="Your state"
       className="w-full rounded-[12px] border px-4 py-3 text-[15px] outline-none"
       style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: value ? "var(--ink)" : "var(--ink-faint)" }}
     >

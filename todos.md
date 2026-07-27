@@ -81,18 +81,6 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   `web/src/app/trending/page.tsx`, `web/src/components/StoryView.tsx`,
   `web/src/components/SiteHeader.tsx`, `web/src/components/BottomTabBar.tsx`.
 
-- **A failed search renders a blank screen** (P2, found while adding page tests). On a
-  rejected `searchEvents`, `searched` stays false and `term.length >= 2` hides the start
-  screen, so the results area shows nothing at all — no error, no "no results". The spinner
-  does clear correctly. File: `web/src/app/search/page.tsx` (~49-53).
-- **`fetchRegions()` has no `.catch` on the interests page** (P3, same pass).
-  `ProfileEditor.tsx:95` does `fetchRegions().then(setStates)` while `useTaxonomy` two
-  functions above it catches. If /api/v1/regions is down this emits an unhandled rejection and
-  the state dropdown silently shows only its disabled placeholder.
-  File: `web/src/components/ProfileEditor.tsx`.
-- **The state `<select>` on /interests has no accessible name** (P3, same pass). The language
-  one has `aria-label="Add a language"`; this one has nothing, so a screen-reader user gets an
-  unlabeled combobox. File: `web/src/components/ProfileEditor.tsx`.
 
 ## Completed
 - **Scope chip claims to apply everywhere but doesn't** (was P2). Scope now lives in
@@ -101,3 +89,9 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   National — the Feed had been calling the widest tier "World" while Trending called the same
   thing "National" one tap away.
   **Completed:** v0.0.72.0 (2026-07-26)
+- **A failed search rendered a blank screen** (was P2). A rejected `searchEvents` left every
+  render branch false — no error, no empty state, nothing. Now a distinct failure message that
+  does not falsely claim the query had no matches.
+  **Completed:** v0.0.74.2 (2026-07-27)
+- **`fetchRegions()` had no `.catch`, and the state select had no accessible name** (was P3).
+  **Completed:** v0.0.74.2 (2026-07-27)

@@ -154,3 +154,24 @@ describe("Interests — languages", () => {
     expect(saved().languages).toEqual(["en"]);
   });
 });
+
+describe("Interests — when the regions API is down", () => {
+  // The state dropdown is the only way to set a region, and fetchRegions() had
+  // no .catch while useTaxonomy beside it did — so a down /api/v1/regions was an
+  // unhandled rejection AND a silently empty dropdown.
+  // Thin on purpose: the real guard is vitest itself. Without the .catch the
+  // rejection is unhandled and the RUN exits 1 even though the assertions pass —
+  // verified both ways. So CI fails on a regression here.
+  it("does not take the page down when regions fail to load", async () => {
+    fetchRegions.mockRejectedValue(new Error("offline"));
+    render(<InterestsPage />);
+    // The page still renders and the reader can still use the rest of it.
+    expect(await screen.findByLabelText("Your state")).toBeInTheDocument();
+  });
+
+  it("gives the state dropdown an accessible name", async () => {
+    render(<InterestsPage />);
+    const select = await screen.findByLabelText("Your state");
+    expect(select.tagName).toBe("SELECT");
+  });
+});
