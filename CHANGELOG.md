@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.74.2] - 2026-07-27
+
+### Fixed
+- **Search went blank when it failed.** If the request didn't come back, the
+  results area showed nothing at all — no error, no explanation, and no hint the
+  search had even run. It now says so, and it no longer tells you there were no
+  matches when the truth is that it never got to look.
+- The state dropdown in Your Parse survives the regions service being down, and
+  now announces itself to screen readers.
+
 ## [0.0.74.1] - 2026-07-26
 
 ### Fixed

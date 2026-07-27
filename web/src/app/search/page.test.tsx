@@ -173,3 +173,46 @@ describe("Search — start screen", () => {
     await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("RELIANCE"));
   });
 });
+
+describe("Search — a failed request", () => {
+  // REGRESSION: on a rejected searchEvents the page rendered NOTHING. `searched`
+  // is set after the await so it stays false, `loading` is false, `results` is
+  // empty, and a term of 2+ characters hides the start screen — every branch
+  // false. The reader got a blank page with no error and no way to know why.
+  it("tells the reader the search failed instead of going blank", async () => {
+    searchEvents.mockRejectedValue(new Error("offline"));
+    render(<SearchPage />);
+    await userEvent.type(screen.getByRole("textbox"), "reliance");
+
+    expect(await screen.findByText(/Search is unreachable right now/i)).toBeInTheDocument();
+    // And it must NOT claim the query simply had no matches — that's a lie.
+    expect(screen.queryByText(/No stories match/)).not.toBeInTheDocument();
+  });
+
+  it("still says 'no match' when the search genuinely returned nothing", async () => {
+    searchEvents.mockResolvedValue([]);
+    render(<SearchPage />);
+    await userEvent.type(screen.getByRole("textbox"), "zzzz");
+
+    expect(await screen.findByText(/No stories match/)).toBeInTheDocument();
+    expect(screen.queryByText(/unreachable/i)).not.toBeInTheDocument();
+  });
+
+  it("clears the failure when the reader keeps typing, without clearing the box", async () => {
+    // Typing MORE rather than clearing is the case that matters: emptying the
+    // input resets `failed` through the short-term branch, so a test that clears
+    // first passes even with the reset on the search path deleted.
+    searchEvents.mockRejectedValueOnce(new Error("offline")).mockResolvedValue([]);
+    render(<SearchPage />);
+    const box = screen.getByRole("textbox");
+    await userEvent.type(box, "reliance");
+    await screen.findByText(/unreachable/i);
+
+    await userEvent.type(box, " jio");
+    // Wait for the SETTLED result first. Asserting "no error" directly races the
+    // loading state: while `loading` is true the error is hidden anyway, so
+    // waitFor passes on that instant and the test guards nothing.
+    expect(await screen.findByText(/No stories match/)).toBeInTheDocument();
+    expect(screen.queryByText(/unreachable/i)).not.toBeInTheDocument();
+  });
+});

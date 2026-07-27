@@ -13,6 +13,12 @@ function SearchInner() {
   const [results, setResults] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  // A rejected search is NOT the same as no results. Without this the page went
+  // completely blank on a failed request: `searched` stays false because it is
+  // set after the await, `loading` is false, `results` is empty, and a term of 2+
+  // characters hides the start screen — so every render branch was false and the
+  // reader got nothing to read and nothing to do.
+  const [failed, setFailed] = useState(false);
   // Which term produced `results`. Without it, a new query inherits the
   // previous query's results as "ready" and restores that key's offset
   // before its own results exist.
@@ -32,9 +38,11 @@ function SearchInner() {
     if (term.length < 2) {
       setResults([]);
       setSearched(false);
+      setFailed(false);
       return;
     }
     setLoading(true);
+    setFailed(false);
     // clearTimeout cancels the timer, not an in-flight request — without the
     // flag a slow response for an abandoned query overwrites a newer one.
     let cancelled = false;
@@ -50,7 +58,10 @@ function SearchInner() {
         // A network failure REJECTS (searchEvents only swallows !res.ok), and an
         // escaped rejection left setLoading(true) — "Searching…" forever, which
         // is the common case on a flaky mobile connection.
-        if (!cancelled) setResults([]);
+        if (!cancelled) {
+          setResults([]);
+          setFailed(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -136,7 +147,12 @@ function SearchInner() {
             Searching…
           </p>
         )}
-        {!loading && searched && results.length === 0 && (
+        {!loading && failed && (
+          <p className="text-[14px]" style={{ color: "var(--ink-muted)" }} role="status">
+            Search is unreachable right now — check your connection and try again.
+          </p>
+        )}
+        {!loading && !failed && searched && results.length === 0 && (
           <p className="text-[14px]" style={{ color: "var(--ink-muted)" }}>
             No stories match “{term}”.
           </p>
