@@ -109,16 +109,21 @@ describe("Trending — sector chips", () => {
 });
 
 describe("Trending — the list", () => {
-  it("leads with the hero headline and links to the story", async () => {
+  // The row names the STORYLINE, not one member's headline. `label` is the cast
+  // we generated for the cluster, and it is what the story page it opens shows —
+  // leading with hero_title meant the list and the page disagreed about what the
+  // story was even called.
+  it("leads with the storyline name and links to the story", async () => {
     render(<TrendingPage />);
-    const link = await screen.findByRole("link", { name: /Kerala power crisis deepens/ });
+    const link = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(link).toHaveAttribute("href", "/trending/kerala-power");
+    expect(link).not.toHaveTextContent("Kerala power crisis deepens");
   });
 
-  it("falls back to the cast label when there is no hero headline", async () => {
-    fetchTrending.mockResolvedValue([story({ hero_title: null })]);
+  it("falls back to the hero headline when a storyline has no label", async () => {
+    fetchTrending.mockResolvedValue([story({ label: null as unknown as string })]);
     render(<TrendingPage />);
-    expect(await screen.findByText(/CPI\(M\) · Pinarayi Vijayan/)).toBeInTheDocument();
+    expect(await screen.findByText(/Kerala power crisis deepens/)).toBeInTheDocument();
   });
 
   it("renders an empty state rather than a dead screen", async () => {

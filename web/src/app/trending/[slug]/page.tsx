@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
+import { BranchTree } from "@/components/BranchTree";
 import { StoryTimeline } from "@/components/StoryTimeline";
 import { ShareButton } from "@/components/ShareButton";
 
@@ -75,7 +76,16 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
       </div>
 
       <div className="mt-8">
-        <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
+        {/* The tree REPLACES the flat timeline rather than sitting beside it: in
+            TRUNK it renders as that same flat list, so a reader who doesn't care
+            about structure loses nothing and gains one counted line. Storylines
+            that predate the current partition run carry no tree — those keep the
+            old timeline. */}
+        {s.branches && s.branches.nodes.length > 0 ? (
+          <BranchTree tree={s.branches} developments={s.developments} />
+        ) : (
+          <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
+        )}
       </div>
     </div>
   );

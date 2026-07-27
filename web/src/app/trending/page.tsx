@@ -162,7 +162,13 @@ function StoryRow({ story, rank }: { story: TrendingStory; rank: number }) {
         {rank}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[15.5px] font-semibold leading-[1.35]">{story.hero_title ?? story.label}</p>
+        {/* The storyline's NAME, not one outlet's headline. `label` is the cast
+            we generated for the cluster — "Delhi Police · Sonam Wangchuk · Narendra
+            Modi" — which is what the story page shows and what makes a row read as
+            a running story rather than a single article. hero_title is one
+            member's headline and was winning here, so the list and the page it
+            opened disagreed about what the story was called. */}
+        <p className="text-[15.5px] font-semibold leading-[1.35]">{story.label ?? story.hero_title}</p>
         <p className="mt-1 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
           {story.source_count} outlets ·{" "}
           {story.velocity > 0 ? <span style={{ color: "var(--up)" }}>developing</span> : `${story.developments} updates`}
