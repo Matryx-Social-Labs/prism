@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.77.1] - 2026-07-27
+
+### Fixed
+- A sector with one story no longer gets a full-width row of its own on the
+  desktop feed — one photo beside three empty columns read as a failed load.
+  Thin sectors collapse into a single "Also filed" band, so every sector still
+  appears in a quarter of the space.
+- Dropped the red SINGLE-ORIGIN flag from sector rails. It fired on five bands
+  out of six.
+
 ## [0.0.77.0] - 2026-07-27
 
 ### Changed

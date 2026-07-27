@@ -54,7 +54,13 @@ export function FeedDesktop({ items, top }: { items: FeedItem[]; top: FeedItem[]
   // The four beside the lead: highest-ranked, never repeating the lead.
   const also = [...top.slice(1), ...items].filter((i) => i.id !== lead.id).slice(0, 4);
   const used = new Set([lead.id, ...also.map((i) => i.id)]);
-  const sectorBands = bands(items, used);
+  // A sector with a single story got its own full-width row: one 160px photo and
+  // three empty columns, which reads as a failed load rather than a thin sector.
+  // On a live feed that was three of six rows. They collapse into one "Also
+  // filed" band instead — every sector still appears, in a quarter of the space.
+  const all = bands(items, used);
+  const sectorBands = all.filter((b) => b.items.length > 1);
+  const singles = all.filter((b) => b.items.length === 1);
 
   const totalSources = items.reduce((n, i) => n + (i.source_count || 0), 0);
 
@@ -166,11 +172,10 @@ export function FeedDesktop({ items, top }: { items: FeedItem[]; top: FeedItem[]
             </div>
             <div>last moved {lastMoved(band.items)}</div>
             <div>{bandOrigins(band.items)}</div>
-            {band.items.some((i) => i.coverage?.single_origin) && (
-              <div className="mt-3" style={{ color: "var(--danger)" }}>
-                SINGLE-ORIGIN
-              </div>
-            )}
+            {/* No SINGLE-ORIGIN flag here. It was some(), which on an India-only
+                feed was true for five bands out of six — a warning that fires on
+                nearly everything reports nothing. It stays on the lead, where it
+                describes one story rather than a set. */}
           </Rail>
 
           <div>
@@ -236,6 +241,50 @@ export function FeedDesktop({ items, top }: { items: FeedItem[]; top: FeedItem[]
           </div>
         </section>
       ))}
+
+      {/* The thin sectors, four across, each still under its own name. */}
+      {singles.length > 0 && (
+        <section className={`${RAIL} mt-14 border-t pt-6`} style={{ borderColor: "var(--line)" }}>
+          <Rail>
+            <div>{singles.length} sectors</div>
+            <div>last moved {lastMoved(singles.flatMap((b) => b.items))}</div>
+            <div>{bandOrigins(singles.flatMap((b) => b.items))}</div>
+          </Rail>
+          <div>
+            <h2 className="mb-[18px] text-[12px] font-semibold" style={{ color: "var(--ink-muted)" }}>
+              Also filed
+            </h2>
+            <div className={`${FIELD} gap-y-7`}>
+              {singles.map((band, n) => (
+                <article
+                  key={band.sector}
+                  style={{
+                    gridColumn: "span 3",
+                    borderLeft: n % 4 > 0 ? "1px solid var(--line)" : undefined,
+                    paddingLeft: n % 4 > 0 ? 24 : undefined,
+                  }}
+                >
+                  <Link
+                    href={`/sector/${band.sector}`}
+                    className={`${MONO} mb-2 block capitalize transition hover:opacity-70`}
+                    style={{ color: "var(--ink-faint)" }}
+                  >
+                    {band.sector.replaceAll("_", " ")}
+                  </Link>
+                  <Link
+                    href={`/story/${band.items[0].id}`}
+                    className="block text-[15.5px] leading-[1.35] transition hover:opacity-70"
+                    style={{ textWrap: "pretty" }}
+                  >
+                    {band.items[0].title}
+                  </Link>
+                  <Meta item={band.items[0]} />
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
