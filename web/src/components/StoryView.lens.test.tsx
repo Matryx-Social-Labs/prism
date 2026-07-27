@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StoryView } from "@/components/StoryView";
 import type { EventDetail } from "@/lib/api";
@@ -19,6 +19,17 @@ vi.mock("@/lib/lenses", () => ({
       ? { slug: "cyber", short: "Cyber", color: "#06B6D4", bg: "#e0f7fa", tagline: "t" }
       : { slug: "reader", short: "Reader", color: "#111", bg: "#eee", tagline: "t" },
 }));
+
+
+// The desktop composition shows ALL three lens openings at once (the lens board),
+// so "the reader brief is gone" is only true of the mobile tree — which is the
+// one-brief-at-a-time composition these tests are about. Scope to it, rather than
+// weakening the assertion to "appears somewhere".
+function mobile() {
+  const root = document.querySelector(".lg\\:hidden");
+  if (!root) throw new Error("mobile tree not found");
+  return within(root as HTMLElement);
+}
 
 const READER_BRIEF = "The reader take on this story.";
 const CYBER_BRIEF = "The cyber take on this story.";
@@ -51,6 +62,9 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+// jsdom has no viewport, so BOTH the desktop composition and the mobile tree
+// render — hence findAllByText/queryAllByText throughout. In a browser exactly
+// one of them is displayed.
 describe("lens flip", () => {
   // REGRESSION (ISSUE-004): a guard effect snapped any locked lens back to
   // "reader", and it watched `lens` — so it also caught the reader deliberately
@@ -59,13 +73,13 @@ describe("lens flip", () => {
   // signed-out reader: no re-typeset, no unlock prompt, nothing.
   it("flips a signed-out reader to the locked lens so they see the unlock prompt", async () => {
     render(<StoryView event={EVENT} />);
-    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
 
     await userEvent.click(screen.getAllByRole("tab", { name: /Cyber/ })[0]);
 
-    await waitFor(() => expect(screen.queryByText(READER_BRIEF)).not.toBeInTheDocument());
+    await waitFor(() => expect(mobile().queryByText(READER_BRIEF)).not.toBeInTheDocument());
     // Locked: the flip happens, but the brief stays behind the sign-in prompt.
-    expect(screen.queryByText(CYBER_BRIEF)).not.toBeInTheDocument();
+    expect(mobile().queryByText(CYBER_BRIEF)).not.toBeInTheDocument();
     expect(screen.getAllByRole("tab", { name: /Cyber/ })[0]).toHaveAttribute("aria-selected", "true");
   });
 
@@ -75,12 +89,12 @@ describe("lens flip", () => {
       JSON.stringify({ token: "t", userId: "u", email: "e@x.dev" }),
     );
     render(<StoryView event={EVENT} />);
-    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
 
     await userEvent.click(screen.getAllByRole("tab", { name: /Cyber/ })[0]);
 
-    expect(await screen.findByText(CYBER_BRIEF)).toBeInTheDocument();
-    expect(screen.queryByText(READER_BRIEF)).not.toBeInTheDocument();
+    expect(await mobile().findByText(CYBER_BRIEF)).toBeInTheDocument();
+    expect(mobile().queryByText(READER_BRIEF)).not.toBeInTheDocument();
   });
 
   // The guard still has to do its original job: a shared link opened by a
@@ -89,7 +103,7 @@ describe("lens flip", () => {
   it("still snaps back a profile-restored locked lens the reader did not pick", async () => {
     localStorage.setItem("prism.profile.v1", JSON.stringify({ lens: "cyber" }));
     render(<StoryView event={EVENT} />);
-    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
   });
 });
 
@@ -108,13 +122,13 @@ describe("lens flip — signing out mid-read", () => {
     );
     render(<StoryView event={EVENT} />);
     await userEvent.click(screen.getAllByRole("tab", { name: /Cyber/ })[0]);
-    expect(await screen.findByText(CYBER_BRIEF)).toBeInTheDocument();
+    expect(await mobile().findByText(CYBER_BRIEF)).toBeInTheDocument();
 
     // Another tab signs out: the key goes away and `storage` fires.
     localStorage.removeItem("prism.session.v1");
     window.dispatchEvent(new StorageEvent("storage", { key: "prism.session.v1" }));
 
-    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
-    expect(screen.queryByText(CYBER_BRIEF)).not.toBeInTheDocument();
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
+    expect(mobile().queryByText(CYBER_BRIEF)).not.toBeInTheDocument();
   });
 });

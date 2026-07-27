@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StoryView } from "@/components/StoryView";
 import type { EventDetail } from "@/lib/api";
@@ -21,6 +21,17 @@ vi.mock("@/lib/lenses", () => ({
       ? { slug: "cyber", short: "Cyber", color: "#06B6D4", bg: "#e0f7fa", tagline: "t" }
       : { slug: "reader", short: "Reader", color: "#111", bg: "#eee", tagline: "t" },
 }));
+
+
+// jsdom applies no CSS, so the desktop composition and the mobile tree BOTH
+// render and the brief text appears twice. These tests are about the mobile
+// controls — the pinned rail and the number keys — so scope to that tree rather
+// than loosening the assertions to "appears somewhere".
+function mobile() {
+  const root = document.querySelector(".lg\\:hidden");
+  if (!root) throw new Error("mobile tree not found");
+  return within(root as HTMLElement);
+}
 
 const READER_BRIEF = "The reader take on this story.";
 const CYBER_BRIEF = "The cyber take on this story.";
@@ -69,7 +80,7 @@ describe("lens flip — keyboard", () => {
   // regression killed it too — and nothing covered it.
   it("flips a signed-out reader with the number key, no scroll", async () => {
     render(<StoryView event={event()} />);
-    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
 
     await userEvent.keyboard("2");
 
@@ -92,7 +103,7 @@ describe("lens flip — keyboard", () => {
     "ignores %s — the modifier belongs to the browser",
     async (keys) => {
       render(<StoryView event={event()} />);
-      expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+      expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
 
       await userEvent.keyboard(keys);
 
@@ -100,7 +111,7 @@ describe("lens flip — keyboard", () => {
         "aria-selected",
         "true",
       );
-      expect(screen.getByText(READER_BRIEF)).toBeInTheDocument();
+      expect(mobile().getByText(READER_BRIEF)).toBeInTheDocument();
     },
   );
 
@@ -109,11 +120,11 @@ describe("lens flip — keyboard", () => {
   // which reads as "no lens" and empties the brief the reader was reading.
   it.each(["0", "9"])("ignores %s, which is no lens at all", async (key) => {
     render(<StoryView event={event()} />);
-    expect(await screen.findByText(READER_BRIEF)).toBeInTheDocument();
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
 
     await userEvent.keyboard(key);
 
-    expect(screen.getByText(READER_BRIEF)).toBeInTheDocument();
+    expect(mobile().getByText(READER_BRIEF)).toBeInTheDocument();
     expect(screen.getAllByRole("tab", { name: /Reader/ })[0]).toHaveAttribute(
       "aria-selected",
       "true",
@@ -127,7 +138,7 @@ describe("lens flip — keyboard", () => {
         <StoryView event={event()} />
       </>,
     );
-    await screen.findByText(READER_BRIEF);
+    await mobile().findByText(READER_BRIEF);
 
     await userEvent.type(screen.getByLabelText("search"), "2");
 
@@ -145,10 +156,10 @@ describe("lens flip — pinned mobile rail", () => {
   // pick has to bring the result into view or it reads as a dead button.
   it("flips and scrolls the brief into view", async () => {
     render(<StoryView event={event()} />);
-    await screen.findByText(READER_BRIEF);
+    await mobile().findByText(READER_BRIEF);
 
     // role=button excludes the desktop tabs, which declare role=tab.
-    await userEvent.click(screen.getByRole("button", { name: /Cyber/ }));
+    await userEvent.click(mobile().getByRole("button", { name: /Cyber/ }));
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /Sign in to unlock/ })).toBeInTheDocument(),
@@ -166,9 +177,9 @@ describe("lens flip — pinned mobile rail", () => {
       removeEventListener: () => {},
     }));
     render(<StoryView event={event()} />);
-    await screen.findByText(READER_BRIEF);
+    await mobile().findByText(READER_BRIEF);
 
-    await userEvent.click(screen.getByRole("button", { name: /Cyber/ }));
+    await userEvent.click(mobile().getByRole("button", { name: /Cyber/ }));
 
     expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ behavior: "auto" }));
   });
@@ -179,7 +190,7 @@ describe("locked lens", () => {
   // Every signed-out visitor tapping Cyber would otherwise bill an LLM call.
   it("generates no brief for a signed-out reader", async () => {
     render(<StoryView event={event({ lens_briefs: { reader: READER_BRIEF } } as Partial<EventDetail>)} />);
-    await screen.findByText(READER_BRIEF);
+    await mobile().findByText(READER_BRIEF);
     fetchBrief.mockClear();
 
     await userEvent.click(screen.getAllByRole("tab", { name: /Cyber/ })[0]);

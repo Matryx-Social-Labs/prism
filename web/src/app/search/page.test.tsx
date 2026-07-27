@@ -217,6 +217,41 @@ describe("Search — a failed request", () => {
   });
 });
 
+describe("Search — the desktop ledger rail", () => {
+  // jsdom applies no CSS, so `hidden lg:block` hides nothing here and the rail is
+  // in the tree at every "viewport" — which is why it must never repeat what the
+  // field already prints (a headline, "Searching…", an error line). Every query
+  // in this file is singular; a second copy would fail them, not the layout.
+  it("counts what matched, and where it was filed", async () => {
+    searchEvents.mockResolvedValue([
+      item({ id: "a", source_count: 5, coverage: { origins: { IN: 4, AE: 1 }, unknown: 0, single_origin: false } }),
+      item({ id: "b", title: "Second hit", source_count: 3, coverage: { origins: { IN: 3 }, unknown: 0, single_origin: false } }),
+    ]);
+    render(<SearchPage />);
+    await userEvent.type(input(), "freight");
+
+    expect(await screen.findByText("2 results")).toBeInTheDocument();
+    // Summed, not per row — the row cards print "5 sources · just now", so an
+    // exact match here can only be the rail's total.
+    expect(screen.getByText("8 sources")).toBeInTheDocument();
+    expect(screen.getByText("IN ×7 · AE ×1")).toBeInTheDocument();
+  });
+
+  // The mock's hint strip promises ↑↓ / ⏎ / ⌘⏎ / ESC. Only ESC is wired, so only
+  // ESC is printed — and this is the test that keeps that promise honest.
+  it("promises Esc, and Esc empties the box", async () => {
+    render(<SearchPage />);
+    expect(screen.getByText("Esc clear")).toBeInTheDocument();
+
+    await userEvent.type(input(), "kerala");
+    await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("kerala"));
+
+    await userEvent.type(input(), "{Escape}");
+    expect(input()).toHaveValue("");
+    expect(await screen.findByText("Trending entities")).toBeInTheDocument();
+  });
+});
+
 describe("Search — clearing the box", () => {
   // REGRESSION: clearing WHILE a request was in flight stranded `loading` at
   // true. The effect cleanup cancels, and the in-flight `finally` is guarded by
