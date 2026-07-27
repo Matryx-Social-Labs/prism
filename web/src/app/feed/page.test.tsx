@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import FeedPage from "@/app/feed/page";
 
@@ -76,5 +76,33 @@ describe("Feed — scope", () => {
     await userEvent.click(await screen.findByRole("button", { name: "National" }));
 
     expect(localStorage.getItem("parse.scope.v2")).toBe("national");
+  });
+});
+
+describe("Feed — mount fetches", () => {
+  // REGRESSION: loadProfile() is a synchronous localStorage read but runs in a
+  // mount effect, so every fetch effect fired once with profile=null and again
+  // with the profile — ~3 discarded round trips per mount, on a page that
+  // re-mounts every time the reader returns from a story. Measured on the live
+  // feed before the fix: 6 API calls, 3 of them un-personalized.
+  it("never fetches before the profile has loaded", async () => {
+    loadProfile.mockReturnValue({ state: "IN-KL", lens: "reader", interests: ["politics"] });
+    render(<FeedPage />);
+
+    await waitFor(() => expect(fetchFeed).toHaveBeenCalled());
+    // Every call must already carry the reader's state — a call without it is a
+    // request whose response gets thrown away.
+    for (const [query] of fetchFeed.mock.calls) {
+      expect(query.state).toBe("IN-KL");
+    }
+    for (const [query] of fetchTrending.mock.calls) {
+      expect(query.state).toBe("IN-KL");
+    }
+  });
+
+  it("still fetches for a reader who has no profile at all", async () => {
+    loadProfile.mockReturnValue(null);
+    render(<FeedPage />);
+    await waitFor(() => expect(fetchFeed).toHaveBeenCalled());
   });
 });

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ParseMark } from "@/components/ParseMark";
+import { ScopeSheet } from "@/components/ScopeSheet";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
 import { useTaxonomy } from "@/components/ProfileEditor";
 import {
@@ -57,10 +58,19 @@ export default function FeedPage() {
   const [trending, setTrending] = useState<TrendingStory[]>(() => feedCache?.trending ?? []);
   const [watch, setWatch] = useState<WatchEvent[]>([]);
   const restoredCache = useRef(feedCache !== null);
+  // loadProfile() is a synchronous localStorage read, but it can only run on the
+  // client — so it happens in a mount effect and the first render sees null. The
+  // fetch effects below wait for this rather than firing once un-personalized and
+  // again with the profile, which cost ~3 discarded round trips per mount on a
+  // page that re-mounts every time the reader comes back from a story. Can't be
+  // solved with a lazy useState initializer: that would disagree with the server
+  // render and trip hydration.
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   useEffect(() => {
     const p = loadProfile();
     setProfile(p);
+    setProfileLoaded(true);
     if (p?.lens) setLens(p.lens);
     // A SAVED scope always wins. Only fall back to "your state" when the reader
     // has never chosen — otherwise picking World and reloading snapped straight
@@ -82,8 +92,9 @@ export default function FeedPage() {
   }, []);
 
   useEffect(() => {
+    if (!profileLoaded) return;
     fetchTrending({ state: profile?.state, limit: 4 }).then(setTrending).catch(() => setTrending([]));
-  }, [profile?.state]);
+  }, [profile?.state, profileLoaded]);
 
   useEffect(() => {
     if (!session) {
@@ -96,6 +107,7 @@ export default function FeedPage() {
   useEffect(() => {
     // Keep showing cached/previous items while re-fetching (stale-while-revalidate)
     // so returning from a story doesn't flash a skeleton or lose the reader's place.
+    if (!profileLoaded) return;
     setError(null);
     const query = {
       lens,
@@ -104,9 +116,9 @@ export default function FeedPage() {
       state: profile?.state,
       languages: profile?.languages,
     };
-    // Profile loads after the first render, so two fetches are in flight on mount.
-    // Without this flag a slow un-personalized response can land last and overwrite
-    // the personalized one — national stories under a "Your state" chip.
+    // The cancelled flag stays even with the gate above: lens and profile can both
+    // change while a request is in flight, and a slow earlier response landing last
+    // would overwrite the newer one — national stories under a "Your state" chip.
     let cancelled = false;
     Promise.all([fetchFeed({ ...query, sort: "latest" }), fetchFeed({ ...query, sort: "top" })])
       .then(([list, ranked]) => {
@@ -120,7 +132,7 @@ export default function FeedPage() {
     return () => {
       cancelled = true;
     };
-  }, [lens, profile]);
+  }, [lens, profile, profileLoaded]);
 
   // Persist the reader's choice so it survives a reload and carries to Trending.
   const chooseScope = (next: Scope) => {
@@ -199,7 +211,7 @@ export default function FeedPage() {
           brand bar there, and two stacked wordmarks was the original bug. */}
       <div
         className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md lg:hidden"
-        style={{ borderColor: "var(--line)", background: "var(--glass)" }}
+        style={{ borderColor: "var(--line)", background: "var(--glass)", minHeight: "var(--app-header-h)" }}
       >
         <Link href="/" className="flex items-center gap-2" style={{ color: "var(--ink)" }}>
           <ParseMark />
@@ -306,8 +318,8 @@ export default function FeedPage() {
       {/* sticky sector chips */}
       {sections.length > 0 && (
         <div
-          className="hide-scroll sticky top-[53px] z-10 mt-3 flex gap-2 overflow-x-auto border-y px-5 py-2.5 backdrop-blur-md"
-          style={{ borderColor: "var(--line)", background: "var(--glass)" }}
+          className="hide-scroll sticky z-10 mt-3 flex gap-2 overflow-x-auto border-y px-5 py-2.5"
+          style={{ borderColor: "var(--line)", background: "var(--bg)", top: "var(--app-header-h)" }}
         >
           <a href="#for-you" className="flex-none whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-semibold" style={{ background: "var(--ink)", color: "var(--bg)" }}>
             For you
@@ -410,43 +422,17 @@ export default function FeedPage() {
       </div>
 
       {/* scope bottom sheet */}
-      {scopeOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end lg:absolute">
-          <button aria-label="Close" onClick={() => setScopeOpen(false)} className="absolute inset-0" style={{ background: "var(--scrim)" }} />
-          <div className="relative rounded-t-[22px] px-5 pb-11 pt-3" style={{ background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}>
-            <div className="mx-auto mb-3.5 h-1 w-9 rounded-full" style={{ background: "var(--line-strong)" }} />
-            <h3 className="text-[18px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-              Scope
-            </h3>
-            <p className="mb-3 mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-              Applies everywhere — Feed, Trending, Pulse and Search.
-            </p>
-            {scopeOpts.map(([value, label]) => (
-              <button
-                key={value}
-                onClick={() => {
-                  chooseScope(value);
-                  setScopeOpen(false);
-                }}
-                disabled={value !== "all" && !profile?.state}
-                // A greyed row with no reason reads as a broken control, and
-                // disabled buttons leave the tab order so a screen reader gets
-                // nothing at all. Say why, and where to fix it.
-                title={
-                  value !== "all" && !profile?.state
-                    ? "Add your state in Your Parse to filter by region"
-                    : undefined
-                }
-                className="flex min-h-[48px] w-full items-center gap-2.5 border-b px-1 text-left text-[14.5px] disabled:opacity-40"
-                style={{ borderColor: "var(--line)", color: "var(--ink)", fontWeight: scope === value ? 600 : 500 }}
-              >
-                <span>{label}</span>
-                {scope === value && <span className="ml-auto">✓</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <ScopeSheet
+        open={scopeOpen}
+        onClose={() => setScopeOpen(false)}
+        options={scopeOpts}
+        selected={scope}
+        onSelect={chooseScope}
+        disabledReason={(v) =>
+          v !== "all" && !profile?.state ? "Add your state in Your Parse to filter by region" : null
+        }
+        className="lg:absolute"
+      />
     </div>
   );
 }

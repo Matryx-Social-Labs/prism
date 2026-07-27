@@ -3,7 +3,31 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
-## [0.0.72.0] - 2026-07-26
+## [0.0.73.0] - 2026-07-26
+
+### Fixed
+- **Feed images no longer download at full article resolution.** A 64px thumbnail
+  was pulling a 170KB publisher photo — up to 455KB for some — on every visible
+  row. Parse now asks each publisher's CDN for a thumbnail-sized version where it
+  supports one. Measured across a feed screen: 1,544KB → 314KB, an 80% saving.
+  Hindustan Times and LiveMint serve only one fixed size, so those are unchanged.
+- **Landing sections were invisible without JavaScript.** Six content sections
+  were hidden by a reveal animation that only JavaScript could undo, so crawlers,
+  link-preview bots and anyone whose script failed saw blank space. Matters for
+  the public story pages coming next.
+- **Share cards still said PRISM**, in Georgia on cool grey. They now carry the
+  Parse name and the real typefaces on the warm ground.
+- Trending shows the actual name of every Indian state. It knew seven and printed
+  the raw code — "IN-BR" instead of "Bihar" — for everywhere else.
+
+### Changed
+- The scrolling feed composites one translucent blur instead of three, which is a
+  common source of scroll stutter on mid-range Android.
+- Feed and Trending no longer fire a throwaway un-personalised request on every
+  mount before the profile loads: 6 requests down to 3, and 2 down to 1.
+- The scope sheet is one component instead of two copies that had drifted apart.
+
+
 
 ### Fixed
 - **The lens flip works again.** Tapping Cyber or Markets on a story did nothing
