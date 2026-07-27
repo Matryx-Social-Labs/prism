@@ -200,3 +200,70 @@ async def test_partitioned_members_none_for_unknown_event():
         pytest.skip("no database")
     async with session_scope() as s:
         assert await _partitioned_members(s, uuid.uuid4()) is None  # not in any run → BFS fallback
+
+
+def _dated(i: str, day: int, srcs: int = 1) -> Node:
+    """A member on a distinct day — the shared _n() pins them all to one date,
+    which collapses the prior-in-time ordering the arborescence depends on."""
+    return Node(id=i, title=f"t-{i}", sector=None, regions=[],
+                occurred_at=dt.datetime(2026, 7, day, tzinfo=UTC), source_count=srcs, actors={})
+
+
+def test_the_hub_does_not_collect_every_development():
+    """REGRESSION: the tree came back a star, not a tree.
+
+    _root picks the most-corroborated event, and the raw score is shared-actor
+    weight + embedding closeness — so the hub, which by construction is close to
+    everything, outscored every rival parent for nearly every child and collected
+    them all. Measured on a real 22-development storyline: the root won 19 of 21
+    attachments, none by a tie-break. The page then showed a single
+    "21 developments" row: a list wearing a tree's UI.
+
+    Here `r` is that hub (strong with everyone) while a→b→c→d is a genuine chain.
+    The chain must survive.
+    """
+    members = [_dated("r", 1, srcs=100), _dated("a", 2), _dated("b", 3), _dated("c", 4), _dated("d", 5)]
+    chain = {("a", "b"), ("b", "c"), ("c", "d")}
+    edge_w: dict[tuple[str, str], float] = {}
+    for x in "abcd":
+        edge_w[("r", x)] = edge_w[(x, "r")] = 1.0  # the hub is plausible for all of them
+    for a, b in chain:
+        edge_w[(a, b)] = edge_w[(b, a)] = 0.9
+    embed = {(x.id, y.id): 0.5 for x in members for y in members if x.id != y.id}
+    spine = {}
+
+    root_id, parent, _ = build_branch_tree(members, edge_w, embed, spine)
+    assert root_id == "r"  # still the most-corroborated event
+
+    fan_out = sum(1 for p in parent.values() if p == "r")
+    assert fan_out < 4, f"the hub took {fan_out}/4 children — that is a star, not a tree"
+    # And the real chain is what survived.
+    assert parent["b"] == "a"
+    assert parent["c"] == "b"
+    assert parent["d"] == "c"
+
+
+def test_a_genuine_chain_is_left_alone():
+    """Normalising must not invent structure where the raw score already agreed."""
+    members = [_dated("r", 1, srcs=10), _dated("a", 2), _dated("b", 3)]
+    edge_w = {("r", "a"): 0.9, ("a", "r"): 0.9, ("a", "b"): 0.9, ("b", "a"): 0.9}
+    embed = {(x.id, y.id): 0.5 for x in members for y in members if x.id != y.id}
+    root_id, parent, _ = build_branch_tree(members, edge_w, embed, {})
+    assert root_id == "r"
+    assert parent["a"] == "r"
+    assert parent["b"] == "a"
+
+
+def test_a_member_with_no_affinity_at_all_does_not_crash_the_partitioner():
+    """A member connected to nothing has a mean pull of exactly 0.
+
+    Normalising by it is a float division by zero, which takes down the whole
+    partition run — every storyline, not just this one. Isolated members are
+    ordinary in a freshly-ingested corpus, so this is the common case, not a
+    corner. (It cannot instead be a *hijack*: a member with no affinity to
+    anything also has no affinity to this child, so its numerator is 0 too.)"""
+    members = [_dated("r", 1, srcs=10), _dated("lonely", 2), _dated("x", 3)]
+    edge_w = {("r", "x"): 0.8, ("x", "r"): 0.8}
+    embed = {("r", "x"): 0.2, ("x", "r"): 0.2}  # 'lonely' has no pairs at all
+    _, parent, _ = build_branch_tree(members, edge_w, embed, {})
+    assert parent["x"] == "r"
