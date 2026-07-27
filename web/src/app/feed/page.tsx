@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ParseMark } from "@/components/ParseMark";
+import { FeedDesktop } from "@/components/FeedDesktop";
 import { ScopeSheet } from "@/components/ScopeSheet";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
 import { useTaxonomy } from "@/components/ProfileEditor";
@@ -261,10 +262,13 @@ export default function FeedPage() {
         </div>
       )}
 
-      {/* ── The Stone: 104px mono ledger rail + field (desktop only) ──
-          Extra width buys simultaneity, not longer lines: the river keeps its
-          proven ~710px measure and the rail carries provenance beside it. */}
-      <div className="lg:grid lg:grid-cols-[104px_minmax(0,710px)_minmax(0,1fr)] lg:gap-8 lg:px-10 lg:pt-6">
+      {/* Desktop gets its own composition — a lead, an "also reading this" rail
+          beside it, then sector bands (Parse Desktop.dc.html). Widening the
+          mobile column was never the design: it bought 400px of dead ivory each
+          side and still showed one ranked list. */}
+      <FeedDesktop items={visible ?? []} top={visibleTop} />
+
+      <div className="lg:hidden">
         <aside className="hidden lg:block">
           <div className="sticky top-[76px] font-mono text-[10.5px] uppercase leading-[1.9] tracking-[0.12em]" style={{ color: "var(--ink-faint)" }}>
             <div>{scopeLabel}</div>
