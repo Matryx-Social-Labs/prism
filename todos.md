@@ -41,7 +41,7 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   worst-case Ask abuse — not just cost per served event (P2).
 
 ## Mobile web (deferred from /ship 2026-07-25, v0.0.70.0 — review findings not fixed in that branch)
-- **Feed thumbnails download full-resolution publisher images** (P1). `next.config.ts` sets
+- ~~**Feed thumbnails download full-resolution publisher images**~~ → Completed below. (P1). `next.config.ts` sets
   `images.unoptimized: true` (news CDNs block Vercel's optimizer via hotlink protection), and
   the mobile redesign made `StoryRowCard` thumbs visible below 640px. Measured on the live
   feed: natural width 1200px painted into a 64px box — roughly 350x the pixels needed, per
@@ -80,6 +80,19 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   resolves names from `fetchRegions()`. Files: `web/src/app/feed/page.tsx`,
   `web/src/app/trending/page.tsx`, `web/src/components/StoryView.tsx`,
   `web/src/components/SiteHeader.tsx`, `web/src/components/BottomTabBar.tsx`.
+
+- **A failed search renders a blank screen** (P2, found while adding page tests). On a
+  rejected `searchEvents`, `searched` stays false and `term.length >= 2` hides the start
+  screen, so the results area shows nothing at all — no error, no "no results". The spinner
+  does clear correctly. File: `web/src/app/search/page.tsx` (~49-53).
+- **`fetchRegions()` has no `.catch` on the interests page** (P3, same pass).
+  `ProfileEditor.tsx:95` does `fetchRegions().then(setStates)` while `useTaxonomy` two
+  functions above it catches. If /api/v1/regions is down this emits an unhandled rejection and
+  the state dropdown silently shows only its disabled placeholder.
+  File: `web/src/components/ProfileEditor.tsx`.
+- **The state `<select>` on /interests has no accessible name** (P3, same pass). The language
+  one has `aria-label="Add a language"`; this one has nothing, so a screen-reader user gets an
+  unlabeled combobox. File: `web/src/components/ProfileEditor.tsx`.
 
 ## Completed
 - **Scope chip claims to apply everywhere but doesn't** (was P2). Scope now lives in
