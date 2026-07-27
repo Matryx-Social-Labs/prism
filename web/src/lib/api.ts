@@ -218,6 +218,22 @@ export async function fetchTrending(
   return ((await res.json()) as { stories: TrendingStory[] }).stories;
 }
 
+/** One node of the L3 branch tree. partition.py has written these columns every
+ *  run since the storyline partitioner shipped. */
+export interface BranchNode {
+  id: string;
+  parent_id: string | null;
+  off_spine: boolean;
+  depth: number;
+}
+
+export interface BranchTreeData {
+  root_id: string;
+  nodes: BranchNode[];
+  /** Counted, never inferred — the readout prints these verbatim. */
+  shape: { developments: number; branches: number; satellites: number; max_depth: number };
+}
+
 export interface TrendingStoryDetail {
   slug: string;
   canonical_slug: string;
@@ -229,6 +245,8 @@ export interface TrendingStoryDetail {
   status: string;
   developments: StoryDevelopment[];
   timeline_cast: string[];
+  /** Null for a storyline that predates the current partition run. */
+  branches: BranchTreeData | null;
 }
 
 export async function fetchTrendingStory(slug: string): Promise<TrendingStoryDetail | null> {

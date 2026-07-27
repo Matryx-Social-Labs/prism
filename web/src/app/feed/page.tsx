@@ -304,7 +304,8 @@ export default function FeedPage() {
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12.5px] font-semibold leading-[1.35]">{t.hero_title ?? t.label}</p>
+                  {/* Storyline name, not one outlet's headline — matches /trending. */}
+                  <p className="text-[12.5px] font-semibold leading-[1.35]">{t.label ?? t.hero_title}</p>
                   <span className="mt-1 block font-mono text-[10px]" style={{ color: "var(--ink-faint)" }}>
                     {t.source_count} sources · {t.velocity >= 3 ? "developing" : `${t.developments} updates`}
                   </span>

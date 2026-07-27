@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.74.0] - 2026-07-26
+
+### Added
+- **The storyline branch tree.** A trending story is not a list — it forks, and
+  some developments only loosely attach. Parse has been recording that shape on
+  every partition run and never showing it. The storyline page now opens on
+  TRUNK, which reads exactly like the timeline it replaces plus one counted line
+  of structure; branches sit collapsed at the point they fork from, as a single
+  tappable row; and ALL adds the loosely-attached developments, marked, so you
+  are told which ones they are rather than having them quietly mixed in.
+
+### Fixed
+- **Trending names the story, not one outlet's headline.** Rows led with a single
+  member's headline while the page they opened was titled with the story's own
+  cast, so the two disagreed about what you had just tapped.
+
 ## [0.0.73.0] - 2026-07-26
 
 ### Fixed
