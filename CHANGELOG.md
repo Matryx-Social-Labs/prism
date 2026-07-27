@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.76.2] - 2026-07-27
+
+### Fixed
+- **The desktop Feed was hiding most of the news.** It showed four sectors and
+  dropped any sector with fewer than four stories — so on a normal feed five of
+  nine never appeared at all, cybersecurity among them. Every sector now gets a
+  band, however few stories it has, and a band with more to show links through to
+  the full sector page.
+
 ## [0.0.76.1] - 2026-07-27
 
 ### Changed
