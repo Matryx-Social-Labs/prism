@@ -174,12 +174,23 @@ export function FeedDesktop({ items, top }: { items: FeedItem[]; top: FeedItem[]
           </Rail>
 
           <div>
-            <h2
-              className="mb-[18px] text-[12px] font-semibold capitalize"
-              style={{ color: "var(--ink-muted)" }}
-            >
-              {band.sector.replaceAll("_", " ")}
-            </h2>
+            <div className="mb-[18px] flex items-baseline gap-3">
+              <h2 className="text-[12px] font-semibold capitalize" style={{ color: "var(--ink-muted)" }}>
+                {band.sector.replaceAll("_", " ")}
+              </h2>
+              {/* Depth lives on the sector page, not in a horizontal scroller:
+                  the desktop design has no overflow-x anywhere, and the mobile
+                  feed already sends readers here for the rest of a sector. */}
+              {band.total > band.items.length && (
+                <Link
+                  href={`/sector/${band.sector}`}
+                  className={`${MONO} transition hover:opacity-70`}
+                  style={{ color: "var(--ink-faint)" }}
+                >
+                  All {band.total} →
+                </Link>
+              )}
+            </div>
             <div className={FIELD}>
               {band.items.map((i, n) => (
                 <article

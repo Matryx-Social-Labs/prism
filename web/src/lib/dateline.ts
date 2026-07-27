@@ -69,16 +69,23 @@ export function lastMoved(items: FeedItem[]): string {
   return newest ? istTime(newest) : "";
 }
 
-export type Band = { sector: string; items: FeedItem[] };
+export type Band = { sector: string; items: FeedItem[]; total: number };
 
 /**
- * Group the feed into sector bands, densest first.
+ * Group the feed into sector bands, densest first. EVERY sector gets one.
  *
- * `perBand` matches the design's four-across row exactly; a band that can't fill
- * it is dropped rather than rendered ragged, because a half-empty band reads as
- * a loading state on a 1240px field.
+ * The first cut capped this at four bands and dropped any sector with fewer than
+ * four stories, on the theory that a half-empty row reads as a loading state.
+ * That was wrong in the way that matters: of nine sectors in a real feed, five
+ * never rendered at all — including cybersecurity, which is one of the lenses the
+ * product is built around. A short row is a minor typographic compromise;
+ * a missing sector is missing news.
+ *
+ * `perBand` still caps what a band SHOWS, because the design's row is four across
+ * and a dense sector would otherwise run to dozens. Depth lives at /sector/<slug>,
+ * which the band links to — the same pattern the mobile feed already uses.
  */
-export function bands(items: FeedItem[], exclude: Set<string>, perBand = 4, max = 4): Band[] {
+export function bands(items: FeedItem[], exclude: Set<string>, perBand = 4): Band[] {
   const bySector = new Map<string, FeedItem[]>();
   for (const i of items) {
     if (exclude.has(i.id) || !i.sector) continue;
@@ -87,10 +94,8 @@ export function bands(items: FeedItem[], exclude: Set<string>, perBand = 4, max 
     bySector.set(i.sector, list);
   }
   return [...bySector.entries()]
-    .filter(([, list]) => list.length >= perBand)
     .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, max)
-    .map(([sector, list]) => ({ sector, items: list.slice(0, perBand) }));
+    .map(([sector, list]) => ({ sector, items: list.slice(0, perBand), total: list.length }));
 }
 
 /** "POLITICS · ENERGY" — the lead's sector eyebrow. */
