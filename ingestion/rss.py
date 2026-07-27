@@ -19,7 +19,7 @@ import httpx
 
 from common.logging import get_logger
 from common.schemas import RawItemEnvelope
-from ingestion.base import persist_envelopes
+from ingestion.base import clean_text, persist_envelopes
 
 logger = get_logger(__name__)
 
@@ -129,6 +129,7 @@ def _entry_datetime(entry) -> datetime | None:
 
 
 def _strip_html(text: str) -> str:
-    import re
-
-    return re.sub(r"<[^>]+>", " ", text).strip()
+    # One definition, shared with every other collector — this one stripped tags
+    # but left `&#039;` intact, which is exactly the drift that put raw entities
+    # in front of readers.
+    return clean_text(text)
