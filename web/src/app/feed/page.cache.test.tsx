@@ -77,7 +77,11 @@ describe("Feed — the module cache on a return navigation", () => {
     // Their state is the default, since nothing is saved and they have one.
     await screen.findByRole("button", { name: /Kerala/ });
     // Wait for the feed itself: the cache is only written once items land.
-    await screen.findByText(ITEM.title);
+    // getAllBy, not getBy: desktop and mobile are two compositions rendered
+    // together and switched with CSS, so jsdom — which has no viewport — sees
+    // the story in both trees. In a browser only one is displayed, and the
+    // hidden one costs no image requests (verified: 34 img tags, 2 fetches).
+    await screen.findAllByText(ITEM.title);
 
     await userEvent.click(screen.getByRole("button", { name: /Kerala/ }));
     await userEvent.click(await screen.findByRole("button", { name: "All" }));
@@ -89,6 +93,6 @@ describe("Feed — the module cache on a return navigation", () => {
     expect(await screen.findByRole("button", { name: /All/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Kerala/ })).not.toBeInTheDocument();
     // Restored from the module cache, so the reader's place is there immediately.
-    expect(screen.getByText(ITEM.title)).toBeInTheDocument();
+    expect(screen.getAllByText(ITEM.title).length).toBeGreaterThan(0);
   });
 });

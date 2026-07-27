@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.76.0] - 2026-07-27
+
+### Fixed
+- **Trending showed the same story several times over.** One protest had taken 7
+  of 17 slots, under near-identical titles. Each pass merged the duplicates and
+  then immediately recreated them, so the count only ever grew. Slices of one
+  story now fold into it instead of becoming new entries.
+
 ## [0.0.75.1] - 2026-07-27
 
 ### Fixed
