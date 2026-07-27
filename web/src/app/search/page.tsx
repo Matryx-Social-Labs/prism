@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { SearchRail } from "@/components/SearchDesktop";
 import { StoryRowCard } from "@/components/StoryCard";
 import { fetchTrending, searchEvents, type FeedItem } from "@/lib/api";
 import { useScrollRestore } from "@/lib/useScrollRestore";
@@ -86,86 +87,105 @@ function SearchInner() {
   const term = q.trim();
 
   return (
-    <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9 lg:max-w-[1240px] lg:px-10">
-      {/* The query sets in the display voice — the thing you typed is the headline
-          of this screen (Parse Desktop.dc.html). */}
-      <input
-        autoFocus
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && setQ("")}
-        placeholder="Search"
-        aria-label="Search stories, entities and sources"
-        className="w-full border-0 bg-transparent p-0 text-[28px] leading-tight tracking-[-0.02em] outline-none placeholder:opacity-40 sm:text-[34px]"
-        style={{ fontFamily: "var(--font-display), serif", fontWeight: 400, color: "var(--ink)" }}
-      />
-      <div className="mt-3 border-b" style={{ borderColor: "var(--line)" }} />
+    // Desktop is The Stone (Parse Desktop.dc.html, SEARCH): a 104px mono ledger
+    // rail outside a 1240px field — the grid the desktop Feed already uses.
+    // Below lg this is untouched: one 760px column, the phone's screen.
+    <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9 lg:grid lg:w-[1376px] lg:max-w-none lg:grid-cols-[104px_1240px] lg:gap-x-8 lg:px-0 lg:pb-20 lg:pt-10">
+      <SearchRail results={results} />
 
-      {/* What is searchable, in the provenance voice. */}
-      <p className="mt-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-        stories · entities · tickers · CVE ids
-      </p>
+      <div className="min-w-0">
+        {/* The query sets in the display voice — the thing you typed is the headline
+            of this screen (Parse Desktop.dc.html). */}
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          // The rail promises "ESC CLEAR"; this is the only key that promise rests on.
+          onKeyDown={(e) => e.key === "Escape" && setQ("")}
+          placeholder="Search"
+          aria-label="Search stories, entities and sources"
+          className="w-full border-0 bg-transparent p-0 text-[28px] leading-tight tracking-[-0.02em] outline-none placeholder:opacity-40 sm:text-[34px]"
+          style={{ fontFamily: "var(--font-display), serif", fontWeight: 400, color: "var(--ink)" }}
+        />
+        <div className="mt-3 border-b lg:mt-[18px]" style={{ borderColor: "var(--line)" }} />
 
-      {/* EMPTY STATE — the screen used to be blank until you typed, which is the
-          emptiest surface in the app. Give the reader somewhere to start. */}
-      {term.length < 2 && !loading && (
-        <div className="mt-8 flex flex-col gap-8 lg:flex-row lg:gap-16">
-          <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-              Trending entities
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {entities.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => setQ(e)}
-                  className="rounded-full border px-3 py-[7px] text-[13px] transition hover:opacity-70"
-                  style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-                >
-                  {e}
-                </button>
-              ))}
+        {/* What is searchable, in the provenance voice. */}
+        <p className="mt-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+          stories · entities · tickers · CVE ids
+        </p>
+
+        {/* EMPTY STATE — the screen used to be blank until you typed, which is the
+            emptiest surface in the app. Give the reader somewhere to start. */}
+        {term.length < 2 && !loading && (
+          // Desktop lays the same two blocks on the field's twelve 74px columns
+          // (cols 1–6 and 8–12, Parse Desktop.dc.html) and squares the chips off —
+          // a pill is a phone tap target. Same elements, same copy: two trees would
+          // put two "Adani Group" buttons in the DOM and break the start-screen
+          // tests, which count them.
+          <div className="mt-8 flex flex-col gap-8 lg:mt-[26px] lg:grid lg:grid-cols-[repeat(12,74px)] lg:gap-x-8 lg:gap-y-0">
+            <div className="min-w-0 flex-1 lg:col-span-6">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] lg:tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
+                Trending entities
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {entities.map((e) => (
+                  <button
+                    key={e}
+                    onClick={() => setQ(e)}
+                    className="rounded-full border px-3 py-[7px] text-[13px] transition hover:opacity-70 lg:rounded-none lg:px-[11px] lg:py-1.5 lg:text-[13.5px]"
+                    style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 lg:col-span-5 lg:col-start-8">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] lg:tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
+                Try
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["RELIANCE", "CVE-2026-62144", "Kerala"].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setQ(t)}
+                    className="rounded-full border px-3 py-[7px] font-mono text-[11.5px] transition hover:opacity-70 lg:rounded-none lg:px-[9px] lg:py-1 lg:text-[11px]"
+                    style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-              Try
+        )}
+
+        <div className="mt-6 flex flex-col gap-3">
+          {loading && (
+            <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+              Searching…
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {["RELIANCE", "CVE-2026-62144", "Kerala"].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setQ(t)}
-                  className="rounded-full border px-3 py-[7px] font-mono text-[11.5px] transition hover:opacity-70"
-                  style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+          )}
+          {!loading && failed && (
+            <p className="text-[14px]" style={{ color: "var(--ink-muted)" }} role="status">
+              Search is unreachable right now — check your connection and try again.
+            </p>
+          )}
+          {!loading && !failed && searched && results.length === 0 && (
+            <p className="text-[14px]" style={{ color: "var(--ink-muted)" }}>
+              No stories match “{term}”.
+            </p>
+          )}
+          {/* Two columns of ruled rows on desktop, one on the phone. The rows keep
+              their tap padding below lg and lose it above, so the first column's
+              text sits on the field's left edge under the query — the whole point
+              of a grid this rigid. */}
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-0 lg:[&_a]:px-0">
+            {results.map((item) => (
+              <StoryRowCard key={item.id} item={item} lens="reader" />
+            ))}
           </div>
         </div>
-      )}
-
-      <div className="mt-6 flex flex-col gap-3">
-        {loading && (
-          <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-            Searching…
-          </p>
-        )}
-        {!loading && failed && (
-          <p className="text-[14px]" style={{ color: "var(--ink-muted)" }} role="status">
-            Search is unreachable right now — check your connection and try again.
-          </p>
-        )}
-        {!loading && !failed && searched && results.length === 0 && (
-          <p className="text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            No stories match “{term}”.
-          </p>
-        )}
-        {results.map((item) => (
-          <StoryRowCard key={item.id} item={item} lens="reader" />
-        ))}
       </div>
     </div>
   );

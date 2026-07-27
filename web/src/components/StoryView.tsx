@@ -11,6 +11,7 @@ import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { ShareButton } from "@/components/ShareButton";
+import { StoryDesktop } from "@/components/StoryDesktop";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
 import { StoryTimeline } from "@/components/StoryTimeline";
@@ -261,7 +262,22 @@ export function StoryView({ event }: { event: EventDetail }) {
   }, [event.id, storyCount]);
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-[164px] pt-7 sm:px-8 lg:pb-[120px] xl:px-10">
+    <>
+      {/* Desktop is its own composition (Parse Desktop.dc.html): the ledger rail
+          re-inks with the lens and all three openings sit on the board at once.
+          State stays here so there is one lens machine, not two. */}
+      <StoryDesktop
+        event={event}
+        lens={lens}
+        offered={offered}
+        briefs={briefs}
+        brief={brief}
+        lensName={(slug) => lensMeta(slug).short}
+        isLocked={isLocked}
+        onPick={(slug) => pickLens(slug, false)}
+      />
+
+    <div className="mx-auto max-w-[1240px] px-5 pb-[164px] pt-7 sm:px-8 lg:hidden">
       <Link href="/feed" scroll={false} className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
@@ -960,5 +976,6 @@ export function StoryView({ event }: { event: EventDetail }) {
         />
       </div>
     </div>
+    </>
   );
 }

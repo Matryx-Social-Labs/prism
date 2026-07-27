@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { YouDesktop } from "@/components/YouDesktop";
 import { useTaxonomy } from "@/components/ProfileEditor";
 import { timeAgo } from "@/components/StoryCard";
 import { fetchRegions } from "@/lib/api";
@@ -45,8 +46,27 @@ export default function YouPage() {
   };
   const initial = (session?.email ?? "G").charAt(0).toUpperCase();
 
+  const signOut = () => {
+    clearSession();
+    window.location.href = "/feed";
+  };
+
   return (
-    <div className="mx-auto max-w-[620px] pb-28">
+    <div className="mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:pb-20">
+      {/* Desktop gets its own composition — the colophon ledger, with EDIT in
+          the mono rail (Parse Desktop.dc.html). The card stack below is the
+          phone's and stays the phone's. */}
+      <YouDesktop
+        email={session?.email ?? null}
+        lensName={lens.name}
+        stateName={stateName}
+        languages={languages}
+        interests={(profile?.interests ?? []).map(interestName)}
+        follows={follows.map((w) => w.value)}
+        onSignOut={signOut}
+      />
+
+      <div className="lg:hidden">
       {/* identity */}
       <div className="flex items-center gap-3 border-b px-5 py-4" style={{ borderColor: "var(--line)" }}>
         <span
@@ -176,10 +196,7 @@ export default function YouPage() {
         </div>
         {session ? (
           <button
-            onClick={() => {
-              clearSession();
-              window.location.href = "/feed";
-            }}
+            onClick={signOut}
             className="flex min-h-[52px] w-full items-center px-[14px] text-left text-[13.5px] font-medium"
             style={{ color: "var(--danger)" }}
           >
@@ -190,6 +207,7 @@ export default function YouPage() {
             Sign in
           </Link>
         )}
+      </div>
       </div>
     </div>
   );

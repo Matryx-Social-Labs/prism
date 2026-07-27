@@ -3,6 +3,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TrendingPage from "@/app/trending/page";
 
+// jsdom has no viewport, so BOTH trees render — the desktop composition
+// (`lg:block`) and the phone's (`lg:hidden`). The scope control exists on both,
+// so these queries name the surface: the phone's chip carries ◉ and ▾, and the
+// sheet's options sit outside the desktop tab group.
+const phone = (name: string | RegExp) =>
+  screen.getAllByRole("button", { name }).find((b) => !b.closest("[role='group']"))!;
+
 const fetchTrending = vi.hoisted(() => vi.fn());
 const fetchRegions = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn());
@@ -34,7 +41,7 @@ describe("Trending — the scope the reader chose elsewhere", () => {
 
     render(<TrendingPage />);
 
-    expect(await screen.findByRole("button", { name: /National/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /◉ National/ })).toBeInTheDocument();
     await waitFor(() => expect(fetchTrending).toHaveBeenCalled());
     for (const call of fetchTrending.mock.calls) expect(call[0].state).toBeNull();
   });
@@ -48,7 +55,7 @@ describe("Trending — the scope the reader chose elsewhere", () => {
 
     render(<TrendingPage />);
 
-    expect(await screen.findByRole("button", { name: /National/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /◉ National/ })).toBeInTheDocument();
     expect(screen.queryByText(/Your state/)).not.toBeInTheDocument();
   });
 
@@ -62,7 +69,7 @@ describe("Trending — the scope the reader chose elsewhere", () => {
 
     render(<TrendingPage />);
 
-    expect(await screen.findByRole("button", { name: /Kerala/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /◉ Kerala/ })).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ state: "IN-KL" })),
     );
@@ -72,8 +79,9 @@ describe("Trending — the scope the reader chose elsewhere", () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<TrendingPage />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /Kerala/ }));
-    await userEvent.click(await screen.findByRole("button", { name: "National" }));
+    await screen.findByRole("button", { name: /◉ Kerala/ });
+    await userEvent.click(phone(/◉ Kerala/));
+    await userEvent.click(phone("National")); // the sheet's option, not the desktop tab
 
     expect(localStorage.getItem("parse.scope.v2")).toBe("national");
   });

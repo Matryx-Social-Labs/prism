@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { ScopeSheet } from "@/components/ScopeSheet";
+import { TrendingDesktop } from "@/components/TrendingDesktop";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
@@ -94,9 +95,23 @@ export default function TrendingPage() {
   return (
     // Same Stone grid + same regression fix as the feed: this was
     // max-w-[620px] with no breakpoint.
-    <div className="relative mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:px-10 lg:pb-20">
+    <div className="relative mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:pb-20">
+      {/* Desktop gets its own composition — a ruled ledger of ranked storylines
+          with the evidence in the margin (Parse Desktop.dc.html). Everything
+          below it is the phone's, and stays the phone's. */}
+      <TrendingDesktop
+        stories={stories}
+        scope={scope}
+        onScope={chooseScope}
+        stateName={stateName}
+        sector={sector}
+        onSector={setSector}
+        sectors={SECTORS}
+      />
+
+      <div className="lg:hidden">
       <div
-        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md lg:static lg:border-0 lg:px-0"
+        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md"
         style={{ borderColor: "var(--line)", background: "var(--glass)" }}
       >
         <h1 className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -138,6 +153,7 @@ export default function TrendingPage() {
         ) : (
           stories.map((s, i) => <StoryRow key={s.slug} story={s} rank={i + 1} />)
         )}
+      </div>
       </div>
 
       <ScopeSheet

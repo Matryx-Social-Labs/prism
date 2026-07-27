@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.77.0] - 2026-07-27
+
+### Changed
+- **Every screen now has a desktop layout**, not the phone column stretched wide.
+  Story shows all three lens readings side by side and re-inks the margin — the
+  evidence changes with the lens, so cyber shows the CVE and markets the tickers.
+  Trending is a ruled ledger of ranked storylines with the headline each is
+  currently running under. Your Parse reads as a colophon. Search gains a margin
+  ledger counting what matched and where it was filed.
+
 ## [0.0.76.2] - 2026-07-27
 
 ### Fixed
