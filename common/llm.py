@@ -65,7 +65,7 @@ def get_llm() -> AsyncOpenAI:
             base_url = settings.openrouter_base_url
             api_key = settings.openrouter_api_key or "missing-openrouter-key"
             # Optional attribution shown on the OpenRouter dashboard.
-            headers = {"HTTP-Referer": settings.prism_web_url, "X-Title": "Prism"}
+            headers = {"HTTP-Referer": settings.prism_web_url, "X-Title": "Parse"}
         else:  # ollama fallback
             base_url = settings.ollama_base_url
             api_key = settings.ollama_api_key or "ollama"

@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     prism_web_url: str = "http://localhost:3000"
     prism_email_provider: str = "console"  # console (dev) | resend
     resend_api_key: str = ""
-    prism_email_from: str = "Prism <onboarding@resend.dev>"  # set to a verified domain sender
+    prism_email_from: str = "Parse <onboarding@resend.dev>"  # set to a verified domain sender
     prism_magic_token_ttl_min: int = 15  # magic-link lifetime
     prism_session_ttl_days: int = 30  # bearer session lifetime
     prism_magic_request_cooldown_s: int = 30  # per-email rate limit on link requests
