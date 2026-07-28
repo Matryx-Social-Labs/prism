@@ -1,6 +1,6 @@
-# Parse — One story. Every perspective.
+# Prism — One story. Every perspective.
 
-**Parse is a role-aware AI news intelligence platform for everyone.** It clusters worldwide
+**Prism is a role-aware AI news intelligence platform for everyone.** It clusters worldwide
 coverage into single canonical events, then reads each one through the user's professional
 lens: a war is a humanitarian story for a general reader, a cyber-threat forecast (who's
 exposed, what to check) for a security professional, and a market catalyst (sectors, tickers,
@@ -25,7 +25,7 @@ self-hosted, CI auto-deploy on push. See the Quickstart below and
 and [`docs/MARKET-RESEARCH.md`](./docs/MARKET-RESEARCH.md).
 
 ## Lineage
-Parse generalizes the pipeline from the author's EduThreat-CTI research (ingest, classify,
+Prism generalizes the pipeline from the author's EduThreat-CTI research (ingest, classify,
 enrich, cluster and canonicalize, correlate into an impact graph, then serve) from the narrow
 domain of education-sector cyber incidents to worldwide news. The proven enrichment and
 correlation logic is ported here rather than the codebase being forked.
@@ -42,7 +42,7 @@ Full index, organized by [Diataxis](https://diataxis.fr) quadrant:
 
 | Doc | Kind | What it covers |
 | --- | --- | --- |
-| [docs/TUTORIAL.md](./docs/TUTORIAL.md) | Tutorial | Run Parse locally and flip a lens — zero to working |
+| [docs/TUTORIAL.md](./docs/TUTORIAL.md) | Tutorial | Run Prism locally and flip a lens — zero to working |
 | [docs/HOWTO.md](./docs/HOWTO.md) | How-to | Add a source / lens / language, trigger ingestion, inspect prod |
 | [docs/API.md](./docs/API.md) | Reference | Every `/api/v1` endpoint, params, and response shape |
 | [docs/STORY-GRAPH.md](./docs/STORY-GRAPH.md) | Explanation | How stories form and stay coherent — clustering, story timeline, trending |

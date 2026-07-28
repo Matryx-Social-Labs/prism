@@ -79,7 +79,7 @@ describe("You — signed in", () => {
   });
 });
 
-describe("You — Your Parse", () => {
+describe("You — Your Prism", () => {
   it("shows the reader's saved lens", async () => {
     loadProfile.mockReturnValue({ lens: "markets" });
     render(<YouPage />);
@@ -96,7 +96,7 @@ describe("You — Your Parse", () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     fetchRegions.mockRejectedValue(new Error("down"));
     render(<YouPage />);
-    expect((await screen.findAllByText(/Your Parse/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/Your Prism/i)).length).toBeGreaterThan(0);
   });
 
   it("defaults to English when no language is saved", async () => {
@@ -127,7 +127,7 @@ describe("You — the desktop colophon", () => {
     loadProfile.mockReturnValue({ lens: "markets", state: "IN-KL", languages: ["hi"] });
     render(<YouPage />);
 
-    expect(await screen.findByText("How your Parse is made")).toBeInTheDocument();
+    expect(await screen.findByText("How your Prism is made")).toBeInTheDocument();
     expect(screen.getByText(/Signed in as sagar@example.com/)).toBeInTheDocument();
     // The full lens name, not the phone's abbreviated pill.
     expect(screen.getByText("Finance / Trader")).toBeInTheDocument();

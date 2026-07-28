@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.78.0] - 2026-07-28
+
+### Changed
+- **The product is called Prism again**, and the mark is the prism again — a solid
+  ink triangle standing on a spectrum bar, ported from `Prism Landing Desktop.dc.html`.
+  `readprism.news` is secured. The design system never changed through either
+  rename; only the name and the mark did, which is the tell that the spectrum
+  hairline and the discrete lens hues were always the prism's argument.
+- The sign-in email, API title, OG/JSON-LD metadata, share cards and every screen
+  carry the name again. `PRISM_*` env vars and `prism.*` storage keys were never
+  renamed and still aren't.
+
 ## [0.0.77.1] - 2026-07-27
 
 ### Fixed
@@ -20,7 +32,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   Story shows all three lens readings side by side and re-inks the margin — the
   evidence changes with the lens, so cyber shows the CVE and markets the tickers.
   Trending is a ruled ledger of ranked storylines with the headline each is
-  currently running under. Your Parse reads as a colophon. Search gains a margin
+  currently running under. Your Prism reads as a colophon. Search gains a margin
   ledger counting what matched and where it was filed.
 
 ## [0.0.76.2] - 2026-07-27
@@ -82,7 +94,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   results area showed nothing at all — no error, no explanation, and no hint the
   search had even run. It now says so, and it no longer tells you there were no
   matches when the truth is that it never got to look.
-- The state dropdown in Your Parse survives the regions service being down, and
+- The state dropdown in Your Prism survives the regions service being down, and
   now announces itself to screen readers.
 
 ## [0.0.74.1] - 2026-07-26
@@ -96,7 +108,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
 ### Added
 - **The storyline branch tree.** A trending story is not a list — it forks, and
-  some developments only loosely attach. Parse has been recording that shape on
+  some developments only loosely attach. Prism has been recording that shape on
   every partition run and never showing it. The storyline page now opens on
   TRUNK, which reads exactly like the timeline it replaces plus one counted line
   of structure; branches sit collapsed at the point they fork from, as a single
@@ -113,7 +125,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 ### Fixed
 - **Feed images no longer download at full article resolution.** A 64px thumbnail
   was pulling a 170KB publisher photo — up to 455KB for some — on every visible
-  row. Parse now asks each publisher's CDN for a thumbnail-sized version where it
+  row. Prism now asks each publisher's CDN for a thumbnail-sized version where it
   supports one. Measured across a feed screen: 1,544KB → 314KB, an 80% saving.
   Hindustan Times and LiveMint serve only one fixed size, so those are unchanged.
 - **Landing sections were invisible without JavaScript.** Six content sections
@@ -121,7 +133,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   link-preview bots and anyone whose script failed saw blank space. Matters for
   the public story pages coming next.
 - **Share cards still said PRISM**, in Georgia on cool grey. They now carry the
-  Parse name and the real typefaces on the warm ground.
+  Prism name and the real typefaces on the warm ground.
 - Trending shows the actual name of every Indian state. It knew seven and printed
   the raw code — "IN-BR" instead of "Bihar" — for everywhere else.
 
@@ -174,7 +186,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 ## [0.0.71.0] - 2026-07-25
 
 ### Changed
-- **The product is now called Parse.** "Prism" collided with the NSA's PRISM
+- **The product is now called Prism.** "Prism" collided with the NSA's PRISM
   surveillance programme — an unwinnable association for a product whose whole
   pitch is transparency — and was squatted across every TLD. The new mark is a
   citation bracket holding three rules: one record, read three ways, the last

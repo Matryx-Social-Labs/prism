@@ -1,6 +1,6 @@
 # Architecture
 
-Parse is built fresh and streaming-first. It is not a fork of EduThreat, but it ports EduThreat's
+Prism is built fresh and streaming-first. It is not a fork of EduThreat, but it ports EduThreat's
 proven enrichment and correlation logic. The design goal is that a new item flows from collection
 to a user's feed continuously, and that the trader fast-lane in Phase 2 can be added without
 re-architecting.

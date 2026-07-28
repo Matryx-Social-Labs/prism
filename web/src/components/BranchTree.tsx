@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import type { BranchNode, BranchTreeData, StoryDevelopment } from "@/lib/api";
 
-// The storyline branch tree (Parse Mobile.dc.html, screen 2).
+// The storyline branch tree (Prism Mobile.dc.html, screen 2).
 //
 // partition.py has been writing branch_parent_id / off_spine every run since the
 // storyline partitioner shipped, and until now nothing read them: the page

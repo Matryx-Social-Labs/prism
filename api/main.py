@@ -15,7 +15,7 @@ from common.logging import setup_logging
 setup_logging()
 
 app = FastAPI(
-    title="Parse API",
+    title="Prism API",
     version="0.1.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",

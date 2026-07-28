@@ -1,8 +1,8 @@
-# Tutorial: run Parse locally and flip a lens
+# Tutorial: run Prism locally and flip a lens
 
-By the end of this you'll have the full Parse pipeline running on your machine,
+By the end of this you'll have the full Prism pipeline running on your machine,
 real stories in the feed, and you'll have watched one story re-typeset itself as
-you switch lenses — the thing Parse exists to do. You do **not** need an LLM key to
+you switch lenses — the thing Prism exists to do. You do **not** need an LLM key to
 get started: CVE feeds flow end to end with deterministic enrichment, so you'll see
 real cybersecurity stories within a few minutes. A key unlocks news and the
 lens-flip brief later in the tutorial.
@@ -43,7 +43,7 @@ cd web && npm install && npm run dev
 
 ## Step 3: See the app
 
-Open **http://localhost:3000**. You'll see the Parse landing page ("One story.
+Open **http://localhost:3000**. You'll see the Prism landing page ("One story.
 Every perspective."). Click **Browse the news** → the feed. It may be sparse for a
 moment — the worker started ingesting the instant it launched.
 
@@ -73,7 +73,7 @@ feed either way: a lens **ranks**, it never filters, so cyber-relevant items ris
 to the top while elections and markets stay on the page. (Want cybersecurity only?
 That's `?sector=cybersecurity`.)
 
-Reload the feed in the browser with the **Cyber** lens (set it in "Your Parse" via
+Reload the feed in the browser with the **Cyber** lens (set it in "Your Prism" via
 the onboarding flow, or query `?lens=cyber` on the API). You're looking at real,
 clustered, freshly-ingested stories.
 
@@ -105,7 +105,7 @@ Open a story that has more than one lens available and switch the **lens tabs**
 different role — a general reader's "what led to this and who's affected", a
 security professional's "who's exposed, what to patch", a trader's "which tickers,
 what catalyst". The body and layout don't move; only the meaning does. That is
-Parse.
+Prism.
 
 ---
 

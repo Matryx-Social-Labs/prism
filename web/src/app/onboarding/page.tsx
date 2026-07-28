@@ -156,7 +156,7 @@ export default function OnboardingPage() {
             Which state are you in?
           </h1>
           <p className="mt-2.5 text-sm leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Parse leads with news from your state, then the rest of India. Pick your state —
+            Prism leads with news from your state, then the rest of India. Pick your state —
             you can change it anytime.
           </p>
           <div className="mt-6">
@@ -345,7 +345,7 @@ export default function OnboardingPage() {
                 className="mt-0.5 h-4 w-4 shrink-0"
               />
               <span>
-                I agree to the Terms and to Parse creating an account for me and processing my
+                I agree to the Terms and to Prism creating an account for me and processing my
                 email per the privacy policy.
               </span>
             </label>

@@ -54,7 +54,7 @@ export default function YouPage() {
   return (
     <div className="mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:pb-20">
       {/* Desktop gets its own composition — the colophon ledger, with EDIT in
-          the mono rail (Parse Desktop.dc.html). The card stack below is the
+          the mono rail (Prism Desktop.dc.html). The card stack below is the
           phone's and stays the phone's. */}
       <YouDesktop
         email={session?.email ?? null}
@@ -90,9 +90,9 @@ export default function YouPage() {
         )}
       </div>
 
-      {/* Your Parse */}
+      {/* Your Prism */}
       <h2 className={H2} style={{ color: "var(--ink-muted)" }}>
-        Your Parse
+        Your Prism
       </h2>
       <div className={CARD} style={CARD_STYLE}>
         <Row label="Default lens">

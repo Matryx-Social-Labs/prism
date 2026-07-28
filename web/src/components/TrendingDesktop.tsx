@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { TrendingStory } from "@/lib/api";
 import { istDate } from "@/lib/dateline";
 
-// The desktop Trending screen (Parse Desktop.dc.html, TRENDING screen), on the
+// The desktop Trending screen (Prism Desktop.dc.html, TRENDING screen), on the
 // same Stone grid as the desktop Feed: a 104px mono ledger rail outside a 1240px
 // field of twelve 74px columns with 32px gutters (104 + 32 + 1240 = 1376).
 //

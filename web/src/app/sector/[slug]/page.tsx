@@ -34,7 +34,7 @@ export default function SectorPage({ params }: { params: Promise<{ slug: string 
         if (!cancelled) setItems(list);
       })
       .catch(() => {
-        if (!cancelled) setError("The Parse API is unreachable right now. Refresh in a moment.");
+        if (!cancelled) setError("The Prism API is unreachable right now. Refresh in a moment.");
       });
     return () => {
       cancelled = true;

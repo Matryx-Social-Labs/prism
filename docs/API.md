@@ -1,6 +1,6 @@
 # HTTP API Reference
 
-Parse's serving layer is a FastAPI app under `api/` mounted at `/api/v1`. Every
+Prism's serving layer is a FastAPI app under `api/` mounted at `/api/v1`. Every
 endpoint is read-only except auth, watchlist, and the admin pipeline trigger.
 Responses are JSON unless noted (the Ask endpoint streams Server-Sent Events).
 

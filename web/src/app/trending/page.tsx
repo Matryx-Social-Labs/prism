@@ -97,7 +97,7 @@ export default function TrendingPage() {
     // max-w-[620px] with no breakpoint.
     <div className="relative mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:pb-20">
       {/* Desktop gets its own composition — a ruled ledger of ranked storylines
-          with the evidence in the margin (Parse Desktop.dc.html). Everything
+          with the evidence in the margin (Prism Desktop.dc.html). Everything
           below it is the phone's, and stays the phone's. */}
       <TrendingDesktop
         stories={stories}
@@ -162,7 +162,7 @@ export default function TrendingPage() {
         options={scopeOpts}
         selected={scope}
         onSelect={chooseScope}
-        disabledReason={(v) => (v === "region" && !state ? "Add your state in Your Parse to filter by region" : null)}
+        disabledReason={(v) => (v === "region" && !state ? "Add your state in Your Prism to filter by region" : null)}
       />
     </div>
   );

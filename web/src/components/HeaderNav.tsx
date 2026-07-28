@@ -22,7 +22,7 @@ export function HeaderNav() {
     <nav className="flex items-center gap-1 sm:gap-2">
       {/* Text links live on desktop only; on mobile the bottom tab bar owns
           navigation, so the header stays uncluttered. No lens control here:
-          the lens is set in "Your Parse" (/interests) and flipped per-story
+          the lens is set in "Your Prism" (/interests) and flipped per-story
           in the story view — the header stays monochrome chrome. */}
       {NAV.map((n) => (
         <Link

@@ -11,6 +11,12 @@
 // view preference the reader flips several times a session, not part of their
 // identity, and writing it shouldn't churn the profile object the feed query
 // depends on.
+//
+// The key still says `parse` after the rename back to Prism, deliberately. A
+// storage key is not user-facing, and renaming it would silently reset the scope
+// of everyone who already has one — a real regression traded for a cosmetic win
+// nobody can see. The sibling keys (`prism.profile.v1`, `prism.session.v1`)
+// stayed put through the rename out to Parse for the same reason.
 
 export type Scope = "all" | "region" | "national";
 

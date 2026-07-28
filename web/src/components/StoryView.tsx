@@ -223,7 +223,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   }
 
   // Desktop has no thumb zone, so the flip binds to the keyboard: 1 / 2 / 3, no
-  // modifier (Parse Desktop.dc.html — the brief header prints "PRESS 1 · 2 · 3").
+  // modifier (Prism Desktop.dc.html — the brief header prints "PRESS 1 · 2 · 3").
   // Zero-travel and repeatable — a reader hits 1-2-3-2-1 in two seconds, and
   // repeatability is what turns the flip from a trick into the thing they show a
   // colleague. No scroll on a key press: the brief is already in view, and
@@ -263,7 +263,7 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   return (
     <>
-      {/* Desktop is its own composition (Parse Desktop.dc.html): the ledger rail
+      {/* Desktop is its own composition (Prism Desktop.dc.html): the ledger rail
           re-inks with the lens and all three openings sit on the board at once.
           State stays here so there is one lens machine, not two. */}
       <StoryDesktop
@@ -876,7 +876,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             </div>
           )}
 
-          {/* Ask Parse — docked (real AskPanel, un-floated into the rail) */}
+          {/* Ask Prism — docked (real AskPanel, un-floated into the rail) */}
           <div
             className="overflow-hidden rounded-[18px] border"
             style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
@@ -892,7 +892,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13.5px] font-semibold">
-                  Ask Parse
+                  Ask Prism
                   <span
                     className="ml-1.5 rounded-full border px-[7px] py-px font-mono text-[9px] uppercase tracking-wide"
                     style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}

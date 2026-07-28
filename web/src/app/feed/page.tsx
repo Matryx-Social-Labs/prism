@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ParseMark } from "@/components/ParseMark";
+import { PrismMark } from "@/components/PrismMark";
 import { FeedDesktop } from "@/components/FeedDesktop";
 import { ScopeSheet } from "@/components/ScopeSheet";
 import { StoryRowCard, TopStoryCard, timeAgo } from "@/components/StoryCard";
@@ -128,7 +128,7 @@ export default function FeedPage() {
         setTop(ranked.slice(0, 3));
       })
       .catch(() => {
-        if (!cancelled) setError("The Parse API is unreachable right now. Refresh in a moment.");
+        if (!cancelled) setError("The Prism API is unreachable right now. Refresh in a moment.");
       });
     return () => {
       cancelled = true;
@@ -200,7 +200,7 @@ export default function FeedPage() {
   ];
 
   return (
-    // The Stone grid (Parse Desktop.dc.html): 104px mono ledger rail + 1240px
+    // The Stone grid (Prism Desktop.dc.html): 104px mono ledger rail + 1240px
     // field = 1376. Below lg this collapses to the shipped mobile column.
     //
     // REGRESSION FIX: this was `max-w-[620px]` with no breakpoint, so at 1440px
@@ -215,9 +215,9 @@ export default function FeedPage() {
         style={{ borderColor: "var(--line)", background: "var(--glass)", minHeight: "var(--app-header-h)" }}
       >
         <Link href="/" className="flex items-center gap-2" style={{ color: "var(--ink)" }}>
-          <ParseMark />
+          <PrismMark />
           <span className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-            Parse
+            Prism
           </span>
         </Link>
         <button
@@ -263,7 +263,7 @@ export default function FeedPage() {
       )}
 
       {/* Desktop gets its own composition — a lead, an "also reading this" rail
-          beside it, then sector bands (Parse Desktop.dc.html). Widening the
+          beside it, then sector bands (Prism Desktop.dc.html). Widening the
           mobile column was never the design: it bought 400px of dead ivory each
           side and still showed one ranked list. */}
       <FeedDesktop items={visible ?? []} top={visibleTop} />
@@ -434,7 +434,7 @@ export default function FeedPage() {
         selected={scope}
         onSelect={chooseScope}
         disabledReason={(v) =>
-          v !== "all" && !profile?.state ? "Add your state in Your Parse to filter by region" : null
+          v !== "all" && !profile?.state ? "Add your state in Your Prism to filter by region" : null
         }
         className="lg:absolute"
       />
