@@ -98,7 +98,12 @@ export default function SectorPage({ params }: { params: Promise<{ slug: string 
         })}
       </aside>
 
-      <div>
+      {/* min-w-0: a grid item defaults to min-width:auto, so the sort chips'
+          `-mx-5 … overflow-x-auto` rail (650px of content) widened the COLUMN
+          rather than scrolling inside it, and the whole page scrolled sideways
+          at 390px. Same right-bleed, and same one-word fix, as the story
+          article — see the note on StoryView's grid. */}
+      <div className="min-w-0">
         <div className="mb-2 flex items-center justify-between gap-3">
           <h1 className="text-[26px] font-semibold capitalize tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
             {title}

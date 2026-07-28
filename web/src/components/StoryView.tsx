@@ -277,7 +277,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         onPick={(slug) => pickLens(slug, false)}
       />
 
-    <div className="mx-auto max-w-[1240px] px-5 pb-[164px] pt-7 sm:px-8 lg:hidden">
+    <div className="mx-auto max-w-[1240px] px-5 pt-7 sm:px-8 lg:hidden">
       <Link href="/feed" scroll={false} className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
         ← Back to feed
       </Link>
@@ -672,6 +672,87 @@ export function StoryView({ event }: { event: EventDetail }) {
         </div>
       </section>
 
+        </article>
+
+      </div>
+
+      {/* ── Pinned thumb zone (mobile): lens rail + Share ───── */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
+        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+      >
+        <div className="hide-scroll flex gap-1.5 overflow-x-auto">
+          {offered.map((slug) => {
+            const m = lensMeta(slug);
+            const selected = slug === lens;
+            const locked = isLocked(slug);
+            return (
+              <button
+                key={slug}
+                onClick={() => pickLens(slug)}
+                // The lock is carried only by a faint colour and an aria-hidden
+                // glyph, so the accessible name was just "Markets" — identical to
+                // an unlocked lens. The desktop tab says it via title=, but a
+                // title is useless on touch, and this rail is the primary flip
+                // surface on a phone.
+                aria-label={locked ? `${m.short} lens — sign in to unlock, free` : undefined}
+                className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
+                style={
+                  selected
+                    ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
+                    : { border: "1px solid var(--line-strong)", background: "var(--bg-elevated)", color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
+                }
+              >
+                {m.short}
+                {locked && (
+                  <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <ShareButton url={`/story/${event.id}`} title={event.title} fill />
+          </div>
+          <button
+            onClick={() => setAskOpen(true)}
+            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
+            style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
+          >
+            <span className="spectrum-text text-[15px]" aria-hidden>◮</span>
+            Ask
+            <span className="whitespace-nowrap font-mono text-[10.5px] font-normal opacity-70">{sourceCount} sources</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Ask chat — floats above the pinned lens rail when opened ── */}
+      <div className="lg:hidden">
+        <AskPanel
+          eventId={event.id}
+          sourceCount={sourceCount}
+          suggestedQuestions={questions}
+          open={askOpen}
+          onOpenChange={setAskOpen}
+          launcher={false}
+        />
+      </div>
+    </div>
+
+      {/* ── The evidence layer, shared by both trees ──────────────
+          These four sections used to sit inside the lg:hidden mobile tree, so
+          desktop rendered a headline, a brief and a lens board and then simply
+          stopped — no timeline, no perspectives, and none of the sources. They
+          now render once at every width. On desktop they align to the Stone
+          grid's reading column (104px rail + 32px gap = 136px) and hold the
+          604px measure, because extra width goes to simultaneity, never to
+          longer lines. */}
+      <div className="mx-auto max-w-[1240px] px-5 pb-[164px] sm:px-8 lg:w-[1376px] lg:max-w-none lg:px-0 lg:pb-20">
+        <div className="lg:ml-[136px] lg:max-w-[604px]">
       {/* ── Perspectives ─────────────────────────────────────── */}
       <section id="perspectives" className="mt-11 scroll-mt-24">
         <SectionTitle
@@ -809,173 +890,14 @@ export function StoryView({ event }: { event: EventDetail }) {
           ))}
         </ul>
       </section>
-        </article>
 
-        {/* ── Right rail — desktop only ─────────────────────── */}
-        <aside className="sticky top-[72px] hidden min-w-0 flex-col gap-3.5 lg:flex">
-          {/* On this story */}
-          <div
-            className="rounded-[18px] border px-[18px] py-4"
-            style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
-          >
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-              On this story
-            </span>
-            <div className="mt-2.5 flex flex-col gap-px">
-              {navItems.map((n) => {
-                const active = activeSection === n.id;
-                return (
-                  <a
-                    key={n.id}
-                    href={`#${n.id}`}
-                    className="px-3 py-1.5 text-[13px] no-underline"
-                    style={{
-                      borderLeft: `2px solid ${active ? "var(--ink)" : "var(--line)"}`,
-                      fontWeight: active ? 600 : 500,
-                      color: active ? "var(--ink)" : "var(--ink-muted)",
-                    }}
-                  >
-                    {n.label}
-                    {n.count != null && (
-                      <span className="ml-1.5 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-                        {n.count}
-                      </span>
-                    )}
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Coverage */}
-          {coverageEntries.length > 0 && (
-            <div
-              className="rounded-[18px] border px-[18px] py-4"
-              style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
-            >
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-                Coverage
-              </span>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                {coverageEntries.map(([iso, n]) => (
-                  <Chip key={iso} mono>
-                    {regionName(iso)} × {n}
-                  </Chip>
-                ))}
-              </div>
-              {balanceText && (
-                <p className="mt-2.5 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
-                  {balanceText}
-                </p>
-              )}
-              {gapText && (
-                <p className="mt-1.5 text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
-                  ◉ {gapText}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Ask Prism — docked (real AskPanel, un-floated into the rail) */}
-          <div
-            className="overflow-hidden rounded-[18px] border"
-            style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
-          >
-            <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full border"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <span className="spectrum-text text-[12px]" aria-hidden>
-                  ◮
-                </span>
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13.5px] font-semibold">
-                  Ask Prism
-                  <span
-                    className="ml-1.5 rounded-full border px-[7px] py-px font-mono text-[9px] uppercase tracking-wide"
-                    style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-                  >
-                    AI
-                  </span>
-                </p>
-                <p className="text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-                  Answers from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"} only
-                </p>
-              </div>
-            </div>
+          {/* Ask had exactly one desktop mount and it sat inside the rail this
+              change deletes, so desktop could not reach it at all. */}
+          <div className="mt-11 hidden lg:block">
             <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} docked />
           </div>
-        </aside>
-      </div>
-
-      {/* ── Pinned thumb zone (mobile): lens rail + Share ───── */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
-        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
-      >
-        <div className="hide-scroll flex gap-1.5 overflow-x-auto">
-          {offered.map((slug) => {
-            const m = lensMeta(slug);
-            const selected = slug === lens;
-            const locked = isLocked(slug);
-            return (
-              <button
-                key={slug}
-                onClick={() => pickLens(slug)}
-                // The lock is carried only by a faint colour and an aria-hidden
-                // glyph, so the accessible name was just "Markets" — identical to
-                // an unlocked lens. The desktop tab says it via title=, but a
-                // title is useless on touch, and this rail is the primary flip
-                // surface on a phone.
-                aria-label={locked ? `${m.short} lens — sign in to unlock, free` : undefined}
-                className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
-                style={
-                  selected
-                    ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
-                    : { border: "1px solid var(--line-strong)", background: "var(--bg-elevated)", color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
-                }
-              >
-                {m.short}
-                {locked && (
-                  <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                    <rect x="4" y="11" width="16" height="9" rx="2" />
-                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <ShareButton url={`/story/${event.id}`} title={event.title} fill />
-          </div>
-          <button
-            onClick={() => setAskOpen(true)}
-            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
-            style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
-          >
-            <span className="spectrum-text text-[15px]" aria-hidden>◮</span>
-            Ask
-            <span className="whitespace-nowrap font-mono text-[10.5px] font-normal opacity-70">{sourceCount} sources</span>
-          </button>
         </div>
       </div>
-
-      {/* ── Ask chat — floats above the pinned lens rail when opened ── */}
-      <div className="lg:hidden">
-        <AskPanel
-          eventId={event.id}
-          sourceCount={sourceCount}
-          suggestedQuestions={questions}
-          open={askOpen}
-          onOpenChange={setAskOpen}
-          launcher={false}
-        />
-      </div>
-    </div>
     </>
   );
 }
