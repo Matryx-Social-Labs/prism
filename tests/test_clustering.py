@@ -226,3 +226,122 @@ async def test_related_developments_shares_actor():
                             {"i": [str(p1[0]), str(p2[0]), str(place[0])]})
             await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"),
                             {"e": [str(e_anchor), str(e_branch), str(e_weak)]})
+
+
+# ── Collapsed-script guard ──────────────────────────────────────────────────
+# One production event absorbed 139 unrelated Kannada articles: garbage-dumping
+# FIRs, exam-fraud legislation, a Blinkit fine, dam politics, CWG weightlifting,
+# all under a headline about protecting a bird. 120 of them arrived on the
+# embedding path and 18 more on the single-actor entity shortcut.
+#
+# The cause is not a loose threshold. Measured on production, a Kannada article
+# has 228 unrelated same-script neighbours inside 0.12 and 36 inside 0.04, and
+# the ROC against distance is the diagonal (AUC ~0.5) — no cut separates true
+# duplicates from unrelated pairs. So the guard is on the PATH, not the number,
+# and these tests pin exactly that: distance is inadmissible on its own for a
+# collapsed script, however small it gets.
+
+KANNADA = "ಹೊಸಪೇಟೆ | ಎರೆಬೂತ ಸಂರಕ್ಷಣೆಗೆ ಅರಣ್ಯ ಇಲಾಖೆ ಬದ್ಧ"
+TAMIL = "சிக்கல் தீர்ந்தது என்று அமைச்சர் தெரிவித்தார்"
+
+
+async def _seed_event(s, eid, title, vec=V):
+    await s.execute(
+        text("INSERT INTO events (id,title,sector,last_updated_at,embedding) "
+             "VALUES (:i,:t,'politics',now(),CAST(:v AS vector))"),
+        {"i": str(eid), "t": title, "v": _vec(vec)},
+    )
+
+
+async def _seed_actor(s, eid, slug):
+    ent = uuid.uuid4()
+    await s.execute(text("INSERT INTO entities (id,slug,name,entity_type) VALUES (:i,:s,:n,'person')"),
+                    {"i": str(ent), "s": slug, "n": slug})
+    await s.execute(text("INSERT INTO event_entities (id,event_id,entity_id,role) VALUES (:i,:e,:en,'subject')"),
+                    {"i": str(uuid.uuid4()), "e": str(eid), "en": str(ent)})
+    return ent
+
+
+async def _cleanup(eids, ents):
+    async with session_scope() as s:
+        await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": [str(x) for x in eids]})
+        if ents:
+            await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"), {"i": [str(x) for x in ents]})
+        await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": [str(x) for x in eids]})
+
+
+@pytest.mark.parametrize("title", [KANNADA, TAMIL], ids=["kannada", "tamil"])
+async def test_collapsed_script_never_merges_on_distance_alone(title):
+    """An IDENTICAL embedding is still not enough. This is the 120-article path."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid = uuid.uuid4()
+    try:
+        async with session_scope() as s:
+            await _seed_event(s, eid, "an unrelated story")
+        async with session_scope() as s:
+            miss = await find_event(s, cve_ids=[], url=None, title=title, published_at=None,
+                                    embedding=V, entity_slugs=None)
+        assert miss is None, "distance alone merged a collapsed-script article"
+    finally:
+        await _cleanup([eid], [])
+
+
+async def test_collapsed_script_rejects_the_single_actor_shortcut():
+    """The other 18 articles: one shared actor inside the 0.25 near band. That band
+    spans 54% of all unrelated Kannada pairs, so it cannot be evidence here."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid, tag = uuid.uuid4(), uuid.uuid4().hex[:6]
+    ents = []
+    try:
+        async with session_scope() as s:
+            await _seed_event(s, eid, "an unrelated story")
+            ents.append(await _seed_actor(s, eid, f"solo-actor-{tag}"))
+        async with session_scope() as s:
+            miss = await find_event(s, cve_ids=[], url=None, title=KANNADA, published_at=None,
+                                    embedding=V_NEAR, entity_slugs=[f"solo-actor-{tag}"])
+        assert miss is None
+    finally:
+        await _cleanup([eid], ents)
+
+
+async def test_collapsed_script_still_merges_on_two_shared_actors():
+    """The guard must not orphan Kannada entirely — two shared actors is the
+    measured-good gate (0.65 recall at 0.008 false-positive rate)."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid, tag = uuid.uuid4(), uuid.uuid4().hex[:6]
+    ents = []
+    try:
+        async with session_scope() as s:
+            await _seed_event(s, eid, "the same story, in English")
+            ents.append(await _seed_actor(s, eid, f"actor-one-{tag}"))
+            ents.append(await _seed_actor(s, eid, f"actor-two-{tag}"))
+        async with session_scope() as s:
+            hit = await find_event(s, cve_ids=[], url=None, title=KANNADA, published_at=None,
+                                   embedding=V_MODERATE,
+                                   entity_slugs=[f"actor-one-{tag}", f"actor-two-{tag}"])
+        assert hit is not None and hit.match_type == "entity_overlap"
+    finally:
+        await _cleanup([eid], ents)
+
+
+@pytest.mark.parametrize(
+    "title", ["Supreme Court refuses urgent hearing", "मेट्रो बंद"], ids=["latin", "devanagari"]
+)
+async def test_trusted_scripts_keep_the_embedding_path(title):
+    """Devanagari is measured SEPARABLE (69% recall at zero false positives), so the
+    guard must not touch it. Gating on 'not English' would have cost 689 articles."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid = uuid.uuid4()
+    try:
+        async with session_scope() as s:
+            await _seed_event(s, eid, "the same story")
+        async with session_scope() as s:
+            hit = await find_event(s, cve_ids=[], url=None, title=title, published_at=None,
+                                   embedding=V, entity_slugs=None)
+        assert hit is not None and hit.match_type == "embedding"
+    finally:
+        await _cleanup([eid], [])

@@ -73,3 +73,42 @@ if __name__ == "__main__":
     assert entity_slug("Janta") != entity_slug("Janata")        # spelling NOT fuzzed
     assert entity_slug("NDTV") != entity_slug("NDRF")           # distinct acronyms
     print("canonical_entity_name self-check OK")
+
+
+# ── Script detection ────────────────────────────────────────────────────────
+# The stored `language` field cannot be used for this: measured 2026-07-28,
+# ALL 1,385 non-Latin articles in production are labelled `en` (Prajavani
+# 519/519 Kannada, Aaj Tak 530 Devanagari, BBC Tamil 37/37). Zero correct
+# labels, so script has to come from the text itself.
+_SCRIPT_RANGES = (
+    ("kannada", 0x0C80, 0x0CFF),
+    ("tamil", 0x0B80, 0x0BFF),
+    ("devanagari", 0x0900, 0x097F),
+    ("telugu", 0x0C00, 0x0C7F),
+    ("bengali", 0x0980, 0x09FF),
+    ("malayalam", 0x0D00, 0x0D7F),
+    ("gujarati", 0x0A80, 0x0AFF),
+    ("gurmukhi", 0x0A00, 0x0A7F),
+    ("odia", 0x0B00, 0x0B7F),
+)
+
+
+def detect_script(text: str) -> str:
+    """The dominant script of `text` — 'latin' when no Indic block leads.
+
+    Counts characters per block rather than taking the first hit: Indic
+    headlines routinely carry Latin brand names and digits, and an English
+    headline may quote a single Indic word.
+    """
+    if not text:
+        return "latin"
+    counts: dict[str, int] = {}
+    for ch in text:
+        cp = ord(ch)
+        for name, lo, hi in _SCRIPT_RANGES:
+            if lo <= cp <= hi:
+                counts[name] = counts.get(name, 0) + 1
+                break
+    if not counts:
+        return "latin"
+    return max(counts.items(), key=lambda kv: kv[1])[0]

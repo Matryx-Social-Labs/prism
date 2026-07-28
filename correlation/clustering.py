@@ -17,11 +17,39 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.text import detect_script
+
 logger = logging.getLogger(__name__)
 
 TITLE_SIMILARITY_THRESHOLD = 0.6
 EMBEDDING_DISTANCE_THRESHOLD = 0.12  # cosine distance (1 - similarity); near-duplicates only
 TIME_WINDOW_DAYS = 4
+
+# Scripts where cosine distance actually carries same-story signal.
+#
+# Measured against production, 2026-07-28. The embedding model
+# (paraphrase-multilingual-mpnet-base-v2) has a COLLAPSED subspace for some
+# scripts: unrelated articles land as close as genuine duplicates, so a
+# nearest-neighbour query returns an arbitrary neighbour rather than the same
+# story.
+#
+#   script      unrelated-pair floor   median NN dist   unrelated neighbours <=0.12
+#   latin       0.2606                 0.2911           1.50
+#   devanagari  0.1510                 0.1985           0.54
+#   kannada     0.0065                 0.0338           228.4
+#   tamil       0.0148                 0.0284           21.2 (of 36 peers)
+#
+# For Kannada the ROC against distance is the diagonal (AUC ~0.5): excluding 90%
+# of unrelated pairs costs ~91% of true duplicates. There is no threshold that
+# works, at 0.12 or anywhere — one event absorbed 139 unrelated articles this way.
+# So this is NOT a number to tune; the embedding path is simply unusable there and
+# those articles must match on shared actors instead.
+#
+# It is emphatically not "non-Latin is bad" — Devanagari is healthy (69% recall at
+# ZERO false positives), and gating on "not English" would needlessly cripple it.
+# Allow-list, not deny-list: a script nobody has measured gets the safe path.
+# Measure the two columns above before adding one.
+EMBEDDING_TRUSTED_SCRIPTS = frozenset({"latin", "devanagari"})
 # Cross-language / same-story: shared canonical entities + a looser embedding band.
 # A translated retelling scores ~0.42 distance (vs <0.12 for a near-dup) but shares
 # the key actors — so require >=2 shared entities AND moderate similarity.
@@ -85,14 +113,31 @@ async def find_event(
     if match:
         return match
 
-    if embedding is not None:
+    # Distance alone is only evidence where the model's subspace for this script
+    # isn't collapsed (see EMBEDDING_TRUSTED_SCRIPTS). Where it is, skipping
+    # straight to the actor path is the whole fix: of the 139 articles that piled
+    # into one Kannada event, 120 arrived here, and not one of them shared two
+    # actors with the founding article.
+    trusted = detect_script(title) in EMBEDDING_TRUSTED_SCRIPTS
+
+    if embedding is not None and trusted:
         match = await _match_by_embedding(session, embedding, published_at)
         if match:
             return match
 
     # Cross-language / same-story: same key actors + a looser embedding band.
     if entity_slugs and embedding is not None:
-        match = await _match_by_entities(session, entity_slugs, embedding, published_at)
+        match = await _match_by_entities(
+            session,
+            entity_slugs,
+            embedding,
+            published_at,
+            # The one-strong-actor shortcut leans on the near-dup band being
+            # meaningful. For a collapsed script it isn't: 0.25 spans 54% of all
+            # unrelated Kannada pairs, which is how 18 more articles reached that
+            # same event down this path. Two actors, always.
+            allow_single_actor=trusted,
+        )
         if match:
             return match
 
@@ -161,7 +206,11 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
 
 
 async def _match_by_entities(
-    session: AsyncSession, entity_slugs: list[str], embedding: list[float], published_at
+    session: AsyncSession,
+    entity_slugs: list[str],
+    embedding: list[float],
+    published_at,
+    allow_single_actor: bool = True,
 ) -> Match | None:
     """Recent event within the looser embedding band that shares enough IDF-weighted
     canonical actors with this article — merges cross-language / translated retellings
@@ -214,7 +263,10 @@ async def _match_by_entities(
             "min_idf": ENTITY_MATCH_MIN_IDF,
             "dist_threshold": ENTITY_MATCH_LOOSE_DISTANCE,
             "min_shared": ENTITY_MATCH_MIN_SHARED,
-            "near_dist": ENTITY_MATCH_NEAR_DISTANCE,
+            # -1 is unreachable for a cosine distance, so the single-actor
+            # branch of the HAVING can never fire — >=2 shared actors becomes
+            # the only way in.
+            "near_dist": ENTITY_MATCH_NEAR_DISTANCE if allow_single_actor else -1.0,
             "published_at": published_at,
         },
     )

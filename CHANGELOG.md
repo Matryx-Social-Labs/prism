@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.79.0] - 2026-07-28
+
+### Fixed
+- **Kannada and Tamil articles no longer cluster on embedding distance alone.**
+  The embedding model's subspace for those scripts is collapsed — unrelated
+  articles sit as close as genuine duplicates — so one production event absorbed
+  139 unrelated Kannada stories. Those scripts now match on shared actors only.
+  Latin and Devanagari, both measured separable, are unchanged.
+
 ## [0.0.78.2] - 2026-07-28
 
 ### Fixed
