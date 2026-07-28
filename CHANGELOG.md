@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.78.2] - 2026-07-28
+
+### Fixed
+- **Desktop story pages were missing their entire evidence layer.** Perspectives,
+  the timeline, What to expect and every source lived inside the mobile-only
+  tree, so desktop showed a headline, a brief and a lens board and then stopped —
+  a story with 35 sources displayed none of them. Ask was unreachable on desktop
+  for the same reason. Page height on a real story went 961px to 2023px.
+- The sector page scrolled sideways at 390px: a grid item's default
+  `min-width:auto` let the sort-chip rail widen the column instead of scrolling
+  inside it.
+
 ## [0.0.78.1] - 2026-07-28
 
 ### Fixed
