@@ -1,6 +1,6 @@
 "use client";
 
-// Ported from pmndrs/examples demos/nextjs-prism (MIT) — src/components/Parse.jsx
+// Ported from pmndrs/examples demos/nextjs-prism (MIT) — src/components/Prism.jsx
 // The beveled glass prism (GLTF) + an invisible low-res triangular proxy the
 // Reflect raycaster hits (the ray handlers are plain object properties, which
 // is what Reflect looks for — assigned via ref, since they aren't JSX props).

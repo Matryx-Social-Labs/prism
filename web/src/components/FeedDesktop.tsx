@@ -15,7 +15,7 @@ import {
 } from "@/lib/dateline";
 import { CARD_W, thumbUrl } from "@/lib/thumb";
 
-// The desktop Feed (Parse Desktop.dc.html, FEED screen).
+// The desktop Feed (Prism Desktop.dc.html, FEED screen).
 //
 // Desktop was the mobile column widened: one ranked list, 620px of content and
 // 400px of dead ivory each side. This is the composition the design actually

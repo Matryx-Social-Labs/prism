@@ -87,7 +87,7 @@ function SearchInner() {
   const term = q.trim();
 
   return (
-    // Desktop is The Stone (Parse Desktop.dc.html, SEARCH): a 104px mono ledger
+    // Desktop is The Stone (Prism Desktop.dc.html, SEARCH): a 104px mono ledger
     // rail outside a 1240px field — the grid the desktop Feed already uses.
     // Below lg this is untouched: one 760px column, the phone's screen.
     <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9 lg:grid lg:w-[1376px] lg:max-w-none lg:grid-cols-[104px_1240px] lg:gap-x-8 lg:px-0 lg:pb-20 lg:pt-10">
@@ -95,7 +95,7 @@ function SearchInner() {
 
       <div className="min-w-0">
         {/* The query sets in the display voice — the thing you typed is the headline
-            of this screen (Parse Desktop.dc.html). */}
+            of this screen (Prism Desktop.dc.html). */}
         <input
           autoFocus
           value={q}
@@ -118,7 +118,7 @@ function SearchInner() {
             emptiest surface in the app. Give the reader somewhere to start. */}
         {term.length < 2 && !loading && (
           // Desktop lays the same two blocks on the field's twelve 74px columns
-          // (cols 1–6 and 8–12, Parse Desktop.dc.html) and squares the chips off —
+          // (cols 1–6 and 8–12, Prism Desktop.dc.html) and squares the chips off —
           // a pill is a phone tap target. Same elements, same copy: two trees would
           // put two "Adani Group" buttons in the DOM and break the start-screen
           // tests, which count them.

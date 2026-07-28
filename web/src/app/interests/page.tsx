@@ -105,7 +105,7 @@ export default function InterestsPage() {
   return (
     <div className="mx-auto max-w-[640px] px-8 pb-24 pt-10">
       <h1 className="text-[30px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-        Your Parse
+        Your Prism
       </h1>
       <p className="mt-2 text-sm" style={{ color: "var(--ink-muted)" }}>
         State, languages, lens, and interests — everything your feed is built from. Stored only in

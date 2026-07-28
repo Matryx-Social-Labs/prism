@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { langNative } from "@/lib/languages";
 
-// The desktop You screen (Parse Desktop.dc.html, YOU screen) — "How your Parse
+// The desktop You screen (Prism Desktop.dc.html, YOU screen) — "How your Prism
 // is made", read as a colophon: one ruled ledger of what the reader has set,
 // with the EDIT affordance evicted into the 104px mono rail so the values
 // themselves stay prose. Same Stone grid as the desktop Feed and Trending.
@@ -14,7 +14,7 @@ import { langNative } from "@/lib/languages";
 //
 // DROPPED from the design — no data exists for it:
 //  - "Your reading record": twelve weeks of daily marks inked by lens, and the
-//    12 WEEKS / 84 DAYS / 61 READ ledger beside it. Parse stores no per-reader
+//    12 WEEKS / 84 DAYS / 61 READ ledger beside it. Prism stores no per-reader
 //    reading history (no API, no table); every mark in that block would have
 //    been invented. It is the one visual centrepiece of this screen, so it
 //    should come back the day reading events are actually recorded.
@@ -93,7 +93,7 @@ export function YouDesktop({
         </div>
         <div>
           <h1 className="text-[30px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-            How your Parse is made
+            How your Prism is made
           </h1>
           <p className="mt-2.5 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
             {email ? (

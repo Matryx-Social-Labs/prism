@@ -77,7 +77,7 @@ async def request_link(body: MagicLinkRequest, db: AsyncSession = Depends(get_db
     link = f"{settings.prism_web_url}/auth/verify?token={raw}"
     text, html = magic_link_email(link=link, ttl_min=settings.prism_magic_token_ttl_min, to=body.email)
     await get_email_sender().send(
-        to=body.email, subject="Your Parse sign-in link", body=text, html=html
+        to=body.email, subject="Your Prism sign-in link", body=text, html=html
     )
     return {"ok": True}
 

@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     alternates: { canonical: url },
     openGraph: {
       type: "article",
-      siteName: "Parse",
+      siteName: "Prism",
       title: event.title,
       description,
       url,
@@ -75,8 +75,8 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
     dateModified: event.last_updated_at,
     url: `${SITE_URL}/story/${id}`,
     articleSection: event.sector ?? undefined,
-    author: { "@type": "Organization", name: "Parse" },
-    publisher: { "@type": "Organization", name: "Parse" },
+    author: { "@type": "Organization", name: "Prism" },
+    publisher: { "@type": "Organization", name: "Prism" },
   };
 
   return (

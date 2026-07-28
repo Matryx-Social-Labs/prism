@@ -1,7 +1,7 @@
 "use client";
 
 // The landing hero: a beam of light physically strikes a glass prism and
-// splits into a spectrum — Parse's brand story, rendered for real.
+// splits into a spectrum — Prism's brand story, rendered for real.
 // Scene architecture adapted from pmndrs/examples demos/nextjs-prism (MIT):
 // raycast Beam → GLTF glass prism → Snell-angle Rainbow + Flare + Bloom.
 // The beam follows the pointer over the stage; when idle it sweeps on its own.

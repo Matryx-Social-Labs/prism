@@ -1,9 +1,10 @@
 """The sign-in email is the first thing a new reader sees with our name on it.
 
-The Parse rename missed it entirely — the subject, the wordmark, the button and
-the sign-off all still said Prism months after the product stopped being called
-that, in the same pass that missed the share cards. Nothing failed, because
-nothing looked.
+It has now been missed by a rename twice — once going out to Parse, once coming
+back to Prism. Both times the subject, wordmark, button and sign-off kept the
+dead name, and nothing failed, because nothing looked. The assertions run both
+ways round on purpose: the live name must be present AND the dead one absent, so
+a half-applied rename cannot pass.
 """
 
 import re
@@ -19,24 +20,24 @@ def _email() -> tuple[str, str]:
     return magic_link_email(link=LINK, ttl_min=15, to="reader@example.com")
 
 
-def test_nothing_in_the_signin_email_still_says_prism():
+def test_nothing_in_the_signin_email_still_says_parse():
     text, html = _email()
-    assert "Prism" not in text
-    assert "Prism" not in html
-    # And it does say the real name, so an empty template can't pass this.
-    assert "Parse" in text
-    assert html.count("Parse") >= 4  # wordmark, heading, button, sign-off
+    assert "Parse" not in text
+    assert "Parse" not in html
+    # And it does say the live name, so an empty template can't pass this.
+    assert "Prism" in text
+    assert html.count("Prism") >= 4  # wordmark, heading, button, sign-off
 
 
 def test_the_from_name_and_subject_carry_the_product_name():
-    assert "Prism" not in get_settings().prism_email_from
-    assert "Parse" in get_settings().prism_email_from
+    assert "Parse" not in get_settings().prism_email_from
+    assert "Prism" in get_settings().prism_email_from
     # The subject is written at the call site rather than in the template.
     src = (auth_routes.__file__ or "").replace(".pyc", ".py")
     with open(src) as fh:
         body = fh.read()
-    assert "Your Parse sign-in link" in body
-    assert "Prism sign-in" not in body
+    assert "Your Prism sign-in link" in body
+    assert "Parse sign-in" not in body
 
 
 def test_the_link_is_escaped_into_both_the_href_and_the_visible_fallback():

@@ -3,7 +3,7 @@
 import type { FeedItem } from "@/lib/api";
 import { bandOrigins } from "@/lib/dateline";
 
-// The desktop Search ledger rail (Parse Desktop.dc.html, SEARCH screen).
+// The desktop Search ledger rail (Prism Desktop.dc.html, SEARCH screen).
 //
 // Desktop /search is The Stone, the same grid the desktop Feed is built on: a
 // 104px mono rail outside a 1240px field (104 + 32 + 1240 = 1376). This file is

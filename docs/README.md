@@ -1,11 +1,11 @@
-# Parse documentation
+# Prism documentation
 
 Organized by the [Diataxis](https://diataxis.fr) framework — four kinds of docs,
 each for a reader in a different mode. New here? Start with the **Tutorial**.
 
 ## 🎓 Tutorial — learning-oriented
-Start here if you've never run Parse.
-- [**Run Parse locally and flip a lens**](./TUTORIAL.md) — zero to a working
+Start here if you've never run Prism.
+- [**Run Prism locally and flip a lens**](./TUTORIAL.md) — zero to a working
   pipeline and your first lens flip.
 
 ## 🔧 How-to — task-oriented

@@ -6,7 +6,7 @@ import type { EventDetail } from "@/lib/api";
 import { istTime, origins } from "@/lib/dateline";
 import { thumbUrl } from "@/lib/thumb";
 
-// The desktop Story (Parse Desktop.dc.html, STORY screen).
+// The desktop Story (Prism Desktop.dc.html, STORY screen).
 //
 // Presentational only — StoryView still owns the lens state, the brief fetching
 // and the flip, so there is one state machine rather than two that can disagree.

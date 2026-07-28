@@ -66,7 +66,7 @@ export default function WatchlistPage() {
         Followed signals
       </h1>
       <p className="mt-2 text-[14px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-        Follow tickers and sectors; their market-moving stories collect here when you open Parse.
+        Follow tickers and sectors; their market-moving stories collect here when you open Prism.
       </p>
 
       <form onSubmit={add} className="mt-[22px] flex gap-2">

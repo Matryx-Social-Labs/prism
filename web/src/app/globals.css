@@ -11,7 +11,7 @@
   display: none;
 }
 
-/* ── Parse design tokens ─────────────────────────────────────────────
+/* ── Prism design tokens ─────────────────────────────────────────────
    Adaptive light/dark. `data-theme` on <html> (set pre-paint in layout)
    wins over the system preference. Spectrum = the brand: one beam of
    news split into its component perspectives. */

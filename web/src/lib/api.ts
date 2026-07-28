@@ -1,4 +1,4 @@
-// Typed client for the Parse API (mirrors api/main.py response models).
+// Typed client for the Prism API (mirrors api/main.py response models).
 // The React Native app will reuse these types via packages/api-client later.
 
 // typeof guard: Next inlines NEXT_PUBLIC_* at build time, but this module
