@@ -173,12 +173,19 @@ jobs:
         # canonical and the sitemap. Unset, lib/site.ts falls back to VERCEL_URL
         # (the per-DEPLOYMENT host, which changes every push, so shared links rot)
         # and then to localhost — which is what the sitemap was actually serving.
+        #
+        # THIS LINE IS THE CANONICAL DOMAIN. Because it is pinned here, changing
+        # the domain in the Vercel dashboard does nothing — this overwrites it on
+        # every build. It must be the host that answers 200, not one that
+        # redirects: the apex readprism.news 308s to www, so canonical points at
+        # www or it names a URL that immediately moves. If the apex is ever made
+        # primary in Vercel, flip this in the same commit.
         run: |
           for f in .vercel/.env.production.local web/.vercel/.env.production.local; do
             [ -f "$f" ] || continue
             grep -vE '^(NEXT_PUBLIC_API_URL|NEXT_PUBLIC_SITE_URL)=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
             echo 'NEXT_PUBLIC_API_URL="https://prism-production-6747.up.railway.app"' >> "$f"
-            echo 'NEXT_PUBLIC_SITE_URL="https://prism-ivory-two.vercel.app"' >> "$f"
+            echo 'NEXT_PUBLIC_SITE_URL="https://www.readprism.news"' >> "$f"
             echo "patched $f"
           done
 

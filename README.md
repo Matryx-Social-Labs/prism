@@ -19,7 +19,7 @@ from origin-diverse outlets, clustered, framed, and answerable.
 ## Status
 **Live prototype**: pipeline (ingest → gate → classify → enrich → cluster → correlate →
 lens briefs → serve) on Railway, web app on Vercel
-([prism-ivory-two.vercel.app](https://prism-ivory-two.vercel.app)), Langfuse observability
+([readprism.news](https://www.readprism.news)), Langfuse observability
 self-hosted, CI auto-deploy on push. See the Quickstart below and
 [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md). Strategy in [`BLUEPRINT.md`](./BLUEPRINT.md)
 and [`docs/MARKET-RESEARCH.md`](./docs/MARKET-RESEARCH.md).
