@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.78.1] - 2026-07-28
+
+### Fixed
+- Canonical, `og:url` and the sitemap pointed at the old Vercel deployment URL
+  after the domain move, telling Google the throwaway host was the real site.
+  The value is pinned in CI, so changing it in the Vercel dashboard had no
+  effect — it was overwritten on every build.
+
 ## [0.0.78.0] - 2026-07-28
 
 ### Changed
