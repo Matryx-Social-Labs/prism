@@ -17,6 +17,7 @@ from common import stream
 from common.config import get_settings
 from common.countries import gdelt_country_to_iso
 from common.db import session_scope
+from common.entities import drop_source_names, source_name_slugs
 from common.llm import structured_chat
 from common.logging import get_logger
 from common.models import (
@@ -70,7 +71,11 @@ async def handle_enriched_item(payload: dict) -> None:
         cve_record = (enrichment.model or "").startswith("deterministic:")
 
         embedding = await _first_chunk_embedding(session, article_id)
-        entity_slugs = [entity_slug(e["name"]) for e in (shared.get("entities") or []) if e.get("name")]
+        # The outlet is not an actor in its own coverage: left in, `prajavani` was
+        # the most-shared "entity" across a 139-article over-merge, i.e. the thing
+        # doing the merging.
+        entity_names = [e["name"] for e in (shared.get("entities") or []) if e.get("name")]
+        entity_slugs = [entity_slug(n) for n in await drop_source_names(session, entity_names)]
 
         match = await find_event(
             session,
@@ -211,9 +216,14 @@ async def _first_chunk_embedding(session, article_id: uuid.UUID) -> list[float] 
 
 
 async def _upsert_entities(session, event_id: uuid.UUID, entities: list[dict]) -> None:
+    blocked = await source_name_slugs(session)
     for extracted in entities[:15]:
         name = (extracted.get("name") or "").strip()
         if not name:
+            continue
+        # Filtered here as well as at the gate: an outlet that reaches the graph
+        # becomes a cast name, and `tv9kannada` led a live trending story.
+        if entity_slug(name) in blocked:
             continue
         slug = entity_slug(name)
         stmt = (
