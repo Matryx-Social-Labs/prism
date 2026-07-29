@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.80.1] - 2026-07-29
+
+### Fixed
+- CVE summaries no longer ship HTML entities. The CVE lens builds its summary
+  from raw NVD JSON and never passed through the `clean_text` choke point, so
+  9 summaries created *after* that fix still carried `&amp;` and `&nbsp;`.
+- BleepingComputer is disabled: it 403s on every 30-minute cycle. The block is on
+  the egress IP, not our User-Agent — the feed returns 200 to the same UA from a
+  residential address.
+- The crawler now identifies itself as `Prism/1.0 (+https://www.readprism.news)`
+  instead of `prism-prototype/0.1`, which named no product and gave no contact.
+
 ## [0.0.80.0] - 2026-07-29
 
 ### Fixed

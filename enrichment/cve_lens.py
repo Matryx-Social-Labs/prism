@@ -6,6 +6,7 @@ Control mappings use a small static ruleset keyed on exploitation status
 and fix availability (LLM-mapped for news articles instead).
 """
 
+import html as _html
 from typing import Any
 
 from enrichment.schemas import (
@@ -24,8 +25,18 @@ from enrichment.schemas import (
 
 def extract_from_nvd(cve: dict[str, Any]) -> ArticleExtraction:
     cve_id = cve.get("id", "unknown")
-    description = next(
-        (d["value"] for d in cve.get("descriptions", []) if d.get("lang") == "en"), ""
+    # NVD ships HTML entities in descriptions, and this path never touched
+    # ingestion/base.py's clean_text choke point — so 9 event summaries created
+    # AFTER that fix still carried &amp;, &nbsp; and &quot;.
+    #
+    # unescape only, NOT clean_text: clean_text strips tags, and a CVE
+    # description quotes the markup it is ABOUT — one of these summaries explains
+    # that an endpoint "returns an inline <script> snippet", and stripping that
+    # deletes the vulnerability. The two differ only on LITERAL markup, since
+    # clean_text strips before it unescapes; for NVD's escaped entities they
+    # agree. Literal is the case worth protecting, so the test uses it.
+    description = _html.unescape(
+        next((d["value"] for d in cve.get("descriptions", []) if d.get("lang") == "en"), "")
     )
 
     cvss = _best_cvss(cve.get("metrics", {}))
