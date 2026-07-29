@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.80.3] - 2026-07-29
+
+### Fixed
+- **The commonest structured-output failure is now named, not guessed at.** In 50
+  of 129 production failures the model returned the JSON Schema instead of an
+  instance; the retry reported the symptom ("shared: Field required") and quoted
+  the schema back, which encouraged it to echo again. 21 messages were dropped
+  outright after retries ran out.
+
 ## [0.0.80.2] - 2026-07-29
 
 ### Fixed
