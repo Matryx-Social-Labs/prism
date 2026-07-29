@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.0] - 2026-07-29
+
+### Fixed
+- **The entity feedback loop is closed.** `event_entities` is cumulative, so an
+  actor arrived when an article was absorbed and stayed forever — every bad merge
+  permanently widened what the event could match, and one event reached 978
+  actors. New `article_entities` table lets the matcher ask how many of an event's
+  OWN articles name an actor, so one inherited from a single mistaken member
+  carries no weight. Backfilled from existing extractions; no LLM cost.
+
 ## [0.0.80.5] - 2026-07-29
 
 ### Fixed

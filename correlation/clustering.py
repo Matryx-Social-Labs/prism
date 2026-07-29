@@ -93,6 +93,17 @@ ENTITY_MATCH_MIN_TOP_IDF = 0.1
 # rare one on top of that is a second tax on the same evidence. Either a
 # genuinely specific actor, OR a cast overlap wide enough to stand on its own.
 ENTITY_MATCH_BROAD_SHARED = 4
+# How many of an event's OWN articles must name an actor for it to count as that
+# event's actor. event_entities is cumulative — an actor arrives when an article
+# is absorbed and stays forever, even after the article is moved away — so a
+# single mistaken merge permanently widens what the event can match. One event
+# reached 978 actors that way, at which point the gate is open.
+#
+# Requiring two of the event's articles to name it means an actor inherited from
+# one absorbed article contributes nothing, which is exactly the feedback loop.
+# Single-article events are exempt: they have nothing to corroborate with, and
+# the >=2-shared-actor rule already guards them.
+ENTITY_MATCH_MIN_ARTICLES = 2
 ENTITY_MATCH_TYPES = ("person", "company", "organization")
 
 
@@ -261,7 +272,18 @@ async def _match_by_entities(
                    sum(1.0 / d.df) AS idf,
                    (e.embedding <=> CAST(:vec AS vector)) AS dist
             FROM ent_df d
-            JOIN event_entities ee ON ee.entity_id = d.id
+            -- The event's OWN cast: actors named by at least :min_articles of the
+            -- articles it currently holds, rather than every actor it has ever
+            -- absorbed. This is what stops a bad merge from widening the gate.
+            JOIN (
+                SELECT em.event_id, ae.entity_id
+                FROM event_memberships em
+                JOIN article_entities ae ON ae.article_id = em.article_id
+                GROUP BY em.event_id, ae.entity_id
+                HAVING count(DISTINCT em.article_id) >= :min_articles
+                    OR (SELECT count(*) FROM event_memberships m2
+                        WHERE m2.event_id = em.event_id) < :min_articles
+            ) ee ON ee.entity_id = d.id
             JOIN events e ON e.id = ee.event_id
             WHERE e.embedding IS NOT NULL
               AND (e.embedding <=> CAST(:vec AS vector)) <= :dist_threshold
@@ -284,6 +306,7 @@ async def _match_by_entities(
             "vec": vector_literal,
             "slugs": entity_slugs,
             "types": list(ENTITY_MATCH_TYPES),
+            "min_articles": ENTITY_MATCH_MIN_ARTICLES,
             "min_idf": ENTITY_MATCH_MIN_IDF,
             "min_top_idf": ENTITY_MATCH_MIN_TOP_IDF,
             "broad_shared": ENTITY_MATCH_BROAD_SHARED,

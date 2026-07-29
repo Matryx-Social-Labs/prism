@@ -206,6 +206,28 @@ class Entity(TimestampMixin, Base):
     meta: Mapped[dict | None] = mapped_column("metadata", JSONB)
 
 
+class ArticleEntity(TimestampMixin, Base):
+    """An actor named by ONE article.
+
+    event_entities says an event has ever touched an actor; this says which
+    article named it. The distinction is the whole point: without it an actor
+    inherited from a single wrongly-absorbed article counts for the event
+    forever, so every bad merge widens the opening for the next.
+    """
+
+    __tablename__ = "article_entities"
+    __table_args__ = (UniqueConstraint("article_id", "entity_id", name="uq_article_entities"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    article_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), nullable=False
+    )
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False, default="affected")
+
+
 class EventEntity(TimestampMixin, Base):
     __tablename__ = "event_entities"
     __table_args__ = (

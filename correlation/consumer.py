@@ -22,6 +22,7 @@ from common.llm import structured_chat
 from common.logging import get_logger
 from common.models import (
     Article,
+    ArticleEntity,
     Enrichment,
     Entity,
     Event,
@@ -128,7 +129,7 @@ async def handle_enriched_item(payload: dict) -> None:
             )
         )
 
-        await _upsert_entities(session, event.id, shared.get("entities") or [])
+        await _upsert_entities(session, event.id, shared.get("entities") or [], article_id)
         event_id = event.id
 
     # Real-time path: rebuild the served projection (fast, DB-only) and publish so
@@ -215,7 +216,9 @@ async def _first_chunk_embedding(session, article_id: uuid.UUID) -> list[float] 
     return None
 
 
-async def _upsert_entities(session, event_id: uuid.UUID, entities: list[dict]) -> None:
+async def _upsert_entities(
+    session, event_id: uuid.UUID, entities: list[dict], article_id: uuid.UUID
+) -> None:
     blocked = await source_name_slugs(session)
     for extracted in entities[:15]:
         name = (extracted.get("name") or "").strip()
@@ -244,6 +247,19 @@ async def _upsert_entities(session, event_id: uuid.UUID, entities: list[dict]) -
             entity_id = existing.scalar_one_or_none()
         if entity_id is None:
             continue
+        # Both links, written together. The event-level one is what the rest of
+        # the product reads; the article-level one is what the matcher weighs, so
+        # an actor named by one absorbed article cannot speak for the whole event.
+        await session.execute(
+            pg_insert(ArticleEntity)
+            .values(
+                id=uuid.uuid4(),
+                article_id=article_id,
+                entity_id=entity_id,
+                role=extracted.get("role", "affected"),
+            )
+            .on_conflict_do_nothing(index_elements=["article_id", "entity_id"])
+        )
         link = (
             pg_insert(EventEntity)
             .values(
