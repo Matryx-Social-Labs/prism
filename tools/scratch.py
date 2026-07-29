@@ -210,6 +210,7 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id) -> dict:
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--event", help="replay a single event id")
+    ap.add_argument("--plan", metavar="FILE", help="write the membership moves as a reviewable plan")
     a = ap.parse_args()
 
     prod = await asyncpg.connect(_prod_url(), timeout=60)
@@ -229,8 +230,12 @@ async def main() -> None:
 
         total_before = total_after = 0
         agg_rejoin = agg_new = 0
+        plan: dict = {"targets": [str(t) for t in targets], "create_events": [],
+                      "moves": [], "retitle": []}
+        runs: list = []
         for t in targets:
             placed, created = await replay(prod, local_url, t)
+            runs.append((t, placed, created))
             sizes = sorted((len(v) for v in placed.values()), reverse=True)
             n = sum(sizes)
             total_before += n
@@ -250,8 +255,87 @@ async def main() -> None:
             print(f"    kept:  {(biggest[0]['title'] or '')[:56]}")
             if rejoined:
                 print(f"    rejoined {n_rejoin} article(s) to {len(rejoined)} EXISTING event(s):")
-                for k, v in list(rejoined.items())[:4]:
+                for _k, v in list(rejoined.items())[:4]:
                     print(f"      [{len(v)}] {(v[0]['title'] or '')[:50]}")
+        # Resolve inheritance ACROSS all targets, not per target. An event created
+        # while replaying target A can be rejoined while replaying target B, so a
+        # per-target remap would leave B's moves pointing at an id A had already
+        # renamed. Decide every destination once, here, then emit.
+        inherit: dict[str, str] = {}
+        orphaned_identity: list[str] = []
+        for t, placed, created in runs:
+            # Identity follows the FOUNDING article, not the biggest cluster. An
+            # event's title and embedding are copied from the article that created
+            # it, so handing the id to a cluster that does not contain that article
+            # leaves a story whose headline describes something it no longer holds.
+            # The replay feeds articles in arrival order, so the founder is the
+            # first one placed.
+            founder = next(iter(next(iter(placed.values()))))["aid"] if placed else None
+            first_aid = min(
+                (m["aid"] for v in placed.values() for m in v),
+                key=lambda x: str(x), default=None,
+            )
+            home = None
+            for k, v in placed.items():
+                if any(str(m["aid"]) == str(founder) for m in v):
+                    home = k
+                    break
+            if home is not None and home in created:
+                inherit[home] = str(t)
+            else:
+                # The founder rejoined a DIFFERENT pre-existing event, so the id
+                # cannot follow it without colliding. Fall back to the largest new
+                # cluster and record it — the surviving event's title will describe
+                # an article that has moved on, and that is worth knowing.
+                fresh = sorted(((k, v) for k, v in placed.items() if k in created),
+                               key=lambda kv: -len(kv[1]))
+                if fresh:
+                    inherit[fresh[0][0]] = str(t)
+                    orphaned_identity.append(str(t))
+            _ = first_aid
+        # A surviving event whose founder left must be re-titled from the earliest
+        # article it actually keeps — same rule a new event is titled by. Keeping
+        # the id makes shared links resolve; retitling makes what they resolve TO
+        # honest. Leaving the old title would be the worst of both.
+        for t, placed, _created in runs:
+            home = next((k for k, v in inherit.items() if v == str(t)), None)
+            if home is None or str(t) not in orphaned_identity:
+                continue
+            keep = sorted(placed[home], key=lambda m: (m["published_at"] or m["created_at"]))
+            plan["retitle"].append({
+                "event_id": str(t),
+                "from_article_id": str(keep[0]["aid"]),
+                "new_title": (keep[0]["title"] or "")[:120],
+            })
+
+        seen_new: set[str] = set()
+        for t, placed, created in runs:
+            for k, v in placed.items():
+                dest = inherit.get(k, k)
+                if k in created and k not in inherit and k not in seen_new:
+                    seen_new.add(k)
+                    plan["create_events"].append(
+                        {"id": k, "founder_article_id": str(v[0]["aid"]),
+                         "title": (v[0]["title"] or "")[:120]}
+                    )
+                for m in v:
+                    plan["moves"].append(
+                        {"article_id": str(m["aid"]), "from_event_id": str(t), "to_event_id": dest}
+                    )
+
+        if orphaned_identity:
+            print(f"\n  NOTE: {len(orphaned_identity)} event(s) whose founding article moved to a"
+                  f" different existing story; their title will describe an article they no"
+                  f" longer hold:")
+            for e in orphaned_identity[:6]:
+                print(f"    {e}")
+
+        if a.plan:
+            with open(a.plan, "w") as fh:
+                json.dump(plan, fh, indent=2, default=str)
+            print(f"\n  plan written: {a.plan}"
+                  f"  ({len(plan['create_events'])} events to create, {len(plan['moves'])} moves)")
+
         print(f"\n  TOTAL: {total_before} articles in {len(targets)} events -> {total_after} events")
         print(f"    {agg_rejoin} article(s) rejoined a story that already exists")
         print(f"    {agg_new} article(s) became a new event")
