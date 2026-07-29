@@ -140,7 +140,42 @@ async def structured_chat[T: BaseModel](
             raise
         content = response.choices[0].message.content or ""
         try:
-            return output_model.model_validate(_parse_json_loose(content))
+            parsed = _parse_json_loose(content)
+        except Exception as e:
+            parsed, e_parse = None, e
+        else:
+            e_parse = None
+
+        # The single most common failure (50 of 129 observed in production): the
+        # model returns the SCHEMA WE SENT rather than an instance of it. The
+        # generic path handles that badly twice over — it reports the symptom
+        # ("shared: Field required") instead of the cause, and it appends the
+        # echoed schema back into the conversation, so the retry sees the schema
+        # one more time and tends to echo it again. Name it instead, and do not
+        # quote it back.
+        if parsed is not None and _looks_like_json_schema(parsed):
+            last_err = ValueError("model returned the JSON Schema instead of an instance of it")
+            logger.warning(
+                "structured_output_schema_echoed",
+                attempt=attempt + 1,
+                max_retries=max_retries,
+                trace=trace_name,
+            )
+            kwargs["messages"] = [
+                *kwargs["messages"],
+                {
+                    "role": "user",
+                    "content": (
+                        "You returned the JSON Schema itself. Do not repeat the schema. "
+                        "Return a single JSON object that is an INSTANCE of it: real values "
+                        "for this article, no '$defs', no 'properties', no 'type' metadata."
+                    ),
+                },
+            ]
+            continue
+
+        try:
+            return output_model.model_validate(parsed if e_parse is None else _parse_json_loose(content))
         except Exception as e:  # invalid JSON or schema mismatch
             last_err = e
             logger.warning(
@@ -161,6 +196,20 @@ async def structured_chat[T: BaseModel](
                 },
             ]
     raise ValueError(f"structured_chat failed after {max_retries} attempts: {last_err}")
+
+
+def _looks_like_json_schema(obj: Any) -> bool:
+    """True when `obj` is the schema rather than an instance of it.
+
+    Keyed on markers that a real extraction cannot carry: `$defs` and `$schema`
+    are schema-only, and a top-level `properties` dict alongside `type: "object"`
+    is the shape of a schema node. An ArticleExtraction instance has none of them.
+    """
+    if not isinstance(obj, dict):
+        return False
+    if "$defs" in obj or "$schema" in obj:
+        return True
+    return obj.get("type") == "object" and isinstance(obj.get("properties"), dict)
 
 
 def _prune_schema_props(schema: dict[str, Any], fields: set[str]) -> None:
