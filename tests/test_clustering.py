@@ -345,3 +345,58 @@ async def test_trusted_scripts_keep_the_embedding_path(title):
         assert hit is not None and hit.match_type == "embedding"
     finally:
         await _cleanup([eid], [])
+
+
+async def test_a_pile_of_half_magnets_is_not_a_match():
+    """sum(1/df) can clear MIN_IDF from several middling actors none of which is
+    actually specific — three actors at df 15 sum to 0.20, past the 0.15 floor.
+    That is how two unrelated blobs that both name a few national figures reach
+    each other. At least ONE shared actor has to be specific on its own."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:6]
+    mids = [(uuid.uuid4(), f"half-magnet-{n}-{tag}") for n in range(3)]
+    fillers = [uuid.uuid4() for _ in range(14)]
+    target = uuid.uuid4()
+    all_ev = [str(x) for x in fillers] + [str(target)]
+    try:
+        async with session_scope() as s:
+            for eid, slug in mids:
+                await s.execute(
+                    text("INSERT INTO entities (id,slug,name,entity_type) VALUES (:i,:s,:n,'person')"),
+                    {"i": str(eid), "s": slug, "n": slug},
+                )
+            # 14 fillers + the target carry all three → df 15 each → 1/df = 0.0667,
+            # sum 0.20 (clears MIN_IDF 0.15), max 0.0667 (fails MIN_TOP_IDF 0.1).
+            for fe in fillers:
+                await s.execute(
+                    text("INSERT INTO events (id,title,sector,last_updated_at) "
+                         "VALUES (:i,:t,'politics',now())"),
+                    {"i": str(fe), "t": f"filler {fe}"},
+                )
+                for eid, _ in mids:
+                    await s.execute(
+                        text("INSERT INTO event_entities (id,event_id,entity_id,role) "
+                             "VALUES (:i,:e,:en,'subject')"),
+                        {"i": str(uuid.uuid4()), "e": str(fe), "en": str(eid)},
+                    )
+            await _seed_event(s, target, "an unrelated english story")
+            for eid, _ in mids:
+                await s.execute(
+                    text("INSERT INTO event_entities (id,event_id,entity_id,role) "
+                         "VALUES (:i,:e,:en,'subject')"),
+                    {"i": str(uuid.uuid4()), "e": str(target), "en": str(eid)},
+                )
+
+        async with session_scope() as s:
+            miss = await find_event(
+                s, cve_ids=[], url=None, title="a different english story", published_at=None,
+                embedding=V_MODERATE, entity_slugs=[slug for _, slug in mids],
+            )
+        assert miss is None, "merged on three half-magnets and no specific actor"
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": all_ev})
+            await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
+                            {"i": [str(e) for e, _ in mids]})
+            await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": all_ev})

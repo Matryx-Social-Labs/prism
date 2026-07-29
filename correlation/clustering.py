@@ -71,6 +71,20 @@ ENTITY_MATCH_MIN_IDF = 0.15
 # in the looser 0.25-0.45 band require >=2, since a single shared actor there is more
 # likely coincidental.
 ENTITY_MATCH_NEAR_DISTANCE = 0.25
+# At least ONE shared actor must be specific on its own, not merely specific in
+# aggregate. sum(1/df) can clear MIN_IDF from a pile of half-magnets, which is how
+# two unrelated blobs that both mention several national figures reach each other.
+# 0.1 means df <= 10 events in the window — appearing in ten stories in four days
+# is still a particular actor, not a fixture.
+#
+# This hardens the gate; it does not close the feedback loop the 139-article event
+# exposed. That event accumulated 978 entities, and _match_by_entities compares
+# against an event's WHOLE accumulated set, so each bad merge widens the opening
+# for the next. Bounding it properly means knowing which entities are core to the
+# event rather than inherited from something it wrongly absorbed — and
+# event_entities has no per-article link, so that is a schema change, not a
+# tweak. Left explicit rather than half-solved.
+ENTITY_MATCH_MIN_TOP_IDF = 0.1
 ENTITY_MATCH_TYPES = ("person", "company", "organization")
 
 
@@ -252,6 +266,7 @@ async def _match_by_entities(
                            AND min(e.embedding <=> CAST(:vec AS vector)) <= :near_dist)
                    )
                    AND sum(1.0 / d.df) >= :min_idf
+                   AND max(1.0 / d.df) >= :min_top_idf
             ORDER BY idf DESC, dist ASC
             LIMIT 1
             """
@@ -261,6 +276,7 @@ async def _match_by_entities(
             "slugs": entity_slugs,
             "types": list(ENTITY_MATCH_TYPES),
             "min_idf": ENTITY_MATCH_MIN_IDF,
+            "min_top_idf": ENTITY_MATCH_MIN_TOP_IDF,
             "dist_threshold": ENTITY_MATCH_LOOSE_DISTANCE,
             "min_shared": ENTITY_MATCH_MIN_SHARED,
             # -1 is unreachable for a cosine distance, so the single-actor

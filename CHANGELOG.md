@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.79.1] - 2026-07-28
+
+### Fixed
+- **Outlets are no longer extracted as actors.** `prajavani` was the most-shared
+  "entity" across a 139-article over-merge — the outlet doing the merging — and
+  `tv9kannada` was the first cast name on a live trending story. Filtered at both
+  the clustering gate and the entity graph, so the two cannot disagree.
+- A match now needs at least one shared actor that is specific on its own, not
+  merely specific in aggregate: three actors at df 15 summed past the IDF floor
+  while none of them was actually particular.
+
 ## [0.0.79.0] - 2026-07-28
 
 ### Fixed
