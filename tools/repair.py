@@ -258,6 +258,58 @@ async def apply_titles(c: asyncpg.Connection, fixes: list[tuple]) -> None:
     print(f"  APPLIED: {len(fixes)} rows unescaped")
 
 
+async def apply_entities(c: asyncpg.Connection, *, write: bool) -> None:
+    """Strip outlet names from the graph, and fold the curated alias variants.
+
+    An outlet is not an actor in its own coverage. The forward-only filter added in
+    0.0.79.1 stops NEW ones, but the historical links remained — and the cast
+    rebuild in tools/scratch.py made it worse, because it read entities straight
+    out of shared_fields and never applied that filter. `prajavani` went from part
+    of a 345-link problem to 240 links on its own.
+    """
+    src = {entity_slug(r["slug"]) for r in await c.fetch("SELECT slug FROM sources")}
+    src |= {entity_slug(r["name"]) for r in await c.fetch("SELECT name FROM sources")}
+    ids = [r["id"] for r in await c.fetch(
+        "SELECT id FROM entities WHERE slug = ANY($1::text[])", sorted(src))]
+    ev = await c.fetchval("SELECT count(*) FROM event_entities WHERE entity_id = ANY($1::uuid[])", ids)
+    ar = await c.fetchval("SELECT count(*) FROM article_entities WHERE entity_id = ANY($1::uuid[])", ids)
+    print(f"\n  outlet entities: {len(ids)}   event links: {ev}   article links: {ar}")
+
+    pairs = [(v, k) for k, v in ENTITY_ALIASES.items()]
+    folds = 0
+    for _canonical, variant in pairs:
+        n = await c.fetchval("""SELECT count(*) FROM event_entities ee
+              JOIN entities e ON e.id = ee.entity_id WHERE e.slug = $1""", variant)
+        folds += n
+    print(f"  alias variants to fold: {len(pairs)} slugs, {folds} event links")
+    if not write:
+        print("  (dry run — nothing written)")
+        return
+
+    async with c.transaction():
+        await c.execute("DELETE FROM article_entities WHERE entity_id = ANY($1::uuid[])", ids)
+        await c.execute("DELETE FROM event_entities WHERE entity_id = ANY($1::uuid[])", ids)
+        for canonical, variant in pairs:
+            cid = await c.fetchval("SELECT id FROM entities WHERE slug = $1", canonical)
+            vid = await c.fetchval("SELECT id FROM entities WHERE slug = $1", variant)
+            if not cid or not vid:
+                continue
+            # Re-point the variant's links at the canonical, then drop the variant.
+            for tbl, key in (("event_entities", "event_id"), ("article_entities", "article_id")):
+                await c.execute(
+                    f"""UPDATE {tbl} SET entity_id = $1 WHERE entity_id = $2
+                        AND NOT EXISTS (SELECT 1 FROM {tbl} t2
+                                        WHERE t2.{key} = {tbl}.{key} AND t2.entity_id = $1)""",
+                    cid, vid)
+                await c.execute(f"DELETE FROM {tbl} WHERE entity_id = $1", vid)
+            await c.execute("UPDATE impacts SET entity_id = $1 WHERE entity_id = $2", cid, vid)
+            # The variant entity ROW is left in place. impacts is not the only
+            # thing that can reference it, and chasing every foreign key to delete
+            # a row nobody reads is work for its own sake — entity_slug already
+            # resolves new mentions to the canonical, so nothing links here again.
+    print(f"  APPLIED: {ev + ar} outlet links removed, {len(pairs)} alias variants folded")
+
+
 async def split_event(c: asyncpg.Connection, event_id, *, apply: bool) -> None:
     """Re-decide ONE over-merged event and, with --apply, split it for real.
 
@@ -427,6 +479,7 @@ async def main() -> None:
             await report_clusters(c)
         if every or a.entities:
             await report_entities(c)
+            await apply_entities(c, write=a.apply and a.entities)
         if every or a.titles:
             fixes = await report_titles(c)
             if a.apply and a.titles:
