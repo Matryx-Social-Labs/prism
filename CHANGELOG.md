@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.80.2] - 2026-07-29
+
+### Fixed
+- **The same article arriving via two feeds is now extracted once.** Dedupe keys
+  on `(source_id, external_id)`, so a URL reaching us through a national feed and
+  a regional one was fetched twice and sent to the model twice — 534 duplicate-URL
+  groups, 355 wasted enrichments. The second copy reuses the first extraction and
+  keeps its own article, so corroboration and the match trail are unaffected.
+
 ## [0.0.80.1] - 2026-07-29
 
 ### Fixed

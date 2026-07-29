@@ -11,6 +11,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy import select
+from sqlalchemy import text as sa_text
 
 from common import stream
 from common.config import get_settings
@@ -58,9 +59,17 @@ async def handle_classified_item(payload: dict) -> None:
     meta = {"stage": "enrichment", "source_slug": source_slug, "raw_item_id": str(raw_item_id)}
     settings = get_settings()
 
+    # Pay for one extraction per URL, not one per feed that carried it.
+    reused = await _extraction_for_same_url(url)
+
     # 1. Full text
     og_image: str | None = None
-    if source_slug in ("nvd", "cisa_kev"):
+    if reused:
+        clean_text, raw_model_output, model_used = reused[0], reused[1], reused[2]
+        extraction = ArticleExtraction.model_validate(raw_model_output)
+        tier = "duplicate_url"
+        logger.info("enrichment_reused_for_duplicate_url", raw_item_id=str(raw_item_id), url=url)
+    elif source_slug in ("nvd", "cisa_kev"):
         clean_text, tier = (body or title), "body"
     else:
         clean_text, tier, og_image = await retrieve_fulltext(url, body)
@@ -69,8 +78,14 @@ async def handle_classified_item(payload: dict) -> None:
 
     # 2. Extraction — deterministic for CVE records, LLM for articles
     model_used: str
-    raw_model_output: dict | None = None
-    if source_slug == "nvd":
+    if not reused:
+        raw_model_output = None
+    if reused:
+        # extraction / model_used / raw_model_output were all set above. Falling
+        # through here would reset raw_model_output to None and re-run the model,
+        # which is the exact spend this branch exists to avoid.
+        pass
+    elif source_slug == "nvd":
         extraction = extract_from_nvd(raw)
         model_used = "deterministic:nvd"
     elif source_slug == "cisa_kev":
@@ -191,3 +206,41 @@ def _parse_date(value: str | None) -> date | None:
         return date.fromisoformat(value[:10])
     except ValueError:
         return None
+
+
+async def _extraction_for_same_url(url: str | None) -> tuple[str, dict, str] | None:
+    """An enrichment already produced for this exact URL, if there is one.
+
+    534 URL groups in production arrive more than once — 533 of them CROSS-source,
+    the same article reaching us through a national feed and a regional one under
+    different external_ids. Dedupe keys on (source_id, external_id), so URL is
+    never compared and both copies are fetched and sent to the model: 355 excess
+    enrichments, entirely wasted spend.
+
+    Reused rather than skipped. Skipping the second article would drop the record
+    that a second feed carried it, and event membership is what corroboration and
+    the match trail are built from. This keeps both articles and pays for one
+    extraction — the embedding pass still runs locally, which is cheap.
+    """
+    if not url:
+        return None
+    async with session_scope() as session:
+        row = (
+            await session.execute(
+                sa_text(
+                    """
+                    SELECT a.clean_text, e.raw_model_output, e.model
+                    FROM enrichments e
+                    JOIN articles a ON a.id = e.article_id
+                    JOIN raw_items ri ON ri.id = a.raw_item_id
+                    WHERE ri.url = :url AND e.raw_model_output IS NOT NULL
+                    ORDER BY e.created_at ASC
+                    LIMIT 1
+                    """
+                ),
+                {"url": url},
+            )
+        ).first()
+    if row and row.raw_model_output:
+        return row.clean_text, row.raw_model_output, row.model
+    return None
