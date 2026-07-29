@@ -29,11 +29,11 @@ SOURCES = [
     {"slug": "prajavani", "name": "Prajavani", "source_type": "rss", "country": "IN", "language": "kn"},
     {"slug": "tv9kannada", "name": "TV9 Kannada", "source_type": "rss", "country": "IN", "language": "kn"},
     # ── India state editions ──
-    {"slug": "thehindu_tamilnadu", "name": "The Hindu — Tamil Nadu", "source_type": "rss", "country": "IN", "language": "en"},
-    {"slug": "thehindu_kerala", "name": "The Hindu — Kerala", "source_type": "rss", "country": "IN", "language": "en"},
-    {"slug": "thehindu_karnataka", "name": "The Hindu — Karnataka", "source_type": "rss", "country": "IN", "language": "en"},
-    {"slug": "thehindu_andhra", "name": "The Hindu — Andhra Pradesh", "source_type": "rss", "country": "IN", "language": "en"},
-    {"slug": "thehindu_telangana", "name": "The Hindu — Telangana", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "thehindu_tamilnadu", "publisher": "thehindu", "name": "The Hindu — Tamil Nadu", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "thehindu_kerala", "publisher": "thehindu", "name": "The Hindu — Kerala", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "thehindu_karnataka", "publisher": "thehindu", "name": "The Hindu — Karnataka", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "thehindu_andhra", "publisher": "thehindu", "name": "The Hindu — Andhra Pradesh", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "thehindu_telangana", "publisher": "thehindu", "name": "The Hindu — Telangana", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "toi_delhi", "name": "The Times of India — Delhi", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "toi_mumbai", "name": "The Times of India — Mumbai", "source_type": "rss", "country": "IN", "language": "en"},
     # ── Cybersecurity lens (global by nature) ──

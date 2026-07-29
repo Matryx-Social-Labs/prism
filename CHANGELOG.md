@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.80.0] - 2026-07-29
+
+### Fixed
+- **Corroboration counts mastheads, not feeds.** The Hindu ships six regional RSS
+  feeds and republishes the same article across them — 666 articles in that family
+  share a byte-identical body — so one newsroom filing one story could report up
+  to six independent sources. New `sources.publisher` column; unrelated sources
+  default to their own slug and are unaffected.
+
 ## [0.0.79.3] - 2026-07-29
 
 ### Fixed
