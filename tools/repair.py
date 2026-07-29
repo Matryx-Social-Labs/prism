@@ -35,6 +35,7 @@ from common.text import detect_script, entity_slug
 from correlation.clustering import (
     EMBEDDING_DISTANCE_THRESHOLD,
     EMBEDDING_TRUSTED_SCRIPTS,
+    ENTITY_MATCH_BROAD_SHARED,
     ENTITY_MATCH_LOOSE_DISTANCE,
     ENTITY_MATCH_MIN_IDF,
     ENTITY_MATCH_MIN_SHARED,
@@ -132,7 +133,10 @@ def _rebuild(members: list[dict], df: dict[str, float], sim: dict[tuple, float] 
                     dist <= ENTITY_MATCH_LOOSE_DISTANCE
                     and len(shared) >= need
                     and sum(1.0 / df.get(s, 1.0) for s in shared) >= ENTITY_MATCH_MIN_IDF
-                    and max((1.0 / df.get(s, 1.0) for s in shared), default=0) >= ENTITY_MATCH_MIN_TOP_IDF
+                    and (
+                        max((1.0 / df.get(s, 1.0) for s in shared), default=0) >= ENTITY_MATCH_MIN_TOP_IDF
+                        or len(shared) >= ENTITY_MATCH_BROAD_SHARED
+                    )
                 ):
                     placed = True
             if placed:
@@ -288,6 +292,7 @@ async def split_event(c: asyncpg.Connection, event_id, *, apply: bool) -> None:
         json.dump(rollback, fh, indent=2)
     print(f"  rollback written: {path}")
 
+    created: list[str] = []
     async with c.transaction():
         for cl in clusters[1:]:
             founder = cl[0]
@@ -305,6 +310,7 @@ async def split_event(c: asyncpg.Connection, event_id, *, apply: bool) -> None:
                    RETURNING id""",
                 founder["aid"], event_id,
             )
+            created.append(str(new_id))
             await c.execute(
                 """UPDATE event_memberships SET event_id = $1
                    WHERE event_id = $2 AND article_id = ANY($3::uuid[])""",
@@ -332,7 +338,12 @@ async def split_event(c: asyncpg.Connection, event_id, *, apply: bool) -> None:
                    ON CONFLICT DO NOTHING""",
                 event_id, kept,
             )
-    print(f"  APPLIED: {len(clusters) - 1} new events created, {len(members)} memberships re-homed")
+    rollback["created_event_ids"] = created
+    with open(path, "w") as fh:
+        json.dump(rollback, fh, indent=2)
+    print(f"  APPLIED: {len(created)} new events created, {len(members)} memberships re-homed")
+    print(f"  undo: move those articles back to {event_id} and delete {len(created)} event(s);")
+    print(f"        ids are in {path}")
 
 
 async def _df(c: asyncpg.Connection) -> dict[str, float]:
