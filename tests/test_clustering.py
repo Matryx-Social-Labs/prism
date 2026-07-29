@@ -38,6 +38,64 @@ def _vec(v: list[float]) -> str:
     return "[" + ",".join(str(x) for x in v) + "]"
 
 
+async def _purge_events(s, ids):
+    """Tear down an event and everything _attach_article hung off it.
+
+    Takes the CALLER's session rather than opening its own: the teardowns already
+    hold one and have already deleted rows these statements touch, so a second
+    session blocks on the first's uncommitted locks while the first waits for it —
+    the tests hung rather than failed.
+    """
+    ids = [str(i) for i in ids]
+    arts = [str(a) for a in (await s.execute(
+        text("SELECT article_id FROM event_memberships WHERE event_id = ANY(:e)"), {"e": ids}
+    )).scalars().all()]
+    await s.execute(text("DELETE FROM event_memberships WHERE event_id = ANY(:e)"), {"e": ids})
+    await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": ids})
+    if arts:
+        await s.execute(text("DELETE FROM article_entities WHERE article_id = ANY(:a)"), {"a": arts})
+        raws = [str(r) for r in (await s.execute(
+            text("SELECT raw_item_id FROM articles WHERE id = ANY(:a)"), {"a": arts})).scalars().all()]
+        await s.execute(text("DELETE FROM articles WHERE id = ANY(:a)"), {"a": arts})
+        if raws:
+            srcs = [str(x) for x in (await s.execute(
+                text("SELECT source_id FROM raw_items WHERE id = ANY(:r)"), {"r": raws})).scalars().all()]
+            await s.execute(text("DELETE FROM raw_items WHERE id = ANY(:r)"), {"r": raws})
+            if srcs:
+                await s.execute(text("DELETE FROM sources WHERE id = ANY(:s)"), {"s": srcs})
+
+
+async def _attach_article(s, event_id, entity_ids):
+    """Give an event one real article that names `entity_ids`.
+
+    Required since article_entities: an event's cast is now derived from the
+    articles it holds, so seeding event_entities alone leaves an event with no
+    countable actors. One article naming all of them is also the honest shape —
+    a single-article event's sole article is where its cast comes from.
+    """
+    sid, rid, aid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    tag = uuid.uuid4().hex[:8]
+    await s.execute(text("INSERT INTO sources (id,slug,name,source_type) VALUES (:i,:s,:s,'rss')"),
+                    {"i": str(sid), "s": f"fixture-{tag}"})
+    await s.execute(
+        text("INSERT INTO raw_items (id,source_id,external_id,title,raw,relevance) "
+             "VALUES (:i,:s,:e,'fixture','{}'::jsonb,'relevant')"),
+        {"i": str(rid), "s": str(sid), "e": f"ext-{tag}"})
+    await s.execute(
+        text("INSERT INTO articles (id,raw_item_id,clean_text,retrieval_tier,word_count) "
+             "VALUES (:i,:r,'body','rss',1)"), {"i": str(aid), "r": str(rid)})
+    await s.execute(
+        text("INSERT INTO event_memberships (id,event_id,article_id,match_type,is_survivor) "
+             "VALUES (:i,:e,:a,'seed',true)"),
+        {"i": str(uuid.uuid4()), "e": str(event_id), "a": str(aid)})
+    for ent in entity_ids:
+        await s.execute(
+            text("INSERT INTO article_entities (id,article_id,entity_id,role) "
+                 "VALUES (:i,:a,:en,'subject')"),
+            {"i": str(uuid.uuid4()), "a": str(aid), "en": str(ent)})
+    return sid, rid, aid
+
+
 async def test_entity_overlap_matches_cross_language():
     if not await _db_reachable():
         pytest.skip("no database")
@@ -62,6 +120,7 @@ async def test_entity_overlap_matches_cross_language():
                     text("INSERT INTO event_entities (id, event_id, entity_id, role) VALUES (:i, :e, :en, 'subject')"),
                     {"i": str(uuid.uuid4()), "e": str(eid), "en": str(ent_id)},
                 )
+            await _attach_article(s, eid, [e[0] for e in ents])
 
         # A Hindi retelling: same two actors, moderately similar (not near-dup), distinct title.
         async with session_scope() as s:
@@ -82,6 +141,7 @@ async def test_entity_overlap_matches_cross_language():
         async with session_scope() as s:
             await s.execute(text("DELETE FROM event_entities WHERE event_id = :e"), {"e": str(eid)})
             await s.execute(text("DELETE FROM entities WHERE id = ANY(:ids)"), {"ids": [str(e[0]) for e in ents]})
+            await _purge_events(s, [eid])
             await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
 
 
@@ -108,16 +168,17 @@ async def test_entity_overlap_idf_weighting():
             # 13 fillers (NULL embedding, never candidates) carry both magnets → df 14 each.
             for fe in fillers:
                 await s.execute(text("INSERT INTO events (id,title,sector,last_updated_at) VALUES (:i,:t,'politics',now())"),
-                                {"i": str(fe), "t": f"filler {fe}"})
+                                {"i": str(fe), "t": f"filler {tag} {fe}"})
                 for ent_id, *_ in (m1, m2):
                     await s.execute(text("INSERT INTO event_entities (id,event_id,entity_id,role) VALUES (:i,:e,:en,'subject')"),
                                     {"i": str(uuid.uuid4()), "e": str(fe), "en": str(ent_id)})
             await s.execute(text("INSERT INTO events (id,title,sector,last_updated_at,embedding) "
                                  "VALUES (:i,:t,'politics',now(),CAST(:v AS vector))"),
-                            {"i": str(target), "t": "metro shut (English)", "v": _vec(V)})
+                            {"i": str(target), "t": f"metro shut {tag}", "v": _vec(V)})
             for ent_id, *_ in (m1, m2, specific):
                 await s.execute(text("INSERT INTO event_entities (id,event_id,entity_id,role) VALUES (:i,:e,:en,'subject')"),
                                 {"i": str(uuid.uuid4()), "e": str(target), "en": str(ent_id)})
+            await _attach_article(s, target, [e for e, *_ in (m1, m2, specific)])
 
         # magnet + specific → IDF carried by the specific actor → merges (the fix; the old
         # df<=2 cutoff dropped the magnet, leaving only 1 shared → no match).
@@ -136,6 +197,7 @@ async def test_entity_overlap_idf_weighting():
             await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": all_ev})
             await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
                             {"i": [str(m1[0]), str(m2[0]), str(specific[0])]})
+            await _purge_events(s, all_ev)
             await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": all_ev})
 
 
@@ -153,7 +215,7 @@ async def test_entity_overlap_near_dup_single_actor():
             await s.execute(
                 text("INSERT INTO events (id, title, sector, last_updated_at, embedding) "
                      "VALUES (:i,:t,'politics',now(),CAST(:v AS vector))"),
-                {"i": str(eid), "t": "16 metro stations shut (English)", "v": _vec(V)},
+                {"i": str(eid), "t": f"16 metro stations shut {tag}", "v": _vec(V)},
             )
             await s.execute(
                 text("INSERT INTO entities (id, slug, name, entity_type) VALUES (:i,:s,:n,:et)"),
@@ -163,6 +225,7 @@ async def test_entity_overlap_near_dup_single_actor():
                 text("INSERT INTO event_entities (id, event_id, entity_id, role) VALUES (:i,:e,:en,'subject')"),
                 {"i": str(uuid.uuid4()), "e": str(eid), "en": str(actor[0])},
             )
+            await _attach_article(s, eid, [actor[0]])
 
         # near-dup (dist 0.2) + the single strong actor → merges.
         async with session_scope() as s:
@@ -179,6 +242,7 @@ async def test_entity_overlap_near_dup_single_actor():
         async with session_scope() as s:
             await s.execute(text("DELETE FROM event_entities WHERE event_id = :e"), {"e": str(eid)})
             await s.execute(text("DELETE FROM entities WHERE id = :i"), {"i": str(actor[0])})
+            await _purge_events(s, [eid])
             await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
 
 
@@ -267,6 +331,7 @@ async def _cleanup(eids, ents):
         await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": [str(x) for x in eids]})
         if ents:
             await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"), {"i": [str(x) for x in ents]})
+        await _purge_events(s, eids)
         await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": [str(x) for x in eids]})
 
 
@@ -275,10 +340,10 @@ async def test_collapsed_script_never_merges_on_distance_alone(title):
     """An IDENTICAL embedding is still not enough. This is the 120-article path."""
     if not await _db_reachable():
         pytest.skip("no database")
-    eid = uuid.uuid4()
+    eid, tag = uuid.uuid4(), uuid.uuid4().hex[:6]
     try:
         async with session_scope() as s:
-            await _seed_event(s, eid, "an unrelated story")
+            await _seed_event(s, eid, f"an unrelated story {tag}")
         async with session_scope() as s:
             miss = await find_event(s, cve_ids=[], url=None, title=title, published_at=None,
                                     embedding=V, entity_slugs=None)
@@ -296,8 +361,9 @@ async def test_collapsed_script_rejects_the_single_actor_shortcut():
     ents = []
     try:
         async with session_scope() as s:
-            await _seed_event(s, eid, "an unrelated story")
+            await _seed_event(s, eid, f"an unrelated story {tag}")
             ents.append(await _seed_actor(s, eid, f"solo-actor-{tag}"))
+            await _attach_article(s, eid, ents)
         async with session_scope() as s:
             miss = await find_event(s, cve_ids=[], url=None, title=KANNADA, published_at=None,
                                     embedding=V_NEAR, entity_slugs=[f"solo-actor-{tag}"])
@@ -315,9 +381,10 @@ async def test_collapsed_script_still_merges_on_two_shared_actors():
     ents = []
     try:
         async with session_scope() as s:
-            await _seed_event(s, eid, "the same story, in English")
+            await _seed_event(s, eid, f"the same story in English {tag}")
             ents.append(await _seed_actor(s, eid, f"actor-one-{tag}"))
             ents.append(await _seed_actor(s, eid, f"actor-two-{tag}"))
+            await _attach_article(s, eid, ents)
         async with session_scope() as s:
             hit = await find_event(s, cve_ids=[], url=None, title=KANNADA, published_at=None,
                                    embedding=V_MODERATE,
@@ -372,7 +439,7 @@ async def test_a_pile_of_half_magnets_is_not_a_match():
                 await s.execute(
                     text("INSERT INTO events (id,title,sector,last_updated_at) "
                          "VALUES (:i,:t,'politics',now())"),
-                    {"i": str(fe), "t": f"filler {fe}"},
+                    {"i": str(fe), "t": f"filler {tag} {fe}"},
                 )
                 for eid, _ in mids:
                     await s.execute(
@@ -380,17 +447,18 @@ async def test_a_pile_of_half_magnets_is_not_a_match():
                              "VALUES (:i,:e,:en,'subject')"),
                         {"i": str(uuid.uuid4()), "e": str(fe), "en": str(eid)},
                     )
-            await _seed_event(s, target, "an unrelated english story")
+            await _seed_event(s, target, f"an unrelated english story {tag}")
             for eid, _ in mids:
                 await s.execute(
                     text("INSERT INTO event_entities (id,event_id,entity_id,role) "
                          "VALUES (:i,:e,:en,'subject')"),
                     {"i": str(uuid.uuid4()), "e": str(target), "en": str(eid)},
                 )
+            await _attach_article(s, target, [e for e, _ in mids])
 
         async with session_scope() as s:
             miss = await find_event(
-                s, cve_ids=[], url=None, title="a different english story", published_at=None,
+                s, cve_ids=[], url=None, title=f"a different english story {tag}", published_at=None,
                 embedding=V_MODERATE, entity_slugs=[slug for _, slug in mids],
             )
         assert miss is None, "merged on three half-magnets and no specific actor"
@@ -399,6 +467,7 @@ async def test_a_pile_of_half_magnets_is_not_a_match():
             await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": all_ev})
             await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
                             {"i": [str(e) for e, _ in mids]})
+            await _purge_events(s, all_ev)
             await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": all_ev})
 
 
@@ -428,23 +497,24 @@ async def test_a_broad_cast_overlap_merges_without_a_rare_actor():
             for fe in fillers:
                 await s.execute(
                     text("INSERT INTO events (id,title,sector,last_updated_at) "
-                         "VALUES (:i,:t,'politics',now())"), {"i": str(fe), "t": f"filler {fe}"})
+                         "VALUES (:i,:t,'politics',now())"), {"i": str(fe), "t": f"filler {tag} {fe}"})
                 for eid, _ in shared:
                     await s.execute(
                         text("INSERT INTO event_entities (id,event_id,entity_id,role) "
                              "VALUES (:i,:e,:en,'subject')"),
                         {"i": str(uuid.uuid4()), "e": str(fe), "en": str(eid)})
-            await _seed_event(s, target, "the same story, in English")
+            await _seed_event(s, target, f"the same story in English {tag}")
             for eid, _ in shared:
                 await s.execute(
                     text("INSERT INTO event_entities (id,event_id,entity_id,role) "
                          "VALUES (:i,:e,:en,'subject')"),
                     {"i": str(uuid.uuid4()), "e": str(target), "en": str(eid)})
+            await _attach_article(s, target, [e for e, _ in shared])
 
         # four mid-df actors, none individually specific -> merges on breadth
         async with session_scope() as s:
             hit = await find_event(
-                s, cve_ids=[], url=None, title="a related english story", published_at=None,
+                s, cve_ids=[], url=None, title=f"a related english story {tag}", published_at=None,
                 embedding=V_MODERATE, entity_slugs=[sl for _, sl in shared])
         assert hit is not None and hit.match_type == "entity_overlap"
 
@@ -452,7 +522,7 @@ async def test_a_broad_cast_overlap_merges_without_a_rare_actor():
         # actor, so it must NOT merge (this is the half-magnet guard intact)
         async with session_scope() as s:
             miss = await find_event(
-                s, cve_ids=[], url=None, title="an unrelated english story", published_at=None,
+                s, cve_ids=[], url=None, title=f"an unrelated english story {tag}", published_at=None,
                 embedding=V_MODERATE, entity_slugs=[sl for _, sl in shared[:3]])
         assert miss is None
     finally:
@@ -460,4 +530,65 @@ async def test_a_broad_cast_overlap_merges_without_a_rare_actor():
             await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": all_ev})
             await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
                             {"i": [str(e) for e, _ in shared]})
+            await _purge_events(s, all_ev)
             await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": all_ev})
+
+
+async def test_an_actor_inherited_from_one_absorbed_article_does_not_widen_the_gate():
+    """The feedback loop, closed.
+
+    event_entities is cumulative: an actor arrives when an article is absorbed and
+    stays forever. So an event that once swallowed one article about a national
+    figure became matchable by every future article naming that figure, and each
+    bad merge widened the opening for the next. One production event reached 978
+    actors this way, at which point the gate is simply open.
+
+    Here a big event holds ten articles about one subject and ONE stray article
+    that named two other actors. Under the old rule those two counted for the
+    event and an unrelated article sharing them merged straight in. Now an actor
+    must be named by at least two of the event's OWN articles to speak for it.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:6]
+    core = [(uuid.uuid4(), f"core-{n}-{tag}") for n in range(2)]
+    stray = [(uuid.uuid4(), f"stray-{n}-{tag}") for n in range(2)]
+    eid = uuid.uuid4()
+    try:
+        async with session_scope() as s:
+            await _seed_event(s, eid, f"a big event {tag}")
+            for ent, slug in core + stray:
+                await s.execute(
+                    text("INSERT INTO entities (id,slug,name,entity_type) VALUES (:i,:s,:n,'person')"),
+                    {"i": str(ent), "s": slug, "n": slug})
+                # cumulative event-level link: exactly what used to be consulted
+                await s.execute(
+                    text("INSERT INTO event_entities (id,event_id,entity_id,role) "
+                         "VALUES (:i,:e,:en,'subject')"),
+                    {"i": str(uuid.uuid4()), "e": str(eid), "en": str(ent)})
+            # ten articles carry the core actors...
+            for _ in range(10):
+                await _attach_article(s, eid, [e for e, _ in core])
+            # ...and exactly ONE stray article named the other two.
+            await _attach_article(s, eid, [e for e, _ in stray])
+
+        # An unrelated article sharing only the two STRAY actors must not merge:
+        # they speak for one of eleven articles, not for the event.
+        async with session_scope() as s:
+            miss = await find_event(
+                s, cve_ids=[], url=None, title=f"a wholly different story {tag}", published_at=None,
+                embedding=V_MODERATE, entity_slugs=[sl for _, sl in stray])
+        assert miss is None, "an actor from one absorbed article still widened the gate"
+
+        # The core actors, named by ten of eleven, still match.
+        async with session_scope() as s:
+            hit = await find_event(
+                s, cve_ids=[], url=None, title=f"more on the same thing {tag}", published_at=None,
+                embedding=V_MODERATE, entity_slugs=[sl for _, sl in core])
+        assert hit is not None and hit.match_type == "entity_overlap"
+    finally:
+        async with session_scope() as s:
+            await _purge_events(s, [eid])
+            await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
+                            {"i": [str(e) for e, _ in core + stray]})
+            await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
