@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.80.4] - 2026-07-29
+
+### Fixed
+- A shared storyline link now lands on the live story however many merges deep.
+  The route followed exactly one hop on the assumption that merges always point
+  at a canonical story; production has a two-hop chain, so that link resolved to
+  a story that was itself merged — dormant, and not what the reader should see.
+
 ## [0.0.80.3] - 2026-07-29
 
 ### Fixed
