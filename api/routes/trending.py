@@ -17,6 +17,9 @@ from common.db import get_db
 
 router = APIRouter()
 
+# Chains observed in production are 1-2 hops; this is a corruption guard, not a limit.
+_MAX_MERGE_HOPS = 8
+
 
 @router.get("/api/v1/trending")
 async def trending(
@@ -81,8 +84,24 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
     ).mappings().first()
     if story is None:
         raise HTTPException(status_code=404, detail="no such story")
-    # Follow the merge chain (one hop is enough — merges always point at a canonical).
-    if story["merged_into"] is not None:
+    # Follow the merge chain to its end.
+    #
+    # This used to take exactly one hop, on the stated assumption that "merges
+    # always point at a canonical". Production disagrees: an audit on 2026-07-28
+    # found a two-hop chain among 356 merged rows. One hop lands on a story that
+    # is ITSELF merged — dormant, superseded, not what the reader should see —
+    # so that share link silently resolved to a dead story instead of the live one.
+    #
+    # Bounded rather than `while`: a cycle would hang the request thread, and a
+    # chain longer than this is corruption worth failing loudly on.
+    seen: set[str] = set()
+    for _ in range(_MAX_MERGE_HOPS):
+        if story["merged_into"] is None:
+            break
+        nxt = str(story["merged_into"])
+        if nxt in seen:
+            raise HTTPException(status_code=500, detail="merge cycle")
+        seen.add(nxt)
         story = (
             await db.execute(
                 text(
@@ -90,11 +109,14 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
                     "sector, source_count, velocity, status, merged_into "
                     "FROM stories WHERE id = :id"
                 ),
-                {"id": str(story["merged_into"])},
+                {"id": nxt},
             )
         ).mappings().first()
         if story is None:
             raise HTTPException(status_code=404, detail="no such story")
+    else:
+        if story["merged_into"] is not None:
+            raise HTTPException(status_code=500, detail="merge chain too deep")
 
     from correlation.threads import branch_tree_for_members, story_timeline_from_members
 
