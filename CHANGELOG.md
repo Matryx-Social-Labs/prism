@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.80.5] - 2026-07-29
+
+### Fixed
+- **A regression from 0.0.79.1.** Requiring one individually-specific shared actor
+  rejected real stories: an article sharing eight actors with its event was
+  refused because its rarest shared actor sat at df 12, just past the df<=10 the
+  threshold implies. A broad cast overlap now satisfies the guard on its own.
+
 ## [0.0.80.4] - 2026-07-29
 
 ### Fixed

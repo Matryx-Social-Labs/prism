@@ -400,3 +400,64 @@ async def test_a_pile_of_half_magnets_is_not_a_match():
             await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
                             {"i": [str(e) for e, _ in mids]})
             await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": all_ev})
+
+
+async def test_a_broad_cast_overlap_merges_without_a_rare_actor():
+    """The counterpart to the half-magnet test, and a regression from production.
+
+    An article sharing EIGHT actors with its event — Amit Shah, Rahul Gandhi, the
+    party, the presiding judge — was refused because its most specific shared
+    actor sat at df 12, just past the df<=10 that MIN_TOP_IDF implies. Eight
+    shared actors is not a coincidence; demanding a rare one on top is a second
+    tax on the same evidence. Four mid-df actors (df 15 -> max 1/df = 0.067,
+    below MIN_TOP_IDF) must merge on breadth alone, while three still do not.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:6]
+    shared = [(uuid.uuid4(), f"broad-{n}-{tag}") for n in range(4)]
+    fillers = [uuid.uuid4() for _ in range(14)]
+    target = uuid.uuid4()
+    all_ev = [str(x) for x in fillers] + [str(target)]
+    try:
+        async with session_scope() as s:
+            for eid, slug in shared:
+                await s.execute(
+                    text("INSERT INTO entities (id,slug,name,entity_type) VALUES (:i,:s,:n,'person')"),
+                    {"i": str(eid), "s": slug, "n": slug})
+            for fe in fillers:
+                await s.execute(
+                    text("INSERT INTO events (id,title,sector,last_updated_at) "
+                         "VALUES (:i,:t,'politics',now())"), {"i": str(fe), "t": f"filler {fe}"})
+                for eid, _ in shared:
+                    await s.execute(
+                        text("INSERT INTO event_entities (id,event_id,entity_id,role) "
+                             "VALUES (:i,:e,:en,'subject')"),
+                        {"i": str(uuid.uuid4()), "e": str(fe), "en": str(eid)})
+            await _seed_event(s, target, "the same story, in English")
+            for eid, _ in shared:
+                await s.execute(
+                    text("INSERT INTO event_entities (id,event_id,entity_id,role) "
+                         "VALUES (:i,:e,:en,'subject')"),
+                    {"i": str(uuid.uuid4()), "e": str(target), "en": str(eid)})
+
+        # four mid-df actors, none individually specific -> merges on breadth
+        async with session_scope() as s:
+            hit = await find_event(
+                s, cve_ids=[], url=None, title="a related english story", published_at=None,
+                embedding=V_MODERATE, entity_slugs=[sl for _, sl in shared])
+        assert hit is not None and hit.match_type == "entity_overlap"
+
+        # three of the same actors -> below the breadth bar, and still no rare
+        # actor, so it must NOT merge (this is the half-magnet guard intact)
+        async with session_scope() as s:
+            miss = await find_event(
+                s, cve_ids=[], url=None, title="an unrelated english story", published_at=None,
+                embedding=V_MODERATE, entity_slugs=[sl for _, sl in shared[:3]])
+        assert miss is None
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_entities WHERE event_id = ANY(:e)"), {"e": all_ev})
+            await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
+                            {"i": [str(e) for e, _ in shared]})
+            await s.execute(text("DELETE FROM events WHERE id = ANY(:e)"), {"e": all_ev})

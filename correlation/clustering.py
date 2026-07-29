@@ -85,6 +85,14 @@ ENTITY_MATCH_NEAR_DISTANCE = 0.25
 # event_entities has no per-article link, so that is a schema change, not a
 # tweak. Left explicit rather than half-solved.
 ENTITY_MATCH_MIN_TOP_IDF = 0.1
+# ...unless the cast overlap is broad. Requiring an individually-specific actor
+# turned out to reject real stories: an article sharing EIGHT actors with its
+# event (Amit Shah, Rahul Gandhi, the CJP, the presiding judge) was refused
+# because its most specific shared actor sat at df 12, just past the df<=10 the
+# threshold implies. Eight shared actors is not a coincidence, and demanding a
+# rare one on top of that is a second tax on the same evidence. Either a
+# genuinely specific actor, OR a cast overlap wide enough to stand on its own.
+ENTITY_MATCH_BROAD_SHARED = 4
 ENTITY_MATCH_TYPES = ("person", "company", "organization")
 
 
@@ -266,7 +274,8 @@ async def _match_by_entities(
                            AND min(e.embedding <=> CAST(:vec AS vector)) <= :near_dist)
                    )
                    AND sum(1.0 / d.df) >= :min_idf
-                   AND max(1.0 / d.df) >= :min_top_idf
+                   AND (max(1.0 / d.df) >= :min_top_idf
+                        OR count(DISTINCT d.id) >= :broad_shared)
             ORDER BY idf DESC, dist ASC
             LIMIT 1
             """
@@ -277,6 +286,7 @@ async def _match_by_entities(
             "types": list(ENTITY_MATCH_TYPES),
             "min_idf": ENTITY_MATCH_MIN_IDF,
             "min_top_idf": ENTITY_MATCH_MIN_TOP_IDF,
+            "broad_shared": ENTITY_MATCH_BROAD_SHARED,
             "dist_threshold": ENTITY_MATCH_LOOSE_DISTANCE,
             "min_shared": ENTITY_MATCH_MIN_SHARED,
             # -1 is unreachable for a cosine distance, so the single-actor
