@@ -160,13 +160,20 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id) -> dict:
     Session = async_sessionmaker(engine, expire_on_commit=False)
     placed: dict[str, list] = {}
     created: set[str] = set()
+    outlets = {entity_slug(r['slug']) for r in await prod.fetch('SELECT slug FROM sources')}
+    outlets |= {entity_slug(r['name']) for r in await prod.fetch('SELECT name FROM sources')}
     try:
         for m in members:
             ents = m["ents"]
             ents = json.loads(ents) if isinstance(ents, str) else (ents or [])
+            # Outlets are not actors. Without this the replay writes them back
+            # into the graph — which is exactly how a previous repair pushed
+            # `prajavani` to 240 event links after the live path had stopped
+            # producing them.
             slugs = [
                 entity_slug(e["name"]) for e in ents
                 if e.get("name") and e.get("type") in ENTITY_MATCH_TYPES
+                and entity_slug(e["name"]) not in outlets
             ]
             lens = (json.loads(m["lens_fields"]) if isinstance(m["lens_fields"], str)
                     else m["lens_fields"]) or {}
@@ -481,6 +488,10 @@ async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
         # 4. every touched event's cast, rebuilt from the articles it now holds —
         #    an inherited actor list is exactly what made these events magnets.
         touched = sorted({m["to_event_id"] for m in moves} | {m["from_event_id"] for m in moves})
+        outlets = sorted(
+            {entity_slug(r["slug"]) for r in await prod.fetch("SELECT slug FROM sources")}
+            | {entity_slug(r["name"]) for r in await prod.fetch("SELECT name FROM sources")}
+        )
         await prod.execute("DELETE FROM event_entities WHERE event_id = ANY($1::uuid[])", touched)
         await prod.execute(
             """INSERT INTO event_entities (id, event_id, entity_id, role)
@@ -490,8 +501,12 @@ async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
                JOIN enrichments e ON e.article_id = em.article_id
                CROSS JOIN LATERAL jsonb_array_elements(e.shared_fields->'entities') x
                JOIN entities ent ON ent.name = x->>'name'
-               WHERE em.event_id = ANY($1::uuid[])""",
-            touched,
+               WHERE em.event_id = ANY($1::uuid[])
+                 -- Outlets are not actors. Rebuilding without this re-introduces
+                 -- every link the entity cleanup removed; it is how a previous
+                 -- repair pushed `prajavani` to 240 event links.
+                 AND ent.slug <> ALL($2::text[])""",
+            touched, outlets,
         )
         # Assert the RESULT, not just that the statements ran. A rehearsal that
         # only proves the SQL parses would have told us nothing about whether the
@@ -506,6 +521,11 @@ async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
         created_empty = await prod.fetchval(
             "SELECT count(*) FROM events e WHERE e.id = ANY($1::uuid[]) AND NOT EXISTS "
             "(SELECT 1 FROM event_memberships m WHERE m.event_id = e.id)", list(creates))
+        # Three separate repairs have re-introduced something a forward-only fix
+        # had already stopped, so this is asserted rather than trusted.
+        outlet_links = await prod.fetchval(
+            """SELECT count(*) FROM event_entities ee JOIN entities e ON e.id = ee.entity_id
+               WHERE e.slug = ANY($1::text[])""", outlets)
         no_cast = await prod.fetchval(
             "SELECT count(*) FROM events e WHERE e.id = ANY($1::uuid[]) AND NOT EXISTS "
             "(SELECT 1 FROM event_entities x WHERE x.event_id = e.id)", touched)
@@ -515,7 +535,9 @@ async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
         print(f"    original events empty : {empty_targets} of {len(plan['targets'])}")
         print(f"    created events empty  : {created_empty} of {len(creates)}")
         print(f"    touched events no cast: {no_cast} of {len(touched)}")
-        bad = (total_now != before_total or orphans or empty_targets or created_empty)
+        print(f"    outlet entity links   : {outlet_links} (must be 0)")
+        bad = (total_now != before_total or orphans or empty_targets
+               or created_empty or outlet_links)
         if bad:
             print("    RESULT FAILED ITS OWN CHECKS — rolling back regardless of --yes.")
             raise _Rehearsed
