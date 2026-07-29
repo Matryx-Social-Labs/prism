@@ -54,6 +54,10 @@ class Source(TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(Text, nullable=False)  # news_api|cve_feed|advisory|rss|scraper
+    # The masthead behind the feed. The Hindu ships six regional feeds that
+    # republish one another, so corroboration counts publishers, not feeds.
+    # Defaults to the slug, so an unrelated source counts for itself.
+    publisher: Mapped[str | None] = mapped_column(Text)
     country: Mapped[str | None] = mapped_column(Text)
     language: Mapped[str | None] = mapped_column(Text)
     reliability: Mapped[dict | None] = mapped_column(JSONB)

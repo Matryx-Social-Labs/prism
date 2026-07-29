@@ -177,10 +177,10 @@ async def _candidate_events(session: AsyncSession) -> list[dict]:
                 f"""
                 WITH vel AS (
                     SELECT em.event_id,
-                           count(DISTINCT s.slug) FILTER (
+                           count(DISTINCT COALESCE(s.publisher, s.slug)) FILTER (
                                WHERE em.created_at > now() - interval '{VELOCITY_WINDOW_HOURS} hours'
                            ) AS recent_sources,
-                           count(DISTINCT s.slug) AS total_sources
+                           count(DISTINCT COALESCE(s.publisher, s.slug)) AS total_sources
                     FROM event_memberships em
                     JOIN articles a ON a.id = em.article_id
                     JOIN raw_items ri ON ri.id = a.raw_item_id
@@ -209,8 +209,8 @@ async def _community_facts(session: AsyncSession, member_ids: list[str]) -> dict
         await session.execute(
             text(
                 f"""
-                SELECT count(DISTINCT s.slug) AS total_sources,
-                       count(DISTINCT s.slug) FILTER (
+                SELECT count(DISTINCT COALESCE(s.publisher, s.slug)) AS total_sources,
+                       count(DISTINCT COALESCE(s.publisher, s.slug)) FILTER (
                            WHERE em.created_at > now() - interval '{VELOCITY_WINDOW_HOURS} hours'
                        ) AS recent_sources
                 FROM event_memberships em
