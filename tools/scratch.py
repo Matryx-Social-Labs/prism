@@ -211,9 +211,22 @@ async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--event", help="replay a single event id")
     ap.add_argument("--plan", metavar="FILE", help="write the membership moves as a reviewable plan")
+    ap.add_argument("--apply-plan", metavar="FILE", dest="apply_plan", help="execute a plan")
+    ap.add_argument("--yes", action="store_true", help="WRITE. Without it, --apply-plan validates only.")
+    ap.add_argument("--rehearse", action="store_true",
+                    help="run the whole transaction against live rows, then roll it back")
     a = ap.parse_args()
 
     prod = await asyncpg.connect(_prod_url(), timeout=60)
+    if a.apply_plan:
+        if not (a.yes or a.rehearse):
+            await prod.execute("SET default_transaction_read_only = on")
+        try:
+            await apply_plan(prod, json.load(open(a.apply_plan)), write=a.yes,
+                             rehearse=a.rehearse)
+        finally:
+            await prod.close()
+        return
     await prod.execute("SET default_transaction_read_only = on")
     local_url = _local_url()
     local = await asyncpg.connect(local_url, timeout=60)
@@ -344,6 +357,160 @@ async def main() -> None:
         await prod.close()
         await local.close()
 
+
+
+
+# ── applying a plan ─────────────────────────────────────────────────────────
+
+class _Rehearsed(Exception):
+    """Raised to force a rollback after a full rehearsal."""
+
+
+async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
+                     rehearse: bool = False) -> None:
+    """Execute a plan produced by --plan, in one transaction, against production.
+
+    Validated against live state first. The plan is a SNAPSHOT: it names the event
+    each article sits in at generation time, so if anything has moved since — a
+    resumed worker, an earlier partial run — applying it blind would move articles
+    out of events they no longer belong to. Drift aborts rather than guesses.
+    """
+    moves = plan["moves"]
+    creates = {c["id"]: c for c in plan["create_events"]}
+    retitles = plan["retitle"]
+    art_ids = [m["article_id"] for m in moves]
+
+    live = {
+        str(r["article_id"]): str(r["event_id"])
+        for r in await prod.fetch(
+            "SELECT article_id, event_id FROM event_memberships WHERE article_id = ANY($1::uuid[])",
+            art_ids,
+        )
+    }
+    drift = [m for m in moves if live.get(m["article_id"]) != m["from_event_id"]]
+    missing = [a for a in art_ids if a not in live]
+    print(f"  validating {len(moves)} moves against live state ...")
+    print(f"    articles not found      : {len(missing)}")
+    print(f"    articles that have moved: {len(drift)}")
+    if drift or missing:
+        print("  ABORT — the plan no longer matches production. Regenerate it.")
+        for m in drift[:5]:
+            print(f"    {m['article_id'][:8]} expected in {m['from_event_id'][:8]}, "
+                  f"found in {live.get(m['article_id'], 'nowhere')[:8]}")
+        return
+
+    before_total = await prod.fetchval("SELECT count(*) FROM event_memberships")
+    real_moves = [m for m in moves if m["to_event_id"] != m["from_event_id"]]
+    print(f"    moves that actually change something: {len(real_moves)}")
+    print(f"    events to create: {len(creates)}   retitles: {len(retitles)}")
+    if not write and not rehearse:
+        print("\n  DRY RUN — nothing written. Add --yes to apply.")
+        return
+
+    rollback = {
+        "memberships": [{"article_id": a, "event_id": e} for a, e in live.items()],
+        "created_event_ids": list(creates),
+        "titles": [
+            {"event_id": r["event_id"], "title": t}
+            for r in retitles
+            for t in [await prod.fetchval("SELECT title FROM events WHERE id = $1::uuid", r["event_id"])]
+        ],
+    }
+    path = "/tmp/repair-plan-rollback.json"
+    with open(path, "w") as fh:
+        json.dump(rollback, fh, indent=2)
+    print(f"  rollback written: {path}")
+
+    try:
+      async with prod.transaction():
+        # 1. the new events, titled and vectorised from their founding article
+        for c in creates.values():
+            await prod.execute(
+                """INSERT INTO events (id, title, summary, sector, subsector, regions,
+                                       occurred_at, embedding, last_updated_at)
+                   SELECT $1::uuid, ri.title, e.summary,
+                          coalesce(ri.classification->>'sector','other'),
+                          ri.classification->>'subsector',
+                          coalesce(ev.regions, '{}'), e.occurred_at, ac.embedding, now()
+                   FROM articles a
+                   JOIN raw_items ri ON ri.id = a.raw_item_id
+                   JOIN article_chunks ac ON ac.article_id = a.id AND ac.chunk_index = 0
+                   LEFT JOIN enrichments e ON e.article_id = a.id
+                   LEFT JOIN LATERAL (SELECT regions FROM events LIMIT 0) ev ON true
+                   WHERE a.id = $2::uuid
+                   ON CONFLICT (id) DO NOTHING""",
+                c["id"], c["founder_article_id"],
+            )
+        # 2. the memberships
+        for m in real_moves:
+            await prod.execute(
+                "UPDATE event_memberships SET event_id = $1::uuid WHERE article_id = $2::uuid",
+                m["to_event_id"], m["article_id"],
+            )
+        # 3. survivors whose founder left get the title of what they actually keep
+        for r in retitles:
+            await prod.execute(
+                """UPDATE events SET title = ri.title, occurred_at = e.occurred_at,
+                          embedding = ac.embedding, summary = e.summary, last_updated_at = now()
+                   FROM articles a
+                   JOIN raw_items ri ON ri.id = a.raw_item_id
+                   JOIN article_chunks ac ON ac.article_id = a.id AND ac.chunk_index = 0
+                   LEFT JOIN enrichments e ON e.article_id = a.id
+                   WHERE a.id = $2::uuid AND events.id = $1::uuid""",
+                r["event_id"], r["from_article_id"],
+            )
+        # 4. every touched event's cast, rebuilt from the articles it now holds —
+        #    an inherited actor list is exactly what made these events magnets.
+        touched = sorted({m["to_event_id"] for m in moves} | {m["from_event_id"] for m in moves})
+        await prod.execute("DELETE FROM event_entities WHERE event_id = ANY($1::uuid[])", touched)
+        await prod.execute(
+            """INSERT INTO event_entities (id, event_id, entity_id, role)
+               SELECT DISTINCT ON (em.event_id, ent.id)
+                      gen_random_uuid(), em.event_id, ent.id, 'subject'
+               FROM event_memberships em
+               JOIN enrichments e ON e.article_id = em.article_id
+               CROSS JOIN LATERAL jsonb_array_elements(e.shared_fields->'entities') x
+               JOIN entities ent ON ent.name = x->>'name'
+               WHERE em.event_id = ANY($1::uuid[])""",
+            touched,
+        )
+        # Assert the RESULT, not just that the statements ran. A rehearsal that
+        # only proves the SQL parses would have told us nothing about whether the
+        # repair is correct.
+        total_now = await prod.fetchval("SELECT count(*) FROM event_memberships")
+        orphans = await prod.fetchval(
+            "SELECT count(*) FROM articles a WHERE NOT EXISTS "
+            "(SELECT 1 FROM event_memberships m WHERE m.article_id = a.id)")
+        empty_targets = await prod.fetchval(
+            "SELECT count(*) FROM events e WHERE e.id = ANY($1::uuid[]) AND NOT EXISTS "
+            "(SELECT 1 FROM event_memberships m WHERE m.event_id = e.id)", plan["targets"])
+        created_empty = await prod.fetchval(
+            "SELECT count(*) FROM events e WHERE e.id = ANY($1::uuid[]) AND NOT EXISTS "
+            "(SELECT 1 FROM event_memberships m WHERE m.event_id = e.id)", list(creates))
+        no_cast = await prod.fetchval(
+            "SELECT count(*) FROM events e WHERE e.id = ANY($1::uuid[]) AND NOT EXISTS "
+            "(SELECT 1 FROM event_entities x WHERE x.event_id = e.id)", touched)
+        print(f"    memberships total     : {total_now} (was {before_total}, delta "
+              f"{total_now - before_total})")
+        print(f"    orphaned articles     : {orphans}")
+        print(f"    original events empty : {empty_targets} of {len(plan['targets'])}")
+        print(f"    created events empty  : {created_empty} of {len(creates)}")
+        print(f"    touched events no cast: {no_cast} of {len(touched)}")
+        bad = (total_now != before_total or orphans or empty_targets or created_empty)
+        if bad:
+            print("    RESULT FAILED ITS OWN CHECKS — rolling back regardless of --yes.")
+            raise _Rehearsed
+
+        if rehearse:
+            # Every statement has now run against real rows. Undo it: a rehearsal
+            # that commits is just an apply with extra steps.
+            raise _Rehearsed
+    except _Rehearsed:
+        print("  REHEARSED: every statement executed against live rows, then rolled back.")
+        return
+    print(f"  APPLIED: {len(creates)} events created, {len(real_moves)} memberships moved, "
+          f"{len(retitles)} retitled, {len(touched)} casts rebuilt")
+    print(f"  undo with the mapping in {path}")
 
 if __name__ == "__main__":
     asyncio.run(main())
