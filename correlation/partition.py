@@ -591,10 +591,30 @@ async def _flip_current(session, run_id: uuid.UUID) -> None:
 
 async def _prune_runs(session, keep: int = PARTITION_RETENTION) -> None:
     """Keep the `keep` most-recent non-current runs; delete older ones (event_story
-    CASCADEs, story_veto.base_run_id SET NULL so verdicts survive for audit)."""
+    CASCADEs, story_veto.base_run_id SET NULL so verdicts survive for audit).
+
+    Never delete a run another run is still built on. partition_runs references
+    ITSELF — an overlay carries the base_run_id it refined — and that self-FK is
+    the one this docstring used to omit, and the code with it: it is NO ACTION,
+    where the other two are CASCADE and SET NULL. So pruning an old base that a
+    newer, still-retained overlay pointed at raised ForeignKeyViolationError; and
+    because retention is deterministic it then raised on the SAME row every 15
+    minutes for days, taking the whole partition pass down with it and leaving the
+    grounded veto stuck at 'pending'.
+
+    Retaining the base rather than orphaning the overlay is the conservative
+    choice — an overlay whose base is gone cannot say what it refined, and these
+    rows exist to be audited. It also self-heals: the overlay ages out first, and
+    the base becomes prunable on the next pass."""
     old = (
         await session.execute(
-            text("SELECT id FROM partition_runs WHERE status <> 'current' ORDER BY created_at DESC OFFSET :k"),
+            text(
+                "SELECT id FROM partition_runs "
+                "WHERE status <> 'current' "
+                "  AND id NOT IN (SELECT base_run_id FROM partition_runs "
+                "                 WHERE base_run_id IS NOT NULL) "
+                "ORDER BY created_at DESC OFFSET :k"
+            ),
             {"k": keep},
         )
     ).scalars().all()
