@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.79.2] - 2026-07-29
+
+### Fixed
+- **The partition retention pass had been failing every 15 minutes for days.**
+  `partition_runs` references itself, and that self-FK is NO ACTION where the
+  other two are CASCADE and SET NULL — so pruning an old base run that a retained
+  overlay still pointed at raised a ForeignKeyViolation, deterministically, on the
+  same row. It took the whole partition pass down with it and left the grounded
+  veto stuck at `pending`, which is why an over-merged 107-member story stayed at
+  the top of Trending.
+
 ## [0.0.79.1] - 2026-07-28
 
 ### Fixed
