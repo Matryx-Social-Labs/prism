@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.79.3] - 2026-07-29
+
+### Fixed
+- **Romanisation variants of one party no longer split its cast.** जनता reaches
+  us as both "Janta" and "Janata" and भारतीय as "Bharatiya" and "Bhartiya" — both
+  correct, both in real mastheads — so live trending stories carried near-duplicate
+  actors. Folded via a curated alias table, never by a transliteration rule.
+
 ## [0.0.79.2] - 2026-07-29
 
 ### Fixed

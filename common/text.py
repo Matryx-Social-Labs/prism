@@ -60,8 +60,11 @@ def canonical_entity_name(name: str) -> str:
 
 
 def entity_slug(name: str) -> str:
-    """Identity slug for an entity, folding punctuation variants together."""
-    return slugify(canonical_entity_name(name))
+    """Identity slug for an entity: punctuation variants fold by rule, spelling
+    variants fold only via the curated table (see common/entity_aliases)."""
+    from common.entity_aliases import resolve_alias
+
+    return resolve_alias(slugify(canonical_entity_name(name)))
 
 
 if __name__ == "__main__":
