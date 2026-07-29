@@ -51,6 +51,10 @@ COLUMNS = {
     "events": "id, title, sector, occurred_at, last_updated_at, embedding, projection",
     "entities": "id, slug, name, entity_type",
     "event_entities": "id, event_id, entity_id, role",
+    # Since 0.0.81.0 the matcher derives an event's cast from the articles it
+    # holds, so without this the replay would see every event with an empty
+    # cast and refuse every entity match.
+    "article_entities": "id, article_id, entity_id, role",
     "event_memberships": "id, event_id, article_id, match_type, is_survivor",
     "articles": "id, raw_item_id, clean_text, retrieval_tier, word_count",
     "raw_items": "id, source_id, external_id, url, title, raw, relevance, published_at",
@@ -120,6 +124,12 @@ async def build_scratch(prod: asyncpg.Connection, local: asyncpg.Connection, tar
         f"CREATE INDEX ON {SCRATCH}.event_entities (entity_id)",
         f"CREATE INDEX ON {SCRATCH}.event_entities (event_id)",
         f"CREATE INDEX ON {SCRATCH}.event_memberships (article_id)",
+        f"CREATE INDEX ON {SCRATCH}.event_memberships (event_id)",
+        # UNIQUE, not just an index: the replay upserts with ON CONFLICT, and
+        # LIKE ... INCLUDING DEFAULTS does not carry constraints across.
+        f"CREATE UNIQUE INDEX ON {SCRATCH}.article_entities (article_id, entity_id)",
+        f"CREATE INDEX ON {SCRATCH}.article_entities (article_id)",
+        f"CREATE INDEX ON {SCRATCH}.article_entities (entity_id)",
         f"CREATE INDEX ON {SCRATCH}.raw_items (url)",
     ):
         await local.execute(idx)
@@ -199,6 +209,15 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id) -> dict:
                                 "SELECT gen_random_uuid(), :e, ent.id, 'subject' FROM entities ent "
                                 "WHERE ent.slug = ANY(CAST(:s AS text[]))"),
                         {"e": str(eid), "s": slugs},
+                    )
+                    # and the article-level link, or the event this article just
+                    # joined would not count it toward its own cast
+                    await s.execute(
+                        sa_text("INSERT INTO article_entities (id,article_id,entity_id,role) "
+                                "SELECT gen_random_uuid(), :a, ent.id, 'subject' FROM entities ent "
+                                "WHERE ent.slug = ANY(CAST(:s AS text[])) "
+                                "ON CONFLICT (article_id, entity_id) DO NOTHING"),
+                        {"a": str(m["aid"]), "s": slugs},
                     )
                 await s.commit()
             placed.setdefault(str(eid), []).append(m)
