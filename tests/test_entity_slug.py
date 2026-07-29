@@ -21,11 +21,26 @@ def test_punctuation_and_acronym_variants_fold():
 def test_distinct_entities_do_not_merge():
     # meaningful parenthetical (not an acronym of the head) is kept
     assert entity_slug("CPI(M)") != entity_slug("CPI")
-    # spelling variants are NOT fuzzed together (needs judgement, not a rule)
-    assert entity_slug("Cockroach Janta Party") != entity_slug("Cockroach Janata Party")
+    # Spelling variants are still NOT fuzzed by any RULE — which is what this
+    # assertion has always been guarding. It used to demonstrate that with
+    # "Cockroach Janta/Janata Party"; that pair has since been listed in
+    # common/entity_aliases, because the same comment's own standard — judgement,
+    # not a rule — is exactly what a curated table is. The mechanism is unchanged,
+    # so the example moves to a pair nobody has ruled on.
+    assert entity_slug("Janta") != entity_slug("Janata")
+    assert entity_slug("Samyukta Morcha") != entity_slug("Samyukt Morcha")
     # distinct acronyms/orgs stay distinct
     assert entity_slug("NDRF") != entity_slug("NDMA")
     assert entity_slug("Delhi Police") != entity_slug("Delhi Metro")
+
+
+def test_a_listed_variant_folds_only_because_it_is_listed():
+    """The counterpart to the above: the table is the ONLY thing that folds a
+    spelling variant, so removing an entry must un-fold that pair."""
+    from common.entity_aliases import ENTITY_ALIASES
+
+    assert entity_slug("Cockroach Janta Party") == entity_slug("Cockroach Janata Party")
+    assert "cockroach-janta-party" in ENTITY_ALIASES
 
 
 def test_canonical_is_idempotent():
