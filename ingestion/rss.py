@@ -31,6 +31,9 @@ class FeedSpec:
     sector: str | None = None  # set => deterministic classification, no LLM
     subsector: str | None = None
     state: str | None = None  # ISO 3166-2 (e.g. IN-KA) => stamped on the event's regions
+    # Kept in the list rather than deleted when a feed goes dark, so the reason
+    # survives and re-enabling is a one-word change.
+    enabled: bool = True
 
 
 # India-first scope: national + state general news, plus the cyber lens beachhead.
@@ -65,16 +68,28 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("toi_mumbai", "https://timesofindia.indiatimes.com/rssfeeds/-2128838597.cms", state="IN-MH"),
     # ── Cybersecurity lens (global by nature — feeds the cyber lens, not the India general feed) ──
     FeedSpec("thehackernews", "https://feeds.feedburner.com/TheHackersNews"),
-    FeedSpec("bleepingcomputer", "https://www.bleepingcomputer.com/feed/"),
+    # 403 on EVERY 30-minute cycle since ingestion began — a dead collector
+    # emitting a traceback per cycle. The block is on the egress IP, not on us:
+    # measured 2026-07-29, the feed returns 200 to this exact User-Agent from a
+    # residential address and 403 from Railway. So there is no UA to fix, and
+    # spoofing a browser to get around a datacentre-IP rule would be evading a
+    # deliberate block rather than fixing a bug. Off until the egress changes.
+    FeedSpec("bleepingcomputer", "https://www.bleepingcomputer.com/feed/", enabled=False),
 ]
+
+# Identify honestly and be reachable: the old "prism-prototype/0.1" named no
+# product, offered no contact, and told every publisher we were a toy.
+USER_AGENT = "Prism/1.0 (+https://www.readprism.news)"
 
 SPEC_BY_SLUG: dict[str, FeedSpec] = {spec.slug: spec for spec in FEEDS}
 
 
 async def collect() -> int:
     inserted_total = 0
-    async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers={"User-Agent": "prism-prototype/0.1"}) as client:
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
         for spec in FEEDS:
+            if not spec.enabled:
+                continue
             try:
                 response = await client.get(spec.url)
                 response.raise_for_status()
