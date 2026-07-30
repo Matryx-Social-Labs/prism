@@ -3,6 +3,24 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.3] - 2026-07-30
+
+### Added
+- `PRISM_VETO_ENABLED` master switch for the grounded storyline veto, mirroring
+  `PRISM_INGESTION_ENABLED`. **Set to false in production.**
+
+### Fixed
+- The hourly veto pass was paying for LLM work that almost never reached a reader.
+  It loses twice: `persist_veto_overlay` publishes only if its base run is still
+  current, and with a 15-minute base cadence against a ~13-minute veto it loses
+  that race roughly half the time; and when it does win, `persist_base_run`
+  unconditionally republishes with `veto_state='pending'` on the next tick, so the
+  refinement is discarded within 15 minutes. Measured on production: of 10 retained
+  partition runs exactly one carried an applied veto, and it survived 4m33s. The
+  switch stops the spend; the structural fix (carry a previous run's veto decisions
+  forward through the base pass) is deliberately not attempted here, because the
+  veto's output has been observed exactly once and has not been judged worth keeping.
+
 ## [0.0.81.2] - 2026-07-30
 
 ### Fixed

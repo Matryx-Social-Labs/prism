@@ -650,6 +650,11 @@ async def persist_veto_overlay() -> str | None:
     """Refine the current base run with the grounded veto and publish an overlay run.
     LLM calls run OUTSIDE the lock; the publish CAS-checks that the base is still
     current (else a newer base won the race — discard). The slow worker path."""
+    # Master switch: gated here rather than in the worker loop so an admin trigger
+    # can't spend on it either. See prism_veto_enabled for why it's off in prod.
+    if not get_settings().prism_veto_enabled:
+        logger.info("veto_disabled", reason="prism_veto_enabled=false")
+        return None
     version = veto_config_version()
     model = get_settings().prism_model_gate
     # Phase 1 (no lock): read the current base, run the veto, finalize. Verdicts persist.
