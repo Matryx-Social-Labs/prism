@@ -36,6 +36,32 @@ ENTITY_ALIASES: dict[str, str] = {
     "e-20-janata-party": "e20-janata-party",
     "i20-janta-party": "e20-janata-party",
     "i-20-janta-party": "e20-janata-party",
+    # Acronyms outlets use interchangeably with the full name, often inside one
+    # article ("the BJP said" after naming Bharatiya Janata Party once). Measured
+    # on production 2026-07-30, these were splitting a single party across two
+    # entities: bjp 176 articles vs bharatiya-janata-party 234, cjp 54 vs
+    # cockroach-janata-party 430. Each half then carries half the document
+    # frequency, so the matcher's 1/df weighting treats a national fixture as
+    # twice as distinctive as it is.
+    #
+    # Listed by hand and NOT derived by initialism, because the initialism is
+    # ambiguous and a wrong fold is unrecoverable. In THIS corpus "brs"
+    # initialises both Bharat Rashtra Samithi and boston-red-sox; "cjp" also
+    # initialises civil-jurisprudence-party, chhatra-jawan-party,
+    # crocodile-janata-party and charama-janpad-panchayat; "bjp" also matches
+    # bhanupratappur-janpad-panchayat. Every pair below was checked against its
+    # article count and folded only where one expansion is unambiguously
+    # dominant. Deliberately absent for that reason: brs, ani.
+    "bjp": "bharatiya-janata-party",
+    "cjp": "cockroach-janata-party",
+    "dmk": "dravida-munnetra-kazhagam",
+    "nda": "national-democratic-alliance",
+    "tvk": "tamilaga-vettri-kazhagam",
+    # Spelling and singular/plural forms of one organisation.
+    "tamilaga-vetri-kazhagam": "tamilaga-vettri-kazhagam",
+    "all-india-student-federation": "all-india-students-federation",
+    "student-federation-of-india": "students-federation-of-india",
+    "left-wing-student-unions": "left-wing-students-unions",
 }
 
 

@@ -43,6 +43,33 @@ def test_a_listed_variant_folds_only_because_it_is_listed():
     assert "cockroach-janta-party" in ENTITY_ALIASES
 
 
+def test_dominant_acronyms_fold_into_their_expansion():
+    """Outlets mix "BJP" and "Bharatiya Janata Party" freely, often inside one
+    article. Left unfolded they are two entities each carrying half the document
+    frequency, so the matcher's 1/df weighting scores a national fixture as twice
+    as distinctive as it really is."""
+    assert entity_slug("BJP") == entity_slug("Bharatiya Janata Party")
+    assert entity_slug("CJP") == entity_slug("Cockroach Janata Party")
+    assert entity_slug("DMK") == entity_slug("Dravida Munnetra Kazhagam")
+
+
+def test_ambiguous_acronyms_are_not_folded():
+    """The counterpart, and the whole reason this stays a hand-curated table rather
+    than an initialism rule. In this corpus "BRS" initialises both Bharat Rashtra
+    Samithi and the Boston Red Sox; deriving the fold would merge a Telangana party
+    into a baseball team, and nothing downstream could recover from that."""
+    from common.entity_aliases import ENTITY_ALIASES
+
+    assert "brs" not in ENTITY_ALIASES
+    assert entity_slug("BRS") != entity_slug("Boston Red Sox")
+    assert entity_slug("BRS") != entity_slug("Bharat Rashtra Samithi")
+
+
+def test_singular_plural_org_variants_fold():
+    assert entity_slug("All India Student Federation") == entity_slug("All India Students Federation")
+    assert entity_slug("Student Federation of India") == entity_slug("Students Federation of India")
+
+
 def test_canonical_is_idempotent():
     for name in ("D.K. Shivakumar", "Cockroach Janta Party (CJP)", "CPI(M)", "Plain Name"):
         assert canonical_entity_name(canonical_entity_name(name)) == canonical_entity_name(name)
