@@ -190,3 +190,74 @@ describe("BranchTree — degenerate real-world data", () => {
     expect(screen.getByText("Child")).toBeInTheDocument();
   });
 });
+
+describe("BranchTree — every development is reachable", () => {
+  // The story page is the only place a reader can move between developments:
+  // the event page dropped its timeline in 0.0.81.1, so nothing else links a
+  // story's members together. This tree listed them as plain <div>s, which made
+  // /trending/[slug] a dead end — titles that look tappable and aren't.
+  it("links each spine development to its own page", () => {
+    render(
+      <BranchTree
+        tree={tree([node("a", null, 0), node("b", "a", 1)])}
+        developments={[dev("a", "Root"), dev("b", "Second")]}
+      />,
+    );
+    expect(screen.getByRole("link", { name: /Root/ })).toHaveAttribute("href", "/story/a");
+    expect(screen.getByRole("link", { name: /Second/ })).toHaveAttribute("href", "/story/b");
+  });
+
+  it("links developments revealed by expanding a branch", async () => {
+    // Three leaf children: the spine takes the earliest, the other two collapse
+    // behind the toggle. Collapsed developments are the ones most at risk of
+    // being unreachable, since nothing else in the app links to them.
+    render(
+      <BranchTree
+        tree={tree([node("a", null, 0), node("b", "a", 1), node("c", "a", 1), node("d", "a", 1)])}
+        developments={[
+          dev("a", "Root"),
+          dev("b", "Spine took me", "2026-07-11"),
+          dev("c", "Collapsed one", "2026-07-23"),
+          dev("d", "Collapsed two", "2026-07-12"),
+        ]}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /developments/ }));
+
+    expect(screen.getByRole("link", { name: /Collapsed one/ })).toHaveAttribute("href", "/story/c");
+    expect(screen.getByRole("link", { name: /Collapsed two/ })).toHaveAttribute("href", "/story/d");
+  });
+
+  it("leaves the development you are already on inert", () => {
+    render(
+      <BranchTree
+        tree={tree([node("a", null, 0), node("b", "a", 1)])}
+        developments={[dev("a", "Root"), dev("b", "Second")]}
+        currentId="b"
+      />,
+    );
+    // Root still navigates; "you are here" is not a link to itself.
+    expect(screen.getByRole("link", { name: /Root/ })).toHaveAttribute("href", "/story/a");
+    expect(screen.queryByRole("link", { name: /Second/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Second")).toBeInTheDocument();
+  });
+
+  it("keeps the branch toggle a button, not a link", async () => {
+    render(
+      <BranchTree
+        tree={tree([node("a", null, 0), node("b", "a", 1), node("c", "a", 1), node("d", "a", 1)])}
+        developments={[
+          dev("a", "Root"),
+          dev("b", "Spine took me", "2026-07-11"),
+          dev("c", "Collapsed one", "2026-07-23"),
+          dev("d", "Collapsed two", "2026-07-12"),
+        ]}
+      />,
+    );
+    const toggle = screen.getByRole("button", { name: /developments/ });
+    expect(toggle).not.toHaveAttribute("href");
+    // Still toggles — swapping the tag must not break the expand.
+    await userEvent.click(toggle);
+    expect(screen.getByText("Collapsed one")).toBeInTheDocument();
+  });
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import type { BranchNode, BranchTreeData, StoryDevelopment } from "@/lib/api";
@@ -43,6 +44,8 @@ type Row = {
   current: boolean;
   satellite: boolean;
   onTap?: () => void;
+  /** Development rows navigate; the branch toggle and the current row don't. */
+  href?: string;
 };
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -159,6 +162,7 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
       bold: true,
       current: id === currentId,
       satellite: false,
+      href: id === currentId ? undefined : `/story/${id}`,
     });
 
     const branch = branchAt.get(id);
@@ -195,6 +199,7 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
             bold: false,
             current: child.id === currentId,
             satellite: false,
+            href: child.id === currentId ? undefined : `/story/${child.id}`,
           });
         }
       }
@@ -214,6 +219,7 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
           bold: false,
           current: sat.id === currentId,
           satellite: true,
+          href: sat.id === currentId ? undefined : `/story/${sat.id}`,
         });
       }
     }
@@ -268,33 +274,22 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
         {rows.map((r) => {
           const railColor =
             r.rail === "strong" ? "var(--line-strong)" : r.rail === "dashed" ? "var(--line-strong)" : "var(--line)";
-          const Tag = r.onTap ? "button" : "div";
-          return (
-            <div
-              key={r.key}
-              className="border-b"
-              style={{
-                borderColor: "var(--line)",
-                paddingLeft: r.depth === 0 ? 0 : r.depth === 2 ? 36 : 22,
-                background: r.current ? "var(--bg-sunken)" : r.kind === "branch" && r.bold ? "var(--bg-sunken)" : "transparent",
-              }}
-            >
-              <Tag
-                {...(r.onTap
-                  ? {
-                      onClick: r.onTap,
-                      type: "button" as const,
-                      // Without this the name concatenates to "2 developments12–23 JUL".
-                      "aria-label": r.meta ? `${r.title.replace(/^[▾↳]\s*/, "")}, ${r.meta}` : r.title,
-                      "aria-expanded": r.bold,
-                    }
-                  : {})}
-                className="flex w-full min-h-[44px] items-start gap-[11px] py-3 pr-1 text-left"
-                style={{
-                  paddingLeft: r.rail === "none" ? 0 : 14,
-                  borderLeft: r.rail === "none" ? undefined : `1px ${r.rail === "dashed" ? "dashed" : "solid"} ${railColor}`,
-                }}
-              >
+          // A row is one of three tags — a link to its development, the branch
+          // toggle, or an inert row for the one you're already on — so the body
+          // is built once and each tag gets it as children. A single dynamic
+          // <Tag> would be shorter, but TS collapses the props of a union-typed
+          // tag to `never`, and the escape hatch is a cast that would silence
+          // real prop errors on all three.
+          const shared = {
+            className: "flex w-full min-h-[44px] items-start gap-[11px] py-3 pr-1 text-left",
+            style: {
+              paddingLeft: r.rail === "none" ? 0 : 14,
+              borderLeft:
+                r.rail === "none" ? undefined : `1px ${r.rail === "dashed" ? "dashed" : "solid"} ${railColor}`,
+            },
+          };
+          const body = (
+            <>
                 {r.kind === "dev" ? (
                   <span
                     aria-hidden
@@ -331,7 +326,40 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
                     </span>
                   )}
                 </span>
-              </Tag>
+            </>
+          );
+          return (
+            <div
+              key={r.key}
+              className="border-b"
+              style={{
+                borderColor: "var(--line)",
+                paddingLeft: r.depth === 0 ? 0 : r.depth === 2 ? 36 : 22,
+                background: r.current
+                  ? "var(--bg-sunken)"
+                  : r.kind === "branch" && r.bold
+                    ? "var(--bg-sunken)"
+                    : "transparent",
+              }}
+            >
+              {r.href ? (
+                <Link href={r.href} {...shared}>
+                  {body}
+                </Link>
+              ) : r.onTap ? (
+                <button
+                  type="button"
+                  onClick={r.onTap}
+                  // Without this the name concatenates to "2 developments12–23 JUL".
+                  aria-label={r.meta ? `${r.title.replace(/^[▾↳]\s*/, "")}, ${r.meta}` : r.title}
+                  aria-expanded={r.bold}
+                  {...shared}
+                >
+                  {body}
+                </button>
+              ) : (
+                <div {...shared}>{body}</div>
+              )}
             </div>
           );
         })}

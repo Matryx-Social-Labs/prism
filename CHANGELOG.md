@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.2] - 2026-07-30
+
+### Fixed
+- **Every development in a storyline is reachable again.** `BranchTree` listed a
+  story's members as plain `<div>`s — titles that look tappable and aren't — so
+  `/trending/{slug}` was a dead end. That was survivable while the event page
+  carried its own timeline linking to siblings; 0.0.81.1 removed it, which left
+  collapsed branch developments with no inbound link anywhere in the app. Spine,
+  branch and satellite rows now link to `/story/{id}`; the development you are
+  already on stays inert, and the branch toggle stays a button.
+
 ## [0.0.81.1] - 2026-07-30
 
 ### Fixed
