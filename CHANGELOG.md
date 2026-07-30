@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.6] - 2026-07-30
+
+### Added
+- A hand-labelled gold clustering (`tools/gold_labels.py`) for the six largest
+  production events, 171 articles read in publication order and assigned to the
+  56 real-world events they actually belong to, plus `tools/score_clustering.py`
+  to score production against it.
+- **Baseline, measured: B-cubed precision 0.29, macro purity 0.48, 6 predicted
+  clusters against 56 real events.** The worst cluster holds 22 distinct stories in
+  49 articles. The scorer ranks the six exactly as reading them did — Assam floods
+  cleanest at 0.86 purity, the CJP protest cluster worst at 0.20 — which is the
+  metric agreeing with a judgement made before it existed.
+- Deliberately a regression suite, not a corpus sample: these six were chosen
+  because fusion is worst there, so B-cubed recall starts near 1.0 by construction
+  and is not meaningful. Precision, purity and the cluster count are.
+
 ## [0.0.81.5] - 2026-07-30
 
 ### Added
