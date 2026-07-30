@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.5] - 2026-07-30
+
+### Added
+- `correlation/cluster_metrics.py` — B-cubed, macro cluster purity, cluster counts
+  and a TDT-style detection cost, so the next change to the matcher can be argued
+  against a number instead of against a reading of a few clusters. Every threshold
+  in `clustering.py` was picked by judgement; that caught the catastrophic failures
+  and missed the subtle ones, and cost one revert (`MIN_TOP_IDF` shipped in
+  0.0.80.0, walked back in 0.0.80.5).
+- B-cubed **precision** is reported separately because it is the over-merge signal,
+  and MUC is deliberately absent because it over-rewards merging — on the standard
+  benchmark two systems 7.4 CEAF-e points apart both score above 98.8 on MUC.
+- `detection_cost` defaults `c_fa` to 4x `c_miss`: an event that absorbs an
+  unrelated story is a visible defect, two events that should have been one is a
+  mild annoyance. F1 assumes those cost the same; they do not.
+
 ## [0.0.81.4] - 2026-07-30
 
 ### Fixed
