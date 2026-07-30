@@ -62,6 +62,23 @@ class Settings(BaseSettings):
     # still being built. On-demand briefs/Ask/digest still work.
     prism_ingestion_enabled: bool = True
 
+    # Grounded storyline veto master switch. Set PRISM_VETO_ENABLED=false to stop
+    # the hourly LLM overlay pass.
+    #
+    # Turned OFF in production 2026-07-30 because the pass pays for itself roughly
+    # never. Two independent losses: persist_veto_overlay does its LLM work, then
+    # publishes only if its base run is STILL current (correlation/partition.py:683)
+    # — with a 15-minute base cadence and a ~13-minute veto it loses that race about
+    # half the time. And when it DOES win, persist_base_run unconditionally
+    # republishes with veto_state='pending' on the next tick, so the refinement is
+    # discarded within 15 minutes. Measured: of 10 retained runs exactly one carried
+    # an applied veto, and it survived 4m33s.
+    #
+    # Re-enable once the base pass carries a previous run's veto decisions forward
+    # instead of dropping them; until then this is an hourly LLM bill for a
+    # refinement almost nobody is served.
+    prism_veto_enabled: bool = True
+
     # Relevance gate — embedding pre-filter (freemium-lens-model PR0).
     # shadow: score every LLM-gated item with embeddings and LOG (score,
     # llm_decision) for calibration, without changing what gets filtered.

@@ -35,6 +35,41 @@ async def test_ingestion_disabled_collects_nothing(monkeypatch):
     assert await run_all() == {"disabled": 1}
 
 
+async def test_veto_disabled_spends_nothing(monkeypatch):
+    """The veto is the most expensive scheduled pass in the product, so the switch
+    has to short-circuit BEFORE the session opens — not merely skip the publish
+    after the LLM calls have already been paid for."""
+    monkeypatch.setenv("PRISM_VETO_ENABLED", "false")
+    get_settings.cache_clear()
+    import correlation.partition as partition
+
+    def boom(*args, **kwargs):
+        raise AssertionError("veto did work despite PRISM_VETO_ENABLED=false")
+
+    monkeypatch.setattr(partition, "session_scope", boom)
+    assert await partition.persist_veto_overlay() is None
+
+
+async def test_veto_enabled_by_default_still_reaches_the_work(monkeypatch):
+    """Counterpart: the guard must gate on the flag, not be an unconditional early
+    return. Without this, deleting the `if` body's condition passes the test above."""
+    monkeypatch.delenv("PRISM_VETO_ENABLED", raising=False)
+    get_settings.cache_clear()
+    import correlation.partition as partition
+
+    reached = False
+
+    def marker(*args, **kwargs):
+        nonlocal reached
+        reached = True
+        raise RuntimeError("stop here — we only needed to know the guard let us past")
+
+    monkeypatch.setattr(partition, "session_scope", marker)
+    with pytest.raises(RuntimeError):
+        await partition.persist_veto_overlay()
+    assert reached is True
+
+
 def test_email_selector(monkeypatch):
     from common.email import ConsoleEmailSender, ResendEmailSender, get_email_sender
 
