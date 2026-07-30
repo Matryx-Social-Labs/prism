@@ -53,9 +53,6 @@ function event(over: Partial<EventDetail> = {}): EventDetail {
     available_lenses: ["reader", "cyber"],
     coverage: null,
     entities: [],
-    thread: null,
-    related: [],
-    story: { developments: [] },
     sources: [],
     perspectives: [],
     impacts: [],
@@ -199,5 +196,42 @@ describe("locked lens", () => {
       expect(screen.getByRole("button", { name: /Sign in to unlock/ })).toBeInTheDocument(),
     );
     expect(fetchBrief).not.toHaveBeenCalled();
+  });
+});
+
+describe("story timeline ownership", () => {
+  // The event page used to render StoryTimeline off story_timeline(event_id) —
+  // the LIVE partition — while /trending/[slug] renders the same arc off the
+  // story's FROZEN member_event_ids. Two member sets for one story, so the two
+  // pages could disagree about which developments exist. The story page owns the
+  // arc now. This test is the boundary: it fails the moment the event page starts
+  // rendering a timeline again, even from a payload that still carries one.
+  const STORY_WITH_SIBLINGS = {
+    developments: [
+      { id: "e0", title: "How it started", sector: null, occurred_at: "2026-06-28T00:00:00Z", image_url: null, is_current: false, why: null },
+      { id: "e1", title: "A story", sector: null, occurred_at: "2026-07-01T00:00:00Z", image_url: null, is_current: true, why: null },
+    ],
+    cast: ["Someone"],
+  };
+
+  it("renders no timeline even when the payload carries sibling developments", async () => {
+    // Passed through the cast, so a server still emitting `story` cannot revive
+    // the section by accident — the component has to ignore it.
+    render(<StoryView event={event({ story: STORY_WITH_SIBLINGS } as unknown as Partial<EventDetail>)} />);
+    // Wait for a real render before asserting an absence, or this passes vacuously.
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
+
+    expect(screen.queryByText("The story so far")).not.toBeInTheDocument();
+    expect(screen.queryByText("How it started")).not.toBeInTheDocument();
+    expect(document.getElementById("story-so-far")).toBeNull();
+  });
+
+  it("keeps the section out of the mobile anchor nav", async () => {
+    render(<StoryView event={event({ story: STORY_WITH_SIBLINGS } as unknown as Partial<EventDetail>)} />);
+    expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
+
+    // Sources still anchors, so the nav itself is proven to render.
+    expect(mobile().getByRole("link", { name: /Sources/ })).toBeInTheDocument();
+    expect(mobile().queryByRole("link", { name: /The story so far/ })).not.toBeInTheDocument();
   });
 });

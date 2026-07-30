@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.1] - 2026-07-30
+
+### Fixed
+- **One story, one timeline.** The event page and the story page each rendered
+  "the story so far", but computed it from different member sets: the event route
+  called `story_timeline(event_id)` against the LIVE partition, while
+  `/trending/{slug}` builds the same arc from the story's FROZEN
+  `member_event_ids`. The two could legitimately disagree about which
+  developments exist. The arc belongs to the story, so the story page owns it and
+  `GET /api/v1/events/{id}` no longer returns `story` at all — which also takes a
+  Redis lookup and a partition/BFS assembly off the most-viewed route.
+
+### Removed
+- `EventDetail.thread` and `EventDetail.related`. The timeline superseded both in
+  0.0.65 and no component ever read them. `fetch_thread` / `related_developments`
+  stay in `correlation/threads.py` — still tested, still useful to the graph work.
+
 ## [0.0.81.0] - 2026-07-29
 
 ### Fixed
