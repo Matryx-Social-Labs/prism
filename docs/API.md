@@ -128,18 +128,23 @@ never breaks. `404` if the slug is unknown.
 ## Story (event) view
 
 ### `GET /api/v1/events/{event_id}` → `EventDetail`
-The full story: header, coverage, entities, the canonical story timeline, sources,
-perspectives (Both Sides), and impacts (So What).
+One event: header, coverage, entities, sources, perspectives (Both Sides), and
+impacts (So What).
 ```
 id, title, summary, sector, subsector, image_url, regions[], occurred_at,
 last_updated_at, projection{}, lens_briefs{lens:text}, lens_points{lens:[…]},
 available_lenses[], coverage{}, entities[{name,entity_type,role}],
-thread{upstream[],downstream[]}, related[], story{developments[],cast[]},
 sources[SourceRef], perspectives[PerspectiveOut], impacts[ImpactOut]
 ```
-`story.developments[]` = the same canonical timeline shown on every development of
-the story (see [STORY-GRAPH.md](./STORY-GRAPH.md#the-story-timeline)). `sources[]`
-carry `stance` and `funding` (`state`/`public`/null) for outlet-transparency chips.
+**No story timeline here.** The arc belongs to
+[`GET /api/v1/trending/{slug}`](#get-apiv1trendingslug--trendingstorydetail), which builds it from the
+story's *frozen* `member_event_ids`. This route used to serve the same arc from the
+*live* partition, so one story could present two different development sets
+depending on which page you opened. `thread`/`related` went with it — the timeline
+superseded them and nothing ever read them.
+
+`sources[]` carry `stance` and `funding` (`state`/`public`/null) for
+outlet-transparency chips.
 
 ### `GET /api/v1/events/{event_id}/brief?lens=<lens>` → `BriefResponse`
 The on-demand, per-lens re-read of the story. Generated once and cached on the

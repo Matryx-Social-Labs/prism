@@ -70,8 +70,16 @@ transfer, the Mumbai solidarity protest, the parliamentary walkout, all one
 protest story. `correlation/threads.py::story_timeline(event_id)` computes, on
 read (cached 300s in Redis), the connected component of the seed event over a
 graph of **shared-actor edges**, then splits it into topical sub-stories by
-community detection. The same timeline is shown on every development of the story,
-so navigating between developments never collapses the view.
+community detection.
+
+**Only the story page serves this arc.** `GET /api/v1/trending/{slug}` builds it
+with the sibling `story_timeline_from_members(...)` over the story's *frozen*
+`member_event_ids`; the event detail route used to serve it too, via
+`story_timeline(event_id)` over the *live* partition. Two member sets for one
+story means the two pages could legitimately disagree about which developments
+exist — so the arc has one owner now, and `GET /api/v1/events/{id}` returns no
+timeline at all. `story_timeline(event_id)` remains the primitive the partition
+work and its tests are written against.
 
 The edge between two events is:
 

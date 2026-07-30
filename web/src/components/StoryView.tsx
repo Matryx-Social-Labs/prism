@@ -14,7 +14,6 @@ import { ShareButton } from "@/components/ShareButton";
 import { StoryDesktop } from "@/components/StoryDesktop";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
-import { StoryTimeline } from "@/components/StoryTimeline";
 
 function regionName(code: string): string {
   try {
@@ -189,7 +188,6 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   // ── "On this story" section nav ────────────────────────
   const sourceCount = event.sources.length;
-  const storyCount = event.story.developments.filter((d) => !d.is_current).length;
   const balanceText = event.coverage?.single_origin
     ? "⚠ Single-origin — one perspective only."
     : coverageEntries.length > 0
@@ -198,7 +196,6 @@ export function StoryView({ event }: { event: EventDetail }) {
   const navItems: { id: string; label: string; count?: number }[] = [
     { id: "lens-brief", label: "Lens brief" },
     { id: "perspectives", label: "Perspectives", count: event.perspectives.length },
-    ...(storyCount > 0 ? [{ id: "story-so-far", label: "The story so far", count: storyCount }] : []),
     { id: "what-to-expect", label: "What to expect", count: event.impacts.length },
     { id: "sources", label: "Sources", count: sourceCount },
   ];
@@ -259,7 +256,7 @@ export function StoryView({ event }: { event: EventDetail }) {
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id, storyCount]);
+  }, [event.id]);
 
   return (
     <>
@@ -806,10 +803,13 @@ export function StoryView({ event }: { event: EventDetail }) {
         )}
       </section>
 
-      {/* ── The story so far — one canonical, consistent timeline ── */}
-      <div id="story-so-far" className="scroll-mt-24">
-        <StoryTimeline story={event.story} />
-      </div>
+      {/* The story timeline used to render here too, off story_timeline(event_id)
+          — the LIVE partition — while /trending/[slug] renders the same timeline
+          off the story's FROZEN member_event_ids. Two member sets, one story, so
+          the two pages could legitimately disagree about which developments
+          exist. The arc belongs to the story, so the story page owns it and this
+          page stops asking. That also drops a Redis lookup plus a BFS assembly
+          from the most-viewed route. */}
 
       {/* ── What to expect ─────────────────────────────────── */}
       <section id="what-to-expect" className="mt-11 scroll-mt-24">

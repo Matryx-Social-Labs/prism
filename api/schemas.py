@@ -120,12 +120,11 @@ class EventDetail(BaseModel):
     available_lenses: list[str]
     coverage: CoverageOut | None
     entities: list[EntityOut]
-    thread: dict  # {"upstream": [...], "downstream": [...]} of linked events
-    related: list[dict] = []  # story branches — events sharing >=2 entities [{id,title,last_updated_at,shared}]
-    # Canonical story timeline: {"developments": [{id,title,sector,occurred_at,image_url,
-    # is_current,why}], "cast": [names]} — the same for every development of the story.
-    # Supersedes thread+related once the StoryTimeline component ships (PR 2).
-    story: dict = {"developments": [], "cast": []}
+    # No story timeline here. GET /trending/{slug} owns the arc and builds it from
+    # the story's FROZEN member_event_ids; this route would have built the same arc
+    # from the LIVE partition, so the two could disagree about which developments
+    # exist. One owner, no divergence. thread/related went with it — the timeline
+    # superseded them and nothing ever read them.
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]

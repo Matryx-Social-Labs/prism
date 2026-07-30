@@ -63,17 +63,6 @@ export interface EntityOut {
   role: string;
 }
 
-export interface ThreadNodeOut {
-  event_id: string;
-  title: string;
-  sector: string | null;
-  occurred_at: string | null;
-  relation: string;
-  rationale: string | null;
-  confidence: number | null;
-  image_url: string | null;
-}
-
 export interface PerspectiveOut {
   label: string;
   stance: string | null;
@@ -138,9 +127,7 @@ export interface EventDetail {
   available_lenses: string[];
   coverage: CoverageOut | null;
   entities: EntityOut[];
-  thread: { upstream: ThreadNodeOut[]; downstream: ThreadNodeOut[] };
-  related: { id: string; title: string; last_updated_at: string; shared: number }[];
-  story: StoryTimelineData;
+  // No `story` here: /trending/[slug] owns the timeline. See api/schemas.py.
   projection: {
     event_type?: string | null;
     source_count?: number;

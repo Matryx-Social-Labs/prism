@@ -30,7 +30,6 @@ from common.lenses import LENSES
 from common.locks import single_flight
 from common.logging import get_logger
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
-from correlation.threads import fetch_thread, related_developments, story_timeline
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -119,13 +118,10 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         )
     ).mappings().all()
 
-    thread = await fetch_thread(event_id)
-    related = await related_developments(event_id)
-    # Canonical story timeline (consistent across every development); added
-    # alongside thread+related so the current UI keeps working until the
-    # StoryTimeline component replaces both.
-    story = await story_timeline(event_id)
-
+    # No story_timeline() call here: the arc belongs to /trending/{slug}, which
+    # builds it from the story's frozen member set. Serving it from here as well
+    # meant two member sets for one story. Dropping it also takes a Redis lookup
+    # and a partition/BFS assembly off the most-viewed route.
     projection = event["projection"] or {}
     return EventDetail(
         id=str(event["id"]),
@@ -145,9 +141,6 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         entities=[
             EntityOut(name=e["name"], entity_type=e["entity_type"], role=e["role"]) for e in entities
         ],
-        thread=thread,
-        related=related,
-        story=story,
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),
