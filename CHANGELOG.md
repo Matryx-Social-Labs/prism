@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.4] - 2026-07-30
+
+### Fixed
+- **A party is one entity, not two.** Outlets mix "BJP" with "Bharatiya Janata
+  Party" freely, often inside a single article, and the two were separate rows:
+  measured on production, bjp 176 articles vs bharatiya-janata-party 234, cjp 54 vs
+  cockroach-janata-party 430, plus dmk/nda/tvk and three singular-plural org pairs.
+  Each half carried half the document frequency, so the matcher's 1/df weighting
+  scored a national fixture as twice as distinctive as it is — the opposite of what
+  the IDF weighting exists to do. Folded by hand in `common/entity_aliases.py`.
+- Folded by hand and NOT by an initialism rule, deliberately: in this corpus "BRS"
+  initialises both Bharat Rashtra Samithi and the Boston Red Sox, and "CJP" also
+  initialises four other organisations. A regression test asserts brs stays unfolded.
+
 ## [0.0.81.3] - 2026-07-30
 
 ### Added
