@@ -11,6 +11,26 @@ meaningless (almost everything here is over-merged, so recall starts near 1.0);
 B-cubed PRECISION, macro purity, and the cluster count are the numbers to watch.
 A random-sample set is still needed before anyone claims a headline F1.
 
+THE SCORE OF 0.29 PRECISION IS NOT A SCORE OF THE CURRENT MATCHER. Read this
+before using these labels to justify a change.
+
+    tools/score_clustering  (production as STORED)    P=0.2908  purity=0.4842   6 clusters
+    tools/scratch --score   (today's find_event)      P=0.8017  purity=0.9223  71 clusters
+
+Same 171 articles, same labels. The difference is that production's rows were
+written by code predating the 0.0.79-81 fixes — the embedding script gate, the
+article_entities corroboration rule, IDF weighting, entity alias folding. Replayed
+through today's matcher those six events become 76, and 110 of the 171 articles
+rejoin a story that already exists.
+
+So the over-merge these labels were built to measure is HISTORICAL DAMAGE, not a
+live defect, and the fix for it is a re-clustering pass over old rows rather than a
+new rule. Today's matcher errs the other way: 71 clusters against 56 real events is
+mild FRAGMENTATION. Any change tuned to raise precision here — a tighter window, a
+higher similarity floor — pushes the live failure mode further in the direction it
+is already wrong. Measure with scratch --score, not score_clustering, before
+touching correlation/clustering.py.
+
 Some labels span predicted events on purpose. `courts-police-action` appears in
 both event 1 and event 6, `kangana-row` in events 1 and 2, `kharge-shah` in 1 and
 2. Those are real FRAGMENTATION — the same story split across clusters — and they

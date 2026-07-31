@@ -233,9 +233,58 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id) -> dict:
     return placed, created
 
 
+async def _score_replay(prod: asyncpg.Connection, runs: list) -> None:
+    """Score what the replay produced against the hand labels.
+
+    Without this the replay prints cluster SIZES, which is a reading exercise —
+    exactly the thing that cost a revert in 0.0.80.5. The replay is the only
+    harness that exercises the article-to-EVENT shape, the full cascade and greedy
+    first-match together, so it is the only place a candidate rule can be honestly
+    judged before it writes anything.
+
+    Gold labels are positional, so they are resolved through the same ordering the
+    labelling used (tools/score_clustering.fetch_membership), never by re-deriving
+    an index here.
+    """
+    from correlation.cluster_metrics import score
+    from tools.gold_labels import GOLD
+    from tools.score_clustering import fetch_membership
+
+    by_event = await fetch_membership(prod)
+    gold: dict[str, str] = {}
+    for eid, rows in by_event.items():
+        labels = GOLD[eid[:8]]
+        if len(rows) != len(labels):
+            print(f"  !! {eid[:8]} drifted ({len(rows)} vs {len(labels)} labelled) — skipped")
+            continue
+        for i, r in enumerate(rows):
+            gold[str(r["aid"])] = labels[i]
+
+    predicted = {
+        str(m["aid"]): cluster
+        for _t, placed, _created in runs
+        for cluster, members in placed.items()
+        for m in members
+    }
+    scored = {k: v for k, v in predicted.items() if k in gold}
+    if not scored:
+        print("\n  nothing scoreable — no replayed article carries a gold label")
+        return
+
+    s = score(scored, gold)
+    print(f"\n  ── replay scored against {len(gold)} hand labels ──")
+    print(f"     B3 precision  {s.b3_precision:.4f}   <- the over-merge number")
+    print(f"     B3 recall     {s.b3_recall:.4f}")
+    print(f"     macro purity  {s.macro_purity:.4f}")
+    print(f"     clusters      {s.predicted_clusters} vs {s.gold_clusters} gold   (n={s.items})")
+    print("     production baseline for the same slice: P=0.2908 purity=0.4842 clusters=6")
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--event", help="replay a single event id")
+    ap.add_argument("--score", action="store_true",
+                    help="score the replay against tools/gold_labels instead of just printing sizes")
     ap.add_argument("--plan", metavar="FILE", help="write the membership moves as a reviewable plan")
     ap.add_argument("--apply-plan", metavar="FILE", dest="apply_plan", help="execute a plan")
     ap.add_argument("--yes", action="store_true", help="WRITE. Without it, --apply-plan validates only.")
@@ -297,6 +346,9 @@ async def main() -> None:
                 for _k, v in list(rejoined.items())[:4]:
                     print(f"      [{len(v)}] {(v[0]['title'] or '')[:50]}")
         # Resolve inheritance ACROSS all targets, not per target. An event created
+        if a.score:
+            await _score_replay(prod, runs)
+
         # while replaying target A can be rejoined while replaying target B, so a
         # per-target remap would leave B's moves pointing at an id A had already
         # renamed. Decide every destination once, here, then emit.
