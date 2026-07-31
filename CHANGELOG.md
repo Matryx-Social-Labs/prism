@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.11] - 2026-07-31
+
+### Added
+- `tools/scratch --min-members N --written-before DATE`, so the repair sweep is a
+  parameterised operation rather than a hardcoded threshold of 20.
+- The target query now **excludes CVE records**. They are one-event-per-CVE by
+  construction (`find_event` returns early on `cve_record`), so replaying them can
+  only reproduce what is already there — 12,788 of 16,732 events for no possible
+  change. This is the difference between a sweep of 252 events and one of 13,040.
+
+### Measured
+- The corpus is **not** broadly fragmented, which the raw ratio suggested. Split by
+  kind: CVE 12,788 events / 12,802 articles (1.001 per event, correct by design)
+  versus news 3,962 events / 5,830 articles (1.471). Near-identical titles sitting
+  in different events over six days: 12 pairs, **all CVEs, all correctly separate**.
+
 ## [0.0.81.10] - 2026-07-31
 
 ### Fixed

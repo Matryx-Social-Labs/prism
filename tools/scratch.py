@@ -33,6 +33,7 @@ import os
 import re
 import subprocess
 import uuid
+from datetime import UTC, datetime
 
 import asyncpg
 from sqlalchemy import text as sa_text
@@ -275,6 +276,15 @@ async def main() -> None:
     ap.add_argument("--event", help="replay a single event id")
     ap.add_argument("--score", action="store_true",
                     help="score the replay against tools/gold_labels instead of just printing sizes")
+    ap.add_argument("--min-members", type=int, default=OVER_MERGE_MIN, dest="min_members",
+                    help=f"replay events holding at least this many articles (default {OVER_MERGE_MIN})")
+    # Parsed here, not in the query: asyncpg binds by inferred type and rejects a
+    # str for a timestamptz parameter regardless of the CAST around it.
+    ap.add_argument("--written-before", dest="written_before", metavar="DATE",
+                    type=lambda s: datetime.fromisoformat(s).replace(tzinfo=UTC),
+                    help="only events whose FIRST membership predates this — i.e. rows written by "
+                         "older code. The 0.0.79-81 fixes landed 2026-07-29; events written after "
+                         "that already went through today's matcher and replaying them is a no-op.")
     ap.add_argument("--plan", metavar="FILE", help="write the membership moves as a reviewable plan")
     ap.add_argument("--apply-plan", metavar="FILE", dest="apply_plan", help="execute a plan")
     ap.add_argument("--yes", action="store_true", help="WRITE. Without it, --apply-plan validates only.")
@@ -299,11 +309,28 @@ async def main() -> None:
         if a.event:
             targets = [uuid.UUID(a.event)]
         else:
+            # CVE records are excluded, always. They are one-event-per-CVE by
+            # construction (find_event returns early on cve_record), so replaying
+            # them can only ever reproduce what is already there — 12,788 of the
+            # 16,732 events, for no possible change. Filtering them here is the
+            # difference between a sweep of 252 events and one of 13,040.
             targets = [
                 r["event_id"] for r in await prod.fetch(
-                    """SELECT em.event_id FROM event_memberships em GROUP BY 1
-                       HAVING count(*) >= $1 ORDER BY count(*) DESC""", OVER_MERGE_MIN)
+                    """SELECT em.event_id
+                       FROM event_memberships em
+                       JOIN articles ar ON ar.id = em.article_id
+                       JOIN raw_items ri ON ri.id = ar.raw_item_id
+                       JOIN sources s ON s.id = ri.source_id
+                       WHERE NOT (s.slug IN ('nvd', 'kev', 'cisa') OR ri.title ~ '^CVE-')
+                       GROUP BY em.event_id
+                       HAVING count(*) >= $1
+                          AND (CAST($2 AS timestamptz) IS NULL
+                               OR min(em.created_at) < CAST($2 AS timestamptz))
+                       ORDER BY count(*) DESC""",
+                    a.min_members, a.written_before)
             ]
+        print(f"targets: {len(targets)} event(s) with >= {a.min_members} articles"
+              + (f", first written before {a.written_before}" if a.written_before else ""))
         await build_scratch(prod, local, targets)
 
         total_before = total_after = 0
