@@ -279,6 +279,18 @@ async def _match_by_entities(
                 SELECT em.event_id, ae.entity_id
                 FROM event_memberships em
                 JOIN article_entities ae ON ae.article_id = em.article_id
+                -- Only THIS article's actors can survive the join below
+                -- (ee.entity_id = d.id), so restricting here is exactly
+                -- equivalent: the aggregate is already grouped BY entity_id, and
+                -- filtering rows by entity_id cannot change a count within a
+                -- group keyed on it.
+                --
+                -- Without it Postgres has no parameterised path into the
+                -- aggregate, so it materialises (event, entity) over the WHOLE
+                -- corpus on every article that reaches this path — measured on
+                -- production at 51,840 rows sorted with a 2,952 kB external merge
+                -- to disk. 273.7ms -> 5.9ms, identical output.
+                WHERE ae.entity_id IN (SELECT id FROM ent_df)
                 GROUP BY em.event_id, ae.entity_id
                 HAVING count(DISTINCT em.article_id) >= :min_articles
                     OR (SELECT count(*) FROM event_memberships m2
