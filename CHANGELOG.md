@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.9] - 2026-07-31
+
+### Added
+- `tools/scratch --score` replays the labelled articles through the real
+  `find_event` and scores the result, instead of printing cluster sizes for a
+  human to read.
+
+### Discovered
+- **The over-merge in production is historical damage, not a live defect.** Same
+  171 articles, same labels: production as stored scores B-cubed precision 0.2908,
+  purity 0.4842, 6 clusters. Replayed through today's matcher it scores **0.8017 /
+  0.9223 / 71 clusters**, with 110 of 171 articles rejoining a story that already
+  exists. The 0.29 was written by code predating the 0.0.79-81 fixes.
+- **Today's matcher errs toward fragmentation** (71 clusters against 56 real
+  events), which is the opposite failure. The `ent_cos` rule measured in 0.0.81.7
+  raises precision and tightens the window, so it would push the live failure
+  further in the direction it is already wrong. Not shipped.
+- Docstrings in `tools/gold_labels.py` and `tools/score_clustering.py` now state
+  which of the two numbers each measures, because reading 0.29 as "the algorithm is
+  broken" is what nearly caused the wrong fix to ship.
+
 ## [0.0.81.8] - 2026-07-31
 
 ### Fixed

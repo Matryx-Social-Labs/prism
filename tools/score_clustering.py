@@ -3,8 +3,19 @@
     uv run python -m tools.score_clustering
 
 Prints B-cubed, macro purity and cluster counts for the labelled slice, overall
-and per predicted cluster. Run it before and after any change to
-correlation/clustering.py so the change is argued against a number.
+and per predicted cluster.
+
+THIS SCORES THE ROWS IN PRODUCTION, NOT THE CURRENT MATCHER. Those are different
+things and confusing them will send you off building the wrong fix:
+
+    this tool        (production as STORED)   P=0.2908  purity=0.4842   6 clusters
+    scratch --score  (today's find_event)     P=0.8017  purity=0.9223  71 clusters
+
+Same articles, same labels. Production's rows were written before the 0.0.79-81
+fixes, so what this measures is accumulated historical damage. Use it to decide
+whether a REPAIR pass is worth running. To judge a change to
+correlation/clustering.py, use `tools/scratch --score`, which replays the articles
+through the real find_event.
 
 READ THE NUMBERS CORRECTLY. tools/gold_labels covers only the six largest
 production events, chosen because that is where fusion is worst. So:
