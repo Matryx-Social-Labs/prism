@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.7] - 2026-07-30
+
+### Added
+- `tools/tune_entity_rule.py` — scores candidate entity-match rules over all 14,535
+  pairs of the labelled articles in seconds, with no database writes and no
+  re-clustering. The fast loop for changing the matcher.
+
+### Measured
+- **A rule that strictly dominates the one in production.** `ent_cos >= 0.45,
+  n_shared >= 2, within 48h` versus production's
+  `sum(1/df) >= 0.15 AND (max(1/df) >= 0.1 OR n_shared >= 4)`, like for like:
+  precision 0.678 -> 0.867 (+28%), recall 0.133 -> 0.243 (+83%), wrong merges
+  39 -> 23 (-41%), Cdet 0.0475 -> 0.0385 (-19%). Better on every axis, not a trade.
+- The load-bearing change is replacing `max(1/df)` with a cosine over the full
+  log-IDF entity vector. A max rule merges on the single rarest shared actor, so
+  one coincidence carries the whole decision.
+- Contradicting the literature on this corpus: removing the `BROAD_SHARED = 4`
+  branch added in 0.0.80.5 makes things WORSE (Cdet 0.0481 vs 0.0475). It stays.
+
 ## [0.0.81.6] - 2026-07-30
 
 ### Added
