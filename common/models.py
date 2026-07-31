@@ -14,6 +14,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Text,
     UniqueConstraint,
@@ -164,7 +165,13 @@ class Event(TimestampMixin, Base):
 
 class EventMembership(TimestampMixin, Base):
     __tablename__ = "event_memberships"
-    __table_args__ = (UniqueConstraint("event_id", "article_id", name="uq_event_memberships_event_article"),)
+    # The unique constraint leads with event_id, so it cannot answer "which event
+    # holds this article?" — a b-tree only helps from its leading column. Both
+    # _match_by_url and _match_by_entities ask exactly that, per ingested article.
+    __table_args__ = (
+        UniqueConstraint("event_id", "article_id", name="uq_event_memberships_event_article"),
+        Index("ix_event_memberships_article", "article_id"),
+    )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id"), nullable=False)

@@ -3,6 +3,21 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.8] - 2026-07-31
+
+### Fixed
+- **The entity matcher stopped scanning the whole corpus per article.** Its
+  corroboration subquery had no parameterised path in, so Postgres materialised
+  (event, entity) over every membership on each ingest — measured on production at
+  51,840 rows sorted with a 2,952 kB external merge to disk. It is joined on
+  `ee.entity_id = d.id`, so only this article's actors can ever survive; pushing
+  that filter inside is exactly equivalent because the aggregate is already grouped
+  by entity_id. **273.7ms -> 5.9ms, output verified identical (193 rows = 193).**
+- Added the missing `event_memberships(article_id)` index. The table carries
+  UNIQUE(event_id, article_id), so nothing led with article_id and every "which
+  event holds this article?" lookup was a sequential scan — on the per-article path
+  in both `_match_by_url` and `_match_by_entities`.
+
 ## [0.0.81.7] - 2026-07-30
 
 ### Added
