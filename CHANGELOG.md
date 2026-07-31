@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.10] - 2026-07-31
+
+### Fixed
+- **Ran the historical re-clustering repair on production.** The six events with
+  >=20 members became 76; 110 of their 171 articles rejoined a story that already
+  existed. Measured before and after against the hand labels:
+
+      B3 precision  0.2908 -> 0.8017
+      B3 F1         0.4440 -> 0.7313
+      macro purity  0.4842 -> 0.9223
+      clusters      6      -> 71   (56 real events)
+
+  Corpus-wide: events with >=50 members 0, largest event 48 -> 30, orphaned
+  articles 0, memberships unchanged at 18,632. The replay predicted these numbers
+  exactly before anything was written.
+- Gold labels are now keyed by **article id** rather than by position. The
+  positional version broke the instant the repair moved articles between events —
+  the scorer correctly refused to score rather than misaligning, but ground truth
+  about an article belongs to the article, and nothing that re-clusters should be
+  able to invalidate it.
+
 ## [0.0.81.9] - 2026-07-31
 
 ### Added
