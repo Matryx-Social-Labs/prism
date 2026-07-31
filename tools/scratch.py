@@ -242,23 +242,13 @@ async def _score_replay(prod: asyncpg.Connection, runs: list) -> None:
     first-match together, so it is the only place a candidate rule can be honestly
     judged before it writes anything.
 
-    Gold labels are positional, so they are resolved through the same ordering the
-    labelling used (tools/score_clustering.fetch_membership), never by re-deriving
-    an index here.
+    Gold labels are keyed by article id, so they survive the very repairs this
+    tool exists to plan — an earlier positional version broke the first time one ran.
     """
     from correlation.cluster_metrics import score
     from tools.gold_labels import GOLD
-    from tools.score_clustering import fetch_membership
 
-    by_event = await fetch_membership(prod)
-    gold: dict[str, str] = {}
-    for eid, rows in by_event.items():
-        labels = GOLD[eid[:8]]
-        if len(rows) != len(labels):
-            print(f"  !! {eid[:8]} drifted ({len(rows)} vs {len(labels)} labelled) — skipped")
-            continue
-        for i, r in enumerate(rows):
-            gold[str(r["aid"])] = labels[i]
+    gold = GOLD
 
     predicted = {
         str(m["aid"]): cluster
