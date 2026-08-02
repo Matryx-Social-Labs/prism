@@ -70,6 +70,41 @@ to apply it — as a gate on the weakest path (entity overlap) rather than globa
 Answering that needs a per-path breakdown this file does not yet carry. Do not
 guess it; measure it.
 
+PAIRWISE MEASUREMENT SYSTEMATICALLY OVER-PREDICTS THE VALUE OF TIGHTENING. This
+is the most expensive lesson these labels have taught and it is worth reading
+before proposing anything measured on them.
+
+A headline-agreement gate on the entity_overlap path was built on exactly this
+data. The attribution was sound: entity_overlap made 22 of the 25 wrong merges at
+precision 0.353, while title_time and embedding were 4/4 and url_exact 0.870. The
+gate was fitted on the train half, frozen, and measured once on the held-out half:
+
+    production        P=0.629  R=0.667  F1=0.647  Cdet=0.260   13 wrong merges
+    with the gate     P=0.833  R=0.606  F1=0.702  Cdet=0.120    4 wrong merges
+
+Then it was replayed through the REAL matcher over 1,428 articles, and it lost:
+
+                            without gate      with gate
+    clusters (41 gold)           40               80
+    B-cubed recall             0.8227           0.5178
+    articles rejoining a
+      story that exists          346              124
+    events from 1,428 arts       687              903
+
+Predicted recall cost: 9%. Actual: 37%. Four times worse, and it took cluster
+count from near-perfect to double.
+
+The cause is compounding, which pairwise scoring cannot see because it has no
+state: every rejected merge starts a NEW event, that event becomes a smaller,
+wrong candidate for the next article, and the story shatters. A pair scored in
+isolation always looks like an independent decision. In a greedy cascade it never
+is.
+
+So: any change measured here must be replayed with `tools/scratch --score` before
+it is believed. Three changes have now been killed at a higher fidelity level than
+the one that endorsed them (proportional corroboration by data, the article-to-
+event cosine by review, this gate by replay). The pattern is not bad luck.
+
 Labelling honesty: 3-4 of the 156 are genuine judgement calls (the Bhogapuram
 inauguration build-up, the cricket vice-captaincy story). A second annotator would
 differ on those. Do not quote 0.613 to three decimals.
