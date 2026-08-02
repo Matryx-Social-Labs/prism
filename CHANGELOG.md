@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.16] - 2026-07-31
+
+### Fixed
+- A repair target now always keeps its **founding article**, so no event is ever
+  left holding nothing. At 6 targets this never came up; at 252 it hit 14 events
+  and the rehearsal refused the whole plan.
+- Deleting those rows was the obvious fix and would have been wrong. Traced on
+  production, the 14 are referenced by 17 `perspectives` and 27 `impacts` whose
+  foreign keys are `ON DELETE NO ACTION` (the delete simply fails), by 2 stories as
+  `hero_event_id`, and by **308 stories inside `stories.member_event_ids` — a jsonb
+  array with no foreign key, so nothing cascades** and 308 storylines would have
+  silently pointed at events that no longer existed.
+
+### Changed
+- **Ran the wider repair sweep on production.** 252 over-merged news events became
+  687; 240 events created, 664 memberships moved, 45 retitled, 616 casts rebuilt.
+  Verified after: 0 empty events, 0 orphaned articles, **0 stories with a dangling
+  member_event_id**, memberships unchanged at 18,632, no event above 50 members.
+  On the labelled slice B-cubed precision 0.8017 -> 0.8341 and macro purity
+  0.9223 -> 0.9347.
+
 ## [0.0.81.15] - 2026-07-31
 
 ### Measured (and NOT shipped)
