@@ -3,6 +3,29 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.13] - 2026-07-31
+
+### Added
+- `tools/gold_pairs.py` — 156 hand-labelled same-event judgements over a **uniformly
+  random** sample of 25 news articles, each surrounded by a deliberately over-broad
+  candidate net. The counterpart to `gold_labels`, which covers only the six largest
+  events and therefore cannot support a corpus-level claim.
+
+### Measured
+- On an unbiased sample, production scores **pairwise precision 0.613, recall
+  0.679**. Over-merge (12 wrong merges) still slightly outweighs under-merge (9
+  misses) — correcting the conclusion drawn from the biased slice, which had
+  suggested fragmentation was now the dominant failure.
+- **Pair completeness is 100%**: all 28 true pairs appeared in the candidate net.
+  The matcher sees every sibling it fails to merge, so candidate generation is not
+  the defect and blocking/LSH would buy nothing. That deletes a planned workstream.
+- **A threshold tuned on the biased slice does not transfer.** An IDF-weighted title
+  word-cosine picks 0.12 there and scores F1 0.427 on the random sample — worse than
+  the cascade it would replace. The two sets have different negative distributions.
+  Tuned on the random sample the same feature reaches F1 0.739, but that is fitted
+  and evaluated on the same 156 pairs and is therefore optimistic. The set needs to
+  grow before it can honestly do both jobs.
+
 ## [0.0.81.12] - 2026-07-31
 
 ### Fixed
