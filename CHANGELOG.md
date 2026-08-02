@@ -3,6 +3,28 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.14] - 2026-07-31
+
+### Added
+- A second independent random batch in `tools/gold_pairs` — 35 more uniformly
+  sampled seeds, 242 more labelled pairs. **398 pairs, 61 positive** total.
+- The two batches agree closely (P 0.613/0.629, R 0.679/0.667), which is the best
+  available evidence that the sample is representative, and it makes batch 1 a
+  legitimate train half and batch 2 a legitimate test half.
+
+### Measured
+- **First honestly-validated improvement.** An IDF-weighted word cosine over titles
+  — not production's character trigrams — fitted on batch 1, frozen at 0.39, tested
+  on batch 2: fit F1 0.723, test 0.692. A small gap, so it transfers. The same
+  feature tuned on the biased slice scored 0.427 here.
+- Against production on held-out data: `P 0.629 -> 0.944`, and **intersecting the
+  two makes zero false merges in 242 pairs**, eliminating all thirteen of
+  production's. By detection cost (a wrong merge weighted 4x a missed one) intersect
+  scores 0.074 and cosine-alone 0.083, against production's 0.260.
+- But the signals are largely redundant — the cosine uniquely catches 2 true pairs
+  where production uniquely catches 7. It is a CONFIRMING signal, not new recall,
+  and where to apply it needs a per-path breakdown that does not exist yet.
+
 ## [0.0.81.13] - 2026-07-31
 
 ### Added

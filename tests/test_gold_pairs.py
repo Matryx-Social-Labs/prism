@@ -11,8 +11,8 @@ from tools.gold_pairs import GOLD_PAIRS, pair_count, positive_count
 
 
 def test_counts_match_what_was_labelled():
-    assert pair_count() == 156
-    assert positive_count() == 28
+    assert pair_count() == 398
+    assert positive_count() == 61
 
 
 def test_keys_are_article_uuid_pairs():
@@ -37,11 +37,11 @@ def test_the_positive_rate_is_what_the_measurements_assumed():
     against this base rate; if the labels change, those numbers are stale and the
     docstring needs rewriting rather than the test relaxing."""
     rate = positive_count() / pair_count()
-    assert 0.17 < rate < 0.19
+    assert 0.14 < rate < 0.17
 
 
 def test_seeds_are_a_real_sample_not_a_handful():
     """The whole point of this set is that it is uniformly sampled. If it collapsed
     to a couple of seeds it would be as biased as the set it exists to correct."""
     seeds = {a for a, _ in GOLD_PAIRS}
-    assert len(seeds) >= 20, "too few distinct seed articles to call this a sample"
+    assert len(seeds) >= 55, "too few distinct seed articles to call this a sample"
