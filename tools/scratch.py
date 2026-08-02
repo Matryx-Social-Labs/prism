@@ -431,6 +431,37 @@ async def main() -> None:
                         {"article_id": str(m["aid"]), "from_event_id": str(t), "to_event_id": dest}
                     )
 
+        # An event must never be left holding nothing. At 6 targets this never
+        # happened; at 252 it happened to 14, and the rehearsal refused the whole
+        # plan for it — correctly, because an emptied event ROW survives and keeps
+        # appearing in feeds and trending with nothing behind it.
+        #
+        # Deleting those rows is not the fix. Traced on production, the 14 are
+        # referenced by 17 perspectives and 27 impacts whose foreign keys are ON
+        # DELETE NO ACTION (so the delete fails), by 2 stories as hero_event_id,
+        # and by 308 stories inside stories.member_event_ids — a jsonb array with
+        # no foreign key at all, so nothing would cascade and 308 storylines would
+        # silently point at an event that no longer exists.
+        #
+        # So the target keeps its FOUNDING article instead. The founder is what the
+        # event's title and embedding were copied from, so an event retaining it
+        # still describes what it holds; it just becomes a single-article event.
+        # That is a deliberate, bounded inaccuracy — the founder may have had a
+        # better home — traded for referential integrity across five tables.
+        by_target: dict[str, list] = {}
+        for mv in plan["moves"]:
+            by_target.setdefault(mv["from_event_id"], []).append(mv)
+        kept_founders = 0
+        for tgt, mvs in by_target.items():
+            if any(mv["to_event_id"] == tgt for mv in mvs):
+                continue  # something already stays behind
+            founder = mvs[0]  # moves are emitted in arrival order; [0] founded it
+            plan["moves"] = [mv for mv in plan["moves"] if mv is not founder]
+            kept_founders += 1
+        if kept_founders:
+            print(f"\n  kept the founding article in {kept_founders} event(s) that would"
+                  f" otherwise have been emptied (see the comment in tools/scratch.py)")
+
         if orphaned_identity:
             print(f"\n  NOTE: {len(orphaned_identity)} event(s) whose founding article moved to a"
                   f" different existing story; their title will describe an article they no"
