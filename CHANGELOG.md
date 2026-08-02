@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.15] - 2026-07-31
+
+### Measured (and NOT shipped)
+- A headline-agreement gate on the `entity_overlap` path was built, tested and then
+  **discarded**. On held-out pairs it looked like a clear win — precision
+  0.629 -> 0.833, wrong merges 13 -> 4, Cdet 0.260 -> 0.120. Replayed through the
+  real matcher over 1,428 articles it lost badly:
+
+      clusters (41 gold)        40  ->  80
+      B-cubed recall        0.8227  ->  0.5178
+      articles rejoining a
+        story that exists      346  ->  124
+
+  Predicted recall cost 9%; actual 37%. It took cluster count from near-perfect to
+  double.
+- The cause is compounding, which pairwise scoring cannot see because it has no
+  state: every rejected merge starts a NEW event, that event becomes a smaller
+  wrong candidate for the next article, and the story shatters. Recorded in
+  `tools/gold_pairs` so the next person measuring on those labels reads it first.
+
 ## [0.0.81.14] - 2026-07-31
 
 ### Added
