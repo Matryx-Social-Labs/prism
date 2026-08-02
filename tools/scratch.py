@@ -518,9 +518,17 @@ async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
 
     try:
       async with prod.transaction():
+        # executemany, not a loop of execute: each execute is a round trip, and at
+        # ~1,000 of them over the Railway public proxy the transaction stays open
+        # for minutes and the proxy drops the connection mid-flight
+        # (InterfaceError: the underlying connection is closed). asyncpg pipelines
+        # executemany into a handful of round trips, inside the same transaction,
+        # so this stays all-or-nothing — which is the property worth keeping. A
+        # half-applied repair is worse than either end state.
+        #
         # 1. the new events, titled and vectorised from their founding article
-        for c in creates.values():
-            await prod.execute(
+        if creates:
+            await prod.executemany(
                 """INSERT INTO events (id, title, summary, sector, subsector, regions,
                                        occurred_at, embedding, last_updated_at)
                    SELECT $1::uuid, ri.title, e.summary,
@@ -534,17 +542,17 @@ async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
                    LEFT JOIN LATERAL (SELECT regions FROM events LIMIT 0) ev ON true
                    WHERE a.id = $2::uuid
                    ON CONFLICT (id) DO NOTHING""",
-                c["id"], c["founder_article_id"],
+                [(c["id"], c["founder_article_id"]) for c in creates.values()],
             )
         # 2. the memberships
-        for m in real_moves:
-            await prod.execute(
+        if real_moves:
+            await prod.executemany(
                 "UPDATE event_memberships SET event_id = $1::uuid WHERE article_id = $2::uuid",
-                m["to_event_id"], m["article_id"],
+                [(m["to_event_id"], m["article_id"]) for m in real_moves],
             )
         # 3. survivors whose founder left get the title of what they actually keep
-        for r in retitles:
-            await prod.execute(
+        if retitles:
+            await prod.executemany(
                 """UPDATE events SET title = ri.title, occurred_at = e.occurred_at,
                           embedding = ac.embedding, summary = e.summary, last_updated_at = now()
                    FROM articles a
@@ -552,7 +560,7 @@ async def apply_plan(prod: asyncpg.Connection, plan: dict, *, write: bool,
                    JOIN article_chunks ac ON ac.article_id = a.id AND ac.chunk_index = 0
                    LEFT JOIN enrichments e ON e.article_id = a.id
                    WHERE a.id = $2::uuid AND events.id = $1::uuid""",
-                r["event_id"], r["from_article_id"],
+                [(r["event_id"], r["from_article_id"]) for r in retitles],
             )
         # 4. every touched event's cast, rebuilt from the articles it now holds —
         #    an inherited actor list is exactly what made these events magnets.
