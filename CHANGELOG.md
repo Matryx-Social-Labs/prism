@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.12] - 2026-07-31
+
+### Fixed
+- `tools/scratch --apply-plan` batches its writes. It issued one round trip per
+  move — roughly 963 for a 1,428-move plan — and over the Railway public proxy the
+  transaction stayed open long enough for the connection to be dropped mid-flight.
+  `executemany` pipelines them into a handful of round trips **inside the same
+  transaction**, so the repair stays all-or-nothing. A 1,428-move rehearsal now
+  takes 30 seconds instead of timing out.
+- That fix is what let the rehearsal reach its own assertions, which then **rejected
+  the 252-event sweep**: 14 target events would have been left holding zero
+  articles while their rows survived, dangling in feeds and trending. Caught before
+  any write; the first repair had 0 of 6, so this only appears at scale.
+
 ## [0.0.81.11] - 2026-07-31
 
 ### Added
