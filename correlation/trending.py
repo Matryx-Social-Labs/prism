@@ -18,7 +18,7 @@ Reconciliation state machine (why /trending/<slug> URLs don't silently change me
     A story not refreshed by any community this pass, older than DORMANT_AFTER → status='dormant'
     (never deleted, so shared links keep resolving). Slug is frozen; only the label refines.
 
-No LLM. Labels are extractive (top cast). Persistence is EARNED: a community must clear the
+No LLM. Labels are extractive — the hero event's own headline (see _label). Persistence is EARNED: a community must clear the
 min-support gate (>= news sources + members) before it gets a durable story.
 """
 
@@ -30,7 +30,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.logging import get_logger
-from common.text import slugify
+from common.text import detect_script, slugify
 from correlation.threads import STORY_WINDOW_DAYS, _partitioned_members, _story_component
 
 logger = get_logger(__name__)
@@ -243,7 +243,13 @@ async def _community_facts(session: AsyncSession, member_ids: list[str]) -> dict
         await session.execute(
             text(
                 """
-                SELECT e.id, e.title, e.sector, e.regions
+                SELECT e.id, e.title, e.sector, e.regions,
+                       (SELECT h->>'title'
+                        FROM jsonb_array_elements(
+                                 CASE WHEN jsonb_typeof(e.projection->'headlines') = 'array'
+                                      THEN e.projection->'headlines' ELSE '[]'::jsonb END) h
+                        WHERE h->>'lang' = 'en' AND coalesce(h->>'title', '') <> ''
+                        LIMIT 1) AS en_title
                 FROM events e
                 LEFT JOIN (SELECT event_id, count(*) c FROM event_memberships GROUP BY 1) m ON m.event_id = e.id
                 WHERE e.id = ANY(CAST(:ids AS uuid[]))
@@ -268,6 +274,7 @@ async def _community_facts(session: AsyncSession, member_ids: list[str]) -> dict
         "recent_sources": int(agg["recent_sources"] or 0),
         "hero_event_id": str(hero["id"]) if hero else None,
         "hero_title": hero["title"] if hero else None,
+        "hero_en_title": hero["en_title"] if hero else None,
         "sector": hero["sector"] if hero else None,
         "regions": sorted(regions),
     }
@@ -298,13 +305,32 @@ async def detect_trending_communities(session: AsyncSession) -> list[dict]:
     return communities
 
 
-def _label(cast: list[str], hero_title: str | None) -> str:
+def _label(cast: list[str], hero_title: str | None, hero_en_title: str | None = None) -> str:
+    """The story's headline, not its cast list.
+
+    This used to return the top three protagonists and fall back to the headline
+    only when the cast was empty — backwards. Trending read as
+    "BJP · Amit Shah · Asom Gana Parishad" where the news belonged
+    ("Assam flood toll rises: 21 killed in a day; over 5.6 lakh affected"). The
+    cast names who is involved and never says what happened, and the fallback was
+    effectively dead: 0 of 27 active stories had an empty cast.
+
+    English is preferred over the hero's own title because 5 of the 10 most
+    trending heroes carried Devanagari or Kannada headlines, and the trending page
+    is English-only — a reader there cannot read them. Cast survives as the last
+    resort for the 3-of-24 case where the hero has neither an English headline nor
+    a Latin-script title, since three readable names beat an unreadable sentence.
+    """
+    if hero_en_title:
+        return hero_en_title
+    if hero_title and detect_script(hero_title) == "latin":
+        return hero_title
     return " · ".join(cast[:3]) if cast else (hero_title or "Developing story")
 
 
 async def _create_story(session: AsyncSession, c: dict) -> str:
     sid = uuid.uuid4()
-    label = _label(c["cast"], c["hero_title"])
+    label = _label(c["cast"], c["hero_title"], c.get("hero_en_title"))
     # Slug frozen at creation: readable prefix + the id suffix guarantees uniqueness.
     slug = f"{slugify(label)[:48] or 'story'}-{sid.hex[:6]}"
     await session.execute(
@@ -324,7 +350,7 @@ async def _create_story(session: AsyncSession, c: dict) -> str:
 
 async def _update_story(session: AsyncSession, story_id: str, c: dict) -> None:
     """Refresh members/label/signal; slug + id + first_seen_at are NOT touched."""
-    label = _label(c["cast"], c["hero_title"])
+    label = _label(c["cast"], c["hero_title"], c.get("hero_en_title"))
     await session.execute(
         text(
             """

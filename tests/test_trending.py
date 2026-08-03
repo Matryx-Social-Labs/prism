@@ -1,5 +1,5 @@
-"""Trending stories: the overlap primitive, reconciliation idempotency, and the
-serving contract (scoping + the merge redirect that keeps shared links stable)."""
+"""Trending stories: the overlap primitive, story labels, reconciliation idempotency,
+and the serving contract (scoping + the merge redirect that keeps shared links stable)."""
 
 import uuid
 from datetime import UTC, datetime
@@ -14,6 +14,7 @@ from common.db import session_scope
 from correlation.trending import (
     _cast_jaccard,
     _converge_existing,
+    _label,
     _overlap,
     _same_story,
     reconcile_stories,
@@ -262,3 +263,49 @@ def _aw(value):
     async def _inner(*_a, **_k):
         return value
     return _inner()
+
+
+# --- story labels: a headline, in a script the reader can read ---------------
+
+# Verbatim from production: label as it rendered vs the hero's actual headline.
+ASSAM_CAST = ["BJP", "Amit Shah", "Asom Gana Parishad"]
+ASSAM_HEADLINE = "Assam flood toll rises: 21 killed in a day; over 5.6 lakh affected"
+HINDI_HEADLINE = "ट्रंप बोले-ईरान से दोस्ताना बातचीत चल रही है"
+KANNADA_HEADLINE = "ರಾಹುಲ್ ಸಭೆ ಅಂತ್ಯ, ಬೆಂಗಳೂರಿನತ್ತ ಡಿಕೆಶಿ"
+
+
+def test_the_headline_beats_the_cast_list():
+    """The regression. Cast names who is involved and never says what happened."""
+    assert _label(ASSAM_CAST, ASSAM_HEADLINE) == ASSAM_HEADLINE
+
+
+def test_english_headline_beats_the_heros_own_non_latin_title():
+    """5 of the 10 most-trending heroes carried Devanagari or Kannada titles while
+    an English headline sat unused in the same event's projection."""
+    assert _label(ASSAM_CAST, HINDI_HEADLINE, ASSAM_HEADLINE) == ASSAM_HEADLINE
+
+
+def test_a_latin_headline_is_used_without_a_translation():
+    """en_title is absent for events we never translated; a Latin title is already
+    readable, so it must not fall through to the cast."""
+    assert _label(ASSAM_CAST, ASSAM_HEADLINE, None) == ASSAM_HEADLINE
+
+
+def test_cast_is_the_last_resort_for_an_unreadable_headline():
+    """3 of 24 heroes had neither an English headline nor a Latin title. Three
+    readable names beat a sentence the audience cannot read."""
+    for unreadable in (HINDI_HEADLINE, KANNADA_HEADLINE):
+        assert _label(ASSAM_CAST, unreadable, None) == "BJP · Amit Shah · Asom Gana Parishad"
+
+
+def test_latin_detection_tolerates_curly_quotes_and_digits():
+    """Real headlines carry ‘smart quotes’, em-dashes and numerals — none of which
+    are ASCII. An `isascii()` check here would have dumped these to the cast list."""
+    headline = "Chambal mining crackdown facing ‘practical constraints’ — 21 held"
+    assert _label(ASSAM_CAST, headline, None) == headline
+
+
+def test_developing_story_only_when_there_is_nothing_at_all():
+    assert _label([], None, None) == "Developing story"
+    # A cast-less story with an unreadable title still shows it — never blank a card.
+    assert _label([], HINDI_HEADLINE, None) == HINDI_HEADLINE
