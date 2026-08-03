@@ -398,8 +398,29 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         event = await session.get(Event, event_id)
         if event is None:
             return
-        # Prefer a news-article summary (readable) over raw CVE text when present.
-        event.summary = summaries[-1] if summaries else event.summary
+        # The FOUNDER's summary, not the newest member's.
+        #
+        # `rows` is ordered by em.created_at, so summaries[-1] was whichever
+        # article joined most recently — while the title is copied from the
+        # founding article at creation and never changes. Those are different
+        # articles for any event with more than one member, so the headline and
+        # the summary underneath it described different pieces of news. Measured
+        # on production: 830 of 1,054 multi-member events, 79%.
+        #
+        # It is worst exactly where a reader notices. The lead story on the feed
+        # read "AAIB explains to SC why AI171 crash report is getting delayed"
+        # over a summary about a seafarer missing in the Black Sea, because one
+        # late member had wrongly merged on the shared entity "Supreme Court".
+        # One bad merge at the tail replaced the whole event's summary; the
+        # founder's own summary ("Aircraft Accident Investigation Bureau informs
+        # Supreme Court") matched its headline perfectly.
+        #
+        # Coherence beats freshness here: a headline and a summary about the same
+        # article is the product's basic promise, and a stale-but-matching summary
+        # is a far smaller defect than a mismatched one. Updating BOTH from the
+        # newest member would also be coherent, but it rewrites the headline a
+        # reader may have arrived on, which is a bigger product change than this.
+        event.summary = summaries[0] if summaries else event.summary
         event.projection = {
             "event_type": max(set(event_types), key=event_types.count) if event_types else None,
             "source_count": len(rows),
