@@ -121,3 +121,119 @@ async def test_the_summary_comes_from_the_founder_not_the_newest_member():
                 await s.execute(text("DELETE FROM raw_items WHERE id = :r"), {"r": str(raw_id)})
             await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
             await s.execute(text("DELETE FROM sources WHERE id = :s"), {"s": str(src)})
+
+
+async def test_single_origin_means_one_masthead_not_one_country():
+    """"Single-origin" warns a reader that only one newsroom is carrying this and
+    nobody has corroborated it. It was computed as `len(origins) == 1` where
+    origins are source COUNTRIES, so on an India-first feed it fired on 97% of
+    multi-article events (1,039 of 1,070) — a warning on almost everything, which
+    is a warning about nothing.
+
+    Two same-country outlets covering one story is exactly the corroboration the
+    flag exists to say is MISSING, so it must not fire there.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    eid = uuid.uuid4()
+    src_a, src_b = uuid.uuid4(), uuid.uuid4()
+    created = []
+    try:
+        async with session_scope() as s:
+            # Two DIFFERENT mastheads, same country.
+            for sid, slug, pub in ((src_a, "a", "Alpha Times"), (src_b, "b", "Beta Herald")):
+                await s.execute(
+                    text("INSERT INTO sources (id, slug, name, source_type, country, publisher) "
+                         "VALUES (:i, :s, :n, 'rss', 'IN', :p)"),
+                    {"i": str(sid), "s": f"{slug}-{eid.hex[:8]}", "n": pub, "p": pub},
+                )
+            await s.execute(
+                text("INSERT INTO events (id, title, summary, sector, regions, last_updated_at) "
+                     "VALUES (:i, :t, :su, 'politics', CAST(:r AS text[]), now())"),
+                {"i": str(eid), "t": "Flood relief operations begin",
+                 "su": "Relief operations began.", "r": ["IN"]},
+            )
+            created.append(await _add_member(
+                s, eid, title="Flood relief operations begin",
+                summary="Relief operations began.", source_id=src_a))
+            created.append(await _add_member(
+                s, eid, title="Relief teams deployed after flooding",
+                summary="Teams were deployed.", source_id=src_b))
+
+        await _rebuild_projection(eid)
+        async with session_scope() as s:
+            proj = (await s.execute(
+                text("SELECT projection FROM events WHERE id = :i"), {"i": str(eid)}
+            )).scalar_one()
+
+        cov = proj["coverage"]
+        assert cov["single_origin"] is False, (
+            "two independent mastheads corroborate each other — flagging this "
+            "single-origin is what made the warning fire on 97% of stories"
+        )
+        # The country breakdown is still reported; it just no longer drives the flag.
+        assert cov["origins"] == {"IN": 2}
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_memberships WHERE event_id = :e"), {"e": str(eid)})
+            for raw_id, art_id in created:
+                await s.execute(text("DELETE FROM enrichments WHERE article_id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM articles WHERE id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM raw_items WHERE id = :r"), {"r": str(raw_id)})
+            await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
+            await s.execute(text("DELETE FROM sources WHERE id = ANY(:ids)"),
+                            {"ids": [str(src_a), str(src_b)]})
+
+
+async def test_single_origin_DOES_fire_for_one_masthead_across_its_own_feeds():
+    """The counterpart, and the reason this counts publishers rather than source
+    slugs: The Hindu syndicates one story across six regional feeds. Six slugs,
+    one newsroom, no corroboration — the flag must still fire."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    eid = uuid.uuid4()
+    src_a, src_b = uuid.uuid4(), uuid.uuid4()
+    created = []
+    try:
+        async with session_scope() as s:
+            # Two feeds, ONE publisher — the thehindu / thehindu_kerala shape.
+            for sid, slug in ((src_a, "main"), (src_b, "kerala")):
+                await s.execute(
+                    text("INSERT INTO sources (id, slug, name, source_type, country, publisher) "
+                         "VALUES (:i, :s, :n, 'rss', 'IN', 'One Masthead')"),
+                    {"i": str(sid), "s": f"{slug}-{eid.hex[:8]}", "n": slug},
+                )
+            await s.execute(
+                text("INSERT INTO events (id, title, summary, sector, regions, last_updated_at) "
+                     "VALUES (:i, :t, :su, 'politics', CAST(:r AS text[]), now())"),
+                {"i": str(eid), "t": "Only one newsroom has this",
+                 "su": "A single newsroom reported it.", "r": ["IN"]},
+            )
+            created.append(await _add_member(
+                s, eid, title="Only one newsroom has this",
+                summary="A single newsroom reported it.", source_id=src_a))
+            created.append(await _add_member(
+                s, eid, title="Only one newsroom has this (regional edition)",
+                summary="A single newsroom reported it.", source_id=src_b))
+
+        await _rebuild_projection(eid)
+        async with session_scope() as s:
+            proj = (await s.execute(
+                text("SELECT projection FROM events WHERE id = :i"), {"i": str(eid)}
+            )).scalar_one()
+
+        assert proj["coverage"]["single_origin"] is True, (
+            "two feeds of the same masthead are not corroboration"
+        )
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_memberships WHERE event_id = :e"), {"e": str(eid)})
+            for raw_id, art_id in created:
+                await s.execute(text("DELETE FROM enrichments WHERE article_id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM articles WHERE id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM raw_items WHERE id = :r"), {"r": str(raw_id)})
+            await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
+            await s.execute(text("DELETE FROM sources WHERE id = ANY(:ids)"),
+                            {"ids": [str(src_a), str(src_b)]})
