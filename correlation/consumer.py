@@ -289,6 +289,7 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
                     """
                     SELECT e.shared_fields, e.lens_fields, e.summary, e.event_type, s.slug AS source_slug,
                            s.country AS source_country, s.language AS source_language,
+                           s.publisher AS source_publisher,
                            ri.title AS article_title, ri.published_at AS published_at,
                            ri.raw ->> 'sourcecountry' AS gdelt_country,
                            ri.classification AS classification
@@ -315,6 +316,10 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         role_interests: set[str] = set()
         origins: dict[str, int] = {}
         unknown_origins = 0
+        # Distinct MASTHEADS, which is what 'single-origin' means to a reader:
+        # one newsroom telling this, nobody corroborating it. Publisher rather
+        # than source slug so The Hindu's six regional feeds count once.
+        publishers: set[str] = set()
         languages: set[str] = set()
         best_headline: dict[str, dict] = {}  # lang -> most-recent member headline
         for row in rows:
@@ -340,6 +345,7 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
                             "published_at": pub.isoformat() if pub else None,
                             "_pub": pub,
                         }
+            publishers.add(row["source_publisher"] or row["source_slug"])
             origin = row["source_country"] or gdelt_country_to_iso(row["gdelt_country"])
             if origin:
                 origins[origin] = origins.get(origin, 0) + 1
@@ -438,7 +444,13 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             "coverage": {
                 "origins": origins,
                 "unknown": unknown_origins,
-                "single_origin": len(origins) == 1 and len(rows) >= 2,
+                # ONE MASTHEAD, not one country. This was len(origins) == 1,
+                # and origins are source COUNTRIES — so on an India-first feed
+                # it fired on 97% of multi-article events (1,039 of 1,070) and
+                # told a reader nothing. Counting publishers it fires on 57%,
+                # which is the thing worth warning about: a story only one
+                # newsroom is carrying, with no second account of it.
+                "single_origin": len(publishers) == 1 and len(rows) >= 2,
             },
             "cyber": cyber or None,
             "finance": finance or None,

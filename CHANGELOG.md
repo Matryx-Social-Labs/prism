@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.20] - 2026-08-03
+
+### Fixed
+- **"Single-origin" now means one masthead, not one country.** The flag warns a
+  reader that only one newsroom is carrying a story and nobody has corroborated
+  it — but it was computed as `len(origins) == 1` where origins are source
+  COUNTRIES. On an India-first feed that is true of almost everything: it fired on
+  **1,039 of 1,070 multi-article events (97%)**, so the warning appeared on nearly
+  every story and told a reader nothing. Counting distinct publishers it fires on
+  **612 (57%)**, which is the case actually worth flagging.
+- Publishers rather than source slugs, so The Hindu's six regional feeds count as
+  one newsroom. Two feeds of one masthead are not corroboration.
+
 ## [0.0.81.19] - 2026-08-03
 
 ### Fixed
