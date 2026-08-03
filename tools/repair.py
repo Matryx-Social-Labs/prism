@@ -115,7 +115,18 @@ _ENTITY_RE = re.compile(r"&(?:amp|quot|nbsp|lt|gt|#0?39|#x27|#8217|#\d+);", re.I
 async def report_titles(c: asyncpg.Connection) -> list[tuple]:
     print(f"\n{'='*74}\nTITLES / SUMMARIES with HTML entities\n{'='*74}")
     fixes = []
-    for table, col in (("events", "title"), ("events", "summary"), ("stories", "label")):
+    # raw_items.title is the SOURCE. Fixing only the derived copies is why this
+    # defect came back: 119 raw_items still carried escapes from before the
+    # clean_text choke point existed, and the 0.0.81.16 repair copied one straight
+    # into a new event's title on 2026-08-02 — `INSERT INTO events ... SELECT
+    # ri.title` in tools/scratch.py takes it verbatim. Clean the source and every
+    # future copy is clean; clean only the copies and the next repair reintroduces it.
+    for table, col in (
+        ("raw_items", "title"),
+        ("events", "title"),
+        ("events", "summary"),
+        ("stories", "label"),
+    ):
         rows = await c.fetch(
             f"SELECT id, {col} v FROM {table} WHERE {col} ~ '&(amp|quot|nbsp|lt|gt|#[0-9a-fA-F]+);'"
         )
