@@ -33,9 +33,10 @@ def test_no_pair_is_labelled_twice_in_either_direction():
 
 
 def test_the_positive_rate_is_what_the_measurements_assumed():
-    """18% positives. Every precision/recall figure in the docstring is computed
-    against this base rate; if the labels change, those numbers are stale and the
-    docstring needs rewriting rather than the test relaxing."""
+    """15.3% positives (61 of 398). Every precision/recall figure in the module
+    docstring is computed against this base rate; if the labels change, those
+    numbers are stale and the docstring needs rewriting rather than this test
+    relaxing to accommodate them."""
     rate = positive_count() / pair_count()
     assert 0.14 < rate < 0.17
 

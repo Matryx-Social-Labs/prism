@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.17] - 2026-08-03
+
+### Fixed
+- `test_the_positive_rate_is_what_the_measurements_assumed` claimed 18% positives in
+  its docstring while asserting 14-17%. The set grew from 156 pairs to 398 in
+  0.0.81.14 and the rate moved to 15.3% (61 of 398); the assertion was updated then
+  and the prose was not. A test whose docstring disagrees with its assertion is
+  worse than an undocumented one, because the docstring is what gets believed.
+
+### Operations
+- **Ingestion re-enabled** (`PRISM_INGESTION_ENABLED=true`). It had been off since
+  2026-07-30 while the clustering was repaired, leaving the feed serving news
+  almost four days stale. Safe to resume now: replayed over 1,428 articles the
+  current matcher produces 40 clusters against 41 real events, and
+  `PRISM_VETO_ENABLED` stays false so the hourly LLM pass cannot burn credits for a
+  refinement that reached a reader roughly never.
+
 ## [0.0.81.16] - 2026-07-31
 
 ### Fixed
