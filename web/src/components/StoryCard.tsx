@@ -1,5 +1,6 @@
 "use client";
 
+import { newsTime } from "@/lib/dateline";
 import Image from "next/image";
 
 import { CARD_W, THUMB_W, thumbUrl } from "@/lib/thumb";
@@ -16,7 +17,7 @@ export function timeAgo(iso: string): string {
 }
 
 export function itemMeta(item: FeedItem): string {
-  return `${item.source_count} source${item.source_count === 1 ? "" : "s"} · ${timeAgo(item.last_updated_at)}`;
+  return `${item.source_count} source${item.source_count === 1 ? "" : "s"} · ${timeAgo(newsTime(item))}`;
 }
 
 export function StoryBadges({ item, lens, primaryLang = "en" }: { item: FeedItem; lens: string; primaryLang?: string }) {

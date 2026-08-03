@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FeedItem } from "@/lib/api";
-import { bandOrigins, bands, lastMoved, origins, sectorEyebrow } from "@/lib/dateline";
+import { bandOrigins, bands, istTime, lastMoved, newsTime, origins, sectorEyebrow } from "@/lib/dateline";
 
 function item(id: string, sector: string, over: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -110,5 +110,37 @@ describe("the ledger rail", () => {
   it("builds the lead eyebrow from sector and subsector", () => {
     expect(sectorEyebrow(item("a", "politics", { subsector: "energy" }))).toBe("POLITICS · ENERGY");
     expect(sectorEyebrow(item("a", "politics"))).toBe("POLITICS");
+  });
+});
+
+describe("newsTime — the dateline prints when the NEWS happened", () => {
+  // events.last_updated_at is set to now() on every projection rebuild, so it
+  // records the ingest batch. The feed printed one identical timestamp against
+  // every story, and 79% of events (13,657 of 17,385) were more than six hours
+  // from their newest article — one by 7.7 hours.
+  it("prefers the newest article's publication time", () => {
+    expect(
+      newsTime({
+        latest_published_at: "2026-08-03T13:40:00Z",
+        last_updated_at: "2026-08-03T21:19:00Z",
+      }),
+    ).toBe("2026-08-03T13:40:00Z");
+  });
+
+  it("falls back to last_updated_at when no article carries a published_at", () => {
+    expect(newsTime({ latest_published_at: null, last_updated_at: "2026-08-03T21:19:00Z" })).toBe(
+      "2026-08-03T21:19:00Z",
+    );
+    expect(newsTime({ last_updated_at: "2026-08-03T21:19:00Z" })).toBe("2026-08-03T21:19:00Z");
+  });
+
+  it("renders the news clock, not the ingest clock", () => {
+    // 13:40Z is 19:10 IST; the ingest ran at 21:19Z = 02:49 IST the next day.
+    const item = {
+      latest_published_at: "2026-08-03T13:40:00Z",
+      last_updated_at: "2026-08-03T21:19:00Z",
+    };
+    expect(istTime(newsTime(item))).toBe("19:10");
+    expect(istTime(item.last_updated_at)).toBe("02:49"); // what it used to print
   });
 });

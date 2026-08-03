@@ -6,6 +6,19 @@ import type { FeedItem } from "@/lib/api";
 // in mono, so the prose column is never interrupted by chips (DESIGN.md decisions
 // log, 2026-07-25). These helpers produce exactly the strings that rail prints.
 
+/** When the NEWS happened, falling back to when Prism last touched the story.
+ *
+ * `last_updated_at` is set to now() on every projection rebuild, so it records
+ * the ingest batch — the feed printed one identical timestamp against every
+ * story, and 79% of events were more than six hours from their newest article.
+ * DESIGN.md reserves the mono provenance line for claims about where a story
+ * came from, so it has to be the news's own clock. The fallback matters for
+ * events whose articles carry no published_at at all.
+ */
+export function newsTime(item: { latest_published_at?: string | null; last_updated_at: string }): string {
+  return item.latest_published_at || item.last_updated_at;
+}
+
 /** 14:22 IST — the reader's newsroom clock, not their device's. */
 export function istTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", {
@@ -63,7 +76,7 @@ export function bandOrigins(items: FeedItem[], max = 2): string {
 /** The most recent update in a band — "last moved 13:05". */
 export function lastMoved(items: FeedItem[]): string {
   const newest = items
-    .map((i) => i.last_updated_at)
+    .map((i) => newsTime(i))
     .sort()
     .at(-1);
   return newest ? istTime(newest) : "";

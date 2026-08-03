@@ -34,7 +34,11 @@ class FeedItem(BaseModel):
     tickers: list[str]
     catalyst: str | None
     price_impact_direction: str | None
-    last_updated_at: str
+    last_updated_at: str  # when Prism last touched it — NOT when the news happened
+    # The newest member article's publication time. The dateline must print
+    # this, not last_updated_at, which is set to now() on every projection
+    # rebuild and so showed one identical batch timestamp against every story.
+    latest_published_at: str | None = None
     score: float
 
 
