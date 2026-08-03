@@ -118,7 +118,14 @@ async def handle_classified_item(payload: dict) -> None:
             # deterministic cve_lens path, which still populates these fields.
             prune_fields={"claims", "impacts"},
         )
-        model_used = f"ollama:{extract_model}"
+        # The ACTUAL provider, not a hardcoded one. This read "ollama:" while
+        # llm_provider defaulted to openrouter and the OpenRouter key was set, so
+        # every row claimed a provider that had not been called. The prefix is
+        # load-bearing — correlation/consumer.py and tools/scratch.py both test
+        # `startswith("deterministic:")` to spot CVE records — and it is the first
+        # thing anyone reads when attributing spend, which is exactly how it
+        # misled a spend investigation on 2026-08-03.
+        model_used = f"{settings.llm_provider}:{extract_model}"
         raw_model_output = extraction.model_dump()
 
     # 3. Chunk + embed

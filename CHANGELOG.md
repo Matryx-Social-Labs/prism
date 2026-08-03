@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.22] - 2026-08-03
+
+### Fixed
+- `enrichments.model` now records the provider actually called. It was hardcoded
+  `f"ollama:{extract_model}"` while `llm_provider` defaults to `openrouter` and the
+  OpenRouter key is set on the worker — so every row named a provider that had
+  never been billed. Spend was being attributed to the wrong vendor, and a cost
+  investigation on 2026-08-03 read the column and reached the wrong conclusion.
+- The prefix is load-bearing, not decorative: `correlation/consumer.py` and
+  `tools/scratch.py` both test `startswith("deterministic:")` to identify CVE
+  records, which must never be fuzzy-matched. `deterministic:` is unaffected.
+
 ## [0.0.81.21] - 2026-08-03
 
 ### Fixed

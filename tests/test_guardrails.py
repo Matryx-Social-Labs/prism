@@ -85,3 +85,37 @@ def test_email_selector(monkeypatch):
     get_settings.cache_clear()
     with pytest.raises(NotImplementedError):
         get_email_sender()
+
+
+def test_the_model_column_is_not_hardcoded_to_a_provider():
+    """enrichments.model is the first thing anyone reads when attributing spend,
+    and its prefix is load-bearing: correlation/consumer.py and tools/scratch.py
+    both test `startswith("deterministic:")` to identify CVE records.
+
+    It was hardcoded to "ollama:" while llm_provider defaulted to openrouter and
+    the OpenRouter key was set, so every row named a provider that had never been
+    called — which is exactly how a spend investigation was misled on 2026-08-03.
+
+    This reads the source rather than driving handle_classified_item, which needs
+    network, an LLM and a database to reach one f-string. A source assertion is
+    the proportionate guard for "someone hardcoded the provider again", and unlike
+    testing the f-string in isolation it cannot pass while the caller ignores it.
+    """
+    import inspect
+
+    import enrichment.consumer as mod
+
+    src = inspect.getsource(mod)
+    assert 'f"ollama:' not in src and "f'ollama:" not in src, (
+        "provider hardcoded in the model tag — use settings.llm_provider"
+    )
+    assert "settings.llm_provider" in src, "the model tag must name the provider actually configured"
+    # The deterministic prefix is NOT a provider and must survive: two call sites
+    # rely on it to mark articles that no fuzzy matching may ever touch.
+    assert '"deterministic:cisa_kev"' in src
+
+
+def test_deterministic_prefix_is_not_a_provider():
+    """The counterpart. Whatever the provider, a CVE record keeps its own prefix."""
+    assert "deterministic:cisa_kev".startswith("deterministic:")
+    assert not "deterministic:cisa_kev".startswith("openrouter:")
