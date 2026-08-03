@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.18] - 2026-08-03
+
+### Fixed
+- `tools/repair.py --titles` now cleans **`raw_items.title`**, the source, not only
+  the derived copies in `events` and `stories`. Fixing copies alone is why this
+  defect returned: 119 raw_items still carried HTML entities from before the
+  `clean_text` choke point existed, and the 0.0.81.16 sweep copied one straight into
+  a new event's title, because `INSERT INTO events ... SELECT ri.title` takes it
+  verbatim. Applied: 121 rows unescaped, all four columns now at zero.
+- Found by watching the first 90 minutes of resumed ingestion rather than by a test.
+  Fresh fetches were clean throughout (0 escaped titles in 3 hours) — the forward
+  fix works; the reintroduction came from a repair reading unrepaired history.
+
 ## [0.0.81.17] - 2026-08-03
 
 ### Fixed
