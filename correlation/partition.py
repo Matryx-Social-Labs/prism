@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -34,6 +35,7 @@ from common.db import session_scope
 from common.llm import structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
+from common.text import detect_script
 from correlation.threads import (
     _ROUNDUP_CTE,
     _STORY_STOP_LIST,
@@ -232,6 +234,136 @@ def leiden_partition(
         seed=42,  # deterministic
     )
     return {g.vs[v]["name"]: comm for comm, members in enumerate(part) for v in members}
+
+
+# ── Content gate (L2.5) ──────────────────────────────────────────────────────
+# Leiden groups events by SHARED ACTORS, and shared actors are a TOPIC signal, not
+# a story signal. Nallapati et al. (Event Threading within News Topics, CIKM 2004)
+# measured this directly: adding person-name overlap to news clustering made it
+# WORSE, 0.50 -> 0.45 cluster F1, because "many on-topic stories share the same
+# locations or persons irrespective of the event they belong to".
+#
+# That is why no value of PARTITION_MIN_EDGE_WEIGHT works. Raising it raises the
+# ENTITY requirement, which is exactly what a story's aftermath fails (the hospital
+# coverage names different people than the protest), while two unrelated bills keep
+# passing it on their shared politicians. Fortunato & Barthelemy (PNAS 2007) proved
+# the other half: modularity cannot resolve communities below a size that scales
+# with the whole graph, so one resolution cannot both split the blob and hold a
+# real story together. Tuning was never going to fix either.
+#
+# So: after Leiden, require CONTENT support for staying together. Two events keep
+# their link only if their headlines share a non-stopword word. This is Story
+# Forest's fine gate (Liu et al., CIKM 2017) at its published n=1, and n=1 is also
+# what measured best here, against tools/gold_stories:
+#
+#   gate      P        R        F1       Cdet     wrong merges   wrong splits
+#   none      0.2245   0.9041   0.3597   1.1676   228            7
+#   n >= 1    0.3367   0.9041   0.4907   0.7069   130            7     <- shipped
+#   n >= 2    0.4286   0.4110   0.4196   0.7771    40           43
+#   n >= 3    0.7500   0.1233   0.2118   0.8908     3           64
+#
+# n=1 cuts wrong merges 43% for ZERO recall (false negatives stay at exactly 7, and
+# gold stories split across groups stays 2/25). That is a gate dropping only bad
+# edges, not a precision/recall trade — which is what makes it safe to ship where
+# the headline gate of #131 was not.
+CONTENT_MIN_SHARED_WORDS = 1
+
+# Function words only. Deliberately NOT a news-vocabulary stoplist ("police",
+# "court", "protest"): those ARE the story signal this gate reads. An early version
+# stripped every word appearing in any entity name and the link rate collapsed to
+# 2%, because that deletes "police" and "court" along with the names.
+_TITLE_STOP = frozenset("""
+about after against amid also been before being both came come could does done
+down during each else even ever every from gets give goes gone half have here
+himself into itself just keep kept know last like made make many more most much
+must near next none only ones other over said same says seen shall since some
+such take taken than that their them then there these they this those thus told
+took under until upon very want well went were what when where which while whom
+whose will with within without would your
+""".split())
+
+
+# A word starts with a letter and may continue through Indic combining marks.
+# `\w` alone is wrong for Indian scripts: matras (U+093E etc.) are nonspacing
+# marks, not alphanumeric, so `[^\W\d_]{4,}` chops "पैलेट" into sub-4-char pieces
+# and returns NOTHING for a Devanagari headline. That failure is silent — a title
+# with no tokens shares no words with anything, so the gate would shatter every
+# Hindi and Kannada story into singletons while looking like a clean split.
+_WORD_RE = re.compile(r"[^\W\d_][\wऀ-ൿ]{3,}", re.UNICODE)
+
+
+def _content_words(title: str) -> frozenset[str]:
+    """Content words of a headline, in any script the feed carries.
+
+    ponytail: no stemming, so "protesters"/"protestors" and singular/plural read as
+    different words. Measured anyway (see the table above) — the gate is transitive,
+    so a story survives on a chain of overlapping headlines and does not need every
+    pair to match. Add a stemmer only if recall starts moving.
+    """
+    return frozenset(
+        w for w in _WORD_RE.findall((title or "").lower()) if w not in _TITLE_STOP
+    )
+
+
+def _content_linked(a: Node, b: Node, min_shared: int = CONTENT_MIN_SHARED_WORDS) -> bool:
+    """Whether two events keep their within-community link.
+
+    Absence of evidence never splits. A headline we cannot tokenise, and a pair
+    written in DIFFERENT scripts, both return True: the gold set behind the table
+    above covers Latin headlines only, so applying the gate to a Hindi/Kannada pair
+    would be acting on a rule that was never measured for them. Worse, the honest
+    failure is silent — an untokenisable title shares zero words with everything,
+    so the gate would shatter every non-Latin story into singletons and look like
+    a clean split. The gate may only ever REMOVE a link it can actually justify.
+    """
+    if detect_script(a.title) != detect_script(b.title):
+        return True
+    wa, wb = _content_words(a.title), _content_words(b.title)
+    if not wa or not wb:
+        return True
+    return len(wa & wb) >= min_shared
+
+
+def split_on_shared_content(
+    labels: dict[str, int], nodes: dict[str, Node], min_shared: int = CONTENT_MIN_SHARED_WORDS
+) -> dict[str, int]:
+    """Refine a Leiden partition: within each community, keep only the events joined
+    by a chain of content-sharing headlines. Splits only — it can never merge two
+    communities — so it cannot undo the boundary Leiden and the veto agreed on.
+    """
+    by_comm: dict[int, list[str]] = defaultdict(list)
+    for eid, comm in labels.items():
+        by_comm[comm].append(eid)
+
+    out: dict[str, int] = {}
+    nxt = 0
+    for comm in sorted(by_comm):
+        members = sorted(by_comm[comm])
+        parent = {e: e for e in members}
+        for i, a in enumerate(members):
+            na = nodes.get(a)
+            for b in members[i + 1:]:
+                nb = nodes.get(b)
+                if na is None or nb is None or _content_linked(na, nb, min_shared):
+                    ra, rb = _find(parent, a), _find(parent, b)
+                    if ra != rb:
+                        parent[ra] = rb
+        relabel: dict[str, int] = {}
+        for e in members:
+            root = _find(parent, e)
+            if root not in relabel:
+                relabel[root] = nxt
+                nxt += 1
+            out[e] = relabel[root]
+    return out
+
+
+def _find(parent: dict[str, str], x: str) -> str:
+    """Union-find root with path compression."""
+    while parent[x] != x:
+        parent[x] = parent[parent[x]]
+        x = parent[x]
+    return x
 
 
 # ── Branch tree (L3) ─────────────────────────────────────────────────────────
@@ -517,6 +649,8 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION, llm_veto: boo
         nodes = await _load_nodes(session)
         edges = await _load_edges(session)
         labels = leiden_partition(nodes, edges, resolution)
+        # Shared actors put them together; shared content decides if they stay.
+        labels = split_on_shared_content(labels, nodes)
         edge_w = _edge_weight_map(edges)
         by_story = _group_by_story(labels, nodes)
         veto_log = await _apply_veto(session, by_story, get_settings().prism_model_gate) if llm_veto else []
@@ -530,7 +664,14 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION, llm_veto: boo
 # unchanged stories reuse. codex #5/#6/#9: never keys on the ephemeral Leiden label.
 def veto_config_version() -> str:
     s = get_settings()
-    raw = f"gate={s.prism_model_gate}|res={LEIDEN_RESOLUTION}|win={STORY_WINDOW_DAYS}|stop={len(_STORY_STOP_LIST)}|v1"
+    raw = (
+        f"gate={s.prism_model_gate}|res={LEIDEN_RESOLUTION}|win={STORY_WINDOW_DAYS}"
+        # The content gate changes which events are in a story, so tuning it must
+        # re-vet. story_signature already covers a membership change for stories
+        # that exist; this covers the config itself so a revert to the old value
+        # cannot silently reuse verdicts taken under the new one.
+        f"|stop={len(_STORY_STOP_LIST)}|content={CONTENT_MIN_SHARED_WORDS}|v1"
+    )
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
