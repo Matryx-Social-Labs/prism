@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.19] - 2026-08-03
+
+### Fixed
+- **The headline and the summary now describe the same article.** An event's title
+  is copied from its FOUNDING article at creation and never changes, while its
+  summary was taken from whichever article joined most recently — so for any event
+  with more than one member the two described different news. Measured on
+  production: **830 of 1,054 multi-member events, 79%**.
+  Found by opening the live feed: the lead story read *"AAIB explains to SC why
+  AI171 crash report is getting delayed"* above a summary about a seafarer missing
+  in the Black Sea, because one late member had wrongly merged on the shared entity
+  "Supreme Court". One bad merge at the tail replaced the whole event's summary.
+- **Every DB-backed test was passing by luck of ordering.** `asyncio_mode = "auto"`
+  gives each test a fresh event loop while `common/db.py` holds a module-level pool,
+  so a connection opened on one test's loop and reused by the next raises
+  `RuntimeError: got Future attached to a different loop`. Because the test modules
+  guard on `_db_reachable()`, that crash surfaced as **"no database" and SKIPPED** —
+  green, and testing nothing. conftest now disposes the engine between tests.
+
 ## [0.0.81.18] - 2026-08-03
 
 ### Fixed
