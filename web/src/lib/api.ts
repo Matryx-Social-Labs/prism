@@ -31,6 +31,7 @@ export interface FeedItem {
   catalyst: string | null;
   price_impact_direction: string | null;
   last_updated_at: string;
+  latest_published_at?: string | null;
   score: number;
 }
 

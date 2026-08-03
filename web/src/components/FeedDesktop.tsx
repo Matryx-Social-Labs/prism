@@ -12,6 +12,7 @@ import {
   lastMoved,
   origins,
   sectorEyebrow,
+  newsTime,
 } from "@/lib/dateline";
 import { CARD_W, thumbUrl } from "@/lib/thumb";
 
@@ -40,7 +41,7 @@ function Meta({ item }: { item: FeedItem }) {
   const o = origins(item, 2);
   return (
     <div className={`${MONO} mt-2.5`} style={{ color: "var(--ink-faint)" }}>
-      {[`${item.source_count} source${item.source_count === 1 ? "" : "s"}`, istTime(item.last_updated_at), o]
+      {[`${item.source_count} source${item.source_count === 1 ? "" : "s"}`, istTime(newsTime(item)), o]
         .filter(Boolean)
         .join(" · ")}
     </div>
@@ -90,7 +91,7 @@ export function FeedDesktop({ items, top }: { items: FeedItem[]; top: FeedItem[]
           <div style={{ color: "var(--ink-muted)" }}>
             {lead.source_count} source{lead.source_count === 1 ? "" : "s"}
           </div>
-          <div>{istTime(lead.last_updated_at)} IST</div>
+          <div>{istTime(newsTime(lead))} IST</div>
           <div>{origins(lead)}</div>
           <div className="mt-3">LEAD</div>
           {lead.coverage?.single_origin && <div style={{ color: "var(--danger)" }}>SINGLE-ORIGIN</div>}

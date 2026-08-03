@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.21] - 2026-08-03
+
+### Fixed
+- **The dateline now prints when the news happened, not when Prism looked.**
+  `events.last_updated_at` is set to `now()` on every projection rebuild, so it
+  records the ingest batch — the feed printed one identical timestamp against every
+  story on the page, and **13,657 of 17,385 events (79%) were more than six hours
+  from their newest article**, one by 7.7 hours. The projection now carries
+  `latest_published_at` and the UI reads it through a single `newsTime()` accessor,
+  falling back to `last_updated_at` where no article has a publication time.
+- The serializer already used the event's own clock for RANKING, with the comment
+  *"Recency = when the event happened, not when we ingested it"*. That principle had
+  simply never been applied to display.
+
 ## [0.0.81.20] - 2026-08-03
 
 ### Fixed

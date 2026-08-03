@@ -320,6 +320,8 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         # one newsroom telling this, nobody corroborating it. Publisher rather
         # than source slug so The Hindu's six regional feeds count once.
         publishers: set[str] = set()
+        # When the NEWS happened, as distinct from when Prism noticed it.
+        latest_published: object = None
         languages: set[str] = set()
         best_headline: dict[str, dict] = {}  # lang -> most-recent member headline
         for row in rows:
@@ -346,6 +348,10 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
                             "_pub": pub,
                         }
             publishers.add(row["source_publisher"] or row["source_slug"])
+            if row["published_at"] and (
+                latest_published is None or row["published_at"] > latest_published
+            ):
+                latest_published = row["published_at"]
             origin = row["source_country"] or gdelt_country_to_iso(row["gdelt_country"])
             if origin:
                 origins[origin] = origins.get(origin, 0) + 1
@@ -430,6 +436,16 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         event.projection = {
             "event_type": max(set(event_types), key=event_types.count) if event_types else None,
             "source_count": len(rows),
+            # The newest member's publication time. events.last_updated_at is
+            # set to now() on every projection rebuild, so it records when the
+            # INGEST ran, not when the news happened — the feed printed one
+            # identical batch timestamp against every story, and 79% of events
+            # (13,657 of 17,385) were more than six hours out, one by 7.7.
+            # DESIGN.md reserves the mono provenance line for exactly this
+            # claim, so it has to be the news's own clock.
+            "latest_published_at": (
+                latest_published.isoformat() if latest_published else None
+            ),
             "source_slugs": sorted(set(source_slugs)),
             "role_interests": sorted(role_interests),
             # Languages this event is covered in + the per-language display headline
