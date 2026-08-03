@@ -38,7 +38,6 @@ from correlation.threads import (
     _ROUNDUP_CTE,
     _STORY_STOP_LIST,
     STORY_MAX_EMBED_DIST,
-    STORY_MIN_EDGE_WEIGHT,
     STORY_MIN_SHARED,
     STORY_WINDOW_DAYS,
 )
@@ -48,6 +47,36 @@ logger = get_logger(__name__)
 # Leiden resolution: higher → more, smaller stories. Tuned against the validation
 # cases (CJP must stay one story with branches; Assam must not absorb Sikkim).
 LEIDEN_RESOLUTION = 1.0
+# The Leiden graph's own edge floor, deliberately SEPARATE from
+# threads.STORY_MIN_EDGE_WEIGHT (0.15), which the BFS timeline still uses.
+#
+# Shared-actor edges say WHO, never WHAT HAPPENED, so at 0.15 the partition was
+# producing topic blobs rather than stories. Measured on the live graph
+# (18,490 events, 1,312 edges):
+#
+#   floor   multi-event stories   largest   stories >=30
+#   0.15            146              80           8
+#   0.30            158              44           4
+#   0.50            159              29           0
+#   0.80             94              10           0
+#
+# 0.50 is a strict improvement: MORE stories than today AND no blobs, because
+# cutting weak edges splits a mega-community into real stories instead of
+# deleting it. 0.80 over-prunes and starts destroying real ones.
+#
+# What that looks like in content: at 0.15 one 58-event "story" was SC contempt
+# notices, a TASMAC white paper, the Southern Zonal Council, the Chennai Mayor's
+# cyberbullying complaint and CM Vijay lobbying Ford — all of Tamil Nadu politics.
+# At 0.50 the CJP material separates into a 29-event political-response story and
+# an 18-event medical/legal-aftermath story, both keeping their Hindi members.
+#
+# threads.py:352-363 warns that raising the weight also drops CJP's legitimate
+# cross-state links, which is why the BFS path solved this with a seed-relative
+# embedding distance instead. On the partition that warning does not hold: the
+# CJP story keeps 29 members here, essentially what that gate achieved (~28/31).
+# Left at 0.15 for threads.py, which is a different traversal with its own guard.
+PARTITION_MIN_EDGE_WEIGHT = 0.50
+
 # Branch-tree gate: a member must share this much root-spine IDF weight AND embed
 # within STORY_MAX_EMBED_DIST of the root to hang on the main tree (else it is in
 # the story_id but off-spine — a weak satellite, not a branch).
@@ -168,7 +197,7 @@ async def _load_edges(session) -> list[tuple[str, str, float]]:
             {
                 "stop": _STORY_STOP_LIST,
                 "min_shared": STORY_MIN_SHARED,
-                "min_weight": STORY_MIN_EDGE_WEIGHT,
+                "min_weight": PARTITION_MIN_EDGE_WEIGHT,
                 "max_dist": STORY_MAX_EMBED_DIST,
             },
         )

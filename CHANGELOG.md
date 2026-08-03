@@ -3,6 +3,32 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.23] - 2026-08-03
+
+### Fixed
+- **Stories were topic blobs, not stories.** The Leiden partition ran on the same
+  0.15 edge floor as the BFS timeline, and shared-actor edges say WHO, never WHAT
+  HAPPENED — so one 58-event "story" was SC contempt notices, a TASMAC white paper,
+  the Southern Zonal Council, the Chennai Mayor's cyberbullying complaint and CM
+  Vijay lobbying Ford. All of Tamil Nadu politics, under one headline. Another held
+  73 events spanning four days of national politics.
+- `PARTITION_MIN_EDGE_WEIGHT = 0.50`, separate from `threads.STORY_MIN_EDGE_WEIGHT`
+  which stays at 0.15 for the BFS timeline. Measured on the live graph (18,490
+  events, 1,312 edges):
+
+      floor   multi-event stories   largest   stories >=30
+      0.15            146              80           8
+      0.50            159              29           0
+      0.80             94              10           0
+
+  A strict improvement — **more** stories AND no blobs, because cutting weak edges
+  splits a mega-community into real stories rather than deleting it. The CJP
+  material separates into a 29-event political-response story and an 18-event
+  medical/legal-aftermath story, both keeping their Hindi members.
+- Resolution was the obvious lever and is the wrong one: sweeping it 1.0 -> 8.0 only
+  moved the largest story 73 -> 25 and never changed the singleton count at all.
+  The edges were the problem.
+
 ## [0.0.81.22] - 2026-08-03
 
 ### Fixed

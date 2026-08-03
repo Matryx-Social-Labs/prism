@@ -267,3 +267,42 @@ def test_a_member_with_no_affinity_at_all_does_not_crash_the_partitioner():
     embed = {("r", "x"): 0.2, ("x", "r"): 0.2}  # 'lonely' has no pairs at all
     _, parent, _ = build_branch_tree(members, edge_w, embed, {})
     assert parent["x"] == "r"
+
+
+def test_the_partition_edge_floor_is_separate_from_the_bfs_one():
+    """The Leiden partition and the BFS timeline traverse the same actor graph but
+    need different floors, so they must not share a constant.
+
+    At the BFS floor (0.15) the partition produced topic blobs rather than stories:
+    one 58-event "story" was SC contempt notices, a TASMAC white paper, the Southern
+    Zonal Council, the Chennai Mayor's cyberbullying complaint and CM Vijay lobbying
+    Ford — all of Tamil Nadu politics. Measured on the live graph, raising only the
+    partition's floor to 0.50 yields MORE multi-event stories (159 vs 146) and no
+    community above 29 events (vs 8 above 30).
+
+    threads.py warns that raising the weight drops CJP's legitimate cross-state
+    links; that holds for its seed-relative BFS and is why this is a second
+    constant rather than a change to the first.
+    """
+    from correlation.partition import PARTITION_MIN_EDGE_WEIGHT
+    from correlation.threads import STORY_MIN_EDGE_WEIGHT
+
+    assert PARTITION_MIN_EDGE_WEIGHT > STORY_MIN_EDGE_WEIGHT, (
+        "the partition floor must be strictly higher, or the blobs come back"
+    )
+    assert STORY_MIN_EDGE_WEIGHT == 0.15, "the BFS timeline's floor is deliberately unchanged"
+    # 0.80 was measured to over-prune: multi-event stories collapse 159 -> 94.
+    assert PARTITION_MIN_EDGE_WEIGHT <= 0.6, "above ~0.6 real stories start being destroyed"
+
+
+def test_the_partition_uses_its_own_floor_not_the_shared_one():
+    """Guards the wiring, not the constant. Defining a new floor and leaving the
+    query bound to the old one would look identical from the outside — the same
+    shape as a gate that is correct but never called."""
+    import inspect
+
+    import correlation.partition as mod
+
+    src = inspect.getsource(mod)
+    assert '"min_weight": PARTITION_MIN_EDGE_WEIGHT' in src
+    assert '"min_weight": STORY_MIN_EDGE_WEIGHT' not in src
