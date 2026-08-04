@@ -102,14 +102,32 @@ def shape(labels: dict[str, int]) -> dict:
     }
 
 
-def run_config(nodes, edges, *, floor: float, method: str, res: float, gate: bool) -> dict:
-    """One configuration end to end. `method` is 'rb' (modularity, current) or 'cpm'."""
+def run_config(nodes, edges, *, floor: float, method: str, res: float, gate: bool,
+               csim: float = 0.0) -> dict:
+    """One configuration end to end. `method` is 'rb' (modularity, current) or 'cpm'.
+
+    `csim` gates edges on CONTENT before Leiden ever sees them — the "two
+    independent gates" shape (Story Forest's coarse+fine), as opposed to `gate`
+    which splits communities after the fact. Shared actors propose an edge;
+    shared content has to confirm it.
+    """
     import igraph as ig
     import leidenalg
 
     import correlation.partition as P
 
     sub = [e for e in edges if e[2] >= floor]
+    if csim > 0:
+        kept = []
+        for a, b, w in sub:
+            na, nb = nodes.get(a), nodes.get(b)
+            if na is None or nb is None:
+                kept.append((a, b, w))
+                continue
+            s = P.content_similarity(na, nb)
+            if s is None or s >= csim:  # no evidence -> keep
+                kept.append((a, b, w))
+        sub = kept
     idx = {eid: i for i, eid in enumerate(nodes)}
     g = ig.Graph(n=len(idx))
     g.vs["name"] = list(nodes)
@@ -123,8 +141,6 @@ def run_config(nodes, edges, *, floor: float, method: str, res: float, gate: boo
         g, cls, weights=weights or None, resolution_parameter=res, seed=42
     )
     labels = {g.vs[v]["name"]: c for c, members in enumerate(part) for v in members}
-    if gate:
-        labels = P.split_on_shared_content(labels, nodes)
     return {"labels": labels, "edges": len(sub)}
 
 
@@ -147,17 +163,20 @@ def cross_validate(nodes, edges, plans) -> None:
     print(f"fold A: {len(fold_a)} stories   fold B: {len(fold_b)} stories\n")
 
     cache = {}
-    for method, res, floor in plans:
+    for method, res, floor, csim in plans:
         for gate in (False, True):
-            out = run_config(nodes, edges, floor=floor, method=method, res=res, gate=gate)
-            cache[(method, res, floor, gate)] = {e: str(v) for e, v in out["labels"].items() if e in STORY_OF}
+            out = run_config(nodes, edges, floor=floor, method=method, res=res, gate=gate, csim=csim)
+            cache[(method, res, floor, csim, gate)] = {
+                e: str(v) for e, v in out["labels"].items() if e in STORY_OF
+            }
 
     for train, test, name in ((fold_a, fold_b, "A->B"), (fold_b, fold_a, "B->A")):
         best = min(cache, key=lambda k: score(cache[k], train)["Cdet"])
         tr, te = score(cache[best], train), score(cache[best], test)
-        print(f"  {name}: tuned {best[0]} res={best[1]} floor={best[2]} gate={'ON' if best[3] else 'off'}")
+        print(f"  {name}: tuned {best[0]} res={best[1]} floor={best[2]} csim={best[3]} "
+              f"gate={'ON' if best[4] else 'off'}")
         print(f"     train Cdet {tr['Cdet']:.4f} F1 {tr['F1']:.4f}  ->  HELD-OUT Cdet {te['Cdet']:.4f} F1 {te['F1']:.4f}")
-        live = ("rb", 1.0, 0.50, True)
+        live = ("rb", 1.0, 0.50, 0.0, True)
         if live in cache:
             lt = score(cache[live], test)
             print(f"     live config on the same held-out fold: Cdet {lt['Cdet']:.4f} F1 {lt['F1']:.4f}")
@@ -169,6 +188,7 @@ def main() -> None:
     ap.add_argument("--floors", default="0.15,0.30,0.50")
     ap.add_argument("--cpm", default="0.02,0.05,0.10,0.20,0.40")
     ap.add_argument("--rb", default="1.0")
+    ap.add_argument("--csim", default="0.0", help="content-similarity edge gate thresholds")
     ap.add_argument("--cv", action="store_true", help="tune on half the gold stories, report on the other half")
     a = ap.parse_args()
 
@@ -180,8 +200,11 @@ def main() -> None:
 
     nodes, edges = load_snapshot()
     print(f"snapshot: {len(nodes)} nodes, {len(edges)} edges\n")
-    plans_cv = [("rb", float(r), f) for r in a.rb.split(",") for f in map(float, a.floors.split(","))]
-    plans_cv += [("cpm", float(r), f) for r in a.cpm.split(",") for f in map(float, a.floors.split(","))]
+    csims = [float(c) for c in a.csim.split(",")]
+    plans_cv = [("rb", float(r), f, c) for r in a.rb.split(",")
+                for f in map(float, a.floors.split(",")) for c in csims]
+    plans_cv += [("cpm", float(r), f, c) for r in a.cpm.split(",")
+                 for f in map(float, a.floors.split(",")) for c in csims]
     if a.cv:
         cross_validate(nodes, edges, plans_cv)
         return

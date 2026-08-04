@@ -79,6 +79,8 @@ STORIES: dict[str, list[str]] = {
     "pradhan-resignation": [
         "f3a2e150-4e10-4d88-8c38-877f2e467fc6",  # BJP's rousing Parliament welcome for ex-edu minister
         "09630d04-c01b-451d-b996-bc29233ca3e9",  # CPI slams BJP for felicitating Pradhan after resigning
+        "d7d5242c-b1ce-4a83-a67f-522342c306c7",  # Congress steps up attack, seeks Pradhan's resignation
+        "0be766c9-0f4c-4400-9de0-325608dc3c0d",  # Congress hails Pradhan's resignation
     ],
     # --- other business of the same Parliament, which is NOT the same story ---
     "vande-mataram-bill": [
@@ -115,6 +117,77 @@ STORIES: dict[str, list[str]] = {
     "greta-backs-cjp": ["4748d8a1-71e4-4540-8f1e-ed96daa4ba0f"],
     "nda-families-neet": ["a44bc1a2-024b-4ae5-ad97-3e1b0a46cc9f"],
     "ed-team-attack-bail": ["c57a2ac7-314d-4c85-83f9-8f123d91d2f9"],
+    # ── second labelling pass, 2026-08-04 ────────────────────────────────────
+    # The first pass was one topic (CJP politics), which is too narrow to select a
+    # hyperparameter on: cross-validating a CPM sweep over it produced a config that
+    # LOST to production on held-out stories in both fold directions. These clusters
+    # come from four other groups in the same run — business, civic infrastructure,
+    # electoral politics and sport — so a rule that only works on protest coverage
+    # can no longer look general.
+    #
+    # Three deliberate near-miss sets, because they are what a shared-actor graph
+    # gets wrong and a content signal should get right:
+    #   - three DIFFERENT bypolls (Bankipur, Datia, Manjalpur) sharing "BJP",
+    #     "Congress", "bypoll" and nothing else,
+    #   - four BEST bus stories that are one topic and four separate events,
+    #   - two India coaching departures that are genuinely separate stories.
+    "tn-ford-return": [
+        "c8d7b9e1-7ed8-40ad-92c2-0ccc4ea0e17b",  # CM Vijay requests Ford to resume production in TN
+        "040ad9d8-71e4-40d3-a683-d6bbf0c8038c",  # Ford delegation meets CM Vijay, discusses expansion
+    ],
+    "southern-zonal-council": ["e1cf2096-d1b8-4e1c-b8cf-e08028a8c8b9"],
+    "tn-investment-mous": ["a00153b9-b47a-4d47-a0af-ef6247618e9f"],
+    # One topic ("BEST is failing"), four separate events. The whole group is a
+    # worked example of the topic/story confusion.
+    "best-fleet-revival": ["b56f7503-f9cc-4d9f-b75c-2702dff31b4b"],
+    "best-bus-crash-probe": ["ee43efbd-f38e-46ff-abc6-d7e0e58b29d9"],
+    "best-commuter-woes": ["69af6426-795c-4525-9671-81b4f251f851"],
+    "best-depot-power-cut": ["c39275bc-f031-468d-89ef-86dcbe80936a"],
+    "bankipur-bypoll": [
+        "65ea6afd-ece0-4842-b324-f008691f542b",  # Bihar BJP complains to ECI about PK's expenditure
+        "62cdf769-e0ed-4ccb-80bc-841db7938d51",  # Nitin Nabin calls PK a businessman
+        "766ea6e3-f4b6-4a12-8f73-9f27df7c1254",  # Nitish's appeal for the Bankipur bypoll
+        "3187b5c3-82b0-43cd-926a-00460d248dce",  # High drama at Bihar police station, PK claims detentions
+        "c43171b8-da55-4042-b920-8a6315a044ca",  # PK wins the seat Nitin Nabin held for 20 years
+    ],
+    "datia-bypoll": [
+        "c4232e50-5707-40ae-8f1b-8483cb71f892",  # Datia bye election campaign
+        "1efda373-2950-4e49-823b-076283a38214",  # Datia bypoll: Congress candidate confident
+    ],
+    "gujarat-manjalpur-bypoll": ["aa44e4fd-15f7-4dd1-8932-3cab630a40c4"],
+    "maliwal-punjab-paper-leaks": [
+        "973f867e-70db-41cd-944f-5c76eef0d242",  # Maliwal's allegation against Kejriwal on Punjab leaks
+        "b602d92f-8f7f-4a44-85d3-6c03b14e8a0d",  # 'Six major paper leaks in five years in Punjab'
+    ],
+    "punjab-edu-minister-protest": ["1dfc88b2-7504-41e0-ad86-15aad1e9e2ee"],
+    "delhi-bjp-youth-outreach": ["f10b7318-b738-4803-b238-15a87e0f44bf"],
+    "channi-faridkot-rally": ["6261c07b-6e60-4bf1-b6ad-e3f138712660"],
+    "karnataka-cabinet-expansion": [
+        "91456068-eb82-4ac8-b943-969ba7230c09",  # Cabinet expansion postponed again
+        "72fa073a-612c-4ab7-9d90-83fb3480eeb6",  # 2 Congress MLAs resign over non-inclusion
+        "a72325d8-a265-43b7-bf77-cc59a40aa80f",  # 20 names approved by the high command
+        "c3de83eb-c381-4c48-8030-f0e06f039639",  # 20 MLAs sworn in
+    ],
+    "zimbabwe-series-sweep": [
+        "188b10f8-4414-48a3-8901-a29b0dd5aa0c",  # Shreyas continues the Dhoni trophy tradition
+        "33194c29-f0ac-4beb-897e-bdbd0fefa24b",  # Iyer credits Laxman after the 3-0 sweep
+    ],
+    "sri-lanka-test-squad": [
+        "7462bb6c-24f4-4734-9e9c-6ecacd68f3b3",  # Squad announced for the Sri Lanka tour
+        "9e110a2c-8140-4dee-aa53-d9dcb76ad6f1",  # Jadeja returns; Bumrah picked with a rider
+        "22a22749-41a2-40fd-abb5-3bac6ac804a3",  # Bumrah ruled out of the Sri Lanka Tests
+    ],
+    # Two coaching departures, four weeks apart, different people. Same topic
+    # ("India's support staff is churning"), different stories.
+    "india-fielding-coach-change": [
+        "776f9005-92d2-4632-9db9-b1204663f20c",  # Subhadeep Ghosh replaces T Dilip as fielding coach
+        "a870868f-5e07-4dd7-a6d0-188c0cd7f126",  # Rohit reacts to Dilip being released
+    ],
+    "ten-doeschate-exit": [
+        "0599ca3f-b3d2-459a-9b06-4dbd7580270a",  # Assistant coach resigns suddenly
+        "d22b5a30-07cd-4cca-b963-f5f79489710d",  # Why ten Doeschate parted ways with the team
+    ],
+    "pandya-ipl-move": ["96b8ad45-bffd-4420-9c26-1f6b726c4556"],
 }
 
 # Cluster pairs a careful person could call either way. Their cross-pairs are NOT
@@ -141,6 +214,22 @@ AMBIGUOUS: set[frozenset[str]] = {
     frozenset({"pradhan-resignation", "nda-families-neet"}),
     # Kerala's leadership row and the assault case that triggered the explanation.
     frozenset({"kerala-police-leadership", "kafir-screenshot-case"}),
+    # --- second pass ---------------------------------------------------------
+    # Whether the wet-lease fleet's failures and the plan to replace it are one
+    # story is exactly the granularity question; do not answer it in the labels.
+    frozenset({"best-fleet-revival", "best-commuter-woes"}),
+    # Two departures from the same support staff in the same window.
+    frozenset({"india-fielding-coach-change", "ten-doeschate-exit"}),
+    # Paper leaks reach the labels from two directions — the NEET leak that drove
+    # the protest, and Punjab's own leaks used as a political counter-attack.
+    # Related enough that a reasonable person could group them.
+    frozenset({"maliwal-punjab-paper-leaks", "punjab-edu-minister-protest"}),
+    frozenset({"maliwal-punjab-paper-leaks", "neet-paper-leak-bill"}),
+    frozenset({"punjab-edu-minister-protest", "neet-paper-leak-bill"}),
+    frozenset({"punjab-edu-minister-protest", "pradhan-resignation"}),
+    # "After Gen-Z stir, Delhi BJP eyes youth outreach" IS a response to the protest.
+    frozenset({"delhi-bjp-youth-outreach", "cjp-police-force"}),
+    frozenset({"delhi-bjp-youth-outreach", "neet-paper-leak-bill"}),
 }
 
 STORY_OF: dict[str, str] = {e: k for k, ids in STORIES.items() for e in ids}
