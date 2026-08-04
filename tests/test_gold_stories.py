@@ -43,6 +43,16 @@ def test_the_set_scores_both_directions():
     assert neg >= 100, f"only {neg} different-story pairs — cannot detect over-merging"
 
 
+def test_the_set_spans_more_than_one_topic():
+    """The first pass was all CJP politics, which is too narrow to select a
+    hyperparameter on — a CPM sweep cross-validated over it produced a config that
+    LOST to production on held-out stories in both directions. Sport, business and
+    civic infrastructure are in here so a protest-specific rule cannot look general."""
+    for key in ("sri-lanka-test-squad", "tn-ford-return", "best-bus-crash-probe",
+                "karnataka-cabinet-expansion"):
+        assert key in STORIES
+
+
 def test_ambiguous_pairs_are_actually_skipped():
     p = pairs()
     a = STORIES["cjp-police-force"][0]
@@ -81,5 +91,47 @@ def test_multi_event_stories_stay_in_the_published_size_range(key):
 
 
 def test_counts_are_what_was_labelled():
-    assert event_count() == 49
-    assert story_count() == 25
+    assert event_count() == 86
+    assert story_count() == 45
+
+
+# --- the scorer itself -------------------------------------------------------
+# tools/score_stories.score_pairs is now the single scorer for both the live
+# report and the offline sweep. If it drifts, every story-layer number drifts
+# with it silently, so pin its contract.
+
+
+def test_perfect_prediction_scores_perfectly():
+    from tools.score_stories import score_pairs
+
+    s = score_pairs(dict(STORY_OF))
+    assert s["P"] == 1.0 and s["R"] == 1.0 and s["fp"] == 0 and s["fn"] == 0
+
+
+def test_putting_everything_in_one_group_is_all_recall_no_precision():
+    from tools.score_stories import score_pairs
+
+    s = score_pairs(dict.fromkeys(STORY_OF, "one"))
+    assert s["R"] == 1.0 and s["fn"] == 0
+    assert s["fp"] > 0 and s["P"] < 0.5
+
+
+def test_all_singletons_is_all_precision_no_recall():
+    from tools.score_stories import score_pairs
+
+    s = score_pairs({e: e for e in STORY_OF})
+    assert s["fp"] == 0 and s["R"] == 0.0 and s["fn"] > 0
+
+
+def test_key_restriction_scores_only_the_named_stories():
+    """The cross-validation split depends on this: a config tuned on one fold must
+    be judged only on pairs from the other, or held-out numbers are meaningless."""
+    from tools.score_stories import score_pairs
+
+    subset = {"european-wildfires", "cjp-police-force"}
+    s = score_pairs(dict(STORY_OF), subset)
+    full = score_pairs(dict(STORY_OF))
+    assert 0 < s["pairs"] < full["pairs"]
+    # Cross-fold pairs must be excluded, not merely down-weighted.
+    inside = sum(len(STORIES[k]) for k in subset)
+    assert s["pairs"] <= inside * (inside - 1) // 2

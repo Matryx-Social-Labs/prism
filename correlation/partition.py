@@ -46,38 +46,43 @@ from correlation.threads import (
 
 logger = get_logger(__name__)
 
-# Leiden resolution: higher → more, smaller stories. Tuned against the validation
-# cases (CJP must stay one story with branches; Assam must not absorb Sikkim).
-LEIDEN_RESOLUTION = 1.0
+# CPM resolution, NOT modularity's. leiden_partition uses CPMVertexPartition
+# because modularity has a resolution limit and CPM does not (Fortunato &
+# Barthelemy, PNAS 2007; Traag et al. 2011). Under modularity no floor could both
+# split the 80-event blob and hold a real story together — same edges, same floor:
+#
+#     rb  1.000  floor 0.15  ->  max 80  >25=12     (blob-and-dust)
+#     cpm 0.020  floor 0.15  ->  max 34  >25= 1     (blobs broken)
+#
+# CPM's parameter is an absolute density threshold, so it is on the scale of the
+# edge weights (IDF sums), not modularity's 1.0. Do not read 0.020 as "20x finer".
+LEIDEN_RESOLUTION = 0.020
 # The Leiden graph's own edge floor, deliberately SEPARATE from
 # threads.STORY_MIN_EDGE_WEIGHT (0.15), which the BFS timeline still uses.
 #
-# Shared-actor edges say WHO, never WHAT HAPPENED, so at 0.15 the partition was
-# producing topic blobs rather than stories. Measured on the live graph
-# (18,490 events, 1,312 edges):
+# This floor CAME DOWN from 0.50, which is the whole point of the content gate.
+# Shared-actor weight says WHO, never WHAT HAPPENED, so it was being asked to
+# carry precision on its own and could not: raising it cut a story's aftermath
+# (different people) while two unrelated bills sailed through on shared
+# politicians. With CONTENT_MIN_SIM confirming each edge, the actor bar only has
+# to propose, so it can be permissive again and stop destroying recall.
 #
-#   floor   multi-event stories   largest   stories >=30
-#   0.15            146              80           8
-#   0.30            158              44           4
-#   0.50            159              29           0
-#   0.80             94              10           0
+# Chosen from the CENTRE of a broad plateau, not the argmin — see
+# tools/sweep_partition. Selecting the single best of ~150 cells on a 45-story
+# gold set finds a sharp optimum whether or not one exists, and a first attempt at
+# exactly that (CPM alone, tuned) LOST to production on held-out folds in both
+# directions. Every config in res 0.02-0.03 x floor 0.15-0.30 x csim 0.20-0.25
+# beats the old configuration on the full set; this cell is one of only two that also
+# beats it on both folds independently, which is why it and not the argmin.
 #
-# 0.50 is a strict improvement: MORE stories than today AND no blobs, because
-# cutting weak edges splits a mega-community into real stories instead of
-# deleting it. 0.80 over-prunes and starts destroying real ones.
+#   config                          P        R      F1     Cdet   fp   max  >25
+#   rb  1.0   floor 0.50 gate     0.2709  0.5340  0.3595  0.6496  148   32   1
+#   cpm 0.020 floor 0.30 csim .20 0.4344  0.5146  0.4711  0.5710   69   23   0
 #
-# What that looks like in content: at 0.15 one 58-event "story" was SC contempt
-# notices, a TASMAC white paper, the Southern Zonal Council, the Chennai Mayor's
-# cyberbullying complaint and CM Vijay lobbying Ford — all of Tamil Nadu politics.
-# At 0.50 the CJP material separates into a 29-event political-response story and
-# an 18-event medical/legal-aftermath story, both keeping their Hindi members.
-#
-# threads.py:352-363 warns that raising the weight also drops CJP's legitimate
-# cross-state links, which is why the BFS path solved this with a seed-relative
-# embedding distance instead. On the partition that warning does not hold: the
-# CJP story keeps 29 members here, essentially what that gate achieved (~28/31).
-# Left at 0.15 for threads.py, which is a different traversal with its own guard.
-PARTITION_MIN_EDGE_WEIGHT = 0.50
+# Wrong merges more than halved (148 -> 69) for two extra wrong splits, and the
+# size distribution lands on the published reference (Story Forest, CIKM 2017:
+# mean 4.07, median 3, max 25) at mean 3.32, max 23, zero groups over 25.
+PARTITION_MIN_EDGE_WEIGHT = 0.30
 
 # Branch-tree gate: a member must share this much root-spine IDF weight AND embed
 # within STORY_MAX_EMBED_DIST of the root to hang on the main tree (else it is in
@@ -228,7 +233,7 @@ def leiden_partition(
             weights.append(w)
     part = leidenalg.find_partition(
         g,
-        leidenalg.RBConfigurationVertexPartition,
+        leidenalg.CPMVertexPartition,
         weights=weights or None,
         resolution_parameter=resolution,
         seed=42,  # deterministic
@@ -266,7 +271,8 @@ def leiden_partition(
 # gold stories split across groups stays 2/25). That is a gate dropping only bad
 # edges, not a precision/recall trade — which is what makes it safe to ship where
 # the headline gate of #131 was not.
-CONTENT_MIN_SHARED_WORDS = 1
+CONTENT_MIN_SIM = 0.20      # headline content-word overlap an edge must clear
+CONTENT_MIN_SHARED_WORDS = 1  # kept for _content_linked's callers/tests
 
 # Function words only. Deliberately NOT a news-vocabulary stoplist ("police",
 # "court", "protest"): those ARE the story signal this gate reads. An early version
@@ -324,46 +330,45 @@ def _content_linked(a: Node, b: Node, min_shared: int = CONTENT_MIN_SHARED_WORDS
     return len(wa & wb) >= min_shared
 
 
-def split_on_shared_content(
-    labels: dict[str, int], nodes: dict[str, Node], min_shared: int = CONTENT_MIN_SHARED_WORDS
-) -> dict[str, int]:
-    """Refine a Leiden partition: within each community, keep only the events joined
-    by a chain of content-sharing headlines. Splits only — it can never merge two
-    communities — so it cannot undo the boundary Leiden and the veto agreed on.
+def content_similarity(a: Node, b: Node) -> float | None:
+    """Overlap coefficient of two headlines' content words, or None for "no evidence".
+
+    None is NOT zero. A pair written in different scripts, or a title we cannot
+    tokenise, is a pair this gate knows nothing about — and the gold set behind the
+    threshold is Latin-headline heavy. Scoring those as dissimilar would delete
+    every cross-script edge and look like a clean result while quietly destroying
+    the Hindi and Kannada stories.
     """
-    by_comm: dict[int, list[str]] = defaultdict(list)
-    for eid, comm in labels.items():
-        by_comm[comm].append(eid)
-
-    out: dict[str, int] = {}
-    nxt = 0
-    for comm in sorted(by_comm):
-        members = sorted(by_comm[comm])
-        parent = {e: e for e in members}
-        for i, a in enumerate(members):
-            na = nodes.get(a)
-            for b in members[i + 1:]:
-                nb = nodes.get(b)
-                if na is None or nb is None or _content_linked(na, nb, min_shared):
-                    ra, rb = _find(parent, a), _find(parent, b)
-                    if ra != rb:
-                        parent[ra] = rb
-        relabel: dict[str, int] = {}
-        for e in members:
-            root = _find(parent, e)
-            if root not in relabel:
-                relabel[root] = nxt
-                nxt += 1
-            out[e] = relabel[root]
-    return out
+    if detect_script(a.title) != detect_script(b.title):
+        return None
+    wa, wb = _content_words(a.title), _content_words(b.title)
+    if not wa or not wb:
+        return None
+    return len(wa & wb) / min(len(wa), len(wb))
 
 
-def _find(parent: dict[str, str], x: str) -> str:
-    """Union-find root with path compression."""
-    while parent[x] != x:
-        parent[x] = parent[parent[x]]
-        x = parent[x]
-    return x
+def filter_edges_on_content(
+    edges: list[tuple[str, str, float]],
+    nodes: dict[str, Node],
+    min_sim: float = CONTENT_MIN_SIM,
+) -> list[tuple[str, str, float]]:
+    """Drop actor-derived edges that no shared content supports.
+
+    Two gates, and they are independent by design (Story Forest's coarse+fine):
+    shared actors PROPOSE the link, shared content CONFIRMS it. That is why the
+    actor floor can now come DOWN to 0.30 — the entity bar no longer has to carry
+    precision on its own, which is what it was never able to do.
+    """
+    kept = []
+    for a, b, w in edges:
+        na, nb = nodes.get(a), nodes.get(b)
+        if na is None or nb is None:
+            kept.append((a, b, w))
+            continue
+        sim = content_similarity(na, nb)
+        if sim is None or sim >= min_sim:  # no evidence never cuts
+            kept.append((a, b, w))
+    return kept
 
 
 # ── Branch tree (L3) ─────────────────────────────────────────────────────────
@@ -648,9 +653,9 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION, llm_veto: boo
     async with session_scope() as session:
         nodes = await _load_nodes(session)
         edges = await _load_edges(session)
+        # Two independent gates: actors propose the edge, content confirms it.
+        edges = filter_edges_on_content(edges, nodes)
         labels = leiden_partition(nodes, edges, resolution)
-        # Shared actors put them together; shared content decides if they stay.
-        labels = split_on_shared_content(labels, nodes)
         edge_w = _edge_weight_map(edges)
         by_story = _group_by_story(labels, nodes)
         veto_log = await _apply_veto(session, by_story, get_settings().prism_model_gate) if llm_veto else []
@@ -670,7 +675,7 @@ def veto_config_version() -> str:
         # re-vet. story_signature already covers a membership change for stories
         # that exist; this covers the config itself so a revert to the old value
         # cannot silently reuse verdicts taken under the new one.
-        f"|stop={len(_STORY_STOP_LIST)}|content={CONTENT_MIN_SHARED_WORDS}|v1"
+        f"|stop={len(_STORY_STOP_LIST)}|csim={CONTENT_MIN_SIM}|floor={PARTITION_MIN_EDGE_WEIGHT}|v2"
     )
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
