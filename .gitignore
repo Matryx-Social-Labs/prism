@@ -40,3 +40,4 @@ ds-bundle/
 .design-sync/node_modules
 web/.ds-tailwind.css
 .gstack/
+.cache/

@@ -51,12 +51,19 @@ def _db_url() -> str:
     return re.sub(r"^postgresql\+asyncpg://", "postgresql://", raw)
 
 
-def report(predicted: dict[str, str], label: str = "current partition") -> None:
-    """predicted: event_id -> whatever group id the system put it in."""
-    p = pairs()
-    scored = {k: v for k, v in p.items() if k[0] in predicted and k[1] in predicted}
+def score_pairs(predicted: dict[str, str], keys: set[str] | None = None) -> dict:
+    """THE scorer. One copy, so two callers cannot quietly disagree about what a
+    number means — tools/sweep_partition imports this rather than reimplementing it.
+
+    `keys` restricts scoring to events in those gold stories, which is how the
+    cross-validation split judges a config on stories it was not tuned on.
+    """
     tp = fp = fn = tn = 0
-    for (a, b), same in scored.items():
+    for (a, b), same in pairs().items():
+        if a not in predicted or b not in predicted:
+            continue
+        if keys is not None and not (STORY_OF[a] in keys and STORY_OF[b] in keys):
+            continue
         together = predicted[a] == predicted[b]
         tp += together and same
         fp += together and not same
@@ -64,13 +71,25 @@ def report(predicted: dict[str, str], label: str = "current partition") -> None:
         tn += (not together) and not same
     prec = tp / (tp + fp) if tp + fp else 0.0
     rec = tp / (tp + fn) if tp + fn else 0.0
-    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
     npos, nneg = tp + fn, fp + tn
-    cdet = (C_MISS * fn / npos if npos else 0) + (C_FA * fp / nneg if nneg else 0)
+    return {
+        "P": prec, "R": rec,
+        "F1": 2 * prec * rec / (prec + rec) if prec + rec else 0.0,
+        "Cdet": (C_MISS * fn / npos if npos else 0) + (C_FA * fp / nneg if nneg else 0),
+        "tp": tp, "fp": fp, "fn": fn, "tn": tn, "pairs": tp + fp + fn + tn,
+    }
+
+
+def report(predicted: dict[str, str], label: str = "current partition") -> None:
+    """predicted: event_id -> whatever group id the system put it in."""
+    s = score_pairs(predicted)
+    prec, rec, f1, cdet = s["P"], s["R"], s["F1"], s["Cdet"]
+    tp, fp, fn = s["tp"], s["fp"], s["fn"]
+    scored = {"n": s["pairs"]}
 
     covered = len([e for e in STORY_OF if e in predicted])
     print(f"\n── {label} ──")
-    print(f"  {covered}/{event_count()} labelled events found, {len(scored)} pairs scored")
+    print(f"  {covered}/{event_count()} labelled events found, {scored['n']} pairs scored")
     print(f"  P {prec:.4f}   R {rec:.4f}   F1 {f1:.4f}   Cdet {cdet:.4f}")
     print(f"  tp {tp}  fp {fp} (wrong merges)  fn {fn} (wrong splits)")
 
