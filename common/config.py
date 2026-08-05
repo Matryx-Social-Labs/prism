@@ -1,6 +1,7 @@
 import os
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,18 +9,18 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Infrastructure
-    database_url: str = "postgresql+asyncpg://prism:prism@localhost:5432/prism"
-    redis_url: str = "redis://localhost:6379/0"
+    database_url: str = Field("postgresql+asyncpg://prism:prism@localhost:5432/prism", repr=False)
+    redis_url: str = Field("redis://localhost:6379/0", repr=False)
 
     # LLM provider. Both are OpenAI-compatible, so switching is base_url + key +
     # model IDs. OpenRouter is primary (per-token, no weekly cap, one key for many
     # models, structured output, provider fallback). Set LLM_PROVIDER=ollama +
     # override the model IDs below to fall back to Ollama Cloud.
     llm_provider: str = "openrouter"  # openrouter | ollama
-    openrouter_api_key: str = ""
+    openrouter_api_key: str = Field("", repr=False)
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     # Ollama Cloud (fallback, OpenAI-compatible)
-    ollama_api_key: str = ""
+    ollama_api_key: str = Field("", repr=False)
     ollama_base_url: str = "https://ollama.com/v1"
 
     # Per-stage models — OpenRouter IDs, every one env-overridable (PRISM_MODEL_*).
@@ -96,8 +97,21 @@ class Settings(BaseSettings):
 
     # Langfuse (self-hosted). The SDK also reads LANGFUSE_* env vars directly;
     # these mirror them so app code can check whether tracing is configured.
-    langfuse_public_key: str = ""
-    langfuse_secret_key: str = ""
+    #
+    # OFF BY DEFAULT, and deliberately so: the self-hosted stack (web + worker +
+    # Postgres + Redis + ClickHouse + MinIO) cost $70 in its first two weeks,
+    # more than the LLM spend it was there to observe. It is now configured to
+    # scale to zero after 10 idle minutes, which means ANY background trace wakes
+    # the whole stack and starts billing again. A pipeline that traces by default
+    # would keep it permanently awake, so tracing is opt-in per environment.
+    #
+    # Setting the keys is NOT enough to enable it — that was the old rule, and it
+    # made "cost" a side effect of "credentials are present", which is not a
+    # decision anyone makes on purpose. Set PRISM_LANGFUSE_ENABLED=true when you
+    # actually want to look at traces.
+    prism_langfuse_enabled: bool = False
+    langfuse_public_key: str = Field("", repr=False)
+    langfuse_secret_key: str = Field("", repr=False)
     langfuse_base_url: str = ""
     # Tags every trace with an environment so local/dev traces are filterable and
     # never mixed with prod in the shared Langfuse. Local sets "development";
@@ -111,12 +125,12 @@ class Settings(BaseSettings):
 
     # API
     cors_origins: str = "http://localhost:3000"
-    prism_admin_token: str = "change-me"
+    prism_admin_token: str = Field("change-me", repr=False)
 
     # Auth (magic-link, bearer). Web URL is where the verify link points.
     prism_web_url: str = "http://localhost:3000"
     prism_email_provider: str = "console"  # console (dev) | resend
-    resend_api_key: str = ""
+    resend_api_key: str = Field("", repr=False)
     prism_email_from: str = "Prism <onboarding@resend.dev>"  # set to a verified domain sender
     prism_magic_token_ttl_min: int = 15  # magic-link lifetime
     prism_session_ttl_days: int = 30  # bearer session lifetime
@@ -124,7 +138,7 @@ class Settings(BaseSettings):
     prism_free_markets_samples: int = 3  # sample grant on signup (D13 Markets-only)
 
     # Sources
-    nvd_api_key: str = ""
+    nvd_api_key: str = Field("", repr=False)
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -132,7 +146,10 @@ class Settings(BaseSettings):
 
     @property
     def langfuse_enabled(self) -> bool:
-        return bool(self.langfuse_public_key and self.langfuse_secret_key)
+        """Tracing costs money, so it takes an explicit switch AND credentials."""
+        return bool(
+            self.prism_langfuse_enabled and self.langfuse_public_key and self.langfuse_secret_key
+        )
 
 
 @lru_cache

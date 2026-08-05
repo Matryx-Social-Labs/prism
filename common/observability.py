@@ -5,11 +5,14 @@ fallback files in common/prompts/fallbacks/ keep the pipeline running if
 Langfuse is unreachable (prompt-management "guaranteed availability").
 """
 
+import functools
+import inspect
 import json
 import logging
 from pathlib import Path
 
-from langfuse import get_client, observe  # noqa: F401  (observe re-exported for stages)
+from langfuse import get_client
+from langfuse import observe as _sdk_observe
 
 from common.config import get_settings
 
@@ -19,7 +22,58 @@ FALLBACK_DIR = Path(__file__).parent / "prompts" / "fallbacks"
 
 
 def get_langfuse():
+    """The Langfuse client, or None when tracing is off.
+
+    Returns None rather than raising: callers are observability paths, and losing
+    a trace must never take down the stage it was watching.
+    """
+    if not get_settings().langfuse_enabled:
+        return None
     return get_client()
+
+
+def observe(*dargs, **dkwargs):
+    """Trace this stage — or, when tracing is off, be exactly the plain function.
+
+    The self-hosted Langfuse scales to zero after 10 idle minutes, so a single
+    background span wakes the whole stack (web + worker + ClickHouse + MinIO) and
+    restarts billing. The gate therefore has to sit BEFORE the SDK is touched, not
+    merely drop the span afterwards: `_sdk_observe` is applied lazily on the first
+    ENABLED call, so with tracing off no client is ever constructed, no exporter
+    thread starts, and nothing is queued for flush.
+
+    Checked per call rather than at import so a process can be flipped without a
+    redeploy, and so tests can toggle it without reimporting every stage module.
+    """
+
+    def decorate(fn):
+        traced = None
+
+        def _traced():
+            nonlocal traced
+            if traced is None:
+                traced = _sdk_observe(*dargs, **dkwargs)(fn)
+            return traced
+
+        if inspect.iscoroutinefunction(fn):
+
+            @functools.wraps(fn)
+            async def awrapper(*args, **kwargs):
+                if not get_settings().langfuse_enabled:
+                    return await fn(*args, **kwargs)
+                return await _traced()(*args, **kwargs)
+
+            return awrapper
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not get_settings().langfuse_enabled:
+                return fn(*args, **kwargs)
+            return _traced()(*args, **kwargs)
+
+        return wrapper
+
+    return decorate
 
 
 def fetch_prompt(name: str, *, prompt_type: str = "chat"):
