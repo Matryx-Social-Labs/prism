@@ -219,15 +219,29 @@ def leiden_partition(
     resolution: float = LEIDEN_RESOLUTION,
 ) -> dict[str, int]:
     """Partition events into stories. Isolated nodes (no qualifying edge) each get
-    their own singleton story. Returns {event_id: story_label}."""
+    their own singleton story. Returns {event_id: story_label}.
+
+    Nodes and edges are SORTED before the graph is built, and that is load-bearing.
+    seed=42 fixes Leiden's RNG but not the vertex ordering, and Leiden's local
+    moves are order-sensitive — so feeding the same graph in a different order
+    reaches a different local optimum. Both inputs arrive straight from SQL, which
+    guarantees no row order at all, so the story boundary was quietly varying
+    between runs on identical data: 32 of 3,655 gold pairs landed in different
+    groups offline vs in production, from the same 19,337 events.
+
+    That is not just a reproducibility annoyance. Unstable boundaries mean trending
+    stories churn between passes for no reason a reader could perceive, and it made
+    the offline harness disagree with production about how good a config was.
+    """
     import igraph as ig
     import leidenalg
 
-    idx = {eid: i for i, eid in enumerate(nodes)}
+    names = sorted(nodes)
+    idx = {eid: i for i, eid in enumerate(names)}
     g = ig.Graph(n=len(idx))
-    g.vs["name"] = list(nodes)
+    g.vs["name"] = names
     weights = []
-    for a, b, w in edges:
+    for a, b, w in sorted(edges):
         if a in idx and b in idx:
             g.add_edge(idx[a], idx[b])
             weights.append(w)
@@ -236,7 +250,7 @@ def leiden_partition(
         leidenalg.CPMVertexPartition,
         weights=weights or None,
         resolution_parameter=resolution,
-        seed=42,  # deterministic
+        seed=42,
     )
     return {g.vs[v]["name"]: comm for comm, members in enumerate(part) for v in members}
 
