@@ -106,3 +106,41 @@ def test_stoplist_holds_function_words_not_news_words():
         assert w not in _TITLE_STOP, f"{w!r} is story signal and must not be stopped"
     for w in ("about", "would", "their", "which"):
         assert w in _TITLE_STOP
+
+
+# --- the partition must not depend on SQL row order --------------------------
+
+
+def _grouping(labels):
+    """Labels are arbitrary ints; compare the PARTITION, not the numbering."""
+    return {frozenset(e for e in labels if labels[e] == g) for g in set(labels.values())}
+
+
+def test_partition_is_independent_of_input_order():
+    """seed=42 fixes Leiden's RNG but NOT the vertex ordering, and its local moves
+    are order-sensitive. Nodes and edges arrive straight from SQL, which guarantees
+    no row order, so without sorting the story boundary varies between runs on
+    identical data — 32 of 3,655 gold pairs differed between the offline harness
+    and production from the same 19,337 events.
+
+    The graph below is sparse with UNIFORM weights on purpose. A clean block
+    structure is stable whatever the order (the first version of this test used
+    one and passed with the sorting deleted — i.e. it tested nothing). Ties are
+    where the optimum is genuinely ambiguous and the input order decides it.
+    """
+    import random
+
+    from correlation.partition import leiden_partition
+
+    rng = random.Random(1)
+    ids = [f"{i:08d}-0000-0000-0000-000000000000" for i in range(40)]
+    edges = [(a, b, 0.5) for i, a in enumerate(ids) for b in ids[i + 1:] if rng.random() < 0.08]
+    nodes = {i: n(i, "x") for i in ids}
+
+    base = _grouping(leiden_partition(nodes, edges, 0.02))
+    for _ in range(6):
+        shuffled_edges, shuffled_ids = edges[:], ids[:]
+        rng.shuffle(shuffled_edges)
+        rng.shuffle(shuffled_ids)
+        other = leiden_partition({i: nodes[i] for i in shuffled_ids}, shuffled_edges, 0.02)
+        assert _grouping(other) == base, "partition changed with input order"
