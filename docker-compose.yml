@@ -11,6 +11,10 @@ services:
       - "5432:5432"
     volumes:
       - prism_pgdata:/var/lib/postgresql/data
+      # Creates prism_test on first boot. conftest.py treats a `_test` database
+      # as a safe target but nothing was creating one, so the destructive DB
+      # tests ran against the dev database by default.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prism -d prism"]
       interval: 5s
@@ -29,6 +33,27 @@ services:
       timeout: 3s
       retries: 10
 
+  # Local LLM, so the whole pipeline runs with no API key and no spend.
+  # common/llm.py already takes base_url from settings, so this needs
+  # configuration only — set LLM_PROVIDER=ollama and OLLAMA_BASE_URL to
+  # http://localhost:11434/v1. No code change.
+  #
+  # Under the `local-llm` profile so `docker compose up -d` stays fast for
+  # anyone who is pointing at OpenRouter: `docker compose --profile local-llm up -d`.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - prism_ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   prism_pgdata:
   prism_redisdata:
+  prism_ollama:

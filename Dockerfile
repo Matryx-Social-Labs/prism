@@ -26,7 +26,16 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Bake the embedding model into the image: containers have no persistent
 # cache, so without this every boot re-downloads from HF (slow cold starts).
-RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5', cache_dir='.fastembed_cache')"
+#
+# The model is read from common/config.py rather than hardcoded. It WAS
+# hardcoded to BAAI/bge-small-en-v1.5 (384-dim) long after the default moved to
+# a 768-dim multilingual model, so the bake cached a model the app never loads
+# and production re-downloaded on every boot — a cold-start optimization that
+# silently did nothing. tests/test_dockerfile_bake.py fails if this drifts again.
+RUN python -c "\
+from fastembed import TextEmbedding; \
+from common.config import get_settings; \
+TextEmbedding(get_settings().prism_embed_model, cache_dir='.fastembed_cache')"
 
 # One image, two roles: PRISM_SERVICE_ROLE=worker runs the pipeline worker;
 # anything else (default) runs migrations + the API. Lets both Railway
