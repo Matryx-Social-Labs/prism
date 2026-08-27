@@ -57,8 +57,11 @@ agent.rag, personalization.ranking, common.lenses"
 	@echo ""
 	@echo "  check: PASS"
 
-seed:  ## Load the offline fixture corpus (no API keys, no LLM spend)
-	uv run python -m tools.load_fixtures
+# Fixtures go in the DEV database, never prism_test — pytest owns that one, and
+# fixture rows break tests that count.
+seed:  ## Load the offline fixture corpus into the DEV db (no API keys, no LLM spend)
+	DATABASE_URL=postgresql+asyncpg://prism:prism@localhost:5432/prism \
+		uv run python -m tools.load_fixtures
 
 sweep:  ## Offline story-layer sweep against the snapshot (zero LLM cost)
 	uv run python -m tools.sweep_partition --cv

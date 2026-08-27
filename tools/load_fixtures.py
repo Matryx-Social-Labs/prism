@@ -82,7 +82,18 @@ def _refuse_non_local() -> None:
     raw = re.sub(r"^postgresql\+asyncpg://", "postgresql://", get_settings().database_url)
     host = urlparse(raw).hostname or ""
     name = (urlparse(raw).path or "").lstrip("/")
-    if host in LOCAL_HOSTS or name.endswith("_test"):
+    # A *_test database is where pytest runs, and pytest assumes it owns the
+    # tables it touches. Loading 152 events and 624 articles into it silently
+    # broke a test that counts rows — found the hard way. Fixtures belong in the
+    # DEV database; tests get a clean one.
+    if name.endswith("_test"):
+        raise SystemExit(
+            f"refusing to load fixtures into {name!r}: that is the test database.\n"
+            "pytest assumes it owns those tables, and fixture rows break tests that\n"
+            "count. Point DATABASE_URL at the dev database instead, e.g.\n"
+            "  DATABASE_URL=postgresql+asyncpg://prism:prism@localhost:5432/prism make seed"
+        )
+    if host in LOCAL_HOSTS:
         return
     raise SystemExit(
         f"refusing to load fixtures into a non-local database (host={host!r} db={name!r}).\n"

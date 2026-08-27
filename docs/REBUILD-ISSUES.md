@@ -12,7 +12,7 @@ Ordered by severity within each group. Update as things land.
 | # | Issue | Evidence | Status |
 |---|---|---|---|
 | A1 | **Story layer is wrong about half the time.** | P 0.4344 / R 0.5146 / F1 0.4711 vs 45-story gold set. ~200 configs swept; plateau. | OPEN — step 6 |
-| A2 | **Language is a lie at the source.** `ingestion/rss.py:115` hardcodes `language="en"` on every envelope. | All **1,385** non-Latin production articles labelled English. The correct value is already in `sources.language`. | OPEN — step 1 |
+| A2 | **Language is a lie at the source.** `ingestion/rss.py:115` hardcoded `language="en"` on every envelope. | All **1,385** non-Latin production articles labelled English while `sources.language` held the truth. | **FIXED** — source is now the authority at the persist choke point; migration backfills |
 | A3 | **Kannada/Tamil embeddings carry no signal.** | AUC ≈ 0.5. Root cause found: `paraphrase-multilingual-mpnet-base-v2` supports 50 languages and `kn`/`ta` are **not among them** (`hi`/`gu`/`mr` are). Out-of-distribution, not "collapsed". | OPEN — steps 2–3 |
 | A4 | **Tickers are hallucinations.** `FinanceLens.tickers` are LLM-guessed strings validated against nothing, joined into `watchlist`. | No market data exists at all. A hallucinated symbol becomes a followable entity. | OPEN — step 9 |
 | A5 | **Perspectives cannot do what the tagline promises.** Per-event not per-story; speaker is free text not an entity; no quotes; no time; forces one article into exactly one narrative. | `event-analysis` prompt, Task 1. An article quoting two actors is filed under one. | OPEN — steps 5b–5d |
@@ -81,6 +81,8 @@ Ordered by severity within each group. Update as things land.
 | H2 | **Check evidence recency, not existence.** "CI works" was based on runs 22 days old. | Told the founder their own account information was wrong. |
 | H3 | **A subset cannot measure a corpus-relative statistic.** IDF over 152 events ≠ IDF over 19,337. | Fixture L2 scores P 0.17 vs prod 0.43 — would read as a regression. |
 | H4 | **Absence of a signal ≠ a negative signal.** | Guarded in the content gate; the reason silence-as-signal is deferred. |
+| H5 | **A source-inspection test will match its own explanatory comment.** Bit twice — the Dockerfile model check and the language check both failed on the comment describing the bug. Strip comments before asserting. | Keeping the history is worth more than a simpler assertion. |
+| H6 | **Fixtures and tests must not share a database.** Loading the corpus into `prism_test` silently broke a test that counts rows. | My own error. `make seed` now targets the dev DB and the loader refuses `*_test` outright. |
 
 ## G. Operational
 

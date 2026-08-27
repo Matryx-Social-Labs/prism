@@ -112,7 +112,11 @@ async def collect() -> int:
                         url=entry.get("link"),
                         title=entry.get("title", "(untitled)"),
                         body=_strip_html(summary) or None,
-                        language="en",
+                        # None, not "en" — the source is the authority (see
+                        # ingestion/base.py::persist_envelopes). A collector
+                        # asserting a language it cannot know is how every
+                        # non-Latin article ended up labelled English.
+                        language=None,
                         published_at=_entry_datetime(entry),
                         image_url=_entry_image(entry),
                         raw={k: str(v)[:2000] for k, v in dict(entry).items()},
