@@ -13,13 +13,22 @@ Ordered by severity within each group. Update as things land.
 |---|---|---|---|
 | A1 | **Story layer is wrong about half the time.** | P 0.4344 / R 0.5146 / F1 0.4711 vs 45-story gold set. ~200 configs swept; plateau. | OPEN — step 6 |
 | A2 | **Language is a lie at the source.** `ingestion/rss.py:115` hardcoded `language="en"` on every envelope. | All **1,385** non-Latin production articles labelled English while `sources.language` held the truth. | **FIXED** — source is now the authority at the persist choke point; migration backfills |
-| A3 | **Indic embedding quality — resolved by bake-off across 5 models × 12 languages.** | **Cross-lingual P@1** (FLORES-200): mpnet kannada 0.875 / assamese 0.715 → **mE5-base 1.000 / 0.985**. **Monolingual news AUC**: kannada mpnet 0.7006 → mE5-base 0.7475; devanagari 0.8518 → 0.8311 (a real regression, accepted). LaBSE has the best Kannada but the worst Devanagari — it is a bitext specialist. Vyakyarth, the *Indic-specific* model, loses to mE5 on both axes. | **DECIDED — adopt `intfloat/multilingual-e5-base`** (768-dim, no migration). Step 3 reinstated. |
+| A3 | **Indic embedding quality — resolved by bake-off across 5 models × 12 languages, on three axes.** | **Cross-lingual, FLORES prose (P@1)**: mpnet kn 0.875 / as 0.715 → mE5-base **1.000 / 0.985**. **Cross-lingual, REAL NEWS (P@1)**: mpnet deva 0.483 / kn 0.444 → mE5-base **0.531 / 0.778**; LaBSE 0.497 / 0.722 despite perfect FLORES — its bitext specialism does not transfer. **Monolingual news AUC**: kn 0.7006 → 0.7475; deva 0.8518 → 0.8311. Vyakyarth (Indic-specific) loses on every axis. | **DECIDED — `intfloat/multilingual-e5-base`.** 768-dim, official ONNX, fastembed-servable with no torch in the container. See **B0** before implementing. |
 | A4 | **Tickers are hallucinations.** `FinanceLens.tickers` are LLM-guessed strings validated against nothing, joined into `watchlist`. | No market data exists at all. A hallucinated symbol becomes a followable entity. | OPEN — step 9 |
 | A5 | **Perspectives cannot do what the tagline promises.** Per-event not per-story; speaker is free text not an entity; no quotes; no time; forces one article into exactly one narrative. | `event-analysis` prompt, Task 1. An article quoting two actors is filed under one. | OPEN — steps 5b–5d |
 | A6 | **Offices resolve to the wrong person over time.** "The Education Minister" is Pradhan before his resignation and someone else after — mid-arc in the CJP story. | Would silently attribute one person's statements to another. | OPEN — step 5b |
 | A7 | **Entity canonicalization is a hand-maintained list.** 21 pairs, English-romanisation-specific. | 39 slugs hold multiple entity rows; IDF distorted up to **372×**. Both `Cockroach Janata Party` and `Cockroach Janta Party` sit in one story's cast. | OPEN — step 5 |
 
 ## B. Silent failure — things that look fine and are not
+
+> **B0 — PENDING, and the biggest trap in step 3.** Swapping to mE5 **requires
+> retuning every embedding threshold**. E5 compresses the space: measured on real
+> text, an EN↔HI *same-story* pair sits at cosine distance **0.1527** while an
+> EN↔EN *unrelated* pair sits at **0.1975**. The live `EMBEDDING_DISTANCE_THRESHOLD`
+> is **0.12**, which rejects BOTH — so the embedding match tier would silently stop
+> firing entirely while every health check stayed green. `STORY_MAX_EMBED_DIST=0.55`
+> and `LOOSE_DISTANCE=0.45` need the same treatment. Retune against `gold_pairs`
+> before the swap ships, never after.
 
 | # | Issue | Evidence | Status |
 |---|---|---|---|
