@@ -63,9 +63,12 @@ seed:  ## Load the offline fixture corpus (no API keys, no LLM spend)
 sweep:  ## Offline story-layer sweep against the snapshot (zero LLM cost)
 	uv run python -m tools.sweep_partition --cv
 
-score:  ## Score the current partition against the gold sets
-	uv run python -m tools.score_stories
+score:  ## Score against the gold sets. L1 is faithful on fixtures; L2 needs the full corpus.
 	uv run python -m tools.score_clustering
+	@echo ""
+	@echo "  NOTE: score_stories (L2) is only meaningful against the FULL corpus."
+	@echo "  On the fixture subset, 1/df inflates and it over-merges by construction."
+	@echo "  Use: make sweep   (snapshot of production, read-only, zero LLM cost)"
 
 clean:  ## Remove caches
 	find . -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
