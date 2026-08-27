@@ -27,20 +27,55 @@ number to tune.
 
 PASS BAR: kannada and tamil must reach devanagari's current numbers.
 
-RESULT, 2026-08-27 — the pass bar was NOT met, and the hypothesis was wrong.
+RESULT, 2026-08-27 — full bake-off across 5 models and 12 Indian languages.
 
-    model                              latin   devanagari   kannada
-    paraphrase-multilingual-mpnet     0.9811     0.8518     0.7006
-    intfloat/multilingual-e5-large    0.9837     0.8888     0.6958
+NEWS-DOMAIN monolingual same-story AUC (production titles, entity-formed labels):
 
-mE5 does NOT fix Kannada. It improves Devanagari (+0.037) and leaves Latin
-saturated, but Kannada is flat-to-slightly-worse. Since large generally
-dominates base, mE5-base will not rescue it either — so the 1024-dim migration
-buys nothing for the scripts it was proposed for.
+    model              latin   devanagari   kannada
+    mpnet             0.9811     0.8518     0.7006
+    mE5-base          0.9827     0.8311     0.7475
+    LaBSE             0.9906     0.7949     0.7564
+    Vyakyarth         0.9896     0.8355     0.7181
 
-The "kn/ta are absent from mpnet's 50-language list, mE5's CC-100 backbone has
-them, therefore a swap fixes it" argument was sound and still lost to the
-measurement. That is what the bake-off is for.
+CROSS-LINGUAL alignment, FLORES-200 P@1 (see tools/score_crosslingual.py):
+
+    model              kannada   tamil   malayalam   assamese
+    mpnet                0.875   0.935       0.925      0.715
+    mE5-base             1.000   0.995       1.000      0.985
+    mE5-large            1.000   1.000       1.000      0.995
+    LaBSE                1.000   1.000       1.000      1.000
+    Vyakyarth            0.990   0.995       0.995      0.800
+
+DECISION: intfloat/multilingual-e5-base.
+
+  - 768-dim, so NO vector migration, no HNSW rebuild, no ORM dim change.
+  - Cross-lingual goes from 0.875 to 1.000 on Kannada and 0.715 to 0.985 on
+    Assamese. That is the capability that makes multilingual ingestion pay:
+    a Hindi and an English report of one event become two INDEPENDENT sources,
+    which is the corroboration the product sells.
+  - Kannada monolingual +0.047; Latin unchanged.
+  - Costs Devanagari -0.021, which is a real regression on our largest
+    non-English corpus and is accepted deliberately, not overlooked.
+
+WHY NOT THE OTHERS:
+  - LaBSE has the best Kannada (0.7564) and perfect cross-lingual, but the WORST
+    Devanagari (0.7949, -0.057 vs incumbent). It is a bitext-mining specialist —
+    tuned to pull translations together, which trades against general semantic
+    discrimination. Perfect P@1 was necessary, not sufficient, exactly as flagged.
+  - Vyakyarth, the Indic-SPECIFIC model, loses to mE5 on both axes (Assamese
+    0.800 cross-lingual, Kannada 0.7181 monolingual). "Indic-specific" is not
+    automatically better.
+  - mE5-large matches base cross-lingually and costs a 1024-dim migration plus
+    2.24 GB resident. Base is the same answer for less.
+
+CORRECTION TO AN EARLIER CONCLUSION IN THIS FILE: a first pass measured ONLY
+monolingual same-story AUC, found mE5 flat on Kannada, and concluded the model
+swap was pointless. That was the wrong test. Monolingual asks "are two Kannada
+articles about one event close"; the question that decides whether non-English
+ingestion is worth anything is "is a Kannada article close to its ENGLISH
+counterpart" — and there the gap is enormous. Measure the capability the product
+actually needs.
+
 
 TWO CAVEATS, both of which make Kannada's 0.70 OPTIMISTIC rather than pessimistic:
 
@@ -161,11 +196,24 @@ def _cosine_matrix(vectors):
     return 1.0 - (m @ m.T)  # cosine DISTANCE
 
 
-def score_model(model_name: str, by_script: dict[str, list[dict]], prefix: str = "") -> None:
-    import numpy as np
+def _embed(model_name: str, texts: list[str]):
+    """fastembed where it has the model (the production path), sentence-transformers
+    otherwise. Several candidates — LaBSE, Vyakyarth, mE5-base — are not in
+    fastembed's registry, and requiring an ONNX export just to RULE ONE OUT would
+    make the bake-off cost more than the decision is worth."""
     from fastembed import TextEmbedding
 
-    embedder = TextEmbedding(model_name)
+    if model_name in {m["model"] for m in TextEmbedding.list_supported_models()}:
+        return list(TextEmbedding(model_name).embed(texts))
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(model_name, trust_remote_code=True).encode(
+        texts, normalize_embeddings=True, batch_size=32, show_progress_bar=False
+    )
+
+
+def score_model(model_name: str, by_script: dict[str, list[dict]], prefix: str = "") -> None:
+    import numpy as np
     print(f"\n=== {model_name} ===")
     # Absolute cosine distances are NOT comparable between models — E5 packs the
     # whole space much tighter than mpnet (Latin 5th-percentile 0.19 vs 0.73), so
@@ -187,7 +235,7 @@ def score_model(model_name: str, by_script: dict[str, list[dict]], prefix: str =
             print(f"  {script:12} {len(items):4}   (too few titles to measure)")
             continue
         texts = [prefix + i["title"] for i in items]
-        vecs = list(embedder.embed(texts))
+        vecs = _embed(model_name, texts)
         d = _cosine_matrix(vecs)
         n = len(items)
         np.fill_diagonal(d, np.inf)
@@ -214,7 +262,9 @@ def main() -> None:
     ap.add_argument("--snapshot", action="store_true", help="refresh titles from production (read-only)")
     ap.add_argument("--models", default=(
         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2,"
-        "intfloat/multilingual-e5-large"))
+        "intfloat/multilingual-e5-base,"
+        "sentence-transformers/LaBSE,"
+        "krutrim-ai-labs/Vyakyarth"))
     a = ap.parse_args()
     if a.snapshot:
         asyncio.run(build_snapshot())
