@@ -13,7 +13,6 @@ import uuid
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from common import stream
 from common.config import get_settings
 from common.countries import gdelt_country_to_iso
 from common.db import session_scope
@@ -33,7 +32,6 @@ from common.models import (
     RawItem,
 )
 from common.observability import fetch_prompt, observe
-from common.schemas import EventUpdateMessage
 from common.stream import get_redis
 from common.text import entity_slug
 from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
@@ -135,7 +133,6 @@ async def handle_enriched_item(payload: dict) -> None:
     # Real-time path: rebuild the served projection (fast, DB-only) and publish so
     # the feed reflects the new coverage immediately — before any LLM runs.
     await _rebuild_projection(event_id)
-    await stream.publish(stream.EVENT_UPDATES, EventUpdateMessage(event_id=str(event_id)).model_dump())
     # Defer the expensive per-story analysis (perspectives/impacts/briefs/threads)
     # to the debounced sweeper: a burst of coverage for one story then costs a
     # single analysis pass, off the ingest hot path.
@@ -197,7 +194,6 @@ async def analyze_event_now(event_id: uuid.UUID) -> None:
         except Exception:
             # Threads are additive; never fail analysis over them.
             logger.exception("thread_linking_failed", event_id=str(event_id))
-    await stream.publish(stream.EVENT_UPDATES, EventUpdateMessage(event_id=str(event_id)).model_dump())
 
 
 async def _first_chunk_embedding(session, article_id: uuid.UUID) -> list[float] | None:

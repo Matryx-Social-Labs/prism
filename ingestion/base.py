@@ -61,7 +61,7 @@ def clean_text(text: str) -> str:
     publisher meant; React escapes it again at render, so this is not a way in.
 
     Applied here rather than in each collector because every one of them —
-    rss, gdelt, nvd, cisa_kev — persists through this function.
+    rss, nvd, cisa_kev — persists through this function.
     """
     if not text:
         return text

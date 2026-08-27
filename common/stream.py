@@ -8,6 +8,7 @@ later means reimplementing publish/consume, not touching stage logic.
 
 import asyncio
 import json
+import os
 from collections.abc import Awaitable, Callable
 
 import redis.asyncio as aioredis
@@ -21,8 +22,6 @@ logger = get_logger(__name__)
 RAW_ITEMS = "raw.items"
 CLASSIFIED_ITEMS = "classified.items"
 ENRICHED_ITEMS = "enriched.items"
-EVENTS = "events"
-EVENT_UPDATES = "event.updates"
 ADMIN_TRIGGERS = "admin.triggers"  # api -> worker: run ingestion now
 
 _redis: aioredis.Redis | None = None
@@ -42,10 +41,27 @@ def get_redis() -> aioredis.Redis:
     return _redis
 
 
+# Redis streams do NOT drop entries on XACK — an acknowledged message stays in
+# the stream forever unless something trims it. Nothing did, so every topic grew
+# without bound: measured in production at 306,509 entries across five streams
+# (raw.items alone at 141,185). That ends with Redis hitting its memory limit and
+# the pipeline stopping, with no prior symptom.
+#
+# `approximate=True` lets Redis trim on radix-node boundaries, which is far
+# cheaper than exact trimming and overshoots by at most a node. The cap is huge
+# relative to throughput (~1k items per 30-minute ingest run), so a consumer that
+# is behind — or reclaiming after a crash, which XAUTOCLAIM allows up to 5 min —
+# has orders of magnitude of headroom before anything it still needs is trimmed.
+STREAM_MAXLEN = int(os.environ.get("PRISM_STREAM_MAXLEN", "100000"))
+
+
 async def publish(topic: str, message: dict) -> str:
     """Publish a JSON message to a topic. Returns the stream entry id."""
     r = get_redis()
-    entry_id = await r.xadd(topic, {"data": json.dumps(message, default=str)})
+    entry_id = await r.xadd(
+        topic, {"data": json.dumps(message, default=str)},
+        maxlen=STREAM_MAXLEN, approximate=True,
+    )
     return entry_id
 
 
