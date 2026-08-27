@@ -35,14 +35,23 @@ async def _db_reachable() -> bool:
         return False
 
 
-async def _add_member(s, event_id, *, title, summary, source_id):
-    """One article joining an event, as the correlation consumer writes it."""
+async def _add_member(s, event_id, *, title, summary, source_id, minutes_ago=0):
+    """One article joining an event, as the correlation consumer writes it.
+
+    `minutes_ago` is not decoration. Without it every member inserted in one
+    transaction shares a published_at AND a created_at — Postgres evaluates now()
+    at transaction start — so nothing ordered them and this test asserted on a
+    coin flip. It failed 5/5 on one run and passed 5/5 on another with no code
+    change between.
+    """
     raw_id, art_id = uuid.uuid4(), uuid.uuid4()
     await s.execute(
         text("INSERT INTO raw_items (id, source_id, external_id, url, title, raw, "
              "relevance, published_at) "
-             "VALUES (:i, :s, :x, :u, :t, '{}'::jsonb, 'relevant', now())"),
-        {"i": str(raw_id), "s": str(source_id), "x": str(raw_id), "u": f"http://x/{raw_id}", "t": title},
+             "VALUES (:i, :s, :x, :u, :t, '{}'::jsonb, 'relevant', "
+             "now() - make_interval(mins => :m))"),
+        {"i": str(raw_id), "s": str(source_id), "x": str(raw_id), "u": f"http://x/{raw_id}",
+         "t": title, "m": minutes_ago},
     )
     await s.execute(
         text("INSERT INTO articles (id, raw_item_id, clean_text, retrieval_tier, word_count) "
@@ -85,6 +94,7 @@ async def test_the_summary_comes_from_the_founder_not_the_newest_member():
             # The founder — the article the TITLE was copied from.
             created.append(await _add_member(
                 s, eid,
+                minutes_ago=120,  # the founder: oldest article
                 title="AAIB explains to SC why the crash report is delayed",
                 summary="Aircraft Accident Investigation Bureau informs the Supreme Court.",
                 source_id=src))
@@ -93,6 +103,7 @@ async def test_the_summary_comes_from_the_founder_not_the_newest_member():
             # — any later member with different content produced the mismatch.
             created.append(await _add_member(
                 s, eid,
+                minutes_ago=5,  # a later member
                 title="SC directs MEA to trace seafarer missing after Black Sea attack",
                 summary="The Supreme Court directed the Ministry of External Affairs to "
                         "locate an Indian seafarer missing in the Black Sea.",
@@ -237,3 +248,36 @@ async def test_single_origin_DOES_fire_for_one_masthead_across_its_own_feeds():
             await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
             await s.execute(text("DELETE FROM sources WHERE id = ANY(:ids)"),
                             {"ids": [str(src_a), str(src_b)]})
+
+
+def test_the_member_ordering_has_a_deterministic_tiebreaker():
+    """`ORDER BY em.created_at` alone is not a total order, and the tie is real.
+
+    created_at defaults to now(), which Postgres evaluates at TRANSACTION start,
+    so every member written in one transaction shares a timestamp exactly.
+    event_memberships.id is a uuid4 and orders nothing. summaries[0] is what
+    becomes the event summary, so an unstable sort silently swaps in a later
+    member's summary and reintroduces the headline/summary mismatch #135 fixed.
+
+    This is a SOURCE assertion rather than a behavioural one, deliberately. The
+    behavioural test above passes with the tiebreaker removed — on a small table
+    Postgres returns heap order, which happens to be insertion order — so it
+    cannot detect the bug. Asserting the query shape can. Same reasoning as
+    test_the_model_column_is_not_hardcoded_to_a_provider.
+
+    (This test was itself flaky before the fix: it inserted both members with
+    published_at = now() inside one transaction, so nothing ordered them and it
+    asserted on a coin flip — 5/5 failures on one run, 5/5 passes on another,
+    with no code change in between.)
+    """
+    import inspect
+
+    import correlation.consumer as mod
+
+    src = inspect.getsource(mod)
+    assert "ORDER BY em.created_at\n" not in src, (
+        "member ordering must not rely on created_at alone — it ties inside a transaction"
+    )
+    assert src.count("ORDER BY em.created_at, ri.published_at NULLS LAST, a.id") == 2, (
+        "both member queries need the same deterministic order"
+    )

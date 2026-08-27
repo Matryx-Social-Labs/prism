@@ -295,7 +295,25 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
                     JOIN raw_items ri ON ri.id = a.raw_item_id
                     JOIN sources s ON s.id = ri.source_id
                     WHERE em.event_id = :eid
-                    ORDER BY em.created_at
+                    -- em.id breaks the tie, and the tie is REAL: created_at
+                    -- defaults to now(), which Postgres evaluates as the
+                    -- TRANSACTION start time — so every member inserted in one
+                    -- transaction gets an identical timestamp and the row order
+                    -- is then arbitrary. summaries[0] is the founder's summary,
+                    -- so an unstable sort silently swaps the event's summary for
+                    -- a later member's, reintroducing the exact headline/summary
+                    -- mismatch #135 fixed. Same family as the Leiden ordering bug.
+                    -- The founder is the earliest member, and the tie is REAL:
+                    -- created_at defaults to now(), which Postgres evaluates as
+                    -- the TRANSACTION start time, so members written in one
+                    -- transaction share a timestamp exactly. em.id is a uuid4 and
+                    -- orders nothing. Falling back to the article's own clock makes
+                    -- this both deterministic and semantically right — the founder
+                    -- is the first article published, not the first row inserted.
+                    -- summaries[0] is the event summary, so an unstable sort
+                    -- silently swaps in a later member's and reintroduces the
+                    -- headline/summary mismatch #135 fixed.
+                    ORDER BY em.created_at, ri.published_at NULLS LAST, a.id
                     """
                 ),
                 {"eid": str(event_id)},
@@ -498,7 +516,25 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
                     JOIN raw_items ri ON ri.id = a.raw_item_id
                     JOIN sources s ON s.id = ri.source_id
                     WHERE em.event_id = :eid
-                    ORDER BY em.created_at
+                    -- em.id breaks the tie, and the tie is REAL: created_at
+                    -- defaults to now(), which Postgres evaluates as the
+                    -- TRANSACTION start time — so every member inserted in one
+                    -- transaction gets an identical timestamp and the row order
+                    -- is then arbitrary. summaries[0] is the founder's summary,
+                    -- so an unstable sort silently swaps the event's summary for
+                    -- a later member's, reintroducing the exact headline/summary
+                    -- mismatch #135 fixed. Same family as the Leiden ordering bug.
+                    -- The founder is the earliest member, and the tie is REAL:
+                    -- created_at defaults to now(), which Postgres evaluates as
+                    -- the TRANSACTION start time, so members written in one
+                    -- transaction share a timestamp exactly. em.id is a uuid4 and
+                    -- orders nothing. Falling back to the article's own clock makes
+                    -- this both deterministic and semantically right — the founder
+                    -- is the first article published, not the first row inserted.
+                    -- summaries[0] is the event summary, so an unstable sort
+                    -- silently swaps in a later member's and reintroduces the
+                    -- headline/summary mismatch #135 fixed.
+                    ORDER BY em.created_at, ri.published_at NULLS LAST, a.id
                     """
                 ),
                 {"eid": str(event_id)},
