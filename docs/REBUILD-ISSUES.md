@@ -19,6 +19,21 @@ Ordered by severity within each group. Update as things land.
 | A6 | **Offices resolve to the wrong person over time.** "The Education Minister" is Pradhan before his resignation and someone else after — mid-arc in the CJP story. | Would silently attribute one person's statements to another. | OPEN — step 5b |
 | A7 | **Entity canonicalization is a hand-maintained list.** 21 pairs, English-romanisation-specific. | 39 slugs hold multiple entity rows; IDF distorted up to **372×**. Both `Cockroach Janata Party` and `Cockroach Janta Party` sit in one story's cast. | OPEN — step 5 |
 
+## A-bis. Product concepts to build (founder direction)
+
+| # | Concept | Where it lands | Status |
+|---|---|---|---|
+| P1 | **Maximise Indian-language coverage.** Ingest most major Indian languages; display stays English-only for now. | Feeds + `sources`. mE5-base makes cross-lingual merging viable (kn 0.444 → 0.778 on real news). | IN PROGRESS |
+| P2 | **Coverage contribution — "100% by contributor".** Per canonical event, the share of unique claims each source FIRST reported. Republishers score ~0; whoever broke it scores high. | Falls out of the claims layer (5b/5c): every claim carries a source, clusters dedupe across outlets. | PLANNED — after 5c |
+| P3 | **Missing coverage.** The complement of P2: a claim held by 6 of 7 sources and absent from the 7th is a gap in that outlet's reporting. | Same data. Computed, not asserted. | PLANNED — after 5c |
+| P4 | **English-first source ordering** on a multilingual canonical event, other languages below. | UI decision per `DESIGN.md`; data carries `(claim, source, language, first_reported_at)`. | NOTED |
+
+> **P2/P3 precondition:** both are only honest once claim recall is measured.
+> "This source contributed nothing" and "this source omitted X" are
+> indistinguishable from "our extractor read it badly" — the same
+> absence-of-evidence trap as silence-as-signal, which has caught this repo four
+> times.
+
 ## B. Silent failure — things that look fine and are not
 
 > **B0 — PENDING, and the biggest trap in step 3.** Swapping to mE5 **requires
