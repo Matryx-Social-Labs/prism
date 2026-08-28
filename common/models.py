@@ -211,6 +211,13 @@ class Entity(TimestampMixin, Base):
     entity_type: Mapped[str] = mapped_column(Text, nullable=False)  # person|company|organization|government|place|product|ticker
     aliases: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     meta: Mapped[dict | None] = mapped_column("metadata", JSONB)
+    # Canonical identity. NULL is a normal outcome, not an error: Wikidata covers
+    # 72% of the entities that can form an edge, and the rest stay on their slug.
+    # `resolution` records HOW a link was made, because a fold is unrecoverable
+    # once mentions are repointed and "which of these was a tie-break" must stay
+    # answerable without re-deriving it.
+    qid: Mapped[str | None] = mapped_column(Text)
+    resolution: Mapped[str | None] = mapped_column(Text)
 
 
 class ArticleEntity(TimestampMixin, Base):

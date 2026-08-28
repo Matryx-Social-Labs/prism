@@ -124,29 +124,81 @@ def fetch_aliases(qids: list[str]) -> dict[str, dict]:
         for qid, ent in data.items():
             if "missing" in ent:
                 continue
-            names: set[str] = set()
-            for lab in (ent.get("labels") or {}).values():
-                names.add(lab["value"])
+            # Kind per surface form, strongest first — a name reached as both a
+            # label and an alias is a label. See the disambiguation note above.
+            forms: dict[str, str] = {}
+            sitelinks = ent.get("sitelinks") or {}
             for group in (ent.get("aliases") or {}).values():
                 for a in group:
-                    names.add(a["value"])
-            sitelinks = ent.get("sitelinks") or {}
+                    forms[a["value"]] = "alias"
             for lang in LANGS:
                 title = (sitelinks.get(f"{lang}wiki") or {}).get("title")
                 if title:
-                    names.add(re.sub(r"\s*\([^)]*\)\s*$", "", title).strip())
+                    # The RAW title is a recorded name. The parenthetical-stripped
+                    # form is a derived guess and is ranked as an alias, because a
+                    # wiki parenthetical is not always a disambiguator: stripping
+                    # "Communist Party of India (Marxist)" yields the name of a
+                    # different, still-existing party. Ranking the derived form as
+                    # strongly as a real title let it tie with the true CPI's own
+                    # label and forced a refusal on an entity we can resolve.
+                    forms.setdefault(re.sub(r"\s*\([^)]*\)\s*$", "", title).strip(), "alias")
+                    forms[title] = "sitelink"
+            for lab in (ent.get("labels") or {}).values():
+                forms[lab["value"]] = "label"
             out[qid] = {
-                "names": sorted(n for n in names if n),
+                "forms": {n: k for n, k in forms.items() if n},
                 "label": ((ent.get("labels") or {}).get("en") or {}).get("value", ""),
                 "prior": len(sitelinks),
             }
     return out
 
 
+SPARQL = "https://query.wikidata.org/sparql"
+
+
+def agent_qids(qids: list[str]) -> set[str]:
+    """The subset of `qids` that are people or organizations.
+
+    Our entity table only holds `person` and `organization` rows, so a candidate
+    that is neither can never be a correct link — and search happily returns them.
+    Measured on this corpus, they are the main cause of false ambiguity:
+
+        "BJP"  ->  Q10230  Bharatiya Janata Party
+                   Q919631 British Journal of Pharmacology   <- blocks the link
+        "CPI"  ->  ... Q27677677 isolated cleft palate
+
+    Without this filter those force a refusal on entities we can resolve perfectly
+    well, and the biggest available IDF fix (BJP, 1.47x) is lost to a pharmacology
+    journal. With it, genuine ambiguity still refuses — three different people
+    named Amit Shah stay unlinked, which is correct.
+
+    P31/P279* rather than a hand-listed set of types: "political party",
+    "government agency" and "trade union" are all subclasses of organization, and
+    enumerating that taxonomy ourselves would be the same hand-maintained list this
+    module exists to delete. One query answers for every candidate at once.
+    """
+    out: set[str] = set()
+    for i in range(0, len(qids), 200):
+        values = " ".join(f"wd:{q}" for q in qids[i:i + 200])
+        query = (
+            "SELECT DISTINCT ?item WHERE { VALUES ?item {" + values + "} "
+            "?item wdt:P31/wdt:P279* ?root . VALUES ?root {wd:Q5 wd:Q43229} }"
+        )
+        req = urllib.request.Request(
+            f"{SPARQL}?{urllib.parse.urlencode({'query': query, 'format': 'json'})}",
+            headers={"User-Agent": UA, "Accept": "application/sparql-results+json"},
+        )
+        with urllib.request.urlopen(req, timeout=90) as r:
+            data = json.load(r)
+        for b in data["results"]["bindings"]:
+            out.add(b["item"]["value"].rsplit("/", 1)[-1])
+    return out
+
+
 if __name__ == "__main__":
     # 1. The index reproduces a hand-written alias row from evidence alone.
     qid = search("Bharatiya Janata Party", limit=1)[0]
-    keys = {alias_key(n) for n in fetch_aliases([qid])[qid]["names"]}
+    keys = {alias_key(n) for n in fetch_aliases([qid])[qid]["forms"]}
     assert {"bjp", "bharatiya-janata-party"} <= keys, "the hand-list fold is not derivable"
     assert "भारतीय-जनता-पार्टी" in keys, "native script did not fold — check slugify"
 
@@ -154,14 +206,18 @@ if __name__ == "__main__":
     #    137 labels and NO English one; without the enwiki title the most
     #    prominent entity in the corpus is unlinkable.
     modi = fetch_aliases(["Q1058"])["Q1058"]
-    assert "narendra-modi" in {alias_key(n) for n in modi["names"]}, "sitelink title path broken"
+    assert "narendra-modi" in {alias_key(n) for n in modi["forms"]}, "sitelink title path broken"
 
     # 3. The case this module was built for: search cannot find the variant, and
     #    the enwiki title recovers it. If this breaks, the sitelink path is dead
     #    and the docstring's central claim is false.
     assert not search("Pakistan Muslim League-Nawaz"), "search now finds it — recheck the premise"
     plm = fetch_aliases(["Q799577"])["Q799577"]
-    assert alias_key("Pakistan Muslim League-Nawaz") in {alias_key(n) for n in plm["names"]}, \
+    assert alias_key("Pakistan Muslim League-Nawaz") in {alias_key(n) for n in plm["forms"]}, \
         "the fold this module exists for is broken"
+
+    # 4. Type filter: a journal is never a valid link for a political party.
+    agents = agent_qids(["Q10230", "Q919631", "Q5"])
+    assert "Q10230" in agents and "Q919631" not in agents, f"type filter wrong: {agents}"
 
     print("wikidata self-check OK — hand-list rows derived, sitelink path live, limits honest")
