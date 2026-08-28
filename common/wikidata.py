@@ -195,6 +195,60 @@ def agent_qids(qids: list[str]) -> set[str]:
     return out
 
 
+INDIA = "Q668"
+
+
+def entity_context(qids: list[str]) -> dict[str, dict]:
+    """Liveness and country for candidates, to separate what a name alone cannot.
+
+    Only ever called for candidate sets that are ALREADY ambiguous, so it costs one
+    query for a handful of items rather than a property fetch for the whole index.
+
+    Two signals, and the distinction between them matters:
+
+      defunct   P576 (dissolved) for organizations, P570 (died) for people.
+      countries P17.
+
+    `defunct` is close to a filter — given a live candidate and a defunct one, a
+    current-news corpus means the live one. "Indian National Congress" matches both
+    the party in government and a splinter that existed 1969-77, with identical
+    labels; nothing in the name separates them and liveness does.
+
+    `countries` is weaker and must never become a blanket preference for India.
+    Pakistani, Chinese and American entities are legitimately covered here — PML-N
+    resolves to Q799577 precisely because it is unambiguous. Country may only break
+    a tie between candidates that a name has already failed to separate, which is
+    where "Aam Aadmi Party" (Indian Q129844 vs Pakistani Q17003198) sits.
+
+    Deliberately NOT prominence. That signal is what merged the CPI into the
+    CPI(Marxist) on 52 sitelinks against 46, and these two are evidence about which
+    entity a story is about rather than about which is more famous.
+    """
+    out: dict[str, dict] = {q: {"defunct": False, "countries": set()} for q in qids}
+    for i in range(0, len(qids), 200):
+        values = " ".join(f"wd:{q}" for q in qids[i:i + 200])
+        query = (
+            "SELECT ?item ?ended ?country WHERE { VALUES ?item {" + values + "} "
+            "OPTIONAL { ?item wdt:P576 ?dis } OPTIONAL { ?item wdt:P570 ?died } "
+            "BIND(COALESCE(?dis, ?died) AS ?ended) "
+            "OPTIONAL { ?item wdt:P17 ?country } }"
+        )
+        req = urllib.request.Request(
+            f"{SPARQL}?{urllib.parse.urlencode({'query': query, 'format': 'json'})}",
+            headers={"User-Agent": UA, "Accept": "application/sparql-results+json"},
+        )
+        with urllib.request.urlopen(req, timeout=90) as r:
+            data = json.load(r)
+        for b in data["results"]["bindings"]:
+            qid = b["item"]["value"].rsplit("/", 1)[-1]
+            rec = out.setdefault(qid, {"defunct": False, "countries": set()})
+            if b.get("ended"):
+                rec["defunct"] = True
+            if b.get("country"):
+                rec["countries"].add(b["country"]["value"].rsplit("/", 1)[-1])
+    return out
+
+
 if __name__ == "__main__":
     # 1. The index reproduces a hand-written alias row from evidence alone.
     qid = search("Bharatiya Janata Party", limit=1)[0]
@@ -219,5 +273,11 @@ if __name__ == "__main__":
     # 4. Type filter: a journal is never a valid link for a political party.
     agents = agent_qids(["Q10230", "Q919631", "Q5"])
     assert "Q10230" in agents and "Q919631" not in agents, f"type filter wrong: {agents}"
+
+    # 5. Context: the INC splinter is dissolved, the sitting party is not.
+    ctx = entity_context(["Q10225", "Q3523002", "Q129844", "Q17003198"])
+    assert ctx["Q3523002"]["defunct"] and not ctx["Q10225"]["defunct"], ctx
+    assert INDIA in ctx["Q129844"]["countries"], ctx["Q129844"]
+    assert INDIA not in ctx["Q17003198"]["countries"], "the Pakistani AAP looks Indian"
 
     print("wikidata self-check OK — hand-list rows derived, sitelink path live, limits honest")

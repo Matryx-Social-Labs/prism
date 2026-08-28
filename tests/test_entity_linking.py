@@ -7,7 +7,7 @@ raised anywhere, so each rule below exists because a specific real candidate set
 defeated a simpler version.
 """
 
-from tools.link_entities import resolve
+from tools.link_entities import narrow, resolve
 
 
 def test_a_single_candidate_links():
@@ -65,3 +65,69 @@ def test_an_unknown_kind_is_treated_as_the_weakest():
     """A kind we do not recognise must never outrank a real label. Defaulting the
     other way would let a future column value silently win every tie."""
     assert resolve([("Q1", "label"), ("Q2", "something-new")]) == ("Q1", "label_wins")
+
+
+# --- context narrowing: convert refusals into links, never links into other links ---
+# `narrow` runs BEFORE `resolve`, so `resolve` keeps taking nothing but (qid, kind)
+# and the prominence signal that once merged two parties stays out of reach.
+
+LIVE = {"defunct": False, "countries": {"Q668"}}
+DEAD = {"defunct": True, "countries": {"Q668"}}
+PAKISTANI = {"defunct": False, "countries": {"Q843"}}
+
+
+def test_a_defunct_candidate_loses_to_a_live_one():
+    """Indian National Congress matches the sitting party and a splinter that
+    existed 1969-77, with identical labels. Nothing in the name separates them."""
+    cands = [("Q10225", "label"), ("Q3523002", "label")]
+    got, applied = narrow(cands, {"Q10225": LIVE, "Q3523002": DEAD})
+    assert got == [("Q10225", "label")]
+    assert applied == ["live"]
+    assert resolve(got) == ("Q10225", "alias_exact")
+
+
+def test_all_defunct_narrows_to_nothing_and_stays_refused():
+    """Never empty the set. A historical story about two dissolved organisations
+    is still ambiguous, and inventing a winner would be worse than refusing."""
+    cands = [("Q1", "label"), ("Q2", "label")]
+    got, applied = narrow(cands, {"Q1": DEAD, "Q2": DEAD})
+    assert got == cands and applied == []
+    assert resolve(got) is None
+
+
+def test_country_breaks_a_tie_only_after_liveness_fails():
+    """Aam Aadmi Party matches an Indian and a Pakistani party, both live."""
+    cands = [("Q129844", "label"), ("Q17003198", "label")]
+    got, applied = narrow(cands, {"Q129844": LIVE, "Q17003198": PAKISTANI})
+    assert got == [("Q129844", "label")] and applied == ["india"]
+
+
+def test_country_is_not_applied_when_liveness_already_decided():
+    """Ordering matters: a live non-Indian candidate must not then be dropped for
+    being foreign when liveness had already produced a single answer."""
+    _, applied = narrow(
+        [("Q1", "label"), ("Q2", "label")], {"Q1": PAKISTANI, "Q2": DEAD}
+    )
+    assert applied == ["live"], "country narrowed a set that liveness had settled"
+
+
+def test_two_live_indian_candidates_stay_refused():
+    """Three different people named Amit Shah. Neither signal separates them, and
+    neither should pretend to."""
+    cands = [("Q1", "label"), ("Q2", "label")]
+    got, applied = narrow(cands, {"Q1": LIVE, "Q2": LIVE})
+    assert got == cands and applied == []
+    assert resolve(got) is None
+
+
+def test_missing_context_changes_nothing():
+    """When the context lookup fails the dict is empty. That must cost recall, not
+    precision — every ambiguous name stays refused, exactly as before."""
+    cands = [("Q1", "label"), ("Q2", "label")]
+    assert narrow(cands, {}) == (cands, [])
+
+
+def test_narrow_never_adds_a_candidate():
+    cands = [("Q1", "label"), ("Q2", "label"), ("Q3", "alias")]
+    got, _ = narrow(cands, {"Q1": LIVE, "Q2": DEAD, "Q3": DEAD})
+    assert set(got) <= set(cands)

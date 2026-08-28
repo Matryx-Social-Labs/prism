@@ -33,7 +33,14 @@ import sys
 
 import asyncpg
 
-from common.wikidata import agent_qids, alias_key, fetch_aliases, search
+from common.wikidata import (
+    INDIA,
+    agent_qids,
+    alias_key,
+    entity_context,
+    fetch_aliases,
+    search,
+)
 
 
 def _db_url() -> str:
@@ -51,14 +58,19 @@ async def load_entities(c, min_df: int) -> list[dict]:
     Restricted to df >= min_df because an entity in ONE event can never form a
     shared-actor edge — it is clustering-inert, so folding it changes nothing that
     is measured. The default of 2 is the set where a fold can actually pay.
+
+    Deliberately does NOT select `qid`: nothing downstream reads it, and leaving it
+    out means this runs against a corpus that has not had the migration applied —
+    which is the whole point of being able to measure production read-only before
+    deciding whether to migrate it.
     """
     return [dict(r) for r in await c.fetch(
         """
-        SELECT e.id, e.slug, e.name, e.qid, count(DISTINCT ee.event_id)::int AS df
+        SELECT e.id, e.slug, e.name, count(DISTINCT ee.event_id)::int AS df
         FROM entities e
         JOIN event_entities ee ON ee.entity_id = e.id
         WHERE e.entity_type IN ('person', 'organization')
-        GROUP BY e.id, e.slug, e.name, e.qid
+        GROUP BY e.id, e.slug, e.name
         HAVING count(DISTINCT ee.event_id) >= $1
         ORDER BY count(DISTINCT ee.event_id) DESC
         """,
@@ -201,14 +213,54 @@ def resolve(cands: list[tuple[str, str]]) -> tuple[str, str] | None:
     return None
 
 
+def narrow(cands: list[tuple[str, str]], ctx: dict) -> tuple[list[tuple[str, str]], list[str]]:
+    """Drop candidates a current-India corpus cannot mean, but only ever narrowing.
+
+    Applied BEFORE `resolve`, not inside it, so `resolve` keeps taking nothing but
+    (qid, kind) and the prominence signal that caused a wrong fold stays
+    structurally out of reach.
+
+    Each step only takes effect if it removes something AND leaves something —
+    never empties the set, never invents a candidate. If narrowing still leaves two,
+    `resolve` refuses exactly as before, so this can convert a refusal into a link
+    but never a link into a different link.
+
+    Liveness first, because it is close to a fact: given a live candidate and a
+    defunct one, current news means the live one. Country second and only if
+    liveness did not settle it, because it is a prior rather than a fact — Pakistani
+    and other non-Indian entities are legitimately covered here, and this must not
+    become a blanket preference for India. It fires only where the NAME has already
+    failed, e.g. the Indian and Pakistani parties both called "Aam Aadmi Party".
+    """
+    applied: list[str] = []
+
+    def keep(tag: str, pred) -> None:
+        nonlocal cands
+        kept = [c for c in cands if pred(c[0])]
+        if kept and len({q for q, _ in kept}) < len({q for q, _ in cands}):
+            cands = kept
+            applied.append(tag)
+
+    keep("live", lambda q: not ctx.get(q, {}).get("defunct"))
+    if len({q for q, _ in cands}) > 1:
+        keep("india", lambda q: INDIA in ctx.get(q, {}).get("countries", ()))
+    return cands, applied
+
+
 async def match(c, ents: list[dict]) -> tuple[dict, list[tuple]]:
-    """entity id -> (qid, resolution) via `resolve`, plus the refusals."""
+    """entity id -> (qid, resolution) via `resolve`, plus the refusals.
+
+    Two passes. The first resolves on the name alone; the second asks Wikidata for
+    context on ONLY the candidate sets that stayed ambiguous, so the extra lookup
+    is one query for a few hundred items instead of a property fetch over the whole
+    index.
+    """
     idx: dict[str, list[tuple[str, str]]] = {}
     for r in await c.fetch("SELECT alias_norm, qid, kind FROM entity_alias WHERE qid <> ''"):
         idx.setdefault(r["alias_norm"], []).append((r["qid"], r["kind"] or "alias"))
 
     linked: dict = {}
-    refused: list[tuple] = []
+    unresolved: list[tuple[dict, list[tuple[str, str]]]] = []
     for e in ents:
         cands = idx.get(alias_key(e["name"]))
         if not cands:
@@ -217,7 +269,30 @@ async def match(c, ents: list[dict]) -> tuple[dict, list[tuple]]:
         if got:
             linked[e["id"]] = got
         else:
-            refused.append((e["name"], e["df"], sorted({q for q, _ in cands})))
+            unresolved.append((e, cands))
+
+    refused: list[tuple] = []
+    if unresolved:
+        qids = sorted({q for _, cands in unresolved for q, _ in cands})
+        try:
+            ctx = entity_context(qids)
+        except Exception as exc:  # noqa: BLE001
+            # Losing the context lookup must cost recall, never precision: without
+            # it every one of these stays refused, which is the pre-existing
+            # behaviour. It must not fall through to some looser rule.
+            print(f"  ! context lookup failed ({exc}); {len(unresolved)} stay refused")
+            ctx = {}
+        n_rescued = 0
+        for e, cands in unresolved:
+            narrowed, applied = narrow(cands, ctx)
+            got = resolve(narrowed) if applied else None
+            if got:
+                linked[e["id"]] = (got[0], f"{got[1]}+{'+'.join(applied)}")
+                n_rescued += 1
+            else:
+                refused.append((e["name"], e["df"], sorted({q for q, _ in cands})))
+        if n_rescued:
+            print(f"  context resolved {n_rescued} of {len(unresolved)} ambiguous names")
     return linked, refused
 
 
@@ -340,22 +415,32 @@ async def main() -> None:
     ap.add_argument("--journal", default="entity_fold.json")
     ap.add_argument("--min-df", type=int, default=2)
     ap.add_argument("--limit", type=int, default=400, help="max names to look up per --fetch run")
+    ap.add_argument("--index-url", default=None,
+                    help="hold the alias index in a DIFFERENT database from the corpus")
     a = ap.parse_args()
 
+    # The alias index is a CACHE of public Wikidata, not corpus data, so it does
+    # not have to live beside the corpus it is used against. Separating them is
+    # what lets production be measured entirely read-only: the index is built and
+    # written locally, and the production connection only ever reads.
     c = await asyncpg.connect(_db_url(), timeout=60)
+    ic = await asyncpg.connect(a.index_url, timeout=60) if a.index_url else c
     try:
-        if not (a.fetch or a.write or a.prune or a.refresh):
+        corpus_writes = a.write or a.fold
+        if not corpus_writes:
             await c.execute("SET default_transaction_read_only = on")
-            print("READ-ONLY — the connection refuses writes.")
+            print("READ-ONLY — the corpus connection refuses writes.")
+        if ic is not c:
+            print(f"  alias index held separately: {re.sub(r'//[^@]+@', '//[REDACTED]@', a.index_url)}")
         ents = await load_entities(c, a.min_df)
         print(f"  person/organization entities with df >= {a.min_df}: {len(ents)}")
         if a.fetch:
-            await fetch_index(c, ents, a.limit)
+            await fetch_index(ic, ents, a.limit)
         if a.refresh:
-            await refresh_index(c)
+            await refresh_index(ic)
         if a.fetch or a.prune:
-            await prune_non_agents(c)
-        linked, refused = await match(c, ents)
+            await prune_non_agents(ic)
+        linked, refused = await match(ic, ents)
         await report(c, ents, linked, refused)
         if a.write:
             await c.executemany(
@@ -368,6 +453,8 @@ async def main() -> None:
             print("\n  Nothing written. --write persists qid; --fold repoints mentions.")
     finally:
         await c.close()
+        if ic is not c:
+            await ic.close()
 
 
 if __name__ == "__main__":
