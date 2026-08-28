@@ -55,6 +55,17 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("aajtak", "https://www.aajtak.in/rssfeeds/?id=home"),
     FeedSpec("amarujala", "https://www.amarujala.com/rss/breaking-news.xml"),
     FeedSpec("bbc_tamil", "https://feeds.bbci.co.uk/tamil/rss.xml"),
+    # The rest of BBC's Indian-language services. Language is NOT set here — the
+    # SOURCE declares it (see ingestion/base.py::persist_envelopes); a collector
+    # asserting a language it cannot know is how 1,385 non-Latin articles ended
+    # up labelled English.
+    FeedSpec("bbc_hindi", "https://feeds.bbci.co.uk/hindi/rss.xml"),
+    FeedSpec("bbc_telugu", "https://feeds.bbci.co.uk/telugu/rss.xml"),
+    FeedSpec("bbc_marathi", "https://feeds.bbci.co.uk/marathi/rss.xml"),
+    FeedSpec("bbc_gujarati", "https://feeds.bbci.co.uk/gujarati/rss.xml"),
+    FeedSpec("bbc_punjabi", "https://feeds.bbci.co.uk/punjabi/rss.xml"),
+    FeedSpec("bbc_bengali", "https://feeds.bbci.co.uk/bengali/rss.xml"),
+    FeedSpec("bbc_urdu", "https://feeds.bbci.co.uk/urdu/rss.xml"),
     # Kannada (Bangalore launch). Validated: 5/5 Kannada titles, fresh dailies.
     FeedSpec("prajavani", "https://www.prajavani.net/feed", state="IN-KA"),
     FeedSpec("tv9kannada", "https://tv9kannada.com/feed", state="IN-KA"),

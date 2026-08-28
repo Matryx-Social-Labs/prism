@@ -93,6 +93,18 @@ _SCRIPT_RANGES = (
     ("gujarati", 0x0A80, 0x0AFF),
     ("gurmukhi", 0x0A00, 0x0A7F),
     ("odia", 0x0B00, 0x0B7F),
+    # Arabic script — Urdu, and Kashmiri/Sindhi in the Perso-Arabic orthography.
+    # Its absence was NOT harmless. Urdu fell through to "latin", which put it
+    # inside EMBEDDING_TRUSTED_SCRIPTS with nothing having validated the embedding
+    # there, and — worse — made correlation/partition.py's cross-script guard read
+    # an Urdu/English pair as SAME script. content_similarity then compared them,
+    # found zero shared words (different alphabets share none) and CUT the edge.
+    # That is precisely the absence-of-evidence failure the guard exists to stop,
+    # defeated by the script detector rather than by the guard's own logic.
+    ("arabic", 0x0600, 0x06FF),
+    ("arabic", 0x0750, 0x077F),          # Arabic Supplement
+    ("arabic", 0xFB50, 0xFDFF),          # Presentation Forms-A
+    ("arabic", 0xFE70, 0xFEFF),          # Presentation Forms-B
 )
 
 

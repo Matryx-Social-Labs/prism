@@ -65,3 +65,57 @@ def test_default_lens_is_general_reader():
         lens = get_lens(slug)
         assert lens.slug == "reader"
         assert lens.sectors == []  # [] = all sectors, i.e. every story
+
+
+# --- script detection must cover every script we INGEST ----------------------
+
+
+def test_arabic_script_is_detected_not_silently_latin():
+    """Urdu returned "latin" because _SCRIPT_RANGES had no Arabic block, and the
+    fallback for "no Indic block leads" is latin.
+
+    That was not harmless. It put Urdu inside EMBEDDING_TRUSTED_SCRIPTS with
+    nothing having validated the embedding there, and it made the partition's
+    cross-script guard read an Urdu/English pair as the SAME script — so
+    content_similarity compared them, found zero shared words (different
+    alphabets share none) and CUT the edge. The absence-of-evidence guard was
+    defeated by the detector rather than by its own logic.
+    """
+    from common.text import detect_script
+
+    assert detect_script("مکہ معاہدے میں بنگلہ دیش کی شمولیت پر ڈھاکہ") == "arabic"
+
+
+def test_every_ingested_feed_language_has_a_script_range():
+    """The real guard. detect_script FAILS OPEN — any script without a range is
+    reported as latin, silently. So adding a feed in a new language can quietly
+    break clustering for it, with no error anywhere.
+
+    This ties the detector to what the collectors actually ingest: add a feed in
+    a language whose script is unknown and this fails, instead of production
+    mislabelling every one of its articles.
+    """
+    from common.text import _SCRIPT_RANGES, detect_script
+
+    known = {name for name, _lo, _hi in _SCRIPT_RANGES} | {"latin"}
+    # One representative headline per script the seeded feeds publish in.
+    samples = {
+        "en": "Delhi police used pellet guns on protesters",
+        "hi": "दिल्ली पुलिस ने प्रदर्शनकारियों पर पैलेट गन चलाई",
+        "mr": "नेपाळ : 'वेळेवर सूचना न दिल्या'च्या आरोपावर",
+        "ta": "நேபாளத்தை உரிய நேரத்தில் எச்சரிக்க சீனா தவறியது",
+        "kn": "ರಾಹುಲ್ ಸಭೆ ಅಂತ್ಯ, ಬೆಂಗಳೂರಿನತ್ತ ಡಿಕೆಶಿ",
+        "te": "టిబెట్ నుంచి కైలాస మానస సరోవర యాత్ర",
+        "bn": "তারেক রহমানকে দিল্লিতে কেন চায় ভারত?",
+        "gu": "મહાસાગરો ઊકળ્યા : દરિયાનું તાપમાન રેકૉર્ડ",
+        "pa": "ਇਕੱਲੇ ਬੈਠ ਕੇ ਖਾਣਾ ਖਾਂਦੇ ਹੋ ਤਾਂ ਕੁਝ ਖ਼ਾਸ",
+        "ur": "مکہ معاہدے میں بنگلہ دیش کی شمولیت پر ڈھاکہ",
+    }
+    for lang, text in samples.items():
+        script = detect_script(text)
+        assert script in known, f"{lang}: {script!r} is not a known script"
+        if lang != "en":
+            assert script != "latin", (
+                f"{lang} headlines detect as 'latin' — detect_script fails OPEN, so this "
+                f"silently disables the cross-script guard and mislabels every article"
+            )
