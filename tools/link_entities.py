@@ -26,6 +26,7 @@ surface forms. No match is a fine outcome: the entity keeps its slug.
 
 import argparse
 import asyncio
+import json
 import os
 import re
 import sys
@@ -155,56 +156,68 @@ async def prune_non_agents(c) -> None:
         await c.execute("DELETE FROM entity_alias WHERE qid = ANY($1::text[])", drop)
 
 
-async def match(c, ents: list[dict]) -> tuple[dict, list[tuple]]:
-    """entity id -> (qid, resolution), by EXACT normalised match, plus the refusals.
+# A recorded canonical name outranks a recorded nickname outranks a derived form.
+TIER = ("label", "sitelink", "alias")
 
-    Two rules, in order, and the second one is why this is not a one-liner.
 
-    1. One candidate QID for the surface form -> link it.
-    2. Several -> prefer the candidate whose LABEL or wiki TITLE is that form over
-       one that merely lists it as an alias. Wikidata alias sets are not
-       identity-preserving: Q234277 is the CPI(Marxist) and carries plain
+def resolve(cands: list[tuple[str, str]]) -> tuple[str, str] | None:
+    """Decide one surface form's QID from its candidates, or refuse.
+
+    `cands` is [(qid, kind)]. Returns (qid, resolution), or None for "cannot tell".
+
+    1. One candidate QID -> link it.
+    2. Several -> only the STRONGEST tier present competes, so a label match is
+       never dragged into a tie by some other item's alias. Wikidata alias sets are
+       not identity-preserving: Q234277 is the CPI(Marxist) and carries plain
        "Communist Party of India" as an alias — a different party that still
-       exists, and one our corpus names separately. Its label disambiguates where
-       the alias does not.
-    3. Still several -> DO NOT LINK.
+       exists, and one our corpus names separately. The real CPI's own LABEL is
+       that string, so the tier separates them where a raw match cannot.
+    3. Still several -> REFUSE.
 
-    An earlier version broke the tie on prominence (sitelink count) instead, which
-    is how "Communist Party of India" became the CPI(Marxist): 52 sitelinks against
-    46. That is the absence-of-evidence trap this repo keeps relearning — a weak
-    signal used to manufacture a confident answer out of "I cannot tell". The cost
-    of refusing is one unlinked entity; the cost of a wrong fold is two parties
-    merged into one, permanently, with no error anywhere.
+    An earlier version broke the tie on prominence (sitelink count), which is
+    exactly how "Communist Party of India" became the CPI(Marxist): 52 sitelinks
+    against 46. That is the absence-of-evidence trap this repo keeps relearning — a
+    weak signal used to manufacture a confident answer out of "I cannot tell". The
+    cost of refusing is an entity left on its slug, which is today's behaviour; the
+    cost of a wrong fold is two parties merged permanently, with nothing raised.
 
-    Refusing is also load-bearing for real ambiguity. "CPI" alone genuinely names
-    both parties in Indian coverage (and, per Wikidata, an isolated cleft palate),
-    so no rule should resolve it.
+    Refusing is load-bearing for genuine ambiguity too. "CPI" alone really does
+    name both parties in Indian coverage (and, per Wikidata, an isolated cleft
+    palate), so no rule should resolve it.
+
+    Prominence is not a parameter here, deliberately: the signal that caused the
+    wrong fold is not available to be reached for again.
     """
-    idx: dict[str, list[tuple[str, int, str]]] = {}
-    for r in await c.fetch(
-        "SELECT alias_norm, qid, prior, kind FROM entity_alias WHERE qid <> ''"
-    ):
-        idx.setdefault(r["alias_norm"], []).append((r["qid"], r["prior"], r["kind"] or "alias"))
+    if not cands:
+        return None
+    if len({q for q, _ in cands}) == 1:
+        return cands[0][0], "alias_exact"
+    rank = {k: i for i, k in enumerate(TIER)}
+    weakest = len(TIER) - 1
+    best = min(rank.get(k, weakest) for _, k in cands)
+    strong = {q for q, k in cands if rank.get(k, weakest) == best}
+    if len(strong) == 1:
+        return next(iter(strong)), f"{TIER[best]}_wins"
+    return None
 
-    # A recorded canonical name outranks a recorded nickname outranks a derived
-    # form. Only the STRONGEST tier present competes, so a label match is never
-    # dragged into a tie by an alias on some other item.
-    tier = {"label": 0, "sitelink": 1, "alias": 2}
+
+async def match(c, ents: list[dict]) -> tuple[dict, list[tuple]]:
+    """entity id -> (qid, resolution) via `resolve`, plus the refusals."""
+    idx: dict[str, list[tuple[str, str]]] = {}
+    for r in await c.fetch("SELECT alias_norm, qid, kind FROM entity_alias WHERE qid <> ''"):
+        idx.setdefault(r["alias_norm"], []).append((r["qid"], r["kind"] or "alias"))
+
     linked: dict = {}
     refused: list[tuple] = []
     for e in ents:
         cands = idx.get(alias_key(e["name"]))
         if not cands:
             continue
-        if len({q for q, _, _ in cands}) == 1:
-            linked[e["id"]] = (cands[0][0], "alias_exact")
-            continue
-        best = min(tier.get(k, 2) for _, _, k in cands)
-        strong = {q for q, _, k in cands if tier.get(k, 2) == best}
-        if len(strong) == 1:
-            linked[e["id"]] = (next(iter(strong)), f"{'label sitelink alias'.split()[best]}_wins")
+        got = resolve(cands)
+        if got:
+            linked[e["id"]] = got
         else:
-            refused.append((e["name"], e["df"], sorted({q for q, _, _ in cands})))
+            refused.append((e["name"], e["df"], sorted({q for q, _ in cands})))
     return linked, refused
 
 
@@ -244,6 +257,70 @@ async def report(c, ents: list[dict], linked: dict, refused: list) -> None:
     print(f"\n  worst distortion in the top groups: {worst:.2f}x")
 
 
+async def fold(c, ents: list[dict], linked: dict, journal: str, *, write: bool) -> None:
+    """Repoint every mention of a QID's variant rows onto one canonical row.
+
+    This is what turns a recorded identity into a measured effect: all six IDF
+    sites key on `entity_id`, so one real-world entity has to BE one row for the
+    1/df weighting to be right. Repointing means none of those six queries — each
+    carrying performance annotations earned the hard way — needs rewriting.
+
+    The canonical is the variant with the most event links, so the majority of
+    mentions do not move and the fewest possible rows change. Ties break on id:
+    SQL row order is not guaranteed, and a canonical that varied between runs would
+    make the fold unreproducible.
+
+    A JOURNAL of every (table, row, old entity) is written before the first write.
+    A repoint is otherwise irreversible — `article_entities` stores no surface form,
+    so once a mention points at the canonical, nothing records which variant it came
+    from. The variant entity ROW survives (other tables may reference it, and
+    chasing every foreign key to clear a row nobody reads is work for its own sake),
+    but the mention edges do not, which is what the file is for.
+    """
+    by_qid: dict[str, list[dict]] = {}
+    for e in ents:
+        if e["id"] in linked:
+            by_qid.setdefault(linked[e["id"]][0], []).append(e)
+    groups = [sorted(es, key=lambda e: (-e["df"], str(e["id"])))
+              for es in by_qid.values() if len(es) > 1]
+    if not groups:
+        print("  nothing to fold")
+        return
+
+    entries = []
+    for canon, *variants in groups:
+        for v in variants:
+            for tbl in ("event_entities", "article_entities", "impacts"):
+                entries += [
+                    {"table": tbl, "id": str(r["id"]), "from": str(v["id"]), "to": str(canon["id"])}
+                    for r in await c.fetch(f"SELECT id FROM {tbl} WHERE entity_id = $1", v["id"])
+                ]
+    print(f"  {len(groups)} groups -> {len(entries)} mentions move onto {len(groups)} rows")
+    if not write:
+        print("  (dry run — nothing written; --fold --write applies it)")
+        return
+
+    with open(journal, "w") as fh:
+        json.dump(entries, fh, indent=1)
+    print(f"  journal written: {journal}  ({len(entries)} reversible edges)")
+
+    async with c.transaction():
+        for canon, *variants in groups:
+            for v in variants:
+                for tbl, key in (("event_entities", "event_id"), ("article_entities", "article_id")):
+                    # Repoint only where it would not collide with a row the canonical
+                    # already holds — (key, entity_id) is unique — then clear the rest.
+                    await c.execute(
+                        f"""UPDATE {tbl} SET entity_id = $1 WHERE entity_id = $2
+                            AND NOT EXISTS (SELECT 1 FROM {tbl} t2
+                                            WHERE t2.{key} = {tbl}.{key} AND t2.entity_id = $1)""",
+                        canon["id"], v["id"])
+                    await c.execute(f"DELETE FROM {tbl} WHERE entity_id = $1", v["id"])
+                await c.execute("UPDATE impacts SET entity_id = $1 WHERE entity_id = $2",
+                                canon["id"], v["id"])
+    print(f"  FOLDED: {len(entries)} mentions repointed")
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fetch", action="store_true", help="query Wikidata to fill the index")
@@ -252,6 +329,9 @@ async def main() -> None:
     ap.add_argument("--prune", action="store_true",
                     help="drop index entries that are neither people nor organizations")
     ap.add_argument("--write", action="store_true", help="persist qid/resolution on entities")
+    ap.add_argument("--fold", action="store_true",
+                    help="repoint mentions of variant rows onto one canonical row")
+    ap.add_argument("--journal", default="entity_fold.json")
     ap.add_argument("--min-df", type=int, default=2)
     ap.add_argument("--limit", type=int, default=400, help="max names to look up per --fetch run")
     a = ap.parse_args()
@@ -275,9 +355,11 @@ async def main() -> None:
             await c.executemany(
                 "UPDATE entities SET qid = $2, resolution = $3 WHERE id = $1",
                 [(eid, q, r) for eid, (q, r) in linked.items()])
-            print(f"\n  WROTE qid on {len(linked)} entities. No mention was repointed.")
-        else:
-            print("\n  Nothing written. --write persists qid; folding rows is a separate pass.")
+            print(f"\n  WROTE qid on {len(linked)} entities.")
+        if a.fold:
+            await fold(c, ents, linked, a.journal, write=a.write)
+        elif not a.write:
+            print("\n  Nothing written. --write persists qid; --fold repoints mentions.")
     finally:
         await c.close()
 
