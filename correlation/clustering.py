@@ -216,6 +216,7 @@ async def find_event(
             # unrelated Kannada pairs, which is how 18 more articles reached that
             # same event down this path. Two actors, always.
             allow_single_actor=trusted,
+            title=title,
         )
         if match:
             return match
@@ -284,12 +285,49 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
     return None
 
 
+# Optional confirming gate on the entity path: require the candidate event's
+# title to agree with this article's, by IDF-weighted word cosine.
+#
+# OFF BY DEFAULT AND NOT YET SHIPPED. The attribution that motivates it is sound
+# — entity_overlap made 22 of 25 wrong merges at precision 0.353 while the other
+# tiers were near-perfect — but a headline-agreement gate on this exact path was
+# already built on this exact data and LOST at replay:
+#
+#                             without gate      with gate
+#     clusters (41 gold)           40               80
+#     B-cubed recall             0.8227           0.5178
+#
+# Predicted recall cost 9%, actual 37%. The cause is compounding, which pairwise
+# scoring cannot see: every rejected merge starts a NEW event, that event becomes
+# a smaller wrong candidate for the next article, and the story shatters. So this
+# is wired as a measurable switch, not a default — flip it only on cascade-replay
+# evidence (tools/score_cascade), never on a pairwise number.
+#
+# MEASURED 2026-08-28, and it LOSES — the third time this shape has been tried
+# here and the third time the cascade contradicted the pairwise number:
+#
+#     pairwise, threshold 0.45      P 0.9706  fp 1     (looks excellent)
+#     cascade, no gate              tp 28  fp 3  P 0.9032  R 0.4590  Cdet 0.5766
+#     cascade, gate at 0.45         tp 24  fp 0  P 1.0000  R 0.3934  Cdet 0.6066
+#
+# The gate does exactly what it promised — it eliminates EVERY false merge, P 1.0 —
+# and still loses, because it costs 4 true merges to save 3 false ones. Cdet
+# already weights a false alarm 4x a miss, so this is not a weighting artefact:
+# perfect precision is not worth having when recall pays for it.
+#
+# The mechanism is compounding, which no pairwise measurement can see: a rejected
+# merge does not merely fail to merge, it CREATES a new event, and that event is
+# then a smaller, wronger candidate for the next article. Leave this off.
+TITLE_COSINE_GATE: float | None = None
+
+
 async def _match_by_entities(
     session: AsyncSession,
     entity_slugs: list[str],
     embedding: list[float],
     published_at,
     allow_single_actor: bool = True,
+    title: str = "",
 ) -> Match | None:
     """Recent event within the looser embedding band that shares enough IDF-weighted
     canonical actors with this article — merges cross-language / translated retellings
@@ -378,9 +416,17 @@ async def _match_by_entities(
         },
     )
     row = result.first()
-    if row:
-        return Match(event_id=row.id, match_type="entity_overlap", match_score=1.0 - float(row.dist))
-    return None
+    if not row:
+        return None
+    if TITLE_COSINE_GATE is not None and title:
+        from tools.title_cosine import cosine, load_idf
+
+        cand = (await session.execute(
+            text("SELECT title FROM events WHERE id = :i"), {"i": str(row.id)}
+        )).scalar_one_or_none()
+        if cand and cosine(title, cand, load_idf()) < TITLE_COSINE_GATE:
+            return None
+    return Match(event_id=row.id, match_type="entity_overlap", match_score=1.0 - float(row.dist))
 
 
 async def _match_by_embedding(

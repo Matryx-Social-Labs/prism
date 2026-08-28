@@ -32,6 +32,8 @@ import asyncpg
 
 from tools.scratch import _local_url, _prod_url, build_scratch, replay
 
+TITLE_GATE: list[float | None] = [None]
+
 MODELS = [
     "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
     "intfloat/multilingual-e5-base",
@@ -131,6 +133,9 @@ async def run(models: list[str], limit: int | None) -> None:
             original = {k: getattr(clu, k) for k in
                         ("EMBEDDING_DISTANCE_THRESHOLD", "ENTITY_MATCH_NEAR_DISTANCE",
                          "ENTITY_MATCH_LOOSE_DISTANCE")}
+            clu.TITLE_COSINE_GATE = TITLE_GATE[0]
+            if TITLE_GATE[0] is not None:
+                print(f"  entity-path title-cosine gate: {TITLE_GATE[0]}")
             applied = THRESHOLDS.get(model, {})
             for k, v in applied.items():
                 setattr(clu, k, v)
@@ -166,7 +171,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", default=",".join(MODELS))
     ap.add_argument("--limit", type=int, default=None, help="cap events replayed (smoke test)")
+    ap.add_argument("--title-gate", type=float, default=None,
+                    help="entity-path title-cosine gate; measures the change that "
+                         "previously LOST at replay despite a good pairwise number")
     a = ap.parse_args()
+    TITLE_GATE[0] = a.title_gate
     asyncio.run(run([m.strip() for m in a.models.split(",")], a.limit))
 
 
