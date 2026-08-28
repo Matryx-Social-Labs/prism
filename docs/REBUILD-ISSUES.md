@@ -37,7 +37,15 @@ Ordered by severity within each group. Update as things land.
 
 ## B. Silent failure — things that look fine and are not
 
-> **B0 — PENDING, and the biggest trap in step 3.** Swapping to mE5 **requires
+> **B0 — CALIBRATED, swap still gated.** Measured against `gold_pairs`: mpnet's
+> optimal primary threshold is **0.305**, mE5-base's is **0.080** — a 3.8x scale
+> difference, confirming the two are not interchangeable. Percentile mapping for
+> the five dependent constants is in `tools/tune_embed_threshold.py`. The
+> infrastructure is now in place (`common/embeddings.py` registers mE5 from its
+> official ONNX and applies E5's prefixes automatically), so the swap is a config
+> change — but see **A9** before making it.
+>
+> **B0 — original note.** Swapping to mE5 **requires
 > retuning every embedding threshold**. E5 compresses the space: measured on real
 > text, an EN↔HI *same-story* pair sits at cosine distance **0.1527** while an
 > EN↔EN *unrelated* pair sits at **0.1975**. The live `EMBEDDING_DISTANCE_THRESHOLD`
@@ -70,6 +78,9 @@ Ordered by severity within each group. Update as things land.
 | C5 | **Dead stream topics.** `stream.EVENTS` declared, never published. `EVENT_UPDATES` published twice per event, consumed by nobody — **65,736 entries, zero consumer groups**. | | **FIXED** — both removed |
 | C6 | **~4 heavy 3D deps serve an orphaned component tree.** `three`, `@react-three/*` used only by unimported components. | `HeroVisual`, `PrismHero`, `LensDemo`, `components/prism3d/*`. | OPEN |
 | C7 | **The veto is an hourly LLM bill for a refinement nobody sees.** Config's own docstring: the overlay loses its CAS race about half the time and survives ~4m33s on average. | Uses `prism_model_gate` — the *cheapest* model — for the most semantically demanding judgement in the system. | DEFERRED to step 6 — do not remove a safety net before its replacement is proven |
+
+| A9 | **mE5-base REGRESSES monolingual L1 matching, even as it improves cross-lingual.** | `gold_pairs` (a uniformly random production sample, so ~90% English): mpnet Cdet **0.4613** (P 0.7544 / R 0.7049) vs mE5-base Cdet **0.4957** (P 0.7917 / R 0.6230) — better precision, much worse recall. Step 3's gate is "L1 does not regress", so by that gate mE5 **fails**. Against that: cross-lingual news retrieval kn 0.444 → 0.778. Genuine trade, needs a decision. | **OPEN — founder decision** |
+| A10 | **`EMBEDDING_DISTANCE_THRESHOLD` is badly tuned for the model we already run.** | Optimal against `gold_pairs` is **0.305**; production uses **0.12**. Recall is being left on the table today, with no model change involved. Caveat: the embedding tier is one rung of a cascade, not a standalone classifier, so the isolated optimum is not automatically the right ship value — it needs `scratch.py --score` through the real matcher. | **OPEN — measure via cascade replay** |
 
 ## D. Performance / scale
 
