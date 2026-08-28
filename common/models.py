@@ -218,6 +218,14 @@ class Entity(TimestampMixin, Base):
     # answerable without re-deriving it.
     qid: Mapped[str | None] = mapped_column(Text)
     resolution: Mapped[str | None] = mapped_column(Text)
+    # Set when this row was folded into another sharing its QID. The row is kept
+    # rather than deleted (other tables reference it, and it still holds a name
+    # real articles used), so without this pointer the next article naming the
+    # variant would land here and reopen the split. Same shape as
+    # `Story.merged_into`, one level down.
+    merged_into: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("entities.id", ondelete="SET NULL")
+    )
 
 
 class ArticleEntity(TimestampMixin, Base):

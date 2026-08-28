@@ -318,7 +318,13 @@ async def fold(c, ents: list[dict], linked: dict, journal: str, *, write: bool) 
                     await c.execute(f"DELETE FROM {tbl} WHERE entity_id = $1", v["id"])
                 await c.execute("UPDATE impacts SET entity_id = $1 WHERE entity_id = $2",
                                 canon["id"], v["id"])
-    print(f"  FOLDED: {len(entries)} mentions repointed")
+                # The redirect, without which this fold decays. The variant row
+                # survives on purpose, so `_resolve_entity` would send the next
+                # article naming it straight back here and reopen the split — the
+                # measurement would stay true only until the next ingest.
+                await c.execute("UPDATE entities SET merged_into = $1 WHERE id = $2",
+                                canon["id"], v["id"])
+    print(f"  FOLDED: {len(entries)} mentions repointed, {len(groups)} redirects set")
 
 
 async def main() -> None:

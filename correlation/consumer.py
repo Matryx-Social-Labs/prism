@@ -690,7 +690,44 @@ def _deterministic_correlation(members) -> CorrelationResult:
     )
 
 
+# Folds observed are one hop; this is a corruption guard, not a limit. Mirrors the
+# bound `api/routes/trending.py` puts on the story merge chain, and for the same
+# reason: a cycle would hang the caller rather than fail.
+_MAX_ENTITY_MERGE_HOPS = 8
+
+
 async def _resolve_entity(session, name: str) -> uuid.UUID | None:
+    """The entity a name belongs to, following any fold to the canonical row.
+
+    Without the follow, canonicalization decays the moment it is applied. Folding
+    "BJP" into "Bharatiya Janata Party" repoints existing mentions but keeps the
+    `bjp` row — it is referenced elsewhere and still holds a name real articles
+    used — so the next article naming BJP resolves straight back to it and the
+    split reopens. The corpus would drift apart again at ingest speed while the
+    one-off measurement still said it was fixed.
+    """
     slug = entity_slug(name)
-    result = await session.execute(select(Entity.id).where(Entity.slug == slug))
-    return result.scalar_one_or_none()
+    row = (
+        await session.execute(
+            select(Entity.id, Entity.merged_into).where(Entity.slug == slug)
+        )
+    ).first()
+    if row is None:
+        return None
+    entity_id, merged_into = row
+    seen: set[uuid.UUID] = set()
+    for _ in range(_MAX_ENTITY_MERGE_HOPS):
+        if merged_into is None:
+            return entity_id
+        if merged_into in seen:
+            return entity_id  # cycle: stop on the last sound row rather than loop
+        seen.add(merged_into)
+        nxt = (
+            await session.execute(
+                select(Entity.id, Entity.merged_into).where(Entity.id == merged_into)
+            )
+        ).first()
+        if nxt is None:
+            return entity_id  # dangling pointer: the row we have is still real
+        entity_id, merged_into = nxt
+    return entity_id
