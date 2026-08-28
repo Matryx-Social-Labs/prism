@@ -28,9 +28,42 @@ def chunk_text(text: str, max_chars: int = 1200, overlap: int = 150) -> list[str
 
 
 def slugify(value: str) -> str:
-    import re
+    """Identity key for a name. Unicode-aware, because our entities are not ASCII.
 
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    This was `[^a-z0-9]+` — an ASCII-only class that DELETED every other script
+    rather than transliterating it. Nine Indian-language feeds now ingest, so the
+    moment extraction emits a native-script name that rule fails in the worst
+    available way: every Devanagari, Kannada, Bengali, Tamil and Urdu name folds
+    to the empty string and then to the SAME fallback slug, so unrelated people
+    become one entity with an enormous document frequency. Silent, and shaped
+    exactly like a working system.
+
+        entity_slug("भारतीय जनता पार्टी")  ->  "unknown"
+        entity_slug("ನರೇಂದ್ರ ಮೋದಿ")        ->  "unknown"     # the same entity
+
+    Latin diacritics are folded (`Ávila` == `Avila`) — the old rule dropped the
+    accented letter outright and produced `vila`, a wrong slug rather than an
+    obviously broken one. Marks in Indic scripts are NOT folded: a Devanagari
+    matra or a Kannada vowel sign is a letter, not an accent, and stripping it
+    would mangle the name into a different one. So the fold is applied per
+    character and only where the base is Latin.
+    """
+    import re
+    import unicodedata
+
+    out = []
+    for ch in unicodedata.normalize("NFKC", value):
+        d = unicodedata.normalize("NFKD", ch)
+        if d and unicodedata.name(d[0], "").startswith("LATIN"):
+            out.append("".join(c for c in d if not unicodedata.combining(c)))
+        else:
+            out.append(ch)
+    # Keep letters, marks and digits; everything else is a separator. Marks must
+    # survive for the Indic reason above — they are not alphanumeric to Python.
+    kept = "".join(
+        c if unicodedata.category(c)[0] in "LMN" else "-" for c in "".join(out).casefold()
+    )
+    slug = re.sub(r"-+", "-", kept).strip("-")
     return slug[:120] or "unknown"
 
 
