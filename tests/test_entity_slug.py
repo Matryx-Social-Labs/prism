@@ -118,3 +118,19 @@ def test_latin_diacritics_fold_rather_than_vanish():
     wrong slug rather than a visibly broken one."""
     assert entity_slug("Ávila") == entity_slug("Avila") == "avila"
     assert entity_slug("Beyoncé") == entity_slug("Beyonce")
+
+
+def test_story_slugs_stay_ascii_while_entity_slugs_do_not():
+    """Same normaliser, two jobs. An entity slug is an IDENTITY and must keep its
+    script; a story slug is a shareable URL and must not become percent-encoded
+    line noise. A fully non-Latin label degrades to the `story-<id>` fallback."""
+    import uuid
+
+    from correlation.trending import story_slug
+
+    sid = uuid.UUID(int=0)
+    assert story_slug("दिल्ली में प्रदर्शन", sid) == "story-000000"
+    assert story_slug("Delhi protest", sid) == "delhi-protest-000000"
+    assert story_slug("Ávila verdict", sid) == "avila-verdict-000000"
+    # The entity path keeps what the URL path drops — that contrast is the point.
+    assert entity_slug("दिल्ली") == "दिल्ली"
