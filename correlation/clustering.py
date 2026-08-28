@@ -17,13 +17,59 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.config import get_settings
 from common.text import detect_script
 
 logger = logging.getLogger(__name__)
 
 TITLE_SIMILARITY_THRESHOLD = 0.6
-EMBEDDING_DISTANCE_THRESHOLD = 0.12  # cosine distance (1 - similarity); near-duplicates only
 TIME_WINDOW_DAYS = 4
+
+# ── Distance scale: these MOVE WITH THE MODEL ────────────────────────────────
+# Cosine distances are not comparable across embedding models, and the failure
+# mode is silent in both directions. Swapping the model while keeping these
+# numbers was measured through the full cascade against gold_pairs:
+#
+#   mpnet, its own thresholds     tp 28  fp  3  P 0.9032  R 0.4590  Cdet 0.5766
+#   mE5,   MPNET's thresholds     tp 47  fp 76  P 0.3821  R 0.7705  Cdet 1.1316  <-- 25x the false merges
+#   mE5,   its own thresholds     tp 31  fp  8  P 0.7949  R 0.5082  Cdet 0.5868
+#
+# E5 compresses the space: its same-event median distance is 0.063 and its
+# different-event median 0.145, so mpnet's 0.12 sits BETWEEN them and sweeps in
+# roughly a third of unrelated pairs. Nothing errors; the feed just starts fusing
+# unrelated stories.
+#
+# Keyed by model so the two can never drift apart. Derived by matching PERCENTILES
+# of the pairwise distance distribution (tools/tune_embed_threshold), not by a
+# constant ratio — the distributions differ in shape as well as width.
+_SCALE = {
+    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": {
+        "embedding": 0.12, "entity_near": 0.25, "entity_loose": 0.45,
+    },
+    "intfloat/multilingual-e5-base": {
+        "embedding": 0.050, "entity_near": 0.079, "entity_loose": 0.106,
+    },
+}
+
+
+def _scale() -> dict:
+    """Thresholds for the CONFIGURED model.
+
+    An unknown model falls back to the incumbent's numbers and says so loudly —
+    silently guessing a scale for an unmeasured model is how a swap turns into a
+    quiet 25x increase in false merges.
+    """
+    name = get_settings().prism_embed_model
+    if name not in _SCALE:
+        logger.warning(
+            "embedding_model_uncalibrated model=%s — using incumbent thresholds; "
+            "run tools/tune_embed_threshold before trusting match quality", name
+        )
+        return _SCALE["sentence-transformers/paraphrase-multilingual-mpnet-base-v2"]
+    return _SCALE[name]
+
+
+EMBEDDING_DISTANCE_THRESHOLD = _scale()["embedding"]  # cosine distance; near-duplicates only
 
 # Scripts where cosine distance actually carries same-story signal.
 #
@@ -54,7 +100,7 @@ EMBEDDING_TRUSTED_SCRIPTS = frozenset({"latin", "devanagari"})
 # A translated retelling scores ~0.42 distance (vs <0.12 for a near-dup) but shares
 # the key actors — so require >=2 shared entities AND moderate similarity.
 ENTITY_MATCH_MIN_SHARED = 2
-ENTITY_MATCH_LOOSE_DISTANCE = 0.45  # was 0.55; retellings sit ~0.42, trim the loose tail
+ENTITY_MATCH_LOOSE_DISTANCE = _scale()["entity_loose"]  # outer guard against topic drift
 # IDF-weight shared actors (1/df) rather than a df CUTOFF. A magnet (Modi, a major
 # party, Cockroach Janta Party df82) contributes almost nothing; a specific actor
 # carries the match. A cutoff deleted a trending story's OWN core (CJP/Pradhan/Wangchuk
@@ -70,7 +116,7 @@ ENTITY_MATCH_MIN_IDF = 0.15
 # retellings of "16 metro stations shut" sit at ~0.20 and share only "Delhi Metro");
 # in the looser 0.25-0.45 band require >=2, since a single shared actor there is more
 # likely coincidental.
-ENTITY_MATCH_NEAR_DISTANCE = 0.25
+ENTITY_MATCH_NEAR_DISTANCE = _scale()["entity_near"]
 # At least ONE shared actor must be specific on its own, not merely specific in
 # aggregate. sum(1/df) can clear MIN_IDF from a pile of half-magnets, which is how
 # two unrelated blobs that both mention several national figures reach each other.
