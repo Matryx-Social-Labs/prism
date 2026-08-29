@@ -23,7 +23,14 @@ async def search(
     # recency, not lens score. No CVE-only filter here: an explicit query is
     # intent, so a searched CVE record should surface.
     active_lens = get_lens("reader")
-    pattern = f"%{q.strip()}%"  # ponytail: ILIKE full-scan; add pg_trgm/tsvector index if the corpus grows
+    # Served by the GIN trigram indexes on events.title/summary (migration
+    # c8a3f5d21b74). Substring matching is kept deliberately — switching to
+    # tsvector would change what a query MEANS ("modi" would stop finding
+    # "Modinagar") and would have to pick a stemming language the multilingual
+    # corpus does not have. Trigrams need a query of >=3 characters to use the
+    # index, so a 2-character search still scans; that is the documented floor,
+    # not an oversight.
+    pattern = f"%{q.strip()}%"
     rows = (
         await db.execute(
             text(

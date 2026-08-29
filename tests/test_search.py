@@ -62,3 +62,46 @@ async def test_search_matches_title_and_summary():
                 text("DELETE FROM events WHERE id = ANY(:ids)"),
                 {"ids": [str(e_title), str(e_summary), str(e_miss)]},
             )
+
+
+# --- the index that keeps this route off a full table scan ----------------------
+# Measured on production before migration c8a3f5d21b74: Seq Scan, ~100ms per query
+# over 19,356 events, growing linearly. The route's leading-wildcard ILIKE cannot
+# use a btree, so it needs GIN over trigrams.
+#
+# This asserts the SCHEMA rather than a query plan on purpose. The local test
+# database holds a couple of hundred rows, where Postgres correctly prefers a
+# sequential scan whatever indexes exist — so an EXPLAIN assertion here would fail
+# for a reason that has nothing to do with the thing being tested.
+
+
+async def test_search_columns_have_trigram_indexes():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    async with session_scope() as s:
+        rows = await s.execute(
+            text(
+                "SELECT indexdef FROM pg_indexes "
+                "WHERE tablename = 'events' AND indexdef ILIKE '%gin_trgm_ops%'"
+            )
+        )
+        defs = " ".join(r[0] for r in rows.all())
+    assert "title" in defs, "events.title has no trigram index; search full-scans"
+    assert "summary" in defs, "events.summary has no trigram index; search full-scans"
+
+
+async def test_search_still_matches_inside_a_word():
+    """Substring semantics are the reason this used ILIKE and not tsvector. A
+    lexeme index would quietly stop matching mid-word, which is a product change,
+    not a performance one — so it is pinned here."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    token = uuid.uuid4().hex[:10]
+    await _seed(f"Prefix{token}Suffix headline", "body", "politics")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://t") as client:
+        r = await client.get("/api/v1/search", params={"q": token})
+    assert r.status_code == 200
+    assert any(token in i["title"] for i in r.json()["items"]), (
+        "a mid-word substring stopped matching — search semantics changed"
+    )
