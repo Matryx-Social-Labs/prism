@@ -134,3 +134,33 @@ def test_story_slugs_stay_ascii_while_entity_slugs_do_not():
     assert story_slug("Ávila verdict", sid) == "avila-verdict-000000"
     # The entity path keeps what the URL path drops — that contrast is the point.
     assert entity_slug("दिल्ली") == "दिल्ली"
+
+
+# --- spaced vs dotted initials are one name --------------------------------------
+# Removing dots turned "V.D. Satheesan" into "VD Satheesan" while "V D Satheesan"
+# kept its spaces, so the two forms were different entities. Measured in production:
+# vd-satheesan(23) and v-d-satheesan(16) were separate rows for one person, as were
+# kc-venugopal/k-c-venugopal, ps-narasimha/p-s-narasimha and eleven more. Indian
+# political coverage writes initials both ways constantly.
+
+
+def test_spaced_initials_match_dotted_initials():
+    for dotted, spaced in [
+        ("V.D. Satheesan", "V D Satheesan"),
+        ("K.C. Venugopal", "K C Venugopal"),
+        ("J.C.D. Prabhakar", "J C D Prabhakar"),
+    ]:
+        assert entity_slug(dotted) == entity_slug(spaced), f"{dotted} != {spaced}"
+
+
+def test_a_lone_initial_before_a_full_name_keeps_its_space():
+    """Only single letters ADJACENT to another single letter join. "R Nirmal Kumar"
+    and "R Nirmalkumar" are not evidence of one name from initials alone, so this
+    rule must not claim them — that fold, if wanted, needs different evidence."""
+    assert entity_slug("R Nirmal Kumar") == "r-nirmal-kumar"
+
+
+def test_ordinary_words_are_never_joined():
+    assert entity_slug("Narendra Modi") == "narendra-modi"
+    assert entity_slug("Delhi Police") == "delhi-police"
+    assert entity_slug("Wrestling Federation of India") == "wrestling-federation-of-india"
