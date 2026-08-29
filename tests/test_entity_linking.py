@@ -222,3 +222,19 @@ def test_grouping_is_transitive_across_both_keys():
     linked = {1: ("Q16193764", "alias_exact"), 2: ("Q16193764", "alias_exact")}
     groups = fold_groups(ents, linked)
     assert len(groups) == 1 and len(groups[0]) == 3
+
+
+def test_curated_spelling_variants_group():
+    """Devanagari romanisation is not standardised, so जनता arrives as both "Janta"
+    and "Janata". Those are not separator-identical and Wikidata records only one,
+    so neither of the other two keys can join them — and the product was showing
+    "Cockroach Janata Party" and "Cockroach Janta Party" in one story's cast."""
+    ents = [_e(1, "cockroach-janata-party", 212), _e(2, "cockroach-janta-party", 172)]
+    assert len(fold_groups(ents, {2: ("Q139857349", "alias_exact")})) == 1
+
+
+def test_a_curated_group_is_still_refused_on_a_qid_conflict():
+    """Curated judgement does not outrank Wikidata saying "two distinct items"."""
+    ents = [_e(1, "cockroach-janata-party"), _e(2, "cockroach-janta-party")]
+    linked = {1: ("Q1", "alias_exact"), 2: ("Q2", "alias_exact")}
+    assert fold_groups(ents, linked) == []

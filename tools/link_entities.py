@@ -33,6 +33,7 @@ import sys
 
 import asyncpg
 
+from common.entity_aliases import resolve_alias
 from common.wikidata import (
     INDIA,
     agent_qids,
@@ -365,6 +366,17 @@ def fold_groups(ents: list[dict], linked: dict) -> list[list[dict]]:
     to punctuation, one level up — no fuzzy distance, no edit threshold, just a
     difference that carries no information.
 
+    The third key is `common/entity_aliases.py`, the curated list this whole module
+    set out to replace. It stays because it encodes the one thing neither Wikidata
+    nor a separator rule can supply: judgement about spellings that genuinely
+    differ. Devanagari romanisation is not standardised, so जनता reaches us as both
+    "Janta" and "Janata" — cockroachjantaparty and cockroachjanataparty are not
+    separator-identical, and Wikidata records only one of them. Left out, the
+    product kept showing "Cockroach Janata Party" AND "Cockroach Janta Party" in a
+    single story's cast, which is the defect that started this work. `entity_slug`
+    already resolves new mentions through this list; the fold now cleans up the
+    rows that predate it.
+
     A group holding two DIFFERENT QIDs is refused outright, even though the slugs
     match. Wikidata saying "these are distinct items" is stronger evidence than a
     space, and production has a real case: thawar-chand-gehlot is Q7711496 while
@@ -387,6 +399,7 @@ def fold_groups(ents: list[dict], linked: dict) -> list[list[dict]]:
     for key in (
         lambda e: (linked.get(e["id"]) or (None,))[0],   # QID, when linked
         lambda e: e["slug"].replace("-", ""),             # the same name, respaced
+        lambda e: resolve_alias(e["slug"]),               # curated spelling variants
     ):
         seen: dict = {}
         for e in ents:
