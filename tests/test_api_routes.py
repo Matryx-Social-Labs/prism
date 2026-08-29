@@ -32,6 +32,11 @@ EXPECTED = {
     ("DELETE", "/api/v1/watchlist"),
     ("GET", "/api/v1/watchlist/events"),
     ("POST", "/api/v1/admin/pipeline/run"),
+    # Labelling — how the gold set grows without a checkout (api/routes/label.py).
+    ("GET", "/api/v1/label/{key}"),
+    ("GET", "/api/v1/label/{key}/next"),
+    ("POST", "/api/v1/label/{key}/answer"),
+    ("GET", "/api/v1/label/{key}/export"),
 }
 
 

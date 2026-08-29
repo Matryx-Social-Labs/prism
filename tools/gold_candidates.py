@@ -261,6 +261,53 @@ def review() -> None:
     print("  open it, tick what belongs, press Export, then --compile")
 
 
+async def push(name: str, url: str | None = None) -> None:
+    """Load the proposed candidates into `label_batches` / `label_tasks`.
+
+    Separate from --propose so the same candidate file can be pushed to a local
+    database for a rehearsal and to production for the real thing, without
+    regenerating and getting a different sample.
+
+    The batch key is `secrets.token_urlsafe`, not a slug of the name. It is the only
+    thing standing between a public URL and someone dropping junk into the
+    measurement everything else is judged against, so it must not be guessable from
+    the batch's title.
+    """
+    import secrets
+    import uuid
+
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    cands = json.loads(CANDIDATES.read_text())
+    key = secrets.token_urlsafe(9)
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        bid = uuid.uuid4()
+        async with c.transaction():
+            await c.execute(
+                "INSERT INTO label_batches (id, key, name, kind, notes) "
+                "VALUES ($1,$2,$3,'story_boundary',$4)",
+                bid, key, name,
+                "Tick every headline that is part of the SAME unfolding story as the "
+                "one in bold. Same topic is not enough.",
+            )
+            await c.executemany(
+                "INSERT INTO label_tasks (id, batch_id, position, seed_event_id, "
+                "candidates, sector) VALUES ($1,$2,$3,$4,$5::jsonb,$6)",
+                [
+                    (uuid.uuid4(), bid, i, uuid.UUID(o["seed"]),
+                     json.dumps(o["candidates"]), o["sector"])
+                    for i, o in enumerate(cands)
+                ],
+            )
+    finally:
+        await c.close()
+    print(f"  batch '{name}': {len(cands)} tasks")
+    print(f"  share this link:  /label/{key}")
+
+
 def compile_gold() -> None:
     """Turn exported decisions into a gold_stories block, ready to paste.
 
@@ -339,14 +386,20 @@ def main() -> None:
     ap.add_argument("--review", action="store_true")
     ap.add_argument("--compile", action="store_true")
     ap.add_argument("--seeds", type=int, default=123)
+    ap.add_argument("--push", metavar="NAME", help="load candidates into a label batch")
+    ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     a = ap.parse_args()
     if a.propose:
         propose(a.seeds)
     if a.review:
         review()
+    if a.push:
+        import asyncio
+
+        asyncio.run(push(a.push, a.db))
     if a.compile:
         compile_gold()
-    if not (a.propose or a.review or a.compile):
+    if not (a.propose or a.review or a.compile or a.push):
         ap.print_help()
 
 
