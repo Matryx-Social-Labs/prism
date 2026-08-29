@@ -226,8 +226,11 @@ async def test_two_communities_of_one_story_fold_instead_of_minting_duplicates(m
                     return self
                 def all(self):
                     # One existing story that both communities match.
+                    # hero_event_id is part of the real SELECT; the stub must carry
+                    # it or the test passes against a shape production never returns.
                     return [{"id": "S", "member_event_ids": ["1", "2"], "cast": cast,
-                             "first_seen_at": datetime(2026, 7, 23, 14, 0, tzinfo=UTC)}]
+                             "first_seen_at": datetime(2026, 7, 23, 14, 0, tzinfo=UTC),
+                             "hero_event_id": None}]
                 def scalar(self):
                     return None
             return _R()
@@ -309,3 +312,40 @@ def test_developing_story_only_when_there_is_nothing_at_all():
     assert _label([], None, None) == "Developing story"
     # A cast-less story with an unreadable title still shows it — never blank a card.
     assert _label([], HINDI_HEADLINE, None) == HINDI_HEADLINE
+
+
+def test_two_stories_anchored_on_one_event_are_the_same_story():
+    """The hero is the trunk. An event can anchor one story only, and a reader
+    seeing two cards with the same headline is the visible symptom.
+
+    Verbatim from production 2026-08-29: two active stories both anchored on event
+    91456068, "Karnataka cabinet expansion: DKS inducts 19", sharing 7 members.
+    Every existing threshold missed it, and not narrowly — member overlap 7/21 =
+    0.33 against 0.60, cast Jaccard 0.20 against 0.50, and their one shared actor
+    was Dharmendra Pradhan, df 339, giving IDF overlap 0.003 against 0.12.
+    """
+    a_cast = ["Bharatiya Janata Party", "Dharmendra Pradhan", "Lok Sabha"]
+    b_cast = ["Dharmendra Pradhan", "Delhi Police", "Cockroach Janata Party"]
+    a_members = {str(i) for i in range(32)}
+    b_members = {str(i) for i in range(25, 46)}  # 7 shared
+    df = {"Dharmendra Pradhan": 339.0, "Bharatiya Janata Party": 356.0}
+
+    assert not _same_story(a_members, a_cast, b_members, b_cast, df), (
+        "setup is wrong: the thresholds are supposed to miss this pair"
+    )
+    assert _same_story(a_members, a_cast, b_members, b_cast, df,
+                       "91456068", "91456068"), "same anchor must mean same story"
+
+
+def test_different_heroes_do_not_merge_on_the_anchor_alone():
+    """The rule must not become 'anything with a hero merges'. Two genuinely
+    different stories keep their own anchors and stay apart."""
+    assert not _same_story({"1"}, ["Donald Trump"], {"2"}, ["Vinesh Phogat"],
+                           {}, "aaa", "bbb")
+
+
+def test_a_missing_hero_falls_through_to_the_thresholds():
+    """A story predating the hero column, or a community without one, must be
+    judged exactly as before — never merged for both being None."""
+    assert not _same_story({"1"}, ["A"], {"2"}, ["B"], {}, None, None)
+    assert _same_story({"1", "2", "3"}, ["A", "B"], {"1", "2", "3"}, ["A", "B"], {}, None, None)

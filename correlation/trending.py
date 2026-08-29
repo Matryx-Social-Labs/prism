@@ -89,7 +89,25 @@ def _idf_cast_overlap(cast_a: list[str], cast_b: list[str], df: dict[str, float]
 def _same_story(
     members_a: set[str], cast_a: list[str], members_b: set[str], cast_b: list[str],
     df: dict[str, float] | None = None,
+    hero_a: str | None = None, hero_b: str | None = None,
 ) -> bool:
+    # Same hero event => same story, before any threshold is consulted.
+    #
+    # The hero is the most-corroborated event in a community and the thing the card
+    # is titled from. Two stories claiming it is a contradiction: an event can be
+    # the trunk of one story only, and the reader sees two cards with one headline.
+    # Observed live — two active stories both anchored on 91456068, "Karnataka
+    # cabinet expansion: DKS inducts 19", sharing 7 members.
+    #
+    # None of the three thresholds below could catch that, and not narrowly: member
+    # overlap 7/21 = 0.33 against 0.60, cast Jaccard 0.20 against 0.50, and the only
+    # shared actor was Dharmendra Pradhan, whose df of 339 puts the IDF-weighted
+    # overlap at 0.003 against 0.12. The IDF weighting is right — a national magnet
+    # SHOULD count for almost nothing — which is precisely why the anchor has to be
+    # its own signal rather than another threshold to loosen. Loosening any of the
+    # three to reach this pair would merge unrelated stories that share a magnet.
+    if hero_a is not None and hero_a == hero_b:
+        return True
     return (
         _overlap(members_a, members_b) >= OVERLAP_THRESHOLD
         or _cast_jaccard(cast_a, cast_b) >= CAST_SAME_STORY
@@ -151,7 +169,9 @@ async def _converge_existing(session: AsyncSession, stories: dict, df: dict[str,
             a, b = find(ids[i]), find(ids[j])
             if a == b:
                 continue
-            if _same_story(stories[a]["members"], stories[a]["cast"], stories[b]["members"], stories[b]["cast"], df):
+            if _same_story(stories[a]["members"], stories[a]["cast"],
+                           stories[b]["members"], stories[b]["cast"], df,
+                           stories[a].get("hero"), stories[b].get("hero")):
                 # attach the younger root under the older, so the root is always the oldest
                 old, new = sorted((a, b), key=lambda x: (stories[x]["first"] or _MAX_TS))
                 parent[new] = old
@@ -399,7 +419,8 @@ async def reconcile_stories(session: AsyncSession) -> int:
     communities = await detect_trending_communities(session)
     rows = (
         await session.execute(
-            text('SELECT id, member_event_ids, "cast", first_seen_at FROM stories WHERE merged_into IS NULL')
+            text('SELECT id, member_event_ids, "cast", first_seen_at, hero_event_id '
+                 'FROM stories WHERE merged_into IS NULL')
         )
     ).mappings().all()
     stories = {
@@ -407,6 +428,7 @@ async def reconcile_stories(session: AsyncSession) -> int:
             "members": {str(m) for m in (r["member_event_ids"] or [])},
             "cast": r["cast"] or [],
             "first": r["first_seen_at"],
+            "hero": str(r["hero_event_id"]) if r["hero_event_id"] else None,
         }
         for r in rows
     }
@@ -424,7 +446,8 @@ async def reconcile_stories(session: AsyncSession) -> int:
         ccast = c["cast"]
         matches = [
             sid for sid, s in stories.items()
-            if sid not in claimed and _same_story(cmembers, ccast, s["members"], s["cast"], df)
+            if sid not in claimed and _same_story(cmembers, ccast, s["members"], s["cast"], df,
+                                                  c.get("hero_event_id"), s.get("hero"))
         ]
         if not matches:
             # Before minting a new story, check whether this community belongs to
@@ -446,7 +469,8 @@ async def reconcile_stories(session: AsyncSession) -> int:
             fold = [
                 sid for sid in claimed
                 if sid in stories
-                and _same_story(cmembers, ccast, stories[sid]["members"], stories[sid]["cast"], df)
+                and _same_story(cmembers, ccast, stories[sid]["members"], stories[sid]["cast"], df,
+                                c.get("hero_event_id"), stories[sid].get("hero"))
             ]
             if fold:
                 sid = min(fold, key=lambda x: (stories[x]["first"] or _MAX_TS))
@@ -455,15 +479,18 @@ async def reconcile_stories(session: AsyncSession) -> int:
                 await _update_story(session, sid, c)
                 stories[sid]["members"] = set(merged)
                 stories[sid]["cast"] = c["cast"]
+                stories[sid]["hero"] = c.get("hero_event_id")
                 seen.add(sid)
                 continue
             sid = await _create_story(session, c)
-            stories[sid] = {"members": cmembers, "cast": ccast, "first": None}
+            stories[sid] = {"members": cmembers, "cast": ccast, "first": None,
+                            "hero": c.get("hero_event_id")}
         elif len(matches) == 1:
             sid = matches[0]
             await _update_story(session, sid, c)
             stories[sid]["members"] = cmembers
             stories[sid]["cast"] = ccast
+            stories[sid]["hero"] = c.get("hero_event_id")
         else:  # MERGE: oldest survives; younger point at it and go dormant → their URL 301s
             canonical = min(matches, key=lambda x: (stories[x]["first"] or _MAX_TS))
             await _update_story(session, canonical, c)
