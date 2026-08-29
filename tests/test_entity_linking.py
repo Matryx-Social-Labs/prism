@@ -7,7 +7,7 @@ raised anywhere, so each rule below exists because a specific real candidate set
 defeated a simpler version.
 """
 
-from tools.link_entities import narrow, resolve
+from tools.link_entities import is_identifying, narrow, resolve
 
 
 def test_a_single_candidate_links():
@@ -131,3 +131,51 @@ def test_narrow_never_adds_a_candidate():
     cands = [("Q1", "label"), ("Q2", "label"), ("Q3", "alias")]
     got, _ = narrow(cands, {"Q1": LIVE, "Q2": DEAD, "Q3": DEAD})
     assert set(got) <= set(cands)
+
+
+# --- weak aliases: where the false merges actually came from ---------------------
+# A single-token ALIAS is the weakest evidence Wikidata offers. Q114270322 is a
+# Kashmiri poet whose item lists BOTH "Rahul" and "Kiran" as aliases, so two
+# unrelated people in the corpus were folded into a poet neither of them is.
+# But single-token aliases are also the most valuable folds (bjp, cbi, rss), so the
+# test is not "reject short" — it is "reject what the item's own name cannot yield".
+
+
+def test_an_initialism_of_the_item_name_is_identifying():
+    assert is_identifying("bjp", "alias", ["Bharatiya Janata Party"])
+    assert is_identifying("cbi", "alias", ["Central Bureau of Investigation"])
+
+
+def test_joining_words_are_skipped_when_forming_the_initialism():
+    """Press Trust of India is PTI, not PTOI."""
+    assert is_identifying("pti", "alias", ["Press Trust of India"])
+
+
+def test_a_word_of_the_name_is_identifying():
+    """Shortened personal names: 'Vijay' for C. Joseph Vijay."""
+    assert is_identifying("vijay", "alias", ["C. Joseph Vijay"])
+    assert is_identifying("kanimozhi", "alias", ["Kanimozhi Karunanidhi"])
+
+
+def test_a_bare_name_unrelated_to_the_item_is_refused():
+    """The actual production defect: both of these were aliases on ONE poet's item
+    and merged two unrelated people."""
+    assert not is_identifying("rahul", "alias", ["Hemangi Sharma"])
+    assert not is_identifying("kiran", "alias", ["Hemangi Sharma"])
+
+
+def test_labels_and_wiki_titles_are_exempt():
+    """Those ARE the item's name, so 'is it derived from the name' cannot apply —
+    and requiring it would reject every single-word label, e.g. Infosys."""
+    assert is_identifying("anything", "label", [])
+    assert is_identifying("anything", "sitelink", [])
+
+
+def test_a_multi_token_alias_is_specific_enough_on_its_own():
+    assert is_identifying("press-trust-of-india", "alias", [])
+
+
+def test_an_item_with_no_recorded_label_cannot_vouch_for_a_bare_alias():
+    """No labels means no evidence the alias derives from the name. Refuse rather
+    than default to trusting it — absence of evidence must not permit an action."""
+    assert not is_identifying("rahul", "alias", [])

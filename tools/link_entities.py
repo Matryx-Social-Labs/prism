@@ -171,6 +171,43 @@ async def prune_non_agents(c) -> None:
 # A recorded canonical name outranks a recorded nickname outranks a derived form.
 TIER = ("label", "sitelink", "alias")
 
+# Words an initialism skips. Not a stoplist for meaning — just the joining words
+# English acronyms drop: "Press Trust of India" -> PTI, not PTOI.
+_JOINERS = {"of", "and", "the", "for", "in", "on", "at", "de", "da", "el", "la"}
+
+
+def is_identifying(key: str, kind: str, labels: list[str]) -> bool:
+    """Is this surface form specific enough to identify the item on its own?
+
+    A single-token ALIAS is the weakest evidence Wikidata offers, and it is where
+    the false merges live. Q114270322 is a Kashmiri poet, Hemangi Sharma, whose
+    item lists both "Rahul" and "Kiran" as aliases — so two unrelated people in our
+    corpus were folded into a poet neither of them is.
+
+    But single-token aliases are also the folds worth the most: bjp, cjp, dmk, cbi,
+    rss, nta. What separates those from "Rahul" is that each is DERIVED FROM the
+    item's own name — an initialism of it, or one of its words:
+
+        bjp    <- Bharatiya Janata Party        initialism
+        pti    <- Press Trust of India          initialism (joiners skipped)
+        vijay  <- C. Joseph Vijay               a word of the name
+        rahul  <- Hemangi Sharma                neither, so refused
+
+    Labels and wiki titles are exempt: those ARE the item's name, so the question
+    does not arise. Multi-token aliases are exempt too — "Press Trust of India" is
+    specific enough on its own, and the tier rule already covers the case where a
+    multi-word alias belongs to a different entity (CPI vs CPI(Marxist)).
+    """
+    if kind != "alias" or "-" in key:
+        return True
+    for lab in labels:
+        words = [w for w in alias_key(lab).split("-") if w]
+        if key in words:
+            return True
+        if key == "".join(w[0] for w in words if w not in _JOINERS):
+            return True
+    return False
+
 
 def resolve(cands: list[tuple[str, str]]) -> tuple[str, str] | None:
     """Decide one surface form's QID from its candidates, or refuse.
@@ -255,9 +292,26 @@ async def match(c, ents: list[dict]) -> tuple[dict, list[tuple]]:
     is one query for a few hundred items instead of a property fetch over the whole
     index.
     """
+    # An item's own recorded names, taken from the index itself — the rows whose
+    # kind is 'label' ARE the labels, so this needs no extra column or lookup.
+    labels: dict[str, list[str]] = {}
+    for r in await c.fetch(
+        "SELECT qid, surface FROM entity_alias WHERE qid <> '' AND kind = 'label'"
+    ):
+        labels.setdefault(r["qid"], []).append(r["surface"])
+
     idx: dict[str, list[tuple[str, str]]] = {}
-    for r in await c.fetch("SELECT alias_norm, qid, kind FROM entity_alias WHERE qid <> ''"):
-        idx.setdefault(r["alias_norm"], []).append((r["qid"], r["kind"] or "alias"))
+    weak = 0
+    for r in await c.fetch(
+        "SELECT alias_norm, qid, kind, surface FROM entity_alias WHERE qid <> ''"
+    ):
+        kind = r["kind"] or "alias"
+        if not is_identifying(r["alias_norm"], kind, labels.get(r["qid"], [])):
+            weak += 1
+            continue
+        idx.setdefault(r["alias_norm"], []).append((r["qid"], kind))
+    if weak:
+        print(f"  dropped {weak} single-token aliases not derived from their item's name")
 
     linked: dict = {}
     unresolved: list[tuple[dict, list[tuple[str, str]]]] = []
@@ -362,21 +416,25 @@ async def fold(c, ents: list[dict], linked: dict, journal: str, *, write: bool) 
         print("  nothing to fold")
         return
 
+    # The WHOLE row, not just its id. The repoint below removes rows that would
+    # collide with one the canonical already holds, so those rows do not exist
+    # afterwards and an id alone could never restore them — replaying it would
+    # silently no-op and look like a successful rollback. Storing the columns makes
+    # `--unfold` able to re-insert what was removed.
     entries = []
     for canon, *variants in groups:
         for v in variants:
             for tbl in ("event_entities", "article_entities", "impacts"):
-                entries += [
-                    {"table": tbl, "id": str(r["id"]), "from": str(v["id"]), "to": str(canon["id"])}
-                    for r in await c.fetch(f"SELECT id FROM {tbl} WHERE entity_id = $1", v["id"])
-                ]
+                for r in await c.fetch(f"SELECT * FROM {tbl} WHERE entity_id = $1", v["id"]):
+                    row = {k: (str(x) if x is not None else None) for k, x in dict(r).items()}
+                    entries.append({"table": tbl, "row": row, "to": str(canon["id"])})
     print(f"  {len(groups)} groups -> {len(entries)} mentions move onto {len(groups)} rows")
     if not write:
         print("  (dry run — nothing written; --fold --write applies it)")
         return
 
     with open(journal, "w") as fh:
-        json.dump(entries, fh, indent=1)
+        json.dump({"format": JOURNAL_FORMAT, "entries": entries}, fh, indent=1)
     print(f"  journal written: {journal}  ({len(entries)} reversible edges)")
 
     async with c.transaction():
@@ -402,6 +460,81 @@ async def fold(c, ents: list[dict], linked: dict, journal: str, *, write: bool) 
     print(f"  FOLDED: {len(entries)} mentions repointed, {len(groups)} redirects set")
 
 
+# Bumped whenever the journal's shape changes. `unfold` refuses anything else.
+JOURNAL_FORMAT = "prism-entity-fold/2"
+
+
+async def unfold(c, journal: str, *, write: bool) -> None:
+    """Undo a fold from its journal. The rollback the fold's safety claim depends on.
+
+    Two cases per journalled row, because the fold did two different things:
+
+      repointed  the row still exists with the canonical's entity_id -> put the
+                 original entity_id back.
+      removed    the row collided with one the canonical already held and was
+                 deleted -> re-insert it verbatim.
+
+    The second case is why the journal stores whole rows. An id-only journal would
+    UPDATE nothing for a deleted row, report success, and leave the mention gone —
+    a rollback that appears to work is worse than none, because it is trusted.
+
+    `merged_into` is cleared too, otherwise ingest would keep redirecting to the
+    canonical and the unfold would undo the data but not the behaviour.
+    """
+    doc = json.load(open(journal))
+    if not isinstance(doc, dict) or doc.get("format") != JOURNAL_FORMAT:
+        # Refuse rather than guess. An older journal stored only row ids, and the
+        # fold DELETES rows that would collide — so replaying ids would UPDATE
+        # nothing for exactly the rows that need restoring, and report success. A
+        # rollback that appears to work is worse than one that admits it cannot.
+        raise SystemExit(
+            f"{journal}: not a {JOURNAL_FORMAT} journal. Refusing to restore from a "
+            f"format that cannot re-insert deleted rows."
+        )
+    entries = doc["entries"]
+    by_table: dict[str, list[dict]] = {}
+    for e in entries:
+        by_table.setdefault(e["table"], []).append(e)
+    print(f"  journal: {len(entries)} rows across {', '.join(sorted(by_table))}")
+
+    missing = 0
+    for tbl, rows in by_table.items():
+        ids = [r["row"]["id"] for r in rows]
+        present = {
+            str(x) for x in await c.fetchval(
+                f"SELECT coalesce(array_agg(id), '{{}}') FROM {tbl} WHERE id = ANY($1::uuid[])",
+                ids,
+            )
+        }
+        missing += len(ids) - len(present)
+    print(f"  {len(entries) - missing} rows to repoint, {missing} to re-insert")
+    if not write:
+        print("  (dry run — nothing written; --unfold --write applies it)")
+        return
+
+    restored = 0
+    async with c.transaction():
+        for tbl, rows in by_table.items():
+            for e in rows:
+                # `json_populate_record` rather than a column list of parameters:
+                # the journal is JSON, so every value in it is a string, and
+                # asyncpg refuses a string for a timestamptz parameter. Handing
+                # Postgres the whole object lets it coerce each field against the
+                # table's own row type — no per-column casting to keep in sync with
+                # the schema, and it stays correct when a column is added.
+                await c.execute(
+                    f"INSERT INTO {tbl} SELECT * FROM json_populate_record(NULL::{tbl}, $1::json)"
+                    f" ON CONFLICT (id) DO UPDATE SET entity_id = EXCLUDED.entity_id",
+                    json.dumps(e["row"]),
+                )
+                restored += 1
+        await c.execute(
+            "UPDATE entities SET merged_into = NULL WHERE id = ANY($1::uuid[])",
+            sorted({e["row"]["entity_id"] for e in entries}),
+        )
+    print(f"  UNFOLDED: {restored} rows restored, redirects cleared")
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fetch", action="store_true", help="query Wikidata to fill the index")
@@ -412,6 +545,7 @@ async def main() -> None:
     ap.add_argument("--write", action="store_true", help="persist qid/resolution on entities")
     ap.add_argument("--fold", action="store_true",
                     help="repoint mentions of variant rows onto one canonical row")
+    ap.add_argument("--unfold", action="store_true", help="undo a fold from its journal")
     ap.add_argument("--journal", default="entity_fold.json")
     ap.add_argument("--min-df", type=int, default=2)
     ap.add_argument("--limit", type=int, default=400, help="max names to look up per --fetch run")
@@ -426,7 +560,14 @@ async def main() -> None:
     c = await asyncpg.connect(_db_url(), timeout=60)
     ic = await asyncpg.connect(a.index_url, timeout=60) if a.index_url else c
     try:
-        corpus_writes = a.write or a.fold
+        corpus_writes = a.write or a.fold or a.unfold
+        if a.unfold and not a.write:
+            # The dry run must be protected the same way every other one is.
+            await c.execute("SET default_transaction_read_only = on")
+            print("READ-ONLY — the corpus connection refuses writes.")
+        if a.unfold:
+            await unfold(c, a.journal, write=a.write)
+            return
         if not corpus_writes:
             await c.execute("SET default_transaction_read_only = on")
             print("READ-ONLY — the corpus connection refuses writes.")
