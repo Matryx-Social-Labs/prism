@@ -350,13 +350,79 @@ async def match(c, ents: list[dict]) -> tuple[dict, list[tuple]]:
     return linked, refused
 
 
-async def report(c, ents: list[dict], linked: dict, refused: list) -> None:
-    by_qid: dict[str, list[dict]] = {}
+def fold_groups(ents: list[dict], linked: dict) -> list[list[dict]]:
+    """Entities that are one entity, by QID or by separator-identical slug.
+
+    The QID path only folds variants Wikidata has recorded, and it does not record
+    everything: "Brijbhushan Sharan Singh" is not an alias of Q4967969 even though
+    "Brij Bhushan Sharan Singh" is its label. Those unrecorded variants are the
+    residual left after linking, and in production they were still putting three
+    spellings of one man in a single story's cast.
+
+    The second key catches them without asking Wikidata anything: two slugs that
+    are identical once separators are removed are the same name written two ways.
+    That is the same conservative principle `canonical_entity_name` already applies
+    to punctuation, one level up — no fuzzy distance, no edit threshold, just a
+    difference that carries no information.
+
+    A group holding two DIFFERENT QIDs is refused outright, even though the slugs
+    match. Wikidata saying "these are distinct items" is stronger evidence than a
+    space, and production has a real case: thawar-chand-gehlot is Q7711496 while
+    thawarchand-gehlot is Q107433711. Those are near-certainly duplicate items for
+    one person, but resolving that is Wikidata's job, not a fold's.
+    """
+    parent = {e["id"]: e["id"] for e in ents}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for key in (
+        lambda e: (linked.get(e["id"]) or (None,))[0],   # QID, when linked
+        lambda e: e["slug"].replace("-", ""),             # the same name, respaced
+    ):
+        seen: dict = {}
+        for e in ents:
+            k = key(e)
+            if k is None:
+                continue
+            if k in seen:
+                union(e["id"], seen[k])
+            else:
+                seen[k] = e["id"]
+
+    out: dict = {}
     for e in ents:
-        got = linked.get(e["id"])
-        if got:
-            by_qid.setdefault(got[0], []).append(e)
-    groups = {q: es for q, es in by_qid.items() if len(es) > 1}
+        out.setdefault(find(e["id"]), []).append(e)
+    groups = []
+    for members in out.values():
+        if len(members) < 2:
+            continue
+        qids = {(linked.get(m["id"]) or (None,))[0] for m in members} - {None}
+        if len(qids) > 1:
+            print(f"  refusing to fold {[m['slug'] for m in members]}: "
+                  f"Wikidata has them as {sorted(qids)}")
+            continue
+        groups.append(members)
+    return groups
+
+
+async def report(c, ents: list[dict], linked: dict, refused: list) -> None:
+    # A LIST, not a dict keyed on qid. Keying on the qid silently collapsed every
+    # group folded on slug alone into one entry — they share the placeholder key —
+    # so a run with 18 groups reported 3. The report is what decisions are made
+    # from, so it must not undercount the thing being decided.
+    groups = [
+        ((linked.get(g[0]["id"]) or (None,))[0] or "slug-variant", g)
+        for g in fold_groups(ents, linked)
+    ]
 
     n_lab = sum(1 for v in linked.values() if v[1].endswith("_wins"))
     print(f"\n  entities considered : {len(ents)}")
@@ -365,7 +431,7 @@ async def report(c, ents: list[dict], linked: dict, refused: list) -> None:
     print(f"  REFUSED (ambiguous) : {len(refused)}   left on their slug, deliberately")
     for name, df, qids in sorted(refused, key=lambda r: -r[1])[:6]:
         print(f"      {name[:38]:38} df {df:3}  -> {', '.join(qids[:4])}")
-    print(f"  QIDs holding >1 row : {len(groups)}   (these are the splits that fold)")
+    print(f"  groups holding >1 row: {len(groups)}   (these are the splits that fold)")
 
     if not groups:
         return
@@ -373,7 +439,7 @@ async def report(c, ents: list[dict], linked: dict, refused: list) -> None:
     print("  true df is the union of the group's events, not the sum: an event naming")
     print("  both spellings must not be counted twice.\n")
     worst = 0.0
-    for qid, es in sorted(groups.items(), key=lambda kv: -sum(e["df"] for e in kv[1]))[:15]:
+    for qid, es in sorted(groups, key=lambda kv: -sum(e["df"] for e in kv[1]))[:15]:
         true_df = await c.fetchval(
             "SELECT count(DISTINCT event_id) FROM event_entities WHERE entity_id = ANY($1::uuid[])",
             [e["id"] for e in es])
@@ -406,12 +472,8 @@ async def fold(c, ents: list[dict], linked: dict, journal: str, *, write: bool) 
     chasing every foreign key to clear a row nobody reads is work for its own sake),
     but the mention edges do not, which is what the file is for.
     """
-    by_qid: dict[str, list[dict]] = {}
-    for e in ents:
-        if e["id"] in linked:
-            by_qid.setdefault(linked[e["id"]][0], []).append(e)
     groups = [sorted(es, key=lambda e: (-e["df"], str(e["id"])))
-              for es in by_qid.values() if len(es) > 1]
+              for es in fold_groups(ents, linked)]
     if not groups:
         print("  nothing to fold")
         return

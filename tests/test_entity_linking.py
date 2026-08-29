@@ -7,7 +7,7 @@ raised anywhere, so each rule below exists because a specific real candidate set
 defeated a simpler version.
 """
 
-from tools.link_entities import is_identifying, narrow, resolve
+from tools.link_entities import fold_groups, is_identifying, narrow, resolve
 
 
 def test_a_single_candidate_links():
@@ -179,3 +179,46 @@ def test_an_item_with_no_recorded_label_cannot_vouch_for_a_bare_alias():
     """No labels means no evidence the alias derives from the name. Refuse rather
     than default to trusting it — absence of evidence must not permit an action."""
     assert not is_identifying("rahul", "alias", [])
+
+
+# --- grouping: QID or the same name respaced, but never across a QID conflict ----
+
+
+def _e(eid, slug, df=2):
+    return {"id": eid, "slug": slug, "name": slug, "df": df}
+
+
+def test_entities_sharing_a_qid_group():
+    ents = [_e(1, "bjp"), _e(2, "bharatiya-janata-party")]
+    linked = {1: ("Q10230", "alias_exact"), 2: ("Q10230", "alias_exact")}
+    assert len(fold_groups(ents, linked)) == 1
+
+
+def test_separator_only_differences_group_without_wikidata():
+    """Wikidata does not record every variant: "Brijbhushan Sharan Singh" is not an
+    alias of Q4967969 even though "Brij Bhushan Sharan Singh" is its label. Removing
+    separators is what catches those, and it asks Wikidata nothing."""
+    ents = [_e(1, "brij-bhushan-sharan-singh"), _e(2, "brijbhushan-sharan-singh")]
+    assert len(fold_groups(ents, {1: ("Q4967969", "alias_exact")})) == 1
+
+
+def test_a_qid_conflict_refuses_the_fold_even_when_slugs_match():
+    """Production case: thawar-chand-gehlot is Q7711496, thawarchand-gehlot is
+    Q107433711. Almost certainly duplicate items for one person — but Wikidata
+    saying "distinct" outranks a missing space, and de-duplicating Wikidata is not
+    this fold's job."""
+    ents = [_e(1, "thawar-chand-gehlot"), _e(2, "thawarchand-gehlot")]
+    linked = {1: ("Q7711496", "alias_exact"), 2: ("Q107433711", "alias_exact")}
+    assert fold_groups(ents, linked) == []
+
+
+def test_unrelated_entities_do_not_group():
+    assert fold_groups([_e(1, "narendra-modi"), _e(2, "rahul-gandhi")], {}) == []
+
+
+def test_grouping_is_transitive_across_both_keys():
+    """A shares a QID with B; B is the same name as C respaced. All three are one."""
+    ents = [_e(1, "jp-nadda"), _e(2, "jagat-prakash-nadda"), _e(3, "j-p-nadda")]
+    linked = {1: ("Q16193764", "alias_exact"), 2: ("Q16193764", "alias_exact")}
+    groups = fold_groups(ents, linked)
+    assert len(groups) == 1 and len(groups[0]) == 3

@@ -89,6 +89,19 @@ def canonical_entity_name(name: str) -> str:
             s = head.strip()
     # Collapse intra-word punctuation: D.K. -> DK, O'Brien -> OBrien.
     s = s.replace(".", "").replace("'", "").replace("’", "")
+    # Join runs of single-letter initials: "V D Satheesan" -> "VD Satheesan".
+    #
+    # Without this the dotted and spaced forms of one name are different entities,
+    # because removing dots turns "V.D. Satheesan" into "VD Satheesan" while
+    # "V D Satheesan" keeps its spaces. Measured in production: vd-satheesan(23)
+    # and v-d-satheesan(16) were separate rows for the Kerala LoP, and so were
+    # kc-venugopal/k-c-venugopal, ps-narasimha/p-s-narasimha and eleven more.
+    # Indian political coverage writes initials both ways constantly.
+    #
+    # Only single letters adjacent to another single letter are joined, so ordinary
+    # words are untouched and a lone initial before a full name ("R Nirmal Kumar")
+    # keeps its space — that pairing carries no evidence they are one name.
+    s = re.sub(r"\b([A-Za-z])\s+(?=[A-Za-z]\b)", r"\1", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
