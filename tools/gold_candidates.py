@@ -1,0 +1,407 @@
+"""Propose story-boundary candidates for a human to label, without prejudging them.
+
+    uv run python -m tools.gold_candidates --propose   # sample seeds + neighbours
+    uv run python -m tools.gold_candidates --review    # render the review page
+    uv run python -m tools.gold_candidates --compile   # decisions -> gold_stories block
+
+WHY THE EXISTING GOLD SET CANNOT SIMPLY BE EXTENDED. `tools/gold_stories` says so
+itself: it was labelled off ONE partition group — the Cockroach Janta Party slice —
+and its own docstring warns to quote it as "the CJP slice", never as Prism's story
+accuracy. That is honest about what it is, and it is also why cross-validation on
+it behaves strangely. The two folds are halves of one entangled topic rather than
+two samples of the news, and v1 scores F1 0.6571 on fold A against 0.4848 on fold
+B. A 0.17 spread between halves means the folds are not comparable, so a 6.5%
+difference between algorithms cannot be resolved on it at all.
+
+So this samples the CORPUS, stratified by sector. The current set is entirely
+politics; the corpus is 2,073 politics, 1,084 other, 982 business, 475 sports, 183
+finance, 174 cybersecurity, 168 health, 154 science, 72 technology, 48
+entertainment. Sport and markets are exactly what the existing set says nothing
+about, and they behave differently from politics: a match report and a transfer
+rumour share a cast without sharing a story.
+
+THE CIRCULARITY TRAP, AND HOW THIS AVOIDS IT. A gold set built from the output of
+the algorithm it will judge is worthless — it can only confirm what that algorithm
+already believes, and its blind spots become "correct" by construction. So:
+
+  * The production partition is NOT consulted. Not as a seed, not as a candidate,
+    not as an ordering.
+  * Candidates come from THREE independent proposers — embedding neighbours,
+    shared IDF-weighted actors, and title word overlap. Their blind spots differ
+    (embeddings miss terse follow-ups; actors miss cross-language coverage of one
+    event; titles miss paraphrase), so a pair one misses another usually proposes.
+  * Every candidate records WHICH signal proposed it. If the finished labels turn
+    out to correlate with one proposer, that is measurable afterwards instead of
+    invisible — a gold set containing only pairs the embedding liked would flatter
+    the embedding.
+
+WHAT THIS TOOL DOES NOT DO. It does not decide anything. It proposes a seed and its
+plausible neighbours with the evidence a person needs — headline, date, sector,
+outlet count, distinctive actors — and the judgement stays the human's. Proposing
+is mechanical; the label is the product.
+"""
+
+from __future__ import annotations
+
+import argparse
+import gzip
+import html
+import json
+import random
+import re
+from collections import defaultdict
+from datetime import UTC, datetime
+from pathlib import Path
+
+import numpy as np
+
+from tools.title_cosine import cosine as title_cosine
+from tools.title_cosine import load_idf
+
+SNAPSHOT = Path(".cache/l2_snapshot.json.gz")
+CANDIDATES = Path(".cache/gold_candidates.json")
+REVIEW = Path(".cache/gold_review.html")
+DECISIONS = Path(".cache/gold_decisions.json")
+
+WINDOW_DAYS = 21          # a story's developments; beyond this it is a new story
+PER_SIGNAL = 5            # neighbours each proposer may contribute
+MAX_NEIGHBOURS = 10       # what a person will actually read per seed
+DAY = 86400.0
+
+# Floors so a small sector is still represented. Politics dominates the corpus and
+# would otherwise dominate the sample, which is how the existing set ended up
+# unable to say anything about sport or markets.
+SECTOR_TARGET = {
+    "politics": 30, "business": 20, "sports": 15, "other": 12,
+    "finance": 10, "cybersecurity": 10, "health": 8, "science": 8,
+    "technology": 5, "entertainment": 5,
+}
+
+
+def _load():
+    from tools.l2 import load
+
+    snap = load()
+    with gzip.open(SNAPSHOT, "rt") as fh:
+        raw = json.load(fh)
+    alt = Path(".cache/l2_me5.npz")
+    if alt.exists():
+        # mE5 separates gold pairs markedly better than production's encoder
+        # (AUC 0.9082 vs 0.7994), so it proposes better neighbours. Used only to
+        # SUGGEST — no label depends on it, and two other proposers disagree with
+        # it by design.
+        snap.emb = np.load(alt)["emb"]
+    return snap, raw
+
+
+def _title_tokens(title: str) -> set[str]:
+    """Candidate-generation prefilter only — the SCORE is IDF-weighted below."""
+    return {w for w in re.findall(r"\w+", (title or "").casefold()) if len(w) > 3}
+
+
+def _neighbours(snap, postings, idf, s: int) -> list[tuple[int, set[str]]]:
+    """Union of three independent proposers, inside a time window.
+
+    The window is a constraint rather than a signal: coverage 21 days apart is a
+    new story even when it names the same people, and including it would ask the
+    labeller to adjudicate something the product does not claim.
+    """
+    ts = snap.ts
+    near_time = np.ones(len(snap.ids), dtype=bool)
+    if np.isfinite(ts[s]):
+        dt = np.abs(ts - ts[s]) / DAY
+        near_time = ~np.isfinite(dt) | (dt <= WINDOW_DAYS)
+
+    sig: dict[int, set[str]] = defaultdict(set)
+
+    sims = (snap.emb @ snap.emb[s]).copy()
+    sims[~near_time] = -2.0
+    sims[s] = -2.0
+    for j in np.argsort(-sims)[:PER_SIGNAL]:
+        if sims[j] > -1:
+            sig[int(j)].add("embedding")
+
+    actor_w: dict[int, float] = defaultdict(float)
+    for a in snap.actors[s]:
+        w = snap.idf.get(a, 0.0)
+        for j in postings.get(a, ()):
+            if j != s and near_time[j]:
+                actor_w[j] += w
+    for j, _ in sorted(actor_w.items(), key=lambda kv: -kv[1])[:PER_SIGNAL]:
+        sig[j].add("actors")
+
+    # IDF-weighted, not raw overlap. Raw Jaccard proposed "Gang held for assaulting
+    # commuter of government bus" as a neighbour of "Government distributes science
+    # kits", because both contain "government" — a word carrying almost no
+    # information (idf 4.34 against 7.18 for "distributes"). Sharing a common word
+    # is not evidence, and filling a person's screen with those wastes the scarcest
+    # resource here, which is their attention.
+    seed_toks = _title_tokens(snap.titles[s])
+    if seed_toks:
+        overlap: dict[int, float] = {}
+        for j in np.flatnonzero(near_time):
+            if j == s:
+                continue
+            if seed_toks & _title_tokens(snap.titles[j]):
+                c = title_cosine(snap.titles[s], snap.titles[j], idf)
+                if c > 0:
+                    overlap[int(j)] = c
+        for j, _ in sorted(overlap.items(), key=lambda kv: -kv[1])[:PER_SIGNAL]:
+            sig[j].add("title")
+
+    # Most-corroborated first: a pair two proposers independently suggest is the
+    # one most worth a person's attention.
+    return sorted(sig.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:MAX_NEIGHBOURS]
+
+
+def propose(seed_n: int = 123, rng_seed: int = 7) -> None:
+    snap, raw = _load()
+    sectors, src = raw["sector"], raw["source_count"]
+    rng = random.Random(rng_seed)
+
+    from tools.gold_stories import STORIES
+
+    already = {e for v in STORIES.values() for e in v}
+
+    by_sector: dict[str, list[int]] = defaultdict(list)
+    for i, eid in enumerate(snap.ids):
+        if eid not in already:
+            by_sector[sectors[i] or "other"].append(i)
+
+    # Prefer events several outlets covered, because a story with developments is
+    # what the L2 boundary is about — but keep a slice of single-source events so
+    # the set contains real singletons to answer "none of these" to.
+    seeds: list[int] = []
+    for sector, want in SECTOR_TARGET.items():
+        pool = by_sector.get(sector, [])
+        multi = [i for i in pool if src[i] >= 2]
+        single = [i for i in pool if src[i] < 2]
+        rng.shuffle(multi)
+        rng.shuffle(single)
+        n_multi = int(want * 0.8)
+        seeds.extend((multi[:n_multi] + single[: want - n_multi])[:want])
+    rng.shuffle(seeds)
+    seeds = seeds[:seed_n]
+
+    postings: dict[str, list[int]] = defaultdict(list)
+    for i, acts in enumerate(snap.actors):
+        for a in acts:
+            postings[a].append(i)
+    idf = load_idf()
+
+    out = []
+    for s in seeds:
+        near = _neighbours(snap, postings, idf, s)
+        if near:
+            out.append({
+                "seed": snap.ids[s],
+                "sector": sectors[s],
+                "candidates": [{"id": snap.ids[j], "signals": sorted(g)} for j, g in near],
+            })
+
+    CANDIDATES.parent.mkdir(parents=True, exist_ok=True)
+    CANDIDATES.write_text(json.dumps(out, indent=1))
+
+    per_sig: dict[str, int] = defaultdict(int)
+    per_sec: dict[str, int] = defaultdict(int)
+    for o in out:
+        per_sec[o["sector"] or "—"] += 1
+        for c in o["candidates"]:
+            for g in c["signals"]:
+                per_sig[g] += 1
+    print(f"  seeds {len(out)}   candidate pairs {sum(len(o['candidates']) for o in out)}")
+    print(f"  proposed by : {dict(sorted(per_sig.items()))}")
+    print(f"  sectors     : {dict(sorted(per_sec.items(), key=lambda kv: -kv[1]))}")
+    print(f"  wrote {CANDIDATES}")
+
+
+def _fmt(ts: float) -> str:
+    return "—" if not np.isfinite(ts) else datetime.fromtimestamp(ts, UTC).strftime("%d %b")
+
+
+def review() -> None:
+    """One screen per seed: tick the events belonging to the SAME story.
+
+    Self-contained HTML, no server and no build step. Decisions persist to
+    localStorage as you go and export to JSON at the end, so a closed tab does not
+    lose the session — labelling 120 seeds is not one sitting.
+    """
+    snap, raw = _load()
+    cands = json.loads(CANDIDATES.read_text())
+    idx = snap.index
+
+    def actors_of(i: int) -> str:
+        acts = sorted(snap.actors[i], key=lambda a: snap.idf.get(a, 0.0), reverse=True)
+        return ", ".join(a.replace("-", " ") for a in acts[:3])
+
+    cards = []
+    for n, c in enumerate(cands):
+        s = idx[c["seed"]]
+        rows = []
+        for cand in c["candidates"]:
+            j = idx[cand["id"]]
+            rows.append(
+                f'<label class="c"><input type="checkbox" data-seed="{c["seed"]}" '
+                f'data-id="{cand["id"]}"><span class="t">'
+                f'{html.escape(snap.titles[j] or "")}</span>'
+                f'<span class="m">{_fmt(snap.ts[j])} · {raw["source_count"][j]} outlets · '
+                f'{html.escape(actors_of(j))} · <i>{"+".join(cand["signals"])}</i></span></label>'
+            )
+        cards.append(
+            f'<section class="card"><h2>{n + 1}/{len(cands)} '
+            f'<span class="sec">{html.escape(c["sector"] or "—")}</span></h2>'
+            f'<p class="seed">{html.escape(snap.titles[s] or "")}</p>'
+            f'<p class="m">{_fmt(snap.ts[s])} · {raw["source_count"][s]} outlets · '
+            f'{html.escape(actors_of(s))}</p>'
+            f'<div class="cands">{"".join(rows)}</div></section>'
+        )
+
+    REVIEW.write_text(_PAGE.replace("__CARDS__", "\n".join(cards)))
+    print(f"  {len(cands)} seeds -> {REVIEW}")
+    print("  open it, tick what belongs, press Export, then --compile")
+
+
+async def push(name: str, url: str | None = None) -> None:
+    """Load the proposed candidates into `label_batches` / `label_tasks`.
+
+    Separate from --propose so the same candidate file can be pushed to a local
+    database for a rehearsal and to production for the real thing, without
+    regenerating and getting a different sample.
+
+    The batch key is `secrets.token_urlsafe`, not a slug of the name. It is the only
+    thing standing between a public URL and someone dropping junk into the
+    measurement everything else is judged against, so it must not be guessable from
+    the batch's title.
+    """
+    import secrets
+    import uuid
+
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    cands = json.loads(CANDIDATES.read_text())
+    key = secrets.token_urlsafe(9)
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        bid = uuid.uuid4()
+        async with c.transaction():
+            await c.execute(
+                "INSERT INTO label_batches (id, key, name, kind, notes) "
+                "VALUES ($1,$2,$3,'story_boundary',$4)",
+                bid, key, name,
+                "Tick every headline that is part of the SAME unfolding story as the "
+                "one in bold. Same topic is not enough.",
+            )
+            await c.executemany(
+                "INSERT INTO label_tasks (id, batch_id, position, seed_event_id, "
+                "candidates, sector) VALUES ($1,$2,$3,$4,$5::jsonb,$6)",
+                [
+                    (uuid.uuid4(), bid, i, uuid.UUID(o["seed"]),
+                     json.dumps(o["candidates"]), o["sector"])
+                    for i, o in enumerate(cands)
+                ],
+            )
+    finally:
+        await c.close()
+    print(f"  batch '{name}': {len(cands)} tasks")
+    print(f"  share this link:  /label/{key}")
+
+
+def compile_gold() -> None:
+    """Turn exported decisions into a gold_stories block, ready to paste.
+
+    Ticked events join the seed's story. Unticked candidates become negatives by
+    omission — they were SEEN and rejected, which is stronger evidence than never
+    having been considered, and it is what makes the sample usable for precision
+    as well as recall.
+    """
+    if not DECISIONS.exists():
+        raise SystemExit(f"no {DECISIONS} — export from the review page first")
+    snap, _ = _load()
+    dec = json.loads(DECISIONS.read_text())
+    picked = {seed: list(ids) for seed, ids in dec.get("same", {}).items() if ids}
+
+    lines = []
+    for n, (seed, members) in enumerate(sorted(picked.items()), 1):
+        title = (snap.titles[snap.index[seed]] or "")[:58].replace('"', "'")
+        lines.append(f"    # {title}")
+        lines.append(f'    "corpus-{n:03d}": {json.dumps([seed, *members])},')
+    print("\n".join(lines))
+    print(f"\n  {len(picked)} stories, {sum(len(v) + 1 for v in picked.values())} events")
+    print("  paste into tools/gold_stories.STORIES, keeping the existing CJP slice")
+
+
+_PAGE = """<!doctype html><meta charset=utf-8><title>Prism gold review</title>
+<style>
+ body{font:15px/1.55 -apple-system,system-ui,sans-serif;max-width:840px;margin:0 auto;padding:24px;background:#0b0b0c;color:#e8e8e8}
+ .card{border:1px solid #2a2a2c;border-radius:8px;padding:16px;margin:18px 0;background:#141416}
+ h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#8a8a8f;margin:0 0 10px}
+ .sec{color:#d0a24c} .seed{font-size:17px;font-weight:600;margin:0 0 4px}
+ .m{font-size:12px;color:#8a8a8f;margin:0;display:block}
+ .cands{margin-top:12px}
+ .c{display:block;padding:8px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+ .c:hover{background:#1c1c1f} .c input{margin-right:9px;vertical-align:middle}
+ .c:has(input:checked){background:#16261c;border-color:#2f5d41}
+ .cands .m{margin:3px 0 0 25px}
+ #bar{position:sticky;top:0;background:#0b0b0ce8;backdrop-filter:blur(6px);padding:12px 0;z-index:9;display:flex;gap:14px;align-items:center}
+ button{font:inherit;padding:6px 14px;border-radius:6px;border:1px solid #3a3a3d;background:#1c1c1f;color:#e8e8e8;cursor:pointer}
+ #n{color:#8a8a8f;font-size:13px} .lede{color:#8a8a8f;font-size:13px}
+</style>
+<div id=bar><strong>Prism — story boundaries</strong>
+ <button onclick=exp()>Export decisions</button><span id=n></span></div>
+<p class=lede>Tick every event belonging to the <b>same unfolding story</b> as the bold headline.
+Not the same topic — the same story. Leaving one blank is a real answer: singletons are useful
+negatives. Progress saves automatically.</p>
+__CARDS__
+<script>
+const K='prism-gold-v1';
+let S=JSON.parse(localStorage.getItem(K)||'{}');
+document.querySelectorAll('input').forEach(b=>{
+  const k=b.dataset.seed+'|'+b.dataset.id;
+  if(S[k])b.checked=true;
+  b.addEventListener('change',()=>{S[k]=b.checked;localStorage.setItem(K,JSON.stringify(S));count();});
+});
+function count(){
+  const ticks=Object.values(S).filter(Boolean).length;
+  let seeds=0;
+  document.querySelectorAll('.card').forEach(c=>{
+    if([...c.querySelectorAll('input')].some(i=>i.checked))seeds++;});
+  document.getElementById('n').textContent=ticks+' ticked · '+seeds+' seeds with members';
+}
+function exp(){
+  const same={};
+  for(const [k,v] of Object.entries(S)){if(!v)continue;const p=k.split('|');(same[p[0]]=same[p[0]]||[]).push(p[1]);}
+  const b=new Blob([JSON.stringify({same},null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='gold_decisions.json';a.click();
+}
+count();
+</script>"""
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--propose", action="store_true")
+    ap.add_argument("--review", action="store_true")
+    ap.add_argument("--compile", action="store_true")
+    ap.add_argument("--seeds", type=int, default=123)
+    ap.add_argument("--push", metavar="NAME", help="load candidates into a label batch")
+    ap.add_argument("--db", metavar="URL", help="target database (default: production)")
+    a = ap.parse_args()
+    if a.propose:
+        propose(a.seeds)
+    if a.review:
+        review()
+    if a.push:
+        import asyncio
+
+        asyncio.run(push(a.push, a.db))
+    if a.compile:
+        compile_gold()
+    if not (a.propose or a.review or a.compile or a.push):
+        ap.print_help()
+
+
+if __name__ == "__main__":
+    main()

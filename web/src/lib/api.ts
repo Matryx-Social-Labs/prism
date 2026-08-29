@@ -465,3 +465,66 @@ export async function askQuestion(
     }
   }
 }
+
+// ── Labelling (gold-set collection) ─────────────────────────────────────────
+// Mirrors api/routes/label.py. The gold set is what every story-layer decision
+// is measured against; these types are the contract that lets non-developers
+// grow it.
+
+export interface LabelEvent {
+  id: string;
+  title: string;
+  at: string | null; // ISO-8601; the client decides how to show it
+  source_count: number;
+  actors: string[];
+  signals: string[]; // which proposer suggested it — provenance, not a verdict
+}
+
+export interface LabelTask {
+  id: string;
+  position: number;
+  sector: string | null;
+  seed: LabelEvent;
+  candidates: LabelEvent[];
+}
+
+export interface LabelBatch {
+  name: string;
+  notes: string | null;
+  open: boolean;
+  total: number;
+  done: number; // THIS labeller's count, not everyone's
+}
+
+export async function fetchLabelBatch(key: string, labeller: string): Promise<LabelBatch> {
+  const r = await fetch(
+    `${API_URL}/api/v1/label/${encodeURIComponent(key)}?labeller=${encodeURIComponent(labeller)}`,
+    { cache: "no-store" }
+  );
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+
+export async function fetchLabelTask(
+  key: string,
+  labeller: string
+): Promise<{ task: LabelTask | null; closed: boolean }> {
+  const r = await fetch(
+    `${API_URL}/api/v1/label/${encodeURIComponent(key)}/next?labeller=${encodeURIComponent(labeller)}`,
+    { cache: "no-store" }
+  );
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+
+export async function postLabelAnswer(
+  key: string,
+  body: { task_id: string; labeller: string; selected: string[]; unsure: boolean; ms_spent: number }
+): Promise<void> {
+  const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/answer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(String(r.status));
+}

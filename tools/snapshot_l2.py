@@ -70,7 +70,7 @@ async def build() -> None:
         await c.execute("SET default_transaction_read_only = on")
         rows = await c.fetch(
             """
-            SELECT e.id::text AS id, e.title,
+            SELECT e.id::text AS id, e.title, e.sector, e.regions,
                    extract(epoch FROM coalesce(e.occurred_at, e.first_seen_at)) AS ts,
                    e.embedding::text AS emb,
                    (SELECT count(*) FROM event_memberships m WHERE m.event_id = e.id) AS source_count
@@ -139,6 +139,8 @@ async def build() -> None:
                 "titles": [r["title"] for r in rows],
                 "ts": [float(r["ts"]) if r["ts"] is not None else None for r in rows],
                 "source_count": [int(r["source_count"] or 0) for r in rows],
+                "sector": [r["sector"] for r in rows],
+                "regions": [list(r["regions"] or []) for r in rows],
                 "actors": actors,
                 "df": df,
                 "text": [text_by_event.get(e, "") for e in ids],
