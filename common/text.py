@@ -28,9 +28,42 @@ def chunk_text(text: str, max_chars: int = 1200, overlap: int = 150) -> list[str
 
 
 def slugify(value: str) -> str:
-    import re
+    """Identity key for a name. Unicode-aware, because our entities are not ASCII.
 
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    This was `[^a-z0-9]+` — an ASCII-only class that DELETED every other script
+    rather than transliterating it. Nine Indian-language feeds now ingest, so the
+    moment extraction emits a native-script name that rule fails in the worst
+    available way: every Devanagari, Kannada, Bengali, Tamil and Urdu name folds
+    to the empty string and then to the SAME fallback slug, so unrelated people
+    become one entity with an enormous document frequency. Silent, and shaped
+    exactly like a working system.
+
+        entity_slug("भारतीय जनता पार्टी")  ->  "unknown"
+        entity_slug("ನರೇಂದ್ರ ಮೋದಿ")        ->  "unknown"     # the same entity
+
+    Latin diacritics are folded (`Ávila` == `Avila`) — the old rule dropped the
+    accented letter outright and produced `vila`, a wrong slug rather than an
+    obviously broken one. Marks in Indic scripts are NOT folded: a Devanagari
+    matra or a Kannada vowel sign is a letter, not an accent, and stripping it
+    would mangle the name into a different one. So the fold is applied per
+    character and only where the base is Latin.
+    """
+    import re
+    import unicodedata
+
+    out = []
+    for ch in unicodedata.normalize("NFKC", value):
+        d = unicodedata.normalize("NFKD", ch)
+        if d and unicodedata.name(d[0], "").startswith("LATIN"):
+            out.append("".join(c for c in d if not unicodedata.combining(c)))
+        else:
+            out.append(ch)
+    # Keep letters, marks and digits; everything else is a separator. Marks must
+    # survive for the Indic reason above — they are not alphanumeric to Python.
+    kept = "".join(
+        c if unicodedata.category(c)[0] in "LMN" else "-" for c in "".join(out).casefold()
+    )
+    slug = re.sub(r"-+", "-", kept).strip("-")
     return slug[:120] or "unknown"
 
 
@@ -93,6 +126,18 @@ _SCRIPT_RANGES = (
     ("gujarati", 0x0A80, 0x0AFF),
     ("gurmukhi", 0x0A00, 0x0A7F),
     ("odia", 0x0B00, 0x0B7F),
+    # Arabic script — Urdu, and Kashmiri/Sindhi in the Perso-Arabic orthography.
+    # Its absence was NOT harmless. Urdu fell through to "latin", which put it
+    # inside EMBEDDING_TRUSTED_SCRIPTS with nothing having validated the embedding
+    # there, and — worse — made correlation/partition.py's cross-script guard read
+    # an Urdu/English pair as SAME script. content_similarity then compared them,
+    # found zero shared words (different alphabets share none) and CUT the edge.
+    # That is precisely the absence-of-evidence failure the guard exists to stop,
+    # defeated by the script detector rather than by the guard's own logic.
+    ("arabic", 0x0600, 0x06FF),
+    ("arabic", 0x0750, 0x077F),          # Arabic Supplement
+    ("arabic", 0xFB50, 0xFDFF),          # Presentation Forms-A
+    ("arabic", 0xFE70, 0xFEFF),          # Presentation Forms-B
 )
 
 

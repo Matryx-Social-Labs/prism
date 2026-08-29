@@ -61,7 +61,7 @@ def clean_text(text: str) -> str:
     publisher meant; React escapes it again at render, so this is not a way in.
 
     Applied here rather than in each collector because every one of them —
-    rss, gdelt, nvd, cisa_kev — persists through this function.
+    rss, nvd, cisa_kev — persists through this function.
     """
     if not text:
         return text
@@ -93,7 +93,15 @@ async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
                     url=env.url,
                     title=clean_text(env.title)[:2000],
                     body=clean_text(env.body) if env.body else env.body,
-                    language=env.language,
+                    # The SOURCE knows its language; the collector does not.
+                    # ingestion/rss.py stamped language="en" on every envelope
+                    # including the Hindi, Tamil and Kannada feeds, so all 1,385
+                    # non-Latin production articles were labelled English — and
+                    # sources.language had the right answer the whole time.
+                    #
+                    # Fixed at the persist choke point rather than in rss.py so
+                    # it holds for every collector, present and future.
+                    language=source.language or env.language,
                     published_at=env.published_at,
                     image_url=env.image_url,
                     raw=env.raw,

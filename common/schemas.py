@@ -42,6 +42,3 @@ class EnrichedItemMessage(BaseModel):
 class EventMessage(BaseModel):
     event_id: str
 
-
-class EventUpdateMessage(BaseModel):
-    event_id: str

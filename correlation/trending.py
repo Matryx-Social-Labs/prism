@@ -328,11 +328,24 @@ def _label(cast: list[str], hero_title: str | None, hero_en_title: str | None = 
     return " · ".join(cast[:3]) if cast else (hero_title or "Developing story")
 
 
+def story_slug(label: str, sid: uuid.UUID) -> str:
+    """A shareable story URL: readable prefix + id suffix for uniqueness.
+
+    ASCII-restricted, unlike an ENTITY slug. The two are different jobs sharing one
+    normaliser: an entity slug is an IDENTITY and must keep its script, or names in
+    eight languages collapse into a single row. A story slug is a URL, and a
+    Devanagari label here would produce a percent-encoded link that reads as line
+    noise. Stripping leaves the fallback intact, so a fully non-Latin label
+    degrades to `story-<id>` — readable, and still unique.
+    """
+    prefix = "".join(ch for ch in slugify(label) if ch.isascii())[:48].strip("-")
+    return f"{prefix or 'story'}-{sid.hex[:6]}"
+
+
 async def _create_story(session: AsyncSession, c: dict) -> str:
     sid = uuid.uuid4()
     label = _label(c["cast"], c["hero_title"], c.get("hero_en_title"))
-    # Slug frozen at creation: readable prefix + the id suffix guarantees uniqueness.
-    slug = f"{slugify(label)[:48] or 'story'}-{sid.hex[:6]}"
+    slug = story_slug(label, sid)
     await session.execute(
         text(
             """

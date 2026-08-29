@@ -211,6 +211,21 @@ class Entity(TimestampMixin, Base):
     entity_type: Mapped[str] = mapped_column(Text, nullable=False)  # person|company|organization|government|place|product|ticker
     aliases: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     meta: Mapped[dict | None] = mapped_column("metadata", JSONB)
+    # Canonical identity. NULL is a normal outcome, not an error: Wikidata covers
+    # 72% of the entities that can form an edge, and the rest stay on their slug.
+    # `resolution` records HOW a link was made, because a fold is unrecoverable
+    # once mentions are repointed and "which of these was a tie-break" must stay
+    # answerable without re-deriving it.
+    qid: Mapped[str | None] = mapped_column(Text)
+    resolution: Mapped[str | None] = mapped_column(Text)
+    # Set when this row was folded into another sharing its QID. The row is kept
+    # rather than deleted (other tables reference it, and it still holds a name
+    # real articles used), so without this pointer the next article naming the
+    # variant would land here and reopen the split. Same shape as
+    # `Story.merged_into`, one level down.
+    merged_into: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("entities.id", ondelete="SET NULL")
+    )
 
 
 class ArticleEntity(TimestampMixin, Base):

@@ -17,13 +17,59 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.config import get_settings
 from common.text import detect_script
 
 logger = logging.getLogger(__name__)
 
 TITLE_SIMILARITY_THRESHOLD = 0.6
-EMBEDDING_DISTANCE_THRESHOLD = 0.12  # cosine distance (1 - similarity); near-duplicates only
 TIME_WINDOW_DAYS = 4
+
+# ── Distance scale: these MOVE WITH THE MODEL ────────────────────────────────
+# Cosine distances are not comparable across embedding models, and the failure
+# mode is silent in both directions. Swapping the model while keeping these
+# numbers was measured through the full cascade against gold_pairs:
+#
+#   mpnet, its own thresholds     tp 28  fp  3  P 0.9032  R 0.4590  Cdet 0.5766
+#   mE5,   MPNET's thresholds     tp 47  fp 76  P 0.3821  R 0.7705  Cdet 1.1316  <-- 25x the false merges
+#   mE5,   its own thresholds     tp 31  fp  8  P 0.7949  R 0.5082  Cdet 0.5868
+#
+# E5 compresses the space: its same-event median distance is 0.063 and its
+# different-event median 0.145, so mpnet's 0.12 sits BETWEEN them and sweeps in
+# roughly a third of unrelated pairs. Nothing errors; the feed just starts fusing
+# unrelated stories.
+#
+# Keyed by model so the two can never drift apart. Derived by matching PERCENTILES
+# of the pairwise distance distribution (tools/tune_embed_threshold), not by a
+# constant ratio — the distributions differ in shape as well as width.
+_SCALE = {
+    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": {
+        "embedding": 0.12, "entity_near": 0.25, "entity_loose": 0.45,
+    },
+    "intfloat/multilingual-e5-base": {
+        "embedding": 0.050, "entity_near": 0.079, "entity_loose": 0.106,
+    },
+}
+
+
+def _scale() -> dict:
+    """Thresholds for the CONFIGURED model.
+
+    An unknown model falls back to the incumbent's numbers and says so loudly —
+    silently guessing a scale for an unmeasured model is how a swap turns into a
+    quiet 25x increase in false merges.
+    """
+    name = get_settings().prism_embed_model
+    if name not in _SCALE:
+        logger.warning(
+            "embedding_model_uncalibrated model=%s — using incumbent thresholds; "
+            "run tools/tune_embed_threshold before trusting match quality", name
+        )
+        return _SCALE["sentence-transformers/paraphrase-multilingual-mpnet-base-v2"]
+    return _SCALE[name]
+
+
+EMBEDDING_DISTANCE_THRESHOLD = _scale()["embedding"]  # cosine distance; near-duplicates only
 
 # Scripts where cosine distance actually carries same-story signal.
 #
@@ -54,7 +100,7 @@ EMBEDDING_TRUSTED_SCRIPTS = frozenset({"latin", "devanagari"})
 # A translated retelling scores ~0.42 distance (vs <0.12 for a near-dup) but shares
 # the key actors — so require >=2 shared entities AND moderate similarity.
 ENTITY_MATCH_MIN_SHARED = 2
-ENTITY_MATCH_LOOSE_DISTANCE = 0.45  # was 0.55; retellings sit ~0.42, trim the loose tail
+ENTITY_MATCH_LOOSE_DISTANCE = _scale()["entity_loose"]  # outer guard against topic drift
 # IDF-weight shared actors (1/df) rather than a df CUTOFF. A magnet (Modi, a major
 # party, Cockroach Janta Party df82) contributes almost nothing; a specific actor
 # carries the match. A cutoff deleted a trending story's OWN core (CJP/Pradhan/Wangchuk
@@ -70,7 +116,7 @@ ENTITY_MATCH_MIN_IDF = 0.15
 # retellings of "16 metro stations shut" sit at ~0.20 and share only "Delhi Metro");
 # in the looser 0.25-0.45 band require >=2, since a single shared actor there is more
 # likely coincidental.
-ENTITY_MATCH_NEAR_DISTANCE = 0.25
+ENTITY_MATCH_NEAR_DISTANCE = _scale()["entity_near"]
 # At least ONE shared actor must be specific on its own, not merely specific in
 # aggregate. sum(1/df) can clear MIN_IDF from a pile of half-magnets, which is how
 # two unrelated blobs that both mention several national figures reach each other.
@@ -170,6 +216,7 @@ async def find_event(
             # unrelated Kannada pairs, which is how 18 more articles reached that
             # same event down this path. Two actors, always.
             allow_single_actor=trusted,
+            title=title,
         )
         if match:
             return match
@@ -238,12 +285,49 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
     return None
 
 
+# Optional confirming gate on the entity path: require the candidate event's
+# title to agree with this article's, by IDF-weighted word cosine.
+#
+# OFF BY DEFAULT AND NOT YET SHIPPED. The attribution that motivates it is sound
+# — entity_overlap made 22 of 25 wrong merges at precision 0.353 while the other
+# tiers were near-perfect — but a headline-agreement gate on this exact path was
+# already built on this exact data and LOST at replay:
+#
+#                             without gate      with gate
+#     clusters (41 gold)           40               80
+#     B-cubed recall             0.8227           0.5178
+#
+# Predicted recall cost 9%, actual 37%. The cause is compounding, which pairwise
+# scoring cannot see: every rejected merge starts a NEW event, that event becomes
+# a smaller wrong candidate for the next article, and the story shatters. So this
+# is wired as a measurable switch, not a default — flip it only on cascade-replay
+# evidence (tools/score_cascade), never on a pairwise number.
+#
+# MEASURED 2026-08-28, and it LOSES — the third time this shape has been tried
+# here and the third time the cascade contradicted the pairwise number:
+#
+#     pairwise, threshold 0.45      P 0.9706  fp 1     (looks excellent)
+#     cascade, no gate              tp 28  fp 3  P 0.9032  R 0.4590  Cdet 0.5766
+#     cascade, gate at 0.45         tp 24  fp 0  P 1.0000  R 0.3934  Cdet 0.6066
+#
+# The gate does exactly what it promised — it eliminates EVERY false merge, P 1.0 —
+# and still loses, because it costs 4 true merges to save 3 false ones. Cdet
+# already weights a false alarm 4x a miss, so this is not a weighting artefact:
+# perfect precision is not worth having when recall pays for it.
+#
+# The mechanism is compounding, which no pairwise measurement can see: a rejected
+# merge does not merely fail to merge, it CREATES a new event, and that event is
+# then a smaller, wronger candidate for the next article. Leave this off.
+TITLE_COSINE_GATE: float | None = None
+
+
 async def _match_by_entities(
     session: AsyncSession,
     entity_slugs: list[str],
     embedding: list[float],
     published_at,
     allow_single_actor: bool = True,
+    title: str = "",
 ) -> Match | None:
     """Recent event within the looser embedding band that shares enough IDF-weighted
     canonical actors with this article — merges cross-language / translated retellings
@@ -332,9 +416,17 @@ async def _match_by_entities(
         },
     )
     row = result.first()
-    if row:
-        return Match(event_id=row.id, match_type="entity_overlap", match_score=1.0 - float(row.dist))
-    return None
+    if not row:
+        return None
+    if TITLE_COSINE_GATE is not None and title:
+        from tools.title_cosine import cosine, load_idf
+
+        cand = (await session.execute(
+            text("SELECT title FROM events WHERE id = :i"), {"i": str(row.id)}
+        )).scalar_one_or_none()
+        if cand and cosine(title, cand, load_idf()) < TITLE_COSINE_GATE:
+            return None
+    return Match(event_id=row.id, match_type="entity_overlap", match_score=1.0 - float(row.dist))
 
 
 async def _match_by_embedding(

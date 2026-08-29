@@ -137,8 +137,13 @@ async def build_scratch(prod: asyncpg.Connection, local: asyncpg.Connection, tar
     print(f"  removed {len(ids)} target event(s) from scratch\n")
 
 
-async def replay(prod: asyncpg.Connection, local_url: str, event_id) -> dict:
-    """Replay one event's articles through the real find_event."""
+async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: dict | None = None) -> dict:
+    """Replay one event's articles through the real find_event.
+
+    `vectors` overrides the STORED chunk embedding per article id. Without it the
+    replay reuses whatever model was live at ingest, so comparing two embedding
+    models would score them identically — see tools/score_cascade.
+    """
     members = await prod.fetch(
         """SELECT a.id aid, ri.title, ri.url, ri.published_at, a.created_at,
                   ac.embedding::text vec, e.shared_fields->'entities' ents,
@@ -178,7 +183,9 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id) -> dict:
             ]
             lens = (json.loads(m["lens_fields"]) if isinstance(m["lens_fields"], str)
                     else m["lens_fields"]) or {}
-            vec = [float(x) for x in m["vec"].strip("[]").split(",")]
+            vec = (vectors or {}).get(str(m["aid"]))
+            if vec is None:
+                vec = [float(x) for x in m["vec"].strip("[]").split(",")]
 
             async with Session() as s:
                 match = await find_event(

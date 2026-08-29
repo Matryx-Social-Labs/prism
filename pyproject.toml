@@ -34,6 +34,16 @@ dev = [
     "ruff>=0.6",
 ]
 
+# Embedding bake-off only (tools/score_embeddings.py). NOT a runtime dependency:
+# production embeds through fastembed's ONNX path, which needs neither torch nor
+# sentence-transformers. This group exists so Indic-specific candidates
+# (Vyakyarth, MuRIL, LaBSE) can be evaluated before one is adopted — several are
+# not in fastembed's registry and would otherwise need an ONNX export just to be
+# ruled out. Install with: uv sync --group bench
+bench = [
+    "sentence-transformers>=3.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

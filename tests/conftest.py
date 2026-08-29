@@ -70,3 +70,41 @@ async def _dispose_engine_between_tests():
     engine = get_engine()
     if engine is not None:
         await engine.dispose()
+
+
+# --- PRISM_REQUIRE_DB: make skip-as-pass impossible in CI ---------------------
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Turn a "no database" SKIP into a FAILURE when PRISM_REQUIRE_DB=1.
+
+    20 test modules guard themselves with `_db_reachable()` and skip when
+    Postgres is absent. That is right for a laptop with no docker running, and
+    wrong everywhere it matters: on a machine without Postgres, ~88 assertions
+    across those modules vanish and the suite still reports green. A green suite
+    that ran a third of its tests is worse than a red one, because nobody looks.
+
+    This repo has already been bitten by exactly that: an event-loop bug made
+    real failures surface through `_db_reachable()` as "no database", so broken
+    tests reported as skips (see `_dispose_engine_between_tests` above). The
+    guard against a class of bug should not be able to hide that same class of
+    bug.
+
+    Opt-in rather than always-on, because a skip is the correct behaviour when a
+    contributor genuinely has no database. CI and `make check` set the flag.
+    """
+    import os
+
+    outcome = yield
+    if not os.environ.get("PRISM_REQUIRE_DB"):
+        return
+    report = outcome.get_result()
+    if report.skipped and "no database" in str(report.longrepr):
+        report.outcome = "failed"
+        report.longrepr = (
+            f"{item.nodeid}: skipped for 'no database' while PRISM_REQUIRE_DB=1.\n"
+            "A database-backed test that cannot reach a database is a FAILURE here, "
+            "not a skip — otherwise the suite reports green having silently not run.\n"
+            "Start one with:  docker compose up -d postgres"
+        )

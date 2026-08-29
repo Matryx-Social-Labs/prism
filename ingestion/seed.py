@@ -28,6 +28,22 @@ SOURCES = [
     {"slug": "bbc_tamil", "name": "BBC Tamil", "source_type": "rss", "country": "IN", "language": "ta", "reliability": {"funding": "public"}},
     {"slug": "prajavani", "name": "Prajavani", "source_type": "rss", "country": "IN", "language": "kn"},
     {"slug": "tv9kannada", "name": "TV9 Kannada", "source_type": "rss", "country": "IN", "language": "kn"},
+    # ── India, other languages (BBC's Indian-language services) ──
+    # One newsroom across eight languages, which is the point: BBC Hindi and BBC
+    # Tamil frequently cover the SAME story, so these supply genuine cross-lingual
+    # same-event pairs — the thing mE5-base was chosen for (Kannada cross-lingual
+    # retrieval 0.444 -> 0.778 on real news).
+    #
+    # publisher="bbc" on all of them so corroboration counts ONE masthead, not
+    # eight. Without it a story carried by three BBC services would look
+    # three-times corroborated by a single newsroom.
+    {"slug": "bbc_hindi", "name": "BBC News Hindi", "source_type": "rss", "country": "IN", "language": "hi", "publisher": "bbc"},
+    {"slug": "bbc_telugu", "name": "BBC News Telugu", "source_type": "rss", "country": "IN", "language": "te", "publisher": "bbc"},
+    {"slug": "bbc_marathi", "name": "BBC News Marathi", "source_type": "rss", "country": "IN", "language": "mr", "publisher": "bbc"},
+    {"slug": "bbc_gujarati", "name": "BBC News Gujarati", "source_type": "rss", "country": "IN", "language": "gu", "publisher": "bbc"},
+    {"slug": "bbc_punjabi", "name": "BBC News Punjabi", "source_type": "rss", "country": "IN", "language": "pa", "publisher": "bbc"},
+    {"slug": "bbc_bengali", "name": "BBC News Bengali", "source_type": "rss", "country": "IN", "language": "bn", "publisher": "bbc"},
+    {"slug": "bbc_urdu", "name": "BBC News Urdu", "source_type": "rss", "country": "IN", "language": "ur", "publisher": "bbc"},
     # ── India state editions ──
     {"slug": "thehindu_tamilnadu", "publisher": "thehindu", "name": "The Hindu — Tamil Nadu", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "thehindu_kerala", "publisher": "thehindu", "name": "The Hindu — Kerala", "source_type": "rss", "country": "IN", "language": "en"},
