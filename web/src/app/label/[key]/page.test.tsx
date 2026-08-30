@@ -13,7 +13,13 @@ import type { LabelTask } from "@/lib/api";
 const fetchLabelBatch = vi.hoisted(() => vi.fn());
 const fetchLabelTask = vi.hoisted(() => vi.fn());
 const postLabelAnswer = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ fetchLabelBatch, fetchLabelTask, postLabelAnswer }));
+const joinLabelBatch = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/api", () => ({
+  fetchLabelBatch,
+  fetchLabelTask,
+  postLabelAnswer,
+  joinLabelBatch,
+}));
 
 function task(over: Partial<LabelTask> = {}): LabelTask {
   return {
@@ -70,11 +76,14 @@ beforeEach(() => {
     name: "Story boundaries",
     notes: null,
     open: true,
+    self_join: true,
+    labeller: "ana",
     total: 10,
     done: 3,
   });
   fetchLabelTask.mockResolvedValue({ task: task(), closed: false });
   postLabelAnswer.mockResolvedValue(undefined);
+  joinLabelBatch.mockResolvedValue("tok-abc");
 });
 
 afterEach(() => {
@@ -91,14 +100,14 @@ describe("label page", () => {
   });
 
   it("remembers a returning labeller and resumes their queue", async () => {
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     render(<LabelPage params={params} />);
-    await waitFor(() => expect(fetchLabelTask).toHaveBeenCalledWith("batch-key", "ana"));
+    await waitFor(() => expect(fetchLabelTask).toHaveBeenCalledWith("batch-key", "tok-abc"));
     expect(await screen.findByText(/Babar returns to captaincy/)).toBeInTheDocument();
   });
 
   it("submits exactly the events the labeller picked", async () => {
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     render(<LabelPage params={params} />);
     const pick = await screen.findByRole("button", { name: /Shan Masood/ });
     await userEvent.click(pick);
@@ -107,13 +116,13 @@ describe("label page", () => {
     const body = postLabelAnswer.mock.calls[0][1];
     expect(body.selected).toEqual(["cand-1"]);
     expect(body.unsure).toBe(false);
-    expect(body.labeller).toBe("ana");
+    expect(body.token).toBe("tok-abc");
   });
 
   it("records an empty selection as a real answer, not a skip", async () => {
     // "None of these" is a valuable negative. Treating it as unanswered would
     // serve the same task forever and put nothing in the gold set.
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     render(<LabelPage params={params} />);
     await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
     await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
@@ -125,7 +134,7 @@ describe("label page", () => {
   it("keeps 'not sure' distinct from 'none of these'", async () => {
     // Collapsing them would file coin-flips as confident negatives, which is what
     // the gold set's AMBIGUOUS list exists to prevent.
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     render(<LabelPage params={params} />);
     await userEvent.click(await screen.findByRole("button", { name: "Not sure" }));
     await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
@@ -133,7 +142,7 @@ describe("label page", () => {
   });
 
   it("toggles with number keys so a long session stays on the keyboard", async () => {
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     render(<LabelPage params={params} />);
     await screen.findByText(/Babar returns to captaincy/);
     await userEvent.keyboard("2");
@@ -147,7 +156,7 @@ describe("label page", () => {
     // DESIGN.md: chrome is monochrome, colour only ever means a lens is speaking.
     // Selection is a rule and ink weight — which also means the state must be
     // exposed to assistive tech, since there is no colour cue to perceive.
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     render(<LabelPage params={params} />);
     const row = await screen.findByRole("button", { name: /Shan Masood/ });
     expect(row).toHaveAttribute("aria-pressed", "false");
@@ -156,16 +165,48 @@ describe("label page", () => {
   });
 
   it("says thank you rather than erroring when the queue is empty", async () => {
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     fetchLabelTask.mockResolvedValue({ task: null, closed: false });
     render(<LabelPage params={params} />);
     expect(await screen.findByText(/That's everything/)).toBeInTheDocument();
   });
 
   it("tells the labeller when the batch is closed", async () => {
-    stubStorage({ "prism.labeller": "ana" });
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     fetchLabelTask.mockResolvedValue({ task: null, closed: true });
     render(<LabelPage params={params} />);
     expect(await screen.findByText(/batch is closed/)).toBeInTheDocument();
+  });
+
+  it("mints a credential on first visit and stores it per batch", async () => {
+    // One shared link, a distinct identity per person. The name is a caption —
+    // two labellers called Ana must not collapse into one opinion, which is what
+    // the previous name-keyed design did silently.
+    const store = stubStorage();
+    render(<LabelPage params={params} />);
+    await userEvent.type(await screen.findByLabelText("Your first name"), "Ana");
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await waitFor(() => expect(joinLabelBatch).toHaveBeenCalledWith("batch-key", "Ana"));
+    await waitFor(() => expect(store.get("prism.label.token.batch-key")).toBe("tok-abc"));
+    expect(await screen.findByText(/Babar returns to captaincy/)).toBeInTheDocument();
+  });
+
+  it("never puts the credential in the URL", async () => {
+    // A token in the address bar leaks through browser history, Referer headers
+    // and any screenshot a labeller shares. The batch key is a join capability
+    // only; the write credential lives in storage and the request body.
+    stubStorage({ "prism.label.token.batch-key": "tok-abc" });
+    render(<LabelPage params={params} />);
+    await screen.findByText(/Babar returns to captaincy/);
+    expect(window.location.href).not.toContain("tok-abc");
+  });
+
+  it("shows an error rather than a blank screen when joining fails", async () => {
+    stubStorage();
+    joinLabelBatch.mockRejectedValue(new Error("403"));
+    render(<LabelPage params={params} />);
+    await userEvent.type(await screen.findByLabelText("Your first name"), "Ana");
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(await screen.findByText(/Something went wrong/)).toBeInTheDocument();
   });
 });

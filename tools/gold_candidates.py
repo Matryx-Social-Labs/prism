@@ -308,6 +308,39 @@ async def push(name: str, url: str | None = None) -> None:
     print(f"  share this link:  /label/{key}")
 
 
+async def invite(batch_key: str, names: list[str], url: str | None = None) -> None:
+    """Mint one credential per named person, for a batch where who answers matters.
+
+    The alternative path is self-join: share the batch link and every visitor is
+    issued their own identity automatically. Use this instead when attribution has
+    to be certain — the token is bound to a name before anyone opens it, and it can
+    be revoked on its own without disturbing the other labellers.
+    """
+    import secrets
+    import uuid
+
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=60)
+    try:
+        bid = await c.fetchval("SELECT id FROM label_batches WHERE key = $1", batch_key)
+        if bid is None:
+            raise SystemExit(f"no batch with key {batch_key}")
+        for name in names:
+            tok = secrets.token_urlsafe(24)
+            await c.execute(
+                "INSERT INTO label_invites (id, token, batch_id, name) VALUES ($1,$2,$3,$4)",
+                uuid.uuid4(), tok, bid, name,
+            )
+            print(f"  {name:20} /label/{batch_key}#{tok}")
+    finally:
+        await c.close()
+    print("\n  The part after # is the credential — it stays in the browser and is")
+    print("  never sent to the server as part of the URL.")
+
+
 def compile_gold() -> None:
     """Turn exported decisions into a gold_stories block, ready to paste.
 
@@ -388,6 +421,9 @@ def main() -> None:
     ap.add_argument("--seeds", type=int, default=123)
     ap.add_argument("--push", metavar="NAME", help="load candidates into a label batch")
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
+    ap.add_argument("--invite", nargs="+", metavar="NAME",
+                    help="mint a named credential each, for a batch (needs --batch)")
+    ap.add_argument("--batch", metavar="KEY", help="batch key for --invite")
     a = ap.parse_args()
     if a.propose:
         propose(a.seeds)
@@ -397,9 +433,15 @@ def main() -> None:
         import asyncio
 
         asyncio.run(push(a.push, a.db))
+    if a.invite:
+        import asyncio
+
+        if not a.batch:
+            raise SystemExit("--invite needs --batch <key>")
+        asyncio.run(invite(a.batch, a.invite, a.db))
     if a.compile:
         compile_gold()
-    if not (a.propose or a.review or a.compile or a.push):
+    if not (a.propose or a.review or a.compile or a.push or a.invite):
         ap.print_help()
 
 
