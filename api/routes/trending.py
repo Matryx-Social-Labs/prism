@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.schemas import TrendingResponse, TrendingStoryDetail
 from common.db import get_db
 
 router = APIRouter()
@@ -21,7 +22,7 @@ router = APIRouter()
 _MAX_MERGE_HOPS = 8
 
 
-@router.get("/api/v1/trending")
+@router.get("/api/v1/trending", response_model=TrendingResponse)
 async def trending(
     state: str | None = None,  # ISO 3166-2, e.g. IN-KA — reuses the feed's geo axis
     sector: str | None = None,
@@ -67,7 +68,7 @@ async def trending(
     }
 
 
-@router.get("/api/v1/trending/{slug}")
+@router.get("/api/v1/trending/{slug}", response_model=TrendingStoryDetail)
 async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
     """A shareable story. Follows a merge (`merged_into`) to the canonical story so an
     old share link keeps resolving, and returns `canonical_slug` for the client to swap
