@@ -503,8 +503,9 @@ export interface LabelBatch {
  *
  * Called once on first visit, which is what lets a single link be shared with a
  * group while every person still gets a distinct identity. The token is kept in
- * localStorage and sent in request bodies — deliberately never in the URL, where a
- * credential would leak through history, Referer headers and shared screenshots.
+ * localStorage and sent in the X-Label-Token header (or a POST body) — never in a
+ * URL, path or query string alike, since both are recorded in browser history,
+ * Referer headers and server access logs.
  */
 export async function joinLabelBatch(key: string, name: string): Promise<string> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/join`, {
@@ -517,10 +518,10 @@ export async function joinLabelBatch(key: string, name: string): Promise<string>
 }
 
 export async function fetchLabelBatch(key: string, token: string): Promise<LabelBatch> {
-  const r = await fetch(
-    `${API_URL}/api/v1/label/${encodeURIComponent(key)}?token=${encodeURIComponent(token)}`,
-    { cache: "no-store" }
-  );
+  const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}`, {
+    cache: "no-store",
+    headers: { "X-Label-Token": token },
+  });
   if (!r.ok) throw new Error(String(r.status));
   return r.json();
 }
@@ -529,10 +530,10 @@ export async function fetchLabelTask(
   key: string,
   token: string
 ): Promise<{ task: LabelTask | null; closed: boolean }> {
-  const r = await fetch(
-    `${API_URL}/api/v1/label/${encodeURIComponent(key)}/next?token=${encodeURIComponent(token)}`,
-    { cache: "no-store" }
-  );
+  const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/next`, {
+    cache: "no-store",
+    headers: { "X-Label-Token": token },
+  });
   if (!r.ok) throw new Error(String(r.status));
   return r.json();
 }
