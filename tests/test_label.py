@@ -93,13 +93,13 @@ async def test_a_labeller_is_served_tasks_they_have_not_answered():
     key, _ = await _batch(2)
     async with _client() as c:
         tok = await _join(c, key, "ana")
-        first = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()
+        first = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()
         assert first["task"]["position"] == 0
         await c.post(f"/api/v1/label/{key}/answer", json={
             "task_id": first["task"]["id"], "token": tok,
             "selected": [first["task"]["candidates"][0]["id"]],
         })
-        second = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()
+        second = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()
     assert second["task"]["position"] == 1, "an answered task was served again"
 
 
@@ -113,11 +113,11 @@ async def test_two_labellers_get_the_same_task_independently():
     key, _ = await _batch(1)
     async with _client() as c:
         ta, tb = await _join(c, key, "ana"), await _join(c, key, "ben")
-        a = (await c.get(f"/api/v1/label/{key}/next", params={"token": ta})).json()
+        a = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": ta})).json()
         await c.post(f"/api/v1/label/{key}/answer", json={
             "task_id": a["task"]["id"], "token": ta, "selected": [],
         })
-        b = (await c.get(f"/api/v1/label/{key}/next", params={"token": tb})).json()
+        b = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tb})).json()
     assert b["task"] is not None and b["task"]["id"] == a["task"]["id"]
 
 
@@ -129,12 +129,12 @@ async def test_the_task_never_carries_another_persons_answer():
     key, _ = await _batch(1)
     async with _client() as c:
         ta, tb = await _join(c, key, "ana"), await _join(c, key, "ben")
-        a = (await c.get(f"/api/v1/label/{key}/next", params={"token": ta})).json()
+        a = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": ta})).json()
         await c.post(f"/api/v1/label/{key}/answer", json={
             "task_id": a["task"]["id"], "token": ta,
             "selected": [a["task"]["candidates"][0]["id"]],
         })
-        b = (await c.get(f"/api/v1/label/{key}/next", params={"token": tb})).json()
+        b = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tb})).json()
     blob = str(b["task"])
     assert "selected" not in blob and "ana" not in blob
 
@@ -147,7 +147,7 @@ async def test_changing_your_mind_replaces_rather_than_appends():
     key, tasks = await _batch(1)
     async with _client() as c:
         tok = await _join(c, key, "ana")
-        t = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()["task"]
+        t = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()["task"]
         for sel in ([], [t["candidates"][0]["id"]]):
             r = await c.post(f"/api/v1/label/{key}/answer", json={
                 "task_id": t["id"], "token": tok, "selected": sel,
@@ -172,7 +172,7 @@ async def test_an_empty_selection_is_recorded_as_a_real_answer():
         await c.post(f"/api/v1/label/{key}/answer", json={
             "task_id": tasks[0], "token": tok, "selected": [],
         })
-        nxt = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()
+        nxt = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()
     assert nxt["task"] is None
 
 
@@ -215,8 +215,8 @@ async def test_progress_counts_only_this_labeller():
         await c.post(f"/api/v1/label/{key}/answer", json={
             "task_id": tasks[0], "token": ta, "selected": [],
         })
-        ana = (await c.get(f"/api/v1/label/{key}", params={"token": ta})).json()
-        ben = (await c.get(f"/api/v1/label/{key}", params={"token": tb})).json()
+        ana = (await c.get(f"/api/v1/label/{key}", headers={"X-Label-Token": ta})).json()
+        ben = (await c.get(f"/api/v1/label/{key}", headers={"X-Label-Token": tb})).json()
     assert (ana["done"], ana["total"]) == (1, 3)
     assert ben["done"] == 0
 
@@ -284,7 +284,7 @@ async def test_a_revoked_invite_stops_working():
         r = await c.post(f"/api/v1/label/{key}/answer", json={
             "task_id": tasks[0], "token": tok, "selected": [],
         })
-        nxt = await c.get(f"/api/v1/label/{key}/next", params={"token": tok})
+        nxt = await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})
     assert r.status_code == 403
     assert nxt.status_code == 403
 
@@ -313,3 +313,21 @@ async def test_an_invite_only_batch_refuses_self_join():
     async with _client() as c:
         r = await c.post(f"/api/v1/label/{key}/join", json={"name": "stranger"})
     assert r.status_code == 403
+
+
+async def test_the_credential_is_not_accepted_from_the_query_string():
+    """A token in a URL — path or query alike — is recorded in browser history,
+    Referer headers and server access logs. An earlier version sent it as a query
+    parameter while its own docstring explained why that was unsafe, so this pins
+    the header as the only way in."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, _ = await _batch(1)
+    async with _client() as c:
+        tok = await _join(c, key, "ana")
+        via_query = await c.get(f"/api/v1/label/{key}/next", params={"token": tok})
+        via_header = await c.get(
+            f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok}
+        )
+    assert via_query.status_code == 403, "the query string still authenticates"
+    assert via_header.status_code == 200

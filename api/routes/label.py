@@ -38,7 +38,7 @@ import secrets
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -127,7 +127,11 @@ async def join(key: str, body: Join, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/api/v1/label/{key}")
-async def batch_header(key: str, token: str = "", db: AsyncSession = Depends(get_db)):
+async def batch_header(
+    key: str,
+    token: str = Header("", alias="X-Label-Token"),
+    db: AsyncSession = Depends(get_db),
+):
     """Batch name, instructions, and how far THIS labeller has got.
 
     `done` counts this invite's answers, not everyone's: with several people on one
@@ -163,7 +167,11 @@ async def batch_header(key: str, token: str = "", db: AsyncSession = Depends(get
 
 
 @router.get("/api/v1/label/{key}/next")
-async def next_task(key: str, token: str = "", db: AsyncSession = Depends(get_db)):
+async def next_task(
+    key: str,
+    token: str = Header("", alias="X-Label-Token"),
+    db: AsyncSession = Depends(get_db),
+):
     """The lowest-numbered task this invite has not answered.
 
     Deterministic order rather than random: someone working a batch in a stable

@@ -11,6 +11,19 @@ const nextConfig: NextConfig = {
     unoptimized: true,
     remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
+  async headers() {
+    return [
+      {
+        // Defence in depth for the labelling surface. The credential is already
+        // kept out of the URL and sent in a header, so there is nothing in the
+        // address bar worth leaking — but a labelling link gets pasted into chat
+        // apps and opened beside other tabs, and `no-referrer` means the batch key
+        // is not announced to any third party the page happens to reach.
+        source: "/label/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
