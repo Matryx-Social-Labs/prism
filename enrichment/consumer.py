@@ -22,6 +22,7 @@ from common.logging import get_logger
 from common.models import Article, ArticleChunk, Enrichment, FieldProvenance, RawItem, Source
 from common.observability import fetch_prompt, observe
 from common.schemas import EnrichedItemMessage
+from common.securities import validated
 from common.text import chunk_text
 from enrichment.cve_lens import extract_from_kev, extract_from_nvd
 from enrichment.fulltext import retrieve_fulltext
@@ -158,7 +159,15 @@ async def handle_classified_item(payload: dict) -> None:
         if extraction.cyber:
             lens_fields["cyber"] = extraction.cyber.model_dump()
         if extraction.finance:
-            lens_fields["finance"] = extraction.finance.model_dump()
+            fin = extraction.finance.model_dump()
+            # The one place a ticker enters the database. Everything downstream —
+            # the event projection, the watchlist join, the digest's movers —
+            # reads what is written here, so a symbol that cannot be traced to a
+            # listed security is refused at this line rather than filtered at
+            # each of the places it would later be shown. `raw_model_output`
+            # above keeps the extractor's original list, so nothing is lost.
+            fin["tickers"] = await validated(session, fin.get("tickers") or [])
+            lens_fields["finance"] = fin
         session.add(
             Enrichment(
                 id=enrichment_id,
