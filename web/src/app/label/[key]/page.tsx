@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchLabelBatch,
   fetchLabelTask,
+  joinLabelBatch,
   postLabelAnswer,
   type LabelBatch,
   type LabelEvent,
@@ -29,6 +30,10 @@ import {
 } from "@/lib/api";
 
 const WHO_KEY = "prism.labeller";
+// Per batch, because one person may be invited to several and each carries its own
+// credential. Stored rather than put in the URL: a token in the address bar leaks
+// through history, Referer headers and any shared screenshot.
+const TOKEN_KEY = (batch: string) => `prism.label.token.${batch}`;
 
 function provenance(e: LabelEvent): string {
   const bits = [
@@ -42,7 +47,9 @@ function provenance(e: LabelEvent): string {
 export default function LabelPage({ params }: { params: Promise<{ key: string }> }) {
   const [batchKey, setBatchKey] = useState("");
   const [who, setWho] = useState("");
+  const [token, setToken] = useState("");
   const [draftWho, setDraftWho] = useState("");
+  const [joinError, setJoinError] = useState("");
   const [batch, setBatch] = useState<LabelBatch | null>(null);
   const [task, setTask] = useState<LabelTask | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -57,21 +64,24 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   // The name is remembered so someone resuming tomorrow is served the tasks they
   // have not done, rather than starting over as a stranger.
   useEffect(() => {
+    if (!batchKey) return;
     try {
-      const saved = window.localStorage.getItem(WHO_KEY);
-      if (saved) setWho(saved);
+      const savedTok = window.localStorage.getItem(TOKEN_KEY(batchKey));
+      const savedWho = window.localStorage.getItem(WHO_KEY);
+      if (savedTok) setToken(savedTok);
+      if (savedWho) setWho(savedWho);
     } catch {
       /* private mode: the session simply is not remembered */
     }
-  }, []);
+  }, [batchKey]);
 
   const load = useCallback(async () => {
-    if (!batchKey || !who) return;
+    if (!batchKey || !token) return;
     setState("loading");
     try {
       const [b, t] = await Promise.all([
-        fetchLabelBatch(batchKey, who),
-        fetchLabelTask(batchKey, who),
+        fetchLabelBatch(batchKey, token),
+        fetchLabelTask(batchKey, token),
       ]);
       setBatch(b);
       setPicked(new Set());
@@ -87,7 +97,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
     } catch {
       setState("error");
     }
-  }, [batchKey, who]);
+  }, [batchKey, token]);
 
   useEffect(() => {
     void load();
@@ -100,7 +110,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       try {
         await postLabelAnswer(batchKey, {
           task_id: task.id,
-          labeller: who,
+          token,
           selected: [...picked],
           unsure,
           ms_spent: Date.now() - startedAt.current,
@@ -112,7 +122,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         setSaving(false);
       }
     },
-    [task, saving, batchKey, who, picked, load]
+    [task, saving, batchKey, token, picked, load]
   );
 
   const toggle = useCallback((id: string) => {
@@ -151,7 +161,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
     [batch]
   );
 
-  if (!who) {
+  if (!token) {
     return (
       <Shell>
         <h1 className="text-[30px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -164,16 +174,28 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         </p>
         <form
           className="mt-8 flex flex-wrap items-center gap-3"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const name = draftWho.trim();
             if (!name) return;
             try {
-              window.localStorage.setItem(WHO_KEY, name);
+              // The credential is minted here, once. The name is only a caption —
+              // two labellers may share one and stay separate identities.
+              const t = await joinLabelBatch(batchKey, name);
+              try {
+                window.localStorage.setItem(TOKEN_KEY(batchKey), t);
+                window.localStorage.setItem(WHO_KEY, name);
+              } catch {
+                /* not remembering is survivable; the session still works */
+              }
+              setWho(name);
+              setToken(t);
             } catch {
-              /* not remembering is survivable */
+              // The name screen returns early, so the shared error state below is
+              // never reached from here — without this the person clicks Start and
+              // nothing at all happens.
+              setJoinError("Something went wrong. Check the link and try again.");
             }
-            setWho(name);
           }}
         >
           <input
@@ -193,6 +215,11 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             Start
           </button>
         </form>
+        {joinError && (
+          <p role="alert" className="mt-4 text-[14.5px]" style={{ color: "var(--danger)" }}>
+            {joinError}
+          </p>
+        )}
         <p className="mt-4 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
           YOUR NAME IS ONLY USED TO REMEMBER WHERE YOU GOT TO
         </p>

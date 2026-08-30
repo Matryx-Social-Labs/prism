@@ -1,19 +1,32 @@
 """Story-boundary labelling: serve one judgement at a time, store what people say.
 
-GET  /api/v1/label/{key}          — batch header + this labeller's progress
-GET  /api/v1/label/{key}/next     — the next task this labeller has not answered
-POST /api/v1/label/{key}/answer   — record a judgement
-GET  /api/v1/label/{key}/export   — every response, for compiling a gold set
+POST /api/v1/label/{key}/join     — mint this visitor an invite (the credential)
+GET  /api/v1/label/{key}           — batch header + this invite's progress
+GET  /api/v1/label/{key}/next      — the next task this invite has not answered
+POST /api/v1/label/{key}/answer    — record a judgement
+GET  /api/v1/label/{key}/export    — every response, for compiling a gold set
 
 The gold set is what every story-layer decision is measured against, and it was a
 one-off literal in a Python file. These routes make growing it a job the product
 supports, done by people who do not have a checkout.
 
-ACCESS IS THE BATCH KEY, NOT AN ACCOUNT. The audience is non-technical and a task
-takes a minute; a signup wall would cost more labels than it protects. The key is
-unguessable, the endpoints expose only headlines already public on the site, and
-the write path can do nothing but attach a judgement to a task that already exists.
-An account would be theatre over a link people will paste to each other anyway.
+TWO CREDENTIALS, DOING DIFFERENT JOBS. The batch key in the URL is a JOIN
+capability: it identifies the batch and, if the batch allows it, lets a visitor
+mint an invite. The invite token is the WRITE credential, one per person, and it
+never appears in a URL — the page keeps it in localStorage and sends it in the
+body. A credential in a path leaks through history, Referer headers, server logs
+and any shared screenshot; a join capability leaking is a far smaller thing.
+
+IDENTITY IS THE TOKEN, NOT A TYPED NAME, and that is a bug fix rather than
+hardening. Responses used to be keyed on (task, typed name) with ON CONFLICT DO
+UPDATE, so a second person typing "Ana" silently overwrote the first Ana's
+answers — collapsing the two opinions this schema exists to keep apart, and
+leaving a gold set that looks entirely normal. A name is now a caption; two
+people may share one.
+
+No account, still. The audience is non-technical and a task takes a minute; a
+signup wall would cost more labels than it protects, and the endpoints expose only
+headlines already public on the site.
 
 WHAT IT DELIBERATELY DOES NOT DO. It never shows one labeller another's answer.
 Anchoring is the single failure that would quietly destroy the value of a second
@@ -21,6 +34,7 @@ opinion — and a second opinion is the entire reason responses are keyed per pe
 """
 
 import json
+import secrets
 import uuid
 from typing import Annotated
 
@@ -36,9 +50,14 @@ router = APIRouter()
 MAX_LABELLER = 60
 
 
+class Join(BaseModel):
+    # Display only. Two labellers may share it; identity is the issued token.
+    name: Annotated[str, Field(max_length=MAX_LABELLER)] = ""
+
+
 class Answer(BaseModel):
     task_id: uuid.UUID
-    labeller: Annotated[str, Field(min_length=1, max_length=MAX_LABELLER)]
+    token: Annotated[str, Field(min_length=8, max_length=128)]
     # Event ids judged to be the SAME story as the seed. An empty list is a real
     # answer — "none of these" — and is stored as one.
     selected: list[uuid.UUID] = []
@@ -46,10 +65,35 @@ class Answer(BaseModel):
     ms_spent: int | None = None
 
 
+async def _invite(db: AsyncSession, batch_id, token: str) -> dict:
+    """Resolve a write credential, or refuse.
+
+    Scoped to the batch on purpose: a token minted for one batch must not write to
+    another, or the batch key would gate reads while leaving every task in the
+    database writable by anyone holding any token.
+    """
+    row = (
+        await db.execute(
+            text(
+                "SELECT id, name, revoked FROM label_invites "
+                "WHERE token = :t AND batch_id = :b"
+            ),
+            {"t": token, "b": batch_id},
+        )
+    ).mappings().first()
+    if row is None or row["revoked"]:
+        raise HTTPException(status_code=403, detail="invalid or revoked invite")
+    await db.execute(
+        text("UPDATE label_invites SET last_seen_at = now() WHERE id = :i"),
+        {"i": row["id"]},
+    )
+    return dict(row)
+
+
 async def _batch(db: AsyncSession, key: str) -> dict:
     row = (
         await db.execute(
-            text("SELECT id, name, notes, open FROM label_batches WHERE key = :k"),
+            text("SELECT id, name, notes, open, self_join FROM label_batches WHERE key = :k"),
             {"k": key},
         )
     ).mappings().first()
@@ -58,11 +102,35 @@ async def _batch(db: AsyncSession, key: str) -> dict:
     return dict(row)
 
 
+@router.post("/api/v1/label/{key}/join")
+async def join(key: str, body: Join, db: AsyncSession = Depends(get_db)):
+    """Mint this visitor their own write credential.
+
+    This is what lets ONE link be shared with a group while every person still gets
+    a distinct identity — no name to collide, and nothing for the labeller to copy
+    or keep track of. `self_join` off means invites must be minted deliberately
+    instead, for a batch where who answers matters.
+    """
+    b = await _batch(db, key)
+    if not b["open"]:
+        raise HTTPException(status_code=409, detail="batch is closed")
+    if not b["self_join"]:
+        raise HTTPException(status_code=403, detail="this batch is invite-only")
+    token = secrets.token_urlsafe(24)
+    await db.execute(
+        text("INSERT INTO label_invites (id, token, batch_id, name) "
+             "VALUES (:i, :t, :b, :n)"),
+        {"i": uuid.uuid4(), "t": token, "b": b["id"],
+         "n": body.name.strip()[:MAX_LABELLER] or None},
+    )
+    return {"token": token}
+
+
 @router.get("/api/v1/label/{key}")
-async def batch_header(key: str, labeller: str = "", db: AsyncSession = Depends(get_db)):
+async def batch_header(key: str, token: str = "", db: AsyncSession = Depends(get_db)):
     """Batch name, instructions, and how far THIS labeller has got.
 
-    `done` counts this person's answers, not everyone's: with several people on one
+    `done` counts this invite's answers, not everyone's: with several people on one
     batch a shared counter would tell someone they were nearly finished when they
     had barely started.
     """
@@ -73,26 +141,30 @@ async def batch_header(key: str, labeller: str = "", db: AsyncSession = Depends(
         )
     ).scalar_one()
     done = 0
-    if labeller.strip():
+    name = ""
+    if token:
+        inv = await _invite(db, b["id"], token)
+        name = inv["name"] or ""
         done = (
             await db.execute(
                 text(
                     "SELECT count(*) FROM label_responses r "
                     "JOIN label_tasks t ON t.id = r.task_id "
-                    "WHERE t.batch_id = :b AND r.labeller = :l"
+                    "WHERE t.batch_id = :b AND r.invite_id = :i"
                 ),
-                {"b": b["id"], "l": labeller.strip()[:MAX_LABELLER]},
+                {"b": b["id"], "i": inv["id"]},
             )
         ).scalar_one()
     return {
         "name": b["name"], "notes": b["notes"], "open": b["open"],
+        "self_join": b["self_join"], "labeller": name,
         "total": total, "done": done,
     }
 
 
 @router.get("/api/v1/label/{key}/next")
-async def next_task(key: str, labeller: str = "", db: AsyncSession = Depends(get_db)):
-    """The lowest-numbered task this labeller has not answered.
+async def next_task(key: str, token: str = "", db: AsyncSession = Depends(get_db)):
+    """The lowest-numbered task this invite has not answered.
 
     Deterministic order rather than random: someone working a batch in a stable
     order can stop and resume, and two people on one batch converge on the same
@@ -101,7 +173,7 @@ async def next_task(key: str, labeller: str = "", db: AsyncSession = Depends(get
     b = await _batch(db, key)
     if not b["open"]:
         return {"task": None, "closed": True}
-    who = labeller.strip()[:MAX_LABELLER]
+    inv = await _invite(db, b["id"], token)
     row = (
         await db.execute(
             text(
@@ -111,13 +183,13 @@ async def next_task(key: str, labeller: str = "", db: AsyncSession = Depends(get
                 WHERE t.batch_id = :b
                   AND NOT EXISTS (
                     SELECT 1 FROM label_responses r
-                    WHERE r.task_id = t.id AND r.labeller = :l
+                    WHERE r.task_id = t.id AND r.invite_id = :i
                   )
                 ORDER BY t.position
                 LIMIT 1
                 """
             ),
-            {"b": b["id"], "l": who},
+            {"b": b["id"], "i": inv["id"]},
         )
     ).mappings().first()
     if row is None:
@@ -180,6 +252,7 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     b = await _batch(db, key)
     if not b["open"]:
         raise HTTPException(status_code=409, detail="batch is closed")
+    inv = await _invite(db, b["id"], body.token)
     owned = (
         await db.execute(
             text("SELECT 1 FROM label_tasks WHERE id = :t AND batch_id = :b"),
@@ -193,16 +266,17 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     await db.execute(
         text(
             """
-            INSERT INTO label_responses (id, task_id, labeller, selected, unsure, ms_spent)
-            VALUES (:id, :t, :l, CAST(:sel AS jsonb), :u, :ms)
-            ON CONFLICT (task_id, labeller) DO UPDATE
+            INSERT INTO label_responses
+              (id, task_id, invite_id, labeller, selected, unsure, ms_spent)
+            VALUES (:id, :t, :inv, :l, CAST(:sel AS jsonb), :u, :ms)
+            ON CONFLICT (task_id, invite_id) DO UPDATE
               SET selected = EXCLUDED.selected, unsure = EXCLUDED.unsure,
                   ms_spent = EXCLUDED.ms_spent, created_at = now()
             """
         ),
         {
-            "id": uuid.uuid4(), "t": body.task_id,
-            "l": body.labeller.strip()[:MAX_LABELLER],
+            "id": uuid.uuid4(), "t": body.task_id, "inv": inv["id"],
+            "l": inv["name"] or "anonymous",
             "sel": json.dumps([str(x) for x in body.selected]),
             "u": body.unsure, "ms": body.ms_spent,
         },

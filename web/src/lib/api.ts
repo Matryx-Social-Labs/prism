@@ -492,13 +492,33 @@ export interface LabelBatch {
   name: string;
   notes: string | null;
   open: boolean;
+  self_join: boolean;
+  labeller: string; // display name on the invite; may be shared with someone else
   total: number;
-  done: number; // THIS labeller's count, not everyone's
+  done: number; // THIS invite's count, not everyone's
 }
 
-export async function fetchLabelBatch(key: string, labeller: string): Promise<LabelBatch> {
+/**
+ * Mint this visitor their own write credential.
+ *
+ * Called once on first visit, which is what lets a single link be shared with a
+ * group while every person still gets a distinct identity. The token is kept in
+ * localStorage and sent in request bodies — deliberately never in the URL, where a
+ * credential would leak through history, Referer headers and shared screenshots.
+ */
+export async function joinLabelBatch(key: string, name: string): Promise<string> {
+  const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()).token as string;
+}
+
+export async function fetchLabelBatch(key: string, token: string): Promise<LabelBatch> {
   const r = await fetch(
-    `${API_URL}/api/v1/label/${encodeURIComponent(key)}?labeller=${encodeURIComponent(labeller)}`,
+    `${API_URL}/api/v1/label/${encodeURIComponent(key)}?token=${encodeURIComponent(token)}`,
     { cache: "no-store" }
   );
   if (!r.ok) throw new Error(String(r.status));
@@ -507,10 +527,10 @@ export async function fetchLabelBatch(key: string, labeller: string): Promise<La
 
 export async function fetchLabelTask(
   key: string,
-  labeller: string
+  token: string
 ): Promise<{ task: LabelTask | null; closed: boolean }> {
   const r = await fetch(
-    `${API_URL}/api/v1/label/${encodeURIComponent(key)}/next?labeller=${encodeURIComponent(labeller)}`,
+    `${API_URL}/api/v1/label/${encodeURIComponent(key)}/next?token=${encodeURIComponent(token)}`,
     { cache: "no-store" }
   );
   if (!r.ok) throw new Error(String(r.status));
@@ -519,7 +539,7 @@ export async function fetchLabelTask(
 
 export async function postLabelAnswer(
   key: string,
-  body: { task_id: string; labeller: string; selected: string[]; unsure: boolean; ms_spent: number }
+  body: { task_id: string; token: string; selected: string[]; unsure: boolean; ms_spent: number }
 ): Promise<void> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/answer`, {
     method: "POST",

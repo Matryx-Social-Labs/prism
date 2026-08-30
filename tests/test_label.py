@@ -80,18 +80,26 @@ def _client() -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://t")
 
 
+async def _join(c: AsyncClient, key: str, name: str = "") -> str:
+    """Mint a write credential the way the page does on first visit."""
+    r = await c.post(f"/api/v1/label/{key}/join", json={"name": name})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
+
+
 async def test_a_labeller_is_served_tasks_they_have_not_answered():
     if not await _db_reachable():
         pytest.skip("no database")
     key, _ = await _batch(2)
     async with _client() as c:
-        first = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ana"})).json()
+        tok = await _join(c, key, "ana")
+        first = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()
         assert first["task"]["position"] == 0
         await c.post(f"/api/v1/label/{key}/answer", json={
-            "task_id": first["task"]["id"], "labeller": "ana",
+            "task_id": first["task"]["id"], "token": tok,
             "selected": [first["task"]["candidates"][0]["id"]],
         })
-        second = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ana"})).json()
+        second = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()
     assert second["task"]["position"] == 1, "an answered task was served again"
 
 
@@ -104,11 +112,12 @@ async def test_two_labellers_get_the_same_task_independently():
         pytest.skip("no database")
     key, _ = await _batch(1)
     async with _client() as c:
-        a = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ana"})).json()
+        ta, tb = await _join(c, key, "ana"), await _join(c, key, "ben")
+        a = (await c.get(f"/api/v1/label/{key}/next", params={"token": ta})).json()
         await c.post(f"/api/v1/label/{key}/answer", json={
-            "task_id": a["task"]["id"], "labeller": "ana", "selected": [],
+            "task_id": a["task"]["id"], "token": ta, "selected": [],
         })
-        b = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ben"})).json()
+        b = (await c.get(f"/api/v1/label/{key}/next", params={"token": tb})).json()
     assert b["task"] is not None and b["task"]["id"] == a["task"]["id"]
 
 
@@ -119,12 +128,13 @@ async def test_the_task_never_carries_another_persons_answer():
         pytest.skip("no database")
     key, _ = await _batch(1)
     async with _client() as c:
-        a = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ana"})).json()
+        ta, tb = await _join(c, key, "ana"), await _join(c, key, "ben")
+        a = (await c.get(f"/api/v1/label/{key}/next", params={"token": ta})).json()
         await c.post(f"/api/v1/label/{key}/answer", json={
-            "task_id": a["task"]["id"], "labeller": "ana",
+            "task_id": a["task"]["id"], "token": ta,
             "selected": [a["task"]["candidates"][0]["id"]],
         })
-        b = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ben"})).json()
+        b = (await c.get(f"/api/v1/label/{key}/next", params={"token": tb})).json()
     blob = str(b["task"])
     assert "selected" not in blob and "ana" not in blob
 
@@ -136,15 +146,16 @@ async def test_changing_your_mind_replaces_rather_than_appends():
         pytest.skip("no database")
     key, tasks = await _batch(1)
     async with _client() as c:
-        t = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ana"})).json()["task"]
+        tok = await _join(c, key, "ana")
+        t = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()["task"]
         for sel in ([], [t["candidates"][0]["id"]]):
             r = await c.post(f"/api/v1/label/{key}/answer", json={
-                "task_id": t["id"], "labeller": "ana", "selected": sel,
+                "task_id": t["id"], "token": tok, "selected": sel,
             })
             assert r.status_code == 200
     async with session_scope() as s:
         n = (await s.execute(
-            text("SELECT count(*) FROM label_responses WHERE task_id = :t AND labeller = 'ana'"),
+            text("SELECT count(*) FROM label_responses WHERE task_id = :t"),
             {"t": tasks[0]},
         )).scalar_one()
     assert n == 1, f"{n} rows for one person on one task"
@@ -157,10 +168,11 @@ async def test_an_empty_selection_is_recorded_as_a_real_answer():
         pytest.skip("no database")
     key, tasks = await _batch(1)
     async with _client() as c:
+        tok = await _join(c, key, "ana")
         await c.post(f"/api/v1/label/{key}/answer", json={
-            "task_id": tasks[0], "labeller": "ana", "selected": [],
+            "task_id": tasks[0], "token": tok, "selected": [],
         })
-        nxt = (await c.get(f"/api/v1/label/{key}/next", params={"labeller": "ana"})).json()
+        nxt = (await c.get(f"/api/v1/label/{key}/next", params={"token": tok})).json()
     assert nxt["task"] is None
 
 
@@ -172,8 +184,9 @@ async def test_a_task_from_another_batch_cannot_be_written_through_this_key():
     key_a, _ = await _batch(1)
     _, tasks_b = await _batch(1)
     async with _client() as c:
+        tok_a = await _join(c, key_a, "ana")
         r = await c.post(f"/api/v1/label/{key_a}/answer", json={
-            "task_id": tasks_b[0], "labeller": "ana", "selected": [],
+            "task_id": tasks_b[0], "token": tok_a, "selected": [],
         })
     assert r.status_code == 404
 
@@ -184,8 +197,9 @@ async def test_a_closed_batch_refuses_writes():
     key, tasks = await _batch(1, is_open=False)
     async with _client() as c:
         assert (await c.get(f"/api/v1/label/{key}/next")).json()["closed"] is True
+        assert (await c.post(f"/api/v1/label/{key}/join", json={})).status_code == 409
         r = await c.post(f"/api/v1/label/{key}/answer", json={
-            "task_id": tasks[0], "labeller": "ana", "selected": [],
+            "task_id": tasks[0], "token": "x" * 24, "selected": [],
         })
     assert r.status_code == 409
 
@@ -197,11 +211,12 @@ async def test_progress_counts_only_this_labeller():
         pytest.skip("no database")
     key, tasks = await _batch(3)
     async with _client() as c:
+        ta, tb = await _join(c, key, "ana"), await _join(c, key, "ben")
         await c.post(f"/api/v1/label/{key}/answer", json={
-            "task_id": tasks[0], "labeller": "ana", "selected": [],
+            "task_id": tasks[0], "token": ta, "selected": [],
         })
-        ana = (await c.get(f"/api/v1/label/{key}", params={"labeller": "ana"})).json()
-        ben = (await c.get(f"/api/v1/label/{key}", params={"labeller": "ben"})).json()
+        ana = (await c.get(f"/api/v1/label/{key}", params={"token": ta})).json()
+        ben = (await c.get(f"/api/v1/label/{key}", params={"token": tb})).json()
     assert (ana["done"], ana["total"]) == (1, 3)
     assert ben["done"] == 0
 
@@ -211,3 +226,90 @@ async def test_an_unknown_key_is_a_404_not_an_empty_batch():
         pytest.skip("no database")
     async with _client() as c:
         assert (await c.get("/api/v1/label/nope-not-a-key")).status_code == 404
+
+
+# --- identity is the invite, not the name --------------------------------------
+# The bug this replaced: responses were keyed on (task, typed name) with ON CONFLICT
+# DO UPDATE, so a second person typing "Ana" overwrote the first Ana's answers —
+# collapsing the two opinions the schema exists to keep apart, silently, leaving a
+# gold set that looks entirely normal.
+
+
+async def test_two_labellers_with_the_same_name_stay_separate():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, tasks = await _batch(1)
+    async with _client() as c:
+        one, two = await _join(c, key, "Ana"), await _join(c, key, "Ana")
+        assert one != two, "two joins produced one credential"
+        for tok, sel in ((one, []), (two, [])):
+            r = await c.post(f"/api/v1/label/{key}/answer", json={
+                "task_id": tasks[0], "token": tok, "selected": sel,
+            })
+            assert r.status_code == 200
+    async with session_scope() as s:
+        n = (await s.execute(
+            text("SELECT count(*) FROM label_responses WHERE task_id = :t"), {"t": tasks[0]}
+        )).scalar_one()
+    assert n == 2, f"two people named Ana left {n} opinions, not 2"
+
+
+async def test_a_token_from_another_batch_cannot_write_here():
+    """Scoping is what stops the batch key from gating reads while leaving every
+    task writable by anyone holding any token."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key_a, tasks_a = await _batch(1)
+    key_b, _ = await _batch(1)
+    async with _client() as c:
+        tok_b = await _join(c, key_b, "ben")
+        r = await c.post(f"/api/v1/label/{key_a}/answer", json={
+            "task_id": tasks_a[0], "token": tok_b, "selected": [],
+        })
+    assert r.status_code == 403
+
+
+async def test_a_revoked_invite_stops_working():
+    """Revocation is per person — the reason this is a table and not a signed link,
+    where removing one careless labeller means invalidating everyone."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, tasks = await _batch(1)
+    async with _client() as c:
+        tok = await _join(c, key, "ana")
+        async with session_scope() as s:
+            await s.execute(
+                text("UPDATE label_invites SET revoked = true WHERE token = :t"), {"t": tok}
+            )
+        r = await c.post(f"/api/v1/label/{key}/answer", json={
+            "task_id": tasks[0], "token": tok, "selected": [],
+        })
+        nxt = await c.get(f"/api/v1/label/{key}/next", params={"token": tok})
+    assert r.status_code == 403
+    assert nxt.status_code == 403
+
+
+async def test_a_made_up_token_is_refused():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, tasks = await _batch(1)
+    async with _client() as c:
+        r = await c.post(f"/api/v1/label/{key}/answer", json={
+            "task_id": tasks[0], "token": "not-a-real-token-at-all", "selected": [],
+        })
+    assert r.status_code == 403
+
+
+async def test_an_invite_only_batch_refuses_self_join():
+    """`self_join` off is for a batch where who answers matters — the only way in is
+    an invite someone minted deliberately."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, _ = await _batch(1)
+    async with session_scope() as s:
+        await s.execute(
+            text("UPDATE label_batches SET self_join = false WHERE key = :k"), {"k": key}
+        )
+    async with _client() as c:
+        r = await c.post(f"/api/v1/label/{key}/join", json={"name": "stranger"})
+    assert r.status_code == 403
