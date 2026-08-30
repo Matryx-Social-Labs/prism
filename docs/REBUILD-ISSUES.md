@@ -114,7 +114,7 @@ Ordered by severity within each group. Update as things land.
 
 | # | Issue | Evidence | Status |
 |---|---|---|---|
-| E1 | **`agent/rag.py` has ZERO tests** — the grounded citations-and-refusal agent, i.e. the product's core trust claim. | No test file imports `agent`. | OPEN — step 10 |
+| E1 | **`agent/rag.py` had ZERO tests** — the grounded citations-and-refusal agent, i.e. the product's core trust claim. | No test file imported `agent`. | **FIXED** — 12 tests, mutation-verified. Pins that an unresolved `[n]` yields no source, one article cited twice is one source, both refusal paths spend no LLM call, and a failed completion persists nothing |
 | E2 | **`classification/` has ZERO tests.** Relevance gate + sector routing untested. `shadow_gate` unreferenced in `tests/`. | | OPEN |
 | E3 | **Collectors near-zero.** No watermark/idempotency/pagination tests for GDELT/NVD/KEV. | | OPEN |
 | E4 | **`worker/__main__.py` has ZERO tests.** Stage selection, scheduler, sweeper, health server. | | OPEN |
