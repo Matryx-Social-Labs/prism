@@ -2,6 +2,7 @@
 
     uv run python -m tools.securities --load          # refresh from NSE
     uv run python -m tools.securities --audit         # check stored tickers, READ-ONLY
+    uv run python -m tools.securities --clean         # strip the invented ones (dry-run)
 
 WHY THIS EXISTS. `FinanceLens.tickers` is a list of strings an LLM emitted with
 nothing checking them, and they flow into the watchlist join. Measured on
@@ -31,10 +32,13 @@ import argparse
 import asyncio
 import csv
 import io
+import json
 import urllib.request
 import uuid
 from collections import Counter
 from datetime import datetime
+
+from common.securities import MIN_MASTER_ROWS, normalize
 
 NSE_EQUITY_L = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"
 # NSE serves the archive only to something that looks like a browser.
@@ -146,8 +150,7 @@ async def audit(url: str | None = None) -> None:
     finally:
         await c.close()
 
-    if not known:
-        raise SystemExit("the securities master is empty — run --load first")
+    _require_loaded(known)
 
     counts = Counter(r["t"].strip().upper() for r in rows if r["t"].strip())
     valid = {t: n for t, n in counts.items() if t in known}
@@ -161,17 +164,90 @@ async def audit(url: str | None = None) -> None:
         print(f"    {t:16} {n}")
 
 
+def _require_loaded(known: set[str]) -> None:
+    """Refuse to judge anything against a master that never finished loading.
+
+    A HALF-loaded master is worse than an empty one: it passes an is-it-empty
+    check and then reports every genuine ticker it happens to be missing as a
+    fabrication. Caught for real — a dry run of `--clean` against a master
+    holding 2 rows proposed dropping NHPC, a real NSE listing.
+    """
+    if len(known) < MIN_MASTER_ROWS:
+        raise SystemExit(
+            f"the securities master holds {len(known)} rows, fewer than the "
+            f"{MIN_MASTER_ROWS} a finished NSE load produces. Run --load first; "
+            "judging tickers against a partial master would call real ones invented."
+        )
+
+
+async def clean(url: str | None = None, apply: bool = False) -> None:
+    """Remove already-stored tickers that no security carries. DRY-RUN by default.
+
+    `common/securities.py` stops new ones at the write. It cannot touch what is
+    already there — 138 mentions across 103 events, extracted before the master
+    existed — and those are what a reader sees today.
+
+    Only the ticker LIST is rewritten. `raw_model_output` keeps the extractor's
+    verbatim output, so this narrows what we display without destroying the record
+    of what was claimed.
+    """
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        known = {r["symbol"] for r in await c.fetch("SELECT symbol FROM securities")}
+        _require_loaded(known)
+        for table, col in (("enrichments", "lens_fields"), ("events", "projection")):
+            rows = await c.fetch(
+                f"SELECT id, {col} AS doc FROM {table} "
+                f"WHERE jsonb_typeof({col} -> 'finance' -> 'tickers') = 'array'"
+            )
+            changed = dropped = 0
+            for r in rows:
+                doc = json.loads(r["doc"]) if isinstance(r["doc"], str) else dict(r["doc"])
+                had = doc["finance"]["tickers"]
+                kept: list[str] = []
+                for t in had:
+                    n = normalize(t)
+                    if n in known and n not in kept:
+                        kept.append(n)
+                if kept == had:
+                    continue
+                changed += 1
+                dropped += len(had) - len(kept)
+                if apply:
+                    await c.execute(
+                        f"UPDATE {table} SET {col} = "
+                        f"jsonb_set({col}, '{{finance,tickers}}', $1::jsonb) WHERE id = $2",
+                        json.dumps(kept), r["id"],
+                    )
+            verb = "rewrote" if apply else "would rewrite"
+            print(f"  {table}.{col}: {verb} {changed} of {len(rows)} rows, "
+                  f"dropping {dropped} unverified mentions")
+    finally:
+        await c.close()
+    if not apply:
+        print("\n  DRY RUN — nothing was written. Re-run with --apply.")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--load", action="store_true")
     ap.add_argument("--audit", action="store_true")
+    ap.add_argument("--clean", action="store_true",
+                    help="strip unverified tickers from stored rows (dry-run)")
+    ap.add_argument("--apply", action="store_true", help="let --clean actually write")
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     a = ap.parse_args()
     if a.load:
         asyncio.run(load(a.db))
     if a.audit:
         asyncio.run(audit(a.db))
-    if not (a.load or a.audit):
+    if a.clean:
+        asyncio.run(clean(a.db, apply=a.apply))
+    if not (a.load or a.audit or a.clean):
         ap.print_help()
 
 
