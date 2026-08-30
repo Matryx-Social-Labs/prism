@@ -9,7 +9,11 @@ import { usePathname } from "next/navigation";
 import { PrismMark } from "@/components/PrismMark";
 import { HeaderNav } from "@/components/HeaderNav";
 
-const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you", "/account", "/interests", "/watchlist", "/story"];
+// "/label" is here for a slightly different reason than the reader surfaces: it is
+// a single-purpose task page opened from an unguessable link, often by someone who
+// does not use Prism at all. On a phone the marketing nav ("Sign in", "Get your
+// feed") is an invitation to leave in the middle of a judgement.
+const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you", "/account", "/interests", "/watchlist", "/story", "/label"];
 
 export function SiteHeader() {
   const pathname = usePathname();
