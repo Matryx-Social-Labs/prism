@@ -203,11 +203,13 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   return (
     <Shell>
       <header
-        className="sticky top-0 z-10 -mx-5 mb-8 border-b px-5 py-3 backdrop-blur sm:-mx-8 sm:px-8"
-        style={{
-          borderColor: "var(--line)",
-          background: "color-mix(in srgb, var(--bg) 86%, transparent)",
-        }}
+        // NOT sticky. It was, and on a phone it sat underneath the global brand
+        // header — the progress rule showed through while the batch name and count
+        // were hidden behind it. Stickiness bought nothing here anyway: a task is
+        // one screen, and submitting returns to the top, so the count is in view at
+        // the start of every question regardless.
+        className="-mx-5 mb-8 border-b px-5 py-3 sm:-mx-8 sm:px-8"
+        style={{ borderColor: "var(--line)" }}
       >
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
