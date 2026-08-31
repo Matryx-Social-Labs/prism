@@ -115,9 +115,41 @@ def fetch_us() -> list[dict]:
 
 
 def _get(url: str) -> str:
+    """Fetch, and refuse a 200 that is not the data.
+
+    nasdaqtrader.com rate-limits, and it does so by answering 200 with an Akamai
+    block page rather than an error status. Decoded and parsed, that yields zero
+    rows — which is indistinguishable from "the exchange lists nothing today" and
+    would flow straight into the master. Naming it here means the operator reads
+    "blocked", not "no securities fetched".
+    """
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=60) as r:
-        return r.read().decode("utf-8", errors="replace")
+        body = r.read().decode("utf-8", errors="replace")
+    if body.lstrip()[:200].lower().startswith(("<html", "<!doctype")):
+        raise SystemExit(
+            f"{url} answered with an HTML page, not data — the host is rate-limiting.\n"
+            "Retry later, or fetch the file yourself and pass --from-file."
+        )
+    return body
+
+
+def parse_any(body: str) -> list[dict]:
+    """Dispatch on the file's own header, so --from-file needs no flag saying which.
+
+    Each publisher's first line is distinctive, and getting this wrong is not a
+    quiet error: the NSE parser reading a pipe-delimited file finds no SYMBOL
+    column and returns nothing, which the load would then treat as an exchange
+    that lists no securities.
+    """
+    head = next((ln for ln in body.splitlines() if ln.strip()), "")
+    if head.startswith("Symbol|"):
+        return parse_nasdaq(body)
+    if head.startswith("ACT Symbol|"):
+        return parse_otherlisted(body)
+    if head.upper().replace(" ", "").startswith("SYMBOL,"):
+        return parse_nse(body)
+    raise SystemExit(f"unrecognised symbol file header: {head[:70]!r}")
 
 
 def parse_nasdaq(body: str) -> list[dict]:
@@ -210,7 +242,8 @@ async def _upsert(c, rows: list[dict]) -> None:
         print(f"  {ex}: {len(symbols)} securities")
 
 
-async def load(url: str | None = None, market: str = "all") -> None:
+async def load(url: str | None = None, market: str = "all",
+               files: list[str] | None = None) -> None:
     """Refresh the master. Idempotent: re-running updates rather than duplicating.
 
     Securities that vanish from a published list are marked inactive, not
@@ -222,10 +255,17 @@ async def load(url: str | None = None, market: str = "all") -> None:
     from tools.snapshot_l2 import _prod_url
 
     rows: list[dict] = []
-    if market in ("all", "nse"):
-        rows += fetch_nse()
-    if market in ("all", "us"):
-        rows += fetch_us()
+    if files:
+        # For when the publisher is rate-limiting: fetch by any means, load from
+        # disk. The parser is chosen by each file's own header.
+        for path in files:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                rows += parse_any(fh.read())
+    else:
+        if market in ("all", "nse"):
+            rows += fetch_nse()
+        if market in ("all", "us"):
+            rows += fetch_us()
     if not rows:
         raise SystemExit(f"no securities fetched for market={market!r} — refusing to write")
 
@@ -367,10 +407,12 @@ def main() -> None:
     ap.add_argument("--apply", action="store_true", help="let --clean actually write")
     ap.add_argument("--market", choices=("all", "nse", "us"), default="all",
                     help="which symbol master to load (default: all)")
+    ap.add_argument("--from-file", metavar="PATH", action="append",
+                    help="load from a downloaded symbol file instead of fetching")
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     a = ap.parse_args()
     if a.load:
-        asyncio.run(load(a.db, a.market))
+        asyncio.run(load(a.db, a.market, a.from_file))
     if a.audit:
         asyncio.run(audit(a.db))
     if a.clean:
