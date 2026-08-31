@@ -161,3 +161,81 @@ class DigestResponse(BaseModel):
 class AskRequest(BaseModel):
     question: str
     session_id: str | None = None
+
+
+# --- trending -----------------------------------------------------------------
+# These two routes served bare dicts until now: the only description of their
+# shape lived in web/src/lib/api.ts, so the client and the server could disagree
+# and nothing would say so. StoryTimeline and BranchTree — the two most
+# structural screens — are the consumers.
+#
+# A response_model DROPS any field it does not declare, silently. That makes an
+# incomplete model here worse than no model at all, so every field below is
+# matched against both the producer (correlation/threads.py) and the TypeScript
+# interface, and test_trending_contract.py asserts the served key sets exactly.
+
+
+class TrendingStoryOut(BaseModel):
+    slug: str
+    label: str
+    cast: list[str] = []
+    source_count: int
+    velocity: int  # distinct new outlets in the last 6h
+    developments: int
+    sector: str | None
+    hero_title: str | None
+    hero_image: str | None
+
+
+class TrendingResponse(BaseModel):
+    stories: list[TrendingStoryOut]
+
+
+class StoryDevelopmentOut(BaseModel):
+    id: str
+    title: str
+    sector: str | None
+    occurred_at: str | None
+    image_url: str | None
+    is_current: bool
+    # The causal note from event_links, rendered as "↳ {why}" under the
+    # development it explains. 563 usable notes in production.
+    why: str | None = None
+
+
+class BranchNodeOut(BaseModel):
+    id: str
+    parent_id: str | None
+    off_spine: bool
+    depth: int
+
+
+class BranchShapeOut(BaseModel):
+    """Counted, never summarised — the readout prints these verbatim."""
+
+    developments: int
+    branches: int
+    satellites: int
+    max_depth: int
+
+
+class BranchTreeOut(BaseModel):
+    root_id: str
+    nodes: list[BranchNodeOut]
+    shape: BranchShapeOut
+
+
+class TrendingStoryDetail(BaseModel):
+    slug: str
+    canonical_slug: str  # if != the requested slug, the client should redirect
+    label: str
+    cast: list[str] = []
+    sector: str | None
+    source_count: int
+    velocity: int
+    status: str
+    developments: list[StoryDevelopmentOut] = []
+    timeline_cast: list[str] = []
+    # None for a storyline that predates the current partition run — the client
+    # falls back to the flat timeline, so null is a real value, not an error.
+    branches: BranchTreeOut | None = None

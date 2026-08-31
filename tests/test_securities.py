@@ -12,7 +12,7 @@ HINDUNILVR), `ECB`, and the Yahoo-style `UPL.NS`, `^BSESENSEX` and `^NSENIFTY`.
 
 from datetime import date
 
-from tools.securities import parse_nse
+from tools.securities import parse_nasdaq, parse_nse, parse_otherlisted
 
 HEADER = (
     "SYMBOL,NAME OF COMPANY, SERIES, DATE OF LISTING, PAID UP VALUE, "
@@ -71,3 +71,83 @@ def test_a_header_only_file_yields_nothing_rather_than_raising():
     """A fetch returning only a header — or an error page — should not explode in
     the parser; `load` is where emptiness gets challenged."""
     assert parse_nse(HEADER) == []
+
+
+# --- the US master ------------------------------------------------------------
+# Added because NSE alone was not enough to judge by. The six most-shown
+# unverified symbols in production — META, NVDA, GOOGL, MSFT, AAPL, AMZN — are
+# all genuine Nasdaq listings, so a backfill run against NSE alone would have
+# deleted 41 correct ticker mentions as fabrications.
+
+NASDAQ_HEADER = (
+    "Symbol|Security Name|Market Category|Test Issue|Financial Status|"
+    "Round Lot Size|ETF|NextShares"
+)
+OTHER_HEADER = (
+    "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|"
+    "Test Issue|NASDAQ Symbol"
+)
+# Verbatim from the published files on 2026-08-31, footer included.
+FOOTER_NASDAQ = "File Creation Time: 0831202607:00|||||||"
+FOOTER_OTHER = "File Creation Time: 0831202607:00||||||"
+
+
+def nasdaq(*lines: str):
+    return parse_nasdaq("\n".join([NASDAQ_HEADER, *lines, FOOTER_NASDAQ]))
+
+
+def other(*lines: str):
+    return parse_otherlisted("\n".join([OTHER_HEADER, *lines, FOOTER_OTHER]))
+
+
+def test_a_nasdaq_listing_parses():
+    (r,) = nasdaq("META|Meta Platforms, Inc. - Class A Common Stock|Q|N|N|100|N|N")
+    assert r["symbol"] == "META" and r["exchange"] == "NASDAQ"
+    assert r["name"].startswith("Meta Platforms")
+
+
+def test_the_file_creation_footer_is_not_a_security():
+    """Both files end with `File Creation Time: ...`, which parses as a perfectly
+    ordinary row carrying a symbol. Admitted, it would validate a ticker made of
+    a timestamp."""
+    assert nasdaq() == [] and other() == []
+
+
+def test_a_test_issue_is_not_a_security():
+    """`MTEST` and the three IEX test symbols are venue plumbing. They are real
+    rows in the real file, and a reader cannot hold any of them."""
+    assert other("MTEST|NYSE Texas, Inc. TEST Common Stock|M|MTEST|N|100|Y|MTEST") == []
+    assert nasdaq("ZAZZT|Nasdaq TEST Stock|G|Y|N|100|N|N") == []
+
+
+def test_the_exchange_letter_becomes_a_market_name():
+    (r,) = other("A|Agilent Technologies, Inc. Common Stock|N|A|N|100|N|A")
+    assert r["exchange"] == "NYSE"
+
+
+def test_the_act_symbol_is_stored_not_the_nasdaq_one():
+    """otherlisted carries the same security under two spellings: `BRK.A` in the
+    ACT column and `BRK-A` in the NASDAQ one. The dotted form is how the class is
+    written in prose, so it is the one an extractor emits and the one to store.
+
+    Storing the wrong column is invisible in most rows — for the large majority
+    the two are identical — which is why this test picks one where they differ.
+    A ticker stored as `BRK-A` would match nothing a reader ever writes.
+    """
+    (r,) = other("BRK.A|Berkshire Hathaway Inc. Class A|N|BRK.A|N|10|N|BRK-A")
+    assert r["symbol"] == "BRK.A"
+
+
+def test_an_unmapped_exchange_letter_keeps_the_security():
+    """If Nasdaq adds a venue, its listings must still validate a ticker. Dropping
+    them would turn every symbol on that venue into a reported fabrication —
+    the same degrade-rather-than-disappear rule the NSE parser follows."""
+    (r,) = other("NEWCO|New Venue Corp Common Stock|X|NEWCO|N|100|N|NEWCO")
+    assert r["symbol"] == "NEWCO" and r["exchange"] == "US-X"
+
+
+def test_a_us_security_carries_no_isin_and_that_is_allowed():
+    """The US files publish none — (exchange, symbol) identifies the security
+    there. `securities.isin` is nullable for exactly this."""
+    (r,) = nasdaq("NVDA|NVIDIA Corporation - Common Stock|Q|N|N|100|N|N")
+    assert r["isin"] is None and r["listed_on"] is None

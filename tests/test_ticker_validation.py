@@ -22,15 +22,18 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.db import get_engine, session_scope
-from common.securities import MIN_MASTER_ROWS, normalize, validated
+from common.securities import EXPECTED_MARKETS, normalize, validated
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-# Real NSE listings. HUL is deliberately NOT among them — that is the fact under
-# test, and it is NSE's own list that says so.
+# Real listings, one per covered market. HUL is deliberately NOT among them —
+# that is the fact under test, and it is NSE's own list that says so, with
+# Nasdaq's and NYSE's agreeing.
 SEED = [
-    ("HINDUNILVR", "INE030A01027", "Hindustan Unilever Limited"),
-    ("UPL", "INE628A01036", "UPL Limited"),
+    ("HINDUNILVR", "NSE", "INE030A01027", "Hindustan Unilever Limited"),
+    ("UPL", "NSE", "INE628A01036", "UPL Limited"),
+    ("META", "NASDAQ", None, "Meta Platforms, Inc. - Class A Common Stock"),
+    ("A", "NYSE", None, "Agilent Technologies, Inc. Common Stock"),
 ]
 
 
@@ -44,34 +47,35 @@ async def _db_reachable() -> bool:
 
 
 @asynccontextmanager
-async def master(padding: int = MIN_MASTER_ROWS):
+async def master(markets: tuple[str, ...] = tuple(EXPECTED_MARKETS)):
     """A securities master that exists only for the duration of one test.
 
     Built inside a transaction that is ALWAYS rolled back, so the real master is
     never touched — it is reference data loaded from the exchange, not something
     a test may leave rows in.
 
-    `padding` exists because size is itself part of the contract: below
-    `MIN_MASTER_ROWS` the master is treated as unloaded and validation steps
-    aside. A test wanting real validation therefore needs a plausibly complete
-    master, and one wanting the cannot-check behaviour passes `padding=0`.
+    `markets` names which markets are padded to a plausible size, because SIZE
+    PER MARKET is itself part of the contract: a market short of its floor is
+    treated as unloaded and validation steps aside for everything. Pass a subset
+    to get the half-loaded case, or `()` for the never-loaded one.
     """
     async with get_engine().connect() as conn:
         trans = await conn.begin()
         s = AsyncSession(bind=conn)
         await s.execute(text("DELETE FROM securities"))
-        if padding:
+        for market in markets:
             await s.execute(
                 text("INSERT INTO securities (id, symbol, exchange, name) "
-                     "SELECT gen_random_uuid(), 'PAD' || g, 'PAD', 'padding' "
+                     "SELECT gen_random_uuid(), :m || g, :m, 'padding' "
                      "FROM generate_series(1, :n) g"),
-                {"n": padding},
+                {"m": market, "n": EXPECTED_MARKETS[market]},
             )
-        for symbol, isin, name in SEED:
+        for symbol, exchange, isin, name in SEED:
             await s.execute(
-                text("INSERT INTO securities (id, isin, symbol, exchange, name, series, active) "
-                     "VALUES (:i, :isin, :sym, 'NSE', :n, 'EQ', true)"),
-                {"i": str(uuid.uuid4()), "isin": isin, "sym": symbol, "n": name},
+                text("INSERT INTO securities (id, isin, symbol, exchange, name, active) "
+                     "VALUES (:i, :isin, :sym, :ex, :n, true)"),
+                {"i": str(uuid.uuid4()), "isin": isin, "sym": symbol,
+                 "ex": exchange, "n": name},
             )
         try:
             yield s
@@ -152,7 +156,7 @@ async def test_an_unloaded_master_passes_tickers_through_instead_of_blanking_the
     """
     if not await _db_reachable():
         pytest.skip("no database")
-    async with master(padding=0) as s:
+    async with master(markets=()) as s:
         await s.execute(text("DELETE FROM securities"))
         assert await validated(s, ["HUL", "HINDUNILVR"]) == ["HINDUNILVR", "HUL"]
 
@@ -169,8 +173,35 @@ async def test_a_half_loaded_master_is_not_treated_as_an_answer():
     """
     if not await _db_reachable():
         pytest.skip("no database")
-    async with master(padding=0) as s:
+    async with master(markets=()) as s:
         assert await validated(s, ["HUL", "HINDUNILVR"]) == ["HINDUNILVR", "HUL"]
+
+
+async def test_one_market_missing_stops_the_whole_check():
+    """The failure the US master introduced. A US-only load holds ~11,000 rows and
+    clears any TOTAL floor — and then reports every genuine NSE ticker as invented,
+    because none of them are there. HINDUNILVR is real; with NSE unloaded the only
+    honest answer is that we cannot say."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    async with master(markets=("NASDAQ", "NYSE")) as s:
+        # HUL is in NO master and META is in one that IS loaded. Judging would
+        # return just META; the honest answer with NSE missing is that we cannot
+        # judge at all, so both come back. Asserting on a pair where one symbol
+        # is absent is what makes the two outcomes distinguishable — an earlier
+        # version of this test used two symbols that were both present, so a
+        # total-row floor passed it while leaving the bug in place.
+        assert await validated(s, ["HUL", "META"]) == ["HUL", "META"]
+
+
+async def test_a_us_listing_validates_once_its_market_is_loaded():
+    """META, NVDA, GOOGL, MSFT, AAPL and AMZN were the six most-shown unverified
+    symbols in production. All six are genuine Nasdaq listings, so cleaning
+    against NSE alone would have deleted 41 correct mentions."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    async with master() as s:
+        assert await validated(s, ["META", "HUL", "A"]) == ["META", "A"]
 
 
 # --- the whole write path, including the branch that skips the model ----------
@@ -191,10 +222,11 @@ async def test_a_fabricated_ticker_never_lands_in_lens_fields(monkeypatch):
     import enrichment.consumer as ec
 
     # This test is about the WIRING — that the consumer routes tickers through the
-    # check at all. The master-size floor has its own tests above, and the real
+    # check at all. The per-market floor has its own tests above, and the real
     # master lives in the committed database this consumer opens its own sessions
-    # against, so it cannot be staged in a rolled-back transaction here.
-    monkeypatch.setattr(cs, "MIN_MASTER_ROWS", 1)
+    # against, so it cannot be staged in a rolled-back transaction here. Claiming
+    # no markets makes the floor vacuously satisfied without weakening it.
+    monkeypatch.setattr(cs, "EXPECTED_MARKETS", {})
 
     async def _no_embeddings(chunks):
         return [[0.0] * 768 for _ in chunks]
