@@ -12,7 +12,9 @@ HINDUNILVR), `ECB`, and the Yahoo-style `UPL.NS`, `^BSESENSEX` and `^NSENIFTY`.
 
 from datetime import date
 
-from tools.securities import parse_nasdaq, parse_nse, parse_otherlisted
+import pytest
+
+from tools.securities import parse_any, parse_nasdaq, parse_nse, parse_otherlisted
 
 HEADER = (
     "SYMBOL,NAME OF COMPANY, SERIES, DATE OF LISTING, PAID UP VALUE, "
@@ -151,3 +153,20 @@ def test_a_us_security_carries_no_isin_and_that_is_allowed():
     there. `securities.isin` is nullable for exactly this."""
     (r,) = nasdaq("NVDA|NVIDIA Corporation - Common Stock|Q|N|N|100|N|N")
     assert r["isin"] is None and r["listed_on"] is None
+
+
+def test_each_publishers_header_picks_its_own_parser():
+    """`--from-file` takes whatever was downloaded, so the parser is chosen by the
+    file itself. Choosing wrong is not a loud error — the NSE parser reading a
+    pipe-delimited file simply finds no SYMBOL column and returns nothing, which
+    a load would then read as an exchange that lists no securities."""
+    (a,) = parse_any("\n".join([NASDAQ_HEADER, "NVDA|NVIDIA Corporation|Q|N|N|100|N|N"]))
+    (b,) = parse_any("\n".join([OTHER_HEADER, "A|Agilent Technologies|N|A|N|100|N|A"]))
+    (c,) = parse_any("\n".join([HEADER, "INFY,Infosys Limited,EQ,08-FEB-1995,5,1,INE009A01021,5"]))
+    assert (a["exchange"], b["exchange"], c["exchange"]) == ("NASDAQ", "NYSE", "NSE")
+
+
+def test_an_unrecognised_header_refuses_rather_than_returning_nothing():
+    """Returning [] would be read as "this exchange lists nothing"."""
+    with pytest.raises(SystemExit):
+        parse_any("some,other,file\n1,2,3")
