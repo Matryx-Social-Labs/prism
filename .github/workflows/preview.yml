@@ -1,0 +1,104 @@
+name: Preview deploy
+
+# MANUAL ONLY. There is deliberately no push or pull_request trigger.
+#
+# A preview on every dev push would add a full `vercel build` plus an upload to
+# each run, and this repo spent five days in August with Actions credits
+# exhausted and the frontend frozen at a week-old commit. Previews are worth
+# having and are not worth paying for on every commit — so you ask for one.
+#
+# Run it from the Actions tab, or:
+#   gh workflow run preview.yml -f ref=dev
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA to preview"
+        required: false
+        default: dev
+
+concurrency:
+  group: deploy-web-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Deploy web to Vercel (preview)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Re-author HEAD for Vercel's Hobby-plan owner check
+        # Same constraint as the production job: Vercel Hobby only lets the
+        # project owner deploy and checks the commit author's email against the
+        # owner's verified one. Amended inside the runner only, never pushed.
+        run: |
+          git config user.email "contact@matrixsociallabs.com"
+          git config user.name "Prism Deploy"
+          git commit --amend --reset-author --no-edit
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel project + env (preview)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Inject public build env
+        # The Vercel team forces env vars to "Sensitive", and sensitive values
+        # pull as EMPTY strings outside Vercel's own builders — so a prebuilt CI
+        # deploy bakes "" into the client bundle and the preview silently talks to
+        # nothing. Pinned here for the same reason production pins them.
+        #
+        # Both env filenames are patched because which one the build reads depends
+        # on the target, and a preview that missed its API URL would look like a
+        # broken app rather than a missing variable.
+        #
+        # SITE_URL points at PRODUCTION on purpose. It is the base for og:url and
+        # canonical, and a preview should not nominate its own throwaway host as
+        # the canonical version of a story. Vercel already serves preview
+        # deployments with x-robots-tag: noindex, so this costs nothing and keeps
+        # the preview faithful to what would ship.
+        run: |
+          for f in .vercel/.env.preview.local web/.vercel/.env.preview.local \
+                   .vercel/.env.production.local web/.vercel/.env.production.local; do
+            [ -f "$f" ] || continue
+            grep -vE '^(NEXT_PUBLIC_API_URL|NEXT_PUBLIC_SITE_URL)=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            echo 'NEXT_PUBLIC_API_URL="https://prism-production-6747.up.railway.app"' >> "$f"
+            echo 'NEXT_PUBLIC_SITE_URL="https://www.readprism.news"' >> "$f"
+            echo "patched $f"
+          done
+
+      - name: Build with Vercel
+        # No --prod: this is what makes it a preview rather than a release.
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt output
+        # REF COMES THROUGH env, NOT ${{ }} INTERPOLATION. A workflow_dispatch
+        # input is attacker-controlled text; pasted directly into a run: block it
+        # is executed as shell, so a ref of `$(...)` would run in a job holding
+        # the Vercel token. Quoting "$REF" makes it data.
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          url=$(vercel deploy --prebuilt --archive=tgz --token=${{ secrets.VERCEL_TOKEN }})
+          echo "Preview: $url"
+          {
+            echo "### :mag: Preview deploy"
+            echo ""
+            printf '`%s` → %s\n' "$REF" "$url"
+            echo ""
+            echo "Not production. \`www.readprism.news\` is untouched."
+          } >> "$GITHUB_STEP_SUMMARY"
