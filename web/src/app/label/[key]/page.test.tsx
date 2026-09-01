@@ -210,3 +210,68 @@ describe("label page", () => {
     expect(await screen.findByText(/Something went wrong/)).toBeInTheDocument();
   });
 });
+
+describe("an invited labeller's link", () => {
+  // `tools/gold_candidates.py invite` hands out /label/<batch>#<token>. The
+  // fragment carries the credential because browsers never send it to the server
+  // — it stays out of access logs and Referer headers, unlike a path or query
+  // segment. Until this was wired up the page ignored it entirely, so an invited
+  // person fell through to the join form and self-joined as a STRANGER: their
+  // answers were filed under a new anonymous identity while the named invite
+  // minted for them sat unused. Nothing about that looks broken from either end.
+
+  function withHash(hash: string) {
+    window.location.hash = hash;
+    window.history.replaceState(null, "", "/label/batch-key" + hash);
+  }
+
+  afterEach(() => {
+    window.location.hash = "";
+  });
+
+  it("claims the credential from the fragment instead of asking who you are", async () => {
+    const store = stubStorage();
+    withHash("#invited-token");
+    render(<LabelPage params={params} />);
+
+    await waitFor(() => expect(fetchLabelTask).toHaveBeenCalled());
+    expect(fetchLabelTask).toHaveBeenCalledWith("batch-key", "invited-token");
+    expect(store.get("prism.label.token.batch-key")).toBe("invited-token");
+    expect(screen.queryByLabelText("Your first name")).not.toBeInTheDocument();
+  });
+
+  it("clears the credential out of the address bar once claimed", async () => {
+    stubStorage();
+    withHash("#invited-token");
+    render(<LabelPage params={params} />);
+
+    await waitFor(() => expect(fetchLabelTask).toHaveBeenCalled());
+    // A working session gets screenshotted and shared; the URL on screen must not
+    // be enough for someone else to label as this person.
+    expect(window.location.hash).toBe("");
+  });
+
+  it("greets the invited labeller by the name bound to their invite", async () => {
+    stubStorage({ "prism.labeller": "someone else entirely" });
+    withHash("#invited-token");
+    fetchLabelBatch.mockResolvedValue({
+      name: "Story boundaries",
+      notes: null,
+      open: true,
+      self_join: false,
+      labeller: "Priya",
+      total: 10,
+      done: 0,
+    });
+    // Driven to the finished state, which is the only screen that says the name
+    // out loud — asserting on a screen that never renders it would pass for the
+    // wrong reason.
+    fetchLabelTask.mockResolvedValue({ task: null, closed: false });
+    render(<LabelPage params={params} />);
+
+    // The server knows whose credential this is; localStorage only knows what was
+    // last typed on this device. Disagreeing would thank one person for another
+    // person's judgements.
+    expect(await screen.findByText(/Priya/)).toBeInTheDocument();
+  });
+});

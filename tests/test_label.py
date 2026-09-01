@@ -331,3 +331,79 @@ async def test_the_credential_is_not_accepted_from_the_query_string():
         )
     assert via_query.status_code == 403, "the query string still authenticates"
     assert via_header.status_code == 200
+
+
+# --- who may read, and who may write ------------------------------------------
+# The batch key is meant to be pasted into a message and forwarded. Everything it
+# authorises reaches whoever the recipient forwards it to, so what it authorises
+# has to be small on purpose.
+
+
+async def test_the_export_refuses_without_an_admin_token():
+    """Reading answers back is not something a shared link should carry.
+
+    Worse than a data leak: a labeller who can see what everyone else chose is no
+    longer an independent opinion, and independence is the whole reason responses
+    are keyed per person.
+    """
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, _ = await _batch(1)
+    async with _client() as c:
+        assert (await c.get(f"/api/v1/label/{key}/export")).status_code == 403
+        wrong = await c.get(f"/api/v1/label/{key}/export", headers={"X-Admin-Token": "nope"})
+        assert wrong.status_code == 403
+
+
+async def test_the_export_works_with_the_admin_token():
+    """The other half: gating it must not break the one workflow it exists for."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    from common.config import get_settings
+
+    key, _ = await _batch(1)
+    async with _client() as c:
+        ok = await c.get(f"/api/v1/label/{key}/export",
+                         headers={"X-Admin-Token": get_settings().prism_admin_token})
+    assert ok.status_code == 200 and "responses" in ok.json()
+
+
+async def test_an_invite_only_batch_refuses_a_stranger():
+    """`self_join` off is what makes a forwarded link harmless: it still opens the
+    page, and it can no longer mint anyone a credential to write with."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, _ = await _batch(1)
+    async with session_scope() as s:
+        await s.execute(
+            text("UPDATE label_batches SET self_join = false WHERE key = :k"), {"k": key})
+    async with _client() as c:
+        r = await c.post(f"/api/v1/label/{key}/join", json={"name": "a passer-by"})
+    assert r.status_code == 403
+
+
+async def test_a_revoked_invite_can_no_longer_write():
+    """Revocation has to bite on the WRITE, not just on joining. Someone whose
+    credential is already in their browser would otherwise keep labelling."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, tasks = await _batch(1)
+    async with _client() as c:
+        tok = await _join(c, key, "Ana")
+        first = await c.post(f"/api/v1/label/{key}/answer",
+                             json={"task_id": tasks[0], "token": tok, "selected": []})
+        assert first.status_code == 200, "the credential worked before revocation"
+        async with session_scope() as s:
+            await s.execute(
+                text("UPDATE label_invites SET revoked = true WHERE token = :t"), {"t": tok})
+        after = await c.post(f"/api/v1/label/{key}/answer",
+                             json={"task_id": tasks[0], "token": tok, "selected": []})
+        assert after.status_code == 403
+        # And their earlier answers are kept — dropping them would silently change
+        # a measurement rather than withdrawing a credential.
+        async with session_scope() as s:
+            n = (await s.execute(
+                text("SELECT count(*) FROM label_responses r JOIN label_tasks t "
+                     "ON t.id = r.task_id JOIN label_batches b ON b.id = t.batch_id "
+                     "WHERE b.key = :k"), {"k": key})).scalar_one()
+    assert n == 1, "revoking a labeller deleted their answers"

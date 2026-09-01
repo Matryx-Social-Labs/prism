@@ -43,6 +43,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.config import get_settings
 from common.db import get_db
 
 router = APIRouter()
@@ -293,14 +294,30 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/api/v1/label/{key}/export")
-async def export(key: str, db: AsyncSession = Depends(get_db)):
-    """Every response in the batch, for compiling a gold set offline.
+async def export(
+    key: str,
+    x_admin_token: str = Header(default=""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Every response in the batch, for compiling a gold set offline. ADMIN ONLY.
+
+    The batch key is a JOIN capability — it is meant to be pasted into a message
+    and forwarded, and it reaches whoever the recipient forwards it to. Letting it
+    also read back every labeller's answers made it a bearer credential for the
+    whole dataset, which is not what anyone hands out when they share a link.
+
+    Reading answers is also the one operation that could quietly corrupt the gold
+    set rather than merely add noise to it: a labeller who can see what others
+    chose is no longer an independent opinion, and independence is the entire
+    reason responses are keyed per person.
 
     Returns each labeller separately rather than a merged verdict. Merging IS a
     judgement — how many people must concur, what to do with `unsure` — and it
     belongs in the tool that builds the gold set, where it can be written down and
     argued with, not buried in a serializer.
     """
+    if x_admin_token != get_settings().prism_admin_token:
+        raise HTTPException(status_code=403, detail="invalid admin token")
     b = await _batch(db, key)
     rows = (
         await db.execute(
