@@ -7,7 +7,7 @@
 # There was no task runner before this; every command was a hand-typed
 # `uv run ...`, which is how the CI job and the local habit drifted apart.
 
-.PHONY: help up down check lint fmt fmt-check test test-db web seed sweep score clean
+.PHONY: help up down check lint fmt fmt-check test test-db web seed sweep score clean promote
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -59,6 +59,26 @@ agent.rag, personalization.ranking, common.lenses"
 
 # Fixtures go in the DEV database, never prism_test — pytest owns that one, and
 # fixture rows break tests that count.
+promote:  ## Ship dev to main (prod) by FAST-FORWARD — main can never lead dev
+	@# WHY A FAST-FORWARD AND NOT A MERGE. Merging a dev->main PR writes a merge
+	@# commit onto main that dev does not have, so main ends up AHEAD of dev by one
+	@# commit per release while their trees stay identical. Sixteen of those
+	@# accumulated before anyone looked. It is pure bookkeeping, but it makes
+	@# "is prod behind?" unanswerable at a glance, which is the one question this
+	@# branch exists to answer.
+	@#
+	@# A fast-forward moves the main ref onto a commit dev already has, so main is
+	@# always a PREFIX of dev's history: behind or equal, never ahead, and the
+	@# comparison stays readable forever.
+	@git diff --quiet || { echo "  refusing: uncommitted changes"; exit 1; }
+	@git fetch -q --prune origin
+	@git merge-base --is-ancestor origin/main origin/dev || { 		echo "  refusing: main is NOT an ancestor of dev, so this would not fast-forward."; 		echo "  Someone committed to main directly. Reconcile before promoting."; exit 1; }
+	@test -n "$$(git rev-list origin/main..origin/dev)" || { echo "  main is already up to date"; exit 0; }
+	@# Prod ships what CI actually vouched for, not what happens to be on disk.
+	@gh run list --branch dev --limit 1 --json conclusion,headSha 		--jq 'if .[0].conclusion == "success" and .[0].headSha == "'"$$(git rev-parse origin/dev)"'" 			then "" else "  refusing: dev CI is not green for this exact commit" | halt_error(1) end'
+	@echo "  promoting $$(git rev-list --count origin/main..origin/dev) commit(s) to main"
+	git push origin origin/dev:main
+
 seed:  ## Load the offline fixture corpus into the DEV db (no API keys, no LLM spend)
 	DATABASE_URL=postgresql+asyncpg://prism:prism@localhost:5432/prism \
 		uv run python -m tools.load_fixtures

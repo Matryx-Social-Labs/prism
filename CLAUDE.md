@@ -34,3 +34,24 @@ time here, so check for them when writing or reviewing web tests:
   (`expect(screen.getByText(...)).toBeInTheDocument()`).
 
 Every regression test should be mutation-verified: put the bug back, confirm the test fails.
+
+## Branches: dev is where work lands, main is prod
+
+`dev` is the default branch and the only one to commit to. `main` is production —
+Railway and Vercel both deploy from it.
+
+**Promote with `make promote`, never by merging a dev→main PR.** A PR merge writes
+a merge commit onto `main` that `dev` does not have, so `main` ends up AHEAD of
+`dev` by one commit per release while the two trees stay byte-identical. Sixteen of
+those accumulated before anyone noticed. It is only bookkeeping, but it makes "is
+prod behind?" unanswerable at a glance, which is the single question `main` exists
+to answer.
+
+`make promote` fast-forwards instead, so `main` is always a PREFIX of `dev`'s
+history — behind or equal, never ahead. It refuses to run on uncommitted changes,
+refuses if `main` is not an ancestor of `dev` (someone committed to `main`
+directly), and refuses unless CI is green for that exact `dev` commit, so prod
+ships what CI vouched for rather than what happens to be on disk.
+
+Delete every branch after merge except `main`, `dev` and `stage`. The repo has
+`delete_branch_on_merge` enabled, so this is automatic for PR merges.
