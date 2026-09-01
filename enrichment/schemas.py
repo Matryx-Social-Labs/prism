@@ -213,7 +213,19 @@ class PriceImpact(BaseModel):
 
 
 class FinanceLens(BaseModel):
-    tickers: list[str] = Field(default_factory=list, description="Ticker symbols, e.g. NVDA")
+    # The description travels into the JSON schema the model is given, so it is
+    # the last place to say this before the output exists. Measured in production:
+    # this field collected the lens's own FIELD NAMES (`PRICE_IMPACT`, `SECTOR`,
+    # `CATALYST`), values belonging to its neighbours (`MIXED`, `0.5`), company
+    # nicknames (`HUL`, `BOB`, `CITI`) and three entire refusal sentences.
+    tickers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Exchange ticker symbols exactly as listed, e.g. NVDA or HINDUNILVR. "
+            "Not nicknames, not indices, not field names, not explanations. "
+            "Return [] when the exact symbol is unknown — [] is a correct answer."
+        ),
+    )
     sector: str | None = Field(default=None, description="e.g. semiconductors, banking")
     catalyst: str | None = Field(
         default=None,

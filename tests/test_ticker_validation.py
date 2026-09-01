@@ -22,7 +22,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.db import get_engine, session_scope
-from common.securities import EXPECTED_MARKETS, normalize, validated
+from common.securities import EXPECTED_MARKETS, looks_like_symbol, normalize, validated
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -350,3 +350,57 @@ async def _cleanup(made) -> None:
             await s.execute(text("DELETE FROM articles WHERE raw_item_id = :r"), {"r": str(rid)})
             await s.execute(text("DELETE FROM raw_items WHERE id = :i"), {"i": str(rid)})
             await s.execute(text("DELETE FROM sources WHERE id = :i"), {"i": str(sid)})
+
+
+# --- the extractor's schema, stored as a ticker --------------------------------
+# Found in production and swept up by the backfill: `PRICE_IMPACT`, `SECTOR`,
+# `CATALYST`, `CONFIDENCE`, `DIRECTION` and `MAGNITUDE` are FinanceLens's own
+# FIELD NAMES; `MIXED`, `MINOR` and `0.5` belong to its neighbouring fields; and
+# three whole refusal sentences were stored as symbols and rendered as chips.
+# The master catches all of them. These tests are about the path where it cannot.
+
+
+async def test_a_refusal_sentence_is_not_a_symbol():
+    """Real: `AJAYDEVGN-PROD-NOT-LISTED-DIRECTLY-SO-NONE-APPLICABLE-BUT-N/A-...`
+    was stored as a ticker. No listed symbol exceeds 10 characters."""
+    assert not looks_like_symbol("AJAYDEVGN-PROD-NOT-LISTED-DIRECTLY-SO-NONE-APPLICABLE")
+    assert not looks_like_symbol("PRICE_IMPACT")   # underscore, and 12 long
+    assert not looks_like_symbol("N/A")            # slash
+    assert not looks_like_symbol("^NSENIFTY")      # caret — an index, not a security
+    assert not looks_like_symbol("0.5")            # a `confidence` value; no letter
+
+
+async def test_the_shape_rule_admits_every_form_a_real_symbol_takes():
+    """Measured off the 15,701 loaded symbols: & - . $ are the only punctuation
+    any of them use. A rule that rejected these would call real listings invented
+    on the very path that exists to avoid exactly that."""
+    # 3MINDIA leads with a digit — nine loaded symbols do, so a symbol may not be
+    # required to START with a letter, only to contain one.
+    for real in ("M&M", "BAJAJ-AUTO", "BRK.A", "AGM$A", "HINDUNILVR", "A", "META", "3MINDIA"):
+        assert looks_like_symbol(real), real
+
+
+async def test_an_unloadable_master_still_refuses_the_lenss_own_field_names():
+    """The honest half of "we cannot check" is not credulity. Without a master we
+    cannot say whether HUL is listed — but we can say `SECTOR` is not a ticker,
+    and shipping it to a reader is not something the outage excuses."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    async with master(markets=()) as s:
+        got = await validated(s, ["SECTOR", "PRICE_IMPACT", "HUL", "0.5"])
+    assert got == ["HUL"], f"schema vocabulary survived a master outage: {got}"
+
+
+async def test_a_real_symbol_that_collides_with_the_schema_survives_a_healthy_master():
+    """`UP` is a `price_impact.direction` value AND Wheels Up Experience on NYSE.
+    The vocabulary rule is a guess about intent; membership is a fact. When the
+    master can answer, the fact wins — otherwise this check would quietly delete
+    a real company's ticker."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    async with master() as s:
+        await s.execute(
+            text("INSERT INTO securities (id, symbol, exchange, name) "
+                 "VALUES (gen_random_uuid(), 'UP', 'NYSE', 'Wheels Up Experience Inc.')"),
+        )
+        assert await validated(s, ["UP"]) == ["UP"]
