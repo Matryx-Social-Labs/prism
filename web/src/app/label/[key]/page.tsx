@@ -128,15 +128,18 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   }, [load]);
 
   const submit = useCallback(
-    async (unsure: boolean) => {
+    async (unsure: boolean, skipped = false) => {
       if (!task || saving) return;
       setSaving(true);
       try {
         await postLabelAnswer(batchKey, {
           task_id: task.id,
           token,
-          selected: [...picked],
+          // A skip carries no opinion, so whatever was ticked is discarded rather
+          // than filed as a judgement nobody meant to give.
+          selected: skipped ? [] : [...picked],
           unsure,
+          skipped,
           ms_spent: Date.now() - startedAt.current,
         });
         await load();
@@ -391,6 +394,21 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
               style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
             >
               Not sure
+            </button>
+            {/* Distinct from "Not sure" on purpose. "Not sure" says the STORY is
+                ambiguous and is read as a signal about the boundary; this says the
+                READER cannot assess it, and routes the task to someone else. 72 of
+                this batch's 123 tasks carry a Kannada, Devanagari or Tamil
+                headline, so without it the only exits were to guess or to mislabel
+                a language barrier as ambiguity. */}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void submit(false, true)}
+              className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
+              style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}
+            >
+              Can&apos;t read this
             </button>
             <span className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
               KEYS 1–{task.candidates.length} TOGGLE · ENTER SUBMITS

@@ -62,7 +62,13 @@ class Answer(BaseModel):
     # Event ids judged to be the SAME story as the seed. An empty list is a real
     # answer — "none of these" — and is stored as one.
     selected: list[uuid.UUID] = []
+    # "I read these and cannot decide" — a claim about the STORY.
     unsure: bool = False
+    # "I cannot read this language" — a claim about the LABELLER. Kept apart from
+    # `unsure` because conflating them makes a genuinely ambiguous boundary
+    # indistinguishable from having asked the wrong person, and the second one is
+    # fixed by routing the task to someone else.
+    skipped: bool = False
     ms_spent: int | None = None
 
 
@@ -276,10 +282,11 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
         text(
             """
             INSERT INTO label_responses
-              (id, task_id, invite_id, labeller, selected, unsure, ms_spent)
-            VALUES (:id, :t, :inv, :l, CAST(:sel AS jsonb), :u, :ms)
+              (id, task_id, invite_id, labeller, selected, unsure, skipped, ms_spent)
+            VALUES (:id, :t, :inv, :l, CAST(:sel AS jsonb), :u, :sk, :ms)
             ON CONFLICT (task_id, invite_id) DO UPDATE
               SET selected = EXCLUDED.selected, unsure = EXCLUDED.unsure,
+                  skipped = EXCLUDED.skipped,
                   ms_spent = EXCLUDED.ms_spent, created_at = now()
             """
         ),
@@ -287,7 +294,7 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
             "id": uuid.uuid4(), "t": body.task_id, "inv": inv["id"],
             "l": inv["name"] or "anonymous",
             "sel": json.dumps([str(x) for x in body.selected]),
-            "u": body.unsure, "ms": body.ms_spent,
+            "u": body.unsure, "sk": body.skipped, "ms": body.ms_spent,
         },
     )
     return {"ok": True}
@@ -324,7 +331,7 @@ async def export(
             text(
                 """
                 SELECT t.position, t.seed_event_id, t.sector, t.candidates,
-                       r.labeller, r.selected, r.unsure, r.ms_spent
+                       r.labeller, r.selected, r.unsure, r.skipped, r.ms_spent
                 FROM label_tasks t
                 LEFT JOIN label_responses r ON r.task_id = t.id
                 WHERE t.batch_id = :b
@@ -345,6 +352,7 @@ async def export(
                 "labeller": r["labeller"],
                 "selected": r["selected"],
                 "unsure": r["unsure"],
+                "skipped": r["skipped"],
                 "ms_spent": r["ms_spent"],
             }
             for r in rows

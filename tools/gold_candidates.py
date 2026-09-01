@@ -392,8 +392,9 @@ async def status(batch_key: str, url: str | None = None) -> None:
         rows = await c.fetch(
             """
             SELECT i.name, i.revoked, i.last_seen_at,
-                   count(r.id) AS done,
-                   count(*) FILTER (WHERE r.unsure) AS unsure
+                   count(r.id) FILTER (WHERE NOT r.skipped) AS done,
+                   count(*) FILTER (WHERE r.unsure) AS unsure,
+                   count(*) FILTER (WHERE r.skipped) AS skipped
             FROM label_invites i
             LEFT JOIN label_responses r ON r.invite_id = i.id
             WHERE i.batch_id = $1
@@ -412,12 +413,15 @@ async def status(batch_key: str, url: str | None = None) -> None:
         seen = r["last_seen_at"].strftime("%d %b %H:%M") if r["last_seen_at"] else "never opened"
         flag = "  REVOKED" if r["revoked"] else ""
         print(f"    {(r['name'] or 'anonymous'):20} {r['done']:>4}/{total}  "
-              f"unsure {r['unsure']:>3}  last seen {seen}{flag}")
+              f"unsure {r['unsure']:>3}  skipped {r['skipped']:>3}  "
+              f"last seen {seen}{flag}")
 
 
-def merge_votes(answers: list[tuple[list[str], bool]], candidates: list[str],
+def merge_votes(answers: list[tuple[list[str], bool, bool]], candidates: list[str],
                 min_agree: float = 0.5) -> tuple[list[str], int]:
     """Turn several people's ticks on ONE task into one verdict.
+
+    Each answer is (selected, unsure, skipped).
 
     Returns (members, n_definite). MERGING IS A JUDGEMENT, which is why it lives
     here in the open rather than inside the export serializer, and why the two
@@ -427,13 +431,17 @@ def merge_votes(answers: list[tuple[list[str], bool]], candidates: list[str],
     entirely instead of counting against inclusion. Treating "I cannot tell" as
     "not the same story" is absence-of-evidence reasoning, which this repo has
     been burned by four separate times and which `content_similarity` returns
-    None to avoid.
+    None to avoid. A SKIP ("I cannot read this language") is excluded for the same
+    reason — it is an answer about the labeller, not about the story. Both
+    exclusions live HERE rather than in the caller: a filter applied upstream is a
+    merge rule with no test attached, and a mutation that let skips vote went
+    unnoticed until this moved in.
 
     A CANDIDATE NEEDS MORE THAN HALF of the definite answers. With one labeller
     that is simply their opinion; the caller is told `n_definite` so a gold set
     resting on single opinions can say so instead of looking like consensus.
     """
-    definite = [sel for sel, unsure in answers if not unsure]
+    definite = [sel for sel, unsure, skipped in answers if not unsure and not skipped]
     if not definite:
         return [], 0
     members = [
@@ -467,7 +475,7 @@ async def compile_from_batch(batch_key: str, url: str | None = None,
         rows = await c.fetch(
             """
             SELECT t.id, t.seed_event_id::text AS seed, t.candidates,
-                   r.selected, r.unsure
+                   r.selected, r.unsure, r.skipped
             FROM label_tasks t
             JOIN label_responses r ON r.task_id = t.id
             JOIN label_invites i ON i.id = r.invite_id
@@ -482,12 +490,15 @@ async def compile_from_batch(batch_key: str, url: str | None = None,
         await c.close()
 
     by_task: dict = {}
+    skips = 0
     for r in rows:
+        skips += bool(r["skipped"])
         cands = json.loads(r["candidates"]) if isinstance(r["candidates"], str) else r["candidates"]
         entry = by_task.setdefault(
             r["id"], {"seed": r["seed"], "cands": [x["id"] for x in cands], "answers": []})
         sel = json.loads(r["selected"]) if isinstance(r["selected"], str) else (r["selected"] or [])
-        entry["answers"].append(([str(x) for x in sel], bool(r["unsure"])))
+        entry["answers"].append(
+            ([str(x) for x in sel], bool(r["unsure"]), bool(r["skipped"])))
 
     stories, singles, empties = [], 0, 0
     for e in by_task.values():
@@ -506,6 +517,8 @@ async def compile_from_batch(batch_key: str, url: str | None = None,
     print(f"  batch {batch_key}: {len(by_task)} of {total_tasks} tasks answered")
     print(f"  {len(stories)} stories, {sum(len(m) + 1 for _, m in stories)} events")
     print(f"  {empties} seeds judged to stand alone (usable negatives)")
+    if skips:
+        print(f"  {skips} response(s) skipped for language — those tasks need a reader")
     if singles:
         print(f"  WARNING: {singles} task(s) rest on ONE labeller — not consensus")
     print()

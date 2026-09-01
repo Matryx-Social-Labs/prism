@@ -407,3 +407,72 @@ async def test_a_revoked_invite_can_no_longer_write():
                      "ON t.id = r.task_id JOIN label_batches b ON b.id = t.batch_id "
                      "WHERE b.key = :k"), {"k": key})).scalar_one()
     assert n == 1, "revoking a labeller deleted their answers"
+
+
+# --- "I cannot read this" is not "I cannot decide" ------------------------------
+# 72 of the first batch's 123 tasks carry a Kannada, Devanagari or Tamil headline.
+# Without a skip the only exits are to guess — noise that later reads as human
+# judgement — or to tick `unsure`, which is a claim about the STORY and is used to
+# find genuinely ambiguous boundaries. Folding them together makes "this pair is
+# ambiguous" indistinguishable from "we asked the wrong person".
+
+
+async def test_a_skip_is_stored_apart_from_unsure():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, tasks = await _batch(1)
+    async with _client() as c:
+        tok = await _join(c, key, "Reader")
+        r = await c.post(f"/api/v1/label/{key}/answer",
+                         json={"task_id": tasks[0], "token": tok,
+                               "selected": [], "skipped": True})
+        assert r.status_code == 200, r.text
+    async with session_scope() as s:
+        row = (await s.execute(
+            text("SELECT unsure, skipped FROM label_responses WHERE task_id = :t"),
+            {"t": tasks[0]})).mappings().one()
+    assert row["skipped"] is True
+    assert row["unsure"] is False, "a language barrier was recorded as story ambiguity"
+
+
+async def test_an_ordinary_answer_is_not_marked_skipped():
+    """The default has to stay false, or every real judgement would be discarded
+    from the vote as though nobody had read it."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, tasks = await _batch(1)
+    async with _client() as c:
+        tok = await _join(c, key, "Reader")
+        await c.post(f"/api/v1/label/{key}/answer",
+                     json={"task_id": tasks[0], "token": tok, "selected": []})
+    async with session_scope() as s:
+        skipped = (await s.execute(
+            text("SELECT skipped FROM label_responses WHERE task_id = :t"),
+            {"t": tasks[0]})).scalar_one()
+    assert skipped is False
+
+
+async def test_a_skipped_task_comes_back_to_nobody_but_is_exported():
+    """A skip is an answer, so the labeller moves on rather than being handed the
+    same unreadable task forever — but the export must still carry it, because
+    that is the record telling you the task needs a different reader."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    from common.config import get_settings
+
+    key, tasks = await _batch(2)
+    async with _client() as c:
+        tok = await _join(c, key, "Reader")
+        first = (await c.get(f"/api/v1/label/{key}/next",
+                             headers={"X-Label-Token": tok})).json()["task"]
+        await c.post(f"/api/v1/label/{key}/answer",
+                     json={"task_id": first["id"], "token": tok,
+                           "selected": [], "skipped": True})
+        nxt = (await c.get(f"/api/v1/label/{key}/next",
+                           headers={"X-Label-Token": tok})).json()["task"]
+        assert nxt["id"] != first["id"], "the unreadable task was served again"
+
+        exported = (await c.get(f"/api/v1/label/{key}/export",
+                                headers={"X-Admin-Token": get_settings().prism_admin_token})).json()
+    skips = [r for r in exported["responses"] if r.get("skipped")]
+    assert len(skips) == 1, "the skip vanished from the export"

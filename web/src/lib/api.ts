@@ -540,7 +540,15 @@ export async function fetchLabelTask(
 
 export async function postLabelAnswer(
   key: string,
-  body: { task_id: string; token: string; selected: string[]; unsure: boolean; ms_spent: number }
+  body: {
+    task_id: string;
+    token: string;
+    selected: string[];
+    unsure: boolean;
+    /** "I cannot read this language" — about the labeller, not about the story. */
+    skipped?: boolean;
+    ms_spent: number;
+  }
 ): Promise<void> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/answer`, {
     method: "POST",
