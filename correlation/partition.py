@@ -271,20 +271,37 @@ def leiden_partition(
 # real story together. Tuning was never going to fix either.
 #
 # So: after Leiden, require CONTENT support for staying together. Two events keep
-# their link only if their headlines share a non-stopword word. This is Story
-# Forest's fine gate (Liu et al., CIKM 2017) at its published n=1, and n=1 is also
-# what measured best here, against tools/gold_stories:
+# their link only if their headlines share a non-stopword word — Story Forest's
+# fine gate (Liu et al., CIKM 2017) at its published n=1.
 #
-#   gate      P        R        F1       Cdet     wrong merges   wrong splits
-#   none      0.2245   0.9041   0.3597   1.1676   228            7
-#   n >= 1    0.3367   0.9041   0.4907   0.7069   130            7     <- shipped
-#   n >= 2    0.4286   0.4110   0.4196   0.7771    40           43
-#   n >= 3    0.7500   0.1233   0.2118   0.8908     3           64
+# HONEST EFFECT SIZE. A first measurement claimed this cut wrong merges 43%. That
+# was WRONG and the error is worth naming, because it is easy to repeat: the gate
+# was applied to a `labels` dict pre-filtered to the 49 gold events, so union-find
+# ran over tiny sub-slices and never saw the chains that hold a real blob together.
+# Restricting the INPUT to the evaluation set inflates any splitting rule.
 #
-# n=1 cuts wrong merges 43% for ZERO recall (false negatives stay at exactly 7, and
-# gold stories split across groups stays 2/25). That is a gate dropping only bad
-# edges, not a precision/recall trade — which is what makes it safe to ship where
-# the headline gate of #131 was not.
+# Swept properly over the full 18,621-event partition, one snapshot, floor x gate:
+#
+#    floor gate  edges  max  >25  mean |      P      R     F1   Cdet   fp   fn
+#     0.15  off   1347   72   12  6.17 | 0.2324 0.9041 0.3697 1.1206  218    7
+#     0.15   ON   1347   72   10  6.93 | 0.2324 0.9041 0.3697 1.1206  218    7
+#     0.20   ON   1065   62    8  6.17 | 0.2557 0.7671 0.3836 0.9990  163   17
+#     0.30   ON    699   44    4  4.70 | 0.2460 0.4247 0.3116 1.0219   95   42
+#     0.50  off    402   29    1  3.18 | 0.4833 0.3973 0.4361 0.7485   31   44
+#     0.50   ON    402   29    1  3.20 | 0.5179 0.3973 0.4496 0.7296   27   44  <- live
+#     0.80   ON    159   10    0  2.60 | 0.6667 0.0822 0.1463 0.9319    3   67
+#
+# Read it as: the FLOOR does the work (Cdet 1.12 -> 0.75), and the gate is a small
+# free refinement on top of it (fp 31 -> 27, Cdet 0.7485 -> 0.7296, recall
+# untouched). At floors <= 0.30 the gate changes NOTHING on the labelled slice —
+# the blobs are chained together through overlapping headlines, so transitivity
+# defeats it. It is worth keeping because it is monotone and costs no recall, not
+# because it is the fix.
+#
+# THE REAL OPEN PROBLEM IS RECALL: 0.3973, with 44 wrong splits and 6 of 25 gold
+# stories broken across groups. Nothing in the sweep buys precision and recall at
+# once, which is the resolution limit showing through. That needs CPM (which is
+# resolution-limit free) or per-topic best-parent attachment, not another floor.
 CONTENT_MIN_SIM = 0.20      # headline content-word overlap an edge must clear
 CONTENT_MIN_SHARED_WORDS = 1  # kept for _content_linked's callers/tests
 
