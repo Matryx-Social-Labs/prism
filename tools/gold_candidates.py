@@ -415,6 +415,105 @@ async def status(batch_key: str, url: str | None = None) -> None:
               f"unsure {r['unsure']:>3}  last seen {seen}{flag}")
 
 
+def merge_votes(answers: list[tuple[list[str], bool]], candidates: list[str],
+                min_agree: float = 0.5) -> tuple[list[str], int]:
+    """Turn several people's ticks on ONE task into one verdict.
+
+    Returns (members, n_definite). MERGING IS A JUDGEMENT, which is why it lives
+    here in the open rather than inside the export serializer, and why the two
+    rules it encodes are stated rather than assumed:
+
+    UNSURE IS NOT A "NO". An unsure answer is dropped from the denominator
+    entirely instead of counting against inclusion. Treating "I cannot tell" as
+    "not the same story" is absence-of-evidence reasoning, which this repo has
+    been burned by four separate times and which `content_similarity` returns
+    None to avoid.
+
+    A CANDIDATE NEEDS MORE THAN HALF of the definite answers. With one labeller
+    that is simply their opinion; the caller is told `n_definite` so a gold set
+    resting on single opinions can say so instead of looking like consensus.
+    """
+    definite = [sel for sel, unsure in answers if not unsure]
+    if not definite:
+        return [], 0
+    members = [
+        c for c in candidates
+        if sum(1 for sel in definite if c in sel) / len(definite) > min_agree
+    ]
+    return members, len(definite)
+
+
+async def compile_from_batch(batch_key: str, url: str | None = None,
+                             min_agree: float = 0.5) -> None:
+    """Build a gold_stories block from what people actually answered on the page.
+
+    The offline `--compile` path reads a decisions file written by the local HTML
+    review page — one person, one browser. This reads the batch every labeller
+    worked through, which is the only path that exists once the work is shared out.
+
+    Revoked labellers are excluded HERE, which is the other half of `--revoke`:
+    their answers are kept in the table as a record and simply do not vote.
+    """
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        await c.execute("SET default_transaction_read_only = on")
+        bid = await c.fetchval("SELECT id FROM label_batches WHERE key = $1", batch_key)
+        if bid is None:
+            raise SystemExit(f"no batch with key {batch_key}")
+        rows = await c.fetch(
+            """
+            SELECT t.id, t.seed_event_id::text AS seed, t.candidates,
+                   r.selected, r.unsure
+            FROM label_tasks t
+            JOIN label_responses r ON r.task_id = t.id
+            JOIN label_invites i ON i.id = r.invite_id
+            WHERE t.batch_id = $1 AND NOT i.revoked
+            ORDER BY t.position
+            """,
+            bid,
+        )
+        total_tasks = await c.fetchval(
+            "SELECT count(*) FROM label_tasks WHERE batch_id = $1", bid)
+    finally:
+        await c.close()
+
+    by_task: dict = {}
+    for r in rows:
+        cands = json.loads(r["candidates"]) if isinstance(r["candidates"], str) else r["candidates"]
+        entry = by_task.setdefault(
+            r["id"], {"seed": r["seed"], "cands": [x["id"] for x in cands], "answers": []})
+        sel = json.loads(r["selected"]) if isinstance(r["selected"], str) else (r["selected"] or [])
+        entry["answers"].append(([str(x) for x in sel], bool(r["unsure"])))
+
+    stories, singles, empties = [], 0, 0
+    for e in by_task.values():
+        members, n = merge_votes(e["answers"], e["cands"], min_agree)
+        if n == 0:
+            continue
+        if n == 1:
+            singles += 1
+        if not members:
+            # A real answer: "none of these belong". Kept out of the story block
+            # but counted, because a seed nobody linked is a usable negative.
+            empties += 1
+            continue
+        stories.append((e["seed"], members))
+
+    print(f"  batch {batch_key}: {len(by_task)} of {total_tasks} tasks answered")
+    print(f"  {len(stories)} stories, {sum(len(m) + 1 for _, m in stories)} events")
+    print(f"  {empties} seeds judged to stand alone (usable negatives)")
+    if singles:
+        print(f"  WARNING: {singles} task(s) rest on ONE labeller — not consensus")
+    print()
+    for n, (seed, members) in enumerate(sorted(stories), 1):
+        print(f'    "corpus-{n:03d}": {json.dumps([seed, *members])},')
+    print("\n  paste into tools/gold_stories.STORIES, keeping the existing CJP slice")
+
+
 def compile_gold() -> None:
     """Turn exported decisions into a gold_stories block, ready to paste.
 
@@ -500,6 +599,10 @@ def main() -> None:
     ap.add_argument("--batch", metavar="KEY", help="batch key for --invite/--revoke/--status")
     ap.add_argument("--revoke", metavar="NAME", help="withdraw one labeller's credential")
     ap.add_argument("--status", action="store_true", help="who was invited and how far they got")
+    ap.add_argument("--compile-batch", metavar="KEY",
+                    help="build a gold block from what labellers answered on the page")
+    ap.add_argument("--min-agree", type=float, default=0.5,
+                    help="fraction of definite answers a candidate needs (default 0.5)")
     ap.add_argument("--site", default="https://www.readprism.news",
                     help="origin to print in invite links")
     a = ap.parse_args()
@@ -531,8 +634,12 @@ def main() -> None:
         asyncio.run(status(a.batch, a.db))
     if a.compile:
         compile_gold()
+    if a.compile_batch:
+        import asyncio
+
+        asyncio.run(compile_from_batch(a.compile_batch, a.db, a.min_agree))
     if not (a.propose or a.review or a.compile or a.push or a.invite
-            or a.revoke or a.status):
+            or a.revoke or a.status or a.compile_batch):
         ap.print_help()
 
 

@@ -107,3 +107,60 @@ def test_candidates_agreed_by_more_proposers_come_first():
     )
     got = _neighbours(snap, _postings(snap), {}, 0)
     assert len(got[0][1]) >= len(got[-1][1]), "weakest-supported candidate ranked first"
+
+
+# --- turning several people's ticks into one verdict ---------------------------
+# This is the step that decides what the gold set SAYS, and every story-layer
+# measurement is scored against it. Both rules below are judgements, so they are
+# stated and tested rather than assumed inside a serializer.
+
+from tools.gold_candidates import merge_votes  # noqa: E402
+
+
+def test_a_candidate_needs_more_than_half_of_the_definite_answers():
+    answers = [(["b"], False), (["b"], False), ([], False)]
+    members, n = merge_votes(answers, ["b", "c"])
+    assert members == ["b"] and n == 3
+
+
+def test_an_exact_tie_does_not_carry():
+    """Two people, one tick each way, is not agreement. Admitting it would let a
+    coin-flip enter the set as evidence."""
+    assert merge_votes([(["b"], False), ([], False)], ["b"])[0] == []
+
+
+def test_unsure_is_dropped_from_the_denominator_not_counted_as_no():
+    """`unsure` means "I cannot tell", and counting it against inclusion is
+    absence-of-evidence reasoning — the failure this repo has hit four times and
+    the reason content_similarity returns None rather than 0.0.
+
+    One definite yes plus two unsures is a yes on the evidence available. Were
+    unsure a "no", 1/3 would fall under the bar and a real link would be lost.
+    """
+    answers = [(["b"], False), ([], True), ([], True)]
+    members, n = merge_votes(answers, ["b"])
+    assert members == ["b"] and n == 1
+
+
+def test_a_task_everyone_was_unsure_about_yields_no_verdict():
+    """Zero definite answers must not read as "nobody linked these" — that is a
+    verdict the data cannot support. The caller sees n=0 and skips the task."""
+    assert merge_votes([([], True), ([], True)], ["b"]) == ([], 0)
+
+
+def test_a_single_labeller_is_reported_as_such():
+    """Their answer stands, but the count is what lets the compile step say which
+    part of the gold set is one opinion rather than consensus."""
+    assert merge_votes([(["b"], False)], ["b", "c"]) == (["b"], 1)
+
+
+def test_an_empty_selection_is_a_real_verdict_not_a_missing_one():
+    """"None of these belong" is evidence: the seed was SEEN and rejected, which
+    is what makes it usable as a negative."""
+    assert merge_votes([([], False), ([], False)], ["b", "c"]) == ([], 2)
+
+
+def test_only_candidates_offered_can_be_returned():
+    """A selection naming something not on the task cannot enter the story — it
+    would put an event in the gold set that no labeller was ever shown."""
+    assert merge_votes([(["zzz"], False)], ["b"])[0] == []
