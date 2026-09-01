@@ -308,7 +308,8 @@ async def push(name: str, url: str | None = None) -> None:
     print(f"  share this link:  /label/{key}")
 
 
-async def invite(batch_key: str, names: list[str], url: str | None = None) -> None:
+async def invite(batch_key: str, names: list[str], url: str | None = None,
+                 site: str = "https://www.readprism.news") -> None:
     """Mint one credential per named person, for a batch where who answers matters.
 
     The alternative path is self-join: share the batch link and every visitor is
@@ -334,11 +335,84 @@ async def invite(batch_key: str, names: list[str], url: str | None = None) -> No
                 "INSERT INTO label_invites (id, token, batch_id, name) VALUES ($1,$2,$3,$4)",
                 uuid.uuid4(), tok, bid, name,
             )
-            print(f"  {name:20} /label/{batch_key}#{tok}")
+            print(f"  {name:20} {site}/label/{batch_key}#{tok}")
+        # Inviting anyone CLOSES self-join. Otherwise the batch key still admits
+        # every visitor who receives a forwarded link, and the named invites are
+        # decoration on an open door — you would have attribution for the people
+        # you asked and none for anyone else.
+        await c.execute("UPDATE label_batches SET self_join = false WHERE id = $1", bid)
     finally:
         await c.close()
-    print("\n  The part after # is the credential — it stays in the browser and is")
-    print("  never sent to the server as part of the URL.")
+    print("\n  Send each person only their own line. The part after # is their")
+    print("  credential: browsers never send a fragment to the server, so it stays")
+    print("  out of access logs and Referer headers, and the page clears it from the")
+    print("  address bar once claimed.")
+    print("  Self-join is now OFF for this batch — only these people can label.")
+
+
+async def revoke(batch_key: str, name: str, url: str | None = None) -> None:
+    """Withdraw one person's credential without disturbing anyone else's.
+
+    Their answers are KEPT, not deleted. A revoked labeller is usually someone
+    whose judgements you no longer want to weight, and that is a decision for the
+    compile step where it can be seen and argued with — deleting the rows here
+    would silently change a measurement everyone downstream treats as data.
+    """
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=60)
+    try:
+        n = await c.fetchval(
+            "WITH d AS (UPDATE label_invites i SET revoked = true "
+            "FROM label_batches b WHERE b.id = i.batch_id AND b.key = $1 AND i.name = $2 "
+            "AND NOT i.revoked RETURNING 1) SELECT count(*) FROM d",
+            batch_key, name,
+        )
+    finally:
+        await c.close()
+    print(f"  revoked {n} invite(s) for {name!r}" if n else f"  no active invite named {name!r}")
+
+
+async def status(batch_key: str, url: str | None = None) -> None:
+    """Who was invited, who has actually answered, and how far each has got."""
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=60)
+    try:
+        await c.execute("SET default_transaction_read_only = on")
+        b = await c.fetchrow(
+            "SELECT id, name, open, self_join FROM label_batches WHERE key = $1", batch_key)
+        if b is None:
+            raise SystemExit(f"no batch with key {batch_key}")
+        total = await c.fetchval("SELECT count(*) FROM label_tasks WHERE batch_id = $1", b["id"])
+        rows = await c.fetch(
+            """
+            SELECT i.name, i.revoked, i.last_seen_at,
+                   count(r.id) AS done,
+                   count(*) FILTER (WHERE r.unsure) AS unsure
+            FROM label_invites i
+            LEFT JOIN label_responses r ON r.invite_id = i.id
+            WHERE i.batch_id = $1
+            GROUP BY i.id, i.name, i.revoked, i.last_seen_at
+            ORDER BY count(r.id) DESC, i.name
+            """,
+            b["id"],
+        )
+    finally:
+        await c.close()
+    gate = "OPEN to anyone with the link" if b["self_join"] else "invite-only"
+    print(f"  {b['name']!r}: {total} tasks, {gate}, {'accepting' if b['open'] else 'CLOSED'}")
+    if not rows:
+        print("  nobody has been invited or joined yet")
+    for r in rows:
+        seen = r["last_seen_at"].strftime("%d %b %H:%M") if r["last_seen_at"] else "never opened"
+        flag = "  REVOKED" if r["revoked"] else ""
+        print(f"    {(r['name'] or 'anonymous'):20} {r['done']:>4}/{total}  "
+              f"unsure {r['unsure']:>3}  last seen {seen}{flag}")
 
 
 def compile_gold() -> None:
@@ -423,7 +497,11 @@ def main() -> None:
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     ap.add_argument("--invite", nargs="+", metavar="NAME",
                     help="mint a named credential each, for a batch (needs --batch)")
-    ap.add_argument("--batch", metavar="KEY", help="batch key for --invite")
+    ap.add_argument("--batch", metavar="KEY", help="batch key for --invite/--revoke/--status")
+    ap.add_argument("--revoke", metavar="NAME", help="withdraw one labeller's credential")
+    ap.add_argument("--status", action="store_true", help="who was invited and how far they got")
+    ap.add_argument("--site", default="https://www.readprism.news",
+                    help="origin to print in invite links")
     a = ap.parse_args()
     if a.propose:
         propose(a.seeds)
@@ -438,10 +516,23 @@ def main() -> None:
 
         if not a.batch:
             raise SystemExit("--invite needs --batch <key>")
-        asyncio.run(invite(a.batch, a.invite, a.db))
+        asyncio.run(invite(a.batch, a.invite, a.db, a.site))
+    if a.revoke:
+        import asyncio
+
+        if not a.batch:
+            raise SystemExit("--revoke needs --batch <key>")
+        asyncio.run(revoke(a.batch, a.revoke, a.db))
+    if a.status:
+        import asyncio
+
+        if not a.batch:
+            raise SystemExit("--status needs --batch <key>")
+        asyncio.run(status(a.batch, a.db))
     if a.compile:
         compile_gold()
-    if not (a.propose or a.review or a.compile or a.push or a.invite):
+    if not (a.propose or a.review or a.compile or a.push or a.invite
+            or a.revoke or a.status):
         ap.print_help()
 
 

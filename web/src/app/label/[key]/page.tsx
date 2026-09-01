@@ -63,10 +63,28 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
 
   // The name is remembered so someone resuming tomorrow is served the tasks they
   // have not done, rather than starting over as a stranger.
+  //
+  // An invited labeller arrives as /label/<batch>#<token>. THE FRAGMENT IS WHY:
+  // browsers never send it to the server, so a named credential does not appear
+  // in access logs, in a Referer header, or in an upstream proxy's history the way
+  // a path or query segment would. It is claimed into localStorage on arrival and
+  // then stripped from the address bar, so a shared screenshot of a working
+  // session carries nothing either.
+  //
+  // Without this the invite path was silently dead: `tools/gold_candidates.py
+  // invite` printed these URLs, the page ignored the fragment, and the person fell
+  // through to the join form and self-joined as a stranger — so the named identity
+  // that was minted for them was never the one their answers were recorded under.
   useEffect(() => {
     if (!batchKey) return;
     try {
-      const savedTok = window.localStorage.getItem(TOKEN_KEY(batchKey));
+      const invited = window.location.hash.replace(/^#/, "").trim();
+      if (invited) {
+        window.localStorage.setItem(TOKEN_KEY(batchKey), invited);
+        window.history.replaceState(null, "", window.location.pathname);
+        setToken(invited);
+      }
+      const savedTok = invited || window.localStorage.getItem(TOKEN_KEY(batchKey));
       const savedWho = window.localStorage.getItem(WHO_KEY);
       if (savedTok) setToken(savedTok);
       if (savedWho) setWho(savedWho);
@@ -84,6 +102,12 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         fetchLabelTask(batchKey, token),
       ]);
       setBatch(b);
+      // The server knows who this credential belongs to; localStorage only knows
+      // what someone last typed. An invited labeller has a name bound to their
+      // invite before they ever open the link, so the server's answer wins — the
+      // greeting must not be able to disagree with the name their answers are
+      // recorded under.
+      if (b.labeller) setWho(b.labeller);
       setPicked(new Set());
       startedAt.current = Date.now();
       if (t.closed) setState("closed");
