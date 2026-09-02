@@ -350,6 +350,93 @@ async def invite(batch_key: str, names: list[str], url: str | None = None,
     print("  Self-join is now OFF for this batch — only these people can label.")
 
 
+def pair_agreement(a: tuple[list[str], bool, bool],
+                   b: tuple[list[str], bool, bool]) -> str | None:
+    """How two people's answers on ONE task relate. None when not comparable.
+
+    A pair is only comparable when BOTH gave a definite verdict. An `unsure` or a
+    skip is not a quiet "no" — scoring it as disagreement would punish the two
+    honest answers the form provides, and scoring it as agreement would
+    manufacture consensus out of two people declining to answer.
+    """
+    (sel_a, u_a, sk_a), (sel_b, u_b, sk_b) = a, b
+    if u_a or sk_a or u_b or sk_b:
+        return None
+    return "agree" if set(sel_a) == set(sel_b) else "disagree"
+
+
+async def agreement(batch_key: str, url: str | None = None) -> None:
+    """Do the labellers actually mean the same thing by "same story"?
+
+    Worth measuring before trusting any of it. On the first five overlapping
+    tasks, two labellers agreed once and disagreed once — and the disagreement was
+    that one grouped two events because they shared an ORGANISATION. That is the
+    exact signal the story layer already over-weights, so a gold set encoding it
+    would reward the behaviour the rebuild exists to change.
+
+    EXACT-SET agreement, deliberately harsh. Partial credit would report a
+    comfortable number while hiding whether two people draw the boundary in the
+    same place, which is the only thing being asked.
+    """
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        await c.execute("SET default_transaction_read_only = on")
+        rows = await c.fetch(
+            """
+            SELECT t.position, i.name, r.selected, r.unsure, r.skipped
+            FROM label_responses r
+            JOIN label_tasks t ON t.id = r.task_id
+            JOIN label_invites i ON i.id = r.invite_id
+            JOIN label_batches b ON b.id = t.batch_id
+            WHERE b.key = $1 AND NOT i.revoked
+            ORDER BY t.position
+            """,
+            batch_key,
+        )
+    finally:
+        await c.close()
+
+    by_task: dict = {}
+    for r in rows:
+        sel = json.loads(r["selected"]) if isinstance(r["selected"], str) else (r["selected"] or [])
+        by_task.setdefault(r["position"], {})[r["name"] or "anonymous"] = (
+            [str(x) for x in sel], bool(r["unsure"]), bool(r["skipped"]))
+
+    pairs: dict = {}
+    for pos, who in sorted(by_task.items()):
+        names = sorted(who)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                verdict = pair_agreement(who[a], who[b])
+                rec = pairs.setdefault((a, b), {"agree": 0, "disagree": 0, "skip": 0,
+                                                "where": []})
+                if verdict is None:
+                    rec["skip"] += 1
+                else:
+                    rec[verdict] += 1
+                    if verdict == "disagree":
+                        rec["where"].append(pos)
+
+    if not pairs:
+        raise SystemExit("no task has been answered by two labellers yet")
+    print(f"  {len(by_task)} tasks answered; {sum(1 for w in by_task.values() if len(w) > 1)} "
+          "seen by more than one person\n")
+    for (a, b), r in sorted(pairs.items()):
+        n = r["agree"] + r["disagree"]
+        rate = f"{r['agree'] / n:.0%}" if n else "n/a"
+        print(f"  {a} vs {b}")
+        print(f"    comparable {n:>3}   agree {r['agree']:>3} ({rate})   "
+              f"disagree {r['disagree']:>3}   not comparable {r['skip']:>3}")
+        if n and n < 10:
+            print(f"    too few to mean anything yet — {10 - n} more shared tasks would help")
+        if r["where"]:
+            print(f"    disagreed on positions: {r['where'][:12]}")
+
+
 async def revoke(batch_key: str, name: str, url: str | None = None) -> None:
     """Withdraw one person's credential without disturbing anyone else's.
 
@@ -612,6 +699,8 @@ def main() -> None:
     ap.add_argument("--batch", metavar="KEY", help="batch key for --invite/--revoke/--status")
     ap.add_argument("--revoke", metavar="NAME", help="withdraw one labeller's credential")
     ap.add_argument("--status", action="store_true", help="who was invited and how far they got")
+    ap.add_argument("--agreement", action="store_true",
+                    help="do the labellers mean the same thing? pairwise, exact-set")
     ap.add_argument("--compile-batch", metavar="KEY",
                     help="build a gold block from what labellers answered on the page")
     ap.add_argument("--min-agree", type=float, default=0.5,
@@ -645,6 +734,12 @@ def main() -> None:
         if not a.batch:
             raise SystemExit("--status needs --batch <key>")
         asyncio.run(status(a.batch, a.db))
+    if a.agreement:
+        import asyncio
+
+        if not a.batch:
+            raise SystemExit("--agreement needs --batch <key>")
+        asyncio.run(agreement(a.batch, a.db))
     if a.compile:
         compile_gold()
     if a.compile_batch:
@@ -652,7 +747,7 @@ def main() -> None:
 
         asyncio.run(compile_from_batch(a.compile_batch, a.db, a.min_agree))
     if not (a.propose or a.review or a.compile or a.push or a.invite
-            or a.revoke or a.status or a.compile_batch):
+            or a.revoke or a.status or a.compile_batch or a.agreement):
         ap.print_help()
 
 

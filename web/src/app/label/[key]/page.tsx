@@ -44,6 +44,70 @@ function provenance(e: LabelEvent): string {
   return bits.join("  ·  ");
 }
 
+
+// The rule people actually get wrong, shown rather than asserted.
+//
+// "Same topic is not enough" is abstract, and a careful labeller acting in good
+// faith still grouped two stories because they shared an ORGANISATION. That is
+// not carelessness — it is the intuitive reading, and it is the one thing this
+// gold set must not encode, because a shared actor is what the clustering
+// already over-weights and what the whole measurement exists to test.
+//
+// The examples are INVENTED. Using a real pair from the batch would hand the
+// answer to whoever meets it later and quietly contaminate that task.
+function Guide({ open = false }: { open?: boolean }) {
+  return (
+    <details
+      open={open}
+      className="mt-6 border-t pt-5"
+      style={{ borderColor: "var(--line)" }}
+    >
+      <summary className="cursor-pointer text-[14.5px] font-medium" style={{ color: "var(--ink)" }}>
+        How to decide
+      </summary>
+      <div className="mt-4 space-y-5">
+        <div className="border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
+          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+            THE SAME STORY — TICK IT
+          </p>
+          <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
+            &ldquo;Cricketer handed 8-year ban for corruption&rdquo;
+          </p>
+          <p className="text-[14.5px]" style={{ color: "var(--ink)" }}>
+            &ldquo;ICC bans USA player for eight years&rdquo;
+          </p>
+          <p className="mt-2 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+            One happening, reported twice. Different words, different outlet, same event.
+          </p>
+        </div>
+
+        <div className="border-l pl-4" style={{ borderColor: "var(--line-strong)" }}>
+          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+            NOT THE SAME STORY — LEAVE IT
+          </p>
+          <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            &ldquo;State bank signs rural credit deal with farm body&rdquo;
+          </p>
+          <p className="text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            &ldquo;State bank survey finds rural incomes flat&rdquo;
+          </p>
+          <p className="mt-2 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+            The same organisation doing two unrelated things. A shared name is not a
+            shared story — this is the one most people tick by mistake.
+          </p>
+        </div>
+
+        <p className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          Ask: <strong style={{ color: "var(--ink)" }}>would one follow the other in a
+          single running account of events?</strong> If it is just the same subject,
+          the same place or the same person, leave it. Ticking nothing is a real and
+          useful answer.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 export default function LabelPage({ params }: { params: Promise<{ key: string }> }) {
   const [batchKey, setBatchKey] = useState("");
   const [who, setWho] = useState("");
@@ -250,6 +314,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         <p className="mt-4 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
           YOUR NAME IS ONLY USED TO REMEMBER WHERE YOU GOT TO
         </p>
+        <Guide open />
       </Shell>
     );
   }
@@ -420,6 +485,11 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             stories. <strong>Not sure</strong> is a real answer; it keeps genuinely hard
             calls out of the training data rather than guessing at them.
           </p>
+
+          {/* An INVITED labeller never sees the join screen, so this is the only
+              route the worked example has to them. Collapsed, because it is
+              reference rather than instruction once you are going. */}
+          <Guide />
         </>
       )}
     </Shell>

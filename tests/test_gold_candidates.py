@@ -180,3 +180,37 @@ def test_a_task_everyone_skipped_yields_no_verdict():
     different reader, and reporting it as a negative would bake a language barrier
     into the gold set as a story judgement."""
     assert merge_votes([([], False, True), ([], False, True)], ["b"]) == ([], 0)
+
+
+# --- do two labellers mean the same thing by "same story"? ---------------------
+
+from tools.gold_candidates import pair_agreement  # noqa: E402
+
+
+def test_the_same_set_agrees_regardless_of_order():
+    assert pair_agreement((["b", "c"], False, False), (["c", "b"], False, False)) == "agree"
+
+
+def test_two_people_ticking_nothing_agree():
+    """"None of these" twice is real consensus, not two absences — both saw the
+    task and rejected every candidate."""
+    assert pair_agreement(([], False, False), ([], False, False)) == "agree"
+
+
+def test_a_subset_is_a_disagreement_not_partial_credit():
+    """Exact-set on purpose. Partial credit reports a comfortable number while
+    hiding whether two people draw the BOUNDARY in the same place, which is the
+    only thing being asked."""
+    assert pair_agreement((["b", "c"], False, False), (["b"], False, False)) == "disagree"
+
+
+def test_an_unsure_makes_the_pair_incomparable():
+    """Not a quiet "no". Scoring it as disagreement punishes an honest answer;
+    scoring it as agreement manufactures consensus from two people declining."""
+    assert pair_agreement((["b"], False, False), ([], True, False)) is None
+    assert pair_agreement(([], True, False), ([], True, False)) is None
+
+
+def test_a_skip_makes_the_pair_incomparable():
+    """Same reasoning, different cause: one of them could not read it."""
+    assert pair_agreement((["b"], False, False), ([], False, True)) is None
