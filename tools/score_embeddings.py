@@ -102,6 +102,7 @@ import json
 import os
 import re
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 SNAPSHOT = Path(".cache/script_titles.json.gz")
@@ -201,13 +202,29 @@ def _embed(model_name: str, texts: list[str]):
     otherwise. Several candidates — LaBSE, Vyakyarth, mE5-base — are not in
     fastembed's registry, and requiring an ONNX export just to RULE ONE OUT would
     make the bake-off cost more than the decision is worth."""
+    return _loaded(model_name)(texts)
+
+
+@lru_cache(maxsize=4)
+def _loaded(model_name: str):
+    """Build each model ONCE.
+
+    This used to construct the model inside `_embed`, so every call paid for it
+    again — and for a model outside fastembed's registry that means
+    SentenceTransformer re-fetching ~1.1GB of torch weights. Twelve calls into
+    tools/score_crosslingual_news it had produced a header and nothing else, and
+    it read as a hang rather than as repeated downloads, because the progress bars
+    go to stderr and the table only prints once a script finishes.
+    """
     from fastembed import TextEmbedding
 
     if model_name in {m["model"] for m in TextEmbedding.list_supported_models()}:
-        return list(TextEmbedding(model_name).embed(texts))
+        model = TextEmbedding(model_name)
+        return lambda texts: list(model.embed(texts))
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(model_name, trust_remote_code=True).encode(
+    model = SentenceTransformer(model_name, trust_remote_code=True)
+    return lambda texts: model.encode(
         texts, normalize_embeddings=True, batch_size=32, show_progress_bar=False
     )
 

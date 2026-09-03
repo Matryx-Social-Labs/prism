@@ -19,6 +19,38 @@ independent of embeddings (EMBEDDING_TRUSTED_SCRIPTS excludes them, so those
 events were formed by shared actors). For Devanagari the embedding contributed,
 which biases the INCUMBENT optimistically — the safe direction for judging a
 challenger.
+
+MEASURED 2026-09-03, 163 pairs from the frozen corpus, through the PRODUCTION
+fastembed path (common/embeddings), not sentence-transformers:
+
+    script       pairs   mpnet P@1   mE5 P@1
+    devanagari     143       0.483     0.531
+    kannada         18       0.444     0.778
+    tamil            2    too few    too few
+
+mE5 wins on both — but only with the right instruction prefix, and that turned
+out to be the whole story. E5 is asymmetric by design, and the SAME comparison
+scored three different ways depending on which prefix each side got:
+
+    script       passage:/passage:   query:/query:   query:/passage:
+    devanagari               0.399           0.531             0.531
+    kannada                  0.611           0.778             0.667
+
+`embed_texts_sync` stamps `passage:` on every document, which is right for search
+(a query against a corpus) and wrong for clustering, where two ARTICLES are
+compared to each other and E5's own guidance is `query:` on both sides. The
+production prefix is the worst of the three here, costing ~30% relative P@1.
+
+That is not currently biting: the incumbent mpnet takes no prefix at all, so the
+code path is inert. It would bite silently the day mE5 ships — and it nearly
+killed the swap, because a first pass through the production path made mE5 look
+WORSE than mpnet on Devanagari (0.399 vs 0.483) when in fact it is better.
+
+The unresolved part is that ONE stored vector serves both jobs: article_chunks
+feed asymmetric RAG retrieval and events feed symmetric clustering. A single
+prefix cannot be right for both, so this is a design decision — store for search
+and lose clustering quality, store for clustering and prefix search queries
+symmetrically too, or store twice — not a one-line fix.
 """
 
 from __future__ import annotations

@@ -22,6 +22,25 @@ _CUSTOM = {
 # E5 REQUIRES an instruction prefix and is measurably worse without one. The
 # failure is silent: embeddings still come out, just weaker, which reads as "the
 # model is bad" rather than "we used it wrong".
+#
+# WHICH prefix is an open decision, and it is worth more than it looks. Measured
+# 2026-09-03 on the production model over 163 cross-lingual news pairs
+# (tools/score_crosslingual_news, which carries the full table):
+#
+#     script       passage:/passage:   query:/query:
+#     devanagari               0.399           0.531      P@1
+#     kannada                  0.611           0.778
+#
+# `passage:` on both sides — what embed_texts_sync does — is the WORST option for
+# clustering, costing ~30% relative P@1, because comparing two articles is a
+# SYMMETRIC task and E5 wants `query:` on both. It is right for search, which is
+# asymmetric. One stored vector serves both jobs here (article_chunks for RAG,
+# events for clustering), so a single prefix cannot satisfy both and the choice
+# needs making deliberately rather than by default.
+#
+# INERT TODAY: mpnet takes no prefix, so nothing below runs. It starts mattering
+# the day an E5 model ships, and it nearly killed that swap — the first pass made
+# mE5 look worse than mpnet on Devanagari when it is in fact better.
 _PREFIXED = ("e5",)
 
 
