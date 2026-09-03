@@ -70,6 +70,39 @@ Two findings from this that are solid and do not depend on the gold set:
      positive rate near 1e-3, and AUC 0.91 is nowhere near that. The plan's premise
      that embeddings could carry L2 with entities demoted to a confirm is measured
      false for both encoders tried.
+
+
+MEASURED 2026-09-03 AGAINST THE CORPUS SAMPLE — the first representative
+numbers this project has had, and they change the picture the CJP slice gave:
+
+                                CJP slice      corpus sample
+    v1 (entity graph + Leiden)   F1 0.4541       F1 0.0508
+    embedding distance ALONE     F1 0.3564       F1 0.6324
+    embedding ROC-AUC               0.7994          0.9564
+
+The CJP slice flattered v1 by roughly 9x and it is now clear why. Of 115
+human-judged same-story pairs in the corpus sample, the v1 edge rule admits FOUR:
+
+    gate rejecting the pair      CJP slice   corpus sample
+    < 2 shared actors               21.4%        73.0%
+    IDF weight < 0.30               51.5%        23.5%
+    passes all three                21.4%         3.5%
+    median shared actors               4            1
+
+That is the whole thing. In a dense topic cluster a same-story pair shares four
+actors; across the corpus it shares ONE, and `min_shared=2` is the foundation the
+entire story graph is built on. Leiden never gets a chance — 96.5% of real pairs
+have no edge to merge along, and no resolution or threshold reaches them.
+
+Meanwhile the embedding is TIGHTER on exactly those pairs (median distance 0.377
+vs 0.468 on CJP) and separates them cleanly at AUC 0.956. A single cosine
+threshold — the crudest method available — beats the shipped system twelvefold.
+
+Note the inversion: on the CJP slice embeddings LOSE to the entity graph (0.3564
+vs 0.4541). Both facts are real. Entity overlap genuinely works inside one dense
+topic and collapses outside it, which is why measuring on one topic cluster and
+quoting it as story accuracy is the mistake gold_stories' own docstring warns
+against, and why this file now carries both columns.
 """
 
 from __future__ import annotations
