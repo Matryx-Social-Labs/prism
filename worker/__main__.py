@@ -187,6 +187,22 @@ async def main(stages: list[str]) -> None:
                     stream.CLASSIFIED_ITEMS, "enrichment", handle_classified_item,
                     # Enrichment's cost is the LLM extract (I/O-bound) — parallelize
                     # it so a slow-but-reliable model keeps up with ingest.
+                    #
+                    # IT DOES NOT KEEP UP, measured 2026-09-03 on a cold start after
+                    # a month with ingestion off. Over six minutes: 5,690 raw items
+                    # collected, 637 passed the relevance gate, and 19 became
+                    # articles. The gate approves ~6,000/hour; enrichment consumes
+                    # ~180/hour. A 33x mismatch, so the queue grows ~5,800/hour and
+                    # most of the spend buys triage for work that will never happen
+                    # — $0.40 for 19 usable articles, against a recorded steady-state
+                    # cost of $1.55 per 1,000.
+                    #
+                    # Raising this number is NOT the fix: 12 already-parallel workers
+                    # at ~180/hour means each article takes seconds of wall clock
+                    # (fulltext fetch, then the extract call), so the ceiling is
+                    # per-article latency, not slot count. The fix is either to rate
+                    # the collectors to what enrichment can absorb, or to stop paying
+                    # for gate decisions on a backlog that is never reached.
                     consumer_name=f"enr-{CONSUMER_NAME}", concurrency=12, batch_size=12,
                 )
             )
