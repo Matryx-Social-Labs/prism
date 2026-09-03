@@ -17,6 +17,11 @@ dependencies = [
     "langfuse>=3.0",
     "openai>=1.60",
     "fastembed>=0.5",
+    # Declared, not merely inherited. numpy arrives transitively through
+    # fastembed today, and correlation/partition.py's embedding kNN depends on it
+    # at RUNTIME — a dependency you rely on but do not name is one a lockfile
+    # refresh is free to drop.
+    "numpy>=1.26",
     "feedparser>=6.0",
     "trafilatura>=1.12",
     "apscheduler>=3.10",

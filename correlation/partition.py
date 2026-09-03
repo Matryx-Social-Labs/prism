@@ -57,6 +57,35 @@ logger = get_logger(__name__)
 # CPM's parameter is an absolute density threshold, so it is on the scale of the
 # edge weights (IDF sums), not modularity's 1.0. Do not read 0.020 as "20x finer".
 LEIDEN_RESOLUTION = 0.020
+
+# ── v2 story edges: embedding kNN unioned with the entity edges ──────────────
+#
+# MEASURED 2026-09-03 against the corpus gold set (tools/l2.py carries the full
+# table). v1's entity-only edge rule scores F1 0.0508 on a cross-sector sample
+# because 96.5% of human-judged same-story pairs have NO EDGE to merge along: a
+# same-story pair shares a median of ONE actor across the corpus, and the rule
+# demands two. Inside the CJP topic cluster the median is four, which is why the
+# old slice reported 0.4541 and hid this completely.
+#
+#                       corpus F1   corpus Cdet   CJP F1   max group
+#   v1 (entity only)       0.0508        0.9739   0.4541          23
+#   v2 (union)             0.5930        0.5628   0.3793          17
+#     CV fold A            0.0385 -> 0.6744        fold B  0.0606 -> 0.5116
+#
+# THE ALGORITHM DID NOT CHANGE, only what it is given. Agglomerative RAC — the
+# plan's proposal — was tried across average and complete linkage, union and
+# mutual kNN, k in 3..10, and blobbed every time: max group 316 to 5,214 of 5,413
+# events. The embedding space is a dense continuum and linkage chains through it.
+# CPM is resolution-limit free, and its resolution is exactly what pins max group
+# at 17, inside Story Forest's bound of 25.
+#
+# The resolution moves 0.020 -> 0.20 WITH the edge set and cannot be changed
+# apart from it: ten times the edges at a tenth of the density needs a different
+# scale. veto_config_version folds the resolution in, so verdicts re-vet.
+STORY_EMBED_KNN = 5              # neighbours per event; 10 blobbed (>25 groups)
+STORY_EMBED_EDGE_MAX_DIST = 0.50 # cosine distance; corpus positives median 0.377
+STORY_ENTITY_EDGE_WEIGHT = 2.0   # entity edges as SECONDARY evidence, not a gate
+LEIDEN_RESOLUTION_V2 = 0.20
 # The Leiden graph's own edge floor, deliberately SEPARATE from
 # threads.STORY_MIN_EDGE_WEIGHT (0.15), which the BFS timeline still uses.
 #
@@ -195,6 +224,62 @@ async def _load_nodes(session) -> dict[str, Node]:
         if n is not None:
             n.actors[str(entity_id)] = float(d)
     return nodes
+
+
+async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
+    """Each windowed event's k nearest neighbours by cosine, kept when close enough.
+
+    Computed in numpy rather than as a pgvector lateral join. The HNSW index is on
+    `article_chunks.embedding`, not `events.embedding`, so a lateral kNN would seq
+    scan the window once per row; and this is the code path that was actually
+    measured offline, which matters more than elegance for a number we intend to
+    quote.
+
+    Chunked because the full similarity matrix is O(n^2): 5,413 events would be
+    117MB as float32, and the window only grows.
+    """
+    import numpy as np
+
+    rows = (
+        await session.execute(
+            text(
+                f"""
+                -- CAST IS LOAD-BEARING. pgvector hands `embedding` back as its
+                -- TEXT form ('[0.031,-0.044,...]'), so numpy sees a list of one
+                -- string per row and raises. Casting to float4[] returns real
+                -- floats. Caught by test_persist_base_run_invariant_and_read.
+                SELECT id::text AS id, embedding::float4[] AS embedding
+                FROM events
+                WHERE last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                  AND embedding IS NOT NULL
+                ORDER BY id
+                """
+            )
+        )
+    ).mappings().all()
+    if len(rows) < 2:
+        return []
+
+    ids = [r["id"] for r in rows]
+    emb = np.asarray([r["embedding"] for r in rows], dtype="float32")
+    emb /= np.linalg.norm(emb, axis=1, keepdims=True) + 1e-12
+
+    k = min(STORY_EMBED_KNN, len(ids) - 1)
+    min_sim = 1.0 - STORY_EMBED_EDGE_MAX_DIST
+    out: dict[tuple[str, str], float] = {}
+    for start in range(0, len(ids), 512):
+        block = emb[start:start + 512]
+        sims = block @ emb.T
+        for row, i in enumerate(range(start, start + len(block))):
+            sims[row, i] = -1.0                     # never a neighbour of itself
+            nbrs = np.argpartition(-sims[row], k)[:k]
+            for j in nbrs:
+                sim = float(sims[row, j])
+                if sim < min_sim:
+                    continue
+                a, b = (ids[i], ids[int(j)]) if ids[i] < ids[int(j)] else (ids[int(j)], ids[i])
+                out[(a, b)] = sim
+    return [(a, b, w) for (a, b), w in out.items()]
 
 
 async def _load_edges(session) -> list[tuple[str, str, float]]:
@@ -678,14 +763,32 @@ async def _finalize_stories(session, by_story: dict[int, list[Node]], edge_w) ->
     return stories
 
 
-async def compute_partition(resolution: float = LEIDEN_RESOLUTION, llm_veto: bool = False) -> dict:
+async def compute_partition(resolution: float = LEIDEN_RESOLUTION_V2, llm_veto: bool = False) -> dict:
     """Load the graph, partition into stories, build each story's branch tree.
     Read-only; returns a structured result for validation or persistence."""
     async with session_scope() as session:
         nodes = await _load_nodes(session)
-        edges = await _load_edges(session)
-        # Two independent gates: actors propose the edge, content confirms it.
-        edges = filter_edges_on_content(edges, nodes)
+        entity_edges = await _load_edges(session)
+        emb_edges = await _load_embedding_edges(session)
+
+        # UNION, not intersection, and the direction matters. v1 made the entity
+        # rule a GATE, so a pair with one shared actor could never be a story
+        # however similar its coverage — which is 96.5% of real pairs. Here the
+        # embedding proposes and the entity edges add weight where they agree.
+        merged: dict[tuple[str, str], float] = {}
+        for a, b, w in emb_edges:
+            merged[(a, b)] = w
+        for a, b, w in entity_edges:
+            key = (a, b) if a < b else (b, a)
+            merged[key] = merged.get(key, 0.0) + STORY_ENTITY_EDGE_WEIGHT * w
+        edges = [(a, b, w) for (a, b), w in merged.items()]
+
+        # NO CONTENT GATE. It was measured as a small free refinement on the
+        # ENTITY edges (fp 31 -> 27) and is not part of what was measured here:
+        # the v2 numbers come from raw entity edges unioned with embedding kNN.
+        # Applying it now would drop embedding edges for sharing no headline word,
+        # which is the cross-lingual and paraphrase case the embedding exists to
+        # catch. Re-measure before adding it back.
         labels = leiden_partition(nodes, edges, resolution)
         edge_w = _edge_weight_map(edges)
         by_story = _group_by_story(labels, nodes)
@@ -701,7 +804,7 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION, llm_veto: boo
 def veto_config_version() -> str:
     s = get_settings()
     raw = (
-        f"gate={s.prism_model_gate}|res={LEIDEN_RESOLUTION}|win={STORY_WINDOW_DAYS}"
+        f"gate={s.prism_model_gate}|res={LEIDEN_RESOLUTION_V2}|win={STORY_WINDOW_DAYS}"
         # The content gate changes which events are in a story, so tuning it must
         # re-vet. story_signature already covers a membership change for stories
         # that exist; this covers the config itself so a revert to the old value
@@ -832,7 +935,7 @@ async def _prune_runs(session, keep: int = PARTITION_RETENTION) -> None:
         logger.info("partition_runs_pruned", dropped=len(old))
 
 
-async def persist_base_run(resolution: float = LEIDEN_RESOLUTION) -> str | None:
+async def persist_base_run(resolution: float = LEIDEN_RESOLUTION_V2) -> str | None:
     """Compute a fresh Leiden L2 partition and publish it as a new immutable base run
     (veto pending). The frequent worker path — cheap, no LLM.
 

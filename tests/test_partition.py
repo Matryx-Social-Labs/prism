@@ -358,3 +358,67 @@ async def test_a_non_empty_partition_still_publishes(monkeypatch):
     with pytest.raises(RuntimeError):
         await partition.persist_base_run()
     assert reached, "a real partition was refused"
+
+
+@contextlib.asynccontextmanager
+async def _fake_scope():
+    yield object()
+
+
+# --- v2 edges: the embedding proposes, entities confirm ------------------------
+
+
+async def test_embedding_edges_are_unioned_not_gated_by_entities():
+    """v1 made the entity rule a GATE, so a pair sharing one actor could never be
+    a story however similar its coverage — 96.5% of human-judged same-story pairs
+    in the corpus sample. The union is the whole fix, and an intersection here
+    would silently restore F1 0.05.
+    """
+    from correlation import partition
+
+    captured = {}
+
+    async def _nodes(_s):
+        return {"a": object(), "b": object()}
+
+    async def _ent(_s):
+        return [("a", "b", 1.0)]
+
+    async def _emb(_s):
+        return [("a", "b", 0.8), ("b", "c", 0.7)]
+
+    def _leiden(_n, edges, _res):
+        captured["edges"] = {(a, b): w for a, b, w in edges}
+        return {}
+
+    partition_patch = [
+        ("_load_nodes", _nodes), ("_load_edges", _ent),
+        ("_load_embedding_edges", _emb), ("leiden_partition", _leiden),
+        ("_edge_weight_map", lambda e: {}), ("_group_by_story", lambda a, b: {}),
+    ]
+    with contextlib.ExitStack() as st:
+        import unittest.mock as m
+        for name, fn in partition_patch:
+            st.enter_context(m.patch.object(partition, name, fn))
+        st.enter_context(m.patch.object(partition, "_finalize_stories",
+                                        m.AsyncMock(return_value=[])))
+        st.enter_context(m.patch.object(partition, "session_scope", _fake_scope))
+        await partition.compute_partition()
+
+    # b-c exists on the embedding alone — an intersection would drop it.
+    assert ("b", "c") in captured["edges"], "an embedding-only edge was gated away"
+    # a-b carries both signals, entity weighted as SECONDARY evidence on top.
+    assert captured["edges"][("a", "b")] == pytest.approx(
+        0.8 + partition.STORY_ENTITY_EDGE_WEIGHT * 1.0
+    )
+
+
+async def test_the_resolution_moves_with_the_edge_set():
+    """0.020 was tuned for ~800 sparse entity edges; v2 supplies ~20,000. Running
+    the old resolution over the new edges is the configuration that blobs, so the
+    two are pinned together and the veto version folds it in."""
+    from correlation import partition
+
+    assert partition.LEIDEN_RESOLUTION_V2 == 0.20
+    assert partition.compute_partition.__defaults__[0] == partition.LEIDEN_RESOLUTION_V2
+    assert partition.persist_base_run.__defaults__[0] == partition.LEIDEN_RESOLUTION_V2
