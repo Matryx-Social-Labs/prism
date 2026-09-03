@@ -214,3 +214,47 @@ def test_an_unsure_makes_the_pair_incomparable():
 def test_a_skip_makes_the_pair_incomparable():
     """Same reasoning, different cause: one of them could not read it."""
     assert pair_agreement((["b"], False, False), ([], False, True)) is None
+
+
+# --- exact-set agreement alone nearly cost the gold set ------------------------
+
+from tools.gold_candidates import candidate_kappa  # noqa: E402
+
+
+def test_near_agreement_is_not_reported_as_total_disagreement():
+    """The failure that made this necessary: on 12 shared tasks exact-set read 33%,
+    which looks like two people answering at random. Per candidate they agreed on
+    86% of 115 decisions at kappa 0.57. With ~10 candidates a task, ONE differing
+    tick fails the whole set."""
+    cands = [f"c{i}" for i in range(10)]
+    shared = [({"c0", "c1"}, {"c0"}, cands)] * 12
+    po, kappa, pa, pb = candidate_kappa(shared)
+    assert po > 0.85, "one differing tick out of ten should not read as disagreement"
+    assert kappa > 0.4
+
+
+def test_a_labeller_who_ticks_nothing_scores_kappa_zero():
+    """Raw agreement flatters badly here: "leave it" is the common answer, so
+    someone who ticked nothing at all would score ~0.9 raw. Kappa corrects for
+    that and is the reason it is reported instead."""
+    cands = [f"c{i}" for i in range(10)]
+    shared = [({"c0"}, set(), cands) for _ in range(10)]
+    po, kappa, _, _ = candidate_kappa(shared)
+    assert po >= 0.85, "raw agreement is high — which is exactly the trap"
+    assert kappa <= 0.0, "kappa must not reward a labeller who never ticks anything"
+
+
+def test_the_pick_counts_expose_a_lumper_and_a_splitter():
+    """A systematic lean is fixable by talking; noise is not. Vijay ticked 28 where
+    Tejas ticked 18 on identical tasks, and that difference is worth surfacing
+    rather than averaging away."""
+    cands = [f"c{i}" for i in range(10)]
+    shared = [({"c0", "c1", "c2"}, {"c0"}, cands)] * 5
+    _, _, pa, pb = candidate_kappa(shared)
+    assert (pa, pb) == (15, 5)
+
+
+def test_perfect_agreement_is_kappa_one():
+    cands = [f"c{i}" for i in range(10)]
+    _, kappa, _, _ = candidate_kappa([({"c0"}, {"c0"}, cands)] * 5)
+    assert kappa == 1.0

@@ -365,6 +365,38 @@ def pair_agreement(a: tuple[list[str], bool, bool],
     return "agree" if set(sel_a) == set(sel_b) else "disagree"
 
 
+def candidate_kappa(shared: list[tuple[set, set, list[str]]]) -> tuple[float, float, int, int]:
+    """Per-candidate agreement and Cohen's kappa over two people's ticks.
+
+    EXACT-SET AGREEMENT ALONE IS MISLEADING and nearly cost this project the gold
+    set. On the first 12 shared tasks it read 33%, which looks like two people
+    answering at random; per candidate they agreed on 86% of 115 decisions at
+    kappa 0.57 — moderate, clearly above chance. With ~10 candidates a task, one
+    differing tick fails the whole set, so exact-set punishes near-agreement as
+    hard as total disagreement.
+
+    Kappa rather than raw agreement because "leave it" is the overwhelmingly
+    common answer: a labeller who ticked nothing at all would score ~0.85 raw and
+    kappa 0. Returns (raw, kappa, picks_a, picks_b) — the two pick counts are what
+    expose a LUMPER/SPLITTER split, which is systematic and fixable by talking,
+    where noise is neither.
+    """
+    n = agree = pa = pb = 0
+    for sel_a, sel_b, cands in shared:
+        for cid in cands:
+            x, y = cid in sel_a, cid in sel_b
+            n += 1
+            agree += x == y
+            pa += x
+            pb += y
+    if not n:
+        return float("nan"), float("nan"), 0, 0
+    po = agree / n
+    pe = (pa / n) * (pb / n) + (1 - pa / n) * (1 - pb / n)
+    kappa = (po - pe) / (1 - pe) if pe < 1 else float("nan")
+    return po, kappa, pa, pb
+
+
 async def agreement(batch_key: str, url: str | None = None) -> None:
     """Do the labellers actually mean the same thing by "same story"?
 
@@ -387,7 +419,7 @@ async def agreement(batch_key: str, url: str | None = None) -> None:
         await c.execute("SET default_transaction_read_only = on")
         rows = await c.fetch(
             """
-            SELECT t.position, i.name, r.selected, r.unsure, r.skipped
+            SELECT t.position, i.name, r.selected, r.unsure, r.skipped, t.candidates
             FROM label_responses r
             JOIN label_tasks t ON t.id = r.task_id
             JOIN label_invites i ON i.id = r.invite_id
@@ -403,17 +435,22 @@ async def agreement(batch_key: str, url: str | None = None) -> None:
     by_task: dict = {}
     for r in rows:
         sel = json.loads(r["selected"]) if isinstance(r["selected"], str) else (r["selected"] or [])
+        cands = (json.loads(r["candidates"]) if isinstance(r["candidates"], str)
+                 else r["candidates"])
         by_task.setdefault(r["position"], {})[r["name"] or "anonymous"] = (
-            [str(x) for x in sel], bool(r["unsure"]), bool(r["skipped"]))
+            [str(x) for x in sel], bool(r["unsure"]), bool(r["skipped"]),
+            [x["id"] for x in cands])
 
     pairs: dict = {}
     for pos, who in sorted(by_task.items()):
         names = sorted(who)
         for i, a in enumerate(names):
             for b in names[i + 1:]:
-                verdict = pair_agreement(who[a], who[b])
+                verdict = pair_agreement(who[a][:3], who[b][:3])
                 rec = pairs.setdefault((a, b), {"agree": 0, "disagree": 0, "skip": 0,
-                                                "where": []})
+                                                "where": [], "shared": []})
+                if verdict is not None:
+                    rec["shared"].append((set(who[a][0]), set(who[b][0]), who[a][3]))
                 if verdict is None:
                     rec["skip"] += 1
                 else:
@@ -431,6 +468,13 @@ async def agreement(batch_key: str, url: str | None = None) -> None:
         print(f"  {a} vs {b}")
         print(f"    comparable {n:>3}   agree {r['agree']:>3} ({rate})   "
               f"disagree {r['disagree']:>3}   not comparable {r['skip']:>3}")
+        if r["shared"]:
+            po, kappa, pa, pb = candidate_kappa(r["shared"])
+            lean = ("" if pa == pb else
+                    f"   <- {a if pa > pb else b} ticks "
+                    f"{max(pa, pb) / max(min(pa, pb), 1):.1f}x more")
+            print(f"    per-candidate {po:.3f}   kappa {kappa:.3f}   "
+                  f"picks {pa} vs {pb}{lean}")
         if n and n < 10:
             print(f"    too few to mean anything yet — {10 - n} more shared tasks would help")
         if r["where"]:
