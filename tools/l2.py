@@ -103,6 +103,46 @@ vs 0.4541). Both facts are real. Entity overlap genuinely works inside one dense
 topic and collapses outside it, which is why measuring on one topic cluster and
 quoting it as story accuracy is the mistake gold_stories' own docstring warns
 against, and why this file now carries both columns.
+
+
+THE L2 REPLACEMENT, MEASURED 2026-09-03. Gate 1's condition is met on the corpus
+sample, on both cross-validation folds:
+
+    config: embedding kNN (k=5, d<=0.50) UNIONED with v1's entity edges at weight
+            2.0, then the SAME Leiden CPM at resolution 0.20
+
+                          corpus F1   corpus Cdet   CJP F1   max group
+    v1 (entity edges)        0.0508        0.9739   0.4541          23
+    v2 (union edges)         0.5930        0.5628   0.3793          17
+
+    cross-validation, disjoint halves of the corpus gold stories
+      fold A (15 stories)    0.0385 -> 0.6744      Cdet 0.9804 -> 0.4582
+      fold B (15 stories)    0.0606 -> 0.5116      Cdet 0.9688 -> 0.6562
+
+WHAT CHANGED IS THE EDGES, NOT THE ALGORITHM, and that is the finding. The plan
+proposed replacing Leiden/CPM with agglomerative RAC. Measured, that is wrong:
+every agglomerative configuration tried — average and complete linkage, union and
+mutual kNN, k in 3..10 — blobbed catastrophically, max group 316 to 5,214 out of
+5,413 events. The embedding space is a dense continuum and linkage chains through
+it no matter how the connectivity is constrained. CPM was never the problem; it
+is resolution-limit free and its resolution parameter is what holds group size at
+17, inside Story Forest's bound of 25.
+
+ENTITIES STAY, AS SECONDARY EVIDENCE. Pure embedding edges score 0.5731 on the
+corpus and collapse the CJP slice to 0.1197. Adding the entity edges at weight
+2.0 lifts CJP to 0.3793 and the corpus slightly too, to 0.5930 — the plan's
+"embedding primary, entity confirm" earning its place rather than being assumed.
+
+THE CJP REGRESSION IS REAL: 0.4541 -> 0.3793. It is the trade this whole
+measurement exists to make legible. Entity overlap genuinely wins inside one
+dense topic and collapses outside it, and the CJP slice is one dense topic by
+construction. Its own docstring says never to quote it as story accuracy.
+
+The winner sits on a shelf, not a spike: F1 stays 0.54-0.61 across resolution
+0.15-0.25 and entity weight 1.5-3.0.
+
+NOT SHIPPED. This is a measured recommendation for correlation/partition.py's
+edge builder, not a change to it.
 """
 
 from __future__ import annotations
