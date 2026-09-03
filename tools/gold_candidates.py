@@ -632,7 +632,18 @@ async def compile_from_batch(batch_key: str, url: str | None = None,
             ([str(x) for x in sel], bool(r["unsure"]), bool(r["skipped"])))
 
     stories, singles, empties = [], 0, 0
+    disputed: list[tuple[str, str]] = []
     for e in by_task.values():
+        # A candidate one labeller ticked and another did not is a DISPUTED pair,
+        # not a negative. Recording it as "not the same story" would assert a
+        # boundary two careful people could not agree on — the coin flip
+        # gold_stories.AMBIGUOUS exists to refuse. Excluded from scoring instead.
+        definite = [(sel, u, sk) for sel, u, sk in e["answers"] if not u and not sk]
+        if len(definite) > 1:
+            for cid in e["cands"]:
+                votes = {cid in sel for sel, _, _ in definite}
+                if len(votes) > 1:
+                    disputed.append((e["seed"], cid))
         members, n = merge_votes(e["answers"], e["cands"], min_agree)
         if n == 0:
             continue
@@ -650,11 +661,16 @@ async def compile_from_batch(batch_key: str, url: str | None = None,
     print(f"  {empties} seeds judged to stand alone (usable negatives)")
     if skips:
         print(f"  {skips} response(s) skipped for language — those tasks need a reader")
+    print(f"  {len(disputed)} candidate pair(s) DISPUTED — excluded from scoring, not "
+          "recorded as negatives")
     if singles:
         print(f"  WARNING: {singles} task(s) rest on ONE labeller — not consensus")
     print()
     for n, (seed, members) in enumerate(sorted(stories), 1):
         print(f'    "corpus-{n:03d}": {json.dumps([seed, *members])},')
+    print("\n  # disputed pairs — exclude from scoring")
+    for a, b in sorted(disputed):
+        print(f'    frozenset({{"{a}", "{b}"}}),')
     print("\n  paste into tools/gold_stories.STORIES, keeping the existing CJP slice")
 
 

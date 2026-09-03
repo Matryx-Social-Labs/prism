@@ -832,10 +832,37 @@ async def _prune_runs(session, keep: int = PARTITION_RETENTION) -> None:
         logger.info("partition_runs_pruned", dropped=len(old))
 
 
-async def persist_base_run(resolution: float = LEIDEN_RESOLUTION) -> str:
+async def persist_base_run(resolution: float = LEIDEN_RESOLUTION) -> str | None:
     """Compute a fresh Leiden L2 partition and publish it as a new immutable base run
-    (veto pending). The frequent worker path — cheap, no LLM."""
+    (veto pending). The frequent worker path — cheap, no LLM.
+
+    Returns None when the partition came out EMPTY and was refused.
+
+    AN EMPTY PARTITION MUST NOT SUPERSEDE A GOOD ONE. Found in production on
+    2026-09-03: `event_story` held 0 rows across 9 runs and none had ever held any.
+    The corpus is frozen at 2026-08-04 and STORY_WINDOW_DAYS is 30, so every event
+    had just aged out of the window; each run selected nothing, produced nothing,
+    wrote nothing — and then promoted itself to `current` anyway and logged
+    "partition_base_published" at INFO.
+
+    Nothing errored. `branch_tree_for_members` simply returned None for every
+    story, and BranchTree fell back to the flat timeline exactly as it is designed
+    to when a storyline predates the current run. The product degraded silently and
+    the logs said success, which is this repo's signature failure mode.
+
+    Refusing to promote is the fix, not widening the window: a stale corpus is a
+    real condition and the honest response is to keep serving the last partition
+    that meant something while saying loudly that a new one could not be built.
+    """
     res = await compute_partition(resolution=resolution, llm_veto=False)
+    if not res["stories"]:
+        logger.error(
+            "partition_empty_refusing_to_publish",
+            events=len(res["nodes"]), edges=len(res["edges"]),
+            window_days=STORY_WINDOW_DAYS,
+            hint="no event is newer than the story window; the previous run stays current",
+        )
+        return None
     async with session_scope() as session:
         await session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _PARTITION_LOCK_KEY})
         run_id = uuid.uuid4()

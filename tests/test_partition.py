@@ -306,3 +306,55 @@ def test_the_partition_uses_its_own_floor_not_the_shared_one():
     src = inspect.getsource(mod)
     assert '"min_weight": PARTITION_MIN_EDGE_WEIGHT' in src
     assert '"min_weight": STORY_MIN_EDGE_WEIGHT' not in src
+
+
+# --- an empty partition must not supersede a good one --------------------------
+
+
+async def test_an_empty_partition_is_refused_not_published(monkeypatch):
+    """Found in production 2026-09-03: event_story held 0 rows across 9 runs and
+    none had ever held any. The corpus is frozen at 2026-08-04 and
+    STORY_WINDOW_DAYS is 30, so every event had just aged out of the window. Each
+    run selected nothing, produced nothing, wrote nothing — then promoted itself
+    to `current` and logged "partition_base_published" at INFO.
+
+    Nothing errored. BranchTree just fell back to the flat timeline, exactly as it
+    does for a storyline predating the current run, so the product degraded in
+    silence while the logs said success.
+    """
+    from correlation import partition
+
+    async def _empty(**_kw):
+        return {"nodes": [], "edges": [], "stories": []}
+
+    def _boom(*_a, **_k):
+        raise AssertionError("an empty partition reached the database")
+
+    monkeypatch.setattr(partition, "compute_partition", _empty)
+    monkeypatch.setattr(partition, "session_scope", _boom)
+
+    assert await partition.persist_base_run() is None
+
+
+async def test_a_non_empty_partition_still_publishes(monkeypatch):
+    """The guard must not swallow the working case — refusing everything would
+    replace a silent failure with a total one."""
+    from correlation import partition
+
+    async def _one(**_kw):
+        return {"nodes": ["e1"], "edges": [], "stories": [{"story_label": "s"}]}
+
+    monkeypatch.setattr(partition, "compute_partition", _one)
+    reached = []
+
+    class _Session:
+        async def __aenter__(self):
+            reached.append(True)
+            raise RuntimeError("stop here — publication was attempted, which is the point")
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(partition, "session_scope", lambda: _Session())
+    with pytest.raises(RuntimeError):
+        await partition.persist_base_run()
+    assert reached, "a real partition was refused"
