@@ -36,6 +36,7 @@ from tools.scratch import _local_url, _prod_url, build_scratch, replay
 
 TITLE_GATE: list[float | None] = [None]
 TITLE_TIER: list[str] = ["trigram"]
+DOC_PREFIX: list[str] = ["passage"]
 
 MODELS = [
     "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
@@ -153,10 +154,14 @@ async def run(models: list[str], limit: int | None) -> None:
 
             os.environ["PRISM_EMBED_MODEL"] = model
             from common.config import get_settings
-            from common.embeddings import _get_model, embed_texts_sync
+            from common.embeddings import _get_model, _needs_prefix, embed_texts_sync
 
             get_settings.cache_clear()
             _get_model.cache_clear()
+            import common.embeddings as emb
+            emb.DOC_PREFIX = DOC_PREFIX[0]
+            if _needs_prefix(model):
+                print(f"  E5 document prefix: {DOC_PREFIX[0]}:")
             ids = sorted(titles)
             vecs = embed_texts_sync([titles[i] or "" for i in ids])
             vectors = dict(zip(ids, vecs, strict=True))
@@ -220,12 +225,18 @@ def main() -> None:
     ap.add_argument("--title-gate", type=float, default=None,
                     help="entity-path title-cosine gate; measures the change that "
                          "previously LOST at replay despite a good pairwise number")
+    ap.add_argument("--doc-prefix", choices=("passage", "query"), default="passage",
+                    help="E5 instruction prefix for STORED vectors. Comparing two "
+                         "articles is a SYMMETRIC task and E5 wants query: on both "
+                         "sides for that; passage: is right for search. One stored "
+                         "vector serves both, so this picks which job wins.")
     ap.add_argument("--title-tier", choices=("trigram", "cosine"), default="trigram",
                     help="similarity used by the title_time tier; 'cosine' replaces "
                          "pg_trgm with IDF-weighted word cosine (plan step 4)")
     a = ap.parse_args()
     TITLE_GATE[0] = a.title_gate
     TITLE_TIER[0] = a.title_tier
+    DOC_PREFIX[0] = a.doc_prefix
     asyncio.run(run([m.strip() for m in a.models.split(",")], a.limit))
 
 

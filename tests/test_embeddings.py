@@ -37,11 +37,68 @@ def test_non_e5_models_get_no_prefix():
     assert not emb._needs_prefix("sentence-transformers/LaBSE")
 
 
-def test_documents_and_queries_use_DIFFERENT_prefixes():
+class _SpyModel:
+    """Records the strings actually handed to the encoder."""
+
+    def __init__(self):
+        self.seen: list[str] = []
+
+    def embed(self, texts):
+        import numpy as np
+
+        texts = list(texts)
+        self.seen.extend(texts)
+        return [np.zeros(4) for _ in texts]
+
+
+def test_documents_and_queries_use_DIFFERENT_prefixes(monkeypatch):
     """E5 is asymmetric: it scores query-vs-passage, not passage-vs-passage. Using
-    one prefix for both silently discards that asymmetry."""
-    assert 'f"passage: {t}"' in inspect.getsource(emb.embed_texts_sync)
-    assert 'f"query: {text}"' in inspect.getsource(emb._embed_query_sync)
+    one prefix for both silently discards that asymmetry.
+
+    Asserts on what reaches the ENCODER, not on the source text of the function.
+    The previous version matched the literal `f"passage: {t}"` with
+    inspect.getsource, so it broke the moment the prefix became a variable and it
+    could never have caught a caller bypassing the prefix anyway.
+    """
+    spy = _SpyModel()
+    monkeypatch.setattr(emb, "_get_model", lambda: spy)
+    monkeypatch.setattr(emb, "DOC_PREFIX", "passage")
+    monkeypatch.setenv("PRISM_EMBED_MODEL", "intfloat/multilingual-e5-base")
+    get_settings.cache_clear()
+
+    emb.embed_texts_sync(["a district road plan"])
+    emb._embed_query_sync("who approved the road plan")
+
+    assert spy.seen == ["passage: a district road plan", "query: who approved the road plan"]
+
+
+def test_the_document_prefix_is_swept_not_hardcoded(monkeypatch):
+    """Comparing two ARTICLES is symmetric and E5 wants `query:` on both sides for
+    that; `passage:` is right for search. One stored vector serves both jobs, so
+    which prefix wins is a measurement (tools/score_cascade --doc-prefix), and the
+    switch has to actually reach the encoder for that sweep to mean anything."""
+    spy = _SpyModel()
+    monkeypatch.setattr(emb, "_get_model", lambda: spy)
+    monkeypatch.setattr(emb, "DOC_PREFIX", "query")
+    monkeypatch.setenv("PRISM_EMBED_MODEL", "intfloat/multilingual-e5-base")
+    get_settings.cache_clear()
+
+    emb.embed_texts_sync(["a district road plan"])
+    assert spy.seen == ["query: a district road plan"]
+
+
+def test_a_non_e5_model_still_gets_no_prefix_whatever_the_switch_says(monkeypatch):
+    """DOC_PREFIX must not leak onto mpnet, which was never trained with one."""
+    spy = _SpyModel()
+    monkeypatch.setattr(emb, "_get_model", lambda: spy)
+    monkeypatch.setattr(emb, "DOC_PREFIX", "query")
+    monkeypatch.setenv(
+        "PRISM_EMBED_MODEL", "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    )
+    get_settings.cache_clear()
+
+    emb.embed_texts_sync(["a district road plan"])
+    assert spy.seen == ["a district road plan"]
 
 
 def test_embed_query_does_not_delegate_to_embed_texts():

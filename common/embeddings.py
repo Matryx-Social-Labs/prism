@@ -43,6 +43,11 @@ _CUSTOM = {
 # mE5 look worse than mpnet on Devanagari when it is in fact better.
 _PREFIXED = ("e5",)
 
+# Which prefix STORED document vectors get. Swept by tools/score_cascade rather
+# than argued about: the two jobs the one stored vector serves disagree, so the
+# only way to choose is to score the job that actually degrades — clustering.
+DOC_PREFIX = "passage"
+
 
 def _needs_prefix(model_name: str) -> bool:
     return any(k in model_name.lower() for k in _PREFIXED)
@@ -74,7 +79,7 @@ def embed_texts_sync(texts: list[str]) -> list[list[float]]:
     here so no caller can forget it."""
     model = _get_model()
     if _needs_prefix(get_settings().prism_embed_model):
-        texts = [f"passage: {t}" for t in texts]
+        texts = [f"{DOC_PREFIX}: {t}" for t in texts]
     return [vec.tolist() for vec in model.embed(texts)]
 
 
