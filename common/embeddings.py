@@ -6,6 +6,7 @@ CPU-bound work runs in a thread so the event loop stays responsive.
 """
 
 import asyncio
+import os
 from functools import lru_cache
 
 from fastembed import TextEmbedding
@@ -46,10 +47,29 @@ _CUSTOM = {
 # mE5 look worse than mpnet on Devanagari when it is in fact better.
 _PREFIXED = ("e5",)
 
-# Which prefix STORED document vectors get. Swept by tools/score_cascade rather
-# than argued about: the two jobs the one stored vector serves disagree, so the
-# only way to choose is to score the job that actually degrades — clustering.
-DOC_PREFIX = "passage"
+# Which prefix STORED document vectors get.
+#
+# The cascade CANNOT separate the two: held out, passage: scores Cdet 0.5837 and
+# query: 0.5949, a difference of ONE event out of 242 pairs (tp 15/fp 2 against
+# tp 14/fp 1). Choosing on that would be reading noise, the same mistake the
+# title-cosine tier made.
+#
+# `query:` is chosen on evidence gold_pairs structurally cannot see. It is almost
+# entirely monolingual English, while the reason for adopting mE5 at all is
+# cross-lingual alignment: measured over 163 news pairs, query:/query: gives
+# P@1 0.531 against passage:'s 0.399 on Devanagari, and 0.778 against 0.611 on
+# Kannada. Comparing two ARTICLES is a symmetric task and that is the prefix E5
+# wants for it; passage: is right for asymmetric search.
+#
+# It also has the better precision on the fold that decides — 0.9333 against
+# 0.8824 — and a false merge fuses two unrelated stories in front of a reader,
+# which is worse than Cdet's 4x weighting already implies.
+#
+# Recorded in corpus_meta and enforced: see assert_corpus_model below.
+DOC_PREFIX = "query"
+
+# See _get_model: 4 protects the worker's event loop; offline tools raise it.
+EMBED_THREADS = int(os.environ.get("PRISM_EMBED_THREADS", "4"))
 
 
 def _needs_prefix(model_name: str) -> bool:
@@ -74,7 +94,12 @@ def _get_model() -> TextEmbedding:
         )
     # Cap ONNX threads so embedding bursts don't starve the event loop
     # (starvation surfaced as Redis read timeouts in the worker).
-    return TextEmbedding(model_name=name, cache_dir=".fastembed_cache", threads=4)
+    #
+    # Raisable for OFFLINE batch work, where there is no event loop to protect:
+    # a whole-corpus re-embed measured 99 ms/chunk at 4 threads and 55 ms at 8 on
+    # a 10-core machine, which is 1.3 hours against 0.7 for 46,635 chunks. The
+    # default stays 4 so the worker keeps its guarantee.
+    return TextEmbedding(model_name=name, cache_dir=".fastembed_cache", threads=EMBED_THREADS)
 
 
 def embed_texts_sync(texts: list[str]) -> list[list[float]]:

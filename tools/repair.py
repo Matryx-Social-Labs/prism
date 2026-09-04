@@ -13,6 +13,7 @@ it deletes and rewrites event_memberships — so read its report before trusting
   uv run python -m tools.repair --titles --apply
   uv run python -m tools.repair --markup        # report only
   uv run python -m tools.repair --reembed       # re-embed the corpus (model swap)
+  uv run python -m tools.repair --drop-cve      # remove the CVE-feed corpus
   uv run python -m tools.repair --clusters      # report only
 
 The expensive work is already paid for: extraction and embeddings exist on every
@@ -29,6 +30,7 @@ import json
 import os
 import re
 import subprocess
+import time
 import uuid
 
 import asyncpg
@@ -348,8 +350,18 @@ async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 256) -> No
     print(f"\n{'='*74}\nRE-EMBED corpus with {model}\n{'='*74}")
     print(f"  dim {dim}   document prefix {prefix!r}")
 
-    current = await c.fetchrow("SELECT embed_model, embed_prefix FROM corpus_meta WHERE id = 1")
-    print(f"  corpus currently: {dict(current) if current else 'unknown'}")
+    try:
+        current = await c.fetchrow(
+            "SELECT embed_model, embed_prefix FROM corpus_meta WHERE id = 1"
+        )
+        has_meta = True
+    except asyncpg.exceptions.UndefinedTableError:
+        # The guard's table ships in a migration that may not be deployed yet.
+        # That must not block the re-embed: the vectors are the thing that takes
+        # time, and the migration seeds the record from settings when it does run,
+        # which is correct precisely BECAUSE the re-embed went first.
+        current, has_meta = None, False
+    print(f"  corpus currently: {dict(current) if current else 'unknown (corpus_meta not deployed)'}")
 
     n_chunks = await c.fetchval("SELECT count(*) FROM article_chunks")
     n_events = await c.fetchval("SELECT count(*) FROM events WHERE embedding IS NOT NULL")
@@ -358,25 +370,34 @@ async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 256) -> No
         print("\n  DRY RUN — nothing written.")
         return
 
-    done = 0
+    # KEYSET pagination and BATCHED writes. Both were measured before changing:
+    #   embed, 4 threads       99 ms/chunk    ->  1.3 h      (raised to 8: 0.7 h)
+    #   one UPDATE per row    182 ms round trip -> 2.4 h     <- the real ceiling
+    #   OFFSET 40000 vs keyset 0.61s vs 0.47s  ->  negligible
+    # So the round trips were the thing to fix, not the OFFSET I first suspected.
+    done, last = 0, "00000000-0000-0000-0000-000000000000"
+    t0 = time.perf_counter()
     while True:
         rows = await c.fetch(
-            "SELECT id::text AS id, text FROM article_chunks ORDER BY id OFFSET $1 LIMIT $2",
-            done, batch,
+            "SELECT id::text AS id, text FROM article_chunks "
+            "WHERE id > $1::uuid ORDER BY id LIMIT $2",
+            last, batch,
         )
         if not rows:
             break
         vecs = await embed_texts([r["text"] for r in rows])
-        async with c.transaction():
-            for r, v in zip(rows, vecs, strict=True):
-                await c.execute(
-                    "UPDATE article_chunks SET embedding = $2::vector WHERE id = $1::uuid",
-                    r["id"], "[" + ",".join(f"{x:.6f}" for x in v) + "]",
-                )
+        await c.executemany(
+            "UPDATE article_chunks SET embedding = $2::vector WHERE id = $1::uuid",
+            [(r["id"], "[" + ",".join(f"{x:.6f}" for x in v) + "]")
+             for r, v in zip(rows, vecs, strict=True)],
+        )
         done += len(rows)
-        if done % (batch * 10) == 0:
-            print(f"    chunks {done}/{n_chunks}")
-    print(f"  chunks rewritten: {done}")
+        last = rows[-1]["id"]
+        if done % (batch * 8) == 0:
+            rate = done / max(time.perf_counter() - t0, 1e-9)
+            left = (n_chunks - done) / max(rate, 1e-9) / 60
+            print(f"    chunks {done}/{n_chunks}  {rate:.0f}/s  ~{left:.0f} min left", flush=True)
+    print(f"  chunks rewritten: {done} in {(time.perf_counter()-t0)/60:.1f} min")
 
     # Events take their vector from the first chunk of their earliest article,
     # matching how correlation assigned it in the first place.
@@ -398,13 +419,108 @@ async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 256) -> No
     n_moved = await c.fetchval("SELECT count(*) FROM events WHERE embedding IS NOT NULL")
     print(f"  event vectors rebuilt from their first chunk (now {n_moved} non-null)")
 
-    await c.execute(
-        "UPDATE corpus_meta SET embed_model = $1, embed_dim = $2, embed_prefix = $3, "
-        "updated_at = now() WHERE id = 1",
-        model, dim, prefix,
-    )
-    print(f"  corpus_meta now records {model} / {prefix!r}")
+    if has_meta:
+        await c.execute(
+            "UPDATE corpus_meta SET embed_model = $1, embed_dim = $2, embed_prefix = $3, "
+            "updated_at = now() WHERE id = 1",
+            model, dim, prefix,
+        )
+        print(f"  corpus_meta now records {model} / {prefix!r}")
+    else:
+        print(f"  corpus_meta absent — the migration will seed {model} / {prefix!r} on deploy,")
+        print("  which is correct because the vectors were rewritten first.")
     print("  Deploy the matching config AFTER this, never before.")
+
+
+# Every table that points at articles / raw_items / events, in the order the
+# foreign keys allow. Read out of information_schema rather than remembered:
+# guessing this order is how a delete half-completes and rolls back after an hour.
+_CVE_ARTICLE_CHILDREN = ("article_chunks", "article_entities", "event_memberships")
+_CVE_EVENT_CHILDREN = (
+    "event_entities", "event_story", "impacts", "perspectives", "agent_sessions",
+)
+
+
+async def drop_cve(c: asyncpg.Connection, *, write: bool) -> None:
+    """Delete the CVE-feed corpus: NVD and CISA KEV.
+
+    19,276 articles, 77% of all events, ingested during the cyber beachhead and
+    not wanted for the India news product as it stands.
+
+    SAFE TO DELETE IN THE SENSE THAT MATTERS: both are public authoritative feeds
+    and their enrichment is DETERMINISTIC (enrichment/cve_lens.extract_from_nvd —
+    no LLM), so the whole set is reconstructible for free by re-enabling the
+    collectors. This is not discarding paid-for work.
+
+    Events are only removed when nothing is left in them. 30 events mix CVE and
+    news members; those keep their news members and lose the CVE ones, because
+    deleting the event would take real reporting with it.
+    """
+    print(f"\n{'='*74}\nDROP the CVE-feed corpus (nvd + cisa_kev)\n{'='*74}")
+    where = "s.source_type = 'cve_feed'"
+    # KEEP anything a labelling task still points at. Five tasks in the completed
+    # story-boundary batch use CVE events as seeds or candidates, and that batch
+    # holds 252 human answers — deleting the events would make the gold set
+    # impossible to re-compile from its source, to save five rows out of 19,276.
+    labelled = """SELECT em.article_id FROM event_memberships em
+                  WHERE em.event_id IN (SELECT seed_event_id FROM label_tasks
+                                        WHERE seed_event_id IS NOT NULL)"""
+    art = f"""SELECT a.id FROM articles a JOIN raw_items ri ON ri.id = a.raw_item_id
+              JOIN sources s ON s.id = ri.source_id
+              WHERE {where} AND a.id NOT IN ({labelled})"""
+    raw = f"""SELECT ri.id FROM raw_items ri JOIN sources s ON s.id = ri.source_id
+              WHERE {where} AND ri.id NOT IN (SELECT raw_item_id FROM articles
+                                              WHERE id IN ({labelled}))"""
+
+    n_art = await c.fetchval(f"SELECT count(*) FROM ({art}) t")
+    n_raw = await c.fetchval(f"SELECT count(*) FROM ({raw}) t")
+    cve_only = await c.fetchval("""
+        SELECT count(*) FROM events e
+        WHERE EXISTS (SELECT 1 FROM event_memberships em WHERE em.event_id = e.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM event_memberships em JOIN articles a ON a.id = em.article_id
+            JOIN raw_items ri ON ri.id = a.raw_item_id JOIN sources s ON s.id = ri.source_id
+            WHERE em.event_id = e.id AND s.source_type <> 'cve_feed')""")
+    print(f"  articles {n_art}   raw_items {n_raw}   events that would empty out {cve_only}")
+
+    kept = await c.fetchval(f"""
+        SELECT count(*) FROM articles a JOIN raw_items ri ON ri.id = a.raw_item_id
+        JOIN sources s ON s.id = ri.source_id
+        WHERE {where} AND a.id IN ({labelled})""")
+    print(f"  keeping {kept} CVE articles that a labelling task still references")
+
+    # Belt and braces: after the exclusion, nothing a task points at may vanish.
+    pinned = await c.fetchval(f"""
+        SELECT count(*) FROM label_tasks lt WHERE lt.seed_event_id IN (
+          SELECT em.event_id FROM event_memberships em WHERE em.article_id IN ({art}))""")
+    if pinned:
+        print(f"  REFUSING: {pinned} label_tasks would still lose their event")
+        return
+
+    if not write:
+        print("\n  DRY RUN — nothing deleted.")
+        return
+
+    async with c.transaction():
+        await c.execute(f"DELETE FROM field_provenance WHERE enrichment_id IN "
+                        f"(SELECT id FROM enrichments WHERE article_id IN ({art}))")
+        await c.execute(f"DELETE FROM enrichments WHERE article_id IN ({art})")
+        for t in _CVE_ARTICLE_CHILDREN:
+            await c.execute(f"DELETE FROM {t} WHERE article_id IN ({art})")
+        await c.execute(f"DELETE FROM articles WHERE id IN ({art})")
+        await c.execute(f"DELETE FROM raw_items WHERE id IN ({raw})")
+        # Now the orphans: events whose every member has just gone.
+        orphan = """SELECT e.id FROM events e WHERE NOT EXISTS
+                    (SELECT 1 FROM event_memberships em WHERE em.event_id = e.id)"""
+        await c.execute(f"DELETE FROM event_links WHERE from_event_id IN ({orphan}) "
+                        f"OR to_event_id IN ({orphan})")
+        for t in _CVE_EVENT_CHILDREN:
+            await c.execute(f"DELETE FROM {t} WHERE event_id IN ({orphan})")
+        gone = await c.fetchval(f"WITH d AS (DELETE FROM events WHERE id IN ({orphan}) "
+                                f"RETURNING 1) SELECT count(*) FROM d")
+    print(f"  deleted. events removed: {gone}")
+    for t in ("raw_items", "articles", "article_chunks", "enrichments", "events"):
+        print(f"    {t:16} now {await c.fetchval(f'SELECT count(*) FROM {t}')}")
 
 
 async def main() -> None:
@@ -412,13 +528,16 @@ async def main() -> None:
     ap.add_argument("--entities", action="store_true")
     ap.add_argument("--titles", action="store_true")
     ap.add_argument("--markup", action="store_true", help="clean_text holding HTML tags")
+    ap.add_argument("--drop-cve", action="store_true",
+                    help="delete the NVD/CISA-KEV corpus (reconstructible: public feeds, "
+                         "deterministic enrichment, no LLM cost)")
     ap.add_argument("--reembed", action="store_true",
                     help="rebuild every vector with the configured model (local, free)")
     ap.add_argument("--limit", type=int, default=None,
                     help="cap articles for --markup; prove the write path on a few first")
     ap.add_argument("--apply", action="store_true", help="WRITE. Without it, nothing changes.")
     a = ap.parse_args()
-    every = not (a.entities or a.titles or a.markup or a.reembed)
+    every = not (a.entities or a.titles or a.markup or a.reembed or a.drop_cve)
 
     c = await asyncpg.connect(_db_url(), timeout=45)
     try:
@@ -436,6 +555,8 @@ async def main() -> None:
             fixes = await report_titles(c)
             if a.apply and a.titles:
                 await apply_titles(c, fixes)
+        if a.drop_cve:
+            await drop_cve(c, write=a.apply and a.drop_cve)
         if a.reembed:
             await reembed(c, write=a.apply and a.reembed)
         if every or a.markup:

@@ -66,7 +66,17 @@ class Settings(BaseSettings):
     # same story. Benchmarked on real CJP coverage: same-story sim Hindi 0.87 /
     # Telugu 0.77 / Tamil 0.56 vs unrelated -0.01 (bge-small-en couldn't separate
     # Hindi at all). Changing dim requires a migration of the vector(...) columns.
-    prism_embed_model: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    # mE5, chosen on a full cascade replay against gold_pairs rather than on the
+    # isolated embedding score — measured 2026-09-05, both folds:
+    #
+    #                       all 398        batch1 (fitted)  batch2 (HELD OUT)
+    #     mpnet             Cdet 0.5930    Cdet 0.5268      Cdet 0.6555
+    #     mE5 + passage:    Cdet 0.5466    Cdet 0.5179      Cdet 0.5837
+    #     mE5 + query:      Cdet 0.5319    Cdet 0.4598      Cdet 0.5949
+    #
+    # mE5 beats mpnet on F1 and Cdet in BOTH folds, which is what step 4 failed to
+    # do. 768-dim either way, so no vector migration.
+    prism_embed_model: str = "intfloat/multilingual-e5-base"
     prism_embed_dim: int = 768
 
     # Ask-agent guardrail — a cheap moderation pre-check rejects explicit/harmful
@@ -78,6 +88,12 @@ class Settings(BaseSettings):
     # collectors (and the stalled-item requeue) so no new news is fetched and the
     # downstream LLM pipeline goes idle — the cost brake while the prototype is
     # still being built. On-demand briefs/Ask/digest still work.
+    # The CVE feeds (NVD, CISA KEV) are the cyber beachhead, and they dominate by
+    # volume: 19,276 of 27,194 articles and 77% of all events, none of which ever
+    # reached the general feed. Off while the product is India news; re-enable
+    # with the Cyber tier. Their corpus was deleted 2026-09-05 and costs nothing
+    # to rebuild — public feeds, deterministic enrichment, no LLM.
+    prism_cve_feeds_enabled: bool = False
     prism_ingestion_enabled: bool = True
 
     # Grounded storyline veto master switch. Set PRISM_VETO_ENABLED=false to stop

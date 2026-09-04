@@ -43,13 +43,19 @@ def upgrade() -> None:
     # databases embedded with whatever model was live for them, and hardcoding one
     # would assert something false about the other.
     from common.config import get_settings
+    from common.embeddings import DOC_PREFIX, _needs_prefix
 
     s = get_settings()
+    # The PREFIX is seeded as well, not left NULL. Recording the model name alone
+    # would be a half-truth the guard reads as a mismatch on first boot — same
+    # name, different prefix — and a guard that fires on a correct deployment is
+    # one people switch off.
+    prefix = DOC_PREFIX if _needs_prefix(s.prism_embed_model) else None
     op.execute(
         sa.text(
             "INSERT INTO corpus_meta (id, embed_model, embed_dim, embed_prefix) "
-            "VALUES (1, :m, :d, NULL)"
-        ).bindparams(m=s.prism_embed_model, d=s.prism_embed_dim)
+            "VALUES (1, :m, :d, :p)"
+        ).bindparams(m=s.prism_embed_model, d=s.prism_embed_dim, p=prefix)
     )
 
 

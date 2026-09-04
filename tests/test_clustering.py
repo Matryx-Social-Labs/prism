@@ -5,24 +5,47 @@ similar. Verifies it matches on >=2 shared entities within the looser band, and
 does NOT match on a single shared entity.
 """
 
+import math
 import uuid
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+import correlation.clustering as clustering
 from common.db import session_scope
 from correlation.clustering import find_event
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-# 768-dim vectors with a controlled cosine: V=[1,0,...], V'=[0.6,0.8,...] → cos 0.6,
-# distance 0.4 (inside the 0.45 entity band, outside the 0.12 near-dup band).
+# 768-dim vectors at a controlled cosine distance, DERIVED from the configured
+# model's own scale rather than pinned to one model's numbers.
+#
+# These used to be literals — cos 0.6 and cos 0.8, chosen because 0.4 and 0.2 sat
+# inside mpnet's 0.45 and 0.25 bands. The mE5 swap moved those bands to 0.106 and
+# 0.079, so every one of these vectors fell outside every band and five
+# entity-overlap tests started failing on a change that was correct. The fixtures
+# encoded a model, not a relationship.
+#
+# `_at(d)` builds a unit vector exactly distance `d` from V: cosine = 1 - d, so
+# the vector is [1-d, sqrt(1-(1-d)^2), 0...]. Whatever the model, MODERATE lands
+# inside the loose entity band and outside the near one, and NEAR lands inside
+# the near band and outside the near-dup embedding tier.
+_S = clustering._scale()
+
+
+def _at(distance: float) -> list[float]:
+    c = 1.0 - distance
+    return [c, math.sqrt(max(0.0, 1.0 - c * c))] + [0.0] * 766
+
+
 V = [1.0, 0.0] + [0.0] * 766
-V_MODERATE = [0.6, 0.8] + [0.0] * 766
-# cos 0.8 → distance 0.2: outside the 0.12 near-dup tier but inside the 0.25
-# near-dup entity band (where ONE strong actor is enough).
-V_NEAR = [0.8, 0.6] + [0.0] * 766
+# Between the near band and the loose band: too far for one actor, close enough
+# for several.
+V_MODERATE = _at((_S["entity_near"] + _S["entity_loose"]) / 2)
+# Inside the near-dup ENTITY band (one strong actor is enough) but outside the
+# near-dup EMBEDDING tier, which would match on distance alone and prove nothing.
+V_NEAR = _at((_S["embedding"] + _S["entity_near"]) / 2)
 
 
 async def _db_reachable() -> bool:

@@ -25,11 +25,12 @@ async def run_all() -> dict[str, int]:
     # RSS (India news) first so the general feed is never starved by the CVE
     # feeds' volume; CVE feeds run after and only ever surface in the cyber lens.
     # GDELT is out for now (international + rate-limited) — India-first scope.
-    for name, collector in (
-        ("rss", rss.collect),
-        ("cisa_kev", cisa_kev.collect),
-        ("nvd", nvd.collect),
-    ):
+    collectors: list[tuple[str, object]] = [("rss", rss.collect)]
+    if get_settings().prism_cve_feeds_enabled:
+        collectors += [("cisa_kev", cisa_kev.collect), ("nvd", nvd.collect)]
+    else:
+        logger.info("cve_feeds_disabled", reason="prism_cve_feeds_enabled=false")
+    for name, collector in collectors:
         try:
             results[name] = await collector()
         except Exception:
