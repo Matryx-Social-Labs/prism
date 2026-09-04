@@ -12,6 +12,7 @@ it deletes and rewrites event_memberships — so read its report before trusting
   uv run python -m tools.repair                 # report everything, write nothing
   uv run python -m tools.repair --titles --apply
   uv run python -m tools.repair --markup        # report only
+  uv run python -m tools.repair --reembed       # re-embed the corpus (model swap)
   uv run python -m tools.repair --clusters      # report only
 
 The expensive work is already paid for: extraction and embeddings exist on every
@@ -322,16 +323,102 @@ async def apply_markup(c: asyncpg.Connection, fixed: list[dict]) -> None:
     print("  NOTE: events.embedding is NOT rewritten — see the comment in apply_markup.")
 
 
+async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 256) -> None:
+    """Rebuild every stored vector with the CONFIGURED model, then record it.
+
+    Needed because cosine distance is not comparable across embedding models. A
+    config change alone leaves the database full of the old model's vectors and
+    the new model's queries scoring against them — measured at 25x the false
+    merges, with nothing logged. So the order is always: re-embed first, deploy
+    the config second.
+
+    Local ONNX only. No LLM, no spend, just time.
+
+    Event vectors are recomputed from each event's FIRST-CHUNK article, which is
+    where correlation/consumer._first_chunk_embedding took them originally. That
+    also repairs the ~1,100 events still holding a vector built from the markup
+    this file's --markup section cleaned out of clean_text.
+    """
+    from common.config import get_settings
+    from common.embeddings import DOC_PREFIX, _needs_prefix, embed_texts
+
+    settings = get_settings()
+    model, dim = settings.prism_embed_model, settings.prism_embed_dim
+    prefix = DOC_PREFIX if _needs_prefix(model) else None
+    print(f"\n{'='*74}\nRE-EMBED corpus with {model}\n{'='*74}")
+    print(f"  dim {dim}   document prefix {prefix!r}")
+
+    current = await c.fetchrow("SELECT embed_model, embed_prefix FROM corpus_meta WHERE id = 1")
+    print(f"  corpus currently: {dict(current) if current else 'unknown'}")
+
+    n_chunks = await c.fetchval("SELECT count(*) FROM article_chunks")
+    n_events = await c.fetchval("SELECT count(*) FROM events WHERE embedding IS NOT NULL")
+    print(f"  {n_chunks} chunks and {n_events} event vectors would be rewritten")
+    if not write:
+        print("\n  DRY RUN — nothing written.")
+        return
+
+    done = 0
+    while True:
+        rows = await c.fetch(
+            "SELECT id::text AS id, text FROM article_chunks ORDER BY id OFFSET $1 LIMIT $2",
+            done, batch,
+        )
+        if not rows:
+            break
+        vecs = await embed_texts([r["text"] for r in rows])
+        async with c.transaction():
+            for r, v in zip(rows, vecs, strict=True):
+                await c.execute(
+                    "UPDATE article_chunks SET embedding = $2::vector WHERE id = $1::uuid",
+                    r["id"], "[" + ",".join(f"{x:.6f}" for x in v) + "]",
+                )
+        done += len(rows)
+        if done % (batch * 10) == 0:
+            print(f"    chunks {done}/{n_chunks}")
+    print(f"  chunks rewritten: {done}")
+
+    # Events take their vector from the first chunk of their earliest article,
+    # matching how correlation assigned it in the first place.
+    await c.execute(
+        """
+        WITH first_chunk AS (
+            SELECT DISTINCT ON (em.event_id) em.event_id, ac.embedding
+            FROM event_memberships em
+            JOIN articles a ON a.id = em.article_id
+            JOIN article_chunks ac ON ac.article_id = a.id AND ac.chunk_index = 0
+            ORDER BY em.event_id, a.created_at, a.id
+        )
+        UPDATE events e SET embedding = f.embedding
+        FROM first_chunk f
+        WHERE e.id = f.event_id AND e.embedding IS NOT NULL
+        RETURNING 1
+        """
+    )
+    n_moved = await c.fetchval("SELECT count(*) FROM events WHERE embedding IS NOT NULL")
+    print(f"  event vectors rebuilt from their first chunk (now {n_moved} non-null)")
+
+    await c.execute(
+        "UPDATE corpus_meta SET embed_model = $1, embed_dim = $2, embed_prefix = $3, "
+        "updated_at = now() WHERE id = 1",
+        model, dim, prefix,
+    )
+    print(f"  corpus_meta now records {model} / {prefix!r}")
+    print("  Deploy the matching config AFTER this, never before.")
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--entities", action="store_true")
     ap.add_argument("--titles", action="store_true")
     ap.add_argument("--markup", action="store_true", help="clean_text holding HTML tags")
+    ap.add_argument("--reembed", action="store_true",
+                    help="rebuild every vector with the configured model (local, free)")
     ap.add_argument("--limit", type=int, default=None,
                     help="cap articles for --markup; prove the write path on a few first")
     ap.add_argument("--apply", action="store_true", help="WRITE. Without it, nothing changes.")
     a = ap.parse_args()
-    every = not (a.entities or a.titles or a.markup)
+    every = not (a.entities or a.titles or a.markup or a.reembed)
 
     c = await asyncpg.connect(_db_url(), timeout=45)
     try:
@@ -349,6 +436,8 @@ async def main() -> None:
             fixes = await report_titles(c)
             if a.apply and a.titles:
                 await apply_titles(c, fixes)
+        if a.reembed:
+            await reembed(c, write=a.apply and a.reembed)
         if every or a.markup:
             fixed = await report_markup(c, a.limit)
             if a.apply and a.markup:

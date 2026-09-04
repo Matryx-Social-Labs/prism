@@ -10,6 +10,7 @@ from datetime import date, datetime
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -473,6 +474,31 @@ class Session(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CorpusMeta(TimestampMixin, Base):
+    """Which embedding model produced the vectors currently in this database.
+
+    Cosine distances are NOT comparable across models, and mixing two of them is
+    silent: vectors still come out, neighbours are still returned, the feed just
+    starts fusing unrelated stories. Measured when mE5 was first tried against
+    mpnet's thresholds — 76 false merges against 3, a 25x increase, with nothing
+    logged.
+
+    Nothing records which model wrote a stored vector, so this does: one row,
+    written by the re-embed, checked before any stage that writes more.
+    """
+
+    __tablename__ = "corpus_meta"
+    __table_args__ = (CheckConstraint("id = 1", name="ck_corpus_meta_singleton"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    embed_model: Mapped[str] = mapped_column(Text, nullable=False)
+    embed_dim: Mapped[int] = mapped_column(Integer, nullable=False)
+    # The prefix matters as much as the model: `query:` and `passage:` put the
+    # same text in different places, so a corpus embedded with one is not
+    # comparable to a query embedded expecting the other.
+    embed_prefix: Mapped[str | None] = mapped_column(Text)
 
 
 class Watchlist(TimestampMixin, Base):

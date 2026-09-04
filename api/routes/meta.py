@@ -12,6 +12,7 @@ from api.schemas import (
     TaxonomyResponse,
 )
 from common.db import get_db
+from common.embeddings import check_corpus_model
 from common.lenses import DEFAULT_LENS, active_lenses
 from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
@@ -36,7 +37,11 @@ async def healthz(db: AsyncSession = Depends(get_db)):
     API out of rotation for a condition the API cannot cause or fix.
     """
     await db.execute(text("SELECT 1"))
-    return {"status": "ok", "streams": await backlog()}
+    return {
+        "status": "ok",
+        "streams": await backlog(),
+        "embeddings": await check_corpus_model(db),
+    }
 
 
 @router.get("/api/v1/lenses", response_model=LensesResponse)

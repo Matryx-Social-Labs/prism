@@ -171,6 +171,17 @@ async def main(stages: list[str]) -> None:
             )
         )
 
+    # Before any stage that WRITES vectors. Enrichment embeds every article, so
+    # starting it against a corpus embedded by another model silently mixes two
+    # incomparable distance scales — measured at 25x the false merges, with
+    # nothing logged. A refusal is visible; a corrupted feed is not.
+    if {"enrichment", "correlation"} & set(stages):
+        from common.db import session_scope
+        from common.embeddings import assert_corpus_model
+
+        async with session_scope() as _s:
+            await assert_corpus_model(_s)
+
     if "classification" in stages:
         tasks.append(
             asyncio.create_task(

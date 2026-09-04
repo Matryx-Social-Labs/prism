@@ -11,10 +11,13 @@ from functools import lru_cache
 from fastembed import TextEmbedding
 
 from common.config import get_settings
+from common.logging import get_logger
 
 # Models fastembed does not ship in its registry, registered on demand from their
 # official ONNX export. This keeps production on the existing onnxruntime path —
 # no torch, no sentence-transformers in the image.
+logger = get_logger(__name__)
+
 _CUSTOM = {
     "intfloat/multilingual-e5-base": {"dim": 768, "file": "onnx/model.onnx"},
 }
@@ -100,3 +103,63 @@ async def embed_query(text: str) -> list[float]:
     """Embed a SEARCH QUERY. Asymmetric models score query-vs-passage, not
     passage-vs-passage, so this cannot just call embed_texts."""
     return await asyncio.to_thread(_embed_query_sync, text)
+
+
+class CorpusModelMismatch(RuntimeError):
+    """The stored vectors were written by a different model than the one configured."""
+
+
+async def check_corpus_model(session) -> dict:
+    """Compare the configured embedding model against the one that wrote the corpus.
+
+    Returns a dict for /healthz. Never raises: a health endpoint that dies on a
+    degraded dependency reports nothing at all.
+    """
+    from sqlalchemy import text as sa_text
+
+    settings = get_settings()
+    want = (settings.prism_embed_model, DOC_PREFIX if _needs_prefix(settings.prism_embed_model) else None)
+    try:
+        row = (
+            await session.execute(
+                sa_text("SELECT embed_model, embed_prefix FROM corpus_meta WHERE id = 1")
+            )
+        ).first()
+    except Exception:
+        return {"ok": None, "configured": want[0], "corpus": None}
+    if row is None:
+        return {"ok": None, "configured": want[0], "corpus": None}
+    have = (row[0], row[1])
+    return {
+        "ok": have == want,
+        "configured": want[0],
+        "corpus": have[0],
+        "configured_prefix": want[1],
+        "corpus_prefix": have[1],
+    }
+
+
+async def assert_corpus_model(session) -> None:
+    """Refuse to continue when the configured model did not write the corpus.
+
+    Called before any stage that WRITES vectors. Writing mE5 vectors into an mpnet
+    corpus does not error — it produces a feed that fuses unrelated stories, which
+    was measured at 25x the false merges with nothing logged. Halting is the
+    correct outcome: a stopped pipeline is visible, a corrupted one is not.
+
+    An UNKNOWN corpus (no row yet) is allowed through with a warning. Refusing
+    there would block every database that predates this table, which is the kind
+    of guard people disable rather than satisfy.
+    """
+    state = await check_corpus_model(session)
+    if state["ok"] is None:
+        logger.warning("corpus_embedding_model_unknown", configured=state["configured"])
+        return
+    if not state["ok"]:
+        raise CorpusModelMismatch(
+            f"corpus was embedded with {state['corpus']!r} (prefix {state['corpus_prefix']!r}) "
+            f"but this process is configured for {state['configured']!r} "
+            f"(prefix {state['configured_prefix']!r}). Re-embed with "
+            f"`tools.repair --reembed --apply` before starting, or the two model's "
+            f"vectors will be compared against each other."
+        )
