@@ -32,3 +32,37 @@ def test_non_quota_error_no_cooldown():
     llm._cooldown_until = 0.0
     llm._maybe_start_cooldown(_status_error(500))
     assert llm._cooldown_until == 0.0
+
+
+# --- a hung call must not hold an enrichment slot for ten minutes --------------
+
+
+def test_the_llm_client_has_an_explicit_timeout():
+    """The OpenAI client default is 600s and nothing overrode it.
+
+    Enrichment runs 12 concurrent handlers over a stream batch of 12, so one
+    hung call holds a slot for the whole default and a few of them stall the
+    batch. Measured on a cold start 2026-09-03: the gate approved ~6,000
+    items/hour while enrichment consumed ~180 — a 33x gap that grew the queue
+    ~5,800/hour and never drained.
+    """
+    from common.llm import LLM_TIMEOUT_SECONDS, get_llm
+
+    client = get_llm()
+    assert client.timeout == LLM_TIMEOUT_SECONDS
+    assert LLM_TIMEOUT_SECONDS < 120, (
+        "a timeout at or above the batch stall defeats the purpose — it must be "
+        "well under the time a slow call can hold a concurrency slot"
+    )
+    assert LLM_TIMEOUT_SECONDS > 30, (
+        "too tight and normal extracts start failing, which turns a throughput "
+        "problem into a data-loss one"
+    )
+
+
+def test_a_timed_out_call_is_retried_not_dropped():
+    """The message stays pending on the stream and is redelivered, so a timeout
+    costs latency rather than an article."""
+    from common.llm import get_llm
+
+    assert get_llm().max_retries >= 1

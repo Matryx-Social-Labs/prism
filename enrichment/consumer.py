@@ -24,6 +24,7 @@ from common.observability import fetch_prompt, observe
 from common.schemas import EnrichedItemMessage
 from common.securities import validated
 from common.text import chunk_text
+from enrichment.claims import verify_claims
 from enrichment.cve_lens import extract_from_kev, extract_from_nvd
 from enrichment.fulltext import retrieve_fulltext
 from enrichment.schemas import ArticleExtraction
@@ -112,12 +113,16 @@ async def handle_classified_item(payload: dict) -> None:
             trace_name="extract-shared",
             metadata=meta,
             langfuse_prompt=prompt if prompt.version else None,
-            # claims/impacts have no news-side reader — correlation re-derives
-            # impacts in event-analysis and nothing reads claims. Drop them from
-            # the schema so the highest-volume LLM stage emits less (fewer output
-            # tokens, less truncation risk on entities). CVE impacts come from the
-            # deterministic cve_lens path, which still populates these fields.
-            prune_fields={"claims", "impacts"},
+            # `impacts` stays pruned: correlation re-derives them in
+            # event-analysis and nothing reads the extracted ones, so asking for
+            # them costs output tokens on the highest-volume stage for nothing.
+            # CVE impacts come from the deterministic cve_lens path regardless.
+            #
+            # `claims` is BACK. It was pruned on the same "nothing reads it"
+            # reasoning, which was true and is the reason the perspectives layer
+            # does not exist — the tagline promises every perspective and the
+            # pipeline was told not to collect any.
+            prune_fields={"impacts"},
         )
         # The ACTUAL provider, not a hardcoded one. This read "ollama:" while
         # llm_provider defaulted to openrouter and the OpenRouter key was set, so
@@ -155,6 +160,14 @@ async def handle_classified_item(payload: dict) -> None:
             session.add(
                 ArticleChunk(article_id=article_id, chunk_index=idx, text=text, embedding=vector)
             )
+        # VERBATIM OR NOT STORED. The model is asked for a quote; whether it
+        # actually copied one is checked here against the article, because a
+        # fabricated quote renders exactly like a real one and no reader can tell.
+        verified, claim_rejects = verify_claims(shared.claims, clean_text)
+        shared = shared.model_copy(update={"claims": verified})
+        if any(claim_rejects.values()):
+            logger.info("claims_rejected", raw_item_id=str(raw_item_id), **claim_rejects)
+
         lens_fields = {}
         if extraction.cyber:
             lens_fields["cyber"] = extraction.cyber.model_dump()

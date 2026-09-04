@@ -32,8 +32,36 @@ class ExtractedEntity(BaseModel):
 
 
 class Claim(BaseModel):
-    text: str
-    contested: bool = False
+    """One thing somebody SAID, attributed and quotable.
+
+    The previous shape was `{text, contested}` — a free-text assertion with no
+    speaker, no quote and no span. That cannot carry a perspectives layer: "what
+    has this person said across this story" is unanswerable when the speaker is
+    not a field, and a claim with no verbatim quote is a summary a reader cannot
+    check.
+
+    MISATTRIBUTION IS THE WORST FAILURE THIS PRODUCT CAN HAVE. A wrong story
+    boundary shows someone an unrelated card; a wrong attribution puts words in a
+    named person's mouth. So the quote is verbatim or the claim is not stored —
+    enforced in enrichment/claims.py against the article text, because the model
+    cannot be trusted to mark its own homework.
+    """
+
+    speaker: str = Field(description="Who said it, as named in the article")
+    quote_text: str = Field(description="Their words VERBATIM from the article, not paraphrased")
+    claim_text: str = Field(default="", description="One neutral sentence: what they claimed")
+    target: str | None = Field(default=None, description="Who or what the claim is about")
+    stance: str | None = Field(default=None, description="critical|neutral|supportive|defensive")
+    said_at: str | None = Field(default=None, description="ISO date if the article states one")
+    # Character offsets into articles.clean_text. The model is poor at these and
+    # they are REPAIRED from quote_text rather than trusted; see verify_claims.
+    quote_start: int | None = None
+    quote_end: int | None = None
+
+    @field_validator("speaker", "quote_text", mode="before")
+    @classmethod
+    def _clean(cls, v):
+        return (v or "").strip()
 
 
 class Stance(BaseModel):

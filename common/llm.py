@@ -33,6 +33,8 @@ _client: AsyncOpenAI | None = None
 #   429     — rate/weekly limit
 _QUOTA_STATUS = {401, 402, 403, 429}
 _COOLDOWN_SECONDS = 120
+# Per-request ceiling; see get_llm for why an explicit one matters.
+LLM_TIMEOUT_SECONDS = 90.0
 _WEEKLY_COOLDOWN_SECONDS = 900  # weekly-limit 429s: don't poke every 2 minutes
 _cooldown_until = 0.0
 
@@ -70,7 +72,20 @@ def get_llm() -> AsyncOpenAI:
             base_url = settings.ollama_base_url
             api_key = settings.ollama_api_key or "ollama"
             headers = None
-        _client = AsyncOpenAI(base_url=base_url, api_key=api_key, default_headers=headers)
+        # EXPLICIT TIMEOUT. The client default is 600s, and a hung call holds an
+        # enrichment concurrency slot for all of it. With 12 slots and a stream
+        # batch of 12, a handful of slow calls stalls the whole batch — which is
+        # what a cold-start measurement on 2026-09-03 showed: the relevance gate
+        # approved ~6,000 items/hour while enrichment consumed ~180, a 33x gap
+        # that grew the queue ~5,800/hour and never drained.
+        #
+        # 90s is well past a normal extract (a few seconds) and well short of the
+        # batch stall. A call that exceeds it raises, the message stays pending on
+        # the stream and is redelivered, so the work is retried rather than lost.
+        _client = AsyncOpenAI(
+            base_url=base_url, api_key=api_key, default_headers=headers,
+            timeout=LLM_TIMEOUT_SECONDS, max_retries=2,
+        )
     return _client
 
 
