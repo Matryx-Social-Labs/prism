@@ -582,15 +582,31 @@ def build_branch_tree(
         for p in members
     }
 
-    for node in order:
+    for idx, node in enumerate(order):
         if node.id == root.id:
             continue
         # Spine gate: shares the root's distinctive actors AND embeds near the root.
         on_spine = _spine_weight(node, spine) >= SPINE_MIN_WEIGHT and root_dist(node.id) <= STORY_MAX_EMBED_DIST
         if not on_spine:
             off_spine.add(node.id)
-        # Attach to the best prior event (root is always an eligible parent).
-        priors = [p for p in order if p.occurred_at <= node.occurred_at and p.id != node.id]
+        # Attach to the best STRICTLY EARLIER member (root is always an eligible
+        # parent, via `best`'s initial value below).
+        #
+        # The prefix of `order`, not a filter on occurred_at. `occurred_at <= ...`
+        # is not an ordering: two events sharing a timestamp were each eligible as
+        # the OTHER's parent, and since affinity is symmetric they routinely chose
+        # each other. Production, measured 2026-09-04: 314 mutual pairs, every one
+        # of them between events with identical occurred_at, leaving 1,059 of
+        # 5,559 members (19%) unable to walk up to a root at all. Not a corner —
+        # 73.5% of events carry date-granularity timestamps (exact midnight),
+        # because that is all their source published.
+        #
+        # `order` is sorted by (occurred_at, id), which IS a total order, so a
+        # parent taken from the prefix is always strictly earlier and a cycle is
+        # impossible by construction rather than merely unlikely. Filtering on
+        # `<` instead would have been the smaller edit and the wrong one: it
+        # orphans every same-day pair onto the root and flattens the tree.
+        priors = order[:idx]
         best, best_score = root, -1.0
         for p in priors:
             # A candidate with no pull at all has nothing to normalise away, and

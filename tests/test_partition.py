@@ -422,3 +422,38 @@ async def test_the_resolution_moves_with_the_edge_set():
     assert partition.LEIDEN_RESOLUTION_V2 == 0.20
     assert partition.compute_partition.__defaults__[0] == partition.LEIDEN_RESOLUTION_V2
     assert partition.persist_base_run.__defaults__[0] == partition.LEIDEN_RESOLUTION_V2
+
+
+def test_same_day_developments_cannot_become_each_others_parent():
+    """REGRESSION: 19% of production's story spine was not attached to a tree.
+
+    `priors` filtered on `p.occurred_at <= node.occurred_at`, which is not an
+    ordering — two events sharing a timestamp were each eligible as the OTHER's
+    parent, and affinity is symmetric, so they routinely chose each other.
+
+    Measured on the live partition run 2026-09-04: 314 mutual pairs, every single
+    one between events with identical occurred_at, leaving 1,059 of 5,559 members
+    unable to walk up to a root. Not a corner case — 73.5% of events carry
+    date-granularity timestamps because that is all their source published.
+
+    The bug is invisible downstream: threads.branch_tree_for_members carries a
+    `seen` guard that stops the walk, so a cycle renders as a plausible depth
+    instead of hanging. The page looked fine.
+    """
+    # a and b share a day and are by far each other's strongest neighbour.
+    members = [_dated("r", 1, srcs=10), _dated("a", 2), _dated("b", 2)]
+    edge_w = {("a", "b"): 5.0, ("b", "a"): 5.0}
+    embed = {(x.id, y.id): 0.5 for x in members for y in members if x.id != y.id}
+
+    root_id, parent, _ = build_branch_tree(members, edge_w, embed, {})
+
+    assert parent[root_id] is None
+    for m in members:
+        seen, cur = set(), m.id
+        while parent.get(cur) is not None:
+            assert cur not in seen, f"{m.id} sits in a parent cycle: {parent}"
+            seen.add(cur)
+            cur = parent[cur]
+        assert cur == root_id, f"{m.id} walks to {cur}, not the root"
+    # The genuine relationship survives: b still attaches to a, not to the root.
+    assert parent["b"] == "a"
