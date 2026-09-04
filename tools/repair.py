@@ -11,6 +11,7 @@ it deletes and rewrites event_memberships — so read its report before trusting
 
   uv run python -m tools.repair                 # report everything, write nothing
   uv run python -m tools.repair --titles --apply
+  uv run python -m tools.repair --markup        # report only
   uv run python -m tools.repair --clusters      # report only
 
 The expensive work is already paid for: extraction and embeddings exist on every
@@ -27,13 +28,19 @@ import json
 import os
 import re
 import subprocess
+import uuid
 
 import asyncpg
 
+from common.embeddings import embed_texts
 from common.entity_aliases import ENTITY_ALIASES
-from common.text import entity_slug
+from common.text import chunk_text, entity_slug
+from enrichment.fulltext import _markup_leaked, retrieve_fulltext
 
 OVER_MERGE_MIN = 20  # members at or above which an event is worth re-deciding
+# Modest on purpose: this walks one publisher's site to recover an error we caused,
+# and there is no deadline. Being impolite about that is a bad trade.
+MARKUP_FETCH_CONCURRENCY = 6
 
 
 def _db_url() -> str:
@@ -201,13 +208,130 @@ async def apply_entities(c: asyncpg.Connection, *, write: bool) -> None:
     print(f"  APPLIED: {ev + ar} outlet links removed, {len(pairs)} alias variants folded")
 
 
+async def report_markup(c: asyncpg.Connection, limit: int | None = None) -> list[dict]:
+    """Articles whose clean_text came back as MARKUP, refetched through the fixed path.
+
+    Sibling of report_titles: that one unescapes HTML ENTITIES in a title, this one
+    removes HTML TAGS from an article body. 877 rows, 854 of them one source, where
+    trafilatura returned the page's HTML as if it were text.
+
+    NO LLM CREDITS. The obvious repair — re-run enrichment — is not needed, because
+    the extraction is fine: the affected source averages 9.30 entities per article
+    against 7.54 for a clean Kannada control, all 883 of its enrichments have a
+    summary, and the summaries are specific and correct. The model read straight
+    through the markup. What is actually damaged is the TEXT and the vectors built
+    from it — `clean_text` is the string a claim's quote is verified against, and
+    `article_chunks.embedding` currently encodes "</p>" and an App Store link. Both
+    are repaired by refetching and re-embedding: HTTP plus local ONNX, cost zero.
+    """
+    print(f"\n{'='*74}\nCLEAN_TEXT holding HTML tags\n{'='*74}")
+    rows = [dict(r) for r in await c.fetch(
+        """
+        SELECT a.id::text AS id, ri.url AS url, length(a.clean_text) AS chars, s.slug AS src
+        FROM articles a
+        JOIN raw_items ri ON ri.id = a.raw_item_id
+        JOIN sources s ON s.id = ri.source_id
+        WHERE a.clean_text ~ '</[a-zA-Z]+>' AND ri.url IS NOT NULL
+        ORDER BY a.created_at
+        """
+    )]
+    if limit:
+        rows = rows[:limit]
+        print(f"\n  --limit {limit}: smoke test on the first {len(rows)}")
+    by_src: dict[str, int] = {}
+    for r in rows:
+        by_src[r["src"]] = by_src.get(r["src"], 0) + 1
+    print(f"\n  {len(rows)} articles, by source:")
+    for slug, n in sorted(by_src.items(), key=lambda kv: -kv[1]):
+        print(f"    {n:>5}  {slug}")
+
+    sem = asyncio.Semaphore(MARKUP_FETCH_CONCURRENCY)
+
+    async def one(r: dict) -> dict:
+        async with sem:
+            try:
+                text, _tier, _img = await retrieve_fulltext(r["url"], None)
+            except Exception as exc:
+                return {**r, "skip": f"fetch failed ({type(exc).__name__})"}
+        if not text:
+            # NEVER blank a row. Contaminated text is worse than clean text and far
+            # better than none: emptying clean_text would delete an article's whole
+            # evidence trail in order to fix its formatting.
+            return {**r, "skip": "empty result"}
+        if _markup_leaked(text):
+            return {**r, "skip": "still markup after refetch"}
+        return {**r, "text": text}
+
+    out = await asyncio.gather(*(one(r) for r in rows))
+    fixed = [r for r in out if "text" in r]
+    skipped = [r for r in out if "skip" in r]
+    print(f"\n  refetched clean : {len(fixed)}")
+    print(f"  left untouched  : {len(skipped)}")
+    for reason in sorted({r["skip"] for r in skipped}):
+        print(f"      {sum(1 for r in skipped if r['skip'] == reason):>4}  {reason}")
+    if fixed:
+        was, now = sum(r["chars"] for r in fixed), sum(len(r["text"]) for r in fixed)
+        print(f"  chars {was:,} -> {now:,}  ({100 * (was - now) // max(was, 1)}% of it was markup)")
+        print(f"\n  sample: {fixed[0]['text'][:110]!r}")
+    return fixed
+
+
+async def apply_markup(c: asyncpg.Connection, fixed: list[dict]) -> None:
+    """Write the refetched text and rebuild each article's chunks.
+
+    Embeddings are computed BEFORE the transaction opens: they are pure local
+    compute and holding a production write transaction across minutes of ONNX for
+    no reason is how a repair becomes an incident.
+    """
+    prepared = []
+    for r in fixed:
+        chunks = chunk_text(r["text"])
+        prepared.append((r["id"], r["text"], chunks, await embed_texts(chunks)))
+
+    async with c.transaction():
+        for aid, text, chunks, vecs in prepared:
+            await c.execute(
+                "UPDATE articles SET clean_text = $2, word_count = $3 WHERE id = $1::uuid",
+                aid, text, len(text.split()),
+            )
+            # Replaced, not updated in place: the clean text may chunk into a
+            # DIFFERENT number of pieces, and updating would leave orphaned tail
+            # chunks still holding the markup.
+            await c.execute("DELETE FROM article_chunks WHERE article_id = $1::uuid", aid)
+            for idx, (chunk, vec) in enumerate(zip(chunks, vecs, strict=True)):
+                # `id` is supplied explicitly. ArticleChunk.id is a PYTHON-side
+                # default (uuid_pk in common/models.py), not a database one, so a
+                # raw INSERT that omits it hits a NOT NULL violation — which is
+                # exactly what the first run of this did. The transaction rolled
+                # it back cleanly; the lesson is that bypassing the ORM means
+                # bypassing its defaults too.
+                await c.execute(
+                    "INSERT INTO article_chunks (id, article_id, chunk_index, text, embedding) "
+                    "VALUES ($1::uuid, $2::uuid, $3, $4, $5::vector)",
+                    str(uuid.uuid4()), aid, idx, chunk,
+                    "[" + ",".join(f"{v:.6f}" for v in vec) + "]",
+                )
+    left = await c.fetchval("SELECT count(*) FROM articles WHERE clean_text ~ '</[a-zA-Z]+>'")
+    print(f"  APPLIED: {len(prepared)} articles rewritten and re-embedded")
+    print(f"  articles still holding markup: {left}")
+    # events.embedding is copied from an article's first chunk at event creation
+    # (correlation/consumer._first_chunk_embedding), so events founded by one of
+    # these articles still carry a vector built from markup. Rewriting those would
+    # change the embedding kNN edges the v2 story layer is built from — a change to
+    # the story graph, unmeasured. Left for a partition replay to decide.
+    print("  NOTE: events.embedding is NOT rewritten — see the comment in apply_markup.")
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--entities", action="store_true")
     ap.add_argument("--titles", action="store_true")
+    ap.add_argument("--markup", action="store_true", help="clean_text holding HTML tags")
+    ap.add_argument("--limit", type=int, default=None,
+                    help="cap articles for --markup; prove the write path on a few first")
     ap.add_argument("--apply", action="store_true", help="WRITE. Without it, nothing changes.")
     a = ap.parse_args()
-    every = not (a.entities or a.titles)
+    every = not (a.entities or a.titles or a.markup)
 
     c = await asyncpg.connect(_db_url(), timeout=45)
     try:
@@ -225,6 +349,10 @@ async def main() -> None:
             fixes = await report_titles(c)
             if a.apply and a.titles:
                 await apply_titles(c, fixes)
+        if every or a.markup:
+            fixed = await report_markup(c, a.limit)
+            if a.apply and a.markup:
+                await apply_markup(c, fixed)
 
         if not a.apply:
             print("\nNothing was written. Re-run with --apply plus a section to act.")
