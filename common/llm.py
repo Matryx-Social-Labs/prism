@@ -248,13 +248,31 @@ def _parse_json_loose(content: str) -> Any:
     if text.startswith("```"):
         text = text.split("\n", 1)[1] if "\n" in text else text
         text = text.rsplit("```", 1)[0].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
+    def _braces() -> Any:
         start, end = text.find("{"), text.rfind("}")
         if start != -1 and end > start:
             return json.loads(text[start : end + 1])
-        raise
+        raise ValueError("no JSON object in model output")
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return _braces()
+    # A BARE SCALAR IS NOT AN INSTANCE OF A MODEL, and returning one here short-
+    # circuits the brace scan below. Observed live: the extract model answered
+    # `-8.039215789473683` and `-1e-05` — a stray sentiment value with the object
+    # nowhere in sight — and pydantic then reported "Input should be a valid
+    # dictionary", which reads like a schema mismatch rather than "the model did
+    # not answer". Falling through lets an object embedded in prose still be
+    # found, and where there is none the error names the real problem.
+    if not isinstance(parsed, dict):
+        try:
+            return _braces()
+        except Exception:
+            raise ValueError(
+                f"model returned a bare {type(parsed).__name__}, not a JSON object"
+            ) from None
+    return parsed
 
 
 async def plain_chat(

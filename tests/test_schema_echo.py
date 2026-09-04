@@ -91,3 +91,63 @@ async def test_an_echoed_schema_is_named_and_not_quoted_back(monkeypatch):
     assert [m["role"] for m in appended] == ["user"], (
         f"the echoed schema was quoted back into the retry: {[m['role'] for m in appended]}"
     )
+
+
+# --- the model answering with a bare number ------------------------------------
+
+
+def test_a_bare_scalar_is_refused_with_a_useful_message():
+    """Observed live on the extract model: it answered `-8.039215789473683` and
+    `-1e-05` — a stray sentiment value, the object nowhere in sight.
+
+    `json.loads` SUCCEEDS on that, so the brace scan never ran and pydantic
+    reported "Input should be a valid dictionary", which reads like a schema
+    mismatch rather than "the model did not answer". Naming it is the difference
+    between tuning a schema and chasing a model.
+    """
+    import pytest as _p
+
+    from common.llm import _parse_json_loose
+
+    for bare in ("-8.039215789473683", "-1e-05", "42", '"just a string"', "true"):
+        with _p.raises(ValueError, match="bare"):
+            _parse_json_loose(bare)
+
+
+def test_an_object_buried_in_reasoning_text_is_still_found():
+    """The extract model leaks chain-of-thought. Short-circuiting on the first
+    valid JSON value would miss the object sitting after it."""
+    from common.llm import _parse_json_loose
+
+    content = 'Thinking Process:\n\n1. sentiment is -0.2\n\n{"shared": {"headline_summary": "x"}}'
+    assert _parse_json_loose(content) == {"shared": {"headline_summary": "x"}}
+
+
+def test_a_real_object_still_parses_unchanged():
+    """The guard must not cost the working path."""
+    from common.llm import _parse_json_loose
+
+    assert _parse_json_loose('{"a": 1}') == {"a": 1}
+    assert _parse_json_loose('```json\n{"a": 2}\n```') == {"a": 2}
+
+
+def test_a_list_WRAPPING_the_object_is_unwrapped_not_refused():
+    """Models wrap the answer in an array constantly. The object is right there,
+    so recovering it beats refusing — the guard exists to catch output with no
+    object in it, not to be strict for its own sake."""
+    from common.llm import _parse_json_loose
+
+    assert _parse_json_loose('[{"shared": {"headline_summary": "x"}}]') == {
+        "shared": {"headline_summary": "x"}
+    }
+
+
+def test_a_list_with_no_object_in_it_is_refused():
+    """`[1, 2, 3]` has nothing to unwrap, and pydantic's "valid dictionary"
+    complaint would send the reader looking at the schema instead of the model."""
+    import pytest as _p
+
+    from common.llm import _parse_json_loose
+
+    with _p.raises(ValueError, match="bare list"):
+        _parse_json_loose("[1, 2, 3]")
