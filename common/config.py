@@ -37,8 +37,25 @@ class Settings(BaseSettings):
     # qwen3.5-flash is the cheapest that stays reliable — 0 empty, ~0.77 recall — at
     # ~4.7x lower cost than qwen3.7-plus ($0.07/$0.26 vs $0.32/$1.28 per M). Soft-news
     # (extract_light) uses it too: gemini-flash-lite was silently emitting no entities.
-    prism_model_extract: str = "qwen/qwen3.5-flash-02-23"
-    prism_model_extract_light: str = "qwen/qwen3.5-flash-02-23"
+    # MEASURED 2026-09-04 on 10 production articles, same prompt, claims enabled:
+    #
+    #   qwen/qwen3.5-flash-02-23      failed 10/10   0 claims    0 entities
+    #   google/gemini-3.1-flash-lite  failed  0/10  16 claims   77 entities
+    #   google/gemini-3.5-flash       failed  0/10  15 claims   73 entities
+    #
+    # qwen answers with a BARE NUMBER instead of the object — `-8.039215789473683`,
+    # a stray sentiment value with no object in the response at all. It has worked
+    # historically (1,095 enrichments carry its name), so this is degradation
+    # rather than a mistake in choosing it, and the stream's redelivery hid the
+    # cost: production still only loses 3.6% of relevant items permanently, but
+    # roughly half of every extraction attempt was being paid for and thrown away.
+    #
+    # THIS REVERSES A RECORDED FINDING and the reversal is the point: the earlier
+    # note said gemini "empties entities", which is why qwen was chosen. On this
+    # sample gemini returns 77 entities and qwen returns none, because qwen
+    # returns nothing at all. Re-measure before trusting either direction again.
+    prism_model_extract: str = "google/gemini-3.1-flash-lite"
+    prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
     prism_model_correlate: str = "qwen/qwen3.7-plus"  # analysis/briefs/digest — content quality
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning
