@@ -239,8 +239,23 @@ async def _upsert_entities(
         result = await session.execute(stmt)
         entity_id = result.scalar_one_or_none()
         if entity_id is None:
-            existing = await session.execute(select(Entity.id).where(Entity.slug == slug))
-            entity_id = existing.scalar_one_or_none()
+            # FOLLOW THE FOLD. This is the path every mention takes, and it used to
+            # stop at whatever row carried the slug — including one already merged
+            # away. Folding "Rashtriya Swayamsevak Sangh" into "RSS" repoints the
+            # existing mentions but keeps the old row, because real articles use
+            # that name; so the next article naming it landed straight back on the
+            # dead row and the split reopened.
+            #
+            # Measured on production 2026-09-03: 31 mentions attached to redirected
+            # entities, every one created that day by a single ingestion run —
+            # RSS, AICC, Directorate of Enforcement, AAP. The one-off fold reported
+            # success while the graph re-fragmented at ingest speed underneath it.
+            existing = (
+                await session.execute(
+                    select(Entity.id, Entity.merged_into).where(Entity.slug == slug)
+                )
+            ).first()
+            entity_id = await _follow_merge(session, *existing) if existing else None
         if entity_id is None:
             continue
         # Both links, written together. The event-level one is what the rest of
@@ -694,6 +709,33 @@ def _deterministic_correlation(members) -> CorrelationResult:
 # bound `api/routes/trending.py` puts on the story merge chain, and for the same
 # reason: a cycle would hang the caller rather than fail.
 _MAX_ENTITY_MERGE_HOPS = 8
+
+
+async def _follow_merge(session, entity_id: uuid.UUID,
+                        merged_into: uuid.UUID | None) -> uuid.UUID:
+    """Walk `merged_into` to the row that actually holds the mentions.
+
+    Bounded rather than `while`: a cycle would hang the consumer, and a chain
+    longer than this is corruption worth stopping on. Production carries a real
+    two-hop chain (CJP -> Cockroach Janta Party -> Cockroach Janata Party), so one
+    hop is not enough.
+    """
+    seen: set[uuid.UUID] = set()
+    for _ in range(_MAX_ENTITY_MERGE_HOPS):
+        if merged_into is None:
+            return entity_id
+        if merged_into in seen:
+            return entity_id      # cycle: stop on the last sound row
+        seen.add(merged_into)
+        nxt = (
+            await session.execute(
+                select(Entity.id, Entity.merged_into).where(Entity.id == merged_into)
+            )
+        ).first()
+        if nxt is None:
+            return entity_id      # dangling pointer: the row we have is the best one
+        entity_id, merged_into = nxt
+    return entity_id
 
 
 async def _resolve_entity(session, name: str) -> uuid.UUID | None:

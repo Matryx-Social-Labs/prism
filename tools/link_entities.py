@@ -610,6 +610,55 @@ async def unfold(c, journal: str, *, write: bool) -> None:
     print(f"  UNFOLDED: {restored} rows restored, redirects cleared")
 
 
+async def repoint(url: str | None = None, apply: bool = False) -> None:
+    """Move mentions off folded entity rows onto the row that survived.
+
+    `fold` repoints everything that exists when it runs. Anything ingested AFTER
+    it lands on the dead row again if the attach path does not follow the fold —
+    which it did not until 2026-09-04, so a single ingestion run left 31 such
+    mentions. The consumer is fixed; this clears what it already wrote, and is
+    safe to re-run whenever the count above is non-zero.
+    """
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        stale = await c.fetchval(
+            "SELECT count(*) FROM event_entities ee JOIN entities e ON e.id = ee.entity_id "
+            "WHERE e.merged_into IS NOT NULL")
+        print(f"  mentions on folded rows: {stale}")
+        if not stale or not apply:
+            if stale and not apply:
+                print("  DRY RUN — re-run with --apply")
+            return
+        async with c.transaction():
+            # ON CONFLICT: the canonical row may already carry this event, in which
+            # case the duplicate is dropped rather than the update failing.
+            moved = await c.fetchval(
+                """
+                WITH m AS (
+                    UPDATE event_entities ee SET entity_id = e.merged_into
+                    FROM entities e
+                    WHERE e.id = ee.entity_id AND e.merged_into IS NOT NULL
+                      AND NOT EXISTS (SELECT 1 FROM event_entities x
+                                      WHERE x.event_id = ee.event_id
+                                        AND x.entity_id = e.merged_into)
+                    RETURNING 1) SELECT count(*) FROM m
+                """)
+            dropped = await c.fetchval(
+                """
+                WITH d AS (
+                    DELETE FROM event_entities ee USING entities e
+                    WHERE e.id = ee.entity_id AND e.merged_into IS NOT NULL
+                    RETURNING 1) SELECT count(*) FROM d
+                """)
+        print(f"  repointed {moved}, dropped {dropped} already-present duplicates")
+    finally:
+        await c.close()
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fetch", action="store_true", help="query Wikidata to fill the index")
@@ -624,9 +673,17 @@ async def main() -> None:
     ap.add_argument("--journal", default="entity_fold.json")
     ap.add_argument("--min-df", type=int, default=2)
     ap.add_argument("--limit", type=int, default=400, help="max names to look up per --fetch run")
+    ap.add_argument("--repoint", action="store_true",
+                    help="move mentions off folded rows onto the survivor (dry-run)")
     ap.add_argument("--index-url", default=None,
                     help="hold the alias index in a DIFFERENT database from the corpus")
     a = ap.parse_args()
+
+    # Repoint stands alone: it needs no alias index and no Wikidata, only the
+    # corpus, so it runs before the heavier setup below.
+    if a.repoint:
+        await repoint(None, apply=a.write)
+        return
 
     # The alias index is a CACHE of public Wikidata, not corpus data, so it does
     # not have to live beside the corpus it is used against. Separating them is
