@@ -347,3 +347,50 @@ describe("a claim task", () => {
     expect(await screen.findByText(/RIGHT QUOTE, WRONG MOUTH/)).toBeInTheDocument();
   });
 });
+
+describe("the claims guide actually reaches the labeller", () => {
+  // The test above asserts the guide's TEXT is in the document. <details> keeps
+  // its children in the DOM when collapsed, so that assertion passes whether or
+  // not anyone can read them. This one checks the disclosure is actually OPEN.
+
+  const CLAIM = {
+    article_id: "a1",
+    title: "Router vendor responds",
+    source: "The Hacker News",
+    speaker: "Zbtlink",
+    quote_text: "This component has never been used for unauthorized access",
+    context_before: "in a statement on its website. ",
+    context_after: ", the company said.",
+    target: "ENDLESSDOORS",
+    stance: "defensive",
+  };
+
+  function taskAt(position: number) {
+    return { id: `task-c${position}`, position, kind: "claim_attribution" as const, claim: CLAIM };
+  }
+
+  it("opens the guide on the first question", async () => {
+    // An invited claims labeller never sees the landing screen where the story
+    // flow shows its guide open — their token takes them straight to a task. So
+    // if it is collapsed here, the tutorial was written and shown to nobody.
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: taskAt(0), closed: false });
+    const { container } = render(<LabelPage params={params} />);
+
+    await screen.findByText(/RIGHT QUOTE, WRONG MOUTH/);
+    const details = container.querySelector("details");
+    expect(details).not.toBeNull();
+    expect(details!.open).toBe(true);
+  });
+
+  it("collapses it once they are past the first question", async () => {
+    // Reading it once is the point; re-reading it above every question is noise
+    // that pushes the actual task off a phone screen.
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: taskAt(1), closed: false });
+    const { container } = render(<LabelPage params={params} />);
+
+    await screen.findByText(/RIGHT QUOTE, WRONG MOUTH/);
+    expect(container.querySelector("details")!.open).toBe(false);
+  });
+});

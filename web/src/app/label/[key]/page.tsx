@@ -192,7 +192,12 @@ function ClaimTask({
         </button>
       </div>
 
-      <ClaimGuide />
+      {/* Open on the FIRST question only. A claims labeller arrives with an
+          invite token, which skips the landing screen where the story flow
+          shows its guide open — so collapsed here meant the guide was never put
+          in front of anyone. The point of it is being read BEFORE the first
+          judgement, not after a wrong one. */}
+      <ClaimGuide open={position === 0} />
     </>
   );
 }
