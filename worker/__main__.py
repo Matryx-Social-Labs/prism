@@ -197,12 +197,25 @@ async def main(stages: list[str]) -> None:
                     # — $0.40 for 19 usable articles, against a recorded steady-state
                     # cost of $1.55 per 1,000.
                     #
-                    # Raising this number is NOT the fix: 12 already-parallel workers
-                    # at ~180/hour means each article takes seconds of wall clock
-                    # (fulltext fetch, then the extract call), so the ceiling is
-                    # per-article latency, not slot count. The fix is either to rate
-                    # the collectors to what enrichment can absorb, or to stop paying
-                    # for gate decisions on a backlog that is never reached.
+                    # THAT DIAGNOSIS WAS WRONG, and the correction is worth keeping.
+                    # "The ceiling is per-article latency, not slot count" does not
+                    # survive arithmetic: components measured 2026-09-04 are fulltext
+                    # 0.42s median, embed 0.107s, extract 2.61s — ~3.14s, which across
+                    # 12 slots is ~13,700 articles/hour, not 180.
+                    #
+                    # The ceiling was the BATCH BARRIER in common/stream.consume: it
+                    # read a batch, gather()ed all of it, and only read the next batch
+                    # once every message finished. With batch_size == concurrency == 12
+                    # the semaphore bounded nothing and throughput was
+                    # batch_size / slowest-of-the-batch. One slow article idled eleven
+                    # workers. Fixed by a pool of persistent workers; see the comment
+                    # there and tests/test_stream_pool.py.
+                    #
+                    # Two contributing faults are also gone: the LLM client had no
+                    # timeout (600s default, so a hung call held a slot for ten
+                    # minutes), and the extract model was returning a bare number for
+                    # every call, so roughly half of each attempt was paid for and
+                    # discarded. Re-measure before tuning this number again.
                     consumer_name=f"enr-{CONSUMER_NAME}", concurrency=12, batch_size=12,
                 )
             )

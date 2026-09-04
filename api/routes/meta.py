@@ -13,6 +13,7 @@ from api.schemas import (
 )
 from common.db import get_db
 from common.lenses import DEFAULT_LENS, active_lenses
+from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
 
 router = APIRouter()
@@ -20,8 +21,22 @@ router = APIRouter()
 
 @router.get("/healthz")
 async def healthz(db: AsyncSession = Depends(get_db)):
+    """Liveness, plus the queue depth behind each stage.
+
+    `SELECT 1` alone was the whole check, and it is exactly the wrong thing to
+    measure: the pipeline's characteristic failure is not a database that stopped
+    answering, it is a stage that keeps answering while its backlog grows. On
+    2026-09-03 the gate approved items ~35x faster than enrichment consumed them,
+    1,023 relevant articles were collected and never enriched, and nothing
+    anywhere reported it. The only stream-size code in the repo was STREAM_MAXLEN,
+    which silently DISCARDS old entries at 100k.
+
+    Never fails the check on a backlog. A deep queue is a capacity problem, not a
+    liveness problem, and a health endpoint that goes red on one would take the
+    API out of rotation for a condition the API cannot cause or fix.
+    """
     await db.execute(text("SELECT 1"))
-    return {"status": "ok"}
+    return {"status": "ok", "streams": await backlog()}
 
 
 @router.get("/api/v1/lenses", response_model=LensesResponse)
