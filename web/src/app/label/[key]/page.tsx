@@ -147,6 +147,18 @@ function ClaimTask({
         <strong style={{ color: "var(--ink)" }}>{claim.speaker}</strong>?
       </p>
 
+      {claim.lead ? (
+        <p
+          className="mt-4 text-[13.5px] leading-[1.6]"
+          style={{ color: "var(--ink-muted)" }}
+        >
+          <span className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+            HOW THE ARTICLE OPENS ·{" "}
+          </span>
+          {claim.lead}…
+        </p>
+      ) : null}
+
       <div
         className="mt-4 border-l-2 pl-4 text-[15px] leading-[1.65]"
         style={{ borderColor: "var(--ink)" }}
@@ -157,6 +169,20 @@ function ClaimTask({
         </mark>
         <span style={{ color: "var(--ink-faint)" }}>{claim.context_after}…</span>
       </div>
+
+      {claim.article_text ? (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+            Read the whole article
+          </summary>
+          <p
+            className="mt-3 max-h-[420px] overflow-y-auto whitespace-pre-line text-[14px] leading-[1.7]"
+            style={{ color: "var(--ink-muted)" }}
+          >
+            {claim.article_text}
+          </p>
+        </details>
+      ) : null}
 
       <div
         className="mt-6 flex flex-wrap items-center gap-3 border-t pt-5"

@@ -308,6 +308,165 @@ async def push(name: str, url: str | None = None) -> None:
     print(f"  share this link:  /label/{key}")
 
 
+# ── Claim-attribution batches ────────────────────────────────────────────────
+# The first claims batch was built from the 60 most RECENTLY enriched articles,
+# which turned out to be 41 articles all dated one afternoon — the 2026-09-03
+# ingestion test — and 29% of them from one cyber outlet, because its pieces are
+# long and quote-dense. That is a sample of one afternoon, not of the corpus.
+#
+# Uniform random with a fixed seed instead, the same discipline gold_pairs uses
+# (setseed(0.42) / setseed(0.77)). A different seed so the two sets cannot
+# accidentally coincide.
+CLAIM_SAMPLE_SEED = 0.31
+
+# How much of the article a labeller can see around the quote.
+#
+# MEASURED on the first batch, asking "is the claimed speaker's name anywhere in
+# what we show?" — because when it is not, the honest answer is "not sure" and the
+# task teaches us nothing:
+#
+#     lead   0 + window +/- 320   ->  79%     <- what shipped
+#     lead   0 + window +/- 800   ->  92%
+#     lead 250 + window +/- 320   ->  90%
+#     lead 250 + window +/- 800   ->  95%
+#     lead 250 + window +/-1200   ->  95%     <- plateau, not worth the extra reading
+#
+# The lead earns its place because Indian news names an official ONCE, in the first
+# sentence ("District Collector S. Venkateswar said..."), and refers to them by role
+# for the rest of the piece. Without it "the Collector said" is unresolvable.
+#
+# THAT MEASUREMENT DID NOT TRANSFER, and the correction is the point. Re-measured on
+# a UNIFORM sample rather than round 1's recency sample:
+#
+#     round-1 shape (+/-320, no lead)   72%
+#     wider window only (+/-800)        75%
+#     +/-800 with the lead              75%     <- the lead adds nothing here
+#
+# Round 1 was easier than the corpus is: vendor security reports say "Sygnia said",
+# while Indian regional news says "the Collector said" and names the Collector once,
+# paragraphs away. So a window cannot fix this — at any width, roughly a quarter of
+# claims refer to their speaker by role near the quote.
+#
+# `article_text` is the actual fix: the full piece travels with the task, behind a
+# disclosure the labeller opens only for the cases the window cannot settle. Fast by
+# default, complete when it needs to be, and 100% rather than 75% answerable.
+CLAIM_LEAD_CHARS = 250
+CLAIM_WINDOW_CHARS = 800
+
+
+async def build_claims(name: str, articles: int, url: str | None = None) -> None:
+    """Sample articles uniformly, extract claims, and load them as a batch.
+
+    Costs LLM credits — one extraction per sampled article — because production
+    stores no claims: the extractor had `claims` pruned for the whole life of the
+    corpus and it was only re-enabled on 2026-09-04, after the corpus froze.
+    """
+    import secrets
+    import uuid
+
+    import asyncpg
+
+    from common.config import get_settings
+    from common.llm import structured_chat
+    from common.observability import fetch_prompt
+    from enrichment.claims import verify_claims
+    from enrichment.schemas import ArticleExtraction
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=180)
+    try:
+        await c.execute("SELECT setseed($1)", CLAIM_SAMPLE_SEED)
+        rows = await c.fetch(
+            """
+            SELECT a.id::text AS id, a.clean_text, ri.title, ri.published_at,
+                   s.slug AS src, s.name AS source_name, s.language AS lang
+            FROM articles a
+            JOIN raw_items ri ON ri.id = a.raw_item_id
+            JOIN sources s ON s.id = ri.source_id
+            WHERE s.source_type <> 'cve_feed' AND a.word_count >= 120
+            ORDER BY random()
+            LIMIT $1
+            """,
+            articles,
+        )
+        from collections import Counter
+        print(f"  sampled {len(rows)} articles uniformly (seed {CLAIM_SAMPLE_SEED})")
+        print(f"  languages: {dict(Counter(r['lang'] for r in rows))}")
+
+        prompt = fetch_prompt("extract-shared")
+        payloads, failed, rejects = [], 0, {"no_speaker": 0, "short_quote": 0, "not_verbatim": 0}
+        for r in rows:
+            try:
+                ext = await structured_chat(
+                    model=get_settings().prism_model_extract,
+                    messages=prompt.compile(
+                        title=r["title"], source=r["src"],
+                        published_at=str(r["published_at"] or "unknown"),
+                        text=r["clean_text"][:12000],
+                    ),
+                    output_model=ArticleExtraction,
+                    trace_name="extract-shared",
+                    prune_fields={"impacts"},
+                )
+            except Exception:
+                failed += 1
+                continue
+            kept, why = verify_claims(ext.shared.claims, r["clean_text"])
+            for k in rejects:
+                rejects[k] += why[k]
+            flat = " ".join((r["clean_text"] or "").split())
+            for cl in kept:
+                at = flat.find(cl.quote_text)
+                if at < 0:
+                    continue
+                end = at + len(cl.quote_text)
+                lead = flat[:CLAIM_LEAD_CHARS]
+                before = flat[max(0, at - CLAIM_WINDOW_CHARS):at]
+                payloads.append({
+                    "kind": "claim_attribution",
+                    "article_id": r["id"],
+                    "title": r["title"],
+                    "source": r["source_name"],
+                    "language": r["lang"],
+                    "speaker": cl.speaker,
+                    "target": cl.target,
+                    "stance": cl.stance,
+                    "quote_text": cl.quote_text,
+                    # Suppressed when the window already reaches the top of the
+                    # article: showing the same sentence twice reads as a bug.
+                    "lead": "" if at <= CLAIM_WINDOW_CHARS else lead,
+                    "context_before": before,
+                    "context_after": flat[end:end + CLAIM_WINDOW_CHARS],
+                    # The whole article, for the ~25% of claims whose speaker is
+                    # named too far from the quote for any window to reach. Behind a
+                    # disclosure in the UI so the common case stays a ten-second read.
+                    "article_text": flat,
+                })
+        print(f"  extract_failed {failed}   kept {len(payloads)}   rejected {rejects}")
+        if not payloads:
+            raise SystemExit("no claims survived the verbatim gate — nothing to label")
+
+        key = secrets.token_urlsafe(9)
+        bid = uuid.uuid4()
+        async with c.transaction():
+            await c.execute(
+                "INSERT INTO label_batches (id, key, name, kind, notes) "
+                "VALUES ($1,$2,$3,'claim_attribution',$4)",
+                bid, key, name,
+                "For each quote, decide whether the article really attributes it to "
+                "the named speaker.",
+            )
+            await c.executemany(
+                "INSERT INTO label_tasks (id, batch_id, position, candidates, payload) "
+                "VALUES ($1,$2,$3,'[]'::jsonb,$4::jsonb)",
+                [(uuid.uuid4(), bid, i, json.dumps(p)) for i, p in enumerate(payloads)],
+            )
+        print(f"\n  batch '{name}': {len(payloads)} claim tasks")
+        print(f"  share this link:  /label/{key}")
+    finally:
+        await c.close()
+
+
 async def invite(batch_key: str, names: list[str], url: str | None = None,
                  site: str = "https://www.readprism.news") -> None:
     """Mint one credential per named person, for a batch where who answers matters.
@@ -753,6 +912,10 @@ def main() -> None:
     ap.add_argument("--compile", action="store_true")
     ap.add_argument("--seeds", type=int, default=123)
     ap.add_argument("--push", metavar="NAME", help="load candidates into a label batch")
+    ap.add_argument("--build-claims", metavar="NAME",
+                    help="sample articles uniformly, extract claims, load a claim batch (COSTS LLM CREDITS)")
+    ap.add_argument("--articles", type=int, default=45,
+                    help="articles to sample for --build-claims (~1.5 claims each)")
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     ap.add_argument("--invite", nargs="+", metavar="NAME",
                     help="mint a named credential each, for a batch (needs --batch)")
@@ -776,6 +939,10 @@ def main() -> None:
         import asyncio
 
         asyncio.run(push(a.push, a.db))
+    if a.build_claims:
+        import asyncio
+
+        asyncio.run(build_claims(a.build_claims, a.articles, a.db))
     if a.invite:
         import asyncio
 
@@ -807,7 +974,7 @@ def main() -> None:
 
         asyncio.run(compile_from_batch(a.compile_batch, a.db, a.min_agree))
     if not (a.propose or a.review or a.compile or a.push or a.invite
-            or a.revoke or a.status or a.compile_batch or a.agreement):
+            or a.revoke or a.status or a.compile_batch or a.agreement or a.build_claims):
         ap.print_help()
 
 

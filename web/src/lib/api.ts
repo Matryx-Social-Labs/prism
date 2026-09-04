@@ -494,6 +494,16 @@ export interface LabelClaim {
   context_after: string;
   target: string | null;
   stance: string | null;
+  /** The article's opening sentences. Indian news names an official ONCE, in the
+   *  first line, then calls them by role for the rest of the piece — so without
+   *  this "the Collector said" cannot be tied to the claimed speaker. Empty when
+   *  the quote is near the top and the context already covers it. */
+  lead?: string;
+  /** The whole article. Measured on a uniform sample: at ANY window width the
+   *  speaker is named near the quote only ~75% of the time, because Indian news
+   *  names an official once and then uses their role. Behind a disclosure, so the
+   *  common case stays a ten-second read and the hard case is still answerable. */
+  article_text?: string;
 }
 
 export interface LabelTask {

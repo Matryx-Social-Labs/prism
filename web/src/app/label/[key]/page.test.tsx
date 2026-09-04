@@ -394,3 +394,102 @@ describe("the claims guide actually reaches the labeller", () => {
     expect(container.querySelector("details")!.open).toBe(false);
   });
 });
+
+describe("the article opening", () => {
+  // Indian news names an official ONCE — "District Collector S. Venkateswar said" —
+  // and then calls them "the Collector" for the rest of the piece. Measured on the
+  // first batch: the claimed speaker's name was visible in only 79% of tasks
+  // without it, 95% with it. Where it is missing the honest answer is "not sure",
+  // and a task nobody can answer teaches us nothing.
+
+  const BASE = {
+    article_id: "a1",
+    title: "Avoid paddy sowing, farmers told",
+    source: "The Hindu",
+    speaker: "S. Venkateswar",
+    quote_text: "there is only 10-12 tmc of water available",
+    context_before: "not to go for paddy cultivation as it could be too risky. ",
+    context_after: ", the Collector said. He urged them to save every drop.",
+    target: null,
+    stance: "neutral",
+  };
+
+  it("shows the opening when the quote sits deep in the article", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({
+      task: {
+        id: "t1", position: 0, kind: "claim_attribution" as const,
+        claim: { ...BASE, lead: "District Collector S. Venkateswar reviewed kharif preparations on Tuesday" },
+      },
+      closed: false,
+    });
+    render(<LabelPage params={params} />);
+
+    // Without this the labeller sees "the Collector said" and cannot tell whether
+    // that is the person named in the question.
+    expect(
+      await screen.findByText(/District Collector S. Venkateswar reviewed/)
+    ).toBeInTheDocument();
+  });
+
+  it("omits it when the context already reaches the top of the article", async () => {
+    // Repeating the same sentence twice reads as a bug and costs screen space on
+    // a phone, which is where most of this labelling actually happens.
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({
+      task: { id: "t2", position: 0, kind: "claim_attribution" as const, claim: { ...BASE, lead: "" } },
+      closed: false,
+    });
+    render(<LabelPage params={params} />);
+
+    await screen.findByText(/the Collector said/);
+    expect(screen.queryByText(/HOW THE ARTICLE OPENS/)).not.toBeInTheDocument();
+  });
+});
+
+describe("the whole article is reachable", () => {
+  // Measured on a UNIFORM sample of the corpus: at ANY window width the speaker is
+  // named near the quote only ~75% of the time. A wider window does not fix it —
+  // Indian news names an official once, then calls them "the Collector" for the
+  // rest of the piece. So the article travels with the task, behind a disclosure:
+  // the common case stays a ten-second read, the hard case stays answerable.
+
+  const CLAIM = {
+    article_id: "a1",
+    title: "Inquiry ordered into hospital complications",
+    source: "The Hindu",
+    speaker: "M. Vijay Bhaskar",
+    quote_text: "A preliminary report has already been submitted",
+    context_before: "others were reported to be recovering. ",
+    context_after: ", he added.",
+    target: null,
+    stance: "neutral",
+  };
+
+  function renderWith(claim: Record<string, unknown>) {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({
+      task: { id: "t1", position: 0, kind: "claim_attribution" as const, claim },
+      closed: false,
+    });
+    return render(<LabelPage params={params} />);
+  }
+
+  it("carries the full article so a role reference can still be resolved", async () => {
+    renderWith({
+      ...CLAIM,
+      article_text:
+        "The Telangana government constituted a four-member committee headed by " +
+        "M. Vijay Bhaskar to investigate the complications reported at the hospital.",
+    });
+    expect(await screen.findByText(/Read the whole article/)).toBeInTheDocument();
+    expect(screen.getByText(/four-member committee headed by/)).toBeInTheDocument();
+  });
+
+  it("offers nothing to open when the article did not travel with the task", async () => {
+    // An empty disclosure is a promise the page cannot keep.
+    renderWith(CLAIM);
+    await screen.findByText(/, he added/);
+    expect(screen.queryByText(/Read the whole article/)).not.toBeInTheDocument();
+  });
+});
