@@ -100,7 +100,7 @@ async def _invite(db: AsyncSession, batch_id, token: str) -> dict:
 async def _batch(db: AsyncSession, key: str) -> dict:
     row = (
         await db.execute(
-            text("SELECT id, name, notes, open, self_join FROM label_batches WHERE key = :k"),
+            text("SELECT id, name, notes, open, self_join, kind FROM label_batches WHERE key = :k"),
             {"k": key},
         )
     ).mappings().first()
@@ -168,7 +168,7 @@ async def batch_header(
         ).scalar_one()
     return {
         "name": b["name"], "notes": b["notes"], "open": b["open"],
-        "self_join": b["self_join"], "labeller": name,
+        "self_join": b["self_join"], "labeller": name, "kind": b["kind"],
         "total": total, "done": done,
     }
 
@@ -193,7 +193,7 @@ async def next_task(
         await db.execute(
             text(
                 """
-                SELECT t.id, t.position, t.sector, t.candidates, t.seed_event_id
+                SELECT t.id, t.position, t.sector, t.candidates, t.seed_event_id, t.payload
                 FROM label_tasks t
                 WHERE t.batch_id = :b
                   AND NOT EXISTS (
@@ -209,6 +209,18 @@ async def next_task(
     ).mappings().first()
     if row is None:
         return {"task": None, "closed": False}
+
+    # A claim task carries everything it needs in `payload` — no events to join.
+    # Returning early keeps the story query off a path where seed_event_id is NULL.
+    if row["payload"] is not None:
+        payload = row["payload"]
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        return {
+            "task": {"id": str(row["id"]), "position": row["position"],
+                     "kind": "claim_attribution", "claim": payload},
+            "closed": False,
+        }
 
     ids = [row["seed_event_id"]] + [uuid.UUID(c["id"]) for c in row["candidates"]]
     events = {

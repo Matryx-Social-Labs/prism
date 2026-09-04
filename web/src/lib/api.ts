@@ -480,12 +480,31 @@ export interface LabelEvent {
   signals: string[]; // which proposer suggested it — provenance, not a verdict
 }
 
+/** A quote and the speaker the extractor attributed it to. The judgement is
+ *  whether the ARTICLE really attributes it that way — the one thing the
+ *  verbatim check cannot decide, since a real sentence can be put in the wrong
+ *  mouth and still match the source text exactly. */
+export interface LabelClaim {
+  article_id: string;
+  title: string;
+  source: string;
+  speaker: string;
+  quote_text: string;
+  context_before: string;
+  context_after: string;
+  target: string | null;
+  stance: string | null;
+}
+
 export interface LabelTask {
   id: string;
   position: number;
-  sector: string | null;
-  seed: LabelEvent;
-  candidates: LabelEvent[];
+  sector?: string | null;
+  /** Absent on story tasks, which predate the second kind. */
+  kind?: "claim_attribution";
+  seed?: LabelEvent;
+  candidates?: LabelEvent[];
+  claim?: LabelClaim;
 }
 
 export interface LabelBatch {
@@ -494,6 +513,8 @@ export interface LabelBatch {
   open: boolean;
   self_join: boolean;
   labeller: string; // display name on the invite; may be shared with someone else
+  /** Which task shape this batch serves; the page renders one or the other. */
+  kind?: string;
   total: number;
   done: number; // THIS invite's count, not everyone's
 }

@@ -275,3 +275,75 @@ describe("an invited labeller's link", () => {
     expect(await screen.findByText(/Priya/)).toBeInTheDocument();
   });
 });
+
+describe("a claim task", () => {
+  // The judgement the verbatim check cannot make: a sentence can be copied
+  // exactly from the article and still be put in the wrong mouth. The quote
+  // matches, the attribution is a lie, and nothing automatic can tell.
+
+  const CLAIM = {
+    article_id: "a1",
+    title: "Minister announces road outlay",
+    source: "The Hindu",
+    speaker: "The minister",
+    quote_text: "double its outlay on rural roads",
+    context_before: "Speaking in Bengaluru, the minister said the state would ",
+    context_after: " before the monsoon.",
+    target: null,
+    stance: "neutral",
+  };
+
+  function claimTask() {
+    return { id: "task-c1", position: 0, kind: "claim_attribution" as const, claim: CLAIM };
+  }
+
+  it("shows the quote inside its surrounding sentences, not alone", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claimTask(), closed: false });
+    render(<LabelPage params={params} />);
+
+    // Attribution usually lives in the words either side ("said the minister").
+    // Shown alone the question is unanswerable and the labeller would guess.
+    expect(await screen.findByText(/Speaking in Bengaluru/)).toBeInTheDocument();
+    expect(screen.getByText(CLAIM.quote_text)).toBeInTheDocument();
+    expect(screen.getByText(/before the monsoon/)).toBeInTheDocument();
+  });
+
+  it("records a yes as a definite answer, not an empty one", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claimTask(), closed: false });
+    render(<LabelPage params={params} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Yes —/ }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
+    const body = postLabelAnswer.mock.calls[0][1];
+    // "Yes" and "No" must be distinguishable in the stored row. An empty
+    // selection for both would make every claim read as unattributed.
+    expect(body.selected).toEqual(["task-c1"]);
+    expect(body.unsure).toBe(false);
+    expect(body.skipped).toBe(false);
+  });
+
+  it("records a no as definite-but-empty, distinct from unsure and skip", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claimTask(), closed: false });
+    render(<LabelPage params={params} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /No —/ }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
+    const body = postLabelAnswer.mock.calls[0][1];
+    expect(body.selected).toEqual([]);
+    expect(body.unsure).toBe(false);
+    expect(body.skipped).toBe(false);
+  });
+
+  it("explains the right-quote-wrong-mouth case before they start", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claimTask(), closed: false });
+    render(<LabelPage params={params} />);
+
+    // "Attribution" is abstract, and abstract lost last time — a careful person
+    // grouped stories by shared organisation in good faith. Show the mistake.
+    expect(await screen.findByText(/RIGHT QUOTE, WRONG MOUTH/)).toBeInTheDocument();
+  });
+});

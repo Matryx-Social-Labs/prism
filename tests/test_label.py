@@ -10,6 +10,7 @@ produces a plausible-looking set of labels that quietly encodes the bug, and eve
 later measurement inherits it as evidence.
 """
 
+import json
 import uuid
 
 import pytest
@@ -476,3 +477,75 @@ async def test_a_skipped_task_comes_back_to_nobody_but_is_exported():
                                 headers={"X-Admin-Token": get_settings().prism_admin_token})).json()
     skips = [r for r in exported["responses"] if r.get("skipped")]
     assert len(skips) == 1, "the skip vanished from the export"
+
+
+# --- the second task kind ------------------------------------------------------
+
+
+async def _claim_batch() -> tuple[str, str]:
+    key = f"c{uuid.uuid4().hex[:12]}"
+    bid, tid = uuid.uuid4(), uuid.uuid4()
+    payload = json.dumps({
+        "article_id": str(uuid.uuid4()), "title": "Minister announces road outlay",
+        "source": "The Hindu", "speaker": "The minister",
+        "quote_text": "double its outlay on rural roads before the monsoon",
+        "context_before": "Speaking in Bengaluru, the minister said the state would ",
+        "context_after": ". Opposition leaders disputed the figure.",
+        "target": None, "stance": "neutral",
+    })
+    async with session_scope() as s:
+        await s.execute(
+            text("INSERT INTO label_batches (id, key, name, kind, open, self_join) "
+                 "VALUES (:i,:k,'claims','claim_attribution',true,true)"),
+            {"i": bid, "k": key})
+        await s.execute(
+            text("INSERT INTO label_tasks (id, batch_id, position, seed_event_id, "
+                 "candidates, payload) VALUES (:i,:b,0,NULL,'[]'::jsonb,CAST(:p AS jsonb))"),
+            {"i": tid, "b": bid, "p": payload})
+    return key, str(tid)
+
+
+async def test_a_claim_task_is_served_with_its_quote_and_speaker():
+    """A claim task has no seed event and no candidates. Routing it through the
+    story query would join on a NULL seed and serve an empty task that looks
+    like a bug in the page rather than in the route."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, _ = await _claim_batch()
+    async with _client() as c:
+        tok = await _join(c, key, "Reader")
+        got = (await c.get(f"/api/v1/label/{key}/next",
+                           headers={"X-Label-Token": tok})).json()
+    t = got["task"]
+    assert t["kind"] == "claim_attribution"
+    assert t["claim"]["speaker"] == "The minister"
+    assert "rural roads" in t["claim"]["quote_text"]
+    # Context is what makes the judgement possible — without it a labeller is
+    # asked whether a quote is attributed correctly with nothing to check against.
+    assert t["claim"]["context_before"] and t["claim"]["context_after"]
+
+
+async def test_the_batch_header_says_which_kind_it_is():
+    """The page renders a different task per kind, so it has to know before the
+    first task arrives."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, _ = await _claim_batch()
+    async with _client() as c:
+        tok = await _join(c, key, "Reader")
+        hdr = (await c.get(f"/api/v1/label/{key}",
+                           headers={"X-Label-Token": tok})).json()
+    assert hdr["kind"] == "claim_attribution"
+
+
+async def test_story_tasks_are_unaffected_by_the_new_shape():
+    """The existing batch must serve exactly as before — a claim column added to
+    the table cannot change what a story task returns."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, _ = await _batch(1)
+    async with _client() as c:
+        tok = await _join(c, key, "Reader")
+        t = (await c.get(f"/api/v1/label/{key}/next",
+                         headers={"X-Label-Token": tok})).json()["task"]
+    assert "seed" in t and "candidates" in t and "claim" not in t

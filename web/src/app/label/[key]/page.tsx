@@ -25,6 +25,7 @@ import {
   joinLabelBatch,
   postLabelAnswer,
   type LabelBatch,
+  type LabelClaim,
   type LabelEvent,
   type LabelTask,
 } from "@/lib/api";
@@ -102,6 +103,145 @@ function Guide({ open = false }: { open?: boolean }) {
           single running account of events?</strong> If it is just the same subject,
           the same place or the same person, leave it. Ticking nothing is a real and
           useful answer.
+        </p>
+      </div>
+    </details>
+  );
+}
+
+
+/** The claim task: a quote, where it sits in the article, and who the extractor
+ *  says said it.
+ *
+ *  THE VERBATIM CHECK CANNOT DECIDE THIS. A sentence can be copied exactly from
+ *  the article and still be put in the wrong mouth — the quote matches, the
+ *  attribution is a lie, and nothing downstream can tell. That is why a person
+ *  reads it.
+ *
+ *  The quote is shown INSIDE its surrounding sentences rather than alone,
+ *  because the attribution usually lives in the words either side of it ("said
+ *  the minister", "according to Kaspersky"). Shown alone the question would be
+ *  unanswerable and the labeller would be guessing. */
+function ClaimTask({
+  claim, position, saving, onAnswer,
+}: {
+  claim: LabelClaim;
+  position: number;
+  saving: boolean;
+  onAnswer: (verdict: "yes" | "no" | "unsure" | "skip") => void;
+}) {
+  return (
+    <>
+      <p className="font-mono text-[10.5px] uppercase" style={{ color: "var(--ink-faint)" }}>
+        {claim.source} · question {position + 1}
+      </p>
+      <h1
+        className="mt-2 text-[19px] leading-[1.35]"
+        style={{ fontFamily: "var(--font-display), serif", textWrap: "pretty" }}
+      >
+        {claim.title}
+      </h1>
+
+      <p className="mt-8 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+        Does this article attribute the highlighted words to{" "}
+        <strong style={{ color: "var(--ink)" }}>{claim.speaker}</strong>?
+      </p>
+
+      <div
+        className="mt-4 border-l-2 pl-4 text-[15px] leading-[1.65]"
+        style={{ borderColor: "var(--ink)" }}
+      >
+        <span style={{ color: "var(--ink-faint)" }}>…{claim.context_before}</span>
+        <mark style={{ background: "var(--bg-sunken)", color: "var(--ink)", fontWeight: 500 }}>
+          {claim.quote_text}
+        </mark>
+        <span style={{ color: "var(--ink-faint)" }}>{claim.context_after}…</span>
+      </div>
+
+      <div
+        className="mt-6 flex flex-wrap items-center gap-3 border-t pt-5"
+        style={{ borderColor: "var(--line)" }}
+      >
+        <button
+          type="button" disabled={saving} onClick={() => onAnswer("yes")}
+          className="h-11 rounded-full px-5 text-[14.5px] font-medium disabled:opacity-50"
+          style={{ background: "var(--ink)", color: "var(--bg)" }}
+        >
+          Yes — {claim.speaker.slice(0, 24)} said it
+        </button>
+        <button
+          type="button" disabled={saving} onClick={() => onAnswer("no")}
+          className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
+          style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
+        >
+          No — someone else, or nobody
+        </button>
+        <button
+          type="button" disabled={saving} onClick={() => onAnswer("unsure")}
+          className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
+          style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+        >
+          Not sure
+        </button>
+        <button
+          type="button" disabled={saving} onClick={() => onAnswer("skip")}
+          className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
+          style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}
+        >
+          Can&apos;t read this
+        </button>
+      </div>
+
+      <ClaimGuide />
+    </>
+  );
+}
+
+
+/** What "attributed" means, shown rather than asserted — the same lesson the
+ *  story guide had to learn when a careful labeller grouped by shared
+ *  organisation in good faith. */
+function ClaimGuide({ open = false }: { open?: boolean }) {
+  return (
+    <details open={open} className="mt-8 border-t pt-5" style={{ borderColor: "var(--line)" }}>
+      <summary className="cursor-pointer text-[14.5px] font-medium" style={{ color: "var(--ink)" }}>
+        How to decide
+      </summary>
+      <div className="mt-4 space-y-5">
+        <div className="border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
+          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+            YES — THE ARTICLE SAYS SO
+          </p>
+          <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
+            …the minister said the state would{" "}
+            <mark style={{ background: "var(--bg-sunken)" }}>double its outlay</mark>…
+          </p>
+          <p className="mt-2 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+            Asked about <strong>the minister</strong> — the words either side name the
+            speaker. That is the whole test.
+          </p>
+        </div>
+
+        <div className="border-l pl-4" style={{ borderColor: "var(--line-strong)" }}>
+          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+            NO — RIGHT QUOTE, WRONG MOUTH
+          </p>
+          <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            …opposition leaders called it{" "}
+            <mark style={{ background: "var(--bg-sunken)" }}>optimistic at best</mark>…
+          </p>
+          <p className="mt-2 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+            Asked about <strong>the minister</strong>. The quotation is real and
+            copied correctly — somebody else said it. This is the mistake worth
+            catching, and it is invisible to every automatic check we have.
+          </p>
+        </div>
+
+        <p className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          You are not judging whether the claim is TRUE, or fair, or well argued —
+          only whether this article puts these words in this person&apos;s mouth. If
+          the surrounding text does not say who spoke, that is a{" "}
+          <strong style={{ color: "var(--ink)" }}>No</strong>, not a guess.
         </p>
       </div>
     </details>
@@ -192,7 +332,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   }, [load]);
 
   const submit = useCallback(
-    async (unsure: boolean, skipped = false) => {
+    async (unsure: boolean, skipped = false, agreed = false) => {
       if (!task || saving) return;
       setSaving(true);
       try {
@@ -201,7 +341,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           token,
           // A skip carries no opinion, so whatever was ticked is discarded rather
           // than filed as a judgement nobody meant to give.
-          selected: skipped ? [] : [...picked],
+          // A claim answer has no candidate ids. "The article does attribute this
+          // quote to this speaker" is carried as a single sentinel selection, so
+          // the same responses table and the same agreement maths serve both kinds.
+          selected: skipped ? [] : task.claim ? (agreed ? [task.id] : []) : [...picked],
           unsure,
           skipped,
           ms_spent: Date.now() - startedAt.current,
@@ -238,9 +381,9 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         return;
       }
       const n = Number(ev.key);
-      if (Number.isInteger(n) && n >= 1 && n <= task.candidates.length) {
+      if (Number.isInteger(n) && n >= 1 && n <= (task.candidates?.length ?? 0)) {
         ev.preventDefault();
-        toggle(task.candidates[n - 1].id);
+        toggle((task.candidates ?? [])[n - 1].id);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -363,6 +506,15 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       )}
 
       {state === "ready" && task && (
+        task.claim ? (
+          <ClaimTask
+            claim={task.claim}
+            position={task.position}
+            saving={saving}
+            onAnswer={(verdict) => void submit(verdict === "unsure", verdict === "skip",
+                                              verdict === "yes")}
+          />
+        ) : (
         <>
           <p className="font-mono text-[10.5px] uppercase" style={{ color: "var(--ink-faint)" }}>
             {task.sector ?? "news"} · question {task.position + 1}
@@ -371,10 +523,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             className="mt-2 text-[23px] leading-[1.3]"
             style={{ fontFamily: "var(--font-display), serif", textWrap: "pretty" }}
           >
-            {task.seed.title}
+            {task.seed?.title}
           </h1>
           <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            {provenance(task.seed)}
+            {task.seed ? provenance(task.seed) : ""}
           </p>
 
           <p className="mt-8 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
@@ -382,7 +534,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           </p>
 
           <ul className="mt-3">
-            {task.candidates.map((c, i) => {
+            {(task.candidates ?? []).map((c, i) => {
               const on = picked.has(c.id);
               return (
                 <li key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
@@ -476,7 +628,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
               Can&apos;t read this
             </button>
             <span className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-              KEYS 1–{task.candidates.length} TOGGLE · ENTER SUBMITS
+              KEYS 1–{(task.candidates?.length ?? 0)} TOGGLE · ENTER SUBMITS
             </span>
           </div>
 
@@ -491,6 +643,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
               reference rather than instruction once you are going. */}
           <Guide />
         </>
+        )
       )}
     </Shell>
   );
