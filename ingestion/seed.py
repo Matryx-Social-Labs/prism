@@ -25,7 +25,7 @@ SOURCES = [
     # ── India national — other languages (multilingual clustering) ──
     {"slug": "aajtak", "name": "Aaj Tak", "source_type": "rss", "country": "IN", "language": "hi"},
     {"slug": "amarujala", "name": "Amar Ujala", "source_type": "rss", "country": "IN", "language": "hi"},
-    {"slug": "bbc_tamil", "name": "BBC Tamil", "source_type": "rss", "country": "IN", "language": "ta", "reliability": {"funding": "public"}},
+    {"slug": "bbc_tamil", "publisher": "bbc", "name": "BBC Tamil", "source_type": "rss", "country": "IN", "language": "ta", "reliability": {"funding": "public"}},
     {"slug": "prajavani", "name": "Prajavani", "source_type": "rss", "country": "IN", "language": "kn"},
     {"slug": "tv9kannada", "name": "TV9 Kannada", "source_type": "rss", "country": "IN", "language": "kn"},
     # ── India, other languages (BBC's Indian-language services) ──
@@ -50,8 +50,14 @@ SOURCES = [
     {"slug": "thehindu_karnataka", "publisher": "thehindu", "name": "The Hindu — Karnataka", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "thehindu_andhra", "publisher": "thehindu", "name": "The Hindu — Andhra Pradesh", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "thehindu_telangana", "publisher": "thehindu", "name": "The Hindu — Telangana", "source_type": "rss", "country": "IN", "language": "en"},
-    {"slug": "toi_delhi", "name": "The Times of India — Delhi", "source_type": "rss", "country": "IN", "language": "en"},
-    {"slug": "toi_mumbai", "name": "The Times of India — Mumbai", "source_type": "rss", "country": "IN", "language": "en"},
+    # publisher="timesofindia" for the same reason bbc_* and thehindu_* carry one:
+    # these are city editions of ONE masthead. Shipped without it, and
+    # `COALESCE(s.publisher, s.slug)` then counted The Times of India as three
+    # separate publishers — so one newsroom republishing itself across its city
+    # feeds read as corroboration. 800 URLs in production arrived under more than
+    # one source for this reason.
+    {"slug": "toi_delhi", "publisher": "timesofindia", "name": "The Times of India — Delhi", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "toi_mumbai", "publisher": "timesofindia", "name": "The Times of India — Mumbai", "source_type": "rss", "country": "IN", "language": "en"},
     # ── Cybersecurity lens (global by nature) ──
     {"slug": "thehackernews", "name": "The Hacker News", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "bleepingcomputer", "name": "BleepingComputer", "source_type": "rss", "country": "US", "language": "en"},

@@ -69,3 +69,35 @@ def test_every_other_feed_stays_on():
 def test_the_crawler_identifies_itself_and_is_reachable():
     assert "prototype" not in USER_AGENT.lower()
     assert "readprism.news" in USER_AGENT
+
+
+def test_regional_editions_fold_into_one_masthead():
+    """REGRESSION: The Times of India counted as three publishers.
+
+    `sources.publisher` exists so corroboration counts MASTHEADS, not feeds —
+    correlation/trending.py and correlation/consumer.py both read
+    `COALESCE(s.publisher, s.slug)`. bbc_* and thehindu_* were seeded with one;
+    toi_delhi and toi_mumbai were not, so they coalesced to their own slugs and
+    one newsroom republishing itself across its city feeds read as independent
+    corroboration. 800 production URLs arrived under more than one source.
+
+    The failure is invisible: a story shows a larger source count and stops
+    flagging `single_origin`, which is precisely the "only one newsroom is
+    telling you this" warning a reader most needs.
+    """
+    from ingestion.seed import SOURCES
+
+    groups: dict[str, list[dict]] = {}
+    for src in SOURCES:
+        groups.setdefault(src["slug"].split("_")[0], []).append(src)
+
+    for prefix, siblings in groups.items():
+        if len(siblings) < 2:
+            continue  # not a family of regional editions
+        # This is exactly what the SQL computes.
+        publishers = {s.get("publisher") or s["slug"] for s in siblings}
+        assert len(publishers) == 1, (
+            f"{prefix}_* is one masthead across {len(siblings)} feeds but resolves to "
+            f"{len(publishers)} publishers {sorted(publishers)} — corroboration will "
+            "count this newsroom republishing itself as independent sources"
+        )
