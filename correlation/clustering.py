@@ -264,7 +264,55 @@ async def _match_by_url(session: AsyncSession, url: str) -> Match | None:
     return None
 
 
+# Which similarity the title tier uses. pg_trgm compares CHARACTER trigrams, so
+# it scores shared boilerplate and a shared rare name the same way; the cosine
+# variant weights words by IDF, so a distinctive name carries the match. Measured
+# on gold_pairs BATCH 2 (held out) as a standalone signal:
+#
+#     production cascade            P 0.629  R 0.667  F1 0.647  Cdet 0.260
+#     title IDF cosine >= 0.39      P 0.944  R 0.515  F1 0.667  Cdet 0.083
+#
+# That is a pairwise number, and pairwise numbers have over-promised three times
+# in this file (see TITLE_COSINE_GATE below, which looked excellent and lost).
+# So this is a switch scored through the real cascade by tools/score_cascade,
+# not a default flipped on the table above.
+#
+# MEASURED 2026-09-04, and the answer is DO NOT SHIP — but not for the usual
+# reason. Full cascade replay, 328 events, both tiers, gold_pairs split into the
+# fold its threshold was fitted on and the fold held out:
+#
+#                     all 398        batch1 (fitted)   batch2 (HELD OUT)
+#     trigram >=0.6   Cdet 0.5930    Cdet 0.5268       Cdet 0.6555
+#     cosine  >=0.39  Cdet 0.5658    Cdet 0.7143       Cdet 0.4737
+#
+# On the combined set cosine wins by 0.027 and looks shippable. Split, the two
+# folds disagree violently AND IN THE WRONG DIRECTION: cosine is far WORSE on the
+# fold its threshold was fitted to and far better on the held-out one. Overfitting
+# produces the opposite shape, so this is not a tuned-threshold story — the two
+# "independent samples of the same distribution" are not behaving like one
+# distribution.
+#
+# The mechanism is 7 events. Cosine makes 9 false merges in total, 8 of them in
+# batch 1 (8/128 negatives) against 1 in batch 2 (1/209). Cdet weights a false
+# alarm 4x, so that single cluster of 8 swings batch 1 by 0.25 on its own. With 28
+# and 33 positive pairs per fold, a seven-event difference is not a finding.
+#
+# So the honest reading is that GOLD_PAIRS IS TOO SMALL TO DECIDE THIS, and the
+# combined number hides that rather than resolving it. The fix is a bigger gold
+# set, which is what the labelling rounds are for — not a different threshold.
+# Re-run `tools/score_cascade --title-tier cosine` when gold_pairs grows; the
+# placement maps are cached under .cache/cascade_placements_*.json so re-scoring
+# a past run is free.
+#
+# Fifth time a pairwise number has over-promised here: the plan's table records
+# this signal at Cdet 0.083.
+TITLE_TIER = "trigram"
+TITLE_COSINE_THRESHOLD = 0.39
+
+
 async def _match_by_title(session: AsyncSession, title: str, published_at) -> Match | None:
+    if TITLE_TIER == "cosine":
+        return await _match_by_title_cosine(session, title, published_at)
     result = await session.execute(
         text(
             f"""
@@ -283,6 +331,49 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
     if row:
         return Match(event_id=row.id, match_type="title_time", match_score=float(row.sim))
     return None
+
+
+async def _match_by_title_cosine(
+    session: AsyncSession, title: str, published_at
+) -> Match | None:
+    """Best in-window event by IDF-weighted word cosine over titles.
+
+    No trigram prefilter. One would be cheap, but every prefilter is a ceiling on
+    recall, and the pairs this tier exists to catch are exactly the ones trigram
+    scores low — a prefilter would silently cap the thing being measured. The
+    scan it replaces was a full scan anyway: `similarity(e.title, :title) >= 0.6`
+    is a function call per row, not an index probe, so this moves the same work
+    into Python and does less of it in the database.
+    """
+    from tools.title_cosine import cosine, load_idf
+
+    rows = (await session.execute(
+        text(
+            f"""
+            SELECT e.id, e.title
+            FROM events e
+            WHERE e.title IS NOT NULL AND e.title <> ''
+              AND (CAST(:published_at AS timestamptz) IS NULL
+                   OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
+            -- Ordered so a tie between two equally-scoring events resolves the
+            -- same way every run. Leiden's order-sensitivity already cost this
+            -- repo a silently-varying boundary on identical data.
+            ORDER BY e.id
+            """
+        ),
+        {"published_at": published_at},
+    )).all()
+    if not rows:
+        return None
+    idf = load_idf()
+    best, best_score = None, 0.0
+    for row in rows:
+        score = cosine(title, row.title, idf)
+        if score > best_score:
+            best, best_score = row.id, score
+    if best is None or best_score < TITLE_COSINE_THRESHOLD:
+        return None
+    return Match(event_id=best, match_type="title_time", match_score=best_score)
 
 
 # Optional confirming gate on the entity path: require the candidate event's

@@ -25,6 +25,7 @@ import gzip
 import json
 import math
 import re
+from functools import lru_cache
 from pathlib import Path
 
 IDF_CACHE = Path(".cache/term_idf.json.gz")
@@ -70,6 +71,7 @@ def cosine(a: str, b: str, idf: dict[str, float], default_idf: float = 1.0) -> f
     return dot / (na * nb) if na and nb else 0.0
 
 
+@lru_cache(maxsize=1)
 def load_idf() -> dict[str, float]:
     if not IDF_CACHE.exists():
         raise SystemExit(f"no IDF at {IDF_CACHE} — run tools.title_cosine --build")

@@ -27,12 +27,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+from pathlib import Path
 
 import asyncpg
 
 from tools.scratch import _local_url, _prod_url, build_scratch, replay
 
 TITLE_GATE: list[float | None] = [None]
+TITLE_TIER: list[str] = ["trigram"]
 
 MODELS = [
     "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
@@ -76,12 +79,43 @@ async def _gold_events(prod: asyncpg.Connection) -> tuple[list, dict]:
     return [r["ev"] for r in rows], titles
 
 
-def _score(pred_event_of: dict[str, str]) -> dict:
+# gold_pairs holds two independent random samples appended in order: batch 1
+# (156 pairs, 28 positive) then batch 2 (242 pairs, 33 positive). The module keeps
+# no batch marker, so the boundary is recovered by insertion order and CHECKED
+# against the counts its docstring records — if either drifts, the split is wrong
+# and scoring silently reports a training number as a held-out one.
+#
+# This matters because thresholds here are fitted on batch 1. Scoring a fitted
+# threshold on all 398 pairs scores it partly on its own training data, which is
+# exactly the pattern that produced a CPM configuration beating production on the
+# full gold set and LOSING on both held-out folds.
+BATCH1_PAIRS, BATCH1_POS = 156, 28
+BATCH2_PAIRS, BATCH2_POS = 242, 33
+
+
+def _batches() -> dict[str, set]:
+    from tools.gold_pairs import GOLD_PAIRS
+
+    items = list(GOLD_PAIRS.items())
+    b1, b2 = items[:BATCH1_PAIRS], items[BATCH1_PAIRS:]
+    if (len(b1), sum(1 for _, v in b1 if v)) != (BATCH1_PAIRS, BATCH1_POS) or (
+        len(b2), sum(1 for _, v in b2 if v)
+    ) != (BATCH2_PAIRS, BATCH2_POS):
+        raise SystemExit(
+            "gold_pairs no longer splits into the two batches its docstring records; "
+            "fix the boundary before trusting a held-out number"
+        )
+    return {"batch1 (fitted)": {k for k, _ in b1}, "batch2 (HELD OUT)": {k for k, _ in b2}}
+
+
+def _score(pred_event_of: dict[str, str], only: set | None = None) -> dict:
     """Pairwise P/R/F1/Cdet over gold_pairs, from replayed co-membership."""
     from tools.gold_pairs import GOLD_PAIRS
 
     tp = fp = fn = tn = 0
     for (a, b), same in GOLD_PAIRS.items():
+        if only is not None and (a, b) not in only:
+            continue
         if a not in pred_event_of or b not in pred_event_of:
             continue
         together = pred_event_of[a] == pred_event_of[b]
@@ -134,6 +168,8 @@ async def run(models: list[str], limit: int | None) -> None:
                         ("EMBEDDING_DISTANCE_THRESHOLD", "ENTITY_MATCH_NEAR_DISTANCE",
                          "ENTITY_MATCH_LOOSE_DISTANCE")}
             clu.TITLE_COSINE_GATE = TITLE_GATE[0]
+            clu.TITLE_TIER = TITLE_TIER[0]
+            print(f"  title tier: {TITLE_TIER[0]}")
             if TITLE_GATE[0] is not None:
                 print(f"  entity-path title-cosine gate: {TITLE_GATE[0]}")
             applied = THRESHOLDS.get(model, {})
@@ -159,10 +195,20 @@ async def run(models: list[str], limit: int | None) -> None:
 
             for k, v in original.items():
                 setattr(clu, k, v)
-            s = _score(placed_all)
+
+            # Dumped so a re-score costs nothing. The replay is the expensive part
+            # and its OUTPUT is just a placement map; re-running it to ask a second
+            # question of the same run is pure waste.
+            dump = Path(f".cache/cascade_placements_{TITLE_TIER[0]}.json")
+            dump.parent.mkdir(parents=True, exist_ok=True)
+            dump.write_text(json.dumps(placed_all))
+
             print(f"=== {model} ===")
-            print(f"  {s['scored']} pairs scored   tp {s['tp']}  fp {s['fp']}  fn {s['fn']}")
-            print(f"  P {s['P']:.4f}  R {s['R']:.4f}  F1 {s['F1']:.4f}  Cdet {s['Cdet']:.4f}\n")
+            for name, subset in ({"all 398": None} | _batches()).items():
+                s = _score(placed_all, subset)
+                print(f"  {name:18} {s['scored']:>4} pairs   tp {s['tp']:>3}  fp {s['fp']:>3}  fn {s['fn']:>3}   "
+                      f"P {s['P']:.4f}  R {s['R']:.4f}  F1 {s['F1']:.4f}  Cdet {s['Cdet']:.4f}")
+            print(f"  placements -> {dump}\n")
     finally:
         await prod.close()
 
@@ -174,8 +220,12 @@ def main() -> None:
     ap.add_argument("--title-gate", type=float, default=None,
                     help="entity-path title-cosine gate; measures the change that "
                          "previously LOST at replay despite a good pairwise number")
+    ap.add_argument("--title-tier", choices=("trigram", "cosine"), default="trigram",
+                    help="similarity used by the title_time tier; 'cosine' replaces "
+                         "pg_trgm with IDF-weighted word cosine (plan step 4)")
     a = ap.parse_args()
     TITLE_GATE[0] = a.title_gate
+    TITLE_TIER[0] = a.title_tier
     asyncio.run(run([m.strip() for m in a.models.split(",")], a.limit))
 
 
