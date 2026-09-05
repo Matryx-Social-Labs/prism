@@ -192,13 +192,25 @@ async def _persist_turn(
         )
 
 
-async def ensure_session(event_id: uuid.UUID, session_id: uuid.UUID | None) -> uuid.UUID:
+async def ensure_session(
+    event_id: uuid.UUID,
+    session_id: uuid.UUID | None,
+    user_ref: str | None = None,
+) -> uuid.UUID:
+    """Resume this event's agent session, or open one.
+
+    `user_ref` was hardcoded to the string 'default' for every session ever
+    created, so Ask usage could not be attributed to anyone — which makes
+    per-user metering impossible and is a stated prerequisite for charging for
+    it. NULL now means genuinely anonymous, which is a different fact from
+    'default' and can be told apart from it in the existing rows.
+    """
     async with session_scope() as session:
         if session_id is not None:
             existing = await session.get(AgentSession, session_id)
             if existing is not None and existing.event_id == event_id:
                 return session_id
-        new_session = AgentSession(event_id=event_id, user_ref="default")
+        new_session = AgentSession(event_id=event_id, user_ref=user_ref)
         session.add(new_session)
         await session.flush()
         return new_session.id

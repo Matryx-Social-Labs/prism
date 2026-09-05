@@ -24,3 +24,24 @@ async def get_current_user(
     if user_id is None:
         raise HTTPException(status_code=401, detail="invalid or expired session")
     return user_id
+
+
+async def get_current_user_optional(
+    authorization: str = Header(default=""),
+    db: AsyncSession = Depends(get_db),
+) -> UUID | None:
+    """The same resolution, but None instead of 401 when there is no valid session.
+
+    Ask is deliberately open to anonymous readers — the free tier is the top of
+    the funnel and a login wall there would cost the audience the product is
+    built to gather. So identity has to be OPTIONAL: signed-in usage gets
+    attributed, anonymous usage still works.
+
+    A bad or expired token is treated as anonymous rather than rejected, for the
+    same reason: someone whose session lapsed mid-read should get an answer, not
+    an error they cannot act on.
+    """
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return await auth.resolve_session(db, token)

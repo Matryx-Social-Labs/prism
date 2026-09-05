@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.questions import suggested_questions
 from agent.rag import answer_stream, ensure_session
+from api.deps import get_current_user_optional
 from api.schemas import (
     AskRequest,
     BriefResponse,
@@ -245,7 +246,12 @@ async def get_questions(
 
 
 @router.post("/api/v1/events/{event_id}/ask")
-async def ask(event_id: uuid.UUID, body: AskRequest, db: AsyncSession = Depends(get_db)):
+async def ask(
+    event_id: uuid.UUID,
+    body: AskRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID | None = Depends(get_current_user_optional),
+):
     exists = (
         await db.execute(text("SELECT 1 FROM events WHERE id = :eid"), {"eid": str(event_id)})
     ).scalar_one_or_none()
@@ -256,7 +262,9 @@ async def ask(event_id: uuid.UUID, body: AskRequest, db: AsyncSession = Depends(
         raise HTTPException(status_code=422, detail="question must be 1-2000 characters")
 
     session_id = await ensure_session(
-        event_id, uuid.UUID(body.session_id) if body.session_id else None
+        event_id,
+        uuid.UUID(body.session_id) if body.session_id else None,
+        user_ref=str(user_id) if user_id else None,
     )
 
     async def sse():
