@@ -485,28 +485,40 @@ def test_same_day_developments_cannot_become_each_others_parent():
     assert parent["b"] == "a"
 
 
-def test_the_embedding_edge_rule_is_MUTUAL_and_has_no_distance_units():
-    """Two properties, both load-bearing, both invisible at runtime if lost.
+def test_the_embedding_edge_rule_is_mutual_AND_floored():
+    """Two properties, and I got this wrong once in each direction.
 
     MUTUAL: an edge needs each event in the other's top-k. One-sided kNN is far
     denser, and density is what lets a single bridge fuse a whole arc — as
-    connected components it produced a 3,511-event group on this corpus.
+    connected components it produced a 3,511-event group on the snapshot.
 
-    NO UNITS: a cosine cutoff is not comparable across embedding models, and it
-    was the last constant in this file pinned to mpnet's scale. mE5's same-event
-    median distance is 0.063 against mpnet's 0.195, so the inherited 0.50 admitted
-    nearly every pair. A rank rule cannot be mis-scaled by a model swap.
+    FLOORED, and the floor MODEL-SCALED. The first version removed the distance
+    cutoff entirely on the reasoning that a rank rule cannot be mis-scaled by a
+    model swap. That is true and it was still wrong: kNN is scale-free but it
+    ASSUMES DENSITY. On the 5,413-event snapshot the fourth-nearest neighbour is
+    genuinely close; on the live 282-event window it is merely the fourth least
+    unrelated, and 19% of the resulting edges joined pairs further apart than
+    mE5's median UNRELATED pair. It linked Uber layoffs to Nepal missing persons.
 
-    Asserted against the SOURCE because the alternative is a database fixture of
-    thousands of events; the two properties are structural, not statistical.
+    So rank decides how many neighbours, the floor decides whether they are
+    actually close — and the floor comes from _SCALE so a model swap moves it.
+    A literal here is the bug that _SCALE exists to prevent.
     """
     import inspect
 
-    from correlation.partition import _load_embedding_edges
+    from correlation import clustering, partition
 
-    src = inspect.getsource(_load_embedding_edges)
+    src = inspect.getsource(partition._load_embedding_edges)
     assert "topk[j]" in src, "the edge rule is no longer mutual"
-    assert "STORY_EMBED_EDGE_MAX_DIST" not in src, (
-        "a distance cutoff is back in the embedding edge rule; it cannot survive a "
-        "model swap and it is what mutual-kNN replaced"
+    assert "min_sim" in src, (
+        "the distance floor is gone; kNN alone links the least-unrelated pair "
+        "available, which on a sparse window is not a story"
     )
+    # The floor must come from the model scale, not a number typed here.
+    assert partition.STORY_EMBED_EDGE_MAX_DIST == clustering._scale()["story_edge_max"]
+    assert "STORY_EMBED_EDGE_MAX_DIST = _scale()" in (
+        pathlib.Path(partition.__file__).read_text()
+    ), "the story edge cutoff is a literal again"
+
+
+import pathlib  # noqa: E402  (used by the test above)

@@ -296,6 +296,25 @@ async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
     # Better on BOTH folds, in the same direction — what step 4 could not show.
     # k=4 is the plateau: k=3 loses recall, k=5 collapses (max group 3,511 as
     # connected components, because mutual-kNN stops being sparse).
+    # AND A DISTANCE FLOOR, model-scaled. Rank alone is not enough, and removing
+    # the cutoff entirely was wrong: kNN is scale-free but it ASSUMES DENSITY.
+    #
+    # The offline snapshot holds 5,413 events, where an event's fourth-nearest
+    # neighbour is genuinely close. The live window holds 282, where it is merely
+    # the fourth LEAST UNRELATED — so the rule happily linked Uber layoffs to
+    # Nepal missing persons because nothing nearer existed. Measured on the live
+    # window before this floor went back:
+    #
+    #     261 edges, distance median 0.1262, p75 0.1389, max 0.1915
+    #     72% beyond the calibrated story cutoff (0.115)
+    #     19% beyond mE5's DIFFERENT-event median (0.145)
+    #
+    # A fifth of the graph joined pairs further apart than a typical unrelated
+    # pair. So: rank decides HOW MANY neighbours (scale-free, density-aware) and
+    # the floor decides whether they are actually close (needs units, and now gets
+    # them from _SCALE rather than a literal, so a model swap cannot silently
+    # invalidate it).
+    min_sim = 1.0 - STORY_EMBED_EDGE_MAX_DIST
     k = min(STORY_EMBED_KNN, len(ids) - 1)
     topk: list[set[int]] = [set() for _ in ids]
     sims_of: dict[tuple[int, int], float] = {}
@@ -306,8 +325,11 @@ async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
             sims[row, i] = -1.0                     # never a neighbour of itself
             nbrs = np.argpartition(-sims[row], k)[:k]
             for j in nbrs:
+                sim = float(sims[row, j])
+                if sim < min_sim:
+                    continue                        # too far to be anyone's story
                 topk[i].add(int(j))
-                sims_of[(i, int(j))] = float(sims[row, j])
+                sims_of[(i, int(j))] = sim
     out: dict[tuple[str, str], float] = {}
     for i, nbrs in enumerate(topk):
         for j in nbrs:

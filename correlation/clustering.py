@@ -56,14 +56,26 @@ TIME_WINDOW_DAYS = 4
 # mE5 values are PERCENTILE-matched against mpnet's distribution by
 # tools/tune_embed_threshold, not rescaled by a constant ratio — the two
 # distributions differ in shape as well as width.
+#
+# `story_edge_max` IS THE EXCEPTION, and its meaning changed with the mechanism.
+# It used to be the primary criterion for a story edge, tuned as a threshold. It
+# is now a SANITY FLOOR under mutual-kNN, so it is set to each model's
+# DIFFERENT-EVENT MEDIAN (mpnet 0.656, mE5 0.145, both from
+# tools/tune_embed_threshold): do not link a pair that is further apart than a
+# typical UNRELATED pair. That has a meaning a percentile map does not, and the
+# percentile map produced 0.115, which cut 72% of the live window's edges and
+# cost real recall on the labelled snapshot (F1 0.7104 -> 0.6816) for no gain
+# the samples could justify.
 _SCALE = {
     "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": {
         "embedding": 0.12, "entity_near": 0.25, "entity_loose": 0.45,
-        "embed_far": 0.45, "story_max": 0.55, "story_edge_max": 0.50,
+        "embed_far": 0.45, "story_max": 0.55,
+        # DIFFERENT-EVENT MEDIAN, not a tuned cutoff — see the note below.
+        "story_edge_max": 0.656,
     },
     "intfloat/multilingual-e5-base": {
         "embedding": 0.050, "entity_near": 0.079, "entity_loose": 0.106,
-        "embed_far": 0.106, "story_max": 0.127, "story_edge_max": 0.115,
+        "embed_far": 0.106, "story_max": 0.127, "story_edge_max": 0.145,
     },
 }
 
