@@ -16,11 +16,50 @@ from common.config import get_settings
 DOCKERFILE = Path(__file__).resolve().parent.parent / "Dockerfile"
 
 
-def test_the_bake_reads_the_model_from_config_not_a_literal():
-    src = DOCKERFILE.read_text()
-    assert "get_settings().prism_embed_model" in src, (
-        "Dockerfile must bake the CONFIGURED embedding model, not a hardcoded name"
+def _instructions() -> str:
+    return "\n".join(
+        ln for ln in DOCKERFILE.read_text().splitlines() if not ln.lstrip().startswith("#")
     )
+
+
+def test_the_bake_goes_through_the_app_s_own_loader():
+    """REGRESSION: the Railway build failed with
+
+        ValueError: Model intfloat/multilingual-e5-base is not supported in TextEmbedding
+
+    The bake called `TextEmbedding(name)` directly, which only works for models
+    fastembed ships in its registry. common.embeddings._get_model() first
+    registers the ones it does not (add_custom_model), and mE5 is one of them —
+    so the image could not bake a model the application loads perfectly well.
+
+    The previous test asserted the Dockerfile READ the model from config, which
+    it did. Reading the right name and then loading it the wrong way still
+    passed. Asserting the loader closes that.
+    """
+    src = _instructions()
+    assert "from common.embeddings import _get_model" in src, (
+        "the bake must use the app's loader, which registers custom models"
+    )
+    assert "from fastembed import TextEmbedding" not in src, (
+        "calling fastembed directly bypasses add_custom_model and breaks the build "
+        "for any model not in fastembed's registry"
+    )
+
+
+def test_the_bake_actually_loads_the_configured_model():
+    """The check the source-reading tests cannot make: does it WORK?
+
+    Skipped when the model is not already cached — this must not turn CI into a
+    1 GB download — but on any machine that has run the app it is the real thing.
+    """
+    import pytest
+
+    from common.embeddings import _get_model
+
+    cache = DOCKERFILE.parent / ".fastembed_cache"
+    if not cache.exists() or not any(cache.iterdir()):
+        pytest.skip("model not cached locally; nothing to verify without a download")
+    _get_model()  # raises if the configured model cannot be loaded
 
 
 def test_no_stale_model_name_is_hardcoded_in_the_image():

@@ -32,10 +32,13 @@ ENV PATH="/app/.venv/bin:$PATH"
 # a 768-dim multilingual model, so the bake cached a model the app never loads
 # and production re-downloaded on every boot — a cold-start optimization that
 # silently did nothing. tests/test_dockerfile_bake.py fails if this drifts again.
-RUN python -c "\
-from fastembed import TextEmbedding; \
-from common.config import get_settings; \
-TextEmbedding(get_settings().prism_embed_model, cache_dir='.fastembed_cache')"
+# Loaded through the APP'S OWN loader, not fastembed directly. _get_model()
+# registers models fastembed does not ship in its registry (add_custom_model),
+# and mE5 is one of them — calling TextEmbedding(name) here failed the build with
+# "Model intfloat/multilingual-e5-base is not supported" the first time the
+# configured model was a custom one. Going through the same function production
+# uses means the bake cannot bake something the app cannot load.
+RUN python -c "from common.embeddings import _get_model; _get_model()"
 
 # One image, two roles: PRISM_SERVICE_ROLE=worker runs the pipeline worker;
 # anything else (default) runs migrations + the API. Lets both Railway
