@@ -325,7 +325,8 @@ async def apply_markup(c: asyncpg.Connection, fixed: list[dict]) -> None:
     print("  NOTE: events.embedding is NOT rewritten — see the comment in apply_markup.")
 
 
-async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 256) -> None:
+async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 64,
+                  from_id: str | None = None) -> None:
     """Rebuild every stored vector with the CONFIGURED model, then record it.
 
     Needed because cosine distance is not comparable across embedding models. A
@@ -370,38 +371,80 @@ async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 256) -> No
         print("\n  DRY RUN — nothing written.")
         return
 
-    # KEYSET pagination and BATCHED writes. Both were measured before changing:
-    #   embed, 4 threads       99 ms/chunk    ->  1.3 h      (raised to 8: 0.7 h)
-    #   one UPDATE per row    182 ms round trip -> 2.4 h     <- the real ceiling
-    #   OFFSET 40000 vs keyset 0.61s vs 0.47s  ->  negligible
-    # So the round trips were the thing to fix, not the OFFSET I first suspected.
-    done, last = 0, "00000000-0000-0000-0000-000000000000"
+    # THE CONNECTION CANNOT BE HELD IDLE WHILE EMBEDDING. Railway's public proxy
+    # drops a connection that sits unused, and a batch of 256 chunks is minutes of
+    # CPU with no traffic on the socket — so the first batched run died on its
+    # first write with ConnectionDoesNotExistError, having converted nothing.
+    # Batching the writes made the idle window LONGER, not shorter.
+    #
+    # Two changes: a smaller batch, so the gap between reads and writes is tens of
+    # seconds rather than minutes; and a reconnect around every statement, because
+    # over a multi-hour job across a public proxy a drop is normal, not
+    # exceptional. Measured per-chunk costs that shaped this:
+    #   embed, 4 threads    99 ms   (8 threads: 55 ms on Latin text, ~600 ms on
+    #                                Kannada/Hindi, which tokenize far longer)
+    #   one UPDATE per row  182 ms round trip
+    #   OFFSET vs keyset    0.61s vs 0.47s — negligible, not the problem
+    conn = c
+
+    async def _live() -> asyncpg.Connection:
+        nonlocal conn
+        if conn is None or conn.is_closed():
+            conn = await asyncpg.connect(_db_url(), timeout=120)
+        return conn
+
+    async def _retry(fn, *args):
+        nonlocal conn
+        for attempt in range(4):
+            try:
+                return await fn(await _live(), *args)
+            except (asyncpg.exceptions.ConnectionDoesNotExistError,
+                    asyncpg.exceptions.InterfaceError, ConnectionResetError, OSError):
+                if attempt == 3:
+                    raise
+                try:
+                    await conn.close()
+                except Exception:
+                    pass
+                conn = None
+                await asyncio.sleep(2 * (attempt + 1))
+        return None
+
+    done, last = 0, from_id or "00000000-0000-0000-0000-000000000000"
+    if from_id:
+        print(f"  resuming after chunk id {from_id}")
     t0 = time.perf_counter()
     while True:
-        rows = await c.fetch(
-            "SELECT id::text AS id, text FROM article_chunks "
-            "WHERE id > $1::uuid ORDER BY id LIMIT $2",
-            last, batch,
+        rows = await _retry(
+            lambda cx, _last=last, _n=batch: cx.fetch(
+                "SELECT id::text AS id, text FROM article_chunks "
+                "WHERE id > $1::uuid ORDER BY id LIMIT $2",
+                _last, _n,
+            )
         )
         if not rows:
             break
         vecs = await embed_texts([r["text"] for r in rows])
-        await c.executemany(
-            "UPDATE article_chunks SET embedding = $2::vector WHERE id = $1::uuid",
-            [(r["id"], "[" + ",".join(f"{x:.6f}" for x in v) + "]")
-             for r, v in zip(rows, vecs, strict=True)],
+        payload = [(r["id"], "[" + ",".join(f"{x:.6f}" for x in v) + "]")
+                   for r, v in zip(rows, vecs, strict=True)]
+        await _retry(
+            lambda cx, _rows=payload: cx.executemany(
+                "UPDATE article_chunks SET embedding = $2::vector WHERE id = $1::uuid",
+                _rows,
+            )
         )
         done += len(rows)
         last = rows[-1]["id"]
-        if done % (batch * 8) == 0:
+        if done % (batch * 16) == 0:
             rate = done / max(time.perf_counter() - t0, 1e-9)
             left = (n_chunks - done) / max(rate, 1e-9) / 60
-            print(f"    chunks {done}/{n_chunks}  {rate:.0f}/s  ~{left:.0f} min left", flush=True)
+            print(f"    chunks {done}/{n_chunks}  {rate:.1f}/s  ~{left:.0f} min left "
+                  f"| resume-at {last}", flush=True)
     print(f"  chunks rewritten: {done} in {(time.perf_counter()-t0)/60:.1f} min")
 
     # Events take their vector from the first chunk of their earliest article,
     # matching how correlation assigned it in the first place.
-    await c.execute(
+    await (await _live()).execute(
         """
         WITH first_chunk AS (
             SELECT DISTINCT ON (em.event_id) em.event_id, ac.embedding
@@ -416,11 +459,12 @@ async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 256) -> No
         RETURNING 1
         """
     )
-    n_moved = await c.fetchval("SELECT count(*) FROM events WHERE embedding IS NOT NULL")
+    n_moved = await (await _live()).fetchval(
+        "SELECT count(*) FROM events WHERE embedding IS NOT NULL")
     print(f"  event vectors rebuilt from their first chunk (now {n_moved} non-null)")
 
     if has_meta:
-        await c.execute(
+        await (await _live()).execute(
             "UPDATE corpus_meta SET embed_model = $1, embed_dim = $2, embed_prefix = $3, "
             "updated_at = now() WHERE id = 1",
             model, dim, prefix,
@@ -531,6 +575,8 @@ async def main() -> None:
     ap.add_argument("--drop-cve", action="store_true",
                     help="delete the NVD/CISA-KEV corpus (reconstructible: public feeds, "
                          "deterministic enrichment, no LLM cost)")
+    ap.add_argument("--from-id", metavar="UUID", default=None,
+                    help="resume --reembed after this chunk id (printed by the progress line)")
     ap.add_argument("--reembed", action="store_true",
                     help="rebuild every vector with the configured model (local, free)")
     ap.add_argument("--limit", type=int, default=None,
@@ -558,7 +604,7 @@ async def main() -> None:
         if a.drop_cve:
             await drop_cve(c, write=a.apply and a.drop_cve)
         if a.reembed:
-            await reembed(c, write=a.apply and a.reembed)
+            await reembed(c, write=a.apply and a.reembed, from_id=a.from_id)
         if every or a.markup:
             fixed = await report_markup(c, a.limit)
             if a.apply and a.markup:

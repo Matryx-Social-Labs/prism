@@ -35,6 +35,9 @@ const WHO_KEY = "prism.labeller";
 // credential. Stored rather than put in the URL: a token in the address bar leaks
 // through history, Referer headers and any shared screenshot.
 const TOKEN_KEY = (batch: string) => `prism.label.token.${batch}`;
+// Per batch, not global: someone who read the story primer has not been taught
+// the claim task, and the two ask for opposite kinds of judgement.
+const PRIMER_KEY = (batch: string) => `prism.label.primer.${batch}`;
 
 function provenance(e: LabelEvent): string {
   const bits = [
@@ -229,6 +232,113 @@ function ClaimTask({
 }
 
 
+
+/** Shown BEFORE the first task, and dismissed deliberately.
+ *
+ *  The first round shipped its guidance as a collapsed <details> and 30% of the
+ *  123 tasks came back with the two labellers disagreeing — not randomly, but
+ *  with opposite systematic biases. One ticked on any shared word (a "Monsoon
+ *  Marathon" grouped with a parliamentary "Monsoon Session"); the other missed
+ *  the same cricket ban reported in English and in Kannada. Neither had read the
+ *  guidance, because nothing made them.
+ *
+ *  Every example below is a REAL disagreement from that round, which is why they
+ *  are worth the screen space: they are the mistakes these two people actually
+ *  make, not invented ones.
+ */
+function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
+  const claim = kind === "claim_attribution";
+  return (
+    <div className="mx-auto max-w-[640px] pt-2">
+      <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+        READ THIS FIRST · ABOUT TWO MINUTES
+      </p>
+      <h1 className="mt-2 text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+        {claim ? "Did this article put these words in this person's mouth?" : "Is this the same story?"}
+      </h1>
+
+      <p className="mt-4 text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+        {claim
+          ? "We check automatically that the quote is copied correctly. What a machine cannot check is whether the article credits it to the right person. That is the only thing you are judging."
+          : "You will see one headline, then others from around the same time. Tick the ones covering the same unfolding story."}
+      </p>
+
+      <div className="mt-7 border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
+        <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>DO</p>
+        {claim ? (
+          <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
+            <li>Read the words either side of the quote — that is usually where the answer is.</li>
+            <li>Open “Read the whole article” when the text near the quote only says “he” or “the Collector”.</li>
+            <li>Answer <strong>Not sure</strong> when you genuinely cannot tell. It is a real answer.</li>
+          </ul>
+        ) : (
+          <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
+            <li>Tick the same happening reported twice, <strong>even in another language</strong>.</li>
+            <li>Ask: would one follow the other in a single running account of one event?</li>
+            <li>Tick nothing when nothing matches. That is a real and useful answer.</li>
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-6 border-l-2 pl-4" style={{ borderColor: "var(--danger, #b91c1c)" }}>
+        <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>DO NOT</p>
+        {claim ? (
+          <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            <li>Do not judge whether the claim is <em>true</em>, fair, or well argued.</li>
+            <li>Do not answer Yes because the quote sounds like something that person would say.</li>
+            <li>Do not guess when the article never names who spoke — that is a No or a Not sure.</li>
+          </ul>
+        ) : (
+          <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            <li>Do not tick because two headlines share a <strong>word</strong>.</li>
+            <li>Do not tick because they share an <strong>organisation</strong>, a person, or a place.</li>
+            <li>Do not tick because they share a <strong>subject</strong>. Two dengue stories are two stories.</li>
+          </ul>
+        )}
+      </div>
+
+      <p className="mt-7 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+        REAL MISTAKES FROM THE LAST ROUND
+      </p>
+      <div className="mt-3 space-y-4">
+        {(claim
+          ? [
+              ["NO — right quote, wrong mouth",
+               "The quotation is copied perfectly from the article, but the words either side credit it to somebody else. This is the one no automatic check can catch."],
+              ["NOT SURE — the article only says “the Collector”",
+               "If you cannot tie that role to the person named in the question, even after opening the full article, say Not sure rather than guessing."],
+            ]
+          : [
+              ["WRONG — “Nandi Hills Monsoon Marathon” ticked with “tribunal reforms Bill in Monsoon Session”",
+               "These share the word “Monsoon” and nothing else. A shared word is not a shared story."],
+              ["WRONG — “CFTRI and NABARD join hands” ticked with “NABARD survey on rural incomes”",
+               "Same organisation, two unrelated things it did. A shared organisation is not a shared story."],
+              ["MISSED — “cricketer Reddy handed 8-year ban” not ticked with the Kannada report of the same ban",
+               "Same man, same ban, same eight years, different language. That IS one story and must be ticked."],
+            ]
+        ).map(([head, body]) => (
+          <div key={head}>
+            <p className="text-[14px] font-medium" style={{ color: "var(--ink)" }}>{head}</p>
+            <p className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{body}</p>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={onStart}
+        className="mt-8 h-11 rounded-full px-6 text-[14.5px] font-medium"
+        style={{ background: "var(--ink)", color: "var(--bg)" }}
+      >
+        I have read this — start
+      </button>
+      <p className="mt-3 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+        You can stop whenever you like; it remembers where you got to.
+      </p>
+    </div>
+  );
+}
+
 /** What "attributed" means, shown rather than asserted — the same lesson the
  *  story guide had to learn when a careful labeller grouped by shared
  *  organisation in good faith. */
@@ -286,6 +396,9 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   const [draftWho, setDraftWho] = useState("");
   const [joinError, setJoinError] = useState("");
   const [batch, setBatch] = useState<LabelBatch | null>(null);
+  // Null until read from storage, so the first paint does not flash the primer at
+  // someone who has already dismissed it.
+  const [primed, setPrimed] = useState<boolean | null>(null);
   const [task, setTask] = useState<LabelTask | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "error">("loading");
@@ -318,6 +431,14 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         window.localStorage.setItem(TOKEN_KEY(batchKey), invited);
         window.history.replaceState(null, "", window.location.pathname);
         setToken(invited);
+      }
+      try {
+        setPrimed(window.localStorage.getItem(PRIMER_KEY(batchKey)) === "1");
+      } catch {
+        // Private browsing with storage denied: show the primer rather than
+        // skipping it. Reading it twice costs two minutes; skipping it cost 30%
+        // disagreement last round.
+        setPrimed(false);
       }
       const savedTok = invited || window.localStorage.getItem(TOKEN_KEY(batchKey));
       const savedWho = window.localStorage.getItem(WHO_KEY);
@@ -536,7 +657,21 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         </Note>
       )}
 
-      {state === "ready" && task && (
+      {state === "ready" && task && primed === false && (
+        <Primer
+          kind={batch?.kind ?? "story_boundary"}
+          onStart={() => {
+            try {
+              window.localStorage.setItem(PRIMER_KEY(batchKey), "1");
+            } catch {
+              // Storage denied — still let them through; the primer has been read.
+            }
+            setPrimed(true);
+          }}
+        />
+      )}
+
+      {state === "ready" && task && primed !== false && (
         task.claim ? (
           <ClaimTask
             claim={task.claim}

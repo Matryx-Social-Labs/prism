@@ -36,6 +36,7 @@ from common.llm import structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
 from common.text import detect_script
+from correlation.clustering import _scale
 from correlation.threads import (
     _ROUNDUP_CTE,
     _STORY_STOP_LIST,
@@ -83,7 +84,7 @@ LEIDEN_RESOLUTION = 0.020
 # apart from it: ten times the edges at a tenth of the density needs a different
 # scale. veto_config_version folds the resolution in, so verdicts re-vet.
 STORY_EMBED_KNN = 5              # neighbours per event; 10 blobbed (>25 groups)
-STORY_EMBED_EDGE_MAX_DIST = 0.50 # cosine distance; corpus positives median 0.377
+STORY_EMBED_EDGE_MAX_DIST = _scale()["story_edge_max"]  # moves with the model
 STORY_ENTITY_EDGE_WEIGHT = 2.0   # entity edges as SECONDARY evidence, not a gate
 LEIDEN_RESOLUTION_V2 = 0.20
 # The Leiden graph's own edge floor, deliberately SEPARATE from

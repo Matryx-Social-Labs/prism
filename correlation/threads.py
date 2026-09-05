@@ -19,6 +19,7 @@ from common.db import session_scope
 from common.llm import structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
+from correlation.clustering import _scale
 from correlation.schemas import ThreadLinkResult
 
 logger = get_logger(__name__)
@@ -28,8 +29,10 @@ WINDOW_DAYS = 14
 # Below 0.12 the articles would have merged into one event (clustering
 # threshold); the mid band is "related, not identical". Cross-sector links
 # (war→stocks) mostly arrive via entity overlap, not embedding proximity.
-EMBED_NEAR = 0.12
-EMBED_FAR = 0.45
+# Cosine distances are not comparable across embedding models; these move with
+# the configured one (correlation.clustering._SCALE).
+EMBED_NEAR = _scale()["embedding"]
+EMBED_FAR = _scale()["embed_far"]
 
 
 async def link_event_threads(event_id: uuid.UUID) -> None:
@@ -285,7 +288,7 @@ STORY_MIN_EDGE_WEIGHT = 0.15
 # 0.0–0.64. 0.55 cleans Cauvery to its 2 water events and keeps ~28/31 CJP developments
 # (it trims only a duplicate and the Wangchuk-hospital tail at 0.64). Skip the gate
 # when either event lacks an embedding (fall back to actor overlap).
-STORY_MAX_EMBED_DIST = 0.55
+STORY_MAX_EMBED_DIST = _scale()["story_max"]
 
 # Story-graph stopwords: generic responders and national bodies that appear across
 # unrelated stories (a flood, a tunnel collapse, and a stampede all name the NDRF,

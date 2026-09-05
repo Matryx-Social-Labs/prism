@@ -42,12 +42,28 @@ TIME_WINDOW_DAYS = 4
 # Keyed by model so the two can never drift apart. Derived by matching PERCENTILES
 # of the pairwise distance distribution (tools/tune_embed_threshold), not by a
 # constant ratio — the distributions differ in shape as well as width.
+# EVERY cosine distance in the correlation layer lives here. Three of them did;
+# four did not, and stayed raw mpnet numbers through a model swap:
+# threads.EMBED_NEAR / EMBED_FAR / STORY_MAX_EMBED_DIST and
+# partition.STORY_EMBED_EDGE_MAX_DIST. The last was added with the v2 story layer
+# after tools/tune_embed_threshold was written, so it was not even on that tool's
+# list of what a swap invalidates.
+#
+# The failure would have been silent and severe: mE5's same-event median distance
+# is 0.063 against mpnet's 0.195, so a 0.50 edge cutoff admits nearly every pair,
+# the kNN graph goes dense, and the story layer over-merges. No error, no log.
+#
+# mE5 values are PERCENTILE-matched against mpnet's distribution by
+# tools/tune_embed_threshold, not rescaled by a constant ratio — the two
+# distributions differ in shape as well as width.
 _SCALE = {
     "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": {
         "embedding": 0.12, "entity_near": 0.25, "entity_loose": 0.45,
+        "embed_far": 0.45, "story_max": 0.55, "story_edge_max": 0.50,
     },
     "intfloat/multilingual-e5-base": {
         "embedding": 0.050, "entity_near": 0.079, "entity_loose": 0.106,
+        "embed_far": 0.106, "story_max": 0.127, "story_edge_max": 0.115,
     },
 }
 

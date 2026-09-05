@@ -59,7 +59,13 @@ function task(over: Partial<LabelTask> = {}): LabelTask {
 // jsdom does NOT route localStorage through Storage.prototype, so spying on the
 // prototype silently never fires (recorded in CLAUDE.md). Stub the global.
 function stubStorage(initial: Record<string, string> = {}) {
-  const store = new Map(Object.entries(initial));
+  // The primer gates the FIRST task, so every test that is about something else
+  // must start past it — otherwise each one silently becomes a test of the
+  // primer. The primer's own tests pass `primer: false` to opt back in.
+  const { primer, ...rest } = initial as Record<string, string> & { primer?: boolean };
+  const seeded: Record<string, string> =
+    primer === false ? rest : { "prism.label.primer.batch-key": "1", ...rest };
+  const store = new Map(Object.entries(seeded));
   vi.stubGlobal("localStorage", {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
@@ -491,5 +497,83 @@ describe("the whole article is reachable", () => {
     renderWith(CLAIM);
     await screen.findByText(/, he added/);
     expect(screen.queryByText(/Read the whole article/)).not.toBeInTheDocument();
+  });
+});
+
+describe("the primer is read before the first judgement", () => {
+  // The first round shipped its guidance as a collapsed <details>. 30% of 123
+  // tasks came back with the two labellers disagreeing, with OPPOSITE systematic
+  // biases — one ticked on any shared word ("Monsoon Marathon" with "Monsoon
+  // Session"), the other missed one cricket ban reported in English and Kannada.
+  // Neither had opened the guidance, because nothing made them.
+
+  const CLAIM = {
+    article_id: "a1", title: "T", source: "The Hindu", speaker: "The minister",
+    quote_text: "double its outlay", context_before: "said the state would ",
+    context_after: " before the monsoon.", target: null, stance: "neutral",
+  };
+
+  function ready(kind: string, task: Record<string, unknown>) {
+    stubStorage({
+      "prism.label.token.batch-key": "t", "prism.labeller": "ana", primer: false,
+    } as never);
+    fetchLabelBatch.mockResolvedValue({
+      name: "B", notes: "", open: true, self_join: false, labeller: "ana",
+      kind, total: 10, done: 0,
+    });
+    fetchLabelTask.mockResolvedValue({ task, closed: false });
+    return render(<LabelPage params={params} />);
+  }
+
+  it("blocks the first story task until it is acknowledged", async () => {
+    ready("story_boundary", {
+      id: "t1", position: 0, sector: "news",
+      seed: { id: "s", title: "Seed headline", at: null, source_count: 1, actors: [], signals: [] },
+      candidates: [],
+    });
+    // The task itself must NOT be reachable yet.
+    expect(await screen.findByText(/READ THIS FIRST/)).toBeInTheDocument();
+    expect(screen.queryByText("Seed headline")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /I have read this/ }));
+    expect(await screen.findByText("Seed headline")).toBeInTheDocument();
+  });
+
+  it("teaches the STORY rule with the mistakes that were actually made", async () => {
+    ready("story_boundary", {
+      id: "t1", position: 0, sector: "news",
+      seed: { id: "s", title: "Seed", at: null, source_count: 1, actors: [], signals: [] },
+      candidates: [],
+    });
+    await screen.findByText(/READ THIS FIRST/);
+    expect(screen.getByText(/Monsoon Session/)).toBeInTheDocument();
+    expect(screen.getByText(/shared word is not a shared story/i)).toBeInTheDocument();
+    // The opposite error matters just as much: the cross-language miss.
+    expect(screen.getByText(/different language. That IS one story/i)).toBeInTheDocument();
+  });
+
+  it("teaches the CLAIM rule instead when the batch is claims", async () => {
+    ready("claim_attribution", { id: "t1", position: 0, kind: "claim_attribution", claim: CLAIM });
+    await screen.findByText(/READ THIS FIRST/);
+    expect(screen.getByText(/right quote, wrong mouth/i)).toBeInTheDocument();
+    // Story guidance must not leak into the claim primer; they ask opposite things.
+    expect(screen.queryByText(/Monsoon Session/)).not.toBeInTheDocument();
+  });
+
+  it("does not show again once acknowledged", async () => {
+    stubStorage({
+      "prism.label.token.batch-key": "t", "prism.labeller": "ana",
+      "prism.label.primer.batch-key": "1",
+    });
+    fetchLabelBatch.mockResolvedValue({
+      name: "B", notes: "", open: true, self_join: false, labeller: "ana",
+      kind: "claim_attribution", total: 10, done: 3,
+    });
+    fetchLabelTask.mockResolvedValue({
+      task: { id: "t1", position: 0, kind: "claim_attribution", claim: CLAIM }, closed: false,
+    });
+    render(<LabelPage params={params} />);
+    expect((await screen.findAllByText(/double its outlay/)).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/READ THIS FIRST/)).not.toBeInTheDocument();
   });
 });

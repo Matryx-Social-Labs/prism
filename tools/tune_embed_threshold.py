@@ -16,12 +16,13 @@ and keep the number and the embedding match tier stops firing entirely — no
 error, no log line, every health check green, just a quiet collapse in recall
 that would be blamed on the model.
 
-Six constants ride on this scale:
+Seven constants ride on this scale:
     clustering.EMBEDDING_DISTANCE_THRESHOLD   0.12
     clustering.ENTITY_MATCH_NEAR_DISTANCE     0.25
     clustering.ENTITY_MATCH_LOOSE_DISTANCE    0.45
     threads.EMBED_NEAR / EMBED_FAR            0.12 / 0.45
     threads.STORY_MAX_EMBED_DIST              0.55
+    partition.STORY_EMBED_EDGE_MAX_DIST       0.50
 
 The primary one is tuned directly against tools/gold_pairs (labelled same-event
 article pairs — precisely what this threshold decides). The rest are mapped by
@@ -51,6 +52,10 @@ DEPENDENTS = {
     "clustering.ENTITY_MATCH_LOOSE_DISTANCE": 0.45,
     "threads.EMBED_FAR": 0.45,
     "threads.STORY_MAX_EMBED_DIST": 0.55,
+    # Added late: the v2 story layer shipped after this tool was written, so its
+    # edge cutoff was never on the list and stayed a raw mpnet distance through a
+    # model swap. That is the whole failure this file exists to prevent.
+    "partition.STORY_EMBED_EDGE_MAX_DIST": 0.50,
 }
 
 
