@@ -414,14 +414,40 @@ async def test_embedding_edges_are_unioned_not_gated_by_entities():
 
 
 async def test_the_resolution_moves_with_the_edge_set():
-    """0.020 was tuned for ~800 sparse entity edges; v2 supplies ~20,000. Running
-    the old resolution over the new edges is the configuration that blobs, so the
-    two are pinned together and the veto version folds it in."""
+    """The resolution and the edge construction are ONE configuration.
+
+    0.020 was tuned for ~800 sparse entity edges. v2's thresholded kNN supplied
+    ~20,000 and needed 0.20. Mutual kNN at k=4 supplies ~4,600 — sparser again,
+    because an edge now needs BOTH events to rank each other — and measures best
+    at 0.05. Running any of those resolutions over another's edge set is the
+    configuration that blobs.
+
+    Asserted as a RELATIONSHIP rather than a literal: the previous version pinned
+    0.20 and would have failed for a change that was correct, which is what it
+    did when the edge rule moved. What must hold is that the two entry points
+    cannot drift from the constant, and that the veto version folds it in so
+    verdicts re-vet when it changes.
+    """
     from correlation import partition
 
-    assert partition.LEIDEN_RESOLUTION_V2 == 0.20
+    # Every caller takes the same resolution; a second literal anywhere is the drift.
     assert partition.compute_partition.__defaults__[0] == partition.LEIDEN_RESOLUTION_V2
     assert partition.persist_base_run.__defaults__[0] == partition.LEIDEN_RESOLUTION_V2
+    # The version is a hash, so the property is that it MOVES with the resolution:
+    # otherwise cached verdicts survive a boundary change they were never judged
+    # against.
+    before = partition.veto_config_version()
+    original = partition.LEIDEN_RESOLUTION_V2
+    try:
+        partition.LEIDEN_RESOLUTION_V2 = original + 0.01
+        assert partition.veto_config_version() != before, (
+            "veto_config_version ignores the resolution; cached verdicts would "
+            "outlive the boundary they were judged on"
+        )
+    finally:
+        partition.LEIDEN_RESOLUTION_V2 = original
+    # Sanity, not tuning: CPM resolutions outside this range do not produce stories.
+    assert 0.01 <= partition.LEIDEN_RESOLUTION_V2 <= 0.50
 
 
 def test_same_day_developments_cannot_become_each_others_parent():
@@ -457,3 +483,30 @@ def test_same_day_developments_cannot_become_each_others_parent():
         assert cur == root_id, f"{m.id} walks to {cur}, not the root"
     # The genuine relationship survives: b still attaches to a, not to the root.
     assert parent["b"] == "a"
+
+
+def test_the_embedding_edge_rule_is_MUTUAL_and_has_no_distance_units():
+    """Two properties, both load-bearing, both invisible at runtime if lost.
+
+    MUTUAL: an edge needs each event in the other's top-k. One-sided kNN is far
+    denser, and density is what lets a single bridge fuse a whole arc — as
+    connected components it produced a 3,511-event group on this corpus.
+
+    NO UNITS: a cosine cutoff is not comparable across embedding models, and it
+    was the last constant in this file pinned to mpnet's scale. mE5's same-event
+    median distance is 0.063 against mpnet's 0.195, so the inherited 0.50 admitted
+    nearly every pair. A rank rule cannot be mis-scaled by a model swap.
+
+    Asserted against the SOURCE because the alternative is a database fixture of
+    thousands of events; the two properties are structural, not statistical.
+    """
+    import inspect
+
+    from correlation.partition import _load_embedding_edges
+
+    src = inspect.getsource(_load_embedding_edges)
+    assert "topk[j]" in src, "the edge rule is no longer mutual"
+    assert "STORY_EMBED_EDGE_MAX_DIST" not in src, (
+        "a distance cutoff is back in the embedding edge rule; it cannot survive a "
+        "model swap and it is what mutual-kNN replaced"
+    )

@@ -83,10 +83,10 @@ LEIDEN_RESOLUTION = 0.020
 # The resolution moves 0.020 -> 0.20 WITH the edge set and cannot be changed
 # apart from it: ten times the edges at a tenth of the density needs a different
 # scale. veto_config_version folds the resolution in, so verdicts re-vet.
-STORY_EMBED_KNN = 5              # neighbours per event; 10 blobbed (>25 groups)
+STORY_EMBED_KNN = 4              # mutual: k=3 loses recall, k=5 collapses to one blob
 STORY_EMBED_EDGE_MAX_DIST = _scale()["story_edge_max"]  # moves with the model
 STORY_ENTITY_EDGE_WEIGHT = 2.0   # entity edges as SECONDARY evidence, not a gate
-LEIDEN_RESOLUTION_V2 = 0.20
+LEIDEN_RESOLUTION_V2 = 0.05
 # The Leiden graph's own edge floor, deliberately SEPARATE from
 # threads.STORY_MIN_EDGE_WEIGHT (0.15), which the BFS timeline still uses.
 #
@@ -265,9 +265,40 @@ async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
     emb = np.asarray([r["embedding"] for r in rows], dtype="float32")
     emb /= np.linalg.norm(emb, axis=1, keepdims=True) + 1e-12
 
+    # MUTUAL kNN, and no distance cutoff. Both halves of that matter.
+    #
+    # An absolute cosine cutoff is not comparable across embedding models, and it
+    # was the last thing in this file still pinned to mpnet's scale. Worse, it
+    # could not exploit a better representation: mE5 separates same-story from
+    # different-story pairs at AUC 0.990 against mpnet's 0.955, yet scored no
+    # better under a thresholded graph, because the grid was built around mpnet's
+    # distances. A rank rule has no units, so no model swap can silently
+    # invalidate it.
+    #
+    # MUTUAL rather than one-sided: requiring each to be in the other's top-k is
+    # far sparser, and sparsity is what stops one bridge fusing a whole arc. The
+    # measured difference is large. Snapshot of 5,413 events, gold_stories,
+    # Leiden CPM on the resulting graph:
+    #
+    #                                   P       R      F1     Cdet   max grp
+    #     mpnet, threshold (v1)      0.4519  0.4563  0.4541  0.6144    23
+    #     mE5 + passage:, mutual-kNN 0.9153  0.4696  0.6207  0.5357    15
+    #     mE5 + query:,   mutual-kNN 0.9545  0.5478  0.6961  0.4553    12
+    #     ...unioned with entity     0.9559  0.5652  0.7104  0.4379    23  <- live
+    #
+    # Cross-validated on disjoint halves of the gold stories, which is the check
+    # that killed a CPM configuration once before:
+    #
+    #                    fold A            fold B
+    #     mpnet        F1 0.5556         F1 0.3250
+    #     mE5+query    F1 0.7619         F1 0.6327
+    #
+    # Better on BOTH folds, in the same direction — what step 4 could not show.
+    # k=4 is the plateau: k=3 loses recall, k=5 collapses (max group 3,511 as
+    # connected components, because mutual-kNN stops being sparse).
     k = min(STORY_EMBED_KNN, len(ids) - 1)
-    min_sim = 1.0 - STORY_EMBED_EDGE_MAX_DIST
-    out: dict[tuple[str, str], float] = {}
+    topk: list[set[int]] = [set() for _ in ids]
+    sims_of: dict[tuple[int, int], float] = {}
     for start in range(0, len(ids), 512):
         block = emb[start:start + 512]
         sims = block @ emb.T
@@ -275,11 +306,15 @@ async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
             sims[row, i] = -1.0                     # never a neighbour of itself
             nbrs = np.argpartition(-sims[row], k)[:k]
             for j in nbrs:
-                sim = float(sims[row, j])
-                if sim < min_sim:
-                    continue
-                a, b = (ids[i], ids[int(j)]) if ids[i] < ids[int(j)] else (ids[int(j)], ids[i])
-                out[(a, b)] = sim
+                topk[i].add(int(j))
+                sims_of[(i, int(j))] = float(sims[row, j])
+    out: dict[tuple[str, str], float] = {}
+    for i, nbrs in enumerate(topk):
+        for j in nbrs:
+            if i >= j or i not in topk[j]:
+                continue                            # one-sided: not an edge
+            a, b = (ids[i], ids[j]) if ids[i] < ids[j] else (ids[j], ids[i])
+            out[(a, b)] = sims_of.get((i, j), sims_of.get((j, i), 0.0))
     return [(a, b, w) for (a, b), w in out.items()]
 
 
