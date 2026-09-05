@@ -363,9 +363,34 @@ export async function fetchLenses(): Promise<LensInfo[]> {
   return data.lenses;
 }
 
-export async function fetchEvent(id: string): Promise<EventDetail> {
+/** What a brief request can come back as.
+ *
+ *  A discriminated union rather than `T | null`, because the paywall has three
+ *  distinct "no brief" outcomes and the reader needs a different affordance for
+ *  each: sign in, buy more, or come back later. Collapsing them to null is what
+ *  made the first version render an empty panel for all three.
+ */
+export type BriefResult =
+  | { state: "ok"; lens: string; brief: string | null; points?: string[]; cached: boolean }
+  | { state: "signin_required" }
+  | { state: "no_samples"; remaining: number | null }
+  | { state: "unavailable" };
+
+/** Bearer header, or nothing. Kept in one place so no caller invents its own. */
+export function authHeaders(token?: string | null): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function fetchEvent(id: string, token?: string | null): Promise<EventDetail> {
   const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(id)}`, {
-    next: { revalidate: 60 },
+    // CACHING IS CONDITIONAL ON IDENTITY. The payload now carries only the
+    // lenses this reader has unlocked, so a shared 60-second cache would serve
+    // one reader's paid lens to everyone behind the same cache entry — the
+    // paywall leaking through the CDN instead of through the route. Signed-in
+    // requests are never shared; anonymous ones are identical for everyone and
+    // keep the cache.
+    ...(token ? { cache: "no-store" as const } : { next: { revalidate: 60 } }),
+    headers: authHeaders(token),
   });
   if (!res.ok) throw new Error(`event failed: ${res.status}`);
   return (await res.json()) as EventDetail;
@@ -384,15 +409,29 @@ export async function fetchQuestions(id: string, lens?: string): Promise<string[
 export async function fetchBrief(
   eventId: string,
   lens: string,
-): Promise<{ lens: string; brief: string | null; points?: string[]; cached: boolean } | null> {
+  token?: string | null,
+): Promise<BriefResult> {
   try {
     const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/brief?lens=${encodeURIComponent(lens)}`, {
       cache: "no-store",
+      headers: authHeaders(token),
     });
-    if (!res.ok) return null;
-    return await res.json();
+    // 401 and 402 ARE THE PRODUCT, not failures. The previous `if (!res.ok)
+    // return null` collapsed them into "no brief", so a reader who needed to
+    // sign in, and one who had run out of samples, both saw an empty panel with
+    // no way forward. The paywall would have been invisible.
+    if (res.status === 401) return { state: "signin_required" };
+    if (res.status === 402) {
+      const body = await res.json().catch(() => ({}));
+      const d = body?.detail ?? {};
+      // `remaining: null` means NO QUOTA ROW — never granted — which reads
+      // differently to the user than "you have spent them all".
+      return { state: "no_samples", remaining: d.remaining ?? null };
+    }
+    if (!res.ok) return { state: "unavailable" };
+    return { state: "ok", ...(await res.json()) };
   } catch {
-    return null;
+    return { state: "unavailable" };
   }
 }
 
@@ -421,10 +460,11 @@ export async function askQuestion(
   // stream: connection held open on metered mobile data, setState on a dead
   // component, and the server generating tokens nobody will ever read.
   signal?: AbortSignal,
+  token?: string | null,
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/ask`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ question, session_id: sessionId }),
     signal,
   });

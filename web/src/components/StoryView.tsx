@@ -91,6 +91,10 @@ export function StoryView({ event }: { event: EventDetail }) {
   const [flipped, setFlipped] = useState(false);
   const [points, setPoints] = useState<Record<string, string[]>>(event.lens_points ?? {});
   const [briefLoading, setBriefLoading] = useState(false);
+  // Which paywall wall this lens hit, if any. Null means the lens is readable.
+  const [gateState, setGateState] = useState<
+    { lens: string; kind: "signin" } | { lens: string; kind: "no_samples"; remaining: number | null } | null
+  >(null);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
   // Did the READER ask for this lens, or did it come back from their profile?
@@ -127,11 +131,24 @@ export function StoryView({ event }: { event: EventDetail }) {
       fetchQuestions(event.id, lens).then((qs) => !cancelled && setQuestions(qs));
       if (!briefs[lens]) {
         setBriefLoading(true);
-        fetchBrief(event.id, lens).then((res) => {
+        fetchBrief(event.id, lens, session?.token).then((res) => {
           if (cancelled) return;
           setBriefLoading(false);
-          if (res?.brief) setBriefs((prev) => ({ ...prev, [lens]: res.brief! }));
-          if (res?.points?.length) setPoints((prev) => ({ ...prev, [lens]: res.points! }));
+          // Each paywall outcome gets its own affordance. Collapsing them into
+          // "no brief" is what made the first version show an empty panel to a
+          // reader who just needed to sign in.
+          if (res.state === "signin_required") {
+            setGateState({ lens, kind: "signin" });
+            return;
+          }
+          if (res.state === "no_samples") {
+            setGateState({ lens, kind: "no_samples", remaining: res.remaining });
+            return;
+          }
+          if (res.state === "unavailable") return;
+          setGateState(null);
+          if (res.brief) setBriefs((prev) => ({ ...prev, [lens]: res.brief! }));
+          if (res.points?.length) setPoints((prev) => ({ ...prev, [lens]: res.points! }));
         });
       }
     }

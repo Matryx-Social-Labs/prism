@@ -93,6 +93,18 @@ class Settings(BaseSettings):
     # reached the general feed. Off while the product is India news; re-enable
     # with the Cyber tier. Their corpus was deleted 2026-09-05 and costs nothing
     # to rebuild — public feeds, deterministic enrichment, no LLM.
+    # A HARD CEILING ON THE CORPUS, checked before every collector run.
+    #
+    # "Bounded article cap" and "watched" are not cost controls, and calling them
+    # that is how a budget goes. This is a real stop condition: once the corpus
+    # holds this many enriched articles, collection stops by itself whether or
+    # not anyone is looking. 0 disables the ceiling.
+    #
+    # It bounds the CORPUS, not the spend directly — spend is LLM calls, retries
+    # and briefs, which no article count predicts exactly. But it is the one
+    # quantity that cannot drift, and it fails safe: the check runs before
+    # collection, so exceeding it costs nothing further.
+    prism_ingest_max_articles: int = 0
     prism_cve_feeds_enabled: bool = False
     prism_ingestion_enabled: bool = True
 

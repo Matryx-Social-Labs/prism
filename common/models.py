@@ -476,6 +476,36 @@ class Session(TimestampMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class LensUnlock(TimestampMixin, Base):
+    """One row per (user, event, lens) a reader has paid to open.
+
+    WHY A ROW AND NOT JUST A DECREMENT. `usage_quota.try_consume_sample` debits
+    unconditionally, so charging per REQUEST means a page refresh costs a sample
+    and three free samples are gone before a reader has seen the feature work.
+    This makes the unit of payment the thing the reader thinks they bought — an
+    unlocked lens on a story — rather than an HTTP call.
+
+    It also decouples payment from generation. The brief is generated once and
+    cached on the event projection, shared by every reader; the sample is
+    consumed once per reader. Those are different lifecycles and conflating them
+    is what made the first design charge for a cache hit.
+
+    UNIQUE on the triple, and the insert uses ON CONFLICT DO NOTHING: two tabs
+    unlocking the same lens race, and the loser must read as "already unlocked",
+    not as a 500.
+    """
+
+    __tablename__ = "lens_unlocks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", "lens", name="uq_lens_unlock"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id"), nullable=False)
+    lens: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class CorpusMeta(TimestampMixin, Base):
     """Which embedding model produced the vectors currently in this database.
 

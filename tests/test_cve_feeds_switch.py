@@ -61,3 +61,56 @@ async def test_the_master_switch_still_beats_everything(monkeypatch):
     monkeypatch.setenv("PRISM_INGESTION_ENABLED", "false")
     monkeypatch.setenv("PRISM_CVE_FEEDS_ENABLED", "true")
     assert await _run(monkeypatch) == []
+
+
+async def test_the_article_cap_stops_collection_before_it_starts(monkeypatch):
+    """A cap enforced AFTER collection is a report, not a brake.
+
+    "Bounded article cap" and "watched" are not cost controls — the outside voice
+    was right about that. This is the one quantity that cannot drift, and the
+    check runs before any collector so hitting the ceiling costs nothing further.
+    """
+    monkeypatch.setenv("PRISM_INGESTION_ENABLED", "true")
+    monkeypatch.setenv("PRISM_INGEST_MAX_ARTICLES", "100")
+    get_settings.cache_clear()
+
+    class _S:
+        async def execute(self, *a, **kw):
+            class R:
+                def scalar_one(self_inner):
+                    return 100  # already at the ceiling
+            return R()
+
+    class _Scope:
+        async def __aenter__(self):
+            return _S()
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(runner, "session_scope", lambda: _Scope())
+    called = await _run(monkeypatch)
+    assert called == [], f"collectors ran past the cap: {called}"
+
+
+async def test_below_the_cap_collection_proceeds(monkeypatch):
+    monkeypatch.setenv("PRISM_INGESTION_ENABLED", "true")
+    monkeypatch.setenv("PRISM_INGEST_MAX_ARTICLES", "100")
+    get_settings.cache_clear()
+
+    class _S:
+        async def execute(self, *a, **kw):
+            class R:
+                def scalar_one(self_inner):
+                    return 7
+            return R()
+
+    class _Scope:
+        async def __aenter__(self):
+            return _S()
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(runner, "session_scope", lambda: _Scope())
+    assert "rss" in await _run(monkeypatch)

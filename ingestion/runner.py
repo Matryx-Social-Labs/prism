@@ -20,6 +20,19 @@ async def run_all() -> dict[str, int]:
     if not get_settings().prism_ingestion_enabled:
         logger.info("ingestion_disabled", reason="prism_ingestion_enabled=false")
         return {"disabled": 1}
+    # Stop condition, checked BEFORE any collector runs so hitting the ceiling
+    # costs nothing. A cap that is only enforced after collection is a report,
+    # not a brake.
+    cap = get_settings().prism_ingest_max_articles
+    if cap:
+        async with session_scope() as session:
+            held = (
+                await session.execute(text("SELECT count(*) FROM articles"))
+            ).scalar_one()
+        if held >= cap:
+            logger.warning("ingestion_cap_reached", articles=held, cap=cap)
+            return {"cap_reached": held}
+
     await seed_sources()
     results: dict[str, int] = {}
     # RSS (India news) first so the general feed is never starved by the CVE

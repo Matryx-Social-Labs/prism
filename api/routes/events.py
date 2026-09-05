@@ -30,6 +30,16 @@ from common.db import get_db
 from common.lenses import LENSES
 from common.locks import single_flight
 from common.logging import get_logger
+from common.quota import (
+    READER_LENS,
+    grant_samples,
+    has_unlocked,
+    record_unlock,
+    release_unlock,
+    remaining_samples,
+    try_consume_sample,
+    unlocked_lenses,
+)
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 
 logger = get_logger(__name__)
@@ -37,7 +47,11 @@ router = APIRouter()
 
 
 @router.get("/api/v1/events/{event_id}", response_model=EventDetail)
-async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_event(
+    event_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID | None = Depends(get_current_user_optional),
+):
     event = (
         await db.execute(
             text(
@@ -124,6 +138,30 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     # meant two member sets for one story. Dropping it also takes a Redis lookup
     # and a partition/BFS assembly off the most-viewed route.
     projection = event["projection"] or {}
+
+    # THE PAYWALL'S REAL BOUNDARY. Gating /brief alone was bypassable: this
+    # endpoint returns every cached lens brief as a plain field, so one request
+    # here handed over exactly what /brief was refusing. Found by the outside
+    # voice in review; the server-side gate has to live wherever the content
+    # leaves the server, not only on the route that generates it.
+    #
+    # Reader lens is always included. Anything else is included only for a
+    # reader who has unlocked it.
+    all_briefs = projection.get("lens_briefs") or {}
+    all_points = projection.get("lens_points") or {}
+    allowed = {READER_LENS}
+    if user_id is not None:
+        allowed |= await unlocked_lenses(db, user_id, event_id)
+    briefs = {k: v for k, v in all_briefs.items() if k in allowed}
+    points = {k: v for k, v in all_points.items() if k in allowed}
+    # `projection` carries the same content, so it is filtered too rather than
+    # left as an open side door.
+    safe_projection = dict(projection)
+    if "lens_briefs" in safe_projection:
+        safe_projection["lens_briefs"] = briefs
+    if "lens_points" in safe_projection:
+        safe_projection["lens_points"] = points
+
     return EventDetail(
         id=str(event["id"]),
         title=event["title"],
@@ -134,9 +172,9 @@ async def get_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         regions=event["regions"] or [],
         occurred_at=event["occurred_at"].isoformat() if event["occurred_at"] else None,
         last_updated_at=event["last_updated_at"].isoformat(),
-        projection=event["projection"],
-        lens_briefs=projection.get("lens_briefs") or {},
-        lens_points=projection.get("lens_points") or {},
+        projection=safe_projection,
+        lens_briefs=briefs,
+        lens_points=points,
         available_lenses=available_lenses(projection, event["sector"]),
         coverage=projection.get("coverage"),
         entities=[
@@ -202,9 +240,42 @@ async def _read_cached_brief(db: AsyncSession, event_id: uuid.UUID, lens: str) -
 # per (event, lens) holds across API replicas so a burst of viewers (and, once
 # the paywall lands, a burst of sample-spenders) costs exactly one LLM call.
 @router.get("/api/v1/events/{event_id}/brief", response_model=BriefResponse)
-async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(get_db)):
+async def get_brief(
+    event_id: uuid.UUID,
+    lens: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID | None = Depends(get_current_user_optional),
+):
     if lens not in LENSES:
         raise HTTPException(status_code=422, detail=f"unknown lens '{lens}'")
+
+    # THE GATE SITS ABOVE THE CACHE READ, and that placement is the whole thing.
+    # `_read_cached_brief` early-returns, so a check placed below it would only
+    # ever run for the FIRST viewer of each (event, lens) — every later reader
+    # would be served free. The paywall has to be the first thing that happens.
+    paid = lens != READER_LENS
+    claimed_now = False
+    if paid:
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="sign in to open this lens")
+        if not await has_unlocked(db, user_id, event_id, lens):
+            # Claim first, then debit: the claim is the concurrency winner, so
+            # two tabs cannot both spend a sample on the same lens.
+            claimed_now = await record_unlock(db, user_id, event_id, lens)
+            if claimed_now and not await try_consume_sample(db, user_id):
+                await release_unlock(db, user_id, event_id, lens)
+                left = await remaining_samples(db, user_id)
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "error": "no samples remaining",
+                        # None means NO QUOTA ROW — never granted — which is a
+                        # different fact from having spent everything.
+                        "remaining": left,
+                        "lens": lens,
+                    },
+                )
+
     cached = await _read_cached_brief(db, event_id, lens)
     if cached:
         return cached
@@ -226,6 +297,13 @@ async def get_brief(event_id: uuid.UUID, lens: str, db: AsyncSession = Depends(g
             # shows "the <lens> read isn't available yet" — never a 500.
             logger.warning("brief_unavailable", event_id=str(event_id), lens=lens, exc_info=True)
             read = {}
+            # NOBODY PAYS FOR AN EMPTY PANEL. The claim was taken above on the
+            # assumption a brief would materialise; it did not, so give it back.
+            # Only the caller that actually claimed it may release it — otherwise
+            # a second tab's failure would revoke the first tab's paid unlock.
+            if claimed_now:
+                await release_unlock(db, user_id, event_id, lens)
+                await grant_samples(db, user_id, 1)
         return BriefResponse(
             lens=lens, brief=read.get("text"), points=read.get("points") or [], cached=False
         )

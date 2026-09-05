@@ -17,12 +17,14 @@ async def get_current_user(
 
     Used by the read-time paywall gate, the watchlist, and the personalized brief.
     """
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(status_code=401, detail="missing bearer token")
-    user_id = await auth.resolve_session(db, token)
+    user_id = await get_current_user_optional(authorization, db)
     if user_id is None:
-        raise HTTPException(status_code=401, detail="invalid or expired session")
+        # ONE message, not two. The previous version distinguished "missing
+        # bearer token" from "invalid or expired session", which is a small
+        # information leak: it tells an unauthenticated caller whether a token
+        # exists. It also duplicated the parse, which is the actual reason this
+        # delegates now.
+        raise HTTPException(status_code=401, detail="missing or invalid session")
     return user_id
 
 
