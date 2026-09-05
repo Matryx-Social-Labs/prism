@@ -110,7 +110,6 @@ async def test_the_ASK_ROUTE_actually_passes_the_user_through(monkeypatch):
     """
     import agent.rag as rag
     import api.routes.events as events
-    from api.deps import get_current_user_optional
     from api.main import app
     from common import auth
 
