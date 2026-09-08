@@ -138,6 +138,11 @@ async def test_the_ASK_ROUTE_actually_passes_the_user_through(monkeypatch):
             def scalar_one_or_none(self):
                 return 1
 
+            def scalar_one(self):
+                # The Ask allowance counts prior questions; 0 keeps this test
+                # about ATTRIBUTION rather than about the quota.
+                return 0
+
         class _S:
             async def execute(self, *a, **kw):
                 return _R()

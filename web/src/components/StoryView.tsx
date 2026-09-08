@@ -534,7 +534,33 @@ export function StoryView({ event }: { event: EventDetail }) {
           className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden px-[22px] py-5`}
         >
           {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
-          {isLocked(lens) ? (
+          {gateState?.lens === lens && gateState.kind === "no_samples" ? (
+            // OUT OF SAMPLES is a different wall from NOT SIGNED IN, and the
+            // reader needs a different next step for each. The server sends the
+            // remaining count; `null` means no quota row was ever granted, which
+            // is not the same as having spent everything, so it is not shown as
+            // "0 left".
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+                You&apos;ve used your free{" "}
+                <span className="font-semibold" style={{ color: meta.color }}>
+                  {meta.short}
+                </span>{" "}
+                reads
+                {typeof gateState.remaining === "number"
+                  ? ` — ${gateState.remaining} left`
+                  : ""}
+                . The reader view of this story stays open.
+              </p>
+              <button
+                onClick={() => setLens("reader")}
+                className="rounded-full border px-4 py-2 text-[13px] font-semibold"
+                style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
+              >
+                Back to the reader view
+              </button>
+            </div>
+          ) : isLocked(lens) || gateState?.lens === lens ? (
             <div className="flex flex-col items-start gap-3">
               <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
                 Read this story through the{" "}

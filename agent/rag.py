@@ -209,6 +209,16 @@ async def ensure_session(
         if session_id is not None:
             existing = await session.get(AgentSession, session_id)
             if existing is not None and existing.event_id == event_id:
+                # ADOPT AN ANONYMOUS SESSION ON SIGN-IN. Resuming matched on
+                # (session_id, event_id) only, with no ownership check, so a
+                # reader who signed in mid-conversation kept writing into a
+                # NULL-user_ref session — their questions stayed uncounted
+                # against the account, which is a quota bypass that needs no
+                # effort to trigger. Claimed once, and never re-assigned: a
+                # session already owned by someone else is left alone rather
+                # than silently transferred.
+                if user_ref and existing.user_ref is None:
+                    existing.user_ref = user_ref
                 return session_id
         new_session = AgentSession(event_id=event_id, user_ref=user_ref)
         session.add(new_session)

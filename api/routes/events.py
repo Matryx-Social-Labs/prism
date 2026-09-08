@@ -32,6 +32,7 @@ from common.locks import single_flight
 from common.logging import get_logger
 from common.quota import (
     READER_LENS,
+    ask_allowance,
     grant_samples,
     has_unlocked,
     record_unlock,
@@ -344,6 +345,27 @@ async def ask(
         uuid.UUID(body.session_id) if body.session_id else None,
         user_ref=str(user_id) if user_id else None,
     )
+
+    # THE SPEND GATE, and it runs before any retrieval or generation. Ask is the
+    # only endpoint whose cost scales with users rather than corpus size, and it
+    # was unlimited and unauthenticated. Checked AFTER ensure_session so an
+    # anonymous session that has just been adopted counts against the account
+    # rather than restarting its allowance.
+    allowed, used, cap = await ask_allowance(
+        db, str(user_id) if user_id else None, session_id
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "question limit reached",
+                "used": used,
+                "limit": cap,
+                # Anonymous readers are told the way forward is signing in, not
+                # that they are blocked: the cap exists to convert, not to wall.
+                "signin_helps": user_id is None,
+            },
+        )
 
     async def sse():
         yield f"event: session\ndata: {json.dumps({'session_id': str(session_id)})}\n\n"

@@ -141,3 +141,63 @@ async def unlocked_lenses(session: AsyncSession, user_id: UUID, event_id: UUID) 
         )
     ).scalars().all()
     return set(rows)
+
+
+# Ask spend guardrails.
+#
+# Ask is the only endpoint whose cost scales with USERS rather than with corpus
+# size: a lens brief is generated once and cached for everyone, but every
+# question runs retrieval plus generation. It was unlimited and unauthenticated.
+#
+# ANONYMOUS ASK STAYS OPEN. A login wall on the most engaging thing the product
+# does would cost the free funnel, so anonymous readers get a small per-session
+# allowance and hitting it prompts sign-in — which converts rather than blocks.
+# Not an IP cap: carrier-grade NAT in India puts thousands of real readers behind
+# one address, so an IP limit throttles exactly the audience we want.
+ANON_ASK_PER_SESSION = 3
+USER_ASK_PER_DAY = 30
+
+
+async def ask_questions_used(
+    session: AsyncSession, user_ref: str | None, session_id: UUID
+) -> int:
+    """Questions already asked — by this account today, or by this anonymous session.
+
+    Counted from `agent_messages` rather than a counter table, so the meter is
+    derived from the record of the questions themselves and cannot drift from
+    it. `role = 'user'` is load-bearing: a completed turn writes two rows, so
+    counting all of them would halve every cap.
+
+    KNOWN LIMIT, worth stating rather than hiding: messages persist only after a
+    turn completes or is refused, so a failed or aborted generation spends money
+    and leaves nothing to count. This is an accurate USAGE meter and an
+    under-counting SPEND meter. Bounding actual spend needs the provider's own
+    accounting, not ours.
+    """
+    if user_ref:
+        sql = (
+            "SELECT count(*) FROM agent_messages m "
+            "JOIN agent_sessions s ON s.id = m.session_id "
+            "WHERE s.user_ref = :ref AND m.role = 'user' "
+            "AND m.created_at > now() - interval '1 day'"
+        )
+        params = {"ref": user_ref}
+    else:
+        # Anonymous: scoped to the one session, which is all the identity there
+        # is. Clearing cookies resets it — accepted, since the alternative is an
+        # IP cap that punishes shared connections.
+        sql = (
+            "SELECT count(*) FROM agent_messages "
+            "WHERE session_id = :sid AND role = 'user'"
+        )
+        params = {"sid": str(session_id)}
+    return (await session.execute(text(sql), params)).scalar_one() or 0
+
+
+async def ask_allowance(
+    session: AsyncSession, user_ref: str | None, session_id: UUID
+) -> tuple[bool, int, int]:
+    """(allowed, used, cap) for the next question."""
+    cap = USER_ASK_PER_DAY if user_ref else ANON_ASK_PER_SESSION
+    used = await ask_questions_used(session, user_ref, session_id)
+    return used < cap, used, cap

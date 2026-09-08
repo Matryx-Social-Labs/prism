@@ -15,6 +15,7 @@ code rather than the design:
 import uuid
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import text
 
 from common.db import session_scope
@@ -29,6 +30,35 @@ from common.quota import (
 )
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
+async def _cleanup():
+    """Delete what this module seeds.
+
+    loop_scope="session" matches the module's pytestmark. Without it the fixture
+    runs on a different event loop from the tests and asyncpg tears the
+    connection down across loops — which surfaces as an unrelated-looking
+    "attached to a different loop" error at teardown, not as a failing test.
+
+    These tests run against the developer's own database — there is no separate
+    test DB — so rows left behind are not merely untidy: test_personalization
+    asserts over the whole `events` table and started failing on ordering when
+    this module seeded events and walked away. A test that breaks another test
+    is a broken test.
+    """
+    yield
+    async with session_scope() as s:
+        await s.execute(text("DELETE FROM agent_messages WHERE content = 'x'"))
+        await s.execute(
+            text("DELETE FROM agent_sessions WHERE id NOT IN "
+                 "(SELECT session_id FROM agent_messages)")
+        )
+        await s.execute(text("DELETE FROM lens_unlocks"))
+        await s.execute(text("DELETE FROM usage_quota WHERE user_id IN "
+                             "(SELECT id FROM users WHERE email LIKE '%@t.test')"))
+        await s.execute(text("DELETE FROM events WHERE title = 't' AND summary = 's'"))
+        await s.execute(text("DELETE FROM users WHERE email LIKE '%@t.test'"))
 
 
 async def _db() -> bool:
