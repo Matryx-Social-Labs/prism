@@ -312,7 +312,10 @@ async def get_brief(
 
 @router.get("/api/v1/events/{event_id}/questions", response_model=QuestionsResponse)
 async def get_questions(
-    event_id: uuid.UUID, lens: str | None = None, db: AsyncSession = Depends(get_db)
+    event_id: uuid.UUID,
+    lens: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID | None = Depends(get_current_user_optional),
 ):
     row = (
         await db.execute(
@@ -321,7 +324,16 @@ async def get_questions(
     ).mappings().first()
     if row is None:
         raise HTTPException(status_code=404, detail="event not found")
-    return QuestionsResponse(questions=suggested_questions(row["projection"], lens))
+    # Anonymous is the common case and needs no query at all: without a user
+    # there is nothing to have unlocked.
+    unlocked = (
+        user_id is not None
+        and lens is not None
+        and await has_unlocked(db, user_id, event_id, lens)
+    )
+    return QuestionsResponse(
+        questions=suggested_questions(row["projection"], lens, unlocked=unlocked)
+    )
 
 
 @router.post("/api/v1/events/{event_id}/ask")

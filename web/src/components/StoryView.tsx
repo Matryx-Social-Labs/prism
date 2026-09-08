@@ -128,7 +128,7 @@ export function StoryView({ event }: { event: EventDetail }) {
     let cancelled = false;
     // Don't fetch (or generate) a locked pro lens for a signed-out reader.
     if (!isLocked(lens)) {
-      fetchQuestions(event.id, lens).then((qs) => !cancelled && setQuestions(qs));
+      fetchQuestions(event.id, lens, session?.token).then((qs) => !cancelled && setQuestions(qs));
       if (!briefs[lens]) {
         setBriefLoading(true);
         fetchBrief(event.id, lens, session?.token).then((res) => {

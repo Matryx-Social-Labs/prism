@@ -396,10 +396,19 @@ export async function fetchEvent(id: string, token?: string | null): Promise<Eve
   return (await res.json()) as EventDetail;
 }
 
-export async function fetchQuestions(id: string, lens?: string): Promise<string[]> {
+export async function fetchQuestions(
+  id: string,
+  lens?: string,
+  token?: string | null,
+): Promise<string[]> {
   const params = lens ? `?lens=${encodeURIComponent(lens)}` : "";
   const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(id)}/questions${params}`, {
+    // The one data-derived question (cyber KEV) is served only to a reader who
+    // unlocked that lens, so the token has to come along or the paying reader
+    // gets the free copy. Already `no-store`, so unlike fetchEvent there is no
+    // shared cache entry for identity to poison.
     cache: "no-store",
+    headers: authHeaders(token),
   });
   if (!res.ok) return [];
   const data = (await res.json()) as { questions: string[] };

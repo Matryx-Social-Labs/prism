@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StoryView } from "@/components/StoryView";
+import { fetchQuestions } from "@/lib/api";
 import type { EventDetail } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -92,6 +93,27 @@ describe("lens flip", () => {
 
     expect(await mobile().findByText(CYBER_BRIEF)).toBeInTheDocument();
     expect(mobile().queryByText(READER_BRIEF)).not.toBeInTheDocument();
+  });
+
+  // The token has to reach /questions too, not only /brief. One suggested
+  // question is derived from story data — the cyber lens swaps in the
+  // exploited-in-the-wild phrasing when the CVE is KEV-listed — and the server
+  // now serves it only to a reader who unlocked that lens. Fetching it
+  // unauthenticated would hand the paying reader the free copy, so plugging the
+  // leak would have quietly removed what they are paying for.
+  //
+  // mockClear first: beforeEach only clears localStorage, so without it this
+  // would pass on the signed-in call left behind by the test above.
+  it("sends the session token when it asks for suggested questions", async () => {
+    localStorage.setItem(
+      "prism.session.v1",
+      JSON.stringify({ token: "t", userId: "u", email: "e@x.dev" }),
+    );
+    vi.mocked(fetchQuestions).mockClear();
+    render(<StoryView event={EVENT} />);
+    await waitFor(() =>
+      expect(vi.mocked(fetchQuestions)).toHaveBeenCalledWith(EVENT.id, expect.anything(), "t"),
+    );
   });
 
   // The guard still has to do its original job: a shared link opened by a
