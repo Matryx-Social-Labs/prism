@@ -546,10 +546,18 @@ describe("the primer is read before the first judgement", () => {
       candidates: [],
     });
     await screen.findByText(/READ THIS FIRST/);
+    // Over-ticking: the round-1 error.
     expect(screen.getByText(/Monsoon Session/)).toBeInTheDocument();
     expect(screen.getByText(/shared word is not a shared story/i)).toBeInTheDocument();
-    // The opposite error matters just as much: the cross-language miss.
-    expect(screen.getByText(/different language. That IS one story/i)).toBeInTheDocument();
+
+    // UNDER-ticking: the round-2 error, and the reason this primer was rebalanced.
+    // Round 1 taught "same topic is not the same story" so well that a labeller
+    // stopped grouping several outlets covering ONE incident — which cut true
+    // pairs by two thirds. Both directions have to be taught or the fix to one
+    // becomes the cause of the other.
+    expect(screen.getByText(/one breach reported twice/i)).toBeInTheDocument();
+    expect(screen.getByText(/two languages/i)).toBeInTheDocument();
+    expect(screen.getByText(/five reports of one/i)).toBeInTheDocument();
   });
 
   it("teaches the CLAIM rule instead when the batch is claims", async () => {

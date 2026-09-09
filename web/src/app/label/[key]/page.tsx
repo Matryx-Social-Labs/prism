@@ -260,7 +260,7 @@ function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
       <p className="mt-4 text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
         {claim
           ? "We check automatically that the quote is copied correctly. What a machine cannot check is whether the article credits it to the right person. That is the only thing you are judging."
-          : "You will see one headline, then others from around the same time. Tick the ones covering the same unfolding story."}
+          : "You will see one headline, then others from around the same time. Tick the ones covering the same unfolding story. The test is whether it is the same real-world happening — not whether the headlines look alike."}
       </p>
 
       <div className="mt-7 border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
@@ -273,7 +273,15 @@ function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
           </ul>
         ) : (
           <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
-            <li>Tick the same happening reported twice, <strong>even in another language</strong>.</li>
+            <li>
+              Tick <strong>every outlet covering the one incident</strong> — five reports of one
+              breach are five ticks, not none.
+            </li>
+            <li>
+              Tick when the words share nothing, <strong>including across languages</strong>. A
+              Kannada and a Hindi report of one final are one story.
+            </li>
+            <li>Tick the direct follow-up: the arrests after the attack are the same story.</li>
             <li>Ask: would one follow the other in a single running account of one event?</li>
             <li>Tick nothing when nothing matches. That is a real and useful answer.</li>
           </ul>
@@ -313,8 +321,14 @@ function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
                "These share the word “Monsoon” and nothing else. A shared word is not a shared story."],
               ["WRONG — “CFTRI and NABARD join hands” ticked with “NABARD survey on rural incomes”",
                "Same organisation, two unrelated things it did. A shared organisation is not a shared story."],
-              ["MISSED — “cricketer Reddy handed 8-year ban” not ticked with the Kannada report of the same ban",
-               "Same man, same ban, same eight years, different language. That IS one story and must be ticked."],
+              ["MISSED — the Hugging Face breach, five outlets, none ticked",
+               "“Hugging Face Breached by Autonomous AI Agent” and “OpenAI Says Its Models Accidentally Hacked Hugging Face” are one breach reported twice. All five belonged together."],
+              ["MISSED — “Supreme Court declines urgent listing” not ticked with “‘Don’t waste our time’: CJI declines urgent listing”",
+               "One court hearing, two headlines that share almost no words. Different wording is the normal case, not a reason to separate."],
+              ["MISSED — the Anantnag attack not ticked with “Policeman killed in terror attack in Anantnag”",
+               "Same attack. “Over 2,000 Detained After Cop Killed In Anantnag” is the direct follow-up and belongs with it too."],
+              ["MISSED — the Kannada CWG javelin report not ticked with the Hindi one",
+               "Same three athletes, same final, two languages. These matter more than any other kind and are the easiest to miss, because the words share nothing."],
             ]
         ).map(([head, body]) => (
           <div key={head}>
