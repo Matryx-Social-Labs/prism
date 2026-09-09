@@ -26,6 +26,7 @@ import re
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -131,6 +132,27 @@ class Node:
     actors: dict[str, float] = field(default_factory=dict)  # entity_id -> df
 
 
+def _window(col: str) -> str:
+    """The story window, as SQL, in ONE place.
+
+    `:as_of` NULL means "now", which is what production passes, so this is a
+    no-op there. A measurement passes a date to reconstruct the window as it
+    stood then — the only way to score a gold set older than STORY_WINDOW_DAYS,
+    because `last_updated_at` slides and labelled events drop out of the live
+    window about a month after they are labelled. Found when the 45-story gold
+    set matched 2 of 86 events against the live partition and read as a total
+    failure rather than an empty join.
+
+    The upper bound is guarded on NULL rather than always applied: against
+    `now()` it is a tautology, and a tautology in a hot query is a future puzzle.
+    """
+    as_of = "CAST(:as_of AS timestamptz)"
+    return (
+        f"{col} > coalesce({as_of}, now()) - interval '{STORY_WINDOW_DAYS} days'"
+        f" AND ({as_of} IS NULL OR {col} <= {as_of})"
+    )
+
+
 # ── Graph load ──────────────────────────────────────────────────────────────
 # Global analogue of threads._COMPONENT_EDGES_SQL: every actor-sharing event pair
 # in the window, IDF-weighted, with the roundup exclusion AND a PAIRWISE embedding
@@ -142,7 +164,7 @@ _GRAPH_EDGES_SQL = text(
         SELECT ee.entity_id, count(DISTINCT ee.event_id)::float AS d
         FROM event_entities ee
         JOIN events ev ON ev.id = ee.event_id
-                      AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                      AND {_window('ev.last_updated_at')}
         GROUP BY ee.entity_id
     ),
     {_ROUNDUP_CTE}
@@ -154,10 +176,10 @@ _GRAPH_EDGES_SQL = text(
     JOIN df ON df.entity_id = ee1.entity_id
     JOIN event_entities ee2 ON ee2.entity_id = ee1.entity_id AND ee2.event_id > ee1.event_id
     JOIN events ea ON ea.id = ee1.event_id
-                  AND ea.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                  AND {_window('ea.last_updated_at')}
                   AND ea.id NOT IN (SELECT id FROM roundup)
     JOIN events eb ON eb.id = ee2.event_id
-                  AND eb.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                  AND {_window('eb.last_updated_at')}
                   AND eb.id NOT IN (SELECT id FROM roundup)
     WHERE (
         ea.embedding IS NULL OR eb.embedding IS NULL
@@ -170,7 +192,7 @@ _GRAPH_EDGES_SQL = text(
 )
 
 
-async def _load_nodes(session) -> dict[str, Node]:
+async def _load_nodes(session, as_of: datetime | None = None) -> dict[str, Node]:
     rows = (
         await session.execute(
             text(
@@ -180,10 +202,11 @@ async def _load_nodes(session) -> dict[str, Node]:
                        coalesce(e.occurred_at::timestamptz, e.last_updated_at) AS occ,
                        (SELECT count(*) FROM event_memberships m WHERE m.event_id = e.id) AS srcs
                 FROM events e
-                WHERE e.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                WHERE {_window('e.last_updated_at')}
                   AND e.id NOT IN (SELECT id FROM roundup)
                 """
-            )
+            ),
+            {"as_of": as_of},
         )
     ).mappings().all()
     nodes = {
@@ -206,7 +229,7 @@ async def _load_nodes(session) -> dict[str, Node]:
                     SELECT ee.entity_id, count(DISTINCT ee.event_id)::float AS d
                     FROM event_entities ee
                     JOIN events ev ON ev.id = ee.event_id
-                                  AND ev.last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                                  AND {_window('ev.last_updated_at')}
                     GROUP BY ee.entity_id
                 )
                 SELECT ee.event_id, ee.entity_id, df.d
@@ -217,7 +240,7 @@ async def _load_nodes(session) -> dict[str, Node]:
                 JOIN df ON df.entity_id = ee.entity_id
                 """
             ),
-            {"stop": _STORY_STOP_LIST},
+            {"stop": _STORY_STOP_LIST, "as_of": as_of},
         )
     ).all()
     for event_id, entity_id, d in arows:
@@ -227,7 +250,9 @@ async def _load_nodes(session) -> dict[str, Node]:
     return nodes
 
 
-async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
+async def _load_embedding_edges(
+    session, as_of: datetime | None = None
+) -> list[tuple[str, str, float]]:
     """Each windowed event's k nearest neighbours by cosine, kept when close enough.
 
     Computed in numpy rather than as a pgvector lateral join. The HNSW index is on
@@ -251,11 +276,12 @@ async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
                 -- floats. Caught by test_persist_base_run_invariant_and_read.
                 SELECT id::text AS id, embedding::float4[] AS embedding
                 FROM events
-                WHERE last_updated_at > now() - interval '{STORY_WINDOW_DAYS} days'
+                WHERE {_window('last_updated_at')}
                   AND embedding IS NOT NULL
                 ORDER BY id
                 """
-            )
+            ),
+            {"as_of": as_of},
         )
     ).mappings().all()
     if len(rows) < 2:
@@ -340,7 +366,7 @@ async def _load_embedding_edges(session) -> list[tuple[str, str, float]]:
     return [(a, b, w) for (a, b), w in out.items()]
 
 
-async def _load_edges(session) -> list[tuple[str, str, float]]:
+async def _load_edges(session, as_of: datetime | None = None) -> list[tuple[str, str, float]]:
     rows = (
         await session.execute(
             _GRAPH_EDGES_SQL,
@@ -349,6 +375,7 @@ async def _load_edges(session) -> list[tuple[str, str, float]]:
                 "min_shared": STORY_MIN_SHARED,
                 "min_weight": PARTITION_MIN_EDGE_WEIGHT,
                 "max_dist": STORY_MAX_EMBED_DIST,
+                "as_of": as_of,
             },
         )
     ).mappings().all()
@@ -837,6 +864,29 @@ async def _finalize_stories(session, by_story: dict[int, list[Node]], edge_w) ->
     return stories
 
 
+def merge_edges(
+    entity_edges: list[tuple[str, str, float]],
+    emb_edges: list[tuple[str, str, float]],
+) -> list[tuple[str, str, float]]:
+    """UNION, not intersection, and the direction matters.
+
+    v1 made the entity rule a GATE, so a pair with one shared actor could never
+    be a story however similar its coverage — which is 96.5% of real pairs. Here
+    the embedding proposes and the entity edges add weight where they agree.
+
+    Extracted from compute_partition so an offline scorer builds the same graph
+    production does. A scorer that re-implements the merge drifts from the thing
+    it scores, and then reports on an algorithm nobody runs.
+    """
+    merged: dict[tuple[str, str], float] = {}
+    for a, b, w in emb_edges:
+        merged[(a, b)] = w
+    for a, b, w in entity_edges:
+        key = (a, b) if a < b else (b, a)
+        merged[key] = merged.get(key, 0.0) + STORY_ENTITY_EDGE_WEIGHT * w
+    return [(a, b, w) for (a, b), w in merged.items()]
+
+
 async def compute_partition(resolution: float = LEIDEN_RESOLUTION_V2, llm_veto: bool = False) -> dict:
     """Load the graph, partition into stories, build each story's branch tree.
     Read-only; returns a structured result for validation or persistence."""
@@ -845,17 +895,7 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION_V2, llm_veto: 
         entity_edges = await _load_edges(session)
         emb_edges = await _load_embedding_edges(session)
 
-        # UNION, not intersection, and the direction matters. v1 made the entity
-        # rule a GATE, so a pair with one shared actor could never be a story
-        # however similar its coverage — which is 96.5% of real pairs. Here the
-        # embedding proposes and the entity edges add weight where they agree.
-        merged: dict[tuple[str, str], float] = {}
-        for a, b, w in emb_edges:
-            merged[(a, b)] = w
-        for a, b, w in entity_edges:
-            key = (a, b) if a < b else (b, a)
-            merged[key] = merged.get(key, 0.0) + STORY_ENTITY_EDGE_WEIGHT * w
-        edges = [(a, b, w) for (a, b), w in merged.items()]
+        edges = merge_edges(entity_edges, emb_edges)
 
         # NO CONTENT GATE. It was measured as a small free refinement on the
         # ENTITY edges (fp 31 -> 27) and is not part of what was measured here:

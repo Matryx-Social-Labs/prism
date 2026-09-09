@@ -22,12 +22,13 @@ import gzip
 import json
 import os
 import statistics
+from datetime import UTC, datetime
 from pathlib import Path
 
 SNAPSHOT = Path(".cache/graph_snapshot.json.gz")
 
 
-async def build_snapshot(path: Path = SNAPSHOT) -> None:
+async def build_snapshot(path: Path = SNAPSHOT, as_of: str | None = None) -> None:
     """Pull nodes+edges from production, READ-ONLY, at a floor low enough that any
     threshold in the sweep can be reached by filtering rather than re-querying."""
     import re
@@ -46,9 +47,17 @@ async def build_snapshot(path: Path = SNAPSHOT) -> None:
     from common.db import session_scope
 
     P.PARTITION_MIN_EDGE_WEIGHT = 0.01  # widest useful graph; sweep filters upward
+    # `as_of` reconstructs the window as it stood on a past date. Without it a
+    # gold set can only be scored for STORY_WINDOW_DAYS after it is labelled —
+    # after that its events have slid out of the window and the join comes back
+    # empty, which reads as a catastrophic score rather than as no data.
+    when = datetime.fromisoformat(as_of).replace(tzinfo=UTC) if as_of else None
     async with session_scope() as s:
-        nodes = await P._load_nodes(s)
-        edges = await P._load_edges(s)
+        nodes = await P._load_nodes(s, when)
+        edges = await P._load_edges(s, when)
+        # The embedding kNN edges ARE the current story layer; a snapshot holding
+        # only entity edges can score v1 and nothing since.
+        emb = await P._load_embedding_edges(s, when)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -59,10 +68,13 @@ async def build_snapshot(path: Path = SNAPSHOT) -> None:
             for n in nodes.values()
         ],
         "edges": [[a, b, w] for a, b, w in edges],
+        "emb_edges": [[a, b, w] for a, b, w in emb],
+        "as_of": as_of,
     }
     with gzip.open(path, "wt") as fh:
         json.dump(payload, fh)
-    print(f"snapshot: {len(payload['nodes'])} nodes, {len(payload['edges'])} edges -> {path}")
+    print(f"snapshot: {len(payload['nodes'])} nodes, {len(payload['edges'])} entity edges, "
+          f"{len(payload['emb_edges'])} embedding edges, as_of={as_of or 'now'} -> {path}")
 
 
 def load_snapshot(path: Path = SNAPSHOT):
@@ -79,6 +91,17 @@ def load_snapshot(path: Path = SNAPSHOT):
     }
     edges = [(a, b, float(w)) for a, b, w in payload["edges"]]
     return nodes, edges
+
+
+def load_emb_edges(path: Path = SNAPSHOT) -> list[tuple[str, str, float]]:
+    """The embedding kNN edges, separate so `load_snapshot`'s 2-tuple keeps working.
+
+    Empty for snapshots built before these were saved — those can only score the
+    entity-only v1 graph, so a caller that needs the current layer must check.
+    """
+    with gzip.open(path, "rt") as fh:
+        payload = json.load(fh)
+    return [(a, b, float(w)) for a, b, w in payload.get("emb_edges", [])]
 
 
 def score(pred: dict[str, str], keys: set[str] | None = None) -> dict:
@@ -185,6 +208,9 @@ def cross_validate(nodes, edges, plans) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--snapshot", action="store_true", help="refresh the local graph snapshot")
+    ap.add_argument("--as-of", dest="as_of", default=None,
+                    help="rebuild the window as it stood on this date (YYYY-MM-DD), "
+                         "so a gold set older than the window can still be scored")
     ap.add_argument("--floors", default="0.15,0.30,0.50")
     ap.add_argument("--cpm", default="0.02,0.05,0.10,0.20,0.40")
     ap.add_argument("--rb", default="1.0")
@@ -193,7 +219,7 @@ def main() -> None:
     a = ap.parse_args()
 
     if a.snapshot:
-        asyncio.run(build_snapshot())
+        asyncio.run(build_snapshot(as_of=a.as_of))
         return
 
     from tools.gold_stories import STORY_OF
