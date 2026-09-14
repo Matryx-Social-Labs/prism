@@ -1,6 +1,13 @@
-"""Score the CURRENT story layer against a labelling batch. Read-only.
+"""Score the CURRENT story layer against the adjudicated gold set. Read-only.
 
-    uv run python -m tools.score_label_batch --batch yy5J0lJdX00L --as-of 2026-08-04
+    uv run python -m tools.score_label_batch --as-of 2026-08-04              # committed gold
+    uv run python -m tools.score_label_batch --as-of 2026-08-04 --agreed-only
+    uv run python -m tools.score_label_batch --batch <key> --as-of ...      # a live batch
+
+The default reads tools/gold_story_pairs — the adjudicated, version-controlled set —
+so a number quoted from here is reproducible from the repo alone. `--batch` reads a
+live labelling batch instead, for work still in progress; it applies the three
+adjudication rules because a live batch has no adjudication yet.
 
 WHY --as-of EXISTS. The partitioner keeps a rolling `STORY_WINDOW_DAYS` window on
 `last_updated_at`, so a gold set stops being scoreable about a month after it is
@@ -112,7 +119,8 @@ def _score(judged, labels, title):
     print(f"  tp {tp}  fp {fp} (wrong merges)  fn {fn} (wrong splits)")
 
 
-async def main(batch: str, as_of: str | None, resolution: float | None) -> None:
+async def main(batch: str | None, as_of: str | None, resolution: float | None,
+               agreed_only: bool = False) -> None:
     os.environ["DATABASE_URL"] = _prod_url()
 
     import correlation.partition as P
@@ -125,7 +133,7 @@ async def main(batch: str, as_of: str | None, resolution: float | None) -> None:
         nodes = await P._load_nodes(s, when)
         entity_edges = await P._load_edges(s, when)
         emb_edges = await P._load_embedding_edges(s, when)
-        rows = (await s.execute(
+        rows = [] if batch is None else (await s.execute(
             text("""
                 SELECT i.name AS who, t.seed_event_id::text AS seed,
                        t.candidates, r.selected
@@ -149,6 +157,16 @@ async def main(batch: str, as_of: str | None, resolution: float | None) -> None:
           f"largest {max(sizes.values()) if sizes else 0}, "
           f"{sum(1 for n in sizes.values() if n > 25)} over Story Forest's max of 25")
 
+    if batch is None:
+        from tools import gold_story_pairs as G
+
+        gold = G.pairs(include_adjudicated=not agreed_only)
+        print(f"\ngold: tools/gold_story_pairs, adjudicated {G.ADJUDICATED_ON} — "
+              f"{len(gold)} pairs, {sum(gold.values())} positive"
+              + (" (agreed-only)" if agreed_only else ""))
+        _score(list(gold.items()), labels, "CURRENT STORY LAYER vs adjudicated gold")
+        return
+
     verdict: dict[tuple[str, str], dict[str, bool]] = {}
     for r in rows:
         sel = _sel_ids(r["selected"])
@@ -170,9 +188,12 @@ async def main(batch: str, as_of: str | None, resolution: float | None) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--batch", required=True, help="label_batches.key")
+    ap.add_argument("--batch", default=None,
+                    help="score a LIVE label batch by key instead of the committed gold")
+    ap.add_argument("--agreed-only", dest="agreed_only", action="store_true",
+                    help="drop the 36 adjudicated pairs; checks a result does not hinge on them")
     ap.add_argument("--as-of", dest="as_of", default=None,
                     help="rebuild the window as it stood on this date (YYYY-MM-DD)")
     ap.add_argument("--resolution", type=float, default=None)
     a = ap.parse_args()
-    asyncio.run(main(a.batch, a.as_of, a.resolution))
+    asyncio.run(main(a.batch, a.as_of, a.resolution, a.agreed_only))
