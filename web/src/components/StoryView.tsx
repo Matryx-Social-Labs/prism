@@ -841,7 +841,9 @@ export function StoryView({ event }: { event: EventDetail }) {
                           “{c.quote_text}”
                         </blockquote>
                         <div className="mt-1 flex items-baseline gap-2 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-                          {/* The citation IS the link: one tap to check us, same target/rel as Sources. */}
+                          {/* The citation IS the link: one tap to check us, same target/rel as
+                              Sources. A 10.5px mono glyph is a 19x16 target, so the pseudo-element
+                              grows the hit area to ~47x44 without moving the glyph or the line. */}
                           {n != null &&
                             (c.url ? (
                               <a
@@ -849,7 +851,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label={`Source ${n}: ${c.source_name}`}
-                                className="font-mono underline-offset-2 hover:underline"
+                                className="relative font-mono underline-offset-2 before:absolute before:-inset-3.5 before:content-[''] hover:underline"
                               >
                                 [{n}]
                               </a>
