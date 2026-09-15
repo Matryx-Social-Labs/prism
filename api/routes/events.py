@@ -19,12 +19,14 @@ from api.deps import get_current_user_optional
 from api.schemas import (
     AskRequest,
     BriefResponse,
+    ClaimOut,
     EntityOut,
     EventDetail,
     ImpactOut,
     PerspectiveOut,
     QuestionsResponse,
     SourceRef,
+    SpeakerClaims,
 )
 from common.db import get_db
 from common.lenses import LENSES
@@ -45,6 +47,75 @@ from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+def _speaker_key(name: str) -> str:
+    """Fold punctuation and case ONLY: "D.K. Shivakumar" == "D K Shivakumar".
+
+    Measured on the live window: 3% of events carry one person under two speaker
+    strings, and every real duplicate was a punctuation or case variant. A surname
+    key would also have merged Chinna Reddy with Komatireddy Rajagopal Reddy, who
+    are different people, so tokens are kept: "Jaishankar" and "S Jaishankar" stay
+    two rows. That fold is the QID ledger's job (plan step 5), not this one's.
+    """
+    return " ".join(name.replace(".", " ").split()).casefold()
+
+
+def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
+    """Speaker-grouped, most-quoted first; newest article first, article order within it.
+
+    `sources` is the event's article rows, already newest-first, each carrying
+    the enrichment's `claims` JSONB (NULL for an un-enriched article). Shown
+    under the first surface form seen for a speaker key.
+
+    Defensive on shape by design: this runs on the most-viewed route, and a row
+    written by an older extractor could hold a dict or a string where a list is
+    expected. Skipping it costs one article's quotes; raising costs the page.
+    """
+    by: dict[str, list[tuple[tuple, ClaimOut]]] = {}
+    label: dict[str, str] = {}
+    first_seen: dict[str, int] = {}
+    for src in sources:
+        claims = src["claims"]
+        if not isinstance(claims, list):
+            continue
+        pub = src["published_at"]
+        for c in claims:
+            if not isinstance(c, dict):
+                continue
+            # Leaf types too, not just the containers: a non-string speaker
+            # would raise on .strip(), a non-int offset would fail ClaimOut
+            # validation, and either is an unhandled 500 on this route.
+            speaker = c.get("speaker")
+            quote = c.get("quote_text")
+            if not isinstance(speaker, str) or not isinstance(quote, str):
+                continue
+            speaker, quote = speaker.strip(), quote.strip()
+            if not speaker or not quote:
+                continue  # verified at write time; belt and braces
+            start, end = c.get("quote_start"), c.get("quote_end")
+            start = start if isinstance(start, int) and not isinstance(start, bool) else None
+            end = end if isinstance(end, int) and not isinstance(end, bool) else None
+            key = _speaker_key(speaker)
+            if key not in by:
+                by[key] = []
+                label[key] = speaker
+                first_seen[key] = len(first_seen)
+            # newest article first, then the order the article said them
+            sort_key = (-(pub.timestamp() if pub else 0.0), start or 0)
+            by[key].append((sort_key, ClaimOut(
+                quote_text=quote,
+                quote_start=start,
+                quote_end=end,
+                article_id=str(src["article_id"]),
+                source_name=src["source_name"],
+                url=src["url"],
+                published_at=pub.isoformat() if pub else None,
+            )))
+    return [
+        SpeakerClaims(speaker=label[k], claims=[cl for _, cl in sorted(by[k], key=lambda x: x[0])])
+        for k in sorted(by, key=lambda k: (-len(by[k]), first_seen[k]))
+    ]
 
 
 @router.get("/api/v1/events/{event_id}", response_model=EventDetail)
@@ -75,7 +146,8 @@ async def get_event(
                 SELECT a.id AS article_id, s.name AS source_name, s.slug AS source_slug,
                        s.reliability ->> 'funding' AS funding,
                        ri.url, ri.title, ri.published_at,
-                       e.shared_fields -> 'stance' ->> 'label' AS stance
+                       e.shared_fields -> 'stance' ->> 'label' AS stance,
+                       e.shared_fields -> 'claims' AS claims
                 FROM event_memberships em
                 JOIN articles a ON a.id = em.article_id
                 JOIN raw_items ri ON ri.id = a.raw_item_id
@@ -204,6 +276,7 @@ async def get_event(
             )
             for p in perspectives
         ],
+        claims=group_claims(sources),
         impacts=[
             ImpactOut(
                 id=str(i["id"]),

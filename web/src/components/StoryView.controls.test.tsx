@@ -56,6 +56,7 @@ function event(over: Partial<EventDetail> = {}): EventDetail {
     sources: [],
     perspectives: [],
     impacts: [],
+  claims: [],
     ...over,
   } as unknown as EventDetail;
 }

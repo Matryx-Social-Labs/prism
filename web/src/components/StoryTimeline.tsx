@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { StoryTimelineData } from "@/lib/api";
+import { shortDate } from "@/lib/dateline";
 
 // "The story so far" — ONE canonical, chronological timeline of a story's
 // developments, identical on every development (they share the same connected
@@ -14,8 +15,7 @@ import type { StoryTimelineData } from "@/lib/api";
 // stagger collapsing to instant under reduced-motion.
 
 function dateLabel(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return iso ? shortDate(iso) : "";
 }
 
 export function StoryTimeline({ story }: { story?: StoryTimelineData }) {

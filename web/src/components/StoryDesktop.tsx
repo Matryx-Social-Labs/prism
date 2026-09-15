@@ -63,6 +63,10 @@ function railFacts(event: EventDetail, lens: string): [string, string][] {
     const o = origins({ coverage: event.coverage } as never);
     if (o) out.push(["", o]);
   }
+  // Attributed quotes are evidence whatever the lens, and navItems never reach
+  // this rail — the Stone ledger is where desktop learns the section exists.
+  const quotes = (event.claims ?? []).reduce((n, s) => n + s.claims.length, 0);
+  if (quotes > 0) out.push(["", `${quotes} quote${quotes === 1 ? "" : "s"}`]);
   return out;
 }
 

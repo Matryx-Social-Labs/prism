@@ -19,6 +19,31 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
 - **First-user calibration** (P2). Test whether active F&O traders (want speed) or swing/
   long-term retail / finance creators are the right first paid cohort before hardcoding acquisition.
 
+## From the claims-display eng review (2026-09-15)
+- **Retire the Perspectives cards once claims are seen beside them** (P2). The rebuild plan
+  names verbatim claims as the successor to the ≤4 LLM "competing narratives" (per-event not
+  per-story, speaker is a string, no quotes, no time, every article forced into one group).
+  The new "What was said" section is rules-and-type; Perspectives is still cards, which
+  DESIGN.md forbids on desktop. Keep both until the founder has looked at a real story with
+  both present — Perspectives has origin-country grouping that claims does not.
+  **Depends on:** the claims section shipping; a look at ~5 live stories.
+- **Per-entity story ledger — fold speakers across a story's events via QIDs** (P2). Today
+  claims group by speaker STRING per event, so "Pradhan", "Dharmendra Pradhan" and "the
+  Education Minister" are three rows across a story. Decision 5 of the rebuild plan wants one
+  row per person with their position over time. Needs `entities.qid` populated (22% of df>=2
+  entities on 2026-09-14, `entity_alias` empty) and `office_holders` for role→person.
+  **Depends on:** plan step 5 (Wikidata linking) reaching useful coverage.
+- **Desktop rail leaks paid-lens facts for a LOCKED lens** (P2). `StoryDesktop.railFacts`
+  renders `projection.cyber.exploitation.kev_listed`, CVSS and `finance.tickers` when the
+  selected lens is cyber/markets. `get_event` filters `lens_briefs`/`lens_points` out of
+  `projection` for locked lenses but NOT the `cyber`/`finance` keys, and a signed-out reader
+  can select a locked lens (the flip happens, the brief is gated). So the rail shows "CISA
+  KEV LISTED" for a lens the reader has not unlocked — the same class as the `/questions`
+  leak closed in 4bde965. Fix is ~3 lines in `get_event` (drop `cyber`/`finance` from
+  `safe_projection` unless unlocked) plus one route test; flagged during the claims review
+  and kept out of that PR to keep it scoped.
+  **Depends on:** nothing.
+
 ## Positioning
 - **Distribution plan is hand-wavy** (P2). FinTwit/Telegram/YouTube are crowded + pay-to-play.
   Name concrete channels, a creator list, an offer, and a CAC assumption before spending.

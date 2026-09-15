@@ -29,6 +29,18 @@ export function istTime(iso: string): string {
   });
 }
 
+/** 27 Jul — the provenance line under a quote or a timeline node.
+ *  Pinned to IST like istDate: the inline formatter this replaced had no
+ *  timeZone, so the same article was dated two ways depending on the reader's
+ *  machine, and disagreed with the ledger rail a few pixels away. */
+export function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Kolkata",
+  });
+}
+
 /** SAT 25 JUL 2026 */
 export function istDate(d: Date): string {
   return d

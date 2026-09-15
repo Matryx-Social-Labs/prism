@@ -54,6 +54,7 @@ const EVENT = {
   sources: [],
   perspectives: [],
   impacts: [],
+  claims: [],
 } as unknown as EventDetail;
 
 beforeEach(() => {

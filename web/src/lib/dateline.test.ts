@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FeedItem } from "@/lib/api";
-import { bandOrigins, bands, istTime, lastMoved, newsTime, origins, sectorEyebrow } from "@/lib/dateline";
+import { bandOrigins, bands, istTime, lastMoved, newsTime, origins, sectorEyebrow, shortDate } from "@/lib/dateline";
 
 function item(id: string, sector: string, over: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -142,5 +142,20 @@ describe("newsTime — the dateline prints when the NEWS happened", () => {
     };
     expect(istTime(newsTime(item))).toBe("19:10");
     expect(istTime(item.last_updated_at)).toBe("02:49"); // what it used to print
+  });
+});
+
+describe("shortDate", () => {
+  it("renders day and short month", () => {
+    expect(shortDate("2026-07-27T10:00:00Z")).toBe("27 Jul");
+  });
+
+  it("is pinned to IST, so an evening-UTC timestamp is the NEXT Indian day", () => {
+    // 20:00 UTC on the 27th is 01:30 IST on the 28th — but still the 27th in
+    // UTC, in Europe (CEST) and everywhere west of UTC+4. The inline formatter
+    // this replaces had no timeZone, so the same article was dated two ways
+    // depending on the reader's machine. A 23:30Z probe would NOT catch a
+    // missing pin on a European dev box; this one does.
+    expect(shortDate("2026-07-27T20:00:00Z")).toBe("28 Jul");
   });
 });

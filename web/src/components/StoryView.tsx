@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
+import { shortDate } from "@/lib/dateline";
 import { useRouter } from "next/navigation";
 
 import { lensMeta, useLenses } from "@/lib/lenses";
@@ -85,6 +86,13 @@ export function StoryView({ event }: { event: EventDetail }) {
   const cyber = event.projection?.cyber ?? null;
   const finance = event.projection?.finance ?? null;
   const sourceById = new Map(event.sources.map((s) => [s.article_id, s]));
+  // ONE index for [n]: the Sources list and the citation under every quote read
+  // the same map, so the two can never number one article differently.
+  const sourceIndex = new Map(event.sources.map((s, i) => [s.article_id, i + 1]));
+  // `?? []` is load-bearing: the web and the API deploy from two pipelines and
+  // /events is cached 60s, so a new page meets an old payload for a window.
+  const claims = event.claims ?? [];
+  const quoteCount = claims.reduce((n, sp) => n + sp.claims.length, 0);
 
   const [lens, setLens] = useState("reader");
   const [briefs, setBriefs] = useState<Record<string, string>>(event.lens_briefs ?? {});
@@ -212,6 +220,9 @@ export function StoryView({ event }: { event: EventDetail }) {
       : null;
   const navItems: { id: string; label: string; count?: number }[] = [
     { id: "lens-brief", label: "Lens brief" },
+    // Only when there is something to jump to: 55% of stories have no attributed
+    // quote, and a permanent "Said 0" would advertise absence on every other page.
+    ...(quoteCount > 0 ? [{ id: "said", label: "Said", count: quoteCount }] : []),
     { id: "perspectives", label: "Perspectives", count: event.perspectives.length },
     { id: "what-to-expect", label: "What to expect", count: event.impacts.length },
     { id: "sources", label: "Sources", count: sourceCount },
@@ -793,6 +804,71 @@ export function StoryView({ event }: { event: EventDetail }) {
           longer lines. */}
       <div className="mx-auto max-w-[1240px] px-5 pb-[164px] sm:px-8 lg:w-[1376px] lg:max-w-none lg:px-0 lg:pb-20">
         <div className="lg:ml-[136px] lg:max-w-[604px]">
+      {/* ── What was said ────────────────────────────────────
+          Rules and type, neutral ink. The quote and the speaker are the body
+          voice; only the provenance line ([n] · outlet · date) is mono. Nothing
+          here is lens-coloured and nothing here is unverified: every quote was
+          checked against its article at write time, and the model's stance
+          never reaches the payload. Rendered only when there is something to
+          say — the section appearing is the signal. */}
+      {claims.length > 0 && (
+        <section id="said" className="mt-11 scroll-mt-24" aria-labelledby="said-title">
+          <h2 id="said-title" className="mb-1.5 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+            What was said
+          </h2>
+          <p className="mb-4 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+            Attributed, verbatim. Every quote is checked against the article it came from — one that does not match is not shown.
+          </p>
+          <div className="flex flex-col">
+            {claims.map((sp, i) => (
+              <div
+                key={sp.speaker}
+                className={i === 0 ? "" : "mt-5 border-t pt-5"}
+                style={i === 0 ? undefined : { borderColor: "var(--line)" }}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-[14.5px] font-semibold">{sp.speaker}</h3>
+                  <span className="shrink-0 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+                    {sp.claims.length} {sp.claims.length === 1 ? "quote" : "quotes"}
+                  </span>
+                </div>
+                <ul className="mt-2 flex flex-col gap-3.5">
+                  {sp.claims.map((c, j) => {
+                    const n = sourceIndex.get(c.article_id);
+                    return (
+                      <li key={`${c.article_id}-${j}`}>
+                        <blockquote className="text-[14.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+                          “{c.quote_text}”
+                        </blockquote>
+                        <div className="mt-1 flex items-baseline gap-2 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+                          {/* The citation IS the link: one tap to check us, same target/rel as Sources. */}
+                          {n != null &&
+                            (c.url ? (
+                              <a
+                                href={c.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Source ${n}: ${c.source_name}`}
+                                className="font-mono underline-offset-2 hover:underline"
+                              >
+                                [{n}]
+                              </a>
+                            ) : (
+                              <span>[{n}]</span>
+                            ))}
+                          <span>{c.source_name}</span>
+                          {c.published_at && <span>· {shortDate(c.published_at)}</span>}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ── Perspectives ─────────────────────────────────────── */}
       <section id="perspectives" className="mt-11 scroll-mt-24">
         <SectionTitle
@@ -894,18 +970,18 @@ export function StoryView({ event }: { event: EventDetail }) {
       </section>
 
       {/* ── Sources ────────────────────────────────────────── */}
-      <section id="sources" className="mt-11 scroll-mt-24">
-        <h2 className="mb-4 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+      <section id="sources" className="mt-11 scroll-mt-24" aria-labelledby="sources-title">
+        <h2 id="sources-title" className="mb-4 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
           Sources{" "}
           <span className="text-[15px] font-normal" style={{ color: "var(--ink-faint)" }}>
             ({event.sources.length})
           </span>
         </h2>
         <ul className="flex flex-col gap-[9px]">
-          {event.sources.map((s, i) => (
+          {event.sources.map((s) => (
             <li key={s.article_id} className="flex items-baseline gap-2.5 text-[13.5px]">
               <span className="shrink-0 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-                [{i + 1}]
+                [{sourceIndex.get(s.article_id)}]
               </span>
               <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[11.5px]" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
                 {s.source_name}

@@ -1,10 +1,11 @@
-"""Extraction schema pruning — the news LLM extract drops claims/impacts.
+"""Extraction schema pruning — the news LLM extract drops impacts.
 
-Those fields have no news-side reader (correlation re-derives impacts in
-event-analysis; nothing reads claims), so structured_chat prunes them from the
-schema shown to the model. cve_lens still populates them deterministically for
-CVE records, so the pydantic model keeps the fields — validation fills the
-defaults when the model omits them.
+Impacts have no news-side reader (correlation re-derives them in event-analysis),
+so structured_chat prunes them from the schema shown to the model. Claims WERE
+pruned on the same reasoning until 2026-09-04; they are extracted again and, since
+the "What was said" section, read by GET /events/{id}. cve_lens still populates
+both deterministically for CVE records, so the pydantic model keeps the fields —
+validation fills the defaults when the model omits them.
 """
 
 from common.llm import _prune_schema_props

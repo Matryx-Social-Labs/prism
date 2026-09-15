@@ -32,6 +32,7 @@ const EVENT = {
   sources: [{ id: "s1", outlet: "The Hindu", url: "https://x.test/a", title: "A report" }],
   perspectives: [],
   impacts: [],
+  claims: [],
 } as unknown as EventDetail;
 
 beforeEach(() => localStorage.clear());

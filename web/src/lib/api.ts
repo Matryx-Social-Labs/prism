@@ -72,6 +72,25 @@ export interface PerspectiveOut {
   article_ids: string[];
 }
 
+/** One thing somebody said, as the article said it. VERIFIED fields only —
+ *  the quote is checked verbatim at write time, the offsets are repaired from
+ *  it, source and date come from raw_items. No stance, no said_at: those are
+ *  model opinions and a guess must not sit beside a verified quote. */
+export interface ClaimOut {
+  quote_text: string;
+  quote_start: number | null;
+  quote_end: number | null;
+  article_id: string;
+  source_name: string;
+  url: string | null;
+  published_at: string | null;
+}
+
+export interface SpeakerClaims {
+  speaker: string;
+  claims: ClaimOut[];
+}
+
 export interface ImpactOut {
   id: string;
   entity_name: string | null;
@@ -128,6 +147,10 @@ export interface EventDetail {
   available_lenses: string[];
   coverage: CoverageOut | null;
   entities: EntityOut[];
+  // Reader-tier: evidence, not lens depth. Optional at the type level because
+  // the web and the API deploy from two pipelines and /events is cached 60s —
+  // a new page can meet an old payload for a window.
+  claims?: SpeakerClaims[];
   // No `story` here: /trending/[slug] owns the timeline. See api/schemas.py.
   projection: {
     event_type?: string | null;

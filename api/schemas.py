@@ -108,6 +108,32 @@ class EntityOut(BaseModel):
     role: str
 
 
+class ClaimOut(BaseModel):
+    """One thing somebody said, as the article said it.
+
+    VERIFIED FIELDS ONLY. quote_text is checked verbatim against the article at
+    write time (enrichment/claims.py); the offsets are repaired from it rather
+    than trusted; source and published_at come from raw_items. The extractor
+    also emits `stance` and `said_at`, and they are NOT here: they are model
+    opinions verify_claims never checks, and putting a guess on the same line as
+    a verified quote lends the guess the quote's credibility. That credibility
+    is the whole point of the section.
+    """
+
+    quote_text: str
+    quote_start: int | None
+    quote_end: int | None
+    article_id: str
+    source_name: str
+    url: str | None
+    published_at: str | None
+
+
+class SpeakerClaims(BaseModel):
+    speaker: str
+    claims: list[ClaimOut]
+
+
 class EventDetail(BaseModel):
     id: str
     title: str
@@ -132,6 +158,12 @@ class EventDetail(BaseModel):
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]
+    # READER-TIER. Claims are evidence, not lens depth: the paid tier is the
+    # reading of the story, the verbatim record of who said what is free. Grouped
+    # by speaker STRING because within one event the name is consistent enough
+    # (measured: 3% of events carry one person under two strings, all
+    # punctuation variants); folding across a story is the QID ledger's job.
+    claims: list[SpeakerClaims]
 
 
 class BriefResponse(BaseModel):
