@@ -49,12 +49,13 @@ function hiddenOnDesktop(el: HTMLElement | null): boolean {
 
 describe("the desktop story page", () => {
   // REGRESSION: StoryDesktop was mounted self-closing, so the `children` slot
-  // built to carry the evidence layer got nothing, and Perspectives, the
-  // timeline, What to expect and every source lived only inside the lg:hidden
-  // mobile tree. Desktop rendered a headline, a brief and a lens board and then
-  // stopped — a story page with 35 sources showed none of them. The whole web
-  // suite stayed green because these tests were scoped to the mobile tree.
-  it.each(["Perspectives", "What to expect", "Sources"])(
+  // built to carry the evidence layer got nothing, and every source lived only
+  // inside the lg:hidden mobile tree. Desktop rendered a headline, a brief and
+  // a lens board and then stopped — a story page with 35 sources showed none of
+  // them. The whole web suite stayed green because these tests were scoped to
+  // the mobile tree. (Perspectives and What to expect were retired in the
+  // redesign — D4 — so Sources is the evidence section that remains here.)
+  it.each(["Sources"])(
     "renders %s outside the mobile-only tree, so desktop can see it",
     (heading) => {
       render(<StoryView event={EVENT} />);

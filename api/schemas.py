@@ -155,6 +155,12 @@ class EventDetail(BaseModel):
     # from the LIVE partition, so the two could disagree about which developments
     # exist. One owner, no divergence. thread/related went with it — the timeline
     # superseded them and nothing ever read them.
+    #
+    # What the ticket DOES carry is the way to that owner: the slug of the
+    # canonical story this event belongs to, so the story page can fetch the
+    # route from /trending/{slug} — the same arc the share page shows. None when
+    # no story holds the event.
+    story_slug: str | None = None
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]

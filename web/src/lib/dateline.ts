@@ -41,6 +41,15 @@ export function shortDate(iso: string): string {
   });
 }
 
+/** 05 SEPT 2026 01:25 IST — the ticket's stamp: when the news happened, on the newsroom clock. */
+export function istStamp(iso: string): string {
+  const d = new Date(iso)
+    .toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
+    .replace(/,/g, "")
+    .toUpperCase();
+  return `${d} ${istTime(iso)} IST`;
+}
+
 /** SAT 25 JUL 2026 */
 export function istDate(d: Date): string {
   return d

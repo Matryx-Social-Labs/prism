@@ -210,6 +210,27 @@ async def get_event(
     # builds it from the story's frozen member set. Serving it from here as well
     # meant two member sets for one story. Dropping it also takes a Redis lookup
     # and a partition/BFS assembly off the most-viewed route.
+    #
+    # The story page still needs to FIND that owner, so this is the one thing it
+    # gets: the canonical (unmerged) story whose frozen member set holds this
+    # event. Newest first, because a story that was split leaves an older,
+    # still-unmerged row behind whose members overlap.
+    # ponytail: JSONB containment over the whole stories table — a few thousand
+    # rows today. Add a GIN index on member_event_ids if this shows up in p95.
+    story = (
+        await db.execute(
+            text(
+                """
+                SELECT slug FROM stories
+                WHERE merged_into IS NULL
+                  AND member_event_ids @> CAST(:member AS jsonb)
+                ORDER BY last_updated_at DESC
+                LIMIT 1
+                """
+            ),
+            {"member": json.dumps([str(event_id)])},
+        )
+    ).mappings().first()
     projection = event["projection"] or {}
 
     # THE PAYWALL'S REAL BOUNDARY. Gating /brief alone was bypassable: this
@@ -263,6 +284,7 @@ async def get_event(
         entities=[
             EntityOut(name=e["name"], entity_type=e["entity_type"], role=e["role"]) for e in entities
         ],
+        story_slug=story["slug"] if story else None,
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),

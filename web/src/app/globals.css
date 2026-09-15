@@ -166,6 +166,13 @@ a {
   font-variant-numeric: tabular-nums;
 }
 /* State is line form, never hue. A row's rule says what it is. */
+/* The ticket's header strip: facts separated by a middle dot, drawn by the
+   rule rather than typed into the record — code · sources · origins · stamp. */
+.ticket-strip > span + span::before {
+  content: "·";
+  margin-right: 0.6em;
+  color: var(--ink-faint);
+}
 .rule-live { border-top: 1px solid var(--line); }
 .rule-single { border-top: 1px dashed var(--line-strong); }
 .rule-stale { border-top: 1px solid var(--line); opacity: 0.6; }

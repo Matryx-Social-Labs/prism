@@ -152,6 +152,9 @@ export interface EventDetail {
   // a new page can meet an old payload for a window.
   claims?: SpeakerClaims[];
   // No `story` here: /trending/[slug] owns the timeline. See api/schemas.py.
+  // What the ticket carries is the way to that owner. Optional: an older
+  // payload (two deploy pipelines, 60s cache) simply has no route.
+  story_slug?: string | null;
   projection: {
     event_type?: string | null;
     source_count?: number;

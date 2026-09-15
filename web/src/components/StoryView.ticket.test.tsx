@@ -1,0 +1,135 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { StoryView } from "@/components/StoryView";
+import type { EventDetail } from "@/lib/api";
+
+const fetchTrendingStory = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, fetchBrief: vi.fn(async () => null), fetchQuestions: vi.fn(async () => []), fetchTrendingStory };
+});
+vi.mock("@/lib/lenses", () => ({
+  useLenses: () => [{ slug: "reader", short: "Reader", color: "#111", bg: "#eee", tagline: "t" }],
+  lensMeta: () => ({ slug: "reader", short: "Reader", color: "#111", bg: "#eee", tagline: "t" }),
+}));
+
+const src = (id: string, published_at: string | null) => ({
+  article_id: id, source_name: "The Hindu", source_slug: "hindu", url: "https://x.test/a", title: "A report", published_at, stance: null, funding: null,
+});
+
+function event(over: Partial<EventDetail> = {}): EventDetail {
+  return {
+    id: "e1",
+    title: "A story",
+    summary: "A summary.",
+    sector: "finance",
+    subsector: null,
+    image_url: null,
+    regions: [],
+    occurred_at: "2026-09-04T18:00:00Z",
+    last_updated_at: "2026-09-10T00:00:00Z",
+    projection: {},
+    lens_briefs: { reader: "The reader take." },
+    lens_points: {},
+    available_lenses: ["reader"],
+    coverage: { origins: { IN: 6, US: 2 }, unknown: 0 },
+    entities: [],
+    sources: [src("a1", "2026-09-04T19:55:00Z"), src("a2", "2026-09-03T10:00:00Z")],
+    perspectives: [],
+    impacts: [],
+    claims: [],
+    ...over,
+  } as unknown as EventDetail;
+}
+
+const mobile = () => within(document.querySelector(".lg\\:hidden") as HTMLElement);
+
+beforeEach(() => {
+  localStorage.clear();
+  fetchTrendingStory.mockReset().mockResolvedValue(null);
+});
+
+describe("the ticket — the header strip", () => {
+  it("prints code · sources · origins · the newest article's IST stamp, on both trees", () => {
+    render(<StoryView event={event()} />);
+    for (const strip of screen.getAllByLabelText("Story facts")) {
+      expect([...strip.querySelectorAll("span")].map((s) => s.textContent)).toEqual([
+        "BIZ", "2 sources", "IN ×6 · US ×2", "05 SEPT 2026 01:25 IST",
+      ]);
+      expect(strip.className).toMatch(/font-mono/);
+      expect(strip.className).toMatch(/rule-live/);
+    }
+  });
+
+  it("sets a single-source story on a dashed rule — state is line form, never hue", () => {
+    render(<StoryView event={event({ sources: [src("a1", "2026-09-04T19:55:00Z")] })} />);
+    for (const strip of screen.getAllByLabelText("Story facts")) {
+      expect(strip.className).toMatch(/rule-single/);
+      expect(within(strip).getByText("1 source")).toBeInTheDocument();
+    }
+  });
+
+  it("sends the reader back to today's chart, not a feed that no longer exists", () => {
+    render(<StoryView event={event()} />);
+    expect(mobile().getByRole("link", { name: /today.s chart/i })).toHaveAttribute("href", "/");
+  });
+});
+
+describe("the ticket — retired sections (D4)", () => {
+  // The route and the passenger list are the perspectives, counted and verbatim.
+  // A payload that still carries the LLM cards must not revive them.
+  it("renders no Perspectives cards and no What to expect, even when the payload carries them", () => {
+    render(
+      <StoryView
+        event={event({
+          perspectives: [{ label: "Access won", stance: "for", origin_country: "IN", summary: "A model's summary.", article_ids: ["a1"] }],
+          impacts: [{ id: "i1", entity_name: "Someone", effect: "loses", direction: "negative", horizon: "weeks", confidence: 0.5, parent_impact_id: null }],
+        })}
+      />,
+    );
+    expect(screen.queryByText("Perspectives")).toBeNull();
+    expect(screen.queryByText("A model's summary.")).toBeNull();
+    expect(screen.queryByText("What to expect")).toBeNull();
+    expect(screen.queryByText(/loses/)).toBeNull();
+    expect(mobile().queryByRole("link", { name: /Perspectives|What to expect/ })).toBeNull();
+  });
+});
+
+describe("the ticket — the route", () => {
+  const TREE = {
+    slug: "s", canonical_slug: "s", label: "L", cast: [], sector: null, source_count: 3, velocity: 0, status: "active",
+    developments: [
+      { id: "e0", title: "How it started", sector: null, occurred_at: "2026-09-01T00:00:00Z", image_url: null, is_current: false, why: null },
+      { id: "e1", title: "A story", sector: null, occurred_at: "2026-09-04T00:00:00Z", image_url: null, is_current: false, why: null },
+    ],
+    timeline_cast: [],
+    branches: { root_id: "e0", nodes: [{ id: "e0", parent_id: null, off_spine: false, depth: 0 }, { id: "e1", parent_id: "e0", off_spine: false, depth: 1 }], shape: { developments: 2, branches: 0, satellites: 0, max_depth: 1 } },
+  };
+
+  it("asks the owner of the arc — /trending/{slug} — and prints the counted route", async () => {
+    fetchTrendingStory.mockResolvedValue(TREE);
+    render(<StoryView event={event({ story_slug: "s" })} />);
+    expect(fetchTrendingStory).toHaveBeenCalledWith("s");
+    const route = await screen.findByRole("region", { name: /the route/i });
+    expect(within(route).getByText(/2 DEVELOPMENTS · 0 BRANCHES · 0 SATELLITES · 4 DAYS/)).toBeInTheDocument();
+    expect(within(route).getByRole("link", { name: /How it started/ })).toHaveAttribute("href", "/story/e0");
+    expect(mobile().getByRole("link", { name: "Route" })).toHaveAttribute("href", "#route");
+  });
+
+  it("shows no route section and no Route anchor when the ticket carries no slug", async () => {
+    render(<StoryView event={event()} />);
+    expect(await mobile().findByText("The reader take.")).toBeInTheDocument();
+    expect(fetchTrendingStory).not.toHaveBeenCalled();
+    expect(screen.queryByRole("region", { name: /the route/i })).toBeNull();
+    expect(mobile().queryByRole("link", { name: "Route" })).toBeNull();
+  });
+
+  it("prints nothing when the owner has no tree for the story", async () => {
+    fetchTrendingStory.mockResolvedValue({ ...TREE, branches: null });
+    render(<StoryView event={event({ story_slug: "s" })} />);
+    const route = await screen.findByRole("region", { name: /the route/i });
+    await vi.waitFor(() => expect(within(route).queryByText(/Printing the route/)).toBeNull());
+    expect(within(route).queryByLabelText("Storyline structure")).toBeNull();
+  });
+});

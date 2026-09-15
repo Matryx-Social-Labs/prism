@@ -3,7 +3,7 @@
 import Image from "next/image";
 
 import type { EventDetail } from "@/lib/api";
-import { istTime, origins } from "@/lib/dateline";
+import { origins } from "@/lib/dateline";
 import { thumbUrl } from "@/lib/thumb";
 
 // The desktop Story (Prism Desktop.dc.html, STORY screen).
@@ -76,6 +76,8 @@ type Props = {
   offered: string[];
   briefs: Record<string, string>;
   brief: string | undefined;
+  /** The ticket's header strip — code · sources · origins · stamp. */
+  facts: string[];
   lensName: (slug: string) => string;
   isLocked: (slug: string) => boolean;
   onPick: (slug: string) => void;
@@ -88,37 +90,39 @@ export function StoryDesktop({
   offered,
   briefs,
   brief,
+  facts,
   lensName,
   isLocked,
   onPick,
   children,
 }: Props) {
   const hue = HUE[lens] ?? "var(--ink)";
-  const eyebrow = [event.sector, event.subsector, (event.regions ?? [])[0]]
-    .filter(Boolean)
-    .map((s) => s!.replaceAll("_", " "))
-    .join(" · ")
-    .toUpperCase();
+  const single = event.sources.length <= 1;
 
   return (
     <div className="mx-auto hidden w-[1376px] pb-20 lg:block">
-      {/* Header: dateline in the rail, the story's own name in the field. */}
+      {/* Header: the strip and the story's own name in the field. The rail
+          used to print the ingest clock here, a different time from the strip's
+          news clock a few pixels away; the strip is the stamp, so the rail is
+          empty until the facts below it. */}
       <div className="grid grid-cols-[104px_1240px] gap-x-8 pt-[22px]">
-        <div className={`${MONO} leading-[1.9]`} style={{ color: "var(--ink-faint)" }}>
-          <div>{new Date(event.last_updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase()}</div>
-          <div>{istTime(event.last_updated_at)} IST</div>
-          {event.sources.length > 1 && <div>{event.sources.length}× filed</div>}
-        </div>
+        <div />
         <div>
-          {eyebrow && (
-            <div className={MONO} style={{ color: "var(--ink-muted)" }}>
-              {eyebrow}
-            </div>
-          )}
-          <h1
-            className="mt-3 max-w-[922px] text-[42px] font-semibold leading-[1.1]"
-            style={{ fontFamily: "var(--font-display), serif", textWrap: "pretty" }}
+          {/* The header strip: what is true whichever lens is reading. A
+              single-source story sits on a dashed rule — state as line form. */}
+          <div
+            className={`${single ? "rule-single" : "rule-live"} ${MONO} ticket-strip flex flex-wrap gap-x-3 pt-2`}
+            style={{ color: "var(--ink-muted)" }}
+            aria-label="Story facts"
           >
+            {facts.map((f, n) => (
+              <span key={n} style={n === 0 ? { color: "var(--ink)" } : undefined}>
+                {f}
+              </span>
+            ))}
+          </div>
+          {/* The reading voice, not the structural one: Teko is never running text. */}
+          <h1 className="mt-3 max-w-[922px] text-[40px] font-medium leading-[1.1]" style={{ textWrap: "balance" }}>
             {event.title}
           </h1>
           <div className="mt-[22px] border-b" style={{ borderColor: "var(--line)" }} />

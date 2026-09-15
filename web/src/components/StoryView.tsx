@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
 import { shortDate } from "@/lib/dateline";
+import { ticketFacts } from "@/lib/ticket";
 import { useRouter } from "next/navigation";
 
 import { lensMeta, useLenses } from "@/lib/lenses";
@@ -13,8 +14,23 @@ import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { ShareButton } from "@/components/ShareButton";
 import { StoryDesktop } from "@/components/StoryDesktop";
+import { StoryRoute } from "@/components/StoryRoute";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
+
+/**
+ * The story page: the ticket.
+ *
+ * One record, read three ways. The header strip states what is true whichever
+ * lens is reading — code, sources, origins, the stamp — then the headline in
+ * the reading voice, then the lens block (mechanics untouched: the flip, the
+ * gate, the keys), then the evidence: the route the story took, who said what,
+ * and which outlets. Section heads are in the structural voice; nothing here
+ * is a card; the only colour is a lens speaking. The LLM "Perspectives" cards
+ * and "What to expect" are retired (founder decision D4, 2026-09-15): the
+ * route and the passenger list ARE the perspectives, and they are counted and
+ * verbatim.
+ */
 
 function regionName(code: string): string {
   try {
@@ -29,63 +45,42 @@ const FUNDING_LABEL: Record<string, string> = {
   public: "Public broadcaster",
 };
 
-function timeAgo(iso: string): string {
-  const hours = Math.floor((Date.now() - new Date(iso).getTime()) / 3_600_000);
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-function Chip({
-  children,
-  bg = "var(--bg-sunken)",
-  color = "var(--ink-muted)",
-  mono = false,
-}: {
-  children: React.ReactNode;
-  bg?: string;
-  color?: string;
-  mono?: boolean;
-}) {
-  return (
-    <span
-      className={`rounded-full px-[9px] py-0.5 text-[11px] ${mono ? "font-mono font-medium" : "font-semibold"}`}
-      style={{ background: bg, color }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function FundingChip({ funding }: { funding: string | null }) {
+/** A funding label is provenance: mono, quiet, no badge. */
+function Funding({ funding }: { funding: string | null }) {
   if (!funding || !FUNDING_LABEL[funding]) return null;
   return (
-    <span
-      className="shrink-0 rounded-full border px-[7px] py-px font-mono text-[9px] font-medium uppercase tracking-wide"
-      style={{ borderColor: "var(--line-strong)", color: "var(--ink-faint)" }}
-    >
+    <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
       {FUNDING_LABEL[funding]}
     </span>
   );
 }
 
-function SectionTitle({ title, hint }: { title: string; hint: string }) {
+/** A section head in the structural voice, with the counted line beneath it in mono. */
+function Head({ id, title, count, hint }: { id: string; title: string; count?: number; hint?: string }) {
   return (
-    <>
-      <h2 className="mb-1.5 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
+    <div className="rule-live mb-4 pt-4">
+      <h2 id={id} className="font-display text-[26px] font-medium uppercase leading-none tracking-[0.03em]">
         {title}
+        {count != null && (
+          <span className="ml-2 font-mono text-[11px] font-normal tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
+            {count}
+          </span>
+        )}
       </h2>
-      <p className="mb-4 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-        {hint}
-      </p>
-    </>
+      {hint && (
+        <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+          {hint}
+        </p>
+      )}
+    </div>
   );
 }
+
+const MONO_LABEL = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
 
 export function StoryView({ event }: { event: EventDetail }) {
   const cyber = event.projection?.cyber ?? null;
   const finance = event.projection?.finance ?? null;
-  const sourceById = new Map(event.sources.map((s) => [s.article_id, s]));
   // ONE index for [n]: the Sources list and the citation under every quote read
   // the same map, so the two can never number one article differently.
   const sourceIndex = new Map(event.sources.map((s, i) => [s.article_id, i + 1]));
@@ -213,18 +208,14 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   // ── "On this story" section nav ────────────────────────
   const sourceCount = event.sources.length;
-  const balanceText = event.coverage?.single_origin
-    ? "⚠ Single-origin — one perspective only."
-    : coverageEntries.length > 0
-      ? `Balanced coverage — ${coverageEntries.length} origin${coverageEntries.length === 1 ? "" : "s"}, no blindspot flag.`
-      : null;
+  const single = sourceCount <= 1;
+  const facts = ticketFacts(event);
   const navItems: { id: string; label: string; count?: number }[] = [
-    { id: "lens-brief", label: "Lens brief" },
+    { id: "lens-brief", label: "Lens" },
+    ...(event.story_slug ? [{ id: "route", label: "Route" }] : []),
     // Only when there is something to jump to: 55% of stories have no attributed
     // quote, and a permanent "Said 0" would advertise absence on every other page.
     ...(quoteCount > 0 ? [{ id: "said", label: "Said", count: quoteCount }] : []),
-    { id: "perspectives", label: "Perspectives", count: event.perspectives.length },
-    { id: "what-to-expect", label: "What to expect", count: event.impacts.length },
     { id: "sources", label: "Sources", count: sourceCount },
   ];
 
@@ -288,99 +279,69 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   return (
     <>
-      {/* Desktop is its own composition (Prism Desktop.dc.html): the ledger rail
-          re-inks with the lens and all three openings sit on the board at once.
-          State stays here so there is one lens machine, not two. */}
+      {/* Desktop is its own composition: the mono rail re-inks with the lens
+          and all the openings sit on the board at once. State stays here so
+          there is one lens machine, not two. */}
       <StoryDesktop
         event={event}
         lens={lens}
         offered={offered}
         briefs={briefs}
         brief={brief}
+        facts={facts}
         lensName={(slug) => lensMeta(slug).short}
         isLocked={isLocked}
         onPick={(slug) => pickLens(slug, false)}
       />
 
-    <div className="mx-auto max-w-[1240px] px-5 pt-7 sm:px-8 lg:hidden">
-      <Link href="/feed" scroll={false} className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
-        ← Back to feed
+    <div className="mx-auto max-w-[1240px] px-5 pt-5 sm:px-8 lg:hidden">
+      <Link href="/" scroll={false} className={`${MONO_LABEL} mb-4 block`} style={{ color: "var(--ink-muted)" }}>
+        ← Today&rsquo;s chart
       </Link>
 
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-        {/* min-w-0: without it a grid item's default min-width:auto lets the
-            inner horizontal scrollers (lens-tab strip, mobile anchor nav, cyber
-            table) stretch the column past the viewport — the mobile right-bleed. */}
-        <article className="min-w-0">
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* min-w-0: without it a grid item's default min-width:auto lets the
+          inner horizontal scrollers (lens-tab strip, mobile anchor nav, cyber
+          table) stretch the column past the viewport — the mobile right-bleed. */}
+      <article className="min-w-0">
+      {/* ── The header strip ───────────────────────────────────
+          What is true whichever lens is reading: code · sources · origins ·
+          stamp. A single-source story sits on a dashed rule — state is line
+          form, never hue — and the strip says so before the headline does. */}
       <header>
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          {event.subsector ? (
-            <Chip>
-              <span className="uppercase tracking-wide" style={{ fontSize: "10.5px" }}>
-                {event.subsector.replaceAll("_", " ")}
-              </span>
-            </Chip>
-          ) : (
-            event.sector && (
-              <Chip>
-                <span className="uppercase tracking-wide" style={{ fontSize: "10.5px" }}>
-                  {event.sector}
-                </span>
-              </Chip>
-            )
-          )}
-          {event.coverage?.single_origin && <Chip>⚠ Single-origin</Chip>}
-          {cvss.score != null && (
-            <Chip bg="var(--danger-bg)" color="var(--danger)">
-              CVSS {cvss.score.toFixed(1)} {cvss.severity ?? ""}
-            </Chip>
-          )}
-          {exploitation.kev_listed && (
-            <Chip bg="var(--danger)" color="#fff">
-              ⚠ Actively exploited
-            </Chip>
-          )}
+        <div
+          className={`${single ? "rule-single" : "rule-live"} ticket-strip flex flex-wrap items-baseline gap-x-2.5 gap-y-1 pt-3 ${MONO_LABEL}`}
+          style={{ color: "var(--ink-muted)" }}
+          aria-label="Story facts"
+        >
+          {facts.map((f, i) => (
+            <span key={i} style={i === 0 ? { color: "var(--ink)" } : undefined}>
+              {f}
+            </span>
+          ))}
           {(cyber?.cve_ids ?? []).slice(0, 3).map((cve) => (
-            <Chip key={cve} mono color="var(--ink)">
-              {cve}
-            </Chip>
+            <span key={cve} style={{ color: "var(--ink)" }}>{cve}</span>
           ))}
           {(finance?.tickers ?? []).slice(0, 4).map((t) => (
-            <Chip key={t} mono bg="var(--lens-finance-bg)" color="var(--lens-finance)">
-              ${t}
-            </Chip>
+            <span key={t} style={{ color: "var(--ink)" }}>{t}</span>
           ))}
-          {finance?.catalyst && (
-            // Catalyst type — SEBI-safe reframe: what kind of event is moving
-            // this, sourced, instead of a buy/sell "direction". Mono evidence label.
-            <span
-              className="rounded-full border px-[8px] py-px font-mono text-[10px] font-medium uppercase tracking-wide"
-              style={{ borderColor: "var(--lens-finance)", color: "var(--lens-finance)" }}
-              title="Catalyst type — what is moving this story"
-            >
-              {finance.catalyst.replaceAll("_", " ")}
-            </span>
-          )}
-          <span className="ml-auto font-mono text-[10.5px]" style={{ color: "var(--ink-muted)" }} suppressHydrationWarning>
-            {event.sources.length} source{event.sources.length === 1 ? "" : "s"} · {timeAgo(event.last_updated_at)}
-          </span>
         </div>
+        {gapText && (
+          <p className="mt-2 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+            {gapText}
+          </p>
+        )}
 
-        <h1
-          className="text-[28px] font-semibold leading-[1.15] tracking-tight sm:text-[34px]"
-          style={{ fontFamily: "var(--font-display), serif" }}
-        >
+        <h1 className="mt-4 text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">
           {event.title}
         </h1>
         {event.summary && (
-          <p className="mt-3.5 text-[15.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-3 text-[15.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
             {event.summary}
           </p>
         )}
 
         {event.image_url && (
-          <div className="relative mt-5 aspect-video overflow-hidden rounded-[18px]" style={{ background: "var(--bg-sunken)" }}>
+          <div className="relative mt-5 aspect-video overflow-hidden" style={{ background: "var(--bg-sunken)" }}>
             <Image
               src={event.image_url}
               alt=""
@@ -388,6 +349,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               priority
               sizes="(max-width: 780px) 100vw, 740px"
               className="object-cover"
+              style={{ filter: "grayscale(0.15) contrast(1.02)" }}
               onError={(e) => {
                 (e.currentTarget.parentElement as HTMLElement).style.display = "none";
               }}
@@ -396,65 +358,16 @@ export function StoryView({ event }: { event: EventDetail }) {
         )}
 
         {(event.entities.length > 0 || event.regions.length > 0) && (
-          <div className="mt-5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-              Affected
-            </span>
-            {event.regions.map((r) => (
-              <span key={r} className="rounded-full border px-2.5 py-0.5 text-xs" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
-                ◉ {regionName(r)}
-              </span>
-            ))}
-            {event.entities.map((en) => (
-              <span
-                key={`${en.name}-${en.role}`}
-                title={en.role}
-                className="rounded-full border px-2.5 py-0.5 text-xs"
-                style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
-              >
-                {en.entity_type === "person" ? "◇" : "▪"} {en.name}
-              </span>
-            ))}
-          </div>
+          <p className="mt-4 text-[13px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+            <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>Affected</span>{" "}
+            {[...event.regions.map(regionName), ...event.entities.map((en) => en.name)].join(" · ")}
+          </p>
         )}
-
       </header>
 
-      {/* ── Mobile section nav — sticky anchor chips ────────── */}
-      {/* Coverage bar — mobile: the verify layer, promoted from the desktop rail. */}
-      {coverageEntries.length > 0 && (
-        <div
-          className="mt-5 rounded-[14px] border px-3.5 py-3 lg:hidden"
-          style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
-        >
-          <span className="font-mono text-[11px]" style={{ color: "var(--ink)" }}>
-            ⌗ {sourceCount} outlet{sourceCount === 1 ? "" : "s"} · {coverageEntries.length} origin
-            {coverageEntries.length === 1 ? "" : "s"} ·{" "}
-            <span style={{ color: event.coverage?.single_origin ? "var(--danger)" : "var(--up)" }}>
-              {event.coverage?.single_origin ? "Single-origin" : "Balanced"}
-            </span>
-          </span>
-          {gapText && (
-            <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--danger)" }}>
-              ◉ {gapText}
-            </p>
-          )}
-          <div className="mt-2.5 flex flex-wrap gap-1.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
-            {coverageEntries.map(([iso, n]) => (
-              <span
-                key={iso}
-                className="rounded-full px-2 py-0.5 font-mono text-[10px]"
-                style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}
-              >
-                {regionName(iso)} × {n}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* ── On this story — the mobile section nav, sticky, codes underlined ── */}
       <nav
-        className="sticky top-0 z-20 -mx-5 mt-5 flex gap-1.5 overflow-x-auto border-b px-5 py-2.5 sm:-mx-8 sm:px-8 lg:hidden"
+        className={`hide-scroll sticky top-0 z-20 -mx-5 mt-5 flex gap-4 overflow-x-auto border-b px-5 sm:-mx-8 sm:px-8 lg:hidden ${MONO_LABEL}`}
         style={{ borderColor: "var(--line)", background: "var(--bg)" }}
         aria-label="On this story"
       >
@@ -462,28 +375,25 @@ export function StoryView({ event }: { event: EventDetail }) {
           <a
             key={n.id}
             href={`#${n.id}`}
-            className="flex-none rounded-full px-3 py-1.5 text-[11px] font-semibold"
-            style={
-              activeSection === n.id
-                ? { background: "var(--bg-sunken)", color: "var(--ink)" }
-                : { color: "var(--ink-muted)" }
-            }
+            className="flex h-11 flex-none items-end gap-1 border-b-2 pb-2 pt-3 leading-none"
+            style={{
+              borderColor: activeSection === n.id ? "var(--ink)" : "transparent",
+              color: activeSection === n.id ? "var(--ink)" : "var(--ink-muted)",
+            }}
           >
             {n.label}
-            {n.count != null && <span className="ml-1 font-mono text-[10px]" style={{ color: "var(--ink-faint)" }}>{n.count}</span>}
+            {n.count != null && <span style={{ color: "var(--ink-faint)" }}>{n.count}</span>}
           </a>
         ))}
       </nav>
 
-      {/* ── Lens block — the product moment ─────────────────── */}
-      <section
-        id="lens-brief"
-        className="mt-9 scroll-mt-24 overflow-hidden rounded-[18px] border"
-        style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-card)" }}
-      >
+      {/* ── The lens block — the product moment ─────────────────
+          Mechanics unchanged: tabs, the locked flip, the gate, the keys. The
+          container is a rule-bounded block, not a card. */}
+      <section id="lens-brief" className="rule-live mt-8 scroll-mt-24 overflow-hidden">
         <div className="hidden border-b lg:block" style={{ borderColor: "var(--line)" }}>
-          <div className="flex items-center gap-1.5 px-4 py-3" role="tablist" aria-label="Read this story through a lens">
-            <span className="mr-1 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+          <div className="flex items-center gap-1.5 py-3" role="tablist" aria-label="Read this story through a lens">
+            <span className={`${MONO_LABEL} mr-1`} style={{ color: "var(--ink-faint)" }}>
               Lens
             </span>
             {offered.map((slug) => {
@@ -529,11 +439,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             {/* Discoverability for the keyboard flip. Provenance voice, far right,
                 quiet — it teaches the shortcut without competing with the tabs. */}
             {offered.length > 1 && (
-              <span
-                className="ml-auto pl-4 font-mono text-[10.5px] uppercase tracking-[0.12em]"
-                style={{ color: "var(--ink-faint)" }}
-                aria-hidden
-              >
+              <span className={`${MONO_LABEL} ml-auto pl-4`} style={{ color: "var(--ink-faint)" }} aria-hidden>
                 Press {offered.map((_, i) => i + 1).join(" · ")}
               </span>
             )}
@@ -542,9 +448,12 @@ export function StoryView({ event }: { event: EventDetail }) {
 
         <div
           key={lens}
-          className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden px-[22px] py-5`}
+          className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden py-5`}
         >
           {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
+          <div className={`${MONO_LABEL} flex items-baseline justify-between`} style={{ color: meta.color }}>
+            <span>{meta.short} read</span>
+          </div>
           {gateState?.lens === lens && gateState.kind === "no_samples" ? (
             // OUT OF SAMPLES is a different wall from NOT SIGNED IN, and the
             // reader needs a different next step for each. The server sends the
@@ -607,23 +516,14 @@ export function StoryView({ event }: { event: EventDetail }) {
 
           {lens === "cyber" && cyber && !isLocked(lens) && (
             <div className="flex flex-col gap-3.5">
-              <div className="flex flex-wrap gap-1.5">
-                {cvss.score != null && (
-                  <Chip bg="var(--danger-bg)" color="var(--danger)">
-                    CVSS {cvss.score.toFixed(1)}
-                  </Chip>
-                )}
-                {exploitation.kev_listed && (
-                  <Chip bg="var(--danger)" color="#fff">
-                    ⚠ KEV listed
-                  </Chip>
-                )}
-                {exploitation.poc_public && <Chip color="var(--ink)">PoC public</Chip>}
-                {cvss.vector && (
-                  <Chip mono>
-                    {cvss.vector}
-                  </Chip>
-                )}
+              {/* The lens's facts as codes on one line, in the lens's own hue —
+                  colour because a lens is speaking, mono because they are read
+                  off the record. */}
+              <div className={`${MONO_LABEL} flex flex-wrap gap-x-3 gap-y-1`} style={{ color: "var(--lens-cyber)" }}>
+                {cvss.score != null && <span>CVSS {cvss.score.toFixed(1)}</span>}
+                {exploitation.kev_listed && <span>KEV listed</span>}
+                {exploitation.poc_public && <span>PoC public</span>}
+                {cvss.vector && <span className="normal-case">{cvss.vector}</span>}
               </div>
               {(cyber.affected ?? []).length > 0 && (
                 <div>
@@ -642,8 +542,8 @@ export function StoryView({ event }: { event: EventDetail }) {
               )}
               {cyber.remediation?.action && (
                 <div
-                  className="rounded-xl border px-4 py-3 text-[13.5px] leading-[1.6]"
-                  style={{ borderColor: "var(--lens-cyber)", background: "var(--lens-cyber-bg)", color: "var(--ink)" }}
+                  className="border-y px-0 py-3 text-[13.5px] leading-[1.6]"
+                  style={{ borderColor: "var(--lens-cyber)", color: "var(--ink)" }}
                 >
                   <strong>Required action:</strong> {cyber.remediation.action}
                 </div>
@@ -688,8 +588,8 @@ export function StoryView({ event }: { event: EventDetail }) {
           {lens === "markets" && finance && !isLocked(lens) && (
             <div className="flex flex-col gap-3">
             <div
-              className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border px-4 py-3 text-[13.5px]"
-              style={{ borderColor: "var(--lens-finance)", background: "var(--lens-finance-bg)", color: "var(--ink)" }}
+              className="flex flex-wrap gap-x-6 gap-y-2 border-y py-3 text-[13.5px]"
+              style={{ borderColor: "var(--lens-finance)", color: "var(--ink)" }}
             >
               {(finance.tickers ?? []).length > 0 && (
                 <span>
@@ -723,11 +623,9 @@ export function StoryView({ event }: { event: EventDetail }) {
         </div>
       </section>
 
-        </article>
+      </article>
 
-      </div>
-
-      {/* ── Pinned thumb zone (mobile): lens rail + Share ───── */}
+      {/* ── Pinned thumb zone (mobile): lens rail + Share/Ask ───── */}
       <div
         className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
         style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
@@ -774,7 +672,6 @@ export function StoryView({ event }: { event: EventDetail }) {
             className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
             style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
           >
-            <span className="spectrum-text text-[15px]" aria-hidden>◮</span>
             Ask
             <span className="whitespace-nowrap font-mono text-[10.5px] font-normal opacity-70">{sourceCount} sources</span>
           </button>
@@ -795,15 +692,21 @@ export function StoryView({ event }: { event: EventDetail }) {
     </div>
 
       {/* ── The evidence layer, shared by both trees ──────────────
-          These four sections used to sit inside the lg:hidden mobile tree, so
-          desktop rendered a headline, a brief and a lens board and then simply
-          stopped — no timeline, no perspectives, and none of the sources. They
-          now render once at every width. On desktop they align to the Stone
-          grid's reading column (104px rail + 32px gap = 136px) and hold the
-          604px measure, because extra width goes to simultaneity, never to
-          longer lines. */}
+          Rendered once at every width. On desktop it aligns to the reading
+          column (104px rail + 32px gap = 136px) and holds the 604px measure,
+          because extra width goes to simultaneity, never to longer lines. */}
       <div className="mx-auto max-w-[1240px] px-5 pb-[164px] sm:px-8 lg:w-[1376px] lg:max-w-none lg:px-0 lg:pb-20">
         <div className="lg:ml-[136px] lg:max-w-[604px]">
+      {/* ── The route ───────────────────────────────────────────
+          The spine of the story this event belongs to, fetched from the owner
+          of the arc. Only when the ticket carries a slug. */}
+      {event.story_slug && (
+        <section id="route" className="mt-10 scroll-mt-24" aria-labelledby="route-title">
+          <Head id="route-title" title="The route" hint="Every development in this story, counted, with the branches and satellites the partitioner recorded." />
+          <StoryRoute slug={event.story_slug} currentId={event.id} />
+        </section>
+      )}
+
       {/* ── What was said ────────────────────────────────────
           Rules and type, neutral ink. The quote and the speaker are the body
           voice; only the provenance line ([n] · outlet · date) is mono. Nothing
@@ -812,13 +715,13 @@ export function StoryView({ event }: { event: EventDetail }) {
           never reaches the payload. Rendered only when there is something to
           say — the section appearing is the signal. */}
       {claims.length > 0 && (
-        <section id="said" className="mt-11 scroll-mt-24" aria-labelledby="said-title">
-          <h2 id="said-title" className="mb-1.5 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-            What was said
-          </h2>
-          <p className="mb-4 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-            Attributed, verbatim. Every quote is checked against the article it came from — one that does not match is not shown.
-          </p>
+        <section id="said" className="mt-10 scroll-mt-24" aria-labelledby="said-title">
+          <Head
+            id="said-title"
+            title="What was said"
+            count={quoteCount}
+            hint="Attributed, verbatim. Every quote is checked against the article it came from — one that does not match is not shown."
+          />
           <div className="flex flex-col">
             {claims.map((sp, i) => (
               <div
@@ -871,150 +774,49 @@ export function StoryView({ event }: { event: EventDetail }) {
         </section>
       )}
 
-      {/* ── Perspectives ─────────────────────────────────────── */}
-      <section id="perspectives" className="mt-11 scroll-mt-24">
-        <SectionTitle
-          title="Perspectives"
-          hint="The story's competing narratives, side by side — grouped by stance, with every outlet's origin and affiliation visible."
-        />
-        {event.perspectives.length === 0 ? (
-          <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-            Perspective analysis pending — it generates as coverage from more origins arrives.
-          </p>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {event.perspectives.map((p, i) => (
-              <div
-                key={i}
-                className="card-hover rounded-[18px] border p-5"
-                style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
-              >
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-[14.5px] font-semibold">{p.label}</span>
-                  {p.origin_country && <Chip>{regionName(p.origin_country)}</Chip>}
-                  {p.stance && (
-                    <span className="text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
-                      {p.stance}
-                    </span>
-                  )}
-                </div>
-                {p.summary && (
-                  <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-                    {p.summary}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {p.article_ids.map((aid) => {
-                    const src = sourceById.get(aid);
-                    return src ? (
-                      <span
-                        key={aid}
-                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px]"
-                        style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}
-                      >
-                        {src.source_name}
-                        <FundingChip funding={src.funding} />
-                      </span>
-                    ) : null;
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* The story timeline used to render here too, off story_timeline(event_id)
-          — the LIVE partition — while /trending/[slug] renders the same timeline
-          off the story's FROZEN member_event_ids. Two member sets, one story, so
-          the two pages could legitimately disagree about which developments
-          exist. The arc belongs to the story, so the story page owns it and this
-          page stops asking. That also drops a Redis lookup plus a BFS assembly
-          from the most-viewed route. */}
-
-      {/* ── What to expect ─────────────────────────────────── */}
-      <section id="what-to-expect" className="mt-11 scroll-mt-24">
-        <SectionTitle
-          title="What to expect"
-          hint="First-order impacts with their likely second-order effects — direction and horizon per node."
-        />
-        {event.impacts.length === 0 ? (
-          <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-            Impact analysis pending.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2.5">
-            {event.impacts.map((imp) => (
-              <li key={imp.id} className={`flex items-start gap-2.5 ${imp.parent_impact_id ? "ml-7" : ""}`}>
-                <span
-                  aria-hidden
-                  className="shrink-0"
-                  style={{
-                    color:
-                      imp.direction === "negative"
-                        ? "var(--danger)"
-                        : imp.direction === "positive"
-                          ? "var(--up)"
-                          : "var(--ink-faint)",
-                  }}
-                >
-                  {imp.parent_impact_id ? "↳" : "●"}
-                </span>
-                <span className="text-[13.5px] leading-[1.55]">
-                  <strong>{imp.entity_name ?? "Affected party"}</strong>{" "}
-                  <span style={{ color: "var(--ink-muted)" }}>— {imp.effect.replaceAll("_", " ")}</span>{" "}
-                  <span style={{ color: "var(--ink-faint)" }}>· {imp.horizon ?? "unknown horizon"}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* ── Sources ────────────────────────────────────────── */}
-      <section id="sources" className="mt-11 scroll-mt-24" aria-labelledby="sources-title">
-        <h2 id="sources-title" className="mb-4 text-[23px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-          Sources{" "}
-          <span className="text-[15px] font-normal" style={{ color: "var(--ink-faint)" }}>
-            ({event.sources.length})
-          </span>
-        </h2>
-        <ul className="flex flex-col gap-[9px]">
+      {/* ── Sources — the coaches ─────────────────────────────
+          [n] outlet · headline · stance. The [n] is the same index the quotes
+          cite, so the two can never number one article differently. */}
+      <section id="sources" className="mt-10 scroll-mt-24" aria-labelledby="sources-title">
+        <Head id="sources-title" title="Sources" count={event.sources.length} />
+        <ul className="flex flex-col">
           {event.sources.map((s) => (
-            <li key={s.article_id} className="flex items-baseline gap-2.5 text-[13.5px]">
-              <span className="shrink-0 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+            <li key={s.article_id} className="rule-live grid grid-cols-[28px_1fr] gap-x-2 py-2.5 text-[13.5px]">
+              <span className="font-mono text-[11px] leading-[1.7]" style={{ color: "var(--ink-faint)" }}>
                 [{sourceIndex.get(s.article_id)}]
               </span>
-              <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[11.5px]" style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}>
-                {s.source_name}
-              </span>
-              <FundingChip funding={s.funding} />
-              {s.url ? (
-                <a
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="min-w-0 truncate underline-offset-4 hover:underline"
-                  style={{ color: "var(--ink)" }}
-                >
-                  {s.title}
-                </a>
-              ) : (
-                <span className="min-w-0 truncate">{s.title}</span>
-              )}
-              {s.stance && (
-                <span className="ml-auto hidden shrink-0 text-[11.5px] sm:block" style={{ color: "var(--ink-faint)" }}>
-                  {s.stance}
+              <span className="min-w-0">
+                <span className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-medium" style={{ color: "var(--ink)" }}>{s.source_name}</span>
+                  <Funding funding={s.funding} />
+                  {s.stance && (
+                    <span className="text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
+                      {s.stance}
+                    </span>
+                  )}
                 </span>
-              )}
+                {s.url ? (
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block truncate underline-offset-4 hover:underline"
+                    style={{ color: "var(--ink-muted)" }}
+                  >
+                    {s.title}
+                  </a>
+                ) : (
+                  <span className="block truncate" style={{ color: "var(--ink-muted)" }}>{s.title}</span>
+                )}
+              </span>
             </li>
           ))}
         </ul>
       </section>
 
-          {/* Ask had exactly one desktop mount and it sat inside the rail this
-              change deletes, so desktop could not reach it at all. */}
-          <div className="mt-11 hidden lg:block">
+          {/* Ask, docked at the foot of the ticket on desktop; the pinned bar
+              reaches it on a phone. */}
+          <div className="mt-10 hidden lg:block">
             <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} docked />
           </div>
         </div>

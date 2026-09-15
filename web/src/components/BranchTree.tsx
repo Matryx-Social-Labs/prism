@@ -69,6 +69,13 @@ function span(devs: StoryDevelopment[]): string {
   return am === bm ? `${ad}–${bd} ${bm}` : `${a} – ${b}`;
 }
 
+/** Calendar days from the first dated development to the last, inclusive; null when nothing is dated. */
+export function spanDays(devs: StoryDevelopment[]): number | null {
+  const ts = devs.map((d) => Date.parse(d.occurred_at ?? "")).filter((t) => !Number.isNaN(t));
+  if (!ts.length) return null;
+  return Math.floor((Math.max(...ts) - Math.min(...ts)) / 86_400_000) + 1;
+}
+
 export function BranchTree({ tree, developments, currentId = null }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [openBranch, setOpenBranch] = useState<string | null>(null);
@@ -226,13 +233,17 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
   }
 
   const shown = rows.filter((r) => r.kind === "dev").length;
-  const { developments: n, branches: b, satellites: sat, max_depth: md } = tree.shape;
-  // Counted, never summarised — the readout prints what the partitioner recorded.
+  const { developments: n, branches: b, satellites: sat } = tree.shape;
+  // Counted, never summarised — the readout prints what the partitioner
+  // recorded, plus the span in days from the developments' own dates. The
+  // partitioner's max_depth is a fact too, but a reader has no use for it;
+  // "9 DAYS" is what the reservation chart would print.
+  const days = spanDays(developments);
   const shapeLine = [
     `${n} DEVELOPMENT${n === 1 ? "" : "S"}`,
     `${b} BRANCH${b === 1 ? "" : "ES"}`,
     `${sat} SATELLITE${sat === 1 ? "" : "S"}`,
-    `DEPTH ${md}`,
+    ...(days != null ? [`${days} DAY${days === 1 ? "" : "S"}`] : []),
   ].join(" · ");
 
   return (

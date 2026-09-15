@@ -56,11 +56,12 @@ describe("BranchTree — TRUNK is the flat timeline", () => {
           satellites: 1,
           max_depth: 2,
         })}
-        developments={[dev("a", "Root development"), dev("b", "Second")]}
+        developments={[dev("a", "Root development", "2026-07-12"), dev("b", "Second", "2026-07-20")]}
       />,
     );
-    // Counted, never summarised — these are the partitioner's numbers.
-    expect(screen.getByText(/14 DEVELOPMENTS · 3 BRANCHES · 1 SATELLITE · DEPTH 2/)).toBeInTheDocument();
+    // Counted, never summarised — the partitioner's numbers, then the span the
+    // developments' own dates make (12th to 20th inclusive is nine days).
+    expect(screen.getByText(/14 DEVELOPMENTS · 3 BRANCHES · 1 SATELLITE · 9 DAYS/)).toBeInTheDocument();
     expect(screen.getByText(/ROOT/)).toBeInTheDocument();
   });
 
