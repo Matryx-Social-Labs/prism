@@ -60,11 +60,8 @@ export const metadata: Metadata = {
 };
 
 // Runs before first paint: sets the saved theme, and marks the document as
-// JS-capable. The `js` class gates the reveal animation — without it, .reveal
-// set opacity:0 unconditionally and only a client effect ever restored it, so a
-// crawler, a social-preview bot, or any reader whose JS failed got six blank
-// content sections. Content is now visible by default and only hidden when we
-// know something is there to un-hide it.
+// JS-capable (the `js` class gates anything that must never hide content from
+// a crawler or a reader whose JS failed).
 const themeInit = `(function(){document.documentElement.classList.add("js");try{var t=localStorage.getItem("prism.theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
