@@ -154,7 +154,7 @@ export function AskPanel({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Ask this story</p>
                 <p className="text-[11px]" style={{ color: "var(--ink-faint)" }}>
-                  Answers only from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"} — with
+                  Answers only from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"}, with
                   citations.
                 </p>
               </div>
@@ -175,7 +175,7 @@ export function AskPanel({
           >
             {docked && turns.length === 0 && (
               <p className="text-[12px] leading-[1.55]" style={{ color: "var(--ink-faint)" }}>
-                Ask anything about this story — every answer cites this story&apos;s own sources, or
+                Ask anything about this story. Every answer cites this story&apos;s own sources, or
                 says it can&apos;t.
               </p>
             )}

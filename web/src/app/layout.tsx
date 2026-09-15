@@ -40,22 +40,22 @@ const mono = Martian_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Prism — One story. Every perspective.",
-    template: "%s — Prism",
+    default: "Prism: One story. Every perspective.",
+    template: "%s | Prism",
   },
   description:
-    "Role-aware AI news intelligence. The same story through your professional lens — with more lenses added continuously — all sides of the narrative, consequences, and a grounded agent you can ask.",
+    "Every outlet's report of one event, gathered into one story you can re-read through a professional lens. Who said what, verbatim, and which outlets.",
   openGraph: {
     type: "website",
     siteName: "Prism",
-    title: "Prism — One story. Every perspective.",
-    description: "Role-aware AI news intelligence. The same story, through your professional lens.",
+    title: "Prism: One story. Every perspective.",
+    description: "Every outlet's report of one event, gathered into one story you can re-read through a professional lens.",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Prism — One story. Every perspective.",
-    description: "Role-aware AI news intelligence. The same story, through your professional lens.",
+    title: "Prism: One story. Every perspective.",
+    description: "Every outlet's report of one event, gathered into one story you can re-read through a professional lens.",
   },
 };
 
@@ -84,7 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
             style={{ color: "var(--ink-muted)" }}
           >
-            <span>◮ Prism — role-aware news intelligence. Every claim traceable to its source.</span>
+            <span>Prism. Every claim traceable to its source.</span>
             <span className="flex items-center gap-3.5">
               <Link href="/about" className="underline underline-offset-[3px]">
                 About &amp; labels

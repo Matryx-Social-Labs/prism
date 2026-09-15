@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
-import { shortDate } from "@/lib/dateline";
 import { ticketFacts } from "@/lib/ticket";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +14,9 @@ import { AskPanel } from "@/components/AskPanel";
 import { ShareButton } from "@/components/ShareButton";
 import { StoryDesktop } from "@/components/StoryDesktop";
 import { StoryRoute } from "@/components/StoryRoute";
+import { Said } from "@/components/Said";
+import { SectionHead as Head } from "@/components/SectionHead";
+import { SourceList, indexSources } from "@/components/SourceList";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
 
@@ -40,42 +42,6 @@ function regionName(code: string): string {
   }
 }
 
-const FUNDING_LABEL: Record<string, string> = {
-  state: "State-affiliated",
-  public: "Public broadcaster",
-};
-
-/** A funding label is provenance: mono, quiet, no badge. */
-function Funding({ funding }: { funding: string | null }) {
-  if (!funding || !FUNDING_LABEL[funding]) return null;
-  return (
-    <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
-      {FUNDING_LABEL[funding]}
-    </span>
-  );
-}
-
-/** A section head in the structural voice, with the counted line beneath it in mono. */
-function Head({ id, title, count, hint }: { id: string; title: string; count?: number; hint?: string }) {
-  return (
-    <div className="rule-live mb-4 pt-4">
-      <h2 id={id} className="font-display text-[26px] font-medium uppercase leading-none tracking-[0.03em]">
-        {title}
-        {count != null && (
-          <span className="ml-2 font-mono text-[11px] font-normal tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
-            {count}
-          </span>
-        )}
-      </h2>
-      {hint && (
-        <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-          {hint}
-        </p>
-      )}
-    </div>
-  );
-}
-
 const MONO_LABEL = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
 
 export function StoryView({ event }: { event: EventDetail }) {
@@ -83,7 +49,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   const finance = event.projection?.finance ?? null;
   // ONE index for [n]: the Sources list and the citation under every quote read
   // the same map, so the two can never number one article differently.
-  const sourceIndex = new Map(event.sources.map((s, i) => [s.article_id, i + 1]));
+  const sourceIndex = indexSources(event.sources);
   // `?? []` is load-bearing: the web and the API deploy from two pipelines and
   // /events is cached 60s, so a new page meets an old payload for a window.
   const claims = event.claims ?? [];
@@ -413,7 +379,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                     // /signin. No brief is fetched for a locked lens, so it stays free.
                     pickLens(slug, false);
                   }}
-                  title={locked ? `Sign in to read the ${m.short} lens — ${m.plain ?? m.tagline} (free)` : undefined}
+                  title={locked ? `Sign in to read the ${m.short} lens: ${m.plain ?? m.tagline} (free)` : undefined}
                   className="flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
                   style={
                     selected
@@ -468,7 +434,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                 </span>{" "}
                 reads
                 {typeof gateState.remaining === "number"
-                  ? ` — ${gateState.remaining} left`
+                  ? `, ${gateState.remaining} left`
                   : ""}
                 . The reader view of this story stays open.
               </p>
@@ -487,7 +453,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                 <span className="font-semibold" style={{ color: meta.color }}>
                   {meta.short} lens
                 </span>{" "}
-                — {meta.plain ?? meta.tagline}. Free with an account.
+: {meta.plain ?? meta.tagline}. Free with an account.
               </p>
               <button
                 onClick={() => router.push("/signin")}
@@ -644,7 +610,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                 // an unlocked lens. The desktop tab says it via title=, but a
                 // title is useless on touch, and this rail is the primary flip
                 // surface on a phone.
-                aria-label={locked ? `${m.short} lens — sign in to unlock, free` : undefined}
+                aria-label={locked ? `${m.short} lens, sign in to unlock, free` : undefined}
                 className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
                 style={
                   selected
@@ -720,57 +686,9 @@ export function StoryView({ event }: { event: EventDetail }) {
             id="said-title"
             title="What was said"
             count={quoteCount}
-            hint="Attributed, verbatim. Every quote is checked against the article it came from — one that does not match is not shown."
+            hint="Attributed, verbatim. Every quote is checked against the article it came from. One that does not match is not shown."
           />
-          <div className="flex flex-col">
-            {claims.map((sp, i) => (
-              <div
-                key={sp.speaker}
-                className={i === 0 ? "" : "mt-5 border-t pt-5"}
-                style={i === 0 ? undefined : { borderColor: "var(--line)" }}
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="text-[14.5px] font-semibold">{sp.speaker}</h3>
-                  <span className="shrink-0 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-                    {sp.claims.length} {sp.claims.length === 1 ? "quote" : "quotes"}
-                  </span>
-                </div>
-                <ul className="mt-2 flex flex-col gap-3.5">
-                  {sp.claims.map((c, j) => {
-                    const n = sourceIndex.get(c.article_id);
-                    return (
-                      <li key={`${c.article_id}-${j}`}>
-                        <blockquote className="text-[14.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
-                          “{c.quote_text}”
-                        </blockquote>
-                        <div className="mt-1 flex items-baseline gap-2 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-                          {/* The citation IS the link: one tap to check us, same target/rel as
-                              Sources. A 10.5px mono glyph is a 19x16 target, so the pseudo-element
-                              grows the hit area to ~47x44 without moving the glyph or the line. */}
-                          {n != null &&
-                            (c.url ? (
-                              <a
-                                href={c.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Source ${n}: ${c.source_name}`}
-                                className="relative font-mono underline-offset-2 before:absolute before:-inset-3.5 before:content-[''] hover:underline"
-                              >
-                                [{n}]
-                              </a>
-                            ) : (
-                              <span>[{n}]</span>
-                            ))}
-                          <span>{c.source_name}</span>
-                          {c.published_at && <span>· {shortDate(c.published_at)}</span>}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
+          <Said claims={claims} sourceIndex={sourceIndex} />
         </section>
       )}
 
@@ -779,39 +697,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           cite, so the two can never number one article differently. */}
       <section id="sources" className="mt-10 scroll-mt-24" aria-labelledby="sources-title">
         <Head id="sources-title" title="Sources" count={event.sources.length} />
-        <ul className="flex flex-col">
-          {event.sources.map((s) => (
-            <li key={s.article_id} className="rule-live grid grid-cols-[28px_1fr] gap-x-2 py-2.5 text-[13.5px]">
-              <span className="font-mono text-[11px] leading-[1.7]" style={{ color: "var(--ink-faint)" }}>
-                [{sourceIndex.get(s.article_id)}]
-              </span>
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="font-medium" style={{ color: "var(--ink)" }}>{s.source_name}</span>
-                  <Funding funding={s.funding} />
-                  {s.stance && (
-                    <span className="text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
-                      {s.stance}
-                    </span>
-                  )}
-                </span>
-                {s.url ? (
-                  <a
-                    href={s.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block truncate underline-offset-4 hover:underline"
-                    style={{ color: "var(--ink-muted)" }}
-                  >
-                    {s.title}
-                  </a>
-                ) : (
-                  <span className="block truncate" style={{ color: "var(--ink-muted)" }}>{s.title}</span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <SourceList sources={event.sources} sourceIndex={sourceIndex} />
       </section>
 
           {/* Ask, docked at the foot of the ticket on desktop; the pinned bar

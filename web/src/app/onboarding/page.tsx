@@ -118,59 +118,47 @@ export default function OnboardingPage() {
 
   return (
     <div className="mx-auto max-w-[720px] px-5 pb-20 pt-9 sm:px-8">
-      <div className="mb-[30px] flex items-center justify-between">
-        <div className="flex items-center gap-2.5" aria-label={`Step ${step + 1} of 3`}>
-          {STEPS.map((label, i) => (
-            <button
-              key={label}
-              onClick={() => i < step && setStep(i)}
-              className="flex items-center gap-2 text-xs font-semibold"
-              style={{ color: i === step ? "var(--ink)" : "var(--ink-faint)" }}
-            >
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full border text-[11px]"
-                style={{
-                  borderColor: i <= step ? "var(--ink)" : "var(--line)",
-                  background: i < step ? "var(--ink)" : "transparent",
-                  color: i < step ? "var(--bg)" : "inherit",
-                }}
-              >
-                {i + 1}
-              </span>
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => router.push("/feed")}
-          className="text-[12.5px] underline underline-offset-[3px]"
-          style={{ color: "var(--ink-faint)" }}
-        >
-          Skip for now
-        </button>
-      </div>
+      {/* The three steps as codes on a rule, the current one underlined, the
+          way the sector strip marks the active subject. Earlier steps are
+          links back; later ones are not yet reachable. */}
+      <nav
+        className="hide-scroll mb-8 flex gap-4 overflow-x-auto border-b font-mono text-[10.5px] uppercase tracking-[0.06em]"
+        style={{ borderColor: "var(--line)" }}
+        aria-label={`Step ${step + 1} of 3`}
+      >
+        {STEPS.map((label, i) => (
+          <button
+            key={label}
+            onClick={() => i < step && setStep(i)}
+            disabled={i > step}
+            aria-current={i === step ? "step" : undefined}
+            className="flex h-11 shrink-0 items-end border-b-2 pb-2 pt-3 leading-none disabled:cursor-default"
+            style={{
+              borderColor: i === step ? "var(--ink)" : "transparent",
+              color: i === step ? "var(--ink)" : "var(--ink-faint)",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
 
       {step === 0 && (
         <section>
-          <h1 className="text-[32px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+          <h1 className="text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">
             Which state are you in?
           </h1>
-          <p className="mt-2.5 text-sm leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Prism leads with news from your state, then the rest of India. Pick your state —
-            you can change it anytime.
+          <p className="mt-3 max-w-[52ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+            Prism leads with news from your state, then the rest of India. You can change it any time.
           </p>
-          <div className="mt-6">
+          <label className="mt-7 block">
+            <span className="mb-2 block text-[13.5px] font-medium">Your state</span>
             <StateSelect value={state} onChange={setState} />
-          </div>
+          </label>
 
           {langOptions.length > 0 && (
             <div className="mt-9">
-              <p
-                className="text-[10.5px] font-semibold uppercase tracking-[0.12em]"
-                style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
-              >
-                Languages you read
-              </p>
+              <p className="text-[13.5px] font-medium">Languages you read</p>
               <div className="mt-3 flex flex-wrap gap-2.5">
                 {langOptions.map((l) => {
                   const idx = languages.indexOf(l.code);
@@ -202,11 +190,8 @@ export default function OnboardingPage() {
                   );
                 })}
               </div>
-              <p
-                className="mt-2.5 text-[10.5px] uppercase tracking-[0.08em]"
-                style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
-              >
-                First pick = your primary. English stays a fallback so you never miss a story.
+              <p className="mt-3 text-[13px] leading-[1.5]" style={{ color: "var(--ink-muted)" }}>
+                Your first pick leads. English stays as a fallback, so you never miss a story.
               </p>
             </div>
           )}
@@ -219,7 +204,7 @@ export default function OnboardingPage() {
             What do you do?
           </h1>
           <p className="mt-2.5 text-sm leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Your profession picks your lens — how stories are ranked, which fields are extracted,
+            Your profession picks your lens: how stories are ranked, which fields are extracted,
             what the agent asks. Every other lens stays one tap away.
           </p>
           <label className="mt-6 flex flex-col gap-1.5">
@@ -308,7 +293,7 @@ export default function OnboardingPage() {
               </div>
               {profession && profession.interests.length > 0 && (
                 <p className="mt-3 text-[11px]" style={{ color: "var(--ink-faint)" }}>
-                  Interests pre-set to {profession.interests.map(sectorName).join(" + ")} — refine in the next step.
+                  Interests pre-set to {profession.interests.map(sectorName).join(" + ")}. Refine them in the next step.
                 </p>
               )}
             </div>
@@ -322,7 +307,7 @@ export default function OnboardingPage() {
             What do you follow?
           </h1>
           <p className="mt-2.5 text-sm leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Pre-set from your profession — add or drop sectors, then narrow any of them to the
+            Pre-set from your profession. Add or drop sectors, then narrow any of them to the
             sub-domains you actually care about (cricket, AI, elections…). Pick nothing and you get
             everything.
           </p>
@@ -360,7 +345,7 @@ export default function OnboardingPage() {
             className="rounded-full border px-6 py-[13px] text-sm font-semibold"
             style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
           >
-            ← Back
+            Back
           </button>
         )}
         <button
@@ -369,13 +354,19 @@ export default function OnboardingPage() {
           className="flex-1 rounded-full px-7 py-[13px] text-sm font-semibold transition hover:opacity-85 disabled:opacity-45"
           style={{ background: "var(--ink)", color: "var(--bg)" }}
         >
-          {saving ? "Saving…" : step < 2 ? "Continue →" : "Build my feed →"}
+          {saving ? "Saving…" : step < 2 ? "Continue" : "Build my feed"}
         </button>
       </div>
-      <p className="mt-3 text-center text-xs" style={{ color: "var(--ink-faint)" }}>
-        {session
-          ? `Signed in as ${session.email} — this sets up your feed.`
-          : "No account needed — your profile lives in this browser."}
+      <p className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+        <span>
+          {session
+            ? `Signed in as ${session.email}. This sets up your feed.`
+            : "No account needed. Your profile lives in this browser."}
+        </span>
+        {/* Nothing blocks reading: the way out is on every step. */}
+        <button onClick={() => router.push("/feed")} className="underline underline-offset-4" style={{ color: "var(--ink)" }}>
+          Skip for now
+        </button>
       </p>
     </div>
   );

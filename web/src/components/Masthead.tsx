@@ -18,7 +18,7 @@ export function Masthead({ dateline, right }: { dateline: string | null; right?:
   return (
     <header className="flex items-end justify-between gap-4 pb-3 pt-4">
       <div className="min-w-0">
-        <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="Prism — today's chart">
+        <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="Prism, today's chart">
           <PrismMark />
           <span
             className="text-[26px] leading-none"

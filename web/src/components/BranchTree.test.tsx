@@ -95,8 +95,8 @@ describe("BranchTree — branches collapse in place", () => {
     const row = screen.getByRole("button", { name: /developments/ });
     expect(row).toHaveTextContent("↳");
     // Three leaf children: the spine takes the EARLIEST (11 JUL), the other two
-    // collapse. Same month reads "12–23 JUL", not "12 JUL – 23 JUL".
-    expect(row).toHaveTextContent(/12–23 JUL/);
+    // collapse. Same month reads "12-23 JUL", not "12 JUL - 23 JUL".
+    expect(row).toHaveTextContent(/12-23 JUL/);
     expect(screen.getByText("Off-spine one")).toBeInTheDocument(); // promoted to the spine
     expect(screen.queryByText("Off-spine two")).not.toBeInTheDocument(); // collapsed
   });

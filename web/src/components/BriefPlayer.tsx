@@ -150,7 +150,7 @@ export function BriefPlayer({
 
       <p className="text-[14.5px] leading-[1.7]">
         <span className="font-semibold" style={{ color: meta.color }}>
-          Through the {meta.short} lens —{" "}
+          Through the {meta.short} lens:{" "}
         </span>
         {briefSentences.map((s, i) => (
           <span key={i} style={active === i ? spoken : { color: "var(--ink-muted)" }}>

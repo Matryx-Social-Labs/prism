@@ -109,8 +109,8 @@ export function StateSelect({ value, onChange }: { value: string; onChange: (cod
       // The language select beside it is labelled; this one had no accessible
       // name at all, so a screen reader announced an unlabelled combobox.
       aria-label="Your state"
-      className="w-full rounded-[12px] border px-4 py-3 text-[15px] outline-none"
-      style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: value ? "var(--ink)" : "var(--ink-faint)" }}
+      className="h-12 w-full border px-4 text-[16px] outline-none"
+      style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: value ? "var(--ink)" : "var(--ink-muted)" }}
     >
       <option value="" disabled>
         Select your state…

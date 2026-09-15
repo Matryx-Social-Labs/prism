@@ -63,10 +63,10 @@ function span(devs: StoryDevelopment[]): string {
   const a = stamp(stamps[0]);
   const b = stamp(stamps[stamps.length - 1]);
   if (a === b) return a;
-  // Same month reads better collapsed: "11–23 JUL", not "11 JUL – 23 JUL".
+  // Same month reads better collapsed: "11-23 JUL", not "11 JUL - 23 JUL".
   const [ad, am] = a.split(" ");
   const [bd, bm] = b.split(" ");
-  return am === bm ? `${ad}–${bd} ${bm}` : `${a} – ${b}`;
+  return am === bm ? `${ad}-${bd} ${bm}` : `${a} - ${b}`;
 }
 
 /** Calendar days from the first dated development to the last, inclusive; null when nothing is dated. */

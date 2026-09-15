@@ -1,8 +1,11 @@
 "use client";
 
-// Landing hero flip demo — the exact 2a mockup content: one obesity-drug story
-// re-read across four lenses (two of them upcoming). Static/illustrative on the
-// marketing page; the real product lens set stays Reader/Cyber/Markets.
+// The flip, demonstrated: one story re-read through four lenses, two of them
+// drafted and not yet served. Illustrative on the about page (the story is an
+// example, not a record); the real product lens set is whatever /api/v1/lenses
+// returns. Mechanics are the story page's: scan line and re-ink, layout never
+// moves, instant under reduced motion.
+import Link from "next/link";
 import { useState } from "react";
 
 interface HeroLens {
@@ -10,6 +13,8 @@ interface HeroLens {
   label: string;
   color: string;
   bg: string;
+  /** What this reading tells you, in plain words, for the unlock prompt. */
+  plain: string;
   brief: string;
 }
 
@@ -19,96 +24,120 @@ const LENSES: HeroLens[] = [
     label: "Reader",
     color: "var(--lens-general)",
     bg: "var(--lens-general-bg)",
+    plain: "what happened, and why it matters",
     brief:
-      "the patent office cleared three manufacturers to make semaglutide from January, with prices projected to fall up to 80%. Two narratives are already competing — a public-health milestone versus patent erosion — and both are grouped on the story page.",
+      "The patent office cleared three manufacturers to make semaglutide from January, with prices projected to fall up to 80%. Two narratives are already competing, a public-health milestone against patent erosion, and both are grouped on the story page.",
   },
   {
     key: "markets",
     label: "Markets",
     color: "var(--lens-finance)",
     bg: "var(--lens-finance-bg)",
+    plain: "which tickers move, and what the catalyst is",
     brief:
-      "generics names ($SUNPHARMA, $CIPLA, $DRREDDY) catch a bid on volume upside while the innovator faces price erosion in its fastest-growing market. Watch API-capacity announcements and the innovator's India revenue guidance.",
+      "Generics names (SUNPHARMA, CIPLA, DRREDDY) catch a bid on volume upside while the innovator faces price erosion in its fastest-growing market. Watch API-capacity announcements and the innovator's India revenue guidance.",
   },
   {
     key: "health",
     label: "Health",
+    // Reserved hues (DESIGN.md) have no tokens yet, so the tint is mixed from
+    // the hue itself and reads the same on both grounds.
     color: "#be123c",
-    bg: "#ffe4e6",
+    bg: "color-mix(in srgb, #be123c 14%, transparent)",
+    plain: "what changes for clinicians and patients",
     brief:
-      "prescribing will widen beyond endocrinology once prices fall; the immediate clinical questions are supply consistency and cold-chain reliability outside metros.",
+      "Prescribing will widen beyond endocrinology once prices fall; the immediate clinical questions are supply consistency and cold-chain reliability outside metros.",
   },
   {
     key: "policy",
     label: "Policy",
     color: "#0369a1",
-    bg: "#e0f2fe",
+    bg: "color-mix(in srgb, #0369a1 14%, transparent)",
+    plain: "what precedent this sets",
     brief:
-      "the ruling becomes a reference point for compulsory-licensing and access-to-medicine arguments — expect it cited well beyond pharma, including in trade negotiations.",
+      "The ruling becomes a reference point for compulsory-licensing and access-to-medicine arguments; expect it cited well beyond pharma, including in trade negotiations.",
   },
 ];
 
-export function HeroLensDemo() {
+const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+
+export function HeroLensDemo({
+  locked = [],
+  title = "Flip the lens",
+}: {
+  /** Lenses that flip but show the unlock prompt instead of the reading: the paywall moment. */
+  locked?: string[];
+  /** The instruction printed above the demo. */
+  title?: string;
+}) {
   const [active, setActive] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const lens = LENSES[active];
+  const isLocked = locked.includes(lens.key);
 
   return (
-    <div
-      className="overflow-hidden rounded-[18px] border"
-      style={{ borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }}
-    >
-      <div className="flex items-center justify-between border-b px-5 py-3" style={{ borderColor: "var(--line)" }}>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-          Try it — flip the lens
-        </span>
-        <span className="spectrum-bar h-1 w-16 rounded-full" aria-hidden />
+    <div className="border" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>
+      <div className={`${MONO} flex items-center justify-between border-b px-5 py-3`} style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+        <span>{title}</span>
+        <span style={{ color: "var(--ink-faint)" }}>Illustration</span>
       </div>
 
-      <div className="px-5 pt-4">
-        <h3 className="text-[18px] font-semibold leading-[1.35]" style={{ fontFamily: "var(--font-display), serif" }}>
-          Blockbuster obesity drug goes generic in India after landmark patent ruling
-        </h3>
-      </div>
+      <h3 className="px-5 pt-4 text-[18px] font-medium leading-[1.3] text-balance">
+        Blockbuster obesity drug goes generic in India after landmark patent ruling
+      </h3>
 
       <div className="flex flex-wrap gap-1.5 px-5 pt-3.5" role="tablist" aria-label="Lens">
         {LENSES.map((l, i) => {
           const selected = i === active;
+          const lock = locked.includes(l.key);
           return (
             <button
               key={l.key}
               role="tab"
               aria-selected={selected}
+              aria-label={lock ? `${l.label} lens, locked` : undefined}
               onClick={() => {
                 setFlipped(true);
                 setActive(i);
               }}
-              className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
+              className="flex min-h-[36px] items-center gap-1 rounded-full px-3.5 text-xs font-semibold transition"
               style={
                 selected
                   ? { background: l.bg, color: l.color, boxShadow: `inset 0 0 0 1.5px ${l.color}` }
-                  : { color: "var(--ink-muted)" }
+                  : { color: lock ? "var(--ink-faint)" : "var(--ink-muted)" }
               }
             >
+              {lock && (
+                <svg aria-hidden width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.75 }}>
+                  <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2.2" />
+                  <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2.2" />
+                </svg>
+              )}
               {l.label}
             </button>
           );
         })}
       </div>
 
-      <div key={active} className={`${flipped ? "flip-body" : ""} relative overflow-hidden px-5 pb-4 pt-3`}>
+      <div key={active} className={`${flipped ? "flip-body" : ""} relative overflow-hidden px-5 pb-5 pt-4`}>
         {flipped && <span aria-hidden className="flip-scanline" style={{ background: lens.color }} />}
-        <p className="text-[13px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-          <span className="font-semibold" style={{ color: lens.color }}>
-            Through the {lens.label} lens —{" "}
-          </span>
-          {lens.brief}
+        <p className={MONO} style={{ color: lens.color }}>
+          {lens.label} read
         </p>
+        {isLocked ? (
+          <p className="mt-2 text-[14px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+            The {lens.label} lens reads this story for {lens.plain}. It is a professional reading, so
+            the brief is behind a sign-in; the flip is not.{" "}
+            <Link href="/signin" className="underline underline-offset-4" style={{ color: "var(--ink)" }}>
+              Sign in
+            </Link>
+          </p>
+        ) : (
+          <p className="mt-2 text-[14px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+            {lens.brief}
+          </p>
+        )}
       </div>
-
-      <p className="px-5 pb-4 text-[11px]" style={{ color: "var(--ink-faint)" }}>
-        Health and Policy are upcoming lenses — new roles ship as registry entries, not new products.
-      </p>
     </div>
   );
 }

@@ -214,7 +214,7 @@ export function StoryDesktop({
                     key={slug}
                     onClick={() => onPick(slug)}
                     aria-pressed={active}
-                    aria-label={locked ? `${lensName(slug)} — sign in to unlock, free` : undefined}
+                    aria-label={locked ? `${lensName(slug)}, sign in to unlock, free` : undefined}
                     className="block text-left transition hover:opacity-80"
                   >
                     <div className="flex items-baseline justify-between">
@@ -228,7 +228,7 @@ export function StoryDesktop({
                       style={{ background: active ? HUE[slug] ?? "var(--ink)" : "var(--line)" }}
                     />
                     <div className="text-[12.5px] leading-[1.45]" style={{ color: "var(--ink-faint)" }}>
-                      {locked ? "Sign in to read this lens — free." : opening(briefs[slug])}
+                      {locked ? "Sign in to read this lens. It is free." : opening(briefs[slug])}
                     </div>
                   </button>
                 );
