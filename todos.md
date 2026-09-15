@@ -33,7 +33,7 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   row per person with their position over time. Needs `entities.qid` populated (22% of df>=2
   entities on 2026-09-14, `entity_alias` empty) and `office_holders` for role→person.
   **Depends on:** plan step 5 (Wikidata linking) reaching useful coverage.
-- **Desktop rail leaks paid-lens facts for a LOCKED lens** (P2). `StoryDesktop.railFacts`
+- **Desktop rail leaks paid-lens facts for a LOCKED lens** (was P2). `StoryDesktop.railFacts`
   renders `projection.cyber.exploitation.kev_listed`, CVSS and `finance.tickers` when the
   selected lens is cyber/markets. `get_event` filters `lens_briefs`/`lens_points` out of
   `projection` for locked lenses but NOT the `cyber`/`finance` keys, and a signed-out reader
@@ -42,7 +42,8 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
   leak closed in 4bde965. Fix is ~3 lines in `get_event` (drop `cyber`/`finance` from
   `safe_projection` unless unlocked) plus one route test; flagged during the claims review
   and kept out of that PR to keep it scoped.
-  **Depends on:** nothing.
+  **Completed:** 2026-09-15 — `PAID_LENS_FIELDS` in common/lenses.py, gated in get_event; the
+  route test also covers the f230e0d prose gate, which had none.
 
 ## Positioning
 - **Distribution plan is hand-wavy** (P2). FinTwit/Telegram/YouTube are crowded + pay-to-play.

@@ -43,6 +43,14 @@ class Lens:
     upcoming: bool = False
 
 
+# The projection key each PAID lens's extracted facts live under. The prose
+# (lens_briefs/lens_points) is keyed by lens slug; the facts (CVSS, KEV, tickers,
+# catalyst) are keyed by the extractor's field name, and for markets that is
+# "finance". GET /events/{id} strips these for a lens the reader has not unlocked:
+# a signed-out reader can select a locked lens — the flip is the upgrade moment —
+# so anything left under these keys is rendered by the desktop rail.
+PAID_LENS_FIELDS: dict[str, str] = {"cyber": "cyber", "markets": "finance"}
+
 LENSES: dict[str, Lens] = {
     "cyber": Lens(
         slug="cyber",

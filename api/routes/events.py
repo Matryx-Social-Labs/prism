@@ -29,7 +29,7 @@ from api.schemas import (
     SpeakerClaims,
 )
 from common.db import get_db
-from common.lenses import LENSES
+from common.lenses import LENSES, PAID_LENS_FIELDS
 from common.locks import single_flight
 from common.logging import get_logger
 from common.quota import (
@@ -234,6 +234,16 @@ async def get_event(
         safe_projection["lens_briefs"] = briefs
     if "lens_points" in safe_projection:
         safe_projection["lens_points"] = points
+    # THE FACTS, NOT JUST THE PROSE. projection.cyber / projection.finance hold
+    # CVSS, KEV status, tickers and the catalyst — what the desktop rail renders
+    # when a lens is selected. The flip to a LOCKED lens is allowed (it is the
+    # upgrade moment), so with these still in the payload the rail showed
+    # "CATALYST · REGULATORY_ACTION" to a reader who had not paid. Same class as
+    # the /questions leak. available_lenses below stays computed from the
+    # UNFILTERED projection: which lenses exist is public, what they say is not.
+    for lens_slug, key in PAID_LENS_FIELDS.items():
+        if lens_slug not in allowed and key in safe_projection:
+            safe_projection[key] = None
 
     return EventDetail(
         id=str(event["id"]),
