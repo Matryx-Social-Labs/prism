@@ -53,7 +53,13 @@ async def get_feed(
             interest_pairs[sec].add(sub)
     if sector:
         # An explicit ?sector= is the reader asking for exactly that — honour it.
-        sectors = [sector]
+        # Comma-separated, because the reader's six subjects are groups of the
+        # pipeline's ten: Business & Markets is business+finance, Tech & Cyber is
+        # technology+cybersecurity, Health & Science is health+science. Unknown
+        # names are dropped rather than 400'd — a stale link still shows a feed.
+        sectors = [x for x in (t.strip() for t in sector.split(",")) if x in TAXONOMY]
+        if not sectors:
+            sectors = [sector]  # unknown single: let the query return nothing, as before
     elif interest_pairs:
         sectors = list(interest_pairs)
     else:

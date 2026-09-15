@@ -18,14 +18,24 @@
 
 :root,
 :root[data-theme="light"] {
-  --bg: #faf8f5;
-  --bg-elevated: #ffffff;
-  --bg-sunken: #f1ede6;
-  --ink: #191613;
-  --ink-muted: #6d675e;
-  --ink-faint: #a39c90;
-  --line: #e5dfd5;
-  --line-strong: #cfc7b9;
+  /* THE RESERVATION CHART. Pale continuous-stationery ground, one ink, a print
+     grey and a faded grey, and a rule colour. No colour in chrome: the lens hues
+     below are the only colour anywhere, and only where a lens speaks. Light is
+     chosen from the scene — a phone on a morning commute, under daylight — not
+     from the category. */
+  --bg: #f2f4ee;
+  --bg-elevated: #fafbf8;
+  --bg-sunken: #e8ece2;
+  --ink: #141414;
+  --ink-muted: #5c5f58;
+  --ink-faint: #8a8d85;
+  --line: #d6dbcf;
+  --line-strong: #b9c0b1;
+  /* The reading voice: Hind, then its script siblings. The browser falls
+     through per glyph, so Kannada in a Latin headline takes Hind Mysuru with
+     the same skeleton — one family, six scripts, no fallback seam. */
+  --font-ui: var(--font-hind), var(--font-hind-kn), var(--font-hind-ta), var(--font-hind-te),
+    system-ui, sans-serif;
 
   --lens-general: #b45309; /* amber-700 */
   --lens-cyber: #0e7490; /* cyan-700 */
@@ -48,7 +58,7 @@
     #06b6d4,
     #8b5cf6
   );
-  --glass: rgba(250, 248, 245, 0.82);
+  --glass: rgba(242, 244, 238, 0.86);
   --shadow-card: 0 1px 2px rgb(25 22 19 / 0.05), 0 8px 24px -12px rgb(25 22 19 / 0.12);
   /* Sheet/modal scrim. Was the raw dark ground copy-pasted into two sheets. */
   --scrim: rgba(15, 14, 12, 0.4);
@@ -62,14 +72,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0c0b09;
-    --bg-elevated: #161411;
-    --bg-sunken: #080706;
-    --ink: #ece8e1;
-    --ink-muted: #a09a8f;
-    --ink-faint: #6b655b;
-    --line: #262320;
-    --line-strong: #3b3731;
+    --bg: #141613;
+    --bg-elevated: #1b1e19;
+    --bg-sunken: #0f110e;
+    --ink: #ebeee6;
+    --ink-muted: #a3a79d;
+    --ink-faint: #737770;
+    --line: #2a2e27;
+    --line-strong: #3d423a;
 
     --lens-general: #fbbf24;
     --lens-cyber: #22d3ee;
@@ -83,21 +93,21 @@
     --up: #34d399;
     --up-bg: rgba(52, 211, 153, 0.14);
 
-    --glass: rgba(12, 11, 9, 0.78);
+    --glass: rgba(20, 22, 19, 0.82);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.5);
     --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 48px -16px rgb(0 0 0 / 0.6);
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0c0b09;
-  --bg-elevated: #161411;
-  --bg-sunken: #080706;
-  --ink: #ece8e1;
-  --ink-muted: #a09a8f;
-  --ink-faint: #6b655b;
-  --line: #262320;
-  --line-strong: #3b3731;
+  --bg: #141613;
+  --bg-elevated: #1b1e19;
+  --bg-sunken: #0f110e;
+  --ink: #ebeee6;
+  --ink-muted: #a3a79d;
+  --ink-faint: #737770;
+  --line: #2a2e27;
+  --line-strong: #3d423a;
 
   --lens-general: #fbbf24;
   --lens-cyber: #22d3ee;
@@ -111,7 +121,7 @@
   --up: #34d399;
   --up-bg: rgba(52, 211, 153, 0.14);
 
-  --glass: rgba(12, 11, 9, 0.78);
+  --glass: rgba(20, 22, 19, 0.82);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.5);
   --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 48px -16px rgb(0 0 0 / 0.6);
 }
@@ -126,15 +136,39 @@ html {
 body {
   background: var(--bg);
   color: var(--ink);
-  font-feature-settings: "ss01";
+  font-family: var(--font-ui);
+  caret-color: var(--ink);
   transition: background-color 240ms ease, color 240ms ease;
 }
 
+/* The browser surfaces we did not draw still carry the design. */
 ::selection {
   /* chrome is monochrome — color only ever means a lens is speaking */
   background: var(--ink);
   color: var(--bg);
 }
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+* {
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+}
+a {
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+/* The provenance voice is tabular by definition: a column of counts and
+   times must align. Every .font-mono inherits it. */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+/* State is line form, never hue. A row's rule says what it is. */
+.rule-live { border-top: 1px solid var(--line); }
+.rule-single { border-top: 1px dashed var(--line-strong); }
+.rule-stale { border-top: 1px solid var(--line); opacity: 0.6; }
 
 /* ── Motion primitives (all gated on prefers-reduced-motion) ───────── */
 

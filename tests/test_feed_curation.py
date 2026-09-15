@@ -235,3 +235,20 @@ async def test_a_reader_with_a_state_still_gets_their_records():
         items = await _feed(lens="cyber", limit=30, state="IN-KL")
     assert len(items) == 30
     assert any(i["title"].startswith("CVE-") for i in items), "records vanished for a state reader"
+
+
+async def test_a_comma_separated_sector_means_the_union():
+    """The reader's six subjects are groups of the pipeline's ten. "Business &
+    Markets" is business+finance, and a single-sector parameter could only ever
+    show half of it."""
+    rows = [_row("Rupee falls", "finance"), _row("Tata results", "business"), _row("Poll result", "politics")]
+    with _corpus(rows):
+        titles = {i["title"] for i in await _feed(sector="business,finance", limit=30)}
+    assert titles == {"Rupee falls", "Tata results"}
+
+
+async def test_an_unknown_name_in_the_list_is_dropped_not_fatal():
+    rows = [_row("Tata results", "business"), _row("Poll result", "politics")]
+    with _corpus(rows):
+        titles = {i["title"] for i in await _feed(sector="business,nonsense", limit=30)}
+    assert titles == {"Tata results"}

@@ -1,32 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Fraunces, IBM_Plex_Mono } from "next/font/google";
-import localFont from "next/font/local";
+import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, Martian_Mono, Teko } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-const display = Fraunces({
+// THREE VOICES, FROM THE SUBJECT'S WORLD (the reservation chart; see
+// .impeccable/surfaces and PRODUCT.md § Brand Commitments). The rule is the
+// commitment — a structural voice, a reading voice, a provenance voice — and the
+// faces are chosen for this world, not inherited from the last one.
+//
+// Structure: Teko (Indian Type Foundry). The condensed signage of station boards
+// and train names on the chart. Masthead labels, the sector strip, section
+// heads, the ticket's big numbers. Never running text.
+const display = Teko({
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
   variable: "--font-display",
-  axes: ["opsz", "SOFT", "WONK"],
 });
 
-// General Sans (ITF Free Font License, self-hosted — see src/fonts/general-sans/LICENSE.md).
-// Replaces Space Grotesk per DESIGN.md: escape the AI-tool font convergence.
-const ui = localFont({
-  src: [
-    { path: "../fonts/general-sans/GeneralSans-400.woff2", weight: "400" },
-    { path: "../fonts/general-sans/GeneralSans-500.woff2", weight: "500" },
-    { path: "../fonts/general-sans/GeneralSans-600.woff2", weight: "600" },
-    { path: "../fonts/general-sans/GeneralSans-700.woff2", weight: "700" },
-  ],
-  variable: "--font-ui",
-});
+// Reading: Hind (ITF) and its script siblings. One family across Latin,
+// Devanagari, Kannada, Tamil and Telugu, so a Kannada headline and an English
+// one sit on the same page without a fallback seam — the browser falls through
+// the stack per glyph. Headlines, body, quotes: everything a reader reads.
+const ui = Hind({ subsets: ["latin", "devanagari"], weight: ["400", "500", "600", "700"], variable: "--font-hind" });
+const uiKannada = Hind_Mysuru({ subsets: ["kannada"], weight: ["400", "500", "600"], variable: "--font-hind-kn" });
+const uiTamil = Hind_Madurai({ subsets: ["tamil"], weight: ["400", "500", "600"], variable: "--font-hind-ta" });
+const uiTelugu = Hind_Guntur({ subsets: ["telugu"], weight: ["400", "500", "600"], variable: "--font-hind-te" });
 
-// Provenance voice (DESIGN.md): timestamps, sources, citations, funding labels.
-const mono = IBM_Plex_Mono({
+// Provenance ONLY: source counts, times, origins, codes, [n], tickers, CVE ids.
+// Tabular by design. Never prose, never a heading.
+const mono = Martian_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
   variable: "--font-mono",
@@ -69,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body
-        className={`${display.variable} ${ui.variable} ${mono.variable} flex min-h-screen flex-col antialiased`}
+        className={`${display.variable} ${ui.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-screen flex-col antialiased`}
         style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
       >
         <SiteHeader />
