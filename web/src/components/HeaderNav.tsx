@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useSession } from "@/lib/session";
 
 const NAV = [
-  { href: "/feed", label: "Feed" },
+  { href: "/", label: "Today" },
   { href: "/trending", label: "Trending" },
   { href: "/pulse", label: "Pulse" },
   { href: "/watchlist", label: "Watchlist" },
@@ -16,7 +16,10 @@ export function HeaderNav() {
   const pathname = usePathname();
   const session = useSession();
 
-  const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const active = (href: string) =>
+    href === "/"
+      ? pathname === "/" || ["/feed", "/sector"].some((p) => pathname === p || pathname.startsWith(`${p}/`))
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <nav className="flex items-center gap-1 sm:gap-2">

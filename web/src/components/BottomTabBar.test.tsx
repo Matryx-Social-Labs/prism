@@ -14,7 +14,7 @@ function at(path: string) {
 }
 
 describe("BottomTabBar — where it shows", () => {
-  it.each(["/feed", "/trending", "/pulse", "/search", "/you", "/sector/markets", "/watchlist"])(
+  it.each(["/", "/feed", "/trending", "/pulse", "/search", "/you", "/sector/business", "/watchlist"])(
     "shows on %s",
     (path) => {
       at(path);
@@ -25,7 +25,7 @@ describe("BottomTabBar — where it shows", () => {
 
   it.each([
     ["/story/abc", "story pins its own lens rail + Share/Ask in the thumb zone"],
-    ["/", "landing"],
+    ["/about", "about"],
     ["/onboarding", "onboarding"],
     ["/signin", "auth"],
   ])("hides on %s (%s)", (path) => {
@@ -57,16 +57,20 @@ describe("BottomTabBar — active tab", () => {
       .getAllByRole("link")
       .filter((l) => l.getAttribute("aria-current") === "page");
     expect(current).toHaveLength(1);
-    expect(screen.getByRole("link", { name: /feed/i })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: /today/i })).not.toHaveAttribute("aria-current");
   });
 
-  it("marks no tab on a route that belongs to none of them", () => {
-    at("/sector/markets");
+  // The chart is / and /feed, and a sector is the chart filtered (D5, D6).
+  it("keeps Today active across the chart's routes, and only there", () => {
+    for (const path of ["/", "/feed", "/sector/business"]) {
+      at(path);
+      const { unmount } = render(<BottomTabBar />);
+      expect(screen.getByRole("link", { name: /today/i })).toHaveAttribute("aria-current", "page");
+      unmount();
+    }
+    at("/trending");
     render(<BottomTabBar />);
-    const current = screen
-      .getAllByRole("link")
-      .filter((l) => l.getAttribute("aria-current") === "page");
-    expect(current).toHaveLength(0);
+    expect(screen.getByRole("link", { name: /today/i })).not.toHaveAttribute("aria-current");
   });
 
   it("keeps You active across the routes that fold into it", () => {
@@ -99,8 +103,14 @@ describe("SiteHeader — the double-header fix", () => {
     expect(container.querySelector("header")?.className).toContain("hidden");
   });
 
+  it("hides it on the chart at / — the masthead is the header there", () => {
+    at("/");
+    const { container } = render(<SiteHeader />);
+    expect(container.querySelector("header")?.className).toContain("hidden");
+  });
+
   it("keeps it on marketing and auth routes", () => {
-    for (const path of ["/", "/about", "/signin"]) {
+    for (const path of ["/about", "/signin"]) {
       at(path);
       const { container, unmount } = render(<SiteHeader />);
       expect(container.querySelector("header")?.className).not.toContain("hidden");

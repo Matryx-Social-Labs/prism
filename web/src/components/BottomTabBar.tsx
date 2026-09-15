@@ -1,9 +1,9 @@
 "use client";
 
 // Mobile bottom tab bar (mobile-first design). The app's navigation spine on the
-// phone: Feed · Trending · Pulse · Search · You. Hidden on desktop (lg+) and on
-// surfaces with their own thumb-zone controls (landing, onboarding, story detail —
-// which pins a lens rail + Share/Ask — and auth).
+// phone: Today · Trending · Pulse · Search · You (founder decision D6). Hidden on
+// desktop (lg+) and on surfaces with their own thumb-zone controls (onboarding,
+// story detail — which pins a lens rail + Share/Ask — and auth).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -16,7 +16,7 @@ const I = (d: React.ReactNode) => (
 );
 
 const TABS: Tab[] = [
-  { href: "/feed", label: "Feed", icon: I(<path d="M4 5h16M4 12h16M4 19h10" />) },
+  { href: "/", label: "Today", icon: I(<path d="M4 5h16M4 12h16M4 19h10" />) },
   { href: "/trending", label: "Trending", icon: I(<><path d="M3 17l6-6 4 4 8-8" /><path d="M14 7h7v7" /></>) },
   { href: "/pulse", label: "Pulse", icon: I(<path d="M3 12h4l3-7 4 14 3-7h4" />) },
   { href: "/search", label: "Search", icon: I(<><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>) },
@@ -25,17 +25,21 @@ const TABS: Tab[] = [
 
 // Routes that fold into the "You" hub — the You tab stays active across them.
 const YOU_ROUTES = ["/you", "/account", "/interests", "/watchlist"];
+// The chart is / and /feed, and a sector is the chart filtered — all Today.
+const TODAY_ROUTES = ["/feed", "/sector"];
 // Route prefixes where the tab bar is shown (story detail is excluded — it pins
 // its own lens rail + Share/Ask in the thumb zone).
-const SHOW_ON = ["/feed", "/trending", "/pulse", "/search", "/sector", ...YOU_ROUTES];
+const SHOW_ON = ["/trending", "/pulse", "/search", ...TODAY_ROUTES, ...YOU_ROUTES];
 
 export function BottomTabBar() {
   const pathname = usePathname();
-  if (!SHOW_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
+  const under = (prefixes: string[]) => prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (pathname !== "/" && !under(SHOW_ON)) return null;
 
   const isActive = (href: string) => {
-    if (href === "/you") return YOU_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-    return pathname === href || pathname.startsWith(`${href}/`);
+    if (href === "/") return pathname === "/" || under(TODAY_ROUTES);
+    if (href === "/you") return under(YOU_ROUTES);
+    return under([href]);
   };
 
   return (

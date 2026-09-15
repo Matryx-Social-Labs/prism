@@ -64,8 +64,8 @@ export function SectorStrip({
   return (
     <nav
       aria-label="Sectors"
-      className="hide-scroll flex items-stretch gap-1 overflow-x-auto border-b sm:gap-3"
-      style={{ borderColor: "var(--line)" }}
+      className="hide-scroll sticky top-0 z-20 flex items-stretch gap-1 overflow-x-auto border-b sm:gap-3 lg:top-[57px]"
+      style={{ borderColor: "var(--line)", background: "var(--bg)" }}
     >
       {item(null, "ALL", "Today", allHref)}
       {SECTOR_GROUPS.map((g) => item(g.slug, g.code, g.name, `/sector/${g.slug}`))}

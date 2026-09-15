@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PrismMark } from "@/components/PrismMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
  * The chart's masthead: the mark and name, then the dateline in the provenance
@@ -8,12 +9,16 @@ import { PrismMark } from "@/components/PrismMark";
  *
  * No kicker, no eyebrow (craft floor: a heading carries its own weight).
  * The mark is the existing logo, unchanged.
+ *
+ * On desktop the brand header (SiteHeader) already carries the mark and the
+ * theme toggle, so here they are phone-only — two stacked wordmarks was the
+ * original double-header bug. The dateline stays at every width.
  */
 export function Masthead({ dateline, right }: { dateline: string | null; right?: React.ReactNode }) {
   return (
     <header className="flex items-end justify-between gap-4 pb-3 pt-4">
       <div className="min-w-0">
-        <Link href="/" className="flex items-center gap-2" aria-label="Prism — today's chart">
+        <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="Prism — today's chart">
           <PrismMark />
           <span
             className="text-[26px] leading-none"
@@ -28,7 +33,12 @@ export function Masthead({ dateline, right }: { dateline: string | null; right?:
           </p>
         )}
       </div>
-      {right && <div className="shrink-0">{right}</div>}
+      <div className="flex shrink-0 items-center gap-3">
+        {right}
+        <span className="lg:hidden">
+          <ThemeToggle />
+        </span>
+      </div>
     </header>
   );
 }
