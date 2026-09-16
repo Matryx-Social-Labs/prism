@@ -26,3 +26,9 @@ export const Corner = ({ size = 12, className }: P) => (
 export const ChevronDown = ({ size = 12, className }: P) => (
   <svg {...base(size)} className={className}><path d="M6 9l6 6 6-6" /></svg>
 );
+export const Speech = ({ size = 16, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M4 5h16v11H9l-5 4z" /></svg>
+);
+export const Close = ({ size = 14, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M6 6l12 12M18 6L6 18" /></svg>
+);

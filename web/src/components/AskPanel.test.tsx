@@ -156,3 +156,24 @@ describe("AskPanel — submitting", () => {
     await waitFor(() => expect(signal.aborted).toBe(true));
   });
 });
+
+describe("AskPanel — the floating panel", () => {
+  it("closes on Escape and on the scrim", async () => {
+    const onOpenChange = vi.fn();
+    render(<AskPanel {...PROPS} open onOpenChange={onOpenChange} launcher={false} />);
+    await userEvent.keyboard("{Escape}");
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    fireEvent.click(document.querySelector('[aria-hidden="true"]')!);
+    expect(onOpenChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("lands the caret in the input when opened", () => {
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
+    expect(screen.getByPlaceholderText(/ask anything/i)).toHaveFocus();
+  });
+
+  it("prints the source count on the launcher", () => {
+    render(<AskPanel {...PROPS} />);
+    expect(screen.getByRole("button", { name: /ask this story\s*4 sources/i })).toBeInTheDocument();
+  });
+});

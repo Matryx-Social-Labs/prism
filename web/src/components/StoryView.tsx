@@ -643,19 +643,18 @@ export function StoryView({ event }: { event: EventDetail }) {
           </button>
         </div>
       </div>
-
-      {/* ── Ask chat — floats above the pinned lens rail when opened ── */}
-      <div className="lg:hidden">
-        <AskPanel
-          eventId={event.id}
-          sourceCount={sourceCount}
-          suggestedQuestions={questions}
-          open={askOpen}
-          onOpenChange={setAskOpen}
-          launcher={false}
-        />
-      </div>
     </div>
+
+      {/* ── Ask — one floating panel at every width: the launcher pill
+          bottom-right from 1024px, the thumb-zone button opens the same one
+          on a phone. */}
+      <AskPanel
+        eventId={event.id}
+        sourceCount={sourceCount}
+        suggestedQuestions={questions}
+        open={askOpen}
+        onOpenChange={setAskOpen}
+      />
 
       {/* ── The evidence layer, shared by both trees ──────────────
           Rendered once at every width. On desktop it aligns to the reading
@@ -699,12 +698,6 @@ export function StoryView({ event }: { event: EventDetail }) {
         <Head id="sources-title" title="Sources" count={event.sources.length} />
         <SourceList sources={event.sources} sourceIndex={sourceIndex} />
       </section>
-
-          {/* Ask, docked at the foot of the ticket on desktop; the pinned bar
-              reaches it on a phone. */}
-          <div className="mt-10 hidden lg:block">
-            <AskPanel eventId={event.id} sourceCount={sourceCount} suggestedQuestions={questions} docked />
-          </div>
         </div>
       </div>
     </>
