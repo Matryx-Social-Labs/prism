@@ -162,7 +162,7 @@ export function BriefPlayer({
 
       {points.length > 0 && (
         <div>
-          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+          <h3 className="mb-2 font-display text-[20px] font-medium uppercase leading-none tracking-[0.03em]">
             {pointsHeading}
           </h3>
           <ul className="flex flex-col gap-1.5">
@@ -170,9 +170,7 @@ export function BriefPlayer({
               const isActive = active === briefSentences.length + i;
               return (
                 <li key={pt} className="flex gap-2 text-[13.5px] leading-[1.55]" style={{ color: isActive ? "var(--ink)" : "var(--ink-muted)" }}>
-                  <span aria-hidden style={{ color: meta.color }}>
-                    ◆
-                  </span>
+                  <span aria-hidden className="mt-[9px] inline-block h-[2px] w-3 shrink-0" style={{ background: meta.color }} />
                   <span style={isActive ? spoken : undefined}>{pt}</span>
                 </li>
               );

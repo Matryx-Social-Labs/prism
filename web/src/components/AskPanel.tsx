@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowUp } from "@/components/icons";
+
 // The grounded per-story agent, redesigned as a floating chat panel
 // (collapsed pill bottom-right → chat). Answers stream from the story's own
 // sources with numbered citations; a refusal renders as a first-class state.
@@ -136,11 +138,8 @@ export function AskPanel({
         >
           {!docked && (
             <div className="flex items-center gap-2.5 border-b px-[18px] py-3.5" style={{ borderColor: "var(--line)" }}>
-              <span className="spectrum-text text-base" aria-hidden>
-                ◮
-              </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Ask this story</p>
+                <p className="font-display text-[20px] font-medium uppercase leading-none tracking-[0.03em]">Ask this story</p>
                 <p className="text-[11px]" style={{ color: "var(--ink-faint)" }}>
                   Answers only from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"}, with
                   citations.
@@ -250,10 +249,10 @@ export function AskPanel({
             <button
               onClick={() => submit(input)}
               aria-label="Send"
-              className="h-[38px] w-[38px] rounded-full text-[15px]"
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-full"
               style={{ background: "var(--ink)", color: "var(--bg)" }}
             >
-              ↑
+              <ArrowUp size={15} />
             </button>
           </div>
         </div>

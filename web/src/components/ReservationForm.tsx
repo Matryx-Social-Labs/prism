@@ -18,9 +18,9 @@ import { fetchLanguages, type LanguageOption } from "@/lib/session";
 import { lensMeta } from "@/lib/lenses";
 import { SECTOR_GROUPS } from "@/lib/sectors";
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ label, hint, flush = false, children }: { label: string; hint?: string; /** The control ends on the next field's rule (a tab rail), so no bottom padding. */ flush?: boolean; children: React.ReactNode }) {
   return (
-    <div className="rule-live py-6">
+    <div className={`rule-live pt-6 ${flush ? "" : "pb-6"}`}>
       <p className="text-[13.5px] font-medium" style={{ color: "var(--ink)" }}>{label}</p>
       {hint && <p className="mt-1 max-w-[52ch] text-[13.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>{hint}</p>}
       <div className="mt-3">{children}</div>
@@ -54,8 +54,8 @@ export function LanguagesField({ value, onChange, options }: { value: string[]; 
     } else onChange([...value, code]);
   };
   return (
-    <Field label="Languages you read" hint="Your first pick leads. Nothing is ever hidden: languages rank the chart, they never filter it.">
-      <div className="flex flex-wrap gap-x-6 gap-y-2 border-b" style={{ borderColor: "var(--line)" }}>
+    <Field label="Languages you read" hint="Your first pick leads. Nothing is ever hidden: languages rank the chart, they never filter it." flush>
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
         {options.map((l) => {
           const idx = value.indexOf(l.code);
           const sel = idx >= 0;
