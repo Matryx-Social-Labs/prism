@@ -1,0 +1,811 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-16T11:05:02+00:00",
+  "title": "Design System: Prism",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Stationery",
+        "canonical": "#f2f4ee",
+        "theme": "light",
+        "cssVar": "--bg",
+        "tonalRamp": [
+          "oklch(15% 0.008 122)",
+          "oklch(27% 0.008 122)",
+          "oklch(39% 0.008 122)",
+          "oklch(51% 0.008 122)",
+          "oklch(63% 0.008 122)",
+          "oklch(75% 0.008 122)",
+          "oklch(87% 0.008 122)",
+          "oklch(95% 0.008 122)"
+        ]
+      },
+      "bg-elevated": {
+        "role": "neutral",
+        "displayName": "Elevated",
+        "canonical": "#fafbf8",
+        "theme": "light",
+        "cssVar": "--bg-elevated",
+        "tonalRamp": [
+          "oklch(15% 0.004 122)",
+          "oklch(27% 0.004 122)",
+          "oklch(39% 0.004 122)",
+          "oklch(51% 0.004 122)",
+          "oklch(63% 0.004 122)",
+          "oklch(75% 0.004 122)",
+          "oklch(87% 0.004 122)",
+          "oklch(95% 0.004 122)"
+        ]
+      },
+      "bg-sunken": {
+        "role": "neutral",
+        "displayName": "Sunken",
+        "canonical": "#e8ece2",
+        "theme": "light",
+        "cssVar": "--bg-sunken",
+        "tonalRamp": [
+          "oklch(15% 0.014 125)",
+          "oklch(27% 0.014 125)",
+          "oklch(39% 0.014 125)",
+          "oklch(51% 0.014 125)",
+          "oklch(63% 0.014 125)",
+          "oklch(75% 0.014 125)",
+          "oklch(87% 0.014 125)",
+          "oklch(95% 0.014 125)"
+        ]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink",
+        "canonical": "#141414",
+        "theme": "light",
+        "cssVar": "--ink",
+        "tonalRamp": [
+          "oklch(15% 0.000 90)",
+          "oklch(27% 0.000 90)",
+          "oklch(39% 0.000 90)",
+          "oklch(51% 0.000 90)",
+          "oklch(63% 0.000 90)",
+          "oklch(75% 0.000 90)",
+          "oklch(87% 0.000 90)",
+          "oklch(95% 0.000 90)"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Print grey",
+        "canonical": "#5c5f58",
+        "theme": "light",
+        "cssVar": "--ink-muted",
+        "tonalRamp": [
+          "oklch(15% 0.012 126)",
+          "oklch(27% 0.012 126)",
+          "oklch(39% 0.012 126)",
+          "oklch(51% 0.012 126)",
+          "oklch(63% 0.012 126)",
+          "oklch(75% 0.012 126)",
+          "oklch(87% 0.012 126)",
+          "oklch(95% 0.012 126)"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Faded",
+        "canonical": "#6d7068",
+        "theme": "light",
+        "cssVar": "--ink-faint",
+        "tonalRamp": [
+          "oklch(15% 0.013 124)",
+          "oklch(27% 0.013 124)",
+          "oklch(39% 0.013 124)",
+          "oklch(51% 0.013 124)",
+          "oklch(63% 0.013 124)",
+          "oklch(75% 0.013 124)",
+          "oklch(87% 0.013 124)",
+          "oklch(95% 0.013 124)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#d6dbcf",
+        "theme": "light",
+        "cssVar": "--line",
+        "tonalRamp": [
+          "oklch(15% 0.017 125)",
+          "oklch(27% 0.017 125)",
+          "oklch(39% 0.017 125)",
+          "oklch(51% 0.017 125)",
+          "oklch(63% 0.017 125)",
+          "oklch(75% 0.017 125)",
+          "oklch(87% 0.017 125)",
+          "oklch(95% 0.017 125)"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Rule strong",
+        "canonical": "#b9c0b1",
+        "theme": "light",
+        "cssVar": "--line-strong",
+        "tonalRamp": [
+          "oklch(15% 0.022 127)",
+          "oklch(27% 0.022 127)",
+          "oklch(39% 0.022 127)",
+          "oklch(51% 0.022 127)",
+          "oklch(63% 0.022 127)",
+          "oklch(75% 0.022 127)",
+          "oklch(87% 0.022 127)",
+          "oklch(95% 0.022 127)"
+        ]
+      },
+      "lens-general": {
+        "role": "secondary",
+        "displayName": "General amber",
+        "canonical": "#b45309",
+        "theme": "light",
+        "cssVar": "--lens-general",
+        "tonalRamp": [
+          "oklch(15% 0.146 49)",
+          "oklch(27% 0.146 49)",
+          "oklch(39% 0.146 49)",
+          "oklch(51% 0.146 49)",
+          "oklch(63% 0.146 49)",
+          "oklch(75% 0.146 49)",
+          "oklch(87% 0.146 49)",
+          "oklch(95% 0.146 49)"
+        ]
+      },
+      "lens-cyber": {
+        "role": "secondary",
+        "displayName": "Cyber cyan",
+        "canonical": "#0e7490",
+        "theme": "light",
+        "cssVar": "--lens-cyber",
+        "tonalRamp": [
+          "oklch(15% 0.094 223)",
+          "oklch(27% 0.094 223)",
+          "oklch(39% 0.094 223)",
+          "oklch(51% 0.094 223)",
+          "oklch(63% 0.094 223)",
+          "oklch(75% 0.094 223)",
+          "oklch(87% 0.094 223)",
+          "oklch(95% 0.094 223)"
+        ]
+      },
+      "lens-finance": {
+        "role": "secondary",
+        "displayName": "Markets violet",
+        "canonical": "#6d28d9",
+        "theme": "light",
+        "cssVar": "--lens-finance",
+        "tonalRamp": [
+          "oklch(15% 0.241 293)",
+          "oklch(27% 0.241 293)",
+          "oklch(39% 0.241 293)",
+          "oklch(51% 0.241 293)",
+          "oklch(63% 0.241 293)",
+          "oklch(75% 0.241 293)",
+          "oklch(87% 0.241 293)",
+          "oklch(95% 0.241 293)"
+        ]
+      },
+      "lens-general-bg": {
+        "role": "secondary",
+        "displayName": "General tint",
+        "canonical": "#fef3e2",
+        "theme": "light",
+        "cssVar": "--lens-general-bg",
+        "tonalRamp": [
+          "oklch(15% 0.025 79)",
+          "oklch(27% 0.025 79)",
+          "oklch(39% 0.025 79)",
+          "oklch(51% 0.025 79)",
+          "oklch(63% 0.025 79)",
+          "oklch(75% 0.025 79)",
+          "oklch(87% 0.025 79)",
+          "oklch(95% 0.025 79)"
+        ]
+      },
+      "lens-cyber-bg": {
+        "role": "secondary",
+        "displayName": "Cyber tint",
+        "canonical": "#e0f4f8",
+        "theme": "light",
+        "cssVar": "--lens-cyber-bg",
+        "tonalRamp": [
+          "oklch(15% 0.022 211)",
+          "oklch(27% 0.022 211)",
+          "oklch(39% 0.022 211)",
+          "oklch(51% 0.022 211)",
+          "oklch(63% 0.022 211)",
+          "oklch(75% 0.022 211)",
+          "oklch(87% 0.022 211)",
+          "oklch(95% 0.022 211)"
+        ]
+      },
+      "lens-finance-bg": {
+        "role": "secondary",
+        "displayName": "Markets tint",
+        "canonical": "#ede9fe",
+        "theme": "light",
+        "cssVar": "--lens-finance-bg",
+        "tonalRamp": [
+          "oklch(15% 0.028 295)",
+          "oklch(27% 0.028 295)",
+          "oklch(39% 0.028 295)",
+          "oklch(51% 0.028 295)",
+          "oklch(63% 0.028 295)",
+          "oklch(75% 0.028 295)",
+          "oklch(87% 0.028 295)",
+          "oklch(95% 0.028 295)"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Danger",
+        "canonical": "#b91c1c",
+        "theme": "light",
+        "cssVar": "--danger",
+        "tonalRamp": [
+          "oklch(15% 0.190 28)",
+          "oklch(27% 0.190 28)",
+          "oklch(39% 0.190 28)",
+          "oklch(51% 0.190 28)",
+          "oklch(63% 0.190 28)",
+          "oklch(75% 0.190 28)",
+          "oklch(87% 0.190 28)",
+          "oklch(95% 0.190 28)"
+        ]
+      },
+      "up": {
+        "role": "tertiary",
+        "displayName": "Up",
+        "canonical": "#047857",
+        "theme": "light",
+        "cssVar": "--up",
+        "tonalRamp": [
+          "oklch(15% 0.105 166)",
+          "oklch(27% 0.105 166)",
+          "oklch(39% 0.105 166)",
+          "oklch(51% 0.105 166)",
+          "oklch(63% 0.105 166)",
+          "oklch(75% 0.105 166)",
+          "oklch(87% 0.105 166)",
+          "oklch(95% 0.105 166)"
+        ]
+      },
+      "bg-dark": {
+        "role": "neutral",
+        "displayName": "Stationery (dark)",
+        "canonical": "#141613",
+        "theme": "dark",
+        "cssVar": "--bg",
+        "tonalRamp": [
+          "oklch(15% 0.007 135)",
+          "oklch(27% 0.007 135)",
+          "oklch(39% 0.007 135)",
+          "oklch(51% 0.007 135)",
+          "oklch(63% 0.007 135)",
+          "oklch(75% 0.007 135)",
+          "oklch(87% 0.007 135)",
+          "oklch(95% 0.007 135)"
+        ]
+      },
+      "bg-elevated-dark": {
+        "role": "neutral",
+        "displayName": "Elevated (dark)",
+        "canonical": "#1b1e19",
+        "theme": "dark",
+        "cssVar": "--bg-elevated",
+        "tonalRamp": [
+          "oklch(15% 0.010 133)",
+          "oklch(27% 0.010 133)",
+          "oklch(39% 0.010 133)",
+          "oklch(51% 0.010 133)",
+          "oklch(63% 0.010 133)",
+          "oklch(75% 0.010 133)",
+          "oklch(87% 0.010 133)",
+          "oklch(95% 0.010 133)"
+        ]
+      },
+      "bg-sunken-dark": {
+        "role": "neutral",
+        "displayName": "Sunken (dark)",
+        "canonical": "#0f110e",
+        "theme": "dark",
+        "cssVar": "--bg-sunken",
+        "tonalRamp": [
+          "oklch(15% 0.007 135)",
+          "oklch(27% 0.007 135)",
+          "oklch(39% 0.007 135)",
+          "oklch(51% 0.007 135)",
+          "oklch(63% 0.007 135)",
+          "oklch(75% 0.007 135)",
+          "oklch(87% 0.007 135)",
+          "oklch(95% 0.007 135)"
+        ]
+      },
+      "ink-dark": {
+        "role": "primary",
+        "displayName": "Ink (dark)",
+        "canonical": "#ebeee6",
+        "theme": "dark",
+        "cssVar": "--ink",
+        "tonalRamp": [
+          "oklch(15% 0.011 123)",
+          "oklch(27% 0.011 123)",
+          "oklch(39% 0.011 123)",
+          "oklch(51% 0.011 123)",
+          "oklch(63% 0.011 123)",
+          "oklch(75% 0.011 123)",
+          "oklch(87% 0.011 123)",
+          "oklch(95% 0.011 123)"
+        ]
+      },
+      "ink-muted-dark": {
+        "role": "neutral",
+        "displayName": "Print grey (dark)",
+        "canonical": "#a3a79d",
+        "theme": "dark",
+        "cssVar": "--ink-muted",
+        "tonalRamp": [
+          "oklch(15% 0.015 125)",
+          "oklch(27% 0.015 125)",
+          "oklch(39% 0.015 125)",
+          "oklch(51% 0.015 125)",
+          "oklch(63% 0.015 125)",
+          "oklch(75% 0.015 125)",
+          "oklch(87% 0.015 125)",
+          "oklch(95% 0.015 125)"
+        ]
+      },
+      "ink-faint-dark": {
+        "role": "neutral",
+        "displayName": "Faded (dark)",
+        "canonical": "#82867f",
+        "theme": "dark",
+        "cssVar": "--ink-faint",
+        "tonalRamp": [
+          "oklch(15% 0.011 131)",
+          "oklch(27% 0.011 131)",
+          "oklch(39% 0.011 131)",
+          "oklch(51% 0.011 131)",
+          "oklch(63% 0.011 131)",
+          "oklch(75% 0.011 131)",
+          "oklch(87% 0.011 131)",
+          "oklch(95% 0.011 131)"
+        ]
+      },
+      "line-dark": {
+        "role": "neutral",
+        "displayName": "Rule (dark)",
+        "canonical": "#2a2e27",
+        "theme": "dark",
+        "cssVar": "--line",
+        "tonalRamp": [
+          "oklch(15% 0.014 132)",
+          "oklch(27% 0.014 132)",
+          "oklch(39% 0.014 132)",
+          "oklch(51% 0.014 132)",
+          "oklch(63% 0.014 132)",
+          "oklch(75% 0.014 132)",
+          "oklch(87% 0.014 132)",
+          "oklch(95% 0.014 132)"
+        ]
+      },
+      "line-strong-dark": {
+        "role": "neutral",
+        "displayName": "Rule strong (dark)",
+        "canonical": "#3d423a",
+        "theme": "dark",
+        "cssVar": "--line-strong",
+        "tonalRamp": [
+          "oklch(15% 0.015 134)",
+          "oklch(27% 0.015 134)",
+          "oklch(39% 0.015 134)",
+          "oklch(51% 0.015 134)",
+          "oklch(63% 0.015 134)",
+          "oklch(75% 0.015 134)",
+          "oklch(87% 0.015 134)",
+          "oklch(95% 0.015 134)"
+        ]
+      },
+      "lens-general-dark": {
+        "role": "secondary",
+        "displayName": "General amber (dark)",
+        "canonical": "#fbbf24",
+        "theme": "dark",
+        "cssVar": "--lens-general",
+        "tonalRamp": [
+          "oklch(15% 0.164 84)",
+          "oklch(27% 0.164 84)",
+          "oklch(39% 0.164 84)",
+          "oklch(51% 0.164 84)",
+          "oklch(63% 0.164 84)",
+          "oklch(75% 0.164 84)",
+          "oklch(87% 0.164 84)",
+          "oklch(95% 0.164 84)"
+        ]
+      },
+      "lens-cyber-dark": {
+        "role": "secondary",
+        "displayName": "Cyber cyan (dark)",
+        "canonical": "#22d3ee",
+        "theme": "dark",
+        "cssVar": "--lens-cyber",
+        "tonalRamp": [
+          "oklch(15% 0.134 212)",
+          "oklch(27% 0.134 212)",
+          "oklch(39% 0.134 212)",
+          "oklch(51% 0.134 212)",
+          "oklch(63% 0.134 212)",
+          "oklch(75% 0.134 212)",
+          "oklch(87% 0.134 212)",
+          "oklch(95% 0.134 212)"
+        ]
+      },
+      "lens-finance-dark": {
+        "role": "secondary",
+        "displayName": "Markets violet (dark)",
+        "canonical": "#a78bfa",
+        "theme": "dark",
+        "cssVar": "--lens-finance",
+        "tonalRamp": [
+          "oklch(15% 0.159 294)",
+          "oklch(27% 0.159 294)",
+          "oklch(39% 0.159 294)",
+          "oklch(51% 0.159 294)",
+          "oklch(63% 0.159 294)",
+          "oklch(75% 0.159 294)",
+          "oklch(87% 0.159 294)",
+          "oklch(95% 0.159 294)"
+        ]
+      },
+      "lens-general-bg-dark": {
+        "role": "secondary",
+        "displayName": "General tint (dark)",
+        "canonical": "rgba(251, 191, 36, 0.12)",
+        "theme": "dark",
+        "cssVar": "--lens-general-bg"
+      },
+      "lens-cyber-bg-dark": {
+        "role": "secondary",
+        "displayName": "Cyber tint (dark)",
+        "canonical": "rgba(34, 211, 238, 0.12)",
+        "theme": "dark",
+        "cssVar": "--lens-cyber-bg"
+      },
+      "lens-finance-bg-dark": {
+        "role": "secondary",
+        "displayName": "Markets tint (dark)",
+        "canonical": "rgba(167, 139, 250, 0.14)",
+        "theme": "dark",
+        "cssVar": "--lens-finance-bg"
+      },
+      "danger-dark": {
+        "role": "tertiary",
+        "displayName": "Danger (dark)",
+        "canonical": "#f87171",
+        "theme": "dark",
+        "cssVar": "--danger",
+        "tonalRamp": [
+          "oklch(15% 0.166 22)",
+          "oklch(27% 0.166 22)",
+          "oklch(39% 0.166 22)",
+          "oklch(51% 0.166 22)",
+          "oklch(63% 0.166 22)",
+          "oklch(75% 0.166 22)",
+          "oklch(87% 0.166 22)",
+          "oklch(95% 0.166 22)"
+        ]
+      },
+      "up-dark": {
+        "role": "tertiary",
+        "displayName": "Up (dark)",
+        "canonical": "#34d399",
+        "theme": "dark",
+        "cssVar": "--up",
+        "tonalRamp": [
+          "oklch(15% 0.153 163)",
+          "oklch(27% 0.153 163)",
+          "oklch(39% 0.153 163)",
+          "oklch(51% 0.153 163)",
+          "oklch(63% 0.153 163)",
+          "oklch(75% 0.153 163)",
+          "oklch(87% 0.153 163)",
+          "oklch(95% 0.153 163)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display (Teko)",
+        "purpose": "Section heads and the PRISM wordmark; uppercase; never running text."
+      },
+      "display-count": {
+        "displayName": "Display count",
+        "purpose": "The lead row's source count only."
+      },
+      "display-nav": {
+        "displayName": "Display nav",
+        "purpose": "Desktop header links, uppercase, underlined 2px when active."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The lead chart row (22px, 26px at sm)."
+      },
+      "headline-row": {
+        "displayName": "Headline row",
+        "purpose": "Every other chart row; outlet names; form section labels."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "The story headline on the ticket (30/34px; 40px desktop)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Summaries, verbatim quotes, briefs; 14.5–16px; ≤ ~36em–44ch."
+      },
+      "ui-label": {
+        "displayName": "UI label",
+        "purpose": "Field labels above controls; sector names; pill text."
+      },
+      "hint": {
+        "displayName": "Hint",
+        "purpose": "The line under a section head; ticket sub-line; lens board descriptions."
+      },
+      "label": {
+        "displayName": "Label (mono)",
+        "purpose": "The row's label grid, ticket strip, [n] citations, counts. The 11px floor. Tabular numerals."
+      },
+      "mono-dateline": {
+        "displayName": "Mono dateline",
+        "purpose": "Masthead second line; sector codes; branch-tree shape readout."
+      }
+    },
+    "shadows": [],
+    "shadowsNote": "None shipped. --shadow-card / --shadow-pop remain declared in globals.css from the retired world and are referenced by nothing; do not revive.",
+    "motion": [
+      {
+        "name": "flip-scanline",
+        "value": "flipSweep 500ms ease-out forwards (top -2px → 100%, opacity 1 → 0.85; 2px bar in the lens hue)",
+        "purpose": "The signature lens flip: a scan line sweeps the lens block. Never a crossfade. none under prefers-reduced-motion."
+      },
+      {
+        "name": "flip-body",
+        "value": "flipReink 500ms ease-out (opacity 0.25 → 0.55 at 60% → 1)",
+        "purpose": "The lens block re-inks behind the scan line; body text and layout never move. none under reduced motion."
+      },
+      {
+        "name": "chart-print",
+        "value": "180ms cubic-bezier(0.16, 1, 0.3, 1) both; opacity 0 → 1, translateY(4px) → 0; 40ms stagger per row (capped at 240ms)",
+        "purpose": "The chart's rows print in one after another on first paint. none under reduced motion."
+      },
+      {
+        "name": "theme-swap",
+        "value": "background-color 240ms ease, color 240ms ease on body",
+        "purpose": "Light/dark toggle."
+      },
+      {
+        "name": "pulse-skel",
+        "value": "pzPulse 1.2s ease-in-out infinite (opacity 0.45 ↔ 1)",
+        "purpose": "Loading skeleton bars on bg-sunken while a lens brief is written."
+      },
+      {
+        "name": "hover-fade",
+        "value": "opacity 150ms (to 0.85 / 0.80 / 0.70)",
+        "purpose": "Pill buttons, the Ask button and the theme toggle on hover."
+      }
+    ],
+    "focus": [
+      {
+        "name": "focus-ring",
+        "value": "outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px",
+        "purpose": "Global :focus-visible; ink, never a colour."
+      }
+    ],
+    "selection": {
+      "background": "var(--ink)",
+      "color": "var(--bg)"
+    },
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px",
+        "purpose": "Sector names beside codes; header nav text."
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Brand header shows; bottom bar and phone masthead hide; lead image moves beside the headline (400px column)."
+      }
+    ],
+    "containers": [
+      {
+        "name": "shell",
+        "value": "1240px"
+      },
+      {
+        "name": "header",
+        "value": "1280px"
+      },
+      {
+        "name": "form",
+        "value": "720px"
+      },
+      {
+        "name": "ticket-desktop",
+        "value": "1376px field, 136px ledger margin, 604px reading column"
+      }
+    ],
+    "cssVars": {
+      "--glass": "rgba(242, 244, 238, 0.86) light / rgba(20, 22, 19, 0.82) dark",
+      "--scrim": "rgba(15, 14, 12, 0.4)",
+      "--app-header-h": "65px",
+      "--spectrum": "linear-gradient(90deg, #ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #8b5cf6) — declared; the only sanctioned gradient use is the mark's own base bar"
+    },
+    "ruleClasses": {
+      ".rule-live": "border-top: 1px solid var(--line)",
+      ".rule-single": "border-top: 1px dashed var(--line-strong)",
+      ".rule-stale": "border-top: 1px solid var(--line); opacity: 0.6",
+      ".ticket-strip > span + span::before": "content: '·'; margin-right: 0.6em; color: var(--ink-faint)"
+    },
+    "fonts": {
+      "--font-display": "Teko 400/500/600 (next/font/google)",
+      "--font-ui": "Hind 400/500/600/700 (latin, devanagari) → Hind Mysuru (kannada) → Hind Madurai (tamil) → Hind Guntur (telugu) → system-ui",
+      "--font-mono": "Martian Mono 400/500; .font-mono sets font-variant-numeric: tabular-nums"
+    }
+  },
+  "components": [
+    {
+      "name": "Chart row (lead)",
+      "kind": "custom",
+      "refersTo": "chart-row-lead",
+      "description": "The lead row: Teko count, Hind headline with a lens dot, summary, mono label grid, on a solid rule.",
+      "html": "<li class=\"ds-row ds-rule-live\"><a class=\"ds-row-link\" href=\"#\"><span class=\"ds-count ds-count-lead\">49</span><div><h2 class=\"ds-headline ds-headline-lead\">Kangana calls Gen Z protest reels 'puke inducing'<span class=\"ds-dots\"><span class=\"ds-dot\" style=\"background:var(--lens-finance)\"></span></span></h2><p class=\"ds-summary\">BJP MP Kangana Ranaut criticized Gen Z-led protests via social media following their demonstration in New Delhi.</p><div class=\"ds-grid\"><span>IN ×49</span><span>01:26</span><span>POL</span></div></div></a></li>",
+      "css": ".ds-row { list-style: none; font-family: var(--font-ui), system-ui, sans-serif; } .ds-rule-live { border-top: 1px solid var(--line); } .ds-row-link { display: grid; grid-template-columns: 56px 1fr; column-gap: 16px; padding: 20px 0; color: var(--ink); text-decoration: none; } .ds-count { text-align: right; font-variant-numeric: tabular-nums; } .ds-count-lead { font-family: var(--font-display), sans-serif; font-size: 44px; line-height: 0.9; letter-spacing: -0.01em; } .ds-headline { margin: 0; font-weight: 500; text-wrap: balance; } .ds-headline-lead { font-size: 22px; line-height: 1.25; } .ds-row-link:hover .ds-headline, .ds-row-link:focus-visible .ds-headline { text-decoration: underline; text-underline-offset: 4px; } .ds-dots { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; transform: translateY(-1px); } .ds-dot { display: inline-block; width: 7px; height: 7px; border-radius: 9999px; } .ds-summary { margin: 8px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--ink-muted); } .ds-grid { display: flex; flex-wrap: wrap; gap: 0 10px; margin-top: 6px; font-family: var(--font-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); } .ds-row-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Chart row (single-source)",
+      "kind": "custom",
+      "refersTo": "chart-row",
+      "description": "A standard row on a dashed rule: state is line form, the count is faint, '1 source' leads the grid.",
+      "html": "<li class=\"ds-row ds-rule-single\"><a class=\"ds-row-link ds-row-link-std\" href=\"#\"><span class=\"ds-count ds-count-std\">1</span><div><h2 class=\"ds-headline ds-headline-std\">Ministerial aspirants disappointed as Karnataka Cabinet expansion postponed</h2><div class=\"ds-grid\"><span class=\"ds-grid-strong\">1 source</span><span>KA</span><span>00:52</span><span>POL</span></div></div></a></li>",
+      "css": ".ds-row { list-style: none; font-family: var(--font-ui), system-ui, sans-serif; } .ds-rule-single { border-top: 1px dashed var(--line-strong); } .ds-row-link { display: grid; column-gap: 16px; color: var(--ink); text-decoration: none; } .ds-row-link-std { grid-template-columns: 40px 1fr; padding: 14px 0; } .ds-count { text-align: right; font-variant-numeric: tabular-nums; } .ds-count-std { font-family: var(--font-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 13px; line-height: 1.9; color: var(--ink-faint); } .ds-headline { margin: 0; font-weight: 500; } .ds-headline-std { font-size: 15.5px; line-height: 1.4; } .ds-row-link:hover .ds-headline { text-decoration: underline; text-underline-offset: 4px; } .ds-grid { display: flex; flex-wrap: wrap; gap: 0 10px; margin-top: 6px; font-family: var(--font-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); } .ds-grid-strong { color: var(--ink-muted); } .ds-row-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Sector strip",
+      "kind": "nav",
+      "refersTo": "sector-code",
+      "description": "Sticky subject nav: ALL plus six codes in mono, names from sm, active underlined 2px ink.",
+      "html": "<nav class=\"ds-strip\" aria-label=\"Sectors\"><a class=\"ds-code ds-code-on\" href=\"#\"><span class=\"ds-code-m\">ALL</span><span class=\"ds-code-n\">Today</span></a><a class=\"ds-code\" href=\"#\"><span class=\"ds-code-m\">POL</span><span class=\"ds-code-n\">Politics</span></a><a class=\"ds-code\" href=\"#\"><span class=\"ds-code-m\">BIZ</span><span class=\"ds-code-n\">Business</span></a><a class=\"ds-code\" href=\"#\"><span class=\"ds-code-m\">TEC</span><span class=\"ds-code-n\">Tech</span></a></nav>",
+      "css": ".ds-strip { display: flex; gap: 12px; border-bottom: 1px solid var(--line); background: var(--bg); overflow-x: auto; } .ds-code { display: flex; align-items: flex-end; gap: 4px; height: 44px; padding: 12px 8px 8px; border-bottom: 2px solid transparent; color: var(--ink-muted); text-decoration: none; line-height: 1; transition: border-color 150ms; } .ds-code-on { border-bottom-color: var(--ink); color: var(--ink); } .ds-code:hover { color: var(--ink); } .ds-code-m { font-family: var(--font-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; letter-spacing: 0.06em; } .ds-code-n { font-family: var(--font-ui), system-ui, sans-serif; font-size: 13.5px; font-weight: 500; } .ds-code:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Section head",
+      "kind": "custom",
+      "refersTo": "section-head",
+      "description": "Teko uppercase head on a hairline, count in mono, hint beneath.",
+      "html": "<div class=\"ds-sh\"><h2 class=\"ds-sh-t\">Today<span class=\"ds-sh-c\">60</span></h2><p class=\"ds-sh-h\">One story. Every perspective.</p></div>",
+      "css": ".ds-sh { border-top: 1px solid var(--line); padding-top: 16px; margin-bottom: 16px; } .ds-sh-t { margin: 0; font-family: var(--font-display), sans-serif; font-size: 26px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1; color: var(--ink); } .ds-sh-c { margin-left: 8px; font-family: var(--font-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 400; letter-spacing: 0.06em; color: var(--ink-faint); } .ds-sh-h { margin: 6px 0 0; max-width: 36em; font-family: var(--font-ui), system-ui, sans-serif; font-size: 12.5px; color: var(--ink-faint); }"
+    },
+    {
+      "name": "Header nav",
+      "kind": "nav",
+      "refersTo": "nav-header-link",
+      "description": "Desktop header: wordmark, Teko uppercase links underlined when active, one primary pill.",
+      "html": "<header class=\"ds-hdr\"><a class=\"ds-wm\" href=\"#\"><svg width=\"21\" height=\"19\" viewBox=\"0 0 24 22\" fill=\"none\" aria-hidden=\"true\"><path d=\"M12 1 L23 21 L1 21 Z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/><rect x=\"1\" y=\"19\" width=\"22\" height=\"3\" fill=\"url(#ds-spec)\"/><defs><linearGradient id=\"ds-spec\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0%\" stop-color=\"#ef4444\"/><stop offset=\"35%\" stop-color=\"#f59e0b\"/><stop offset=\"70%\" stop-color=\"#06b6d4\"/><stop offset=\"100%\" stop-color=\"#8b5cf6\"/></linearGradient></defs></svg><span class=\"ds-wm-t\">PRISM</span></a><nav class=\"ds-nav\"><a class=\"ds-nl ds-nl-on\" href=\"#\">Today</a><a class=\"ds-nl\" href=\"#\">Trending</a><a class=\"ds-nl\" href=\"#\">Pulse</a><a class=\"ds-nl\" href=\"#\">Watchlist</a><a class=\"ds-pill\" href=\"#\">Pick your sectors</a></nav></header>",
+      "css": ".ds-hdr { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(12px); } .ds-wm { display: flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; } .ds-wm-t { font-family: var(--font-display), sans-serif; font-size: 26px; line-height: 1; letter-spacing: 0.01em; } .ds-nav { display: flex; align-items: center; gap: 16px; } .ds-nl { font-family: var(--font-display), sans-serif; font-size: 18px; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1; padding: 4px 4px 2px; border-bottom: 2px solid transparent; color: var(--ink-muted); text-decoration: none; } .ds-nl-on { color: var(--ink); border-bottom-color: var(--ink); } .ds-nl:hover { color: var(--ink); } .ds-pill { font-family: var(--font-ui), system-ui, sans-serif; font-size: 13px; font-weight: 600; padding: 8px 18px; border-radius: 9999px; background: var(--ink); color: var(--bg); text-decoration: none; white-space: nowrap; transition: opacity 150ms; } .ds-pill:hover { opacity: 0.85; } .ds-nl:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; } .ds-pill:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one pill action per page: ink fill, ground text.",
+      "html": "<button class=\"ds-btn-primary\">Sign in to unlock</button>",
+      "css": ".ds-btn-primary { font-family: var(--font-ui), system-ui, sans-serif; font-size: 13px; font-weight: 600; padding: 8px 16px; border: 0; border-radius: 9999px; background: var(--ink); color: var(--bg); cursor: pointer; transition: opacity 150ms; } .ds-btn-primary:hover { opacity: 0.85; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Secondary button / chip",
+      "kind": "chip",
+      "refersTo": "button-secondary",
+      "description": "Square, 1px line-strong border, no radius. Selected fills bg-sunken with an ink border.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\" aria-pressed=\"false\">Elections</button><button class=\"ds-chip ds-chip-on\" aria-pressed=\"true\">Parliament</button><button class=\"ds-chip\" aria-pressed=\"false\">Courts</button></div>",
+      "css": ".ds-chips { display: flex; flex-wrap: wrap; gap: 8px; } .ds-chip { font-family: var(--font-ui), system-ui, sans-serif; font-size: 13px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 0; background: transparent; color: var(--ink-muted); cursor: pointer; transition: border-color 150ms, background 150ms, color 150ms; } .ds-chip:hover { color: var(--ink); } .ds-chip-on { border-color: var(--ink); background: var(--bg-sunken); color: var(--ink); } .ds-chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Lens tabs",
+      "kind": "chip",
+      "refersTo": "lens-tab-selected",
+      "description": "The one coloured pill: selected tab wears the lens tint, hue text and a 1.5px inset ring; a locked tab is faint with a stroke padlock.",
+      "html": "<div class=\"ds-lenses\" role=\"tablist\"><button class=\"ds-lens\" role=\"tab\" aria-selected=\"false\">Reader</button><button class=\"ds-lens ds-lens-on\" role=\"tab\" aria-selected=\"true\" style=\"--l:var(--lens-finance);--lb:var(--lens-finance-bg)\">Markets</button><button class=\"ds-lens ds-lens-locked\" role=\"tab\" aria-selected=\"false\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><rect x=\"5\" y=\"11\" width=\"14\" height=\"9\" rx=\"2\" stroke=\"currentColor\" stroke-width=\"2.2\"/><path d=\"M8 11V8a4 4 0 0 1 8 0v3\" stroke=\"currentColor\" stroke-width=\"2.2\"/></svg>Cyber</button><span class=\"ds-lens-hint\">Press 1 · 2 · 3</span></div>",
+      "css": ".ds-lenses { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line); } .ds-lens { display: flex; align-items: center; gap: 4px; font-family: var(--font-ui), system-ui, sans-serif; font-size: 12px; font-weight: 600; padding: 6px 14px; border: 0; border-radius: 9999px; background: transparent; color: var(--ink-muted); cursor: pointer; white-space: nowrap; transition: background 150ms, color 150ms; } .ds-lens:hover { color: var(--ink); } .ds-lens-on { background: var(--lb); color: var(--l); box-shadow: inset 0 0 0 1.5px var(--l); } .ds-lens-locked { color: var(--ink-faint); } .ds-lens-hint { margin-left: auto; padding-left: 16px; font-family: var(--font-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); } .ds-lens:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Field with input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label above, hint prose, a square h-12 control on bg-elevated with a line-strong border; the field itself sits on a hairline.",
+      "html": "<div class=\"ds-field\"><p class=\"ds-field-l\">What you do</p><p class=\"ds-field-h\">Your profession picks how stories are read for you. Every other read stays one tap away.</p><select class=\"ds-input\" aria-label=\"Your profession\"><option>Choose your profession…</option><option>Equity analyst</option></select></div>",
+      "css": ".ds-field { font-family: var(--font-ui), system-ui, sans-serif; border-top: 1px solid var(--line); padding: 24px 0; } .ds-field-l { margin: 0; font-size: 13.5px; font-weight: 500; color: var(--ink); } .ds-field-h { margin: 4px 0 0; max-width: 52ch; font-size: 13.5px; line-height: 1.55; color: var(--ink-muted); } .ds-input { display: block; width: 100%; height: 48px; margin-top: 12px; padding: 0 16px; font-family: var(--font-ui), system-ui, sans-serif; font-size: 16px; border: 1px solid var(--line-strong); border-radius: 0; background: var(--bg-elevated); color: var(--ink); outline: none; } .ds-input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "Bottom tab bar",
+      "kind": "nav",
+      "refersTo": "bottom-tab",
+      "description": "Five equal columns, 19px stroke icons over 11px labels; active is ink at 600.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Primary\"><a class=\"ds-tab ds-tab-on\" href=\"#\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 5h16M4 12h16M4 19h10\"/></svg>Today</a><a class=\"ds-tab\" href=\"#\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 17l6-6 4 4 8-8\"/><path d=\"M14 7h7v7\"/></svg>Trending</a><a class=\"ds-tab\" href=\"#\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12h4l3-7 4 14 3-7h4\"/></svg>Pulse</a><a class=\"ds-tab\" href=\"#\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M21 21l-4.3-4.3\"/></svg>Search</a><a class=\"ds-tab\" href=\"#\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6\"/></svg>You</a></nav>",
+      "css": ".ds-tabs { display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 0; border-top: 1px solid var(--line); background: var(--bg); } .ds-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font-family: var(--font-ui), system-ui, sans-serif; font-size: 11px; font-weight: 500; color: var(--ink-muted); text-decoration: none; } .ds-tab-on { color: var(--ink); font-weight: 600; } .ds-tab:hover { color: var(--ink); } .ds-tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Reservation Chart",
+    "overview": "**Creative North Star: \"The Reservation Chart\"**\n\nThe day's news is the reservation chart pinned at the platform: one public list,\nevery name on it, read the same way by everyone, re-sorted rather than rewritten\nwhen the reader changes how they read. The ground is pale continuous stationery,\nthe ink is one black, and the structure is a strict table of hairlines, codes and\ncounts. Nothing is decorated; the evidence is the design. The number at the left\nof a row is how many outlets reported it, the code is the subject, and the label\ngrid beneath is the same three facts in the same order on every row.\n\nThe system is dense but never crowded: rows are 14px apart on 1px rules, the lead\nrow is set large, and the page is one column at every width. Colour is absent\nfrom chrome so that when it appears it means exactly one thing: a professional\nlens is speaking. State is carried by line form (solid, dashed, half-weight),\nnever hue. Confirmed rejections: the category default of a cream broadsheet with\na serif lead and cards beneath; perforations, dot-matrix faces and distressing;\na marketing hero on the chart.",
+    "keyCharacteristics": [
+      "One ink, three greys, one rule colour; the three lens hues are the only colour.",
+      "Three voices: Teko for structure, Hind (six scripts) for reading, Martian Mono for provenance.",
+      "Hairlines for structure, no cards, no shadows, no gradients in chrome.",
+      "Counts are printed as counts; quotes are verbatim; single-source rows sit on a dashed rule.",
+      "One signature motion (the lens flip) plus one authored entrance (the chart printing)."
+    ],
+    "rules": [
+      {
+        "name": "The Lens Speaks Rule",
+        "body": "Chrome is monochrome. Colour only ever means a lens is speaking; anything coloured that is not lens-semantic is re-inked to the neutral scale.",
+        "section": "colors"
+      },
+      {
+        "name": "The Line Form Rule",
+        "body": "State is line form, never hue: solid 1px rule = live, multi-source; dashed 1px `line-strong` = single-source; solid at 60% opacity = stale. No badge, no colour, no icon says these things.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Gradient Rule",
+        "body": "The mark's own spectrum base (a 3-unit bar under the triangle) is the only gradient on any surface. No spectrum hairline above the header, no gradient text.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Jobs Rule",
+        "body": "Teko never sets running text; Martian Mono never sets prose or a heading; Hind sets everything a reader reads. A word in the wrong voice is a bug.",
+        "section": "typography"
+      },
+      {
+        "name": "The 11px Floor Rule",
+        "body": "No functional mono label below 11px; no body below 14.5px; 4.5:1 minimum on both grounds. `ink-faint` was moved from #8a8d85 (3.0:1) to #6d7068 for exactly this reason.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Shadow Rule",
+        "body": "A box-shadow on a chrome element is a defect. `--shadow-card` and `--shadow-pop` survive in `globals.css` from the old world and are used by nothing; do not revive them.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep chrome monochrome; colour on a surface means a lens is speaking, and only the 7px dot, the selected lens tab, the scan line and the form's \"Reads as\" dot may carry it.",
+      "Do carry state as line form: solid 1px `line` for live, dashed 1px `line-strong` for single-source, the solid rule at 60% opacity for stale. Never hue.",
+      "Do print counted structure as counts (sources, stories, developments, branches, quotes) in the provenance voice; never let an LLM summarise what can be counted.",
+      "Do quote verbatim or not at all; every quote carries `[n] · outlet · date` in mono 11px and `[n]` is the same index the sources list uses.",
+      "Do mark every written example ILLUSTRATION in mono; no invented numbers on any surface.",
+      "Do render whatever `/api/v1/lenses` returns; lens names are data, never enumerated in generic or marketing copy. The tagline is \"One story. Every perspective.\"",
+      "Do put every unit on a top hairline with its own padding: rows `py-3.5`, lead `py-5`, section heads `pt-4`, fields `pt-6 pb-6`.",
+      "Do hold the floors: 11px for functional mono labels, 14.5px for body, 16px inside inputs, 4.5:1 on both grounds, measures ≤ ~36em for hints and ≤ 44ch for prose.",
+      "Do ration the pill to lens tabs and one primary action per page; every other choice is a square 1px `line-strong` button or an underlined tab.",
+      "Do collapse every animation to nothing under `prefers-reduced-motion`, including the flip and the chart print."
+    ],
+    "donts": [
+      "Don't put an eyebrow, kicker or label above a heading; the heading carries its own weight and the subject lives in the label grid.",
+      "Don't draw a card: no bordered-and-shadowed box around content already separated by a rule. No shadows, no gradients in chrome; the mark's base is the only spectrum.",
+      "Don't put a thumbnail on every row; the lead's image appears only when the story has one, never a placeholder.",
+      "Don't use \"Other\" as a heading; six subjects, every story in one of them.",
+      "Don't add a global lens switcher to the header or the tab bar; the lens is set in the form and flipped on the ticket.",
+      "Don't crossfade the lens block, and don't move body text or layout during the flip.",
+      "Don't put a marketing hero on the chart; `/feed` is always the list, and `/about` is the landing's permanent address.",
+      "Don't infinite-scroll; the day is the unit and yesterday's chart is a link at the foot.",
+      "Don't use text glyphs (↗ ▲ ▼ ↳ ▾) as icons; use the stroke set in `icons.tsx`.",
+      "Don't set running text in Teko, or prose or a heading in Martian Mono.",
+      "Don't use perforations, a dot-matrix face, or distressing; the chart is printed stationery, not a costume of one."
+    ]
+  }
+}

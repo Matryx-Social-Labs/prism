@@ -24,9 +24,9 @@ at once (c244aa6), which is why a half-built dev looks worse than either end sta
 | 5 | Pulse `/pulse` | DONE (this commit) | dated supplement, markets hue marks the read, tickers → watchlist rows (signed in) or search |
 | 7 | Watchlist `/watchlist` | DONE (this commit) | a chart of the reader's signals, ticker in the count column, ?ticker= narrows; StoryCard retired |
 | 10 | Sign-in / unlock — the paywall moment | DONE (this commit) | the unlock sheet was already re-set with the ticket (9d8b026); sign-in, account and the arc page's headings follow. Left for the finish review: AskPanel's chrome (mechanics untouched per the brief), /label (internal tool) |
-| F | Finish — impeccable-finish-reviewer, `impeccable detect`, /design-review, documenter → new DESIGN.md | NOT STARTED | DESIGN.md still describes the old world; it is rewritten last, from the shipped artifact |
+| F | Finish — detector, finish review, documenter → new DESIGN.md | DONE (this commit) | detector clean at 390/1440 on every surface; finish review: fix → fix → **ship** (scoped to the fix list); DESIGN.md + `.impeccable/design.json` rewritten from the shipped build; CLAUDE.md core rules synced. Left for a later pass: /label (internal tool), the orphaned 3D hero files, unused CSS leftovers (`--shadow-*`, `.spectrum-*`, `.beam-*`, `.stagger`) |
 
-Order: F. Checkpoint (commit + preview) after each row.
+All rows done on `dev`; nothing promoted. Next: founder review on the preview, then `make promote`. Checkpoint (commit + preview) after each row.
 
 
 Deferred work captured from the CEO plan review (2026-07-19, freemium lens model).
