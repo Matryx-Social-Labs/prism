@@ -89,7 +89,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
   }
   const upLanes = used.branch.length, downLanes = used.line.length;
   const ySat = yMain + (downLanes ? 84 + (downLanes - 1) * 62 + 86 : 96);
-  const reach = Math.max(x0 + gap * (trunk.length - 1) + (compact ? 140 : 320), ...[...used.branch, ...used.line].flat().map(([, b]) => b + 60), compact || !shape.satellites.length ? 0 : x0 + Math.min(5, shape.satellites.length) * SAT_GAP + (shape.satellites.length > 5 ? 100 : 0));
+  const reach = Math.max(x0 + gap * (trunk.length - 1) + (compact ? 140 : 320), ...[...used.branch, ...used.line].flat().map(([, b]) => b + 60), compact || !shape.satellites.length ? 0 : x0 + Math.min(5, shape.satellites.length) * SAT_GAP);
   const W = reach;
   const H = compact ? (downLanes ? 210 + (downLanes - 1) * 62 : 170) : ySat + (shape.satellites.length ? 60 : 10);
   const yTop = upLanes ? -(upLanes - 1) * 48 : 40;
@@ -236,8 +236,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
           {/* satellites */}
           {!compact && shape.satellites.length > 0 && (
             <g>
-              <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc">Also reported, off the main line</text>
-              {shape.satellites.length > 5 && <text x={x0 + 5 * SAT_GAP - 30} y={ySat + 4} className="rm-k rm-k-lc">+{shape.satellites.length - 5} more, in the list</text>}
+              <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc">Also reported, off the main line{shape.satellites.length > 5 ? ` · ${shape.satellites.length - 5} more in the list` : ""}</text>
               {shape.satellites.slice(0, 5).map((s, i) => {
                 const cx = x0 + i * SAT_GAP;
                 return (
