@@ -1,23 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
-
-import { timeAgo } from "@/components/StoryCard";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Masthead } from "@/components/Masthead";
+import { SectionHead } from "@/components/SectionHead";
+import { istDate, shortDate } from "@/lib/dateline";
+import { sectorCode } from "@/lib/sectors";
 import { useSession } from "@/lib/session";
-import {
-  follow,
-  getWatchlist,
-  unfollow,
-  watchlistEvents,
-  type WatchEvent,
-  type WatchItem,
-} from "@/lib/watchlist";
+import { follow, getWatchlist, unfollow, watchlistEvents, type WatchEvent, type WatchItem } from "@/lib/watchlist";
 
-export default function WatchlistPage() {
+/**
+ * Watchlist (shape brief §7): a chart of the reader's followed tickers and
+ * sectors. Rows are stories that mention them, the ticker in mono at the left
+ * where the chart keeps its sources count. Empty: the form to follow one.
+ * `?ticker=X` (from Market Pulse) narrows the rows to one ticker.
+ */
+const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+
+function WatchlistInner() {
   const session = useSession();
   const router = useRouter();
+  const only = useSearchParams().get("ticker");
   const [items, setItems] = useState<WatchItem[]>([]);
   const [events, setEvents] = useState<WatchEvent[]>([]);
   const [kind, setKind] = useState("ticker");
@@ -58,115 +62,79 @@ export default function WatchlistPage() {
     setEvents(await watchlistEvents(session));
   }
 
+  const rows = useMemo(() => (only ? events.filter((e) => e.tickers.includes(only)) : events), [events, only]);
+
   if (!session) return null;
 
-  return (
-    <div className="mx-auto w-full max-w-[640px] px-8 pt-11 pb-24">
-      <h1 className="text-[30px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-        Followed signals
-      </h1>
-      <p className="mt-2 text-[14px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-        Follow tickers and sectors; their market-moving stories collect here when you open Prism.
-      </p>
+  const dateline = `${istDate(new Date())} · ${items.length} followed`;
 
-      <form onSubmit={add} className="mt-[22px] flex gap-2">
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value)}
-          className="rounded-[10px] border px-3.5 py-2.5 text-[14px]"
-          style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
-        >
+  return (
+    <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
+      <Masthead dateline={dateline} />
+      <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">Watchlist</h1>
+
+      {items.length > 0 && (
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {items.map((it) => (
+            <li key={it.id} className="inline-flex items-center gap-2 border px-3 py-1.5 font-mono text-[12px]" style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}>
+              {it.value}
+              <button onClick={() => remove(it)} aria-label={`Unfollow ${it.value}`} style={{ color: "var(--ink-faint)" }}>✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form onSubmit={add} className="rule-live mt-4 flex flex-wrap gap-2 py-4">
+        <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="What to follow"
+          className="h-12 border px-3 text-[15px]" style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}>
           <option value="ticker">Ticker</option>
           <option value="sector">Sector</option>
         </select>
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+        <input value={value} onChange={(e) => setValue(e.target.value)} aria-label={kind === "ticker" ? "Ticker" : "Sector"}
           placeholder={kind === "ticker" ? "e.g. RELIANCE" : "e.g. finance"}
-          className="flex-1 rounded-[10px] border px-3.5 py-2.5 text-[14px] outline-none"
-          style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
-        />
-        <button
-          type="submit"
-          className="rounded-full px-5 py-2.5 text-[13px] font-semibold"
-          style={{ background: "var(--ink)", color: "var(--bg)" }}
-        >
-          Follow
-        </button>
+          className="h-12 min-w-0 flex-1 border px-4 text-[15px] outline-none" style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }} />
+        <button type="submit" className="rounded-full px-5 text-[14px] font-semibold" style={{ background: "var(--ink)", color: "var(--bg)" }}>Follow</button>
       </form>
 
-      {items.length > 0 && (
-        <div className="mt-3.5 flex flex-wrap gap-2">
-          {items.map((it) => (
-            <span
-              key={it.id}
-              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11.5px]"
-              style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
-            >
-              {it.kind === "sector" ? it.value : `$${it.value}`}
-              <button onClick={() => remove(it)} aria-label={`Unfollow ${it.value}`} style={{ color: "var(--ink-faint)" }}>
-                ✕
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <h2
-        className="mt-9 text-[12px] font-semibold uppercase tracking-[0.14em]"
-        style={{ color: "var(--ink-faint)" }}
-      >
-        Recent on your signals
-      </h2>
-      {ready && events.length === 0 ? (
-        <p className="mt-2 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          {items.length === 0
-            ? "Follow a ticker or sector above to start seeing its stories."
-            : "No recent stories on your followed signals yet."}
-        </p>
-      ) : (
-        <div className="mt-2 flex flex-col">
-          {events.map((ev) => {
-            const isTicker = ev.tickers.length > 0;
-            return (
-              <Link
-                key={ev.id}
-                href={`/story/${ev.id}`}
-                className="flex items-baseline gap-[14px] border-b py-3.5"
-                style={{ borderColor: "var(--line)" }}
-              >
-                {isTicker ? (
-                  <span
-                    className="flex-none rounded-full px-[9px] py-0.5 font-mono text-[11px] font-semibold"
-                    style={{ background: "var(--lens-finance-bg)", color: "var(--lens-finance)" }}
-                  >
-                    ${ev.tickers[0]}
-                  </span>
-                ) : ev.sector ? (
-                  <span
-                    className="flex-none rounded-full px-[9px] py-0.5 text-[11px] font-semibold"
-                    style={{ background: "var(--bg-sunken)", color: "var(--ink-muted)" }}
-                  >
-                    {ev.sector}
-                  </span>
-                ) : null}
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-semibold leading-[1.4]">{ev.title}</p>
-                  <p className="mt-[3px] font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-                    {timeAgo(ev.last_updated_at)}
-                    {ev.catalyst && (
-                      <>
-                        {" · "}
-                        <span style={{ color: "var(--up)" }}>▲ {ev.catalyst.replaceAll("_", " ")}</span>
-                      </>
-                    )}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <section className="mt-6" aria-labelledby="rows-title">
+        <SectionHead id="rows-title" title={only ? `On ${only}` : "On your signals"} count={ready ? rows.length : undefined} />
+        {only && (
+          <Link href="/watchlist" className={`${MONO} mb-3 inline-block underline-offset-4 hover:underline`} style={{ color: "var(--ink-muted)" }}>All signals →</Link>
+        )}
+        {ready && rows.length === 0 ? (
+          <p className="text-[15px]" style={{ color: "var(--ink-muted)" }}>
+            {items.length === 0 ? "Follow a ticker or sector above and its stories collect here." : only ? `No recent stories mention ${only}.` : "No recent stories on your signals yet."}
+          </p>
+        ) : (
+          <ol className="chart-print">
+            {rows.map((ev) => {
+              const mark = ev.tickers[0] ?? (ev.sector ? sectorCode(ev.sector) : "");
+              const grid = [shortDate(ev.last_updated_at), sectorCode(ev.sector) || null, ev.catalyst?.replaceAll("_", " ") ?? null].filter((x): x is string => Boolean(x));
+              return (
+                <li key={ev.id} className="rule-live">
+                  <Link href={`/story/${ev.id}`} className="group grid grid-cols-[88px_1fr] gap-x-4 py-3.5">
+                    <span className="truncate font-mono text-[12px] leading-[1.9]" style={{ color: "var(--ink)" }}>{mark}</span>
+                    <span className="min-w-0">
+                      <span className="block text-[15.5px] font-medium leading-[1.4] group-hover:underline underline-offset-4" style={{ color: "var(--ink)" }}>{ev.title}</span>
+                      <span className={`${MONO} mt-1.5 flex flex-wrap gap-x-2.5`} style={{ color: "var(--ink-faint)" }}>
+                        {grid.map((g) => <span key={g}>{g}</span>)}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
     </div>
+  );
+}
+
+export default function WatchlistPage() {
+  return (
+    <Suspense fallback={null}>
+      <WatchlistInner />
+    </Suspense>
   );
 }

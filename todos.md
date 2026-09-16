@@ -21,12 +21,12 @@ at once (c244aa6), which is why a half-built dev looks worse than either end sta
 | 6 | Search `/search` | DONE dc44247 | query on the masthead's second line, ChartRows, strip filters in place |
 | 8 | You `/you` — the reservation form | DONE (this commit) | ReservationForm: state · languages · profession → lens · six subjects with beats; /interests redirects here; YouDesktop retired |
 | 9 | Onboarding `/onboarding` | DONE (this commit) | the same fields in three steps |
-| 5 | Pulse `/pulse` | NOT STARTED | waits on markets inventory (see memory: 3 % of events carry a ticker) |
-| 7 | Watchlist `/watchlist` | NOT STARTED | |
+| 5 | Pulse `/pulse` | DONE (this commit) | dated supplement, markets hue marks the read, tickers → watchlist rows (signed in) or search |
+| 7 | Watchlist `/watchlist` | DONE (this commit) | a chart of the reader's signals, ticker in the count column, ?ticker= narrows; StoryCard retired |
 | 10 | Sign-in / unlock — the paywall moment | NOT STARTED | |
 | F | Finish — impeccable-finish-reviewer, `impeccable detect`, /design-review, documenter → new DESIGN.md | NOT STARTED | DESIGN.md still describes the old world; it is rewritten last, from the shipped artifact |
 
-Order: 5/7 → 10 → F. Checkpoint (commit + preview) after each row.
+Order: 10 → F. Checkpoint (commit + preview) after each row.
 
 
 Deferred work captured from the CEO plan review (2026-07-19, freemium lens model).
