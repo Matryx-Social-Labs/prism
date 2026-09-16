@@ -25,9 +25,13 @@ const display = Teko({
 // one sit on the same page without a fallback seam — the browser falls through
 // the stack per glyph. Headlines, body, quotes: everything a reader reads.
 const ui = Hind({ subsets: ["latin", "devanagari"], weight: ["400", "500", "600", "700"], variable: "--font-hind" });
-const uiKannada = Hind_Mysuru({ subsets: ["kannada"], weight: ["400", "500", "600"], variable: "--font-hind-kn" });
-const uiTamil = Hind_Madurai({ subsets: ["tamil"], weight: ["400", "500", "600"], variable: "--font-hind-ta" });
-const uiTelugu = Hind_Guntur({ subsets: ["telugu"], weight: ["400", "500", "600"], variable: "--font-hind-te" });
+// next/font has no metrics table for the Indic siblings, so it cannot size a
+// fallback face to them and logs "Failed to find font override values" on
+// every build. Off explicitly: these families only ever set a line or two of
+// a non-Latin headline, so the shift a sized fallback prevents is negligible.
+const uiKannada = Hind_Mysuru({ subsets: ["kannada"], weight: ["400", "500", "600"], variable: "--font-hind-kn", adjustFontFallback: false });
+const uiTamil = Hind_Madurai({ subsets: ["tamil"], weight: ["400", "500", "600"], variable: "--font-hind-ta", adjustFontFallback: false });
+const uiTelugu = Hind_Guntur({ subsets: ["telugu"], weight: ["400", "500", "600"], variable: "--font-hind-te", adjustFontFallback: false });
 
 // Provenance ONLY: source counts, times, origins, codes, [n], tickers, CVE ids.
 // Tabular by design. Never prose, never a heading.
