@@ -101,7 +101,13 @@ Sources: `PRODUCT.md`, the rebuild plan, `todos.md`, `api/routes/*`, `web/src/li
 4. **Where Ask lives**: a docked panel on the ticket (now), a sheet on the phone (now), and whether the landing shows it as a real interactive demo on a real story (possible: it works on any event) or a written exchange (now).
 5. **Titles across surfaces**: chart row = title; trending row = story label; ticket = title + story label? One rule.
 
-## 8. Proposed page map (for the founder to edit)
+## 8. Page map, decided (2026-09-17)
+
+Founder decisions: 1 (b) Prism-written headline, labelled; 2 the ticket shows this event's place
+on the route (my proposal, to iterate); 3 So what and coverage back on the ticket; 4 Ask on the
+landing as an animated exchange; 5 planned features as "Being built next" sections.
+The HTML designs for every page are in
+`~/.gstack/projects/Matryx-Social-Labs-prism/designs/pages-20260917/` (open `index.html`).
 
 | Page | Contains | Reached from / leads to |
 |---|---|---|
