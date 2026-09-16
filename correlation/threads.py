@@ -481,7 +481,8 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
         await session.execute(
             text(
                 """
-                SELECT e.id, e.title, e.sector, e.occurred_at, e.last_updated_at, e.image_url
+                SELECT e.id, e.title, e.sector, e.occurred_at, e.last_updated_at, e.image_url,
+                       COALESCE((e.projection->>'source_count')::int, 1) AS source_count
                 FROM events e WHERE e.id = ANY(CAST(:ids AS uuid[]))
                 """
             ),
@@ -534,6 +535,8 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
                 "image_url": e["image_url"],
                 "is_current": str(e["id"]) == str(seed),
                 "why": why.get(str(e["id"])),
+                # The route map weighs a station by how many outlets filed it.
+                "source_count": e["source_count"],
             }
             for e in events
         ),

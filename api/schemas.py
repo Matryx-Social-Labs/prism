@@ -242,6 +242,8 @@ class StoryDevelopmentOut(BaseModel):
     # The causal note from event_links, rendered as "↳ {why}" under the
     # development it explains. 563 usable notes in production.
     why: str | None = None
+    # How many outlets filed this development: the station's weight on the route map.
+    source_count: int = 1
 
 
 class BranchNodeOut(BaseModel):

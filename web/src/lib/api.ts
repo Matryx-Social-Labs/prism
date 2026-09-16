@@ -126,6 +126,7 @@ export interface StoryDevelopment {
   image_url: string | null;
   is_current: boolean;
   why: string | null;
+  source_count?: number; // the station's weight on the route map; older payloads omit it
 }
 export interface StoryTimelineData {
   developments: StoryDevelopment[];

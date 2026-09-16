@@ -3,7 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
+import { Attention } from "@/components/Attention";
 import { BranchTree } from "@/components/BranchTree";
+import { RouteMap } from "@/components/RouteMap";
+import { SectionHead } from "@/components/SectionHead";
 import { StoryTimeline } from "@/components/StoryTimeline";
 import { ShareButton } from "@/components/ShareButton";
 
@@ -46,46 +49,52 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
   // Merged story → the request slug resolved to a canonical one; move the URL there.
   if (s.canonical_slug !== slug) redirect(`/trending/${s.canonical_slug}`);
 
+  const tree = s.branches && s.branches.nodes.length > 0 ? s.branches : null;
+  const shape = tree ? `${tree.shape.developments} developments · ${tree.shape.branches} branches · ${tree.shape.satellites} satellites` : `${s.developments.length} developments`;
+
   return (
-    <div className="mx-auto max-w-[820px] px-5 pb-24 pt-8 sm:px-8">
-      <Link href="/trending" className="mb-5 block text-[12.5px] font-semibold" style={{ color: "var(--ink-faint)" }}>
-        ← Trending
-      </Link>
-
-      <p
-        className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-        style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono), monospace" }}
-      >
-        Trending · {s.source_count} outlets · {s.velocity > 0 ? "developing now" : "developing"}
-      </p>
-      <h1 className="mt-2 text-[28px] font-medium leading-[1.2] text-balance sm:text-[34px]">
-        {s.label}
-      </h1>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} />
-        {s.cast.slice(0, 4).map((c) => (
-          <span
-            key={c}
-            className="rounded-full border px-3 py-1 text-[12.5px]"
-            style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
-          >
-            {c}
-          </span>
-        ))}
+    <div className="mx-auto max-w-[1240px] px-5 pb-24 pt-4 sm:px-8 lg:pb-16">
+      {/* The strip: what is true of the whole story */}
+      <div className="rule-live flex flex-wrap gap-x-3 pt-3 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>
+        <span>{s.sector ?? "story"}</span><span>· {shape}</span><span>· {s.source_count} outlets</span>{s.velocity > 0 && <span style={{ color: "var(--ink)" }}>· moving</span>}
       </div>
+      <h1 className="mt-2 text-[26px] font-medium leading-[1.2] text-balance sm:text-[32px] lg:max-w-[30ch]">{s.label}</h1>
+      <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>
+        Story headline · from {s.developments.length} developments
+      </p>
 
-      <div className="mt-8">
-        {/* The tree REPLACES the flat timeline rather than sitting beside it: in
-            TRUNK it renders as that same flat list, so a reader who doesn't care
-            about structure loses nothing and gains one counted line. Storylines
-            that predate the current partition run carry no tree — those keep the
-            old timeline. */}
-        {s.branches && s.branches.nodes.length > 0 ? (
-          <BranchTree tree={s.branches} developments={s.developments} />
-        ) : (
-          <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
-        )}
+      {/* The route: the whole story as the rail map, then the attention curve on request */}
+      {tree ? (
+        <section className="mt-6" aria-labelledby="route-title">
+          <SectionHead id="route-title" title="The route" hint="Every development on its line: the main line, its branches, the branch lines that grew their own stations, and what was reported off the main line. Tap a station." />
+          <RouteMap tree={tree} developments={s.developments} />
+          <Attention tree={tree} developments={s.developments} />
+        </section>
+      ) : null}
+
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,720px)_1fr] lg:gap-16">
+        <div>
+          <SectionHead id="list-title" title="Every station, as a list" count={s.developments.length} />
+          {tree ? (
+            <BranchTree tree={tree} developments={s.developments} />
+          ) : (
+            <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
+          )}
+        </div>
+        <aside>
+          <SectionHead id="cast-title" title="Who is in it" count={s.cast.length} />
+          <ul>
+            {s.cast.slice(0, 8).map((c) => (
+              <li key={c} className="rule-live py-2 text-[14.5px]">{c}</li>
+            ))}
+          </ul>
+          <div className="rule-live mt-6 pt-4">
+            <ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} />
+          </div>
+          <Link href="/trending" className="mt-6 block font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+            ← All trending
+          </Link>
+        </aside>
       </div>
     </div>
   );

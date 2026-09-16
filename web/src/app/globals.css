@@ -377,3 +377,34 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .chart-print > li { animation: none; }
 }
+
+/* The route map (components/RouteMap.tsx): identity is line form, never hue. */
+.rm-svg { display: block; overflow: visible; font-family: var(--font-ui), system-ui, sans-serif; }
+.rm-main { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linecap: round; }
+.rm-branch { fill: none; stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.rm-bline { fill: none; stroke: var(--ink-muted); stroke-width: 1.75; }
+.rm-stn { fill: var(--bg); stroke: var(--ink); stroke-width: 2; }
+.rm-stn.rm-dashed { stroke: var(--ink-muted); }
+.rm-stn.rm-dotted { stroke: var(--ink-muted); stroke-dasharray: 2 2; stroke-width: 1.5; }
+.rm-stn.rm-here { fill: var(--ink); }
+.rm-halo { fill: none; stroke: var(--ink); stroke-width: 1; opacity: .5; transform-box: fill-box; transform-origin: center; animation: rm-halo 1.8s ease-out infinite; }
+@keyframes rm-halo { 0% { transform: scale(.7); opacity: .6 } 100% { transform: scale(1.9); opacity: 0 } }
+.rm-lab { font-family: var(--font-mono), monospace; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; fill: var(--ink-faint); }
+.rm-ttl { font-size: 12.5px; fill: var(--ink-muted); }
+.rm-ttl-here { fill: var(--ink); font-weight: 600; }
+.rm-k { font-family: var(--font-mono), monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; fill: var(--ink-faint); }
+.rm-k-here { fill: var(--ink); }
+.rm-hit { fill: transparent; cursor: pointer; outline: none; }
+.rm-hit:focus-visible { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 2 2; }
+.rm-tip { position: absolute; z-index: 5; width: 260px; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--line-strong); font-size: 13px; line-height: 1.45; pointer-events: none; }
+.rm-tip b { display: block; font-weight: 600; } .rm-tip span { display: block; margin-top: 4px; }
+.rm-card { position: relative; margin-top: 12px; border: 1px solid var(--ink); background: var(--bg-elevated); padding: 14px 44px 16px 16px; max-width: 520px; }
+.rm-close { position: absolute; right: 8px; top: 8px; width: 32px; height: 32px; border: 1px solid var(--line); display: grid; place-items: center; font-size: 12px; }
+/* the line draws itself in once; still under reduced motion */
+.rm-svg:not(.rm-still) .rm-main, .rm-svg:not(.rm-still) .rm-bline { stroke-dasharray: 2000; stroke-dashoffset: 2000; }
+.rm-svg.rm-drawn:not(.rm-still) .rm-main, .rm-svg.rm-drawn:not(.rm-still) .rm-bline { animation: rm-draw 700ms cubic-bezier(.16,1,.3,1) forwards; }
+.rm-svg:not(.rm-still) .rm-branch { opacity: 0; }
+.rm-svg.rm-drawn:not(.rm-still) .rm-branch { animation: rm-fade 400ms 300ms ease-out forwards; }
+@keyframes rm-draw { to { stroke-dashoffset: 0; } }
+@keyframes rm-fade { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .rm-halo { display: none; } .rm-main, .rm-bline { stroke-dasharray: none !important; stroke-dashoffset: 0 !important; animation: none !important; } .rm-branch { opacity: 1 !important; animation: none !important; } }
