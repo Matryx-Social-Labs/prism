@@ -223,6 +223,9 @@ class TrendingStoryOut(BaseModel):
     sector: str | None
     hero_title: str | None
     hero_image: str | None
+    hero_event_id: str | None = None
+    first_seen_at: str | None = None
+    last_updated_at: str | None = None
 
 
 class TrendingResponse(BaseModel):

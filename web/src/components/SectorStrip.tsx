@@ -16,11 +16,14 @@ export function SectorStrip({
   active,
   onPick,
   allHref = "/feed",
+  allLabel = "Today",
 }: {
   active: string | null;
   /** When present, codes call this instead of navigating — the chart re-sorts in place. */
   onPick?: (slug: string | null) => void;
   allHref?: string;
+  /** What ALL means on this surface: Today on the chart, All on a chart of arcs or results. */
+  allLabel?: string;
 }) {
   const item = (slug: string | null, code: string, name: string, href: string) => {
     const on = active === slug;
@@ -67,7 +70,7 @@ export function SectorStrip({
       className="hide-scroll sticky top-0 z-20 flex items-stretch gap-1 overflow-x-auto border-b sm:gap-3 lg:top-[57px]"
       style={{ borderColor: "var(--line)", background: "var(--bg)" }}
     >
-      {item(null, "ALL", "Today", allHref)}
+      {item(null, "ALL", allLabel, allHref)}
       {SECTOR_GROUPS.map((g) => item(g.slug, g.code, g.name, `/sector/${g.slug}`))}
     </nav>
   );

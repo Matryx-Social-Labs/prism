@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import TrendingResponse, TrendingStoryDetail
 from common.db import get_db
+from common.taxonomy import TAXONOMY
 
 router = APIRouter()
 
@@ -30,24 +31,31 @@ async def trending(
     db: AsyncSession = Depends(get_db),
 ):
     limit = min(max(limit, 1), 50)
+    # Comma-separated like the feed's: the reader's six subjects are groups of
+    # the pipeline's ten (Business & Markets is business+finance). Unknown names
+    # are dropped rather than 400'd; an all-unknown list matches nothing.
+    sectors = None
+    if sector:
+        sectors = [x for x in (t.strip() for t in sector.split(",")) if x in TAXONOMY] or [sector]
     rows = (
         await db.execute(
             text(
                 """
                 SELECT st.slug, st.label, st."cast" AS cast, st.source_count, st.velocity,
-                       st.sector, st.regions,
+                       st.sector, st.regions, st.hero_event_id,
+                       st.first_seen_at, st.last_updated_at,
                        jsonb_array_length(st.member_event_ids) AS developments,
                        e.title AS hero_title, e.image_url AS hero_image
                 FROM stories st
                 LEFT JOIN events e ON e.id = st.hero_event_id
                 WHERE st.status = 'active' AND st.merged_into IS NULL
                   AND (CAST(:state AS text) IS NULL OR :state = ANY(st.regions))
-                  AND (CAST(:sector AS text) IS NULL OR st.sector = :sector)
+                  AND (CAST(:sectors AS text[]) IS NULL OR st.sector = ANY(:sectors))
                 ORDER BY st.velocity DESC, st.source_count DESC, st.last_updated_at DESC
                 LIMIT :lim
                 """
             ),
-            {"state": state, "sector": sector, "lim": limit},
+            {"state": state, "sectors": sectors, "lim": limit},
         )
     ).mappings().all()
     return {
@@ -62,6 +70,11 @@ async def trending(
                 "sector": r["sector"],
                 "hero_title": r["hero_title"],
                 "hero_image": r["hero_image"],
+                # The chart of arcs prints LAST MOVED and SPAN, and a row opens
+                # the ticket of the story's hero event with the route in view.
+                "hero_event_id": str(r["hero_event_id"]) if r["hero_event_id"] else None,
+                "first_seen_at": r["first_seen_at"].isoformat() if r["first_seen_at"] else None,
+                "last_updated_at": r["last_updated_at"].isoformat() if r["last_updated_at"] else None,
             }
             for r in rows
         ]

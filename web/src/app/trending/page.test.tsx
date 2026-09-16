@@ -1,223 +1,130 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TrendingPage from "@/app/trending/page";
 import type { TrendingStory } from "@/lib/api";
-
-// jsdom has no viewport, so BOTH trees render: the desktop composition
-// (`lg:block`) and the phone's (`lg:hidden`). Every control that exists on both
-// matches twice, so queries below say WHICH surface they mean.
-
-/** A desktop tab, inside its labelled group. */
-const tab = (group: "Scope" | "Sector", name: string) =>
-  within(screen.getByRole("group", { name: group })).getByRole("button", { name });
-
-/** The phone's copy of a control (its chips and sheet options are ungrouped). */
-function phone(name: string | RegExp): HTMLElement {
-  const el = screen.getAllByRole("button", { name }).find((b) => !b.closest("[role='group']"));
-  if (!el) throw new Error(`no phone control named ${name}`);
-  return el;
-}
 
 const fetchTrending = vi.hoisted(() => vi.fn());
 const fetchRegions = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ fetchTrending, fetchRegions }));
 vi.mock("@/lib/profile", () => ({ loadProfile }));
+// @/lib/scope is deliberately NOT mocked: the persisted value is the point.
+
+const DAY = 86_400_000;
+const now = Date.now();
+const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
 
 function story(over: Partial<TrendingStory> = {}): TrendingStory {
   return {
-    slug: "kerala-power",
-    label: "CPI(M) · Pinarayi Vijayan",
-    cast: ["CPI(M)", "Pinarayi Vijayan"],
-    source_count: 4,
-    velocity: 3,
-    developments: 5,
-    sector: "politics",
-    hero_title: "Kerala power crisis deepens",
-    hero_image: null,
+    slug: "kerala-power", label: "CPI(M) · Pinarayi Vijayan", cast: ["CPI(M)", "Pinarayi Vijayan"],
+    source_count: 4, velocity: 3, developments: 5, sector: "politics",
+    hero_title: "Kerala power crisis deepens", hero_image: null,
+    hero_event_id: "ev-1", first_seen_at: iso(6 * DAY), last_updated_at: iso(2 * 3_600_000),
     ...over,
   };
 }
 
+const lastQuery = () => fetchTrending.mock.calls.at(-1)![0];
+const row = (name: string | RegExp) => screen.getByRole("link", { name });
+
 beforeEach(() => {
-  // Trending resolves state names from /api/v1/regions now, like the Feed,
-  // instead of a hand-written seven-state map.
-  fetchRegions.mockReset().mockResolvedValue([
-    { code: "IN-KL", name: "Kerala" },
-    { code: "IN-KA", name: "Karnataka" },
-    { code: "IN-BR", name: "Bihar" },
-  ]);
+  fetchRegions.mockReset().mockResolvedValue([{ code: "IN-KL", name: "Kerala" }, { code: "IN-BR", name: "Bihar" }]);
   fetchTrending.mockReset().mockResolvedValue([story()]);
   loadProfile.mockReset().mockReturnValue(null);
+  localStorage.clear();
 });
 
 describe("Trending — scope", () => {
-  it("defaults to National with no saved state", async () => {
+  it("offers no scope control and asks nationally when the reader has no state", async () => {
     render(<TrendingPage />);
-    // The phone's chip carries ◉ and ▾; the desktop tab is named "National" flat.
-    expect(await screen.findByRole("button", { name: /◉ National/ })).toBeInTheDocument();
-    expect(tab("Scope", "National")).toHaveAttribute("aria-pressed", "true");
-    await waitFor(() => expect(fetchTrending).toHaveBeenCalled());
-    // No state => never request a region-scoped list.
-    for (const call of fetchTrending.mock.calls) expect(call[0].state).toBeNull();
+    await screen.findByRole("list");
+    expect(screen.queryByRole("button", { name: "National" })).toBeNull();
+    expect(lastQuery()).toMatchObject({ state: null });
   });
 
-  it("opens on the reader's own state when they have one", async () => {
+  it("opens on the reader's own state, named from /regions, when they have one", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<TrendingPage />);
-    // The chip specifically: the story fixture headline also says "Kerala".
-    expect(await screen.findByRole("button", { name: /◉ Kerala/ })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ state: "IN-KL" }))
-    );
+    expect(await screen.findByRole("button", { name: "Kerala" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(lastQuery()).toMatchObject({ state: "IN-KL" }));
   });
 
-  it("shows the raw code for a state it has no name for", async () => {
-    // Regression risk: stateLabel hardcodes seven states, so an eighth reader
-    // sees "IN-GJ". Pinning current behavior so the fix is visible when it lands.
+  it("shows the code until a name arrives, and keeps it when none does", async () => {
     loadProfile.mockReturnValue({ state: "IN-GJ" });
     render(<TrendingPage />);
-    expect(await screen.findByRole("button", { name: /◉ IN-GJ/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "IN-GJ" })).toBeInTheDocument();
   });
 
-  it("switches to National from the scope sheet", async () => {
+  it("switches to National and persists the pick for the Feed", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<TrendingPage />);
-    await screen.findByRole("button", { name: /◉ Kerala/ });
+    await userEvent.click(await screen.findByRole("button", { name: "National" }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ state: null }));
+    expect(localStorage.getItem("parse.scope.v2")).toBe("national");
+  });
 
-    await userEvent.click(phone(/◉ Kerala/));
-    // The sheet's option, not the desktop tab of the same name.
-    await userEvent.click(phone("National"));
-
-    await waitFor(() =>
-      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ state: null }))
-    );
+  // REGRESSION: Trending has no "all" tier. A Feed-saved "all" opens here as
+  // National, and tapping National must NOT narrow the Feed's "all" to "national".
+  it("reads a Feed-saved 'all' as National without overwriting it", async () => {
+    localStorage.setItem("parse.scope.v2", "all");
+    loadProfile.mockReturnValue({ state: "IN-KL" });
+    render(<TrendingPage />);
+    expect(await screen.findByRole("button", { name: "National" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "National" }));
+    expect(localStorage.getItem("parse.scope.v2")).toBe("all");
   });
 });
 
-describe("Trending — sector chips", () => {
-  it("offers only filters that can actually return a story", async () => {
+describe("Trending — the sector strip", () => {
+  it("asks for the whole group, comma-separated, and ALL clears it", async () => {
     render(<TrendingPage />);
-    await screen.findAllByText("All sectors");
-    // Cyber is excluded from trending upstream, so a Cyber chip is a dead end.
-    expect(screen.queryByRole("button", { name: "Cyber" })).not.toBeInTheDocument();
-  });
-
-  it("queries the taxonomy sector slug, not the subsector, for Markets", async () => {
-    render(<TrendingPage />);
-    await screen.findAllByText("All sectors");
-    await userEvent.click(phone("Markets"));
-    // "markets" is a subsector of finance; the API filters on sector.
-    await waitFor(() =>
-      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ sector: "finance" }))
-    );
-  });
-
-  it("clears the filter with All sectors", async () => {
-    render(<TrendingPage />);
-    await screen.findAllByText("All sectors");
-    await userEvent.click(phone("Politics"));
-    await waitFor(() =>
-      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ sector: "politics" }))
-    );
-    await userEvent.click(phone("All sectors"));
-    await waitFor(() =>
-      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ sector: null }))
-    );
+    await screen.findByRole("list");
+    await userEvent.click(screen.getByRole("button", { name: /BIZ/ }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sector: "business,finance" }));
+    await userEvent.click(screen.getByRole("button", { name: /ALL/ }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sector: null }));
   });
 });
 
-describe("Trending — the list", () => {
-  // The row names the STORYLINE, not one member's headline. `label` is the cast
-  // we generated for the cluster, and it is what the story page it opens shows —
-  // leading with hero_title meant the list and the page disagreed about what the
-  // story was even called.
-  it("leads with the storyline name and links to the story", async () => {
+describe("Trending — the chart of arcs", () => {
+  it("names the arc, weighs it by developments, and opens the ticket with the route in view", async () => {
     render(<TrendingPage />);
-    // Both surfaces name the row, and both have to name it the same thing.
-    const links = await screen.findAllByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
-    expect(links).toHaveLength(2);
-    for (const link of links) {
-      expect(link).toHaveAttribute("href", "/trending/kerala-power");
-      expect(link).not.toHaveTextContent("Kerala power crisis deepens");
-    }
+    const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
+    expect(r).toHaveAttribute("href", "/story/ev-1#route");
+    expect(screen.getByLabelText("5 developments")).toBeInTheDocument();
+    expect(r.textContent).toMatch(/4 outlets/);
+    expect(r.textContent).toMatch(/span 5d/); // 6 days less two hours, floored
+    expect(r.textContent).toMatch(/moving/);
   });
 
-  it("falls back to the hero headline when a storyline has no label", async () => {
-    fetchTrending.mockResolvedValue([story({ label: null as unknown as string })]);
+  it("opens the arc page when a story has no hero event, and falls back to the hero headline without a label", async () => {
+    fetchTrending.mockResolvedValue([story({ hero_event_id: null, label: null as unknown as string })]);
     render(<TrendingPage />);
-    expect(await screen.findAllByText(/Kerala power crisis deepens/)).toHaveLength(2);
+    expect(await screen.findByRole("link", { name: /Kerala power crisis deepens/ })).toHaveAttribute("href", "/trending/kerala-power");
   });
 
-  it("renders an empty state rather than a dead screen", async () => {
+  // State is line form: dashed for a single outlet, half-weight when the arc has not moved in three days.
+  it("prints a single-outlet arc on a dashed rule and a stale arc at half weight", async () => {
+    fetchTrending.mockResolvedValue([
+      story({ slug: "one", label: "One outlet", source_count: 1 }),
+      story({ slug: "old", label: "Old arc", last_updated_at: iso(5 * DAY), velocity: 0 }),
+      story({ slug: "live", label: "Live arc" }),
+    ]);
+    render(<TrendingPage />);
+    await screen.findByRole("list");
+    expect(row(/One outlet/).closest("li")!.className).toBe("rule-single");
+    expect(row(/Old arc/).closest("li")!.className).toBe("rule-stale");
+    expect(row(/Live arc/).closest("li")!.className).toBe("rule-live");
+  });
+
+  it("says so when nothing is moving, and when the API is down", async () => {
     fetchTrending.mockResolvedValue([]);
+    const { unmount } = render(<TrendingPage />);
+    expect(await screen.findByText(/No story is moving in all sectors/)).toBeInTheDocument();
+    unmount();
+    fetchTrending.mockRejectedValue(new Error("down"));
     render(<TrendingPage />);
-    await waitFor(() => expect(screen.queryByRole("link")).not.toBeInTheDocument());
-  });
-
-  it("does not crash when the API is down", async () => {
-    fetchTrending.mockRejectedValue(new Error("unreachable"));
-    render(<TrendingPage />);
-    expect(await screen.findAllByText("Trending")).toHaveLength(2);
-  });
-});
-
-describe("Trending — the desktop ledger", () => {
-  // Only the desktop composition renders these, so no getAllBy* is needed.
-  it("names the storyline AND shows the headline it is running under", async () => {
-    render(<TrendingPage />);
-    // The phone shows one or the other; the extra desktop width buys both at once.
-    expect(await screen.findByText("Kerala power crisis deepens")).toBeInTheDocument();
-  });
-
-  it("prints the counted evidence — sources, updates — beside the row", async () => {
-    render(<TrendingPage />);
-    expect(await screen.findByText("4 sources")).toBeInTheDocument();
-    expect(screen.getByText("5 updates")).toBeInTheDocument();
-  });
-
-  it("offers no state tab to a reader who has no state", async () => {
-    render(<TrendingPage />);
-    await screen.findAllByText("All sectors");
-    // The phone's sheet disables that option for the same reason: a scope the
-    // reader cannot use, on a page whose whole job is scoping.
-    expect(within(screen.getByRole("group", { name: "Scope" })).getAllByRole("button")).toHaveLength(1);
-  });
-
-  it("scopes the list from the desktop tabs, with no sheet in the way", async () => {
-    loadProfile.mockReturnValue({ state: "IN-KL" });
-    render(<TrendingPage />);
-    await waitFor(() => expect(tab("Scope", "Kerala")).toHaveAttribute("aria-pressed", "true"));
-
-    await userEvent.click(tab("Scope", "National"));
-    await waitFor(() =>
-      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ state: null })),
-    );
-  });
-
-  it("filters by sector from the desktop tabs", async () => {
-    render(<TrendingPage />);
-    await userEvent.click(tab("Sector", "Markets"));
-    await waitFor(() =>
-      expect(fetchTrending).toHaveBeenCalledWith(expect.objectContaining({ sector: "finance" })),
-    );
-  });
-});
-
-describe("Trending — state names", () => {
-  // REGRESSION: this page carried a hand-written map of seven Indian states, so
-  // a reader in any of the other ~29 saw the raw ISO code in the scope chip —
-  // while the Feed, one tab away, resolved the same code from /api/v1/regions.
-  it("names a state that the old seven-state map never covered", async () => {
-    loadProfile.mockReturnValue({ state: "IN-BR" });
-    render(<TrendingPage />);
-    expect(await screen.findByRole("button", { name: /◉ Bihar/ })).toBeInTheDocument();
-  });
-
-  it("falls back to the code when the API doesn't know it", async () => {
-    loadProfile.mockReturnValue({ state: "IN-XX" });
-    render(<TrendingPage />);
-    expect(await screen.findByRole("button", { name: /◉ IN-XX/ })).toBeInTheDocument();
+    expect(await screen.findByText(/unreachable/)).toBeInTheDocument();
   });
 });

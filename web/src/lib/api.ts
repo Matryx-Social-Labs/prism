@@ -218,6 +218,9 @@ export interface TrendingStory {
   sector: string | null;
   hero_title: string | null;
   hero_image: string | null;
+  hero_event_id: string | null; // the ticket a row opens
+  first_seen_at: string | null; // SPAN = last_updated_at - first_seen_at
+  last_updated_at: string | null; // LAST MOVED
 }
 
 export async function fetchTrending(

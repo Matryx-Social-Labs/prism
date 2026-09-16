@@ -1,223 +1,159 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-
-import { ScopeSheet } from "@/components/ScopeSheet";
-import { TrendingDesktop } from "@/components/TrendingDesktop";
+import { Masthead } from "@/components/Masthead";
+import { SectorStrip } from "@/components/SectorStrip";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
+import { arcHref, isStale, spanDays } from "@/lib/arc";
+import { istDate, shortDate } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
-import { THUMB_W, thumbUrl } from "@/lib/thumb";
+import { sectorCode, sectorGroup, sectorParam } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 
-// Trending has no "all" tier — National IS everything here. Narrowed from the
-// shared union so adding a member forces a decision at this call site.
+/**
+ * Trending: the chart of arcs (shape brief §4). Rows are stories, not events;
+ * the number at the left is how many developments the arc has, and the label
+ * grid beneath prints OUTLETS · MOVED · SPAN · CODE. Scope and the sector strip
+ * are the front page's. A row opens the ticket with the route in view.
+ *
+ * Trending has no "all" tier — National IS everything here — so the shared
+ * scope is narrowed at this one call site, and writing it back never narrows
+ * what the Feed saved (an "all" there stays "all").
+ */
 type Scope = Extract<SharedScope, "region" | "national">;
-const SECTORS = [
-  { slug: null as string | null, label: "All sectors" },
-  { slug: "politics", label: "Politics" },
-  // "finance", not "markets": the API filters on the taxonomy sector slug
-  // (common/taxonomy.py), where markets is a SUBSECTOR of finance — so
-  // sector=markets matched nothing and the chip was a dead end.
-  { slug: "finance", label: "Markets" },
-  // No Cyber chip: correlation/trending.py excludes cybersecurity from trending
-  // candidates entirely, so that chip could never return a story.
-  { slug: "health", label: "Health" },
-];
 
 export default function TrendingPage() {
   const [state, setState] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("national");
-  const [scopeOpen, setScopeOpen] = useState(false);
-  const [sector, setSector] = useState<string | null>(null);
+  const [group, setGroup] = useState<string | null>(null);
   const [stories, setStories] = useState<TrendingStory[] | null>(null);
-  // Same gate as the Feed: the profile is a client-only localStorage read, so the
-  // first render sees null and the fetch below would fire once national and again
-  // scoped. Wait for it instead of paying for a throwaway round trip.
-  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The profile is a client-only read: wait for it rather than fetch national
+  // and then again scoped.
+  const [ready, setReady] = useState(false);
   const stateName = useStateName(state);
 
   useEffect(() => {
     const p = loadProfile();
     if (p?.state) setState(p.state);
-    // Honour the scope the reader chose on the Feed — the sheet says it applies
-    // everywhere, so it has to. Trending has no "all" tier, so the everything
-    // choice lands on its closest equivalent (national).
     const saved = loadScope(Boolean(p?.state));
     if (saved) setScope(saved === "region" ? "region" : "national");
     else if (p?.state) setScope("region");
-    setProfileLoaded(true);
+    setReady(true);
   }, []);
 
-  const chooseScope = (next: Scope) => {
+  const pickScope = (next: Scope) => {
     setScope(next);
-    // Trending only speaks two tiers, the Feed speaks three. Writing "national"
-    // back over a Feed-saved "all" silently narrowed it: on the Feed "all" is
-    // everything, while "national" EXCLUDES the reader's own state — so tapping
-    // National here quietly hid their state's news over there, which they never
-    // asked for. Both render as National on this page, so keeping the wider
-    // value is invisible here and lossless there.
     saveScope(next === "national" && loadScope() === "all" ? "all" : next);
   };
 
   useEffect(() => {
-    if (!profileLoaded) return;
+    if (!ready) return;
     setStories(null);
-    // Mount fires world-scope then region-scope once the profile loads; if the
-    // first lands last the list disagrees with the scope chip above it.
+    setError(null);
     let cancelled = false;
-    fetchTrending({ state: scope === "region" ? state : null, sector, limit: 24 })
-      .then((s) => {
-        if (!cancelled) setStories(s);
-      })
-      .catch(() => {
-        if (!cancelled) setStories([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [scope, state, sector, profileLoaded]);
+    const g = sectorGroup(group);
+    fetchTrending({ state: scope === "region" ? state : null, sector: g ? sectorParam(g) : null, limit: 24 })
+      .then((s) => { if (!cancelled) setStories(s); })
+      .catch(() => { if (!cancelled) setError("The Prism API is unreachable right now."); });
+    return () => { cancelled = true; };
+  }, [scope, state, group, ready]);
 
   useScrollRestore("trending:scrollY", stories !== null);
 
-  const scopeLabel = scope === "region" ? stateName ?? "Your state" : "National";
-  const scopeOpts: [Scope, string][] = useMemo(
-    () => [
-      ["region", stateName ? `Your state — ${stateName}` : "Your state"],
-      ["national", "National"],
-    ],
-    [stateName],
-  );
+  const dateline = useMemo(() => {
+    const d = istDate(new Date());
+    if (!stories) return d;
+    const moving = stories.filter((s) => s.velocity > 0).length;
+    return `${d} · ${stories.length} ${stories.length === 1 ? "story" : "stories"}${moving ? ` · ${moving} moving` : ""}`;
+  }, [stories]);
+
+  const scopes: [Scope, string][] = [["region", stateName ?? "Your state"], ["national", "National"]];
+  const subject = sectorGroup(group)?.name ?? "all sectors";
 
   return (
-    // Same Stone grid + same regression fix as the feed: this was
-    // max-w-[620px] with no breakpoint.
-    <div className="relative mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:pb-20">
-      {/* Desktop gets its own composition — a ruled ledger of ranked storylines
-          with the evidence in the margin (Prism Desktop.dc.html). Everything
-          below it is the phone's, and stays the phone's. */}
-      <TrendingDesktop
-        stories={stories}
-        scope={scope}
-        onScope={chooseScope}
-        stateName={stateName}
-        sector={sector}
-        onSector={setSector}
-        sectors={SECTORS}
-      />
-
-      <div className="lg:hidden">
-      <div
-        className="sticky top-0 z-20 flex items-center gap-2.5 border-b px-5 py-2.5 backdrop-blur-md"
-        style={{ borderColor: "var(--line)", background: "var(--glass)" }}
-      >
-        <h1 className="text-[19px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-          Trending
-        </h1>
-        <button
-          onClick={() => setScopeOpen(true)}
-          className="ml-auto inline-flex h-11 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold"
-          style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
-        >
-          ◉ {scopeLabel} <span style={{ color: "var(--ink-faint)" }}>▾</span>
-        </button>
-      </div>
-
-      {/* sector chips */}
-      <div className="hide-scroll flex gap-2 overflow-x-auto border-b px-5 py-2.5" style={{ borderColor: "var(--line)" }}>
-        {SECTORS.map((s) => {
-          const active = sector === s.slug;
-          return (
-            <button
-              key={s.label}
-              onClick={() => setSector(s.slug)}
-              className="flex-none whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-semibold"
-              style={active ? { background: "var(--ink)", color: "var(--bg)" } : { border: "1px solid var(--line-strong)", color: "var(--ink-muted)" }}
-            >
-              {s.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-col">
-        {stories === null ? (
-          [0, 1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)
+    <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
+      <Masthead dateline={dateline} right={state ? (
+        <div className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.06em]">
+          {scopes.map(([s, l]) => (
+            <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s}
+              className="underline-offset-4 aria-pressed:underline"
+              style={{ color: scope === s ? "var(--ink)" : "var(--ink-faint)" }}>{l}</button>
+          ))}
+        </div>
+      ) : null} />
+      <SectorStrip active={group} onPick={setGroup} allLabel="All" />
+      <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">Trending</h1>
+      <section aria-label={`Trending, ${subject}`} className="pt-3">
+        {error ? (
+          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }}>{error}</p>
+        ) : stories === null ? (
+          <p className="rule-live py-6 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>Printing…</p>
         ) : stories.length === 0 ? (
-          <p className="px-5 py-5 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-            No trending stories here right now — check back soon.
-          </p>
+          <p className="rule-live py-8 text-[15px]" style={{ color: "var(--ink-muted)" }}>No story is moving in {subject} right now.</p>
         ) : (
-          stories.map((s, i) => <StoryRow key={s.slug} story={s} rank={i + 1} />)
+          <ol className="chart-print">
+            {stories.map((s, i) => <ArcRow key={s.slug} story={s} lead={i === 0} />)}
+          </ol>
         )}
-      </div>
-      </div>
-
-      <ScopeSheet
-        open={scopeOpen}
-        onClose={() => setScopeOpen(false)}
-        options={scopeOpts}
-        selected={scope}
-        onSelect={chooseScope}
-        disabledReason={(v) => (v === "region" && !state ? "Add your state in Your Prism to filter by region" : null)}
-      />
+      </section>
     </div>
   );
 }
 
-function StoryRow({ story, rank }: { story: TrendingStory; rank: number }) {
+/**
+ * One arc on the chart. Same grammar as a chart row: the count at the left is
+ * the row's weight (developments here, not outlets), the story's NAME in the
+ * reading voice (the cast we generated, so the row and the page agree on what
+ * the story is called), then the label grid in mono. State is line form: a
+ * single-outlet arc sits on a dashed rule; one that has not moved in three
+ * days prints at half weight. No thumbnail: the chart has no pictures in its
+ * rows, and a 56px crop of one outlet's photo said nothing about an arc.
+ */
+export function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean }) {
+  const single = story.source_count <= 1;
+  const stale = isStale(story);
+  const rule = single ? "rule-single" : stale ? "rule-stale" : "rule-live";
+  const span = spanDays(story);
+  const grid = [
+    `${story.source_count} ${story.source_count === 1 ? "outlet" : "outlets"}`,
+    story.last_updated_at ? `moved ${shortDate(story.last_updated_at)}` : null,
+    span != null ? `span ${span}d` : null,
+    sectorCode(story.sector) || null,
+  ].filter((x): x is string => Boolean(x));
+
   return (
-    <Link href={`/trending/${story.slug}`} className="flex items-start gap-3 border-b px-5 py-[13px]" style={{ borderColor: "var(--line)" }}>
-      <span
-        className="w-[26px] shrink-0 text-[24px] font-semibold leading-none"
-        style={{ fontFamily: "var(--font-display), serif", color: rank === 1 ? "var(--ink)" : "var(--ink-faint)" }}
+    <li className={rule}>
+      <Link
+        href={arcHref(story)}
+        className={`group grid gap-x-4 ${lead ? "grid-cols-[56px_1fr] py-5" : "grid-cols-[40px_1fr] py-3.5"} focus-visible:outline-none`}
       >
-        {rank}
-      </span>
-      <div className="min-w-0 flex-1">
-        {/* The storyline's NAME, not one outlet's headline. `label` is the cast
-            we generated for the cluster — "Delhi Police · Sonam Wangchuk · Narendra
-            Modi" — which is what the story page shows and what makes a row read as
-            a running story rather than a single article. hero_title is one
-            member's headline and was winning here, so the list and the page it
-            opened disagreed about what the story was called. */}
-        <p className="text-[15.5px] font-semibold leading-[1.35]">{story.label ?? story.hero_title}</p>
-        <p className="mt-1 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-          {story.source_count} outlets ·{" "}
-          {story.velocity > 0 ? <span style={{ color: "var(--up)" }}>developing</span> : `${story.developments} updates`}
-        </p>
-      </div>
-      <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-xl border" style={{ background: "var(--bg-sunken)", borderColor: "var(--line)" }}>
-        {story.hero_image && (
-          <Image
-            src={thumbUrl(story.hero_image, THUMB_W)}
-            alt=""
-            fill
-            sizes="56px"
-            className="object-cover"
-            onError={(e) => {
-              (e.currentTarget.parentElement as HTMLElement).style.display = "none";
-            }}
-          />
-        )}
-      </span>
-    </Link>
+        <span
+          className={`${lead ? "font-display text-[44px] leading-[0.9] tracking-[-0.01em]" : "font-mono text-[13px] leading-[1.9]"} tabular-nums text-right`}
+          style={{ color: single ? "var(--ink-faint)" : "var(--ink)" }}
+          aria-label={`${story.developments} ${story.developments === 1 ? "development" : "developments"}`}
+        >
+          {story.developments}
+        </span>
+        <div className="min-w-0">
+          <h3
+            className={`${lead ? "text-[22px] leading-[1.25] sm:text-[26px]" : "text-[15.5px] leading-[1.4]"} font-medium text-balance group-hover:underline group-focus-visible:underline underline-offset-4`}
+            style={{ color: "var(--ink)" }}
+          >
+            {story.label ?? story.hero_title}
+          </h3>
+          <div
+            className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[10.5px] uppercase tracking-[0.04em]"
+            style={{ color: "var(--ink-faint)" }}
+          >
+            {story.velocity > 0 && <span style={{ color: "var(--ink)" }}>moving</span>}
+            {grid.map((g) => <span key={g}>{g}</span>)}
+          </div>
+        </div>
+      </Link>
+    </li>
   );
 }
-
-function SkeletonRow() {
-  return (
-    <div className="flex items-start gap-3 border-b px-5 py-[13px]" style={{ borderColor: "var(--line)" }}>
-      <span className="w-[26px] shrink-0" />
-      <div className="min-w-0 flex-1 space-y-2 pt-1">
-        <span className="block h-[14px] w-3/4 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
-        <span className="block h-[10px] w-2/5 animate-pulse rounded" style={{ background: "var(--bg-sunken)" }} />
-      </div>
-      <span className="block h-14 w-14 shrink-0 animate-pulse rounded-xl" style={{ background: "var(--bg-sunken)" }} />
-    </div>
-  );
-}
-
