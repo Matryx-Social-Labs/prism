@@ -91,6 +91,10 @@ class ExtractedImpact(BaseModel):
 class SharedExtraction(BaseModel):
     event_type: str = Field(default="other", description=f"One of: {', '.join(CYBER_EVENT_TYPES)}")
     headline_summary: str = Field(description="One neutral sentence")
+    headline: str | None = Field(
+        default=None,
+        description="A news headline for the event in English: at most twelve words, present tense, neutral, no quotation marks, only what the article states",
+    )
     occurred_at: str | None = Field(default=None, description="ISO date the event occurred, null if not stated")
     entities: list[ExtractedEntity] = Field(default_factory=list)
     regions: list[str] = Field(default_factory=list, description="ISO country codes involved")

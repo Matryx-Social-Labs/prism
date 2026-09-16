@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
 import { ticketFacts } from "@/lib/ticket";
+import { headlineByline } from "@/lib/headline";
 import { useRouter } from "next/navigation";
 
 import { lensMeta, useLenses } from "@/lib/lenses";
@@ -301,6 +302,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         <h1 className="mt-4 text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">
           {event.title}
         </h1>
+        <p className={`${MONO_LABEL} mt-2.5`} style={{ color: "var(--ink-faint)" }}>{headlineByline(event)}</p>
         {event.summary && (
           <p className="mt-3 text-[15.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
             {event.summary}

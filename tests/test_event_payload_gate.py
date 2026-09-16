@@ -41,7 +41,7 @@ def _client(unlocked: set[str], user):
         def scalars(self): return self
         def first(self):
             if "FROM events WHERE id" in self.sql:
-                return {"id": eid, "title": "t", "summary": "s", "sector": "cybersecurity",
+                return {"id": eid, "title": "t", "headline_by": None, "summary": "s", "sector": "cybersecurity",
                         "subsector": None, "image_url": None, "regions": [], "occurred_at": None,
                         "last_updated_at": T0, "projection": PROJECTION}
             return None

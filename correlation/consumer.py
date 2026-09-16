@@ -43,6 +43,17 @@ logger = get_logger(__name__)
 
 
 @observe(name="correlation-stage")
+def canonical_title(shared: dict, raw_title: str) -> tuple[str, str | None]:
+    """The event's title and whose words it is (founder decision 1b, 2026-09-17).
+
+    Prism's headline when the extractor wrote one, marked 'prism'; otherwise the
+    first report's own headline, unmarked. The outlet's words are never lost:
+    they stay on the raw item and print under Sources.
+    """
+    headline = (shared.get("headline") or "").strip()
+    return (headline, "prism") if headline else (raw_title, None)
+
+
 async def handle_enriched_item(payload: dict) -> None:
     article_id = uuid.UUID(payload["article_id"])
     enrichment_id = uuid.UUID(payload["enrichment_id"])
@@ -91,9 +102,11 @@ async def handle_enriched_item(payload: dict) -> None:
             event = await session.get(Event, match.event_id)
             is_new_event = False
         else:
+            canon, by = canonical_title(shared, title)
             event = Event(
                 id=uuid.uuid4(),
-                title=title,
+                title=canon,
+                headline_by=by,
                 summary=enrichment.summary,
                 sector=classification.get("sector", "other"),
                 subsector=classification.get("subsector"),

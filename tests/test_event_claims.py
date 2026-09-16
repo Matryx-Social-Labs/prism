@@ -144,7 +144,7 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
 
         def first(self):
             if "FROM events WHERE id" in self.sql:
-                return {"id": eid, "title": "t", "summary": "s", "sector": None, "subsector": None,
+                return {"id": eid, "title": "t", "headline_by": None, "summary": "s", "sector": None, "subsector": None,
                         "image_url": None, "regions": [], "occurred_at": None,
                         "last_updated_at": T0, "projection": {}}
             return None

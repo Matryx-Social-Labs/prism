@@ -148,6 +148,9 @@ class Event(TimestampMixin, Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    # Whose words `title` holds: NULL = the first report's own headline,
+    # 'prism' = written from the reports (founder decision 1b, 2026-09-17).
+    headline_by: Mapped[str | None] = mapped_column(Text)
     summary: Mapped[str | None] = mapped_column(Text)
     sector: Mapped[str | None] = mapped_column(Text)
     subsector: Mapped[str | None] = mapped_column(Text)

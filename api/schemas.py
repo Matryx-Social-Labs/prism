@@ -137,6 +137,9 @@ class SpeakerClaims(BaseModel):
 class EventDetail(BaseModel):
     id: str
     title: str
+    # Whose words the title holds: "prism" when written from the reports,
+    # None when it is the first report's own headline.
+    headline_by: str | None = None
     summary: str | None
     sector: str | None
     subsector: str | None

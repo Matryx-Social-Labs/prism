@@ -128,7 +128,7 @@ async def get_event(
         await db.execute(
             text(
                 """
-                SELECT id, title, summary, sector, subsector, image_url, regions,
+                SELECT id, title, headline_by, summary, sector, subsector, image_url, regions,
                        occurred_at, last_updated_at, projection
                 FROM events WHERE id = :eid
                 """
@@ -269,6 +269,7 @@ async def get_event(
     return EventDetail(
         id=str(event["id"]),
         title=event["title"],
+        headline_by=event["headline_by"],
         summary=event["summary"],
         sector=event["sector"],
         subsector=event["subsector"],

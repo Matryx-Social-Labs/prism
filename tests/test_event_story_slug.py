@@ -27,7 +27,7 @@ def _client(story_row):
         def mappings(self): return self
         def first(self):
             if "FROM events WHERE id" in self.sql:
-                return {"id": eid, "title": "t", "summary": "s", "sector": None, "subsector": None,
+                return {"id": eid, "title": "t", "headline_by": None, "summary": "s", "sector": None, "subsector": None,
                         "image_url": None, "regions": [], "occurred_at": None,
                         "last_updated_at": T0, "projection": {}}
             if "FROM stories" in self.sql:

@@ -136,6 +136,8 @@ export interface StoryTimelineData {
 export interface EventDetail {
   id: string;
   title: string;
+  /** "prism" when the headline was written from the reports; null when it is the first report's own. */
+  headline_by?: string | null;
   summary: string | null;
   sector: string | null;
   subsector: string | null;
