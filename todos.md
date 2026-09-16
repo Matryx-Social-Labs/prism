@@ -28,6 +28,22 @@ at once (c244aa6), which is why a half-built dev looks worse than either end sta
 
 All rows done on `dev`; nothing promoted. Next: founder review on the preview, then `make promote`.
 
+**The page designs, implemented (2026-09-17, founder decisions 1b · 2 · 3 · 4 · 5, direction A):**
+
+| What | Status | Notes |
+|---|---|---|
+| The route as the rail map (direction A), phone and desk, on the ticket (compact) and the route page (whole), with the attention curve as a toggle | DONE 50cbdab | `lib/route.ts` reads the whole record: through satellites to the nearest on-spine ancestor, a branch carries everything under it, parentless members are branches from the root |
+| One floating Ask at every width; the docked panel is gone | DONE 70e41d6 | launcher pill from 1024px; the thumb-zone button opens the same sheet on a phone |
+| So what and Coverage back on the ticket | DONE e3ceef7 | Perspectives cards stay retired (D4) |
+| The landing's Ask illustration is the ticket's own panel, scripted | DONE 67c5452 | `AskShell` shared by `AskPanel` and `AskDemo` |
+| Prism headline, labelled (1b) | DONE 0073321 | `events.headline_by`; extractor returns `headline`; **founder: run `uv run python -m tools.backfill_headlines` on prod (dry run prints the count and token estimate; `--apply` is the spend)** — until then tickets say "Headline as filed by {outlet}" |
+| Route glyph on the chart of arcs | DONE db0945e | each trending row carries its route; read with the same `routeShape` |
+| Related routes (shared cast · causal links), never drawn on the rail | DONE 8a0d344 | on the ticket's route and the route page; shared cast ≥2 or an event_links note across the boundary |
+| Lens facts first, then the brief | DONE b1b4d23 | |
+| Share cards in the row grammar | DONE 5f5ad6b | Teko · Hind · Martian Mono, both cases fetched |
+| Sign-in with Google | WAITS on OAuth (end of redesign) | the design's "Continue with Google · next" is not shown until it works |
+| The design prototype's rail map on a phone | NOT PORTED | `designs/pages-20260917/spine.js` draws the desk form only; the app has the tall form |
+
 **After the redesign (founder, 2026-09-16):**
 - **Google / OAuth sign-in replaces the browser-saved profile as the account model** (P1). Today the
   profile is `prism.profile.v1` in localStorage and sign-in is a magic link; the founder wants an
