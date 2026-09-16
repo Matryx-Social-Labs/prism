@@ -87,7 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span>Prism. Every claim traceable to its source.</span>
             <span className="flex items-center gap-3.5">
               <Link href="/about" className="underline underline-offset-[3px]">
-                About &amp; labels
+                About
               </Link>
               <span style={{ color: "var(--ink-faint)" }}>Prototype · Matryx Social Labs</span>
             </span>

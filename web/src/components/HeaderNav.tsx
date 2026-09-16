@@ -22,7 +22,7 @@ export function HeaderNav() {
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <nav className="flex items-center gap-1 sm:gap-2">
+    <nav className="flex items-center gap-2 sm:gap-4">
       {/* Text links live on desktop only; on mobile the bottom tab bar owns
           navigation, so the header stays uncluttered. No lens control here:
           the lens is set in "Your Prism" (/interests) and flipped per-story
@@ -31,8 +31,9 @@ export function HeaderNav() {
         <Link
           key={n.href}
           href={n.href}
-          className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
-          style={{ color: active(n.href) ? "var(--ink)" : "var(--ink-muted)" }}
+          className="hidden border-b-2 px-1 pb-0.5 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] sm:block"
+          style={{ borderColor: active(n.href) ? "var(--ink)" : "transparent", color: active(n.href) ? "var(--ink)" : "var(--ink-muted)" }}
+          aria-current={active(n.href) ? "page" : undefined}
         >
           {n.label}
         </Link>
@@ -51,7 +52,7 @@ export function HeaderNav() {
       {!session && (
         <Link
           href="/signin"
-          className="hidden px-2 py-1.5 text-[13.5px] font-medium sm:block"
+          className="hidden px-1 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] sm:block"
           style={{ color: active("/signin") ? "var(--ink)" : "var(--ink-muted)" }}
         >
           Sign in
@@ -73,7 +74,7 @@ export function HeaderNav() {
           className="whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition hover:opacity-85 sm:px-[18px]"
           style={{ background: "var(--ink)", color: "var(--bg)" }}
         >
-          Get your feed
+          Pick your sectors
         </Link>
       )}
     </nav>

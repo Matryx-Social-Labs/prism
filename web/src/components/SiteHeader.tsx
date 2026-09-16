@@ -18,9 +18,10 @@ const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you"
 export function SiteHeader() {
   const pathname = usePathname();
   const isApp = APP_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  // No spectrum bar above the header: colour in chrome is a lens speaking, and
+  // none speaks here. The mark carries the brand on its own.
   return (
     <>
-      <div className="spectrum-bar h-[3px] w-full" aria-hidden />
       <header
         className={`${isApp ? "hidden lg:block" : ""} sticky top-0 z-40 border-b backdrop-blur-md`}
         style={{ borderColor: "var(--line)", background: "var(--glass)" }}
@@ -29,11 +30,10 @@ export function SiteHeader() {
             (32px avatar) and out (36px CTA) — the sector strip sticks under it
             at a known offset (57px with the border) on every surface. */}
         <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-3 px-5 sm:px-8 xl:px-10">
-          <Link href="/" className="flex items-center gap-2.5" style={{ color: "var(--ink)" }}>
+          {/* One wordmark treatment everywhere: the mark, then PRISM in the structural voice (Masthead does the same). */}
+          <Link href="/" className="flex items-center gap-2" style={{ color: "var(--ink)" }} aria-label="Prism">
             <PrismMark />
-            <span className="text-xl font-semibold tracking-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-              Prism
-            </span>
+            <span className="font-display text-[26px] leading-none tracking-[0.01em]">PRISM</span>
           </Link>
           <HeaderNav />
         </div>
