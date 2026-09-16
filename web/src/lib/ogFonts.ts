@@ -11,11 +11,14 @@
 // cached per (family, weight, text) for the life of the server process, which
 // covers the repeat scrapes that follow a share.
 
+// The Reservation Chart's grounds and inks (DESIGN.md), light mode: a share
+// card is the chart's row at poster scale.
 const DESIGN = {
-  ground: "#faf8f5",
-  ink: "#191613",
-  inkMuted: "#6d675e",
-  inkFaint: "#a39c90",
+  ground: "#f2f4ee",
+  ink: "#141414",
+  inkMuted: "#5c5f58",
+  inkFaint: "#6d7068",
+  line: "#d6dbcf",
 } as const;
 
 export const OG_COLORS = DESIGN;
@@ -85,18 +88,24 @@ type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 600; style: "norm
  */
 export async function ogFonts(...text: string[]): Promise<OgFont[]> {
   // Dedupe to characters: the URL carries the glyph set, not the sentences.
-  const all = [...new Set(text.join(" ").split(""))].join("");
+  // Both cases: the card sets its labels in capitals with text-transform, and
+  // a subset fetched for "filed" has no F to transform it into.
+  const joined = text.join(" ");
+  const all = [...new Set((joined + joined.toUpperCase()).split(""))].join("");
   const indic = indicFamilyFor(all);
+  // The three voices: Teko for structure (the count, the wordmark), Hind for
+  // the headline, Martian Mono for provenance.
   const wanted: [string, number, string][] = [
-    ["Fraunces", 600, all],
-    ["IBM Plex Mono", 500, all],
-    ...(indic ? ([[indic, 600, all]] as [string, number, string][]) : []),
+    ["Teko", 500, all],
+    ["Hind", 500, all],
+    ["Martian Mono", 400, all],
+    ...(indic ? ([[indic, 500, all]] as [string, number, string][]) : []),
   ];
 
   const loaded = await Promise.all(
     wanted.map(async ([family, weight, text]) => {
       const data = await fetchFont(family, weight, text);
-      return data ? { name: family, data, weight: weight >= 600 ? 600 : 400, style: "normal" } : null;
+      return data ? { name: family, data, weight: weight >= 500 ? 500 : 400, style: "normal" } : null;
     }),
   );
   return loaded.filter((f): f is OgFont => f !== null);
@@ -105,5 +114,8 @@ export async function ogFonts(...text: string[]): Promise<OgFont[]> {
 /** font-family stack for the headline, Indic first so it wins for those glyphs. */
 export function displayStack(headline: string): string {
   const indic = indicFamilyFor(headline);
-  return [indic, "Fraunces", "serif"].filter(Boolean).join(", ");
+  return [indic, "Hind", "sans-serif"].filter(Boolean).join(", ");
 }
+
+export const OG_MONO = "Martian Mono, monospace";
+export const OG_DISPLAY = "Teko, sans-serif";

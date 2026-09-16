@@ -16,13 +16,13 @@ describe("script detection for social cards", () => {
 
   it("asks for no extra family when the headline is Latin", () => {
     expect(indicFamilyFor("Delhi Police · Sonam Wangchuk")).toBeNull();
-    expect(displayStack("Delhi Police")).toBe("Fraunces, serif");
+    expect(displayStack("Delhi Police")).toBe("Hind, sans-serif");
   });
 
   // The Indic face has to win for its own glyphs, so it goes first — Fraunces
   // has no Devanagari and would otherwise claim the run.
-  it("puts the Indic family ahead of Fraunces in the stack", () => {
-    expect(displayStack("उत्तर प्रदेश")).toBe("Noto Sans Devanagari, Fraunces, serif");
+  it("puts the Indic family ahead of Hind in the stack", () => {
+    expect(displayStack("उत्तर प्रदेश")).toBe("Noto Sans Devanagari, Hind, sans-serif");
   });
 
   // A headline that mixes scripts still needs the non-Latin one covered.
