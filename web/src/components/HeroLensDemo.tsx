@@ -22,7 +22,9 @@ interface HeroLens {
 }
 
 const HEADLINE = "Delhi bans diesel cars older than ten years from Monday";
-const FACTS = "POL · 31 outlets · IN";
+// The row's label grid, beneath the headline as on the chart; no count, because
+// a number inside an illustration reads as a fact two sections from a real one.
+const GRID = "POL · IN";
 
 const LENSES: HeroLens[] = [
   {
@@ -43,11 +45,13 @@ const LENSES: HeroLens[] = [
     brief:
       "A forced replacement cycle for the capital: carmakers with petrol and CNG line-ups gain, used-car platforms lose diesel inventory overnight, and scrappage yards get a quarter of volume. Watch dealer bookings and the rebate's fine print.",
   },
+  // The reads still being built flip in the neutral scale: a lens has a hue
+  // once it exists as a lens, and the world has three.
   {
     key: "health",
     label: "Health",
-    color: "#be123c",
-    bg: "color-mix(in srgb, #be123c 14%, transparent)",
+    color: "var(--ink)",
+    bg: "var(--bg-sunken)",
     next: true,
     plain: "what changes for patients and clinicians",
     brief:
@@ -56,8 +60,8 @@ const LENSES: HeroLens[] = [
   {
     key: "policy",
     label: "Policy",
-    color: "#0369a1",
-    bg: "color-mix(in srgb, #0369a1 14%, transparent)",
+    color: "var(--ink)",
+    bg: "var(--bg-sunken)",
     next: true,
     plain: "what precedent this sets",
     brief:
@@ -87,9 +91,9 @@ export function HeroLensDemo({
       </div>
 
       <div className="px-5 pt-5">
-        <p className="font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{FACTS}</p>
         {/* A paragraph, not a heading: the demo sits inside the hero and must not break the page's outline. */}
-        <p className="mt-1.5 text-[21px] font-medium leading-[1.3] text-balance sm:text-[23px]">{HEADLINE}</p>
+        <p className="text-[21px] font-medium leading-[1.3] text-balance sm:text-[23px]">{HEADLINE}</p>
+        <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{GRID}</p>
       </div>
 
       <div className="flex flex-wrap gap-1.5 px-5 pt-4" role="tablist" aria-label="Lens">

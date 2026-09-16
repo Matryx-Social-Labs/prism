@@ -34,11 +34,6 @@
   --ink-faint: #6d7068;
   --line: #d6dbcf;
   --line-strong: #b9c0b1;
-  /* The reading voice: Hind, then its script siblings. The browser falls
-     through per glyph, so Kannada in a Latin headline takes Hind Mysuru with
-     the same skeleton — one family, six scripts, no fallback seam. */
-  --font-ui: var(--font-hind), var(--font-hind-kn), var(--font-hind-ta), var(--font-hind-te),
-    system-ui, sans-serif;
 
   --lens-general: #b45309; /* amber-700 */
   --lens-cyber: #0e7490; /* cyan-700 */
@@ -137,6 +132,16 @@ html {
 }
 
 body {
+  /* The reading voice: Hind, then its script siblings. The browser falls
+     through per glyph, so Kannada in a Latin headline takes Hind Mysuru with
+     the same skeleton — one family, six scripts, no fallback seam.
+     Defined HERE, not on :root: next/font sets --font-hind and its siblings on
+     <body>, and a custom property is resolved where it is declared, so a
+     :root --font-ui that referenced them computed to nothing and every
+     reading-voice line fell back to the system sans (found by the finish
+     review of the landing, 2026-09-17). */
+  --font-ui: var(--font-hind), var(--font-hind-kn), var(--font-hind-ta), var(--font-hind-te),
+    system-ui, sans-serif;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);

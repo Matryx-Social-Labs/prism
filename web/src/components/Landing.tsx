@@ -37,8 +37,8 @@ type Evidence = {
 /**
  * Today's chart as a general reader meets it: the window, minus the cyber
  * record, most-corroborated first. Then, from the top sixteen, the first story
- * with a verbatim quote, and from the top eight the first with a route of two
- * or more developments. A proof the chart cannot supply is absent, never invented.
+ * with a verbatim quote, and from the top eight the first with a route of three
+ * or more developments on the spine. A proof the chart cannot supply is absent, never invented.
  */
 async function loadEvidence(): Promise<Evidence | null> {
   try {
@@ -51,7 +51,8 @@ async function loadEvidence(): Promise<Evidence | null> {
     for (const event of events.slice(0, 8)) {
       if (!event.story_slug) continue;
       const story = await fetchTrendingStory(event.story_slug).catch(() => null);
-      if (story?.branches && story.branches.nodes.length >= 2) {
+      // Three on the spine, at least: a route with one station shows no route.
+      if (story?.branches && story.branches.nodes.filter((n) => !n.off_spine).length >= 3) {
         route = { event, story };
         break;
       }
@@ -97,7 +98,7 @@ const NEXT: [string, string][] = [
 ];
 
 const READER = ["Today's chart, every story, every subject", "Every quote, verbatim, with its source", "The route a story took", "Ask the story, three questions a day"];
-const PRO = ["Your profession's reading of every story", "Tickers and catalysts on the stories that move markets", "CVEs, exploitation and fixes on the stories that expose you", "A watchlist of what you follow"];
+const PRO = ["Your profession's reading of every story", "Tickers and catalysts on the stories that move markets", "Which systems a security story exposes, and what to fix first", "A watchlist of what you follow"];
 
 export async function Landing() {
   const ev = await loadEvidence();
@@ -151,15 +152,11 @@ export async function Landing() {
       <section id="what-you-get" className={`${SHELL} mt-16 scroll-mt-20`} aria-labelledby="get-title">
         <SectionHead id="get-title" title="What you get" />
         <div className="grid lg:grid-cols-2 lg:gap-x-14">
-          <Cell title="One story, not fifty headlines" body="Every outlet's report of the same event is gathered into one story. The number beside it is how many outlets filed it, so you can see how much of the press agrees it happened.">
+          <Cell title="One story, not fifty headlines" body="Every outlet's report of the same event is gathered into one story. The number at the left of a row is how many outlets filed it, so you can see how much of the press agrees it happened.">
             {lead ? (
-              <div className="flex items-baseline gap-4">
-                <span className="font-display text-[64px] leading-[0.85] tabular-nums">{lead.source_count}</span>
-                <div className="min-w-0">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>outlets filed this story today</p>
-                  <Link href={`/story/${lead.id}`} className="mt-1 block text-[15.5px] font-medium leading-[1.35] underline-offset-4 hover:underline">{lead.title}</Link>
-                </div>
-              </div>
+              <ol className="border-b" style={{ borderColor: "var(--line)" }}>
+                <ChartRow item={ev?.rows[1] ?? lead} />
+              </ol>
             ) : (
               <p className="text-[14.5px]" style={{ color: "var(--ink-faint)" }}>Today&rsquo;s count appears here when the chart is reachable.</p>
             )}
@@ -221,7 +218,7 @@ export async function Landing() {
           </Cell>
 
           <Cell wide title="Six subjects, your state first" body="Politics to entertainment on one strip, on every page. Tell us your state and its news leads the chart; follow a subject and For you appears.">
-            <div className="[&_nav]:static [&_nav]:border-b-0">
+            <div className="[&_nav]:static [&_nav]:border-b-0 [&_nav_a>span:last-child]:!inline">
               <SectorStrip active={null} allHref="/feed" allLabel="Today" />
             </div>
           </Cell>

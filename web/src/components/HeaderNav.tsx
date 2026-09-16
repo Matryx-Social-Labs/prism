@@ -15,6 +15,9 @@ const NAV = [
 export function HeaderNav() {
   const pathname = usePathname();
   const session = useSession();
+  // The landing has its own one action ("Read today's chart"); a second
+  // filled pill in the same viewport is one more than the world allows.
+  const landing = pathname === "/" || pathname === "/about";
 
   const active = (href: string) =>
     href === "/feed"
@@ -68,7 +71,7 @@ export function HeaderNav() {
         >
           {session.email.slice(0, 1)}
         </Link>
-      ) : (
+      ) : landing ? null : (
         <Link
           href="/onboarding"
           className="whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition hover:opacity-85 sm:px-[18px]"

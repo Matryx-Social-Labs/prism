@@ -42,10 +42,14 @@ describe("/about — the product as the proof, live", () => {
     );
     render(await AboutPage());
 
-    // The count cell: the nine-outlet story leads, by the chart's order, not the API's.
+    // The chart rows: the nine-outlet story leads, by the chart's order, not the API's.
+    const rows = screen.getByRole("heading", { name: "Today's chart" }).parentElement!.parentElement!;
+    const links = within(rows).getAllByRole("link", { name: /Story/ });
+    expect(links[0]).toHaveAttribute("href", "/story/strong");
+    // The count cell shows the feature in the row's own grammar: a real row with its count.
     const count = screen.getByRole("heading", { name: "One story, not fifty headlines" }).parentElement!;
-    expect(within(count).getByText("9")).toBeInTheDocument();
-    expect(within(count).getByRole("link", { name: "Story strong" })).toHaveAttribute("href", "/story/strong");
+    expect(within(count).getByRole("link", { name: /Story quoted/ })).toHaveAttribute("href", "/story/quoted");
+    expect(within(count).getByLabelText("2 sources")).toBeInTheDocument();
     // The quote cell comes from a story that HAS quotes, even if it is not the lead.
     const said = screen.getByRole("heading", { name: "Who said what, in their own words" }).parentElement!;
     expect(within(said).getByText("“We were receiving proposals”")).toBeInTheDocument();
@@ -58,11 +62,30 @@ describe("/about — the product as the proof, live", () => {
     fetchFeed.mockResolvedValue([item("cve", 40), item("poll", 5)].map((i, n) => ({ ...i, sector: n === 0 ? "cybersecurity" : "politics" })));
     fetchEvent.mockImplementation(async (id: string) => event(id));
     render(await AboutPage());
-    expect(screen.queryByRole("link", { name: "Story cve" })).toBeNull();
-    expect(screen.getAllByRole("link", { name: "Story poll" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: /Story cve/ })).toBeNull();
+    expect(screen.getAllByRole("link", { name: /Story poll/ }).length).toBeGreaterThan(0);
   });
 
   it("renders the route from the owner of the arc when a story carries a tree", async () => {
+    fetchFeed.mockResolvedValue([item("e1", 4)]);
+    fetchEvent.mockResolvedValue(event("e1", { story_slug: "s" }));
+    fetchTrendingStory.mockResolvedValue({
+      slug: "s", canonical_slug: "s", label: "L", cast: [], sector: null, source_count: 4, velocity: 0, status: "active", timeline_cast: [],
+      developments: [
+        { id: "e0", title: "How it started", sector: null, occurred_at: "2026-09-01T00:00:00Z", image_url: null, is_current: false, why: null },
+        { id: "e1", title: "Story e1", sector: null, occurred_at: "2026-09-03T00:00:00Z", image_url: null, is_current: false, why: null },
+        { id: "e2", title: "What followed", sector: null, occurred_at: "2026-09-04T00:00:00Z", image_url: null, is_current: false, why: null },
+      ],
+      // Three on the spine: a route with fewer shows no route, so the landing skips it.
+      branches: { root_id: "e0", nodes: [{ id: "e0", parent_id: null, off_spine: false, depth: 0 }, { id: "e1", parent_id: "e0", off_spine: false, depth: 1 }, { id: "e2", parent_id: "e1", off_spine: false, depth: 2 }], shape: { developments: 3, branches: 0, satellites: 0, max_depth: 2 } },
+    });
+    render(await AboutPage());
+    expect(fetchTrendingStory).toHaveBeenCalledWith("s");
+    expect(screen.getByRole("heading", { name: "Follow the story as it moves" })).toBeInTheDocument();
+    expect(screen.getByText(/3 DEVELOPMENTS · 0 BRANCHES · 0 SATELLITES · 4 DAYS/)).toBeInTheDocument();
+  });
+
+  it("skips the route when a story has fewer than three developments on the spine", async () => {
     fetchFeed.mockResolvedValue([item("e1", 4)]);
     fetchEvent.mockResolvedValue(event("e1", { story_slug: "s" }));
     fetchTrendingStory.mockResolvedValue({
@@ -74,9 +97,7 @@ describe("/about — the product as the proof, live", () => {
       branches: { root_id: "e0", nodes: [{ id: "e0", parent_id: null, off_spine: false, depth: 0 }, { id: "e1", parent_id: "e0", off_spine: false, depth: 1 }], shape: { developments: 2, branches: 0, satellites: 0, max_depth: 1 } },
     });
     render(await AboutPage());
-    expect(fetchTrendingStory).toHaveBeenCalledWith("s");
-    expect(screen.getByRole("heading", { name: "Follow the story as it moves" })).toBeInTheDocument();
-    expect(screen.getByText(/2 DEVELOPMENTS · 0 BRANCHES · 0 SATELLITES · 3 DAYS/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Follow the story as it moves" })).toBeNull();
   });
 
   it("says the chart is unreachable rather than showing an empty or made-up proof", async () => {
