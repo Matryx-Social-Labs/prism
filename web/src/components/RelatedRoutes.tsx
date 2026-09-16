@@ -24,7 +24,7 @@ export function RelatedRoutes({ related }: { related: RelatedStory[] }) {
           return (
             <li key={r.slug} className="rule-live py-2.5">
               <Link href={`/trending/${r.slug}`} className="text-[15px] leading-[1.4] underline-offset-4 hover:underline">{r.label}</Link>
-              <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>
+              <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
                 {how} · {r.developments} {r.developments === 1 ? "development" : "developments"} ·{" "}
                 {r.velocity > 0 ? <span style={{ color: "var(--ink)" }}>moving</span> : r.last_updated_at ? `quiet since ${shortDate(r.last_updated_at)}` : "quiet"}
               </p>
