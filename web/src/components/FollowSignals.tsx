@@ -46,7 +46,7 @@ export function FollowSignals({ tickers, sector }: { tickers: string[]; sector: 
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
         Follow
       </span>
       {signals.map((s) => {

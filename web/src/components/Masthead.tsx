@@ -28,7 +28,7 @@ export function Masthead({ dateline, right }: { dateline: string | null; right?:
           </span>
         </Link>
         {dateline && (
-          <p className="mt-1.5 truncate font-mono text-[11px] tracking-[0.04em]" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-1.5 truncate font-mono text-[12px] tracking-[0.04em]" style={{ color: "var(--ink-muted)" }}>
             {dateline}
           </p>
         )}

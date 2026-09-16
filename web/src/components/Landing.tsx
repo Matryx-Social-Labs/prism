@@ -60,7 +60,9 @@ async function loadProofs(): Promise<Proofs | null> {
     return {
       route,
       said: events.find((e) => (e.claims ?? []).length > 0) ?? null,
-      sources: events[0] ?? null,
+      // The coaches: the story with the most named sources, and at least two —
+      // a "Sources" proof with one source proves nothing.
+      sources: [...events].filter((e) => e.sources.length >= 2).sort((a, b) => b.sources.length - a.sources.length)[0] ?? null,
     };
   } catch {
     return null;
@@ -70,10 +72,10 @@ async function loadProofs(): Promise<Proofs | null> {
 /** One proof row: the story it comes from at the left, the evidence at the right. */
 function Proof({ title, event, children }: { title: string; event: EventDetail; children: React.ReactNode }) {
   return (
-    <div className="rule-live grid gap-x-8 gap-y-4 py-7 lg:grid-cols-[280px_minmax(0,604px)]">
+    <div className="rule-live grid gap-x-8 gap-y-4 py-7 lg:grid-cols-[280px_minmax(0,560px)]">
       <div>
         <h3 className="font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">{title}</h3>
-        <p className="mt-2 font-mono text-[10.5px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
+        <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
           {ticketFacts(event).slice(0, 2).join(" · ")}
         </p>
         <Link
@@ -138,7 +140,8 @@ const ASK = [
   { q: "Will India win the cup?", a: null },
 ];
 
-const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+// Provenance labels in mono, sentence case: names and short facts, never costume.
+const MONO = "font-mono text-[12px] tracking-[0.02em]";
 const NEXT = "Being built next. The example below is written, not extracted.";
 
 const Illustration = () => (
@@ -226,9 +229,9 @@ export async function Landing() {
         <SectionHead id="made-title" title="How it is made" />
         <dl>
           {MADE.map(([term, body]) => (
-            <div key={term} className="rule-live grid gap-x-8 gap-y-1 py-5 sm:grid-cols-[180px_minmax(0,604px)]">
+            <div key={term} className="rule-live grid gap-x-8 gap-y-1 py-5 sm:grid-cols-[180px_minmax(0,560px)]">
               <dt className="font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">{term}</dt>
-              <dd className="text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+              <dd className="max-w-[36em] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
                 {body}
               </dd>
             </div>
@@ -239,7 +242,7 @@ export async function Landing() {
 
       {/* What is being built next: both sides, so what, blindspots. Ask is live
           but cannot be shown live without a call, so it is written too. */}
-      <section className="mt-16 grid gap-x-14 gap-y-4 lg:grid-cols-[minmax(0,1fr)_604px]" aria-labelledby="sides-title">
+      <section className="mt-16 grid gap-x-14 gap-y-4 lg:grid-cols-[minmax(0,1fr)_560px]" aria-labelledby="sides-title">
         <div>
           <SectionHead id="sides-title" title="The same ruling is two different stories" hint={NEXT} />
           <p className="max-w-[44ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
@@ -262,7 +265,7 @@ export async function Landing() {
         </div>
       </section>
 
-      <section className="mt-16 grid gap-x-14 gap-y-4 lg:grid-cols-[minmax(0,1fr)_604px]" aria-labelledby="sowhat-title">
+      <section className="mt-16 grid gap-x-14 gap-y-4 lg:grid-cols-[minmax(0,1fr)_560px]" aria-labelledby="sowhat-title">
         <div>
           <SectionHead id="sowhat-title" title="What happens next, spelled out" hint={NEXT} />
           <p className="max-w-[44ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
@@ -320,9 +323,9 @@ export async function Landing() {
             <dl>
               {ASK.map((x) => (
                 <div key={x.q} className="rule-live grid grid-cols-[28px_1fr] gap-x-3 py-3 text-[14px] leading-[1.6]">
-                  <dt className="font-mono text-[10.5px] leading-[2.2]" style={{ color: "var(--ink-faint)" }}>Q</dt>
+                  <dt className="font-mono text-[11px] leading-[2.2]" style={{ color: "var(--ink-faint)" }}>Q</dt>
                   <dd style={{ color: "var(--ink)" }}>{x.q}</dd>
-                  <dt className="font-mono text-[10.5px] leading-[2.2]" style={{ color: "var(--ink-faint)" }}>A</dt>
+                  <dt className="font-mono text-[11px] leading-[2.2]" style={{ color: "var(--ink-faint)" }}>A</dt>
                   <dd style={{ color: "var(--ink-muted)" }}>
                     {x.a ?? (
                       <>
@@ -342,16 +345,16 @@ export async function Landing() {
           checkout does not exist yet, and this page does not pretend it does. */}
       <section className="mt-16" aria-labelledby="tiers-title">
         <SectionHead id="tiers-title" title="Free to read. Paid to read as a professional." />
-        <p className="max-w-[60ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+        <p className="max-w-[36em] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
           The Reader lens is free for everyone, with every quote and every source. The professional lenses
           are readings of the same record for people whose work depends on it. A locked lens still flips,
           so you see what you are missing before you sign in.
         </p>
-        <div className="mt-6 max-w-[604px]">
+        <div className="mt-6 max-w-[560px]">
           <HeroLensDemo locked={["markets", "health", "policy"]} title="Flip to a locked lens" />
         </div>
         {/* The reads that exist today, from the registry, never a typed list. */}
-        <div className="mt-8 max-w-[604px]">
+        <div className="mt-8 max-w-[560px]">
           <LensRegistry />
         </div>
       </section>

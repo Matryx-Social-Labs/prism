@@ -55,17 +55,17 @@ export function LanguagesField({ value, onChange, options }: { value: string[]; 
   };
   return (
     <Field label="Languages you read" hint="Your first pick leads. Nothing is ever hidden: languages rank the chart, they never filter it.">
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-wrap gap-x-6 gap-y-2 border-b" style={{ borderColor: "var(--line)" }}>
         {options.map((l) => {
           const idx = value.indexOf(l.code);
           const sel = idx >= 0;
           return (
             <button key={l.code} type="button" onClick={() => toggle(l.code)} aria-pressed={sel}
               aria-label={`${l.name}${sel ? `, preference ${idx + 1}` : ""}`}
-              className="flex min-h-[44px] items-center gap-2 rounded-full border px-4 text-[15px] transition"
-              style={{ borderColor: sel ? "var(--ink)" : "var(--line-strong)", background: sel ? "var(--ink)" : "transparent", color: sel ? "var(--bg)" : "var(--ink)" }}>
+              className="flex min-h-[44px] items-baseline gap-2 border-b-2 px-0.5 text-[15px] transition-[border-color]"
+              style={{ borderColor: sel ? "var(--ink)" : "transparent", color: sel ? "var(--ink)" : "var(--ink-muted)", marginBottom: -1 }}>
               {l.native}
-              {sel && <span className="font-mono text-[11px]" style={{ opacity: 0.7 }}>{idx + 1}</span>}
+              {sel && <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>{idx + 1}</span>}
             </button>
           );
         })}
@@ -148,7 +148,7 @@ export function SectorsField({ taxonomy, picks, onPicks }: { taxonomy: TaxonomyS
                 className="flex min-h-[48px] w-full items-baseline gap-3 py-3 text-left">
                 <span className="w-9 font-mono text-[12px] tracking-[0.06em]" style={{ color: on ? "var(--ink)" : "var(--ink-faint)" }}>{g.code}</span>
                 <span className="text-[15.5px] font-medium" style={{ color: on ? "var(--ink)" : "var(--ink-muted)" }}>{g.name}</span>
-                <span className="ml-auto font-mono text-[10.5px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
+                <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
                   {on ? (nsubs ? `${nsubs} ${nsubs === 1 ? "beat" : "beats"}` : "following") : ""}
                 </span>
               </button>

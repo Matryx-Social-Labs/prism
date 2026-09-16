@@ -8,6 +8,7 @@ import { ticketFacts } from "@/lib/ticket";
 import { useRouter } from "next/navigation";
 
 import { lensMeta, useLenses } from "@/lib/lenses";
+import { ArrowDown, ArrowUp, Dash } from "@/components/icons";
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
@@ -42,7 +43,7 @@ function regionName(code: string): string {
   }
 }
 
-const MONO_LABEL = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+const MONO_LABEL = "font-mono text-[11px] uppercase tracking-[0.06em]";
 
 export function StoryView({ event }: { event: EventDetail }) {
   const cyber = event.projection?.cyber ?? null;
@@ -417,9 +418,6 @@ export function StoryView({ event }: { event: EventDetail }) {
           className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden py-5`}
         >
           {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
-          <div className={`${MONO_LABEL} flex items-baseline justify-between`} style={{ color: meta.color }}>
-            <span>{meta.short} read</span>
-          </div>
           {gateState?.lens === lens && gateState.kind === "no_samples" ? (
             // OUT OF SAMPLES is a different wall from NOT SIGNED IN, and the
             // reader needs a different next step for each. The server sends the
@@ -493,7 +491,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               </div>
               {(cyber.affected ?? []).length > 0 && (
                 <div>
-                  <h3 className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+                  <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
                     Affected products
                   </h3>
                   <ul className="text-[13.5px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>
@@ -518,7 +516,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-[13px]">
                     <thead>
-                      <tr className="text-[10.5px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
+                      <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
                         <th className="border-b py-1.5 pr-3.5 font-semibold" style={{ borderColor: "var(--line)" }}>
                           Framework
                         </th>
@@ -576,7 +574,9 @@ export function StoryView({ event }: { event: EventDetail }) {
               {finance.price_impact?.direction && (
                 <span>
                   <strong>Price read:</strong>{" "}
-                  {finance.price_impact.direction === "up" ? "▲" : finance.price_impact.direction === "down" ? "▼" : "◆"}{" "}
+                  <span className="inline-flex translate-y-[1px]" aria-label={finance.price_impact.direction}>
+                    {finance.price_impact.direction === "up" ? <ArrowUp /> : finance.price_impact.direction === "down" ? <ArrowDown /> : <Dash />}
+                  </span>{" "}
                   {finance.price_impact.magnitude ?? ""}
                   {finance.price_impact.confidence != null &&
                     ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
@@ -639,7 +639,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
           >
             Ask
-            <span className="whitespace-nowrap font-mono text-[10.5px] font-normal opacity-70">{sourceCount} sources</span>
+            <span className="whitespace-nowrap font-mono text-[11px] font-normal opacity-70">{sourceCount} sources</span>
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Corner } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import type { StoryTimelineData } from "@/lib/api";
 import { shortDate } from "@/lib/dateline";
@@ -56,7 +57,7 @@ export function StoryTimeline({ story }: { story?: StoryTimelineData }) {
       {cast.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-1.5">
           <span
-            className="text-[10.5px] font-semibold uppercase tracking-[0.14em]"
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
             style={{ color: "var(--ink-faint)" }}
           >
             Following
@@ -101,7 +102,7 @@ export function StoryTimeline({ story }: { story?: StoryTimelineData }) {
               }
             />
             <span
-              className="w-[52px] shrink-0 pt-[3px] font-mono text-[10.5px]"
+              className="w-[52px] shrink-0 pt-[3px] font-mono text-[11px]"
               style={{ color: "var(--ink-faint)" }}
             >
               {dateLabel(n.occurred_at)}
@@ -132,8 +133,8 @@ export function StoryTimeline({ story }: { story?: StoryTimelineData }) {
                 </Link>
               )}
               {n.why && (
-                <span className="text-[12px] leading-snug" style={{ color: "var(--ink-faint)" }}>
-                  ↳ {n.why}
+                <span className="flex items-start gap-1.5 text-[12px] leading-snug" style={{ color: "var(--ink-faint)" }}>
+                  <Corner className="mt-[2px] shrink-0" /> {n.why}
                 </span>
               )}
             </span>

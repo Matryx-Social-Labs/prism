@@ -84,7 +84,7 @@ export default function OnboardingPage() {
           way the sector strip marks the active subject. Earlier steps are
           links back; later ones are not yet reachable. */}
       <nav
-        className="hide-scroll mb-8 flex gap-4 overflow-x-auto border-b font-mono text-[10.5px] uppercase tracking-[0.06em]"
+        className="mb-8 flex flex-wrap gap-x-4 border-b font-mono text-[11px] uppercase tracking-[0.06em]"
         style={{ borderColor: "var(--line)" }}
         aria-label={`Step ${step + 1} of 3`}
       >

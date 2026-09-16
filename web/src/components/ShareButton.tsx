@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowUpRight } from "@/components/icons";
+
 // Web Share API on mobile (native WhatsApp/Instagram sheet — the India growth
 // path); copy-link fallback on desktop. Shares the shareable /trending/<slug> URL.
 import { useState } from "react";
@@ -54,7 +56,7 @@ export function ShareButton({ url, title, fill }: { url: string; title: string; 
       style={{ borderColor: "var(--line-strong)", color: "var(--ink)", background: "var(--bg-elevated)" }}
       aria-label="Share this story"
     >
-      <span aria-hidden>↗</span>
+      <ArrowUpRight />
       {copied ? "Link copied" : "Share"}
     </button>
   );

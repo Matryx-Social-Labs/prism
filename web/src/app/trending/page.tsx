@@ -77,7 +77,7 @@ export default function TrendingPage() {
   return (
     <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
       <Masthead dateline={dateline} right={state ? (
-        <div className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.06em]">
+        <div className="flex gap-3 font-mono text-[11px] uppercase tracking-[0.06em]">
           {scopes.map(([s, l]) => (
             <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s}
               className="underline-offset-4 aria-pressed:underline"
@@ -85,7 +85,7 @@ export default function TrendingPage() {
           ))}
         </div>
       ) : null} />
-      <SectorStrip active={group} onPick={setGroup} allLabel="All" />
+      <SectorStrip active={group} onPick={setGroup} allLabel="" />
       <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">Trending</h1>
       <section aria-label={`Trending, ${subject}`} className="pt-3">
         {error ? (
@@ -139,14 +139,14 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
           {story.developments}
         </span>
         <div className="min-w-0">
-          <h3
+          <h2
             className={`${lead ? "text-[22px] leading-[1.25] sm:text-[26px]" : "text-[15.5px] leading-[1.4]"} font-medium text-balance group-hover:underline group-focus-visible:underline underline-offset-4`}
             style={{ color: "var(--ink)" }}
           >
             {story.label ?? story.hero_title}
-          </h3>
+          </h2>
           <div
-            className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[10.5px] uppercase tracking-[0.04em]"
+            className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[11px] uppercase tracking-[0.04em]"
             style={{ color: "var(--ink-faint)" }}
           >
             {story.velocity > 0 && <span style={{ color: "var(--ink)" }}>moving</span>}

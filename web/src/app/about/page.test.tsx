@@ -38,7 +38,7 @@ describe("/about — three proofs, live", () => {
     fetchEvent.mockImplementation(async (id: string) =>
       id === "quoted"
         ? event("quoted", { claims: [{ speaker: "Anita Dipke", claims: [{ quote_text: "We were receiving proposals", quote_start: 0, quote_end: 0, article_id: "a1", source_name: "Mint", url: "https://m.example/x", published_at: null }] }] })
-        : event("strong"),
+        : event("strong", { sources: [src("a1"), src("a2")] }),
     );
     render(await AboutPage());
 
@@ -69,6 +69,13 @@ describe("/about — three proofs, live", () => {
     expect(fetchTrendingStory).toHaveBeenCalledWith("s");
     expect(screen.getByRole("heading", { name: "The route" })).toBeInTheDocument();
     expect(screen.getByText(/2 DEVELOPMENTS · 0 BRANCHES · 0 SATELLITES · 3 DAYS/)).toBeInTheDocument();
+  });
+
+  it("omits the coaches when no story names at least two sources — one source proves nothing", async () => {
+    fetchFeed.mockResolvedValue([item("lone", 1)]);
+    fetchEvent.mockResolvedValue(event("lone"));
+    render(await AboutPage());
+    expect(screen.queryByRole("heading", { name: "Sources" })).toBeNull();
   });
 
   it("says the chart is unreachable rather than showing an empty or made-up proof", async () => {

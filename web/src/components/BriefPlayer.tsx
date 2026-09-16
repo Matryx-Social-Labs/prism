@@ -118,7 +118,7 @@ export function BriefPlayer({
           <button
             onClick={toggle}
             aria-label={status === "playing" ? "Pause narration" : status === "paused" ? "Resume narration" : "Listen to this brief"}
-            className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold"
+            className="flex items-center gap-1.5 border-b-2 pb-0.5 text-[12px] font-medium"
             style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
           >
             {status === "playing" ? (
@@ -162,7 +162,7 @@ export function BriefPlayer({
 
       {points.length > 0 && (
         <div>
-          <h3 className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
             {pointsHeading}
           </h3>
           <ul className="flex flex-col gap-1.5">

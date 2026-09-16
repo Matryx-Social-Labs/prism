@@ -28,7 +28,10 @@
   --bg-sunken: #e8ece2;
   --ink: #141414;
   --ink-muted: #5c5f58;
-  --ink-faint: #8a8d85;
+  /* The lightest grey that still reads at 11px on both grounds (4.5:1 on
+     #f2f4ee and #fafbf8). #8a8d85 was the chart's faded ink and sat at 3.0:1,
+     which the label grid printed on every row. */
+  --ink-faint: #6d7068;
   --line: #d6dbcf;
   --line-strong: #b9c0b1;
   /* The reading voice: Hind, then its script siblings. The browser falls
@@ -77,7 +80,7 @@
     --bg-sunken: #0f110e;
     --ink: #ebeee6;
     --ink-muted: #a3a79d;
-    --ink-faint: #737770;
+    --ink-faint: #82867f;
     --line: #2a2e27;
     --line-strong: #3d423a;
 
@@ -105,7 +108,7 @@
   --bg-sunken: #0f110e;
   --ink: #ebeee6;
   --ink-muted: #a3a79d;
-  --ink-faint: #737770;
+  --ink-faint: #82867f;
   --line: #2a2e27;
   --line-strong: #3d423a;
 

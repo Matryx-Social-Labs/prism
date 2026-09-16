@@ -71,7 +71,7 @@ function Guide({ open = false }: { open?: boolean }) {
       </summary>
       <div className="mt-4 space-y-5">
         <div className="border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
-          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
             THE SAME STORY — TICK IT
           </p>
           <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
@@ -86,7 +86,7 @@ function Guide({ open = false }: { open?: boolean }) {
         </div>
 
         <div className="border-l pl-4" style={{ borderColor: "var(--line-strong)" }}>
-          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
             NOT THE SAME STORY — LEAVE IT
           </p>
           <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
@@ -135,7 +135,7 @@ function ClaimTask({
 }) {
   return (
     <>
-      <p className="font-mono text-[10.5px] uppercase" style={{ color: "var(--ink-faint)" }}>
+      <p className="font-mono text-[11px] uppercase" style={{ color: "var(--ink-faint)" }}>
         {claim.source} · question {position + 1}
       </p>
       <h1
@@ -155,7 +155,7 @@ function ClaimTask({
           className="mt-4 text-[13.5px] leading-[1.6]"
           style={{ color: "var(--ink-muted)" }}
         >
-          <span className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+          <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
             HOW THE ARTICLE OPENS ·{" "}
           </span>
           {claim.lead}…
@@ -250,7 +250,7 @@ function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
   const claim = kind === "claim_attribution";
   return (
     <div className="mx-auto max-w-[640px] pt-2">
-      <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+      <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
         READ THIS FIRST · ABOUT TWO MINUTES
       </p>
       <h1 className="mt-2 text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
@@ -264,7 +264,7 @@ function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
       </p>
 
       <div className="mt-7 border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
-        <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>DO</p>
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO</p>
         {claim ? (
           <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
             <li>Read the words either side of the quote — that is usually where the answer is.</li>
@@ -289,7 +289,7 @@ function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
       </div>
 
       <div className="mt-6 border-l-2 pl-4" style={{ borderColor: "var(--danger, #b91c1c)" }}>
-        <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>DO NOT</p>
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO NOT</p>
         {claim ? (
           <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
             <li>Do not judge whether the claim is <em>true</em>, fair, or well argued.</li>
@@ -305,7 +305,7 @@ function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
         )}
       </div>
 
-      <p className="mt-7 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+      <p className="mt-7 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
         REAL MISTAKES FROM THE LAST ROUND
       </p>
       <div className="mt-3 space-y-4">
@@ -364,7 +364,7 @@ function ClaimGuide({ open = false }: { open?: boolean }) {
       </summary>
       <div className="mt-4 space-y-5">
         <div className="border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
-          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
             YES — THE ARTICLE SAYS SO
           </p>
           <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
@@ -378,7 +378,7 @@ function ClaimGuide({ open = false }: { open?: boolean }) {
         </div>
 
         <div className="border-l pl-4" style={{ borderColor: "var(--line-strong)" }}>
-          <p className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+          <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
             NO — RIGHT QUOTE, WRONG MOUTH
           </p>
           <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
@@ -620,7 +620,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             {joinError}
           </p>
         )}
-        <p className="mt-4 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+        <p className="mt-4 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
           YOUR NAME IS ONLY USED TO REMEMBER WHERE YOU GOT TO
         </p>
         <Guide open />
@@ -696,7 +696,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           />
         ) : (
         <>
-          <p className="font-mono text-[10.5px] uppercase" style={{ color: "var(--ink-faint)" }}>
+          <p className="font-mono text-[11px] uppercase" style={{ color: "var(--ink-faint)" }}>
             {task.sector ?? "news"} · question {task.position + 1}
           </p>
           <h1
@@ -750,7 +750,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
                         {c.title}
                       </span>
                       <span
-                        className="mt-1 block font-mono text-[10.5px]"
+                        className="mt-1 block font-mono text-[11px]"
                         style={{ color: "var(--ink-faint)" }}
                       >
                         {provenance(c)}
@@ -759,7 +759,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
                     </span>
                     <span
                       aria-hidden
-                      className="ml-auto shrink-0 font-mono text-[10.5px]"
+                      className="ml-auto shrink-0 font-mono text-[11px]"
                       style={{ color: "var(--ink-faint)" }}
                     >
                       {i + 1}
@@ -807,7 +807,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             >
               Can&apos;t read this
             </button>
-            <span className="font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
+            <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
               KEYS 1–{(task.candidates?.length ?? 0)} TOGGLE · ENTER SUBMITS
             </span>
           </div>

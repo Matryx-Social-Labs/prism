@@ -15,7 +15,7 @@ import { useSession } from "@/lib/session";
  * no watchlist yet). Free, as before: the paid surface is the Markets lens on
  * a story. The markets lens IS speaking here, so its hue marks the supplement.
  */
-const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+const MONO = "font-mono text-[11px] uppercase tracking-[0.06em]";
 
 export default function PulsePage() {
   const session = useSession();
@@ -36,11 +36,6 @@ export default function PulsePage() {
   return (
     <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
       <Masthead dateline={dateline} />
-      <p className={`${MONO} flex items-center gap-2 pt-4`} style={{ color: "var(--lens-finance)" }}>
-        <span aria-hidden className="inline-block h-[7px] w-[7px] rounded-full" style={{ background: "var(--lens-finance)" }} />
-        Markets read
-        {digest && <span style={{ color: "var(--ink-faint)" }}>· synthesized across {digest.event_ids.length} {digest.event_ids.length === 1 ? "story" : "stories"}</span>}
-      </p>
 
       {loading ? (
         <p className={`${MONO} rule-live mt-4 py-6`} style={{ color: "var(--ink-faint)" }}>Composing today&rsquo;s pulse…</p>
@@ -48,9 +43,15 @@ export default function PulsePage() {
         <p className="rule-live mt-4 py-6 text-[15px]" style={{ color: "var(--ink-muted)" }}>The market pulse isn&rsquo;t available right now.</p>
       ) : (
         <div className="max-w-[720px]">
-          <h1 className="mt-3 text-[26px] font-medium leading-[1.2] text-balance sm:text-[30px]" style={{ color: "var(--ink)" }}>
+          <h1 className="mt-4 text-[26px] font-medium leading-[1.2] text-balance sm:text-[30px]" style={{ color: "var(--ink)" }}>
             {digest.headline}
           </h1>
+          {/* Provenance under the headline: the markets lens is speaking, so its hue marks the dot. */}
+          <p className={`${MONO} mt-3 flex items-center gap-2`} style={{ color: "var(--lens-finance)" }}>
+            <span aria-hidden className="inline-block h-[7px] w-[7px] rounded-full" style={{ background: "var(--lens-finance)" }} />
+            Markets read
+            <span style={{ color: "var(--ink-faint)" }}>· synthesized across {digest.event_ids.length} {digest.event_ids.length === 1 ? "story" : "stories"}</span>
+          </p>
           <div className="mt-5 flex max-w-[62ch] flex-col gap-4">
             {digest.narrative.split(/\n{2,}/).map((para, i) => (
               <p key={i} className="text-[16px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>{para}</p>

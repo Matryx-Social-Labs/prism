@@ -22,7 +22,7 @@ export function SectorStrip({
   /** When present, codes call this instead of navigating — the chart re-sorts in place. */
   onPick?: (slug: string | null) => void;
   allHref?: string;
-  /** What ALL means on this surface: Today on the chart, All on a chart of arcs or results. */
+  /** The subject beside the ALL code: Today on the chart; empty where ALL needs no name. */
   allLabel?: string;
 }) {
   const item = (slug: string | null, code: string, name: string, href: string) => {
@@ -38,12 +38,14 @@ export function SectorStrip({
         >
           {code}
         </span>
-        <span
-          className="hidden text-[13.5px] font-medium sm:inline"
-          style={{ color: on ? "var(--ink)" : "var(--ink-muted)" }}
-        >
-          {name}
-        </span>
+        {name && (
+          <span
+            className="hidden text-[13.5px] font-medium sm:inline"
+            style={{ color: on ? "var(--ink)" : "var(--ink-muted)" }}
+          >
+            {name}
+          </span>
+        )}
       </>
     );
     return onPick ? (

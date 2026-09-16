@@ -59,7 +59,7 @@ const LENSES: HeroLens[] = [
   },
 ];
 
-const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+const MONO = "font-mono text-[11px] uppercase tracking-[0.06em]";
 
 export function HeroLensDemo({
   locked = [],
@@ -82,9 +82,10 @@ export function HeroLensDemo({
         <span style={{ color: "var(--ink-faint)" }}>Illustration</span>
       </div>
 
-      <h3 className="px-5 pt-4 text-[18px] font-medium leading-[1.3] text-balance">
+      {/* A paragraph, not a heading: the demo sits inside the hero and must not break the page's outline. */}
+      <p className="px-5 pt-4 text-[18px] font-medium leading-[1.35] text-balance">
         Blockbuster obesity drug goes generic in India after landmark patent ruling
-      </h3>
+      </p>
 
       <div className="flex flex-wrap gap-1.5 px-5 pt-3.5" role="tablist" aria-label="Lens">
         {LENSES.map((l, i) => {
@@ -121,9 +122,6 @@ export function HeroLensDemo({
 
       <div key={active} className={`${flipped ? "flip-body" : ""} relative overflow-hidden px-5 pb-5 pt-4`}>
         {flipped && <span aria-hidden className="flip-scanline" style={{ background: lens.color }} />}
-        <p className={MONO} style={{ color: lens.color }}>
-          {lens.label} read
-        </p>
         {isLocked ? (
           <p className="mt-2 text-[14px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
             The {lens.label} lens reads this story for {lens.plain}. It is a professional reading, so

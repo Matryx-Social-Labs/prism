@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown, Corner } from "@/components/icons";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -179,7 +181,7 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
       rows.push({
         key: `${id}:branch`,
         kind: "branch",
-        title: `${open ? "▾" : "↳"}  ${branch.length} development${branch.length === 1 ? "" : "s"}`,
+        title: `${branch.length} development${branch.length === 1 ? "" : "s"}`,
         meta: span(devs),
         depth: 1,
         rail: open ? "strong" : "solid",
@@ -249,7 +251,7 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
   return (
     <section aria-label="Storyline structure">
       <div
-        className="font-mono text-[10.5px] uppercase leading-[1.7] tracking-[0.06em]"
+        className="font-mono text-[11px] uppercase leading-[1.7] tracking-[0.06em]"
         style={{ color: "var(--ink-muted)" }}
       >
         {shapeLine}
@@ -259,21 +261,20 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
         className="sticky top-0 z-20 mt-3 flex items-center gap-2.5 border-y px-1 py-2"
         style={{ borderColor: "var(--line)", background: "var(--bg)" }}
       >
-        <span className="font-mono text-[10.5px] tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
+        <span className="font-mono text-[11px] tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
           {showAll ? `ALL · ${shown} SHOWN` : `TRUNK · ${onSpineCount} ON THE SPINE`}
         </span>
-        <div className="ml-auto flex gap-1.5">
+        <div className="ml-auto flex gap-4">
           {([["TRUNK", false], ["ALL", true]] as const).map(([label, all]) => (
             <button
               key={label}
               onClick={() => setShowAll(all)}
               aria-pressed={showAll === all}
-              className="flex h-9 items-center rounded-full px-3.5 font-mono text-[10.5px] tracking-[0.1em]"
-              style={
-                showAll === all
-                  ? { background: "var(--ink)", color: "var(--bg)", border: "1px solid var(--ink)" }
-                  : { border: "1px solid var(--line-strong)", color: "var(--ink-muted)", background: "var(--bg-elevated)" }
-              }
+              className="flex h-9 items-center border-b-2 px-1 font-mono text-[11px] tracking-[0.1em]"
+              style={{
+                borderColor: showAll === all ? "var(--ink)" : "transparent",
+                color: showAll === all ? "var(--ink)" : "var(--ink-muted)",
+              }}
             >
               {label}
             </button>
@@ -326,11 +327,16 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
                       textWrap: "pretty",
                     }}
                   >
+                    {r.kind === "branch" && (
+                      <span className="mr-1.5 inline-flex translate-y-[2px]" data-open={r.bold ? "true" : "false"}>
+                        {r.bold ? <ChevronDown /> : <Corner />}
+                      </span>
+                    )}
                     {r.title}
                   </span>
                   {r.meta && (
                     <span
-                      className="font-mono text-[10.5px] tracking-[0.06em]"
+                      className="font-mono text-[11px] tracking-[0.06em]"
                       style={{ color: "var(--ink-faint)" }}
                     >
                       {r.meta}
@@ -362,7 +368,7 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
                   type="button"
                   onClick={r.onTap}
                   // Without this the name concatenates to "2 developments12–23 JUL".
-                  aria-label={r.meta ? `${r.title.replace(/^[▾↳]\s*/, "")}, ${r.meta}` : r.title}
+                  aria-label={r.meta ? `${r.title}, ${r.meta}` : r.title}
                   aria-expanded={r.bold}
                   {...shared}
                 >
@@ -377,10 +383,10 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
       </div>
 
       <p
-        className="px-1 pb-5 pt-3.5 font-mono text-[10.5px] uppercase leading-[1.7] tracking-[0.06em]"
+        className="px-1 pb-5 pt-3.5 font-mono text-[12px] leading-[1.7] tracking-[0.02em]"
         style={{ color: "var(--ink-faint)" }}
       >
-        Root is the most-corroborated development · every other attaches forward in time
+        Root is the most-corroborated development; every other attaches forward in time
       </p>
     </section>
   );

@@ -123,28 +123,16 @@ export function AskPanel({
         launcher ? (
           <button
             onClick={() => setOpen(true)}
-            className="float-right flex items-center gap-2 rounded-full border px-5 py-3 text-[13.5px] font-semibold transition hover:opacity-90"
-            style={{
-              borderColor: "var(--line-strong)",
-              background: "var(--ink)",
-              color: "var(--bg)",
-              boxShadow: "var(--shadow-pop)",
-            }}
+            className="float-right flex items-center gap-2 rounded-full px-5 py-3 text-[13.5px] font-semibold transition hover:opacity-90"
+            style={{ background: "var(--ink)", color: "var(--bg)" }}
           >
-            <span className="spectrum-text text-[15px]" aria-hidden>
-              ◮
-            </span>
             Ask this story
           </button>
         ) : null
       ) : (
         <div
-          className={`flex flex-col overflow-hidden ${docked ? "" : "rounded-[20px] border"}`}
-          style={
-            docked
-              ? undefined
-              : { borderColor: "var(--line)", background: "var(--bg-elevated)", boxShadow: "var(--shadow-pop)" }
-          }
+          className={`flex flex-col overflow-hidden ${docked ? "" : "border"}`}
+          style={docked ? undefined : { borderColor: "var(--line-strong)", background: "var(--bg-elevated)" }}
         >
           {!docked && (
             <div className="flex items-center gap-2.5 border-b px-[18px] py-3.5" style={{ borderColor: "var(--line)" }}>
@@ -181,21 +169,16 @@ export function AskPanel({
             )}
             {turns.map((t, i) =>
               t.role === "u" ? (
-                <div key={i} className="max-w-[85%] self-end">
-                  <p
-                    className="rounded-[14px] px-3.5 py-2 text-[13px] leading-[1.55]"
-                    style={{ background: "var(--bg-sunken)", color: "var(--ink)" }}
-                  >
-                    {t.text}
-                  </p>
+                <div key={i} className="rule-live grid grid-cols-[20px_1fr] gap-x-2 pt-3">
+                  <span className="font-mono text-[11px] leading-[1.9]" style={{ color: "var(--ink-faint)" }}>Q</span>
+                  <p className="text-[13.5px] leading-[1.55]" style={{ color: "var(--ink)" }}>{t.text}</p>
                 </div>
               ) : (
-                <div key={i} className="max-w-[95%] self-start">
+                <div key={i} className="grid grid-cols-[20px_1fr] gap-x-2 pt-1">
+                  <span className="font-mono text-[11px] leading-[1.9]" style={{ color: "var(--ink-faint)" }}>A</span>
+                  <div className="min-w-0">
                   {isRefusal(t) && (
-                    <span
-                      className="mb-1.5 inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                      style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-                    >
+                    <span className="mb-1 block font-mono text-[11px]" style={{ color: "var(--ink)" }}>
                       Not in sources
                     </span>
                   )}
@@ -219,14 +202,15 @@ export function AskPanel({
                           href={c.url ?? undefined}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-full border px-[9px] py-0.5 font-mono text-[10px] font-medium no-underline"
-                          style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
+                          className="font-mono text-[11px] underline-offset-4 hover:underline"
+                          style={{ color: "var(--ink-muted)" }}
                         >
                           [{c.number}] {c.source_name}
                         </a>
                       ))}
                     </div>
                   )}
+                  </div>
                 </div>
               )
             )}
@@ -242,8 +226,8 @@ export function AskPanel({
               <button
                 key={q}
                 onClick={() => submit(q)}
-                className="rounded-full border px-3 py-[5px] text-xs font-medium transition hover:opacity-75"
-                style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--ink-muted)" }}
+                className="border px-3 py-[5px] text-xs font-medium transition hover:opacity-75"
+                style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
               >
                 {q}
               </button>
@@ -260,8 +244,8 @@ export function AskPanel({
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submit(input);
               }}
               placeholder="Ask anything about this story…"
-              className="min-w-0 flex-1 rounded-full border px-4 py-[9px] text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
-              style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--ink)" }}
+              className="min-w-0 flex-1 border px-4 py-[9px] text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+              style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
             />
             <button
               onClick={() => submit(input)}

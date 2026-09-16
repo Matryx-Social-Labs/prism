@@ -93,7 +93,7 @@ describe("BranchTree — branches collapse in place", () => {
   it("collapses the siblings the spine did not take, with their date span", async () => {
     render(<BranchTree tree={t} developments={devs} />);
     const row = screen.getByRole("button", { name: /developments/ });
-    expect(row).toHaveTextContent("↳");
+    expect(row.querySelector("[data-open='false']")).not.toBeNull(); // the branch mark, closed
     // Three leaf children: the spine takes the EARLIEST (11 JUL), the other two
     // collapse. Same month reads "12-23 JUL", not "12 JUL - 23 JUL".
     expect(row).toHaveTextContent(/12-23 JUL/);
@@ -106,7 +106,7 @@ describe("BranchTree — branches collapse in place", () => {
     await userEvent.click(screen.getByRole("button", { name: /developments/ }));
     expect(screen.getByText("Off-spine two")).toBeInTheDocument();
     expect(screen.getByText("Spine second")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /developments/ })).toHaveTextContent("▾");
+    expect(screen.getByRole("button", { name: /developments/ }).querySelector("[data-open='true']")).not.toBeNull();
   });
 
   it("collapses again on a second tap", async () => {

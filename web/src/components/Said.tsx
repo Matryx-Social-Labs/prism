@@ -47,7 +47,7 @@ export function Said({
                     “{c.quote_text}”
                   </blockquote>
                   <div
-                    className="mt-1 flex items-baseline gap-2 font-mono text-[10.5px]"
+                    className="mt-1 flex items-baseline gap-2 font-mono text-[11px]"
                     style={{ color: "var(--ink-faint)" }}
                   >
                     {/* The citation IS the link: one tap to check us, same target/rel as

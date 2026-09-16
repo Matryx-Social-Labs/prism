@@ -72,14 +72,14 @@ export default function YouPage() {
     window.location.href = "/feed";
   };
 
-  const identity = session ? `signed in as ${session.email}` : "browsing without an account";
+  const identity = session ? `Signed in as ${session.email}.` : "Your profile lives in this browser; no account needed.";
 
   return (
     <div className="mx-auto max-w-[720px] px-5 pb-24 sm:px-8 lg:pb-16">
-      <Masthead dateline={identity} />
+      <Masthead dateline={null} />
       <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">You</h1>
       <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
-        Everything your chart is built from. Your profile lives in this browser.
+        Everything your chart is built from. {identity}
       </p>
 
       {loaded && (
@@ -117,7 +117,7 @@ export default function YouPage() {
                   <li key={e.id} className="rule-live">
                     <Link href={`/story/${e.id}`} className="block py-3">
                       <p className="text-[15px] font-medium leading-[1.4]">{e.title}</p>
-                      <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{shortDate(e.last_updated_at)}</p>
+                      <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{shortDate(e.last_updated_at)}</p>
                     </Link>
                   </li>
                 ))}

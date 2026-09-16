@@ -146,7 +146,7 @@ describe("You — when an API is down", () => {
 describe("You — identity, following, account", () => {
   it("presents a guest as browsing without an account and offers sign-in, asking for no watchlist", async () => {
     render(<YouPage />);
-    expect(await screen.findByText("browsing without an account")).toBeInTheDocument();
+    expect(await screen.findByText(/no account needed/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Sign in to follow/ })).toBeInTheDocument();
     expect(getWatchlist).not.toHaveBeenCalled();
   });
@@ -155,7 +155,7 @@ describe("You — identity, following, account", () => {
     useSession.mockReturnValue({ token: "t", userId: "u", email: "asha@example.in" });
     getWatchlist.mockResolvedValue([{ id: "1", kind: "ticker", value: "RELIANCE" }]);
     render(<YouPage />);
-    expect(await screen.findByText("signed in as asha@example.in")).toBeInTheDocument();
+    expect(await screen.findByText(/Signed in as asha@example.in/)).toBeInTheDocument();
     expect(await screen.findByText("RELIANCE")).toBeInTheDocument();
     Object.defineProperty(window, "location", { value: { href: "" }, writable: true });
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));

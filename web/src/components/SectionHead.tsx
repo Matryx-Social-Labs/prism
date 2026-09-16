@@ -11,7 +11,7 @@ export function SectionHead({ id, title, count, hint }: { id: string; title: str
         )}
       </h2>
       {hint && (
-        <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+        <p className="mt-1.5 max-w-[36em] text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
           {hint}
         </p>
       )}

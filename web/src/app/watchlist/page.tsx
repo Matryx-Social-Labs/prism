@@ -16,7 +16,7 @@ import { follow, getWatchlist, unfollow, watchlistEvents, type WatchEvent, type 
  * where the chart keeps its sources count. Empty: the form to follow one.
  * `?ticker=X` (from Market Pulse) narrows the rows to one ticker.
  */
-const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+const MONO = "font-mono text-[11px] uppercase tracking-[0.06em]";
 
 function WatchlistInner() {
   const session = useSession();

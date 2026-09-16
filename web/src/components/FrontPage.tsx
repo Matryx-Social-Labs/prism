@@ -26,6 +26,7 @@ import { sectorGroup, sectorParam } from "@/lib/sectors";
  */
 type Tab = "today" | "foryou";
 const PROMISE_SEEN = "prism.promise.seen";
+const WINDOW = 60;
 
 export function FrontPage({ sector = null }: { sector?: string | null }) {
   const group = sectorGroup(sector);
@@ -63,7 +64,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
       state: profile?.state ?? undefined,
       languages: profile?.languages,
       sort: "latest",
-      limit: 60,
+      limit: WINDOW,
     })
       .then((list) => { if (!cancelled) setItems(list); })
       .catch(() => { if (!cancelled) setError("The Prism API is unreachable right now."); });
@@ -75,10 +76,14 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
     return items.filter((i) => (scope === "region" ? i.is_regional : !i.is_regional));
   }, [items, scope, profile]);
 
+  // The feed is a window (60), not the day: at the cap say "60+" rather than
+  // print the cap as a count; and count the sources behind the rows shown.
   const dateline = useMemo(() => {
     const d = istDate(new Date());
-    const n = scoped.length;
-    return items ? `${d} · ${n} ${n === 1 ? "story" : "stories"}` : d;
+    if (!items) return d;
+    const n = scoped.length >= WINDOW ? `${WINDOW}+` : String(scoped.length);
+    const sources = scoped.reduce((t, i) => t + (i.source_count || 0), 0);
+    return `${d} · ${n} ${scoped.length === 1 ? "story" : "stories"} · ${sources.toLocaleString("en-IN")} ${sources === 1 ? "source" : "sources"}`;
   }, [items, scoped]);
 
   const primaryLang = profile?.languages?.[0] ?? "en";
@@ -93,7 +98,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   return (
     <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-20">
       <Masthead dateline={dateline} right={profile?.state ? (
-        <div className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.06em]">
+        <div className="flex gap-3 font-mono text-[11px] uppercase tracking-[0.06em]">
           {scopes.map(([s, l]) => (
             <button key={s} onClick={() => pick(s)} aria-pressed={scope === s}
               className="underline-offset-4 aria-pressed:underline"
@@ -102,6 +107,9 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
         </div>
       ) : null} />
       <SectorStrip active={group?.slug ?? null} />
+      <h1 id="chart-title" className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">
+        {group ? group.name : tab === "foryou" ? "For you" : "Today"}
+      </h1>
       {showPromise && !group && (
         <p className="rule-live py-3 text-[14px]" style={{ color: "var(--ink-muted)" }}>
           One story. Every perspective.{" "}
@@ -121,7 +129,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
           ))}
         </div>
       )}
-      <section aria-label={`Today's chart, ${subject}`} className="pt-3">
+      <section aria-labelledby="chart-title" className="pt-3">
         {error ? (
           <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }}>{error}</p>
         ) : items === null ? (

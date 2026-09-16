@@ -18,7 +18,7 @@ import { thumbUrl } from "@/lib/thumb";
 // and catalyst for markets. Simultaneity is what the extra width buys, and it is
 // why this is a different composition rather than a wider column.
 
-const MONO = "font-mono text-[10.5px] uppercase tracking-[0.1em]";
+const MONO = "font-mono text-[11px] uppercase tracking-[0.1em]";
 const HUE: Record<string, string> = {
   reader: "#F59E0B",
   general: "#F59E0B",
@@ -140,7 +140,7 @@ export function StoryDesktop({
                   <div style={{ color: "var(--ink-muted)" }}>{value}</div>
                 </>
               ) : (
-                <div style={{ color: n === 0 ? hue : "var(--ink-faint)" }}>{value}</div>
+                <div style={{ color: n === 0 ? (lens === "reader" ? "var(--ink-muted)" : hue) : "var(--ink-faint)" }}>{value}</div>
               )}
             </div>
           ))}
@@ -171,8 +171,8 @@ export function StoryDesktop({
             )}
 
             <div className="mt-7 border-t pt-6" style={{ borderColor: "var(--line)" }}>
-              <div className={`${MONO} flex items-baseline justify-between`} style={{ color: "var(--ink-muted)" }}>
-                <span>{lensName(lens)} brief</span>
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">{lensName(lens)} brief</h2>
                 {offered.length > 1 && (
                   <span style={{ color: "var(--ink-faint)" }}>
                     press {offered.map((_, n) => n + 1).join(" · ")}
@@ -196,9 +196,7 @@ export function StoryDesktop({
           </div>
 
           <aside className="sticky top-20 self-start">
-            <div className={`${MONO} mb-3.5`} style={{ color: "var(--ink-muted)" }}>
-              The lens board
-            </div>
+            <h2 className="mb-3.5 font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">The lens board</h2>
             {/* items-start, because a <button> centres its content vertically by
                 default: stretched to the tallest column, a lens whose opening is
                 one line sat 19px below one whose opening is three. */}

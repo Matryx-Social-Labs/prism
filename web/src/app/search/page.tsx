@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
 import { Masthead } from "@/components/Masthead";
@@ -17,7 +17,8 @@ import { useScrollRestore } from "@/lib/useScrollRestore";
  * strip filters them in place. A failed request says so, in its own line —
  * never "no matches" for an error.
  */
-const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+const MONO = "font-mono text-[11px] uppercase tracking-[0.06em]";
+const HINT = "font-mono text-[12px] tracking-[0.02em]";
 const TRY = ["RELIANCE", "CVE-2026-62144", "Kerala"];
 
 function SearchInner() {
@@ -38,8 +39,12 @@ function SearchInner() {
   // Real entities off the live trending cast: a hardcoded list would go stale
   // and, on a product that sells provenance, would be quietly dishonest.
   const [entities, setEntities] = useState<string[]>([]);
+  const box = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Focus without the browser's scroll-into-view: autoFocus slid the query
+    // and the masthead under the sticky header on load.
+    box.current?.focus({ preventScroll: true });
     setPrimaryLang(loadProfile()?.languages?.[0] ?? "en");
     fetchTrending({ limit: 6 })
       .then((s) => setEntities([...new Set(s.flatMap((x) => x.cast ?? []))].slice(0, 6)))
@@ -116,7 +121,7 @@ function SearchInner() {
       <Masthead dateline={dateline} />
       {/* The query is the masthead's second line: the thing you typed is the headline of this screen. */}
       <input
-        autoFocus
+        ref={box}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && setQ("")}
@@ -125,10 +130,10 @@ function SearchInner() {
         className="w-full border-0 bg-transparent p-0 pb-2 text-[26px] font-medium leading-tight outline-none placeholder:opacity-40 sm:text-[32px]"
         style={{ color: "var(--ink)" }}
       />
-      <p className={`${MONO} pb-2`} style={{ color: "var(--ink-faint)" }}>
-        stories · entities · tickers · CVE ids · Esc clears
+      <p className={`${HINT} pb-2`} style={{ color: "var(--ink-faint)" }}>
+        Stories · entities · tickers · CVE ids · Esc clears
       </p>
-      <SectorStrip active={group} onPick={setGroup} allLabel="All" />
+      <SectorStrip active={group} onPick={setGroup} allLabel="" />
 
       {term.length < 2 && !loading && (
         <div className="grid gap-8 pt-6 lg:grid-cols-2 lg:gap-14">

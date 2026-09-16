@@ -79,18 +79,22 @@ export function ChartRow({
           {count}
         </span>
 
-        <div className="min-w-0">
+        {/* The lead's photo sits above the headline on a phone and beside it from
+            lg: a 1100px hero would push the list itself below the fold, and the
+            list is the page (THESIS). */}
+        <div className={`min-w-0 ${lead && item.image_url ? "lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-8" : ""}`}>
           {lead && item.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={item.image_url}
               alt=""
-              className="mb-3 aspect-[16/9] w-full object-cover"
+              className="mb-3 aspect-[16/9] w-full object-cover lg:order-2 lg:mb-0"
               style={{ filter: "grayscale(0.15) contrast(1.02)" }}
               loading="eager"
             />
           )}
-          <h3
+          <div className="min-w-0 lg:order-1">
+          <h2
             className={`${lead ? "text-[22px] leading-[1.25] sm:text-[26px]" : "text-[15.5px] leading-[1.4]"} font-medium text-balance group-hover:underline group-focus-visible:underline underline-offset-4`}
             style={{ color: "var(--ink)" }}
           >
@@ -108,14 +112,14 @@ export function ChartRow({
                 ))}
               </span>
             )}
-          </h3>
+          </h2>
           {lead && item.summary && (
             <p className="mt-2 text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
               {item.summary}
             </p>
           )}
           <div
-            className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[10.5px] uppercase tracking-[0.04em]"
+            className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[11px] uppercase tracking-[0.04em]"
             style={{ color: "var(--ink-faint)" }}
           >
             {single && <span style={{ color: "var(--ink-muted)" }}>1 source</span>}
@@ -127,6 +131,7 @@ export function ChartRow({
                 · read
               </span>
             )}
+          </div>
           </div>
         </div>
       </Link>
