@@ -83,6 +83,58 @@ async def trending(
     }
 
 
+async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: list[str]) -> list[dict]:
+    """Different stories that touch this one, two ways the record can say so:
+    a causal note in event_links crossing the story boundary, or two or more
+    protagonists in common. At most five, the strongest overlap first. Nothing
+    is inferred beyond what those two tables hold."""
+    members = [str(m) for m in member_ids]
+    if not members and not cast:
+        return []
+    rows = (
+        await db.execute(
+            text(
+                """
+                WITH causal AS (
+                    SELECT DISTINCT st.id
+                    FROM event_links el
+                    JOIN stories st ON st.member_event_ids ? (CASE WHEN el.from_event_id::text = ANY(:members)
+                                                                   THEN el.to_event_id ELSE el.from_event_id END)::text
+                    WHERE el.relation <> 'none'
+                      AND (el.from_event_id::text = ANY(:members) OR el.to_event_id::text = ANY(:members))
+                ),
+                shared AS (
+                    SELECT st.id, array_agg(c.name ORDER BY c.name) AS names
+                    FROM stories st, jsonb_array_elements_text(st."cast") AS c(name)
+                    WHERE c.name = ANY(:cast)
+                    GROUP BY st.id
+                )
+                SELECT st.slug, st.label, st.source_count, st.velocity, st.last_updated_at,
+                       jsonb_array_length(st.member_event_ids) AS developments,
+                       COALESCE(sh.names, ARRAY[]::text[]) AS shared_cast,
+                       (ca.id IS NOT NULL) AS causal
+                FROM stories st
+                LEFT JOIN causal ca ON ca.id = st.id
+                LEFT JOIN shared sh ON sh.id = st.id
+                WHERE st.id <> :sid AND st.status = 'active' AND st.merged_into IS NULL
+                  AND (ca.id IS NOT NULL OR array_length(sh.names, 1) >= 2)
+                ORDER BY (ca.id IS NOT NULL) DESC, COALESCE(array_length(sh.names, 1), 0) DESC, st.source_count DESC
+                LIMIT 5
+                """
+            ),
+            {"members": members, "cast": cast, "sid": story_id},
+        )
+    ).mappings().all()
+    return [
+        {
+            "slug": r["slug"], "label": r["label"], "developments": r["developments"], "source_count": r["source_count"],
+            "velocity": r["velocity"], "last_updated_at": r["last_updated_at"].isoformat() if r["last_updated_at"] else None,
+            "shared_cast": list(r["shared_cast"] or []), "causal": bool(r["causal"]),
+        }
+        for r in rows
+    ]
+
+
 async def _route_for(db: AsyncSession, member_ids: list | None) -> dict | None:
     """The route glyph's data for one row: the persisted branch tree, each node
     with the day it happened. One small query per row on a list of at most 50."""
@@ -169,7 +221,9 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         # predates the current partition run — the client falls back to the flat
         # timeline it already renders, so this is additive with no regression.
         branches = await branch_tree_for_members(story["member_event_ids"])
+    related = await _related_stories(db, story["id"], story["member_event_ids"] or [], story["cast"] or [])
     return {
+        "related": related,
         "slug": story["slug"],
         "canonical_slug": story["slug"],  # if != the requested slug, the client should redirect
         "label": story["label"],

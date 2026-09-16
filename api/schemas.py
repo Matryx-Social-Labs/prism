@@ -289,6 +289,21 @@ class BranchTreeOut(BaseModel):
     shape: BranchShapeOut
 
 
+class RelatedStoryOut(BaseModel):
+    """A different story that touches this one: by a causal note the thread
+    linker wrote across the boundary, or by cast the two share. Never drawn on
+    the route; said beside it."""
+
+    slug: str
+    label: str
+    developments: int
+    source_count: int
+    velocity: int
+    last_updated_at: str | None
+    shared_cast: list[str] = []
+    causal: bool = False
+
+
 class TrendingStoryDetail(BaseModel):
     slug: str
     canonical_slug: str  # if != the requested slug, the client should redirect
@@ -303,3 +318,4 @@ class TrendingStoryDetail(BaseModel):
     # None for a storyline that predates the current partition run — the client
     # falls back to the flat timeline, so null is a real value, not an error.
     branches: BranchTreeOut | None = None
+    related: list[RelatedStoryOut] = []

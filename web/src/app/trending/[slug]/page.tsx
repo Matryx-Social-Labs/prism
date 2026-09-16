@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
 import { Attention } from "@/components/Attention";
 import { BranchTree } from "@/components/BranchTree";
+import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { RouteMap } from "@/components/RouteMap";
 import { SectionHead } from "@/components/SectionHead";
 import { StoryTimeline } from "@/components/StoryTimeline";
@@ -69,8 +70,11 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
           <SectionHead id="route-title" title="The route" hint="Every development on its line: the main line, its branches, the branch lines that grew their own stations, and what was reported off the main line. Tap a station." />
           <RouteMap tree={tree} developments={s.developments} />
           <Attention tree={tree} developments={s.developments} />
+          <RelatedRoutes related={s.related ?? []} />
         </section>
-      ) : null}
+      ) : (
+        <RelatedRoutes related={s.related ?? []} />
+      )}
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,720px)_1fr] lg:gap-16">
         <div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BranchTree } from "@/components/BranchTree";
+import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { RouteMap } from "@/components/RouteMap";
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
 
@@ -50,6 +51,7 @@ export function StoryRoute({ slug, currentId }: { slug: string; currentId: strin
       <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
         The whole route, every branch and satellite →
       </a>
+      <RelatedRoutes related={story.related ?? []} />
     </div>
   );
 }

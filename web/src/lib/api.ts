@@ -280,6 +280,19 @@ export interface TrendingStoryDetail {
   timeline_cast: string[];
   /** Null for a storyline that predates the current partition run. */
   branches: BranchTreeData | null;
+  /** Different stories that touch this one; never drawn on the route. */
+  related: RelatedStory[];
+}
+
+export interface RelatedStory {
+  slug: string;
+  label: string;
+  developments: number;
+  source_count: number;
+  velocity: number;
+  last_updated_at: string | null;
+  shared_cast: string[];
+  causal: boolean;
 }
 
 export async function fetchTrendingStory(slug: string): Promise<TrendingStoryDetail | null> {
