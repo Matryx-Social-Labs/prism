@@ -672,6 +672,30 @@ export function StoryView({ event }: { event: EventDetail }) {
         </section>
       )}
 
+      {/* ── So what ─────────────────────────────────────────
+          Who is affected first and what likely follows, extracted from the
+          reports; a second-order effect indents under its cause. Direction is
+          an arrow in ink, never a hue, and the horizon prints in mono. */}
+      {event.impacts.length > 0 && (
+        <section id="so-what" className="mt-10 scroll-mt-24" aria-labelledby="sowhat-title">
+          <Head id="sowhat-title" title="So what" count={event.impacts.length} hint="Who is affected first and what likely follows, with a direction and a horizon. Extracted from the reports, never invented." />
+          <ul>
+            {event.impacts.map((imp) => (
+              <li key={imp.id} className={`rule-live grid grid-cols-[18px_1fr] gap-x-2.5 py-2.5 text-[14.5px] leading-[1.55] ${imp.parent_impact_id ? "ml-7" : ""}`}>
+                <span className="mt-[5px]" style={{ color: "var(--ink-faint)" }} aria-label={imp.direction ?? "direction unknown"}>
+                  {imp.direction === "negative" ? <ArrowDown /> : imp.direction === "positive" ? <ArrowUp /> : <Dash />}
+                </span>
+                <span>
+                  <b className="font-semibold">{imp.entity_name ?? "Affected party"}</b>{" "}
+                  <span style={{ color: "var(--ink-muted)" }}>{imp.effect.replaceAll("_", " ")}</span>
+                  {imp.horizon && <span className={`${MONO_LABEL} ml-1.5`} style={{ color: "var(--ink-faint)" }}>· {imp.horizon}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* ── What was said ────────────────────────────────────
           Rules and type, neutral ink. The quote and the speaker are the body
           voice; only the provenance line ([n] · outlet · date) is mono. Nothing
@@ -688,6 +712,25 @@ export function StoryView({ event }: { event: EventDetail }) {
             hint="Attributed, verbatim. Every quote is checked against the article it came from. One that does not match is not shown."
           />
           <Said claims={claims} sourceIndex={sourceIndex} />
+        </section>
+      )}
+
+      {/* ── Coverage ────────────────────────────────────────
+          Where the reports were filed from, counted; the reader's own state
+          when it is absent; single origin called out in mono. All three are
+          facts of the record, so an empty coverage prints nothing. */}
+      {coverageEntries.length > 0 && (
+        <section id="coverage" className="mt-10 scroll-mt-24" aria-labelledby="coverage-title">
+          <Head id="coverage-title" title="Coverage" />
+          <div className="rule-live flex flex-wrap gap-x-6 gap-y-2 py-2.5 text-[14.5px]">
+            <span>
+              {sourceCount} {sourceCount === 1 ? "report" : "reports"},{" "}
+              {coverageEntries.length === 1 ? <>all filed from <b className="font-semibold">{regionName(coverageEntries[0][0])}</b></> : <>filed from {coverageEntries.map(([iso, n]) => `${regionName(iso)} ×${n}`).join(", ")}</>}
+              {(event.coverage?.unknown ?? 0) > 0 && <span style={{ color: "var(--ink-muted)" }}> · {event.coverage!.unknown} of unknown origin</span>}
+            </span>
+            {gapText && <span className="inline-flex items-center gap-2"><Dash /> {gapText}</span>}
+            {event.coverage?.single_origin && <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>Single origin</span>}
+          </div>
         </section>
       )}
 

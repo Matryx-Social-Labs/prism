@@ -76,10 +76,12 @@ describe("the ticket — the header strip", () => {
   });
 });
 
-describe("the ticket — retired sections (D4)", () => {
+describe("the ticket — retired sections (D4) and So what (founder, 2026-09-17)", () => {
   // The route and the passenger list are the perspectives, counted and verbatim.
-  // A payload that still carries the LLM cards must not revive them.
-  it("renders no Perspectives cards and no What to expect, even when the payload carries them", () => {
+  // A payload that still carries the LLM cards must not revive them. The
+  // impacts, though, are back as "So what": extracted per report, direction
+  // as an arrow, horizon in mono.
+  it("renders no Perspectives cards; renders the impacts as So what", () => {
     render(
       <StoryView
         event={event({
@@ -91,8 +93,18 @@ describe("the ticket — retired sections (D4)", () => {
     expect(screen.queryByText("Perspectives")).toBeNull();
     expect(screen.queryByText("A model's summary.")).toBeNull();
     expect(screen.queryByText("What to expect")).toBeNull();
-    expect(screen.queryByText(/loses/)).toBeNull();
+    expect(screen.getByText("So what")).toBeInTheDocument();
+    expect(screen.getByText("Someone")).toBeInTheDocument();
+    expect(screen.getByText("loses")).toBeInTheDocument();
+    expect(screen.getByLabelText("negative")).toBeInTheDocument();
     expect(mobile().queryByRole("link", { name: /Perspectives|What to expect/ })).toBeNull();
+  });
+
+  it("prints where the reports were filed from, and single origin when the record says so", () => {
+    render(<StoryView event={event({ coverage: { origins: { IN: 3 }, unknown: 0, single_origin: true } })} />);
+    expect(screen.getByText("Coverage")).toBeInTheDocument();
+    expect(screen.getByText(/all filed from/)).toBeInTheDocument();
+    expect(screen.getByText("Single origin")).toBeInTheDocument();
   });
 });
 
