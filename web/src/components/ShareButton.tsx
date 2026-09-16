@@ -51,9 +51,9 @@ export function ShareButton({ url, title, fill }: { url: string; title: string; 
       className={
         fill
           ? "flex h-11 w-full items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
-          : "inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition hover:opacity-80"
+          : "inline-flex h-9 items-center gap-1.5 border px-3 text-[13px] font-medium transition hover:opacity-80"
       }
-      style={{ borderColor: "var(--line-strong)", color: "var(--ink)", background: "var(--bg-elevated)" }}
+      style={{ borderColor: "var(--line-strong)", color: "var(--ink)", background: fill ? "var(--bg-elevated)" : "transparent" }}
       aria-label="Share this story"
     >
       <ArrowUpRight />

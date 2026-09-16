@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { fetchBrief, fetchQuestions, type EventDetail } from "@/lib/api";
+import { fetchBrief, fetchQuestions, type EventDetail, type TrendingStoryDetail } from "@/lib/api";
 import { ticketFacts } from "@/lib/ticket";
 import { headlineByline } from "@/lib/headline";
+import { useStateNames } from "@/lib/useStateName";
 import { useRouter } from "next/navigation";
 
 import { lensMeta, useLenses } from "@/lib/lenses";
@@ -14,8 +15,9 @@ import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { ShareButton } from "@/components/ShareButton";
-import { StoryDesktop } from "@/components/StoryDesktop";
+import { DesktopRail, LensBoard } from "@/components/StoryDesktop";
 import { StoryRoute } from "@/components/StoryRoute";
+import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { Said } from "@/components/Said";
 import { SectionHead as Head } from "@/components/SectionHead";
 import { SourceList, indexSources } from "@/components/SourceList";
@@ -45,6 +47,7 @@ function regionName(code: string): string {
 }
 
 const MONO_LABEL = "font-mono text-[11px] uppercase tracking-[0.06em]";
+const SOURCES_FOLD = 8;
 
 export function StoryView({ event }: { event: EventDetail }) {
   const cyber = event.projection?.cyber ?? null;
@@ -68,6 +71,8 @@ export function StoryView({ event }: { event: EventDetail }) {
   >(null);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
+  // Country codes resolve locally; a state code (IN-KA) needs the regions list.
+  const regionLabels = useStateNames(event.regions).map((r) => (r.includes("-") ? r : regionName(r)));
   // Did the READER ask for this lens, or did it come back from their profile?
   // The locked-lens guard below has to tell those apart, and `lens` alone can't.
   const readerPicked = useRef(false);
@@ -191,6 +196,12 @@ export function StoryView({ event }: { event: EventDetail }) {
   // in view. Anchors still jump on click; this only drives the active border.
   const [activeSection, setActiveSection] = useState("lens-brief");
   const [askOpen, setAskOpen] = useState(false);
+  // The first eight outlets, then the rest on request: forty-four rows is a
+  // wall, and the [n] index is the same either way.
+  const [allSources, setAllSources] = useState(false);
+  // The route page owns the story; the ticket learns its related routes from
+  // the same fetch StoryRoute makes, so nothing is asked for twice.
+  const [routeStory, setRouteStory] = useState<TrendingStoryDetail | null>(null);
 
   // Picking a lens from the pinned rail must SHOW the result: the brief is
   // off-screen behind the reader's scroll position, so the re-typeset flip
@@ -247,64 +258,61 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   return (
     <>
-      {/* Desktop is its own composition: the mono rail re-inks with the lens
-          and all the openings sit on the board at once. State stays here so
-          there is one lens machine, not two. */}
-      <StoryDesktop
-        event={event}
-        lens={lens}
-        offered={offered}
-        briefs={briefs}
-        brief={brief}
-        facts={facts}
-        lensName={(slug) => lensMeta(slug).short}
-        isLocked={isLocked}
-        onPick={(slug) => pickLens(slug, false)}
-      />
+    {/* One tree at every width. On a desk it is a grid: the mono rail, the
+        604px reading column, and a sticky column beside it that reads the page
+        with you (the lens board, the section nav); the header spans both
+        columns. Width buys simultaneity, never longer lines. */}
+    <div className="mx-auto max-w-[1240px] px-5 pb-[164px] pt-5 sm:px-8 lg:grid lg:w-[1376px] lg:max-w-none lg:grid-cols-[104px_604px_604px] lg:gap-x-8 lg:px-0 lg:pb-20 lg:pt-[22px]">
+      <div className="hidden lg:block" aria-hidden />
 
-    <div className="mx-auto max-w-[1240px] px-5 pt-5 sm:px-8 lg:hidden">
-      <Link href="/" scroll={false} className={`${MONO_LABEL} mb-4 block`} style={{ color: "var(--ink-muted)" }}>
-        ← Today&rsquo;s chart
-      </Link>
-
-      {/* min-w-0: without it a grid item's default min-width:auto lets the
-          inner horizontal scrollers (lens-tab strip, mobile anchor nav, cyber
-          table) stretch the column past the viewport — the mobile right-bleed. */}
-      <article className="min-w-0">
-      {/* ── The header strip ───────────────────────────────────
-          What is true whichever lens is reading: code · sources · origins ·
-          stamp. A single-source story sits on a dashed rule — state is line
-          form, never hue — and the strip says so before the headline does. */}
-      <header>
-        <div
-          className={`${single ? "rule-single" : "rule-live"} ticket-strip flex flex-wrap items-baseline gap-x-2.5 gap-y-1 pt-3 ${MONO_LABEL}`}
-          style={{ color: "var(--ink-muted)" }}
-          aria-label="Story facts"
-        >
-          {facts.map((f, i) => (
-            <span key={i} style={i === 0 ? { color: "var(--ink)" } : undefined}>
-              {f}
-            </span>
-          ))}
-          {(cyber?.cve_ids ?? []).slice(0, 3).map((cve) => (
-            <span key={cve} style={{ color: "var(--ink)" }}>{cve}</span>
-          ))}
-          {(finance?.tickers ?? []).slice(0, 4).map((t) => (
-            <span key={t} style={{ color: "var(--ink)" }}>{t}</span>
-          ))}
+      {/* ── The header: the strip, the headline, whose words it is ──── */}
+      <header className="min-w-0 lg:col-span-2">
+        <Link href="/feed" scroll={false} className={`${MONO_LABEL} mb-4 block lg:hidden`} style={{ color: "var(--ink-muted)" }}>
+          ← Today&rsquo;s chart
+        </Link>
+        {/* The strip: what is true whichever lens is reading: code · sources ·
+            origins · stamp. A single-source story sits on a dashed rule — state
+            is line form, never hue. Share sits on the same rule: sharing is an
+            act on the record, not on a lens. */}
+        <div className={`${single ? "rule-single" : "rule-live"} flex items-start justify-between gap-4 pt-3`}>
+          <div
+            className={`ticket-strip flex flex-wrap items-baseline gap-x-2.5 gap-y-1 ${MONO_LABEL}`}
+            style={{ color: "var(--ink-muted)" }}
+            aria-label="Story facts"
+          >
+            {facts.map((f, i) => (
+              <span key={i} style={i === 0 ? { color: "var(--ink)" } : undefined}>
+                {f}
+              </span>
+            ))}
+            {(cyber?.cve_ids ?? []).slice(0, 3).map((cve) => (
+              <span key={cve} style={{ color: "var(--ink)" }}>{cve}</span>
+            ))}
+            {(finance?.tickers ?? []).slice(0, 4).map((t) => (
+              <span key={t} style={{ color: "var(--ink)" }}>{t}</span>
+            ))}
+          </div>
+          <span className="hidden flex-none lg:inline-flex">
+            <ShareButton url={`/story/${event.id}`} title={event.title} />
+          </span>
         </div>
-        {gapText && (
-          <p className="mt-2 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-            {gapText}
-          </p>
-        )}
-
-        <h1 className="mt-4 text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">
+        <h1 className="mt-4 max-w-[922px] text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px] lg:mt-3 lg:text-[40px] lg:leading-[1.1]">
           {event.title}
         </h1>
         <p className="mt-2.5 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>{headlineByline(event)}</p>
+        <div className="hidden lg:mt-[22px] lg:block lg:border-b" style={{ borderColor: "var(--line)" }} />
+      </header>
+
+      {/* ── The rail (desk): the lens's facts in mono; it re-inks with the
+          lens, the desktop half of the flip. */}
+      <div className={`hidden lg:block lg:pt-[26px] ${MONO_LABEL} leading-[1.9]`} style={{ color: "var(--ink-faint)" }}>
+        <DesktopRail event={event} lens={lens} />
+      </div>
+
+      {/* ── The reading column ───────────────────────────────────── */}
+      <article className="min-w-0 lg:pt-[26px]">
         {event.summary && (
-          <p className="mt-3 text-[15.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-3 text-[15.5px] leading-[1.6] lg:mt-0" style={{ color: "var(--ink-muted)", textWrap: "pretty" }}>
             {event.summary}
           </p>
         )}
@@ -316,7 +324,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               alt=""
               fill
               priority
-              sizes="(max-width: 780px) 100vw, 740px"
+              sizes="(max-width: 780px) 100vw, 604px"
               className="object-cover"
               style={{ filter: "grayscale(0.15) contrast(1.02)" }}
               onError={(e) => {
@@ -326,15 +334,8 @@ export function StoryView({ event }: { event: EventDetail }) {
           </div>
         )}
 
-        {(event.entities.length > 0 || event.regions.length > 0) && (
-          <p className="mt-4 text-[13px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-            <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>Affected</span>{" "}
-            {[...event.regions.map(regionName), ...event.entities.map((en) => en.name)].join(" · ")}
-          </p>
-        )}
-      </header>
-
-      {/* ── On this story — the mobile section nav, sticky, codes underlined ── */}
+      {/* ── On this story — the phone's section nav, sticky through every
+          section it names; the desk has the same list in the column beside. */}
       <nav
         className={`hide-scroll sticky top-0 z-20 -mx-5 mt-5 flex gap-4 overflow-x-auto border-b px-5 sm:-mx-8 sm:px-8 lg:hidden ${MONO_LABEL}`}
         style={{ borderColor: "var(--line)", background: "var(--bg)" }}
@@ -357,64 +358,18 @@ export function StoryView({ event }: { event: EventDetail }) {
       </nav>
 
       {/* ── The lens block — the product moment ─────────────────
-          Mechanics unchanged: tabs, the locked flip, the gate, the keys. The
-          container is a rule-bounded block, not a card. */}
-      <section id="lens-brief" className="rule-live mt-8 scroll-mt-24 overflow-hidden">
-        <div className="hidden border-b lg:block" style={{ borderColor: "var(--line)" }}>
-          <div className="flex items-center gap-1.5 py-3" role="tablist" aria-label="Read this story through a lens">
-            <span className={`${MONO_LABEL} mr-1`} style={{ color: "var(--ink-faint)" }}>
-              Lens
+          Mechanics unchanged: the locked flip, the gate, the keys. Headed like
+          every other section; the phone's rail and the desk's board are the
+          controls, so no tab row here. */}
+      <section id="lens-brief" className="rule-live mt-8 scroll-mt-24 overflow-hidden pt-4 lg:mt-7">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">{meta.short} brief</h2>
+          {offered.length > 1 && (
+            <span className={`hidden ${MONO_LABEL} lg:inline`} style={{ color: "var(--ink-faint)" }} aria-hidden>
+              Press {offered.map((_, i) => i + 1).join(" · ")}
             </span>
-            {offered.map((slug) => {
-              const m = lensMeta(slug);
-              const selected = slug === lens;
-              const locked = isLocked(slug);
-              return (
-                <button
-                  key={slug}
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => {
-                    // Locked pro lens: flip to it anyway. The re-typeset reveals the
-                    // inline "sign in to unlock" prompt in place (isLocked branch
-                    // below) — so a signed-out reader SEES the signature flip and
-                    // keeps their place on the story instead of a hard bounce to
-                    // /signin. No brief is fetched for a locked lens, so it stays free.
-                    pickLens(slug, false);
-                  }}
-                  title={locked ? `Sign in to read the ${m.short} lens: ${m.plain ?? m.tagline} (free)` : undefined}
-                  className="flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
-                  style={
-                    selected
-                      ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
-                      : { color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
-                  }
-                >
-                  {locked && (
-                    <svg aria-hidden width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.75 }}>
-                      <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2.2" />
-                      <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2.2" />
-                    </svg>
-                  )}
-                  {m.short}
-                </button>
-              );
-            })}
-            {offered.length === 1 && (
-              <span className="px-1.5 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
-                Only this lens applies to this story
-              </span>
-            )}
-            {/* Discoverability for the keyboard flip. Provenance voice, far right,
-                quiet — it teaches the shortcut without competing with the tabs. */}
-            {offered.length > 1 && (
-              <span className={`${MONO_LABEL} ml-auto pl-4`} style={{ color: "var(--ink-faint)" }} aria-hidden>
-                Press {offered.map((_, i) => i + 1).join(" · ")}
-              </span>
-            )}
-          </div>
+          )}
         </div>
-
         <div
           key={lens}
           className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden py-5`}
@@ -551,7 +506,7 @@ export function StoryView({ event }: { event: EventDetail }) {
 : {meta.plain ?? meta.tagline}. Free with an account.
               </p>
               <button
-                onClick={() => router.push("/signin")}
+                onClick={() => router.push(`/signin?next=/story/${event.id}`)}
                 className="rounded-full px-4 py-2 text-[13px] font-semibold"
                 style={{ background: "var(--ink)", color: "var(--bg)" }}
               >
@@ -578,86 +533,32 @@ export function StoryView({ event }: { event: EventDetail }) {
         </div>
       </section>
 
-      </article>
+      {/* ── What was said ────────────────────────────────────
+          Rules and type, neutral ink. The quote and the speaker are the body
+          voice; only the provenance line ([n] · outlet · date) is mono. Nothing
+          here is lens-coloured and nothing here is unverified: every quote was
+          checked against its article at write time, and the model's stance
+          never reaches the payload. Rendered only when there is something to
+          say — the section appearing is the signal. */}
+      {claims.length > 0 && (
+        <section id="said" className="mt-10 scroll-mt-24" aria-labelledby="said-title">
+          <Head
+            id="said-title"
+            title="What was said"
+            count={quoteCount}
+            hint="Attributed, verbatim. Every quote is checked against the article it came from. One that does not match is not shown."
+          />
+          <Said claims={claims} sourceIndex={sourceIndex} />
+        </section>
+      )}
 
-      {/* ── Pinned thumb zone (mobile): lens rail + Share/Ask ───── */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
-        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
-      >
-        <div className="hide-scroll flex gap-1.5 overflow-x-auto">
-          {offered.map((slug) => {
-            const m = lensMeta(slug);
-            const selected = slug === lens;
-            const locked = isLocked(slug);
-            return (
-              <button
-                key={slug}
-                onClick={() => pickLens(slug)}
-                // The lock is carried only by a faint colour and an aria-hidden
-                // glyph, so the accessible name was just "Markets" — identical to
-                // an unlocked lens. The desktop tab says it via title=, but a
-                // title is useless on touch, and this rail is the primary flip
-                // surface on a phone.
-                aria-label={locked ? `${m.short} lens, sign in to unlock, free` : undefined}
-                className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
-                style={
-                  selected
-                    ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
-                    : { border: "1px solid var(--line-strong)", background: "var(--bg-elevated)", color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
-                }
-              >
-                {m.short}
-                {locked && (
-                  <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                    <rect x="4" y="11" width="16" height="9" rx="2" />
-                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <ShareButton url={`/story/${event.id}`} title={event.title} fill />
-          </div>
-          <button
-            onClick={() => setAskOpen(true)}
-            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
-            style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
-          >
-            Ask
-            <span className="whitespace-nowrap font-mono text-[11px] font-normal opacity-70">{sourceCount} sources</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-      {/* ── Ask — one floating panel at every width: the launcher pill
-          bottom-right from 1024px, the thumb-zone button opens the same one
-          on a phone. */}
-      <AskPanel
-        eventId={event.id}
-        sourceCount={sourceCount}
-        suggestedQuestions={questions}
-        open={askOpen}
-        onOpenChange={setAskOpen}
-      />
-
-      {/* ── The evidence layer, shared by both trees ──────────────
-          Rendered once at every width. On desktop it aligns to the reading
-          column (104px rail + 32px gap = 136px) and holds the 604px measure,
-          because extra width goes to simultaneity, never to longer lines. */}
-      <div className="mx-auto max-w-[1240px] px-5 pb-[164px] sm:px-8 lg:w-[1376px] lg:max-w-none lg:px-0 lg:pb-20">
-        <div className="lg:ml-[136px] lg:max-w-[604px]">
       {/* ── The route ───────────────────────────────────────────
           The spine of the story this event belongs to, fetched from the owner
           of the arc. Only when the ticket carries a slug. */}
       {event.story_slug && (
         <section id="route" className="mt-10 scroll-mt-24" aria-labelledby="route-title">
           <Head id="route-title" title="The route" hint="Every development in this story, counted, with the branches and satellites the partitioner recorded." />
-          <StoryRoute slug={event.story_slug} currentId={event.id} />
+          <StoryRoute slug={event.story_slug} currentId={event.id} onLoad={setRouteStory} />
         </section>
       )}
 
@@ -685,53 +586,149 @@ export function StoryView({ event }: { event: EventDetail }) {
         </section>
       )}
 
-      {/* ── What was said ────────────────────────────────────
-          Rules and type, neutral ink. The quote and the speaker are the body
-          voice; only the provenance line ([n] · outlet · date) is mono. Nothing
-          here is lens-coloured and nothing here is unverified: every quote was
-          checked against its article at write time, and the model's stance
-          never reaches the payload. Rendered only when there is something to
-          say — the section appearing is the signal. */}
-      {claims.length > 0 && (
-        <section id="said" className="mt-10 scroll-mt-24" aria-labelledby="said-title">
-          <Head
-            id="said-title"
-            title="What was said"
-            count={quoteCount}
-            hint="Attributed, verbatim. Every quote is checked against the article it came from. One that does not match is not shown."
-          />
-          <Said claims={claims} sourceIndex={sourceIndex} />
-        </section>
-      )}
-
-      {/* ── Coverage ────────────────────────────────────────
-          Where the reports were filed from, counted; the reader's own state
-          when it is absent; single origin called out in mono. All three are
-          facts of the record, so an empty coverage prints nothing. */}
-      {coverageEntries.length > 0 && (
-        <section id="coverage" className="mt-10 scroll-mt-24" aria-labelledby="coverage-title">
-          <Head id="coverage-title" title="Coverage" />
-          <div className="rule-live flex flex-wrap gap-x-6 gap-y-2 py-2.5 text-[14.5px]">
-            <span>
-              {sourceCount} {sourceCount === 1 ? "report" : "reports"},{" "}
-              {coverageEntries.length === 1 ? <>all filed from <b className="font-semibold">{regionName(coverageEntries[0][0])}</b></> : <>filed from {coverageEntries.map(([iso, n]) => `${regionName(iso)} ×${n}`).join(", ")}</>}
-              {(event.coverage?.unknown ?? 0) > 0 && <span style={{ color: "var(--ink-muted)" }}> · {event.coverage!.unknown} of unknown origin</span>}
-            </span>
-            {gapText && <span className="inline-flex items-center gap-2"><Dash /> {gapText}</span>}
-            {event.coverage?.single_origin && <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>Single origin</span>}
-          </div>
-        </section>
-      )}
-
       {/* ── Sources — the coaches ─────────────────────────────
           [n] outlet · headline · stance. The [n] is the same index the quotes
           cite, so the two can never number one article differently. */}
       <section id="sources" className="mt-10 scroll-mt-24" aria-labelledby="sources-title">
         <Head id="sources-title" title="Sources" count={event.sources.length} />
-        <SourceList sources={event.sources} sourceIndex={sourceIndex} />
+      {/* Coverage, as a line under the Sources head: where the reports were
+          filed from, the regions and the cast named, the reader's own state
+          when it is absent, single origin in mono. Facts of the record. */}
+      {(coverageEntries.length > 0 || event.regions.length > 0 || event.entities.length > 0) && (
+        <div className="rule-live flex flex-wrap gap-x-6 gap-y-1.5 py-2.5 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          {coverageEntries.length > 0 && (
+            <span>
+              {coverageEntries.length === 1 ? <>All filed from <b className="font-semibold" style={{ color: "var(--ink)" }}>{regionName(coverageEntries[0][0])}</b></> : <>Filed from {coverageEntries.map(([iso, n]) => `${regionName(iso)} ×${n}`).join(", ")}</>}
+              {(event.coverage?.unknown ?? 0) > 0 && <> · {event.coverage!.unknown} of unknown origin</>}
+            </span>
+          )}
+          {gapText && <span className="inline-flex items-center gap-2"><Dash /> {gapText}</span>}
+          {event.coverage?.single_origin && <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>Single origin</span>}
+          {(event.regions.length > 0 || event.entities.length > 0) && (
+            <span className="basis-full">
+              <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>Named</span>{" "}
+              {[...regionLabels, ...event.entities.map((en) => en.name)].join(" · ")}
+            </span>
+          )}
+        </div>
+      )}
+        <SourceList sources={allSources ? event.sources : event.sources.slice(0, SOURCES_FOLD)} sourceIndex={sourceIndex} />
+        {!allSources && event.sources.length > SOURCES_FOLD && (
+          <button
+            type="button"
+            onClick={() => setAllSources(true)}
+            className="mt-3 inline-flex h-9 items-center border px-3 text-[13px] font-medium transition hover:opacity-80"
+            style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
+          >
+            All {event.sources.length} sources
+          </button>
+        )}
       </section>
+
+      {/* ── Related routes: different stories that touch this one, never
+          part of it, so they come after everything that is. */}
+      {(routeStory?.related?.length ?? 0) > 0 && (
+        <section className="mt-10" aria-labelledby="related-title">
+          <Head id="related-title" title="Related routes" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
+          <RelatedRoutes related={routeStory!.related} />
+        </section>
+      )}
+
+      <p className={`rule-live mt-10 flex justify-between gap-4 py-3 ${MONO_LABEL}`}>
+        <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>← Today&rsquo;s chart</Link>
+        {event.story_slug && (
+          <Link href={`/trending/${event.story_slug}`} className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>The whole route →</Link>
+        )}
+      </p>
+      </article>
+
+      {/* ── Beside the reading (desk): the lens board, then the section nav.
+          Sticky, so the column reads the page with you. */}
+      <aside className="hidden lg:block lg:sticky lg:top-20 lg:self-start lg:pt-[26px]">
+        <LensBoard offered={offered} lens={lens} briefs={briefs} lensName={(slug) => lensMeta(slug).short} isLocked={isLocked} onPick={(slug) => pickLens(slug, false)} />
+        <nav className="mt-8" aria-label="On this story">
+          <h2 className="font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">On this story</h2>
+          <ul className="mt-3">
+            {navItems.map((n) => (
+              <li key={n.id} className="rule-live">
+                <a href={`#${n.id}`} className="flex items-baseline justify-between py-2.5 text-[13.5px] font-medium underline-offset-4 hover:underline" style={{ color: activeSection === n.id ? "var(--ink)" : "var(--ink-muted)" }}>
+                  <span>{n.label === "Lens" ? `${meta.short} brief` : n.label === "Said" ? "What was said" : n.label === "Route" ? "The route" : n.label}</span>
+                  {n.count != null && <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>{n.count}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </aside>
+    </div>
+
+      {/* ── Pinned thumb zone (mobile): lens rail + Share/Ask ───── */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t px-3.5 pt-2.5 backdrop-blur-md lg:hidden"
+        style={{ borderColor: "var(--line)", background: "var(--glass)", paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+      >
+        {activeSection === "lens-brief" && (
+        <div className="hide-scroll flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Read this story through a lens">
+          {offered.map((slug) => {
+            const m = lensMeta(slug);
+            const selected = slug === lens;
+            const locked = isLocked(slug);
+            return (
+              <button
+                key={slug}
+                role="tab"
+                aria-selected={selected}
+                onClick={() => pickLens(slug)}
+                // The lock is carried only by a faint colour and an aria-hidden
+                // glyph, so the accessible name was just "Markets" — identical to
+                // an unlocked lens. The desktop tab says it via title=, but a
+                // title is useless on touch, and this rail is the primary flip
+                // surface on a phone.
+                aria-label={locked ? `${m.short} lens, sign in to unlock, free` : undefined}
+                className="flex min-h-[44px] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] font-semibold"
+                style={
+                  selected
+                    ? { background: m.bg, color: m.color, boxShadow: `inset 0 0 0 1.5px ${m.color}` }
+                    : { border: "1px solid var(--line-strong)", background: "var(--bg-elevated)", color: locked ? "var(--ink-faint)" : "var(--ink-muted)" }
+                }
+              >
+                {m.short}
+                {locked && (
+                  <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        )}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <ShareButton url={`/story/${event.id}`} title={event.title} fill />
+          </div>
+          <button
+            onClick={() => setAskOpen(true)}
+            className="flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
+            style={{ borderColor: "var(--ink)", background: "var(--ink)", color: "var(--bg)" }}
+          >
+            Ask
+            <span className="whitespace-nowrap font-mono text-[11px] font-normal opacity-70">{sourceCount} sources</span>
+          </button>
         </div>
       </div>
+
+      {/* ── Ask — one floating panel at every width: the launcher pill
+          bottom-right from 1024px, the thumb-zone button opens the same one
+          on a phone. */}
+      <AskPanel
+        eventId={event.id}
+        sourceCount={sourceCount}
+        suggestedQuestions={questions}
+        open={askOpen}
+        onOpenChange={setAskOpen}
+      />
     </>
   );
 }

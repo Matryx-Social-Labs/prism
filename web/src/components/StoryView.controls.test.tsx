@@ -28,7 +28,7 @@ vi.mock("@/lib/lenses", () => ({
 // controls — the pinned rail and the number keys — so scope to that tree rather
 // than loosening the assertions to "appears somewhere".
 function mobile() {
-  const root = document.querySelector(".lg\\:hidden");
+  const root = document.querySelector("article");
   if (!root) throw new Error("mobile tree not found");
   return within(root as HTMLElement);
 }
@@ -156,8 +156,8 @@ describe("lens flip — pinned mobile rail", () => {
     render(<StoryView event={event()} />);
     await mobile().findByText(READER_BRIEF);
 
-    // role=button excludes the desktop tabs, which declare role=tab.
-    await userEvent.click(mobile().getByRole("button", { name: /Cyber/ }));
+    // The pinned rail is the one tablist on the page; the desk's lens board uses aria-pressed.
+    await userEvent.click(screen.getByRole("tab", { name: /Cyber/ }));
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /Sign in to unlock/ })).toBeInTheDocument(),
@@ -177,7 +177,7 @@ describe("lens flip — pinned mobile rail", () => {
     render(<StoryView event={event()} />);
     await mobile().findByText(READER_BRIEF);
 
-    await userEvent.click(mobile().getByRole("button", { name: /Cyber/ }));
+    await userEvent.click(screen.getByRole("tab", { name: /Cyber/ }));
 
     expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ behavior: "auto" }));
   });

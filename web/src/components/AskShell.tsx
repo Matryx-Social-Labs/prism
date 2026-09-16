@@ -80,12 +80,9 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
         )}
       </div>
 
-      <div ref={scrollRef} className="flex min-h-[160px] flex-1 flex-col gap-3.5 overflow-y-auto px-4 pb-1 pt-3" aria-live="polite">
-        {turns.length === 0 && (
-          <p className="text-[13px] leading-[1.55]" style={{ color: "var(--ink-faint)" }}>
-            Ask anything about this story. Every answer cites this story&apos;s own sources, or says it can&apos;t.
-          </p>
-        )}
+      {/* No hollow frame before the first question: the line under the title
+          already says what this is, and the exchange grows as it happens. */}
+      <div ref={scrollRef} className={`flex flex-1 flex-col gap-3.5 overflow-y-auto px-4 ${turns.length ? "min-h-[160px] pb-1 pt-3" : "min-h-0"}`} aria-live="polite">
         {turns.map((t, i) =>
           t.role === "u" ? (
             <div key={i} className="rule-live grid grid-cols-[20px_1fr] gap-x-2 pt-3">

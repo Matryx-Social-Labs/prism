@@ -11,11 +11,8 @@ import { shortDate } from "@/lib/dateline";
 export function RelatedRoutes({ related }: { related: RelatedStory[] }) {
   if (!related.length) return null;
   return (
-    <div className="mt-6">
-      <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-        Related routes · different stories, not part of this one
-      </p>
-      <ul className="mt-1">
+    <div>
+      <ul>
         {related.map((r) => {
           const how = [
             r.causal ? "linked by a causal note" : null,

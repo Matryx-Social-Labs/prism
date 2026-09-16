@@ -18,6 +18,10 @@ export function HeaderNav() {
   // The landing has its own one action ("Read today's chart"); a second
   // filled pill in the same viewport is one more than the world allows.
   const landing = pathname === "/" || pathname === "/about";
+  // One primary pill per page: the chart, sector, trending, pulse and search
+  // carry "Pick your sectors"; the ticket (Ask), the forms (Save / Continue /
+  // Email me a link) and the watchlist carry their own.
+  const ownAction = ["/story", "/you", "/onboarding", "/signin", "/watchlist", "/account", "/interests", "/auth"].some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   const active = (href: string) =>
     href === "/feed"
@@ -71,7 +75,7 @@ export function HeaderNav() {
         >
           {session.email.slice(0, 1)}
         </Link>
-      ) : landing ? null : (
+      ) : landing || ownAction ? null : (
         <Link
           href="/onboarding"
           className="whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition hover:opacity-85 sm:px-[18px]"

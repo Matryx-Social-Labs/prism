@@ -10,7 +10,7 @@ import type { EventDetail } from "@/lib/api";
 export function headlineByline(e: Pick<EventDetail, "headline_by" | "sources">): string {
   const n = e.sources.length;
   const reports = `${n} ${n === 1 ? "report" : "reports"}`;
-  if (e.headline_by === "prism") return `Headline by Prism · written from ${reports} · the outlets' own headlines are in Sources`;
+  if (e.headline_by === "prism") return `Headline by Prism · from ${reports}`;
   const first = e.sources[0]?.source_name;
   return first ? `Headline as filed by ${first} · ${reports}` : `Headline as filed · ${reports}`;
 }

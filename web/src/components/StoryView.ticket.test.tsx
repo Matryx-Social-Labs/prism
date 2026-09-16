@@ -43,7 +43,7 @@ function event(over: Partial<EventDetail> = {}): EventDetail {
   } as unknown as EventDetail;
 }
 
-const mobile = () => within(document.querySelector(".lg\\:hidden") as HTMLElement);
+const mobile = () => within(document.querySelector("article") as HTMLElement);
 
 beforeEach(() => {
   localStorage.clear();
@@ -58,21 +58,26 @@ describe("the ticket — the header strip", () => {
         "BIZ", "2 sources", "IN ×6 · US ×2", "05 SEPT 2026 01:25 IST",
       ]);
       expect(strip.className).toMatch(/font-mono/);
-      expect(strip.className).toMatch(/rule-live/);
+      expect(strip.parentElement!.className).toMatch(/rule-live/);
     }
   });
 
   it("sets a single-source story on a dashed rule — state is line form, never hue", () => {
     render(<StoryView event={event({ sources: [src("a1", "2026-09-04T19:55:00Z")] })} />);
     for (const strip of screen.getAllByLabelText("Story facts")) {
-      expect(strip.className).toMatch(/rule-single/);
+      expect(strip.parentElement!.className).toMatch(/rule-single/);
       expect(within(strip).getByText("1 source")).toBeInTheDocument();
     }
   });
 
-  it("sends the reader back to today's chart, not a feed that no longer exists", () => {
+  it("sends the reader back to the chart at /feed — never to /, which is the landing for a first visitor", () => {
     render(<StoryView event={event()} />);
-    expect(mobile().getByRole("link", { name: /today.s chart/i })).toHaveAttribute("href", "/");
+    for (const a of screen.getAllByRole("link", { name: /today.s chart/i })) expect(a).toHaveAttribute("href", "/feed");
+  });
+
+  it("puts Share on the strip row and in the thumb zone, nowhere else", () => {
+    render(<StoryView event={event()} />);
+    expect(screen.getAllByRole("button", { name: /share this story/i })).toHaveLength(2);
   });
 });
 
@@ -102,8 +107,7 @@ describe("the ticket — retired sections (D4) and So what (founder, 2026-09-17)
 
   it("prints where the reports were filed from, and single origin when the record says so", () => {
     render(<StoryView event={event({ coverage: { origins: { IN: 3 }, unknown: 0, single_origin: true } })} />);
-    expect(screen.getByText("Coverage")).toBeInTheDocument();
-    expect(screen.getByText(/all filed from/)).toBeInTheDocument();
+    expect(screen.getByText(/All filed from/)).toBeInTheDocument();
     expect(screen.getByText("Single origin")).toBeInTheDocument();
   });
 });
@@ -143,5 +147,17 @@ describe("the ticket — the route", () => {
     const route = await screen.findByRole("region", { name: /the route/i });
     await vi.waitFor(() => expect(within(route).queryByText(/Printing the route/)).toBeNull());
     expect(within(route).queryByLabelText("Storyline structure")).toBeNull();
+  });
+});
+
+describe("the ticket — sources fold", () => {
+  it("prints the first eight outlets and opens the rest on request, the [n] index unchanged", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => src(`a${i + 1}`, "2026-09-04T19:55:00Z"));
+    render(<StoryView event={event({ sources: many })} />);
+    expect(screen.getAllByText("A report")).toHaveLength(8);
+    const { default: userEvent } = await import("@testing-library/user-event");
+    await userEvent.click(screen.getByRole("button", { name: "All 12 sources" }));
+    expect(screen.getAllByText("A report")).toHaveLength(12);
+    expect(screen.getByText("[12]")).toBeInTheDocument();
   });
 });

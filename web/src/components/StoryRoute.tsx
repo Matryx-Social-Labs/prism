@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BranchTree } from "@/components/BranchTree";
-import { RelatedRoutes } from "@/components/RelatedRoutes";
+import { ChevronDown } from "@/components/icons";
 import { RouteMap } from "@/components/RouteMap";
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
 
@@ -17,17 +17,20 @@ import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
  * disagree about which developments exist. No slug, no section: a story with
  * one development has no route to show.
  */
-export function StoryRoute({ slug, currentId }: { slug: string; currentId: string }) {
+export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentId: string; onLoad?: (s: TrendingStoryDetail | null) => void }) {
   const [story, setStory] = useState<TrendingStoryDetail | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
     fetchTrendingStory(slug).then((s) => {
-      if (!cancelled) setStory(s);
+      if (cancelled) return;
+      setStory(s);
+      onLoad?.(s);
     });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   if (story === undefined) {
@@ -42,8 +45,9 @@ export function StoryRoute({ slug, currentId }: { slug: string; currentId: strin
   return (
     <div>
       <RouteMap tree={story.branches} developments={story.developments} currentId={currentId} compact />
-      <details className="rule-live mt-2">
-        <summary className="cursor-pointer list-none py-3 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
+      <details className="rule-live mt-2 group">
+        <summary className="flex cursor-pointer list-none items-center gap-2 py-3 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
+          <ChevronDown className="transition-transform group-open:rotate-180" />
           Every station, as a list
         </summary>
         <BranchTree tree={story.branches} developments={story.developments} currentId={currentId} />
@@ -51,7 +55,6 @@ export function StoryRoute({ slug, currentId }: { slug: string; currentId: strin
       <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
         The whole route, every branch and satellite →
       </a>
-      <RelatedRoutes related={story.related ?? []} />
     </div>
   );
 }

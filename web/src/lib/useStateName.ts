@@ -25,6 +25,24 @@ function regionNames(): Promise<Map<string, string>> {
   return cache;
 }
 
+/** Several codes at once, for a line that names a story's regions. */
+export function useStateNames(codes: string[]): string[] {
+  const [names, setNames] = useState<string[]>(codes);
+  useEffect(() => {
+    let cancelled = false;
+    setNames(codes);
+    if (!codes.some((c) => c.includes("-"))) return;
+    regionNames().then((m) => {
+      if (!cancelled) setNames(codes.map((c) => m.get(c) ?? c));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codes.join(",")]);
+  return names;
+}
+
 /**
  * The state's name, or the code itself until the list arrives (and if it never
  * does). Returns null for a reader with no state, so callers can fall back to

@@ -27,7 +27,7 @@ vi.mock("@/lib/lenses", () => ({
 // one-brief-at-a-time composition these tests are about. Scope to it, rather than
 // weakening the assertion to "appears somewhere".
 function mobile() {
-  const root = document.querySelector(".lg\\:hidden");
+  const root = document.querySelector("article");
   if (!root) throw new Error("mobile tree not found");
   return within(root as HTMLElement);
 }
