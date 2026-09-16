@@ -14,7 +14,7 @@ at once (c244aa6), which is why a half-built dev looks worse than either end sta
 | 0 | Foundation — palette, three voices, six sectors, `?sector=` list, SectorStrip, Masthead | DONE c244aa6 | |
 | 1 | Front page `/feed` — the chart (Today · For you, scope, sector re-sort) | DONE c61dcc8 | not yet: `/feed/yesterday` (API has no day window), in-place FLIP re-sort, sub-sector chips, desktop rail, "Moving now" |
 | 2 | Sector `/sector/<slug>` | DONE c61dcc8 | |
-| 11 | Landing `/` (first visit) + `/about`; returning readers → `/feed` | DONE 4550eab | 8c6930b's live proofs + this session's roadmap sections (marked "being built next", examples marked ILLUSTRATION), merged into one component |
+| 11 | Landing `/` (first visit) + `/about`; returning readers → `/feed` | REBUILT 4218595 | founder rejected the first version; rebuilt under design-taste-frontend: general news only (cyber filtered), Delhi diesel-ban flip demo, real rows with the lead's photo, one feature grid with the product doing each thing, next/tiers/close. Fresh finish review: fix → fix → **ship** (this surface). Found on the way: Hind was never loading anywhere (--font-ui on :root), fixed product-wide |
 | 3 | Story `/story/<id>` — the ticket (strip · route · passenger list · coaches; lens flip kept, Perspectives cards retired per D4) | DONE 9d8b026 | not yet: tapping a station re-typesets in place (stations still navigate) |
 | — | Chrome: SiteHeader, footer | DONE 41da9ab | Teko wordmark and nav, no spectrum bar, monochrome toggle |
 | 4 | Trending `/trending` — the chart of arcs | DONE 19500ee | API: comma-list ?sector=, hero_event_id / first_seen_at / last_updated_at (needs promote before the preview shows them) |
