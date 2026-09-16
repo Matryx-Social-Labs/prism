@@ -107,7 +107,9 @@ Founder decisions: 1 (b) Prism-written headline, labelled; 2 the ticket shows th
 on the route (my proposal, to iterate); 3 So what and coverage back on the ticket; 4 Ask on the
 landing as an animated exchange; 5 planned features as "Being built next" sections.
 The HTML designs for every page are in
-`~/.gstack/projects/Matryx-Social-Labs-prism/designs/pages-20260917/` (open `index.html`).
+`~/.gstack/projects/Matryx-Social-Labs-prism/designs/pages-20260917/` (open `index.html`); its
+`README.md` carries the feature-to-page coverage table and the spine vocabulary (main line,
+this development, a branch, a branch line, also reported off the main line, related routes).
 
 | Page | Contains | Reached from / leads to |
 |---|---|---|
