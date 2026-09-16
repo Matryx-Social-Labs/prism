@@ -110,6 +110,8 @@ The HTML designs for every page are in
 `~/.gstack/projects/Matryx-Social-Labs-prism/designs/pages-20260917/` (open `index.html`); its
 `README.md` carries the feature-to-page coverage table and the spine vocabulary (main line,
 this development, a branch, a branch line, also reported off the main line, related routes).
+The spine is drawn as **the rail map** (founder, 2026-09-17: direction A of `13-spine.html`), with
+the attention curve as a toggle on the route page and a station card on tap.
 
 | Page | Contains | Reached from / leads to |
 |---|---|---|
