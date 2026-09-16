@@ -46,10 +46,7 @@ export function StoryTimeline({ story }: { story?: StoryTimelineData }) {
 
   return (
     <section ref={ref} className="mt-11">
-      <h2
-        className="mb-1.5 text-[23px] font-semibold"
-        style={{ fontFamily: "var(--font-display), serif" }}
-      >
+      <h2 className="mb-1.5 font-display text-[26px] font-medium uppercase leading-none tracking-[0.03em]">
         The story so far
       </h2>
       <p className="mb-4 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>

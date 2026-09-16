@@ -58,7 +58,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
       >
         Trending · {s.source_count} outlets · {s.velocity > 0 ? "developing now" : "developing"}
       </p>
-      <h1 className="mt-2 text-[30px] font-semibold leading-tight sm:text-[36px]" style={{ fontFamily: "var(--font-display), serif" }}>
+      <h1 className="mt-2 text-[28px] font-medium leading-[1.2] text-balance sm:text-[34px]">
         {s.label}
       </h1>
 

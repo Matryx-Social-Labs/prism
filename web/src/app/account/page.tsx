@@ -26,13 +26,9 @@ export default function AccountPage() {
 
   return (
     <div className="mx-auto flex min-h-[60vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
-      <h1 className="text-[28px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-        Your account
-      </h1>
-      <dl className="mt-6 rounded-[18px] border px-5 py-4" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>
-        <dt className="text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
-          Signed in as
-        </dt>
+      <h1 className="font-display text-[26px] uppercase leading-none tracking-[0.03em]">Account</h1>
+      <dl className="rule-live mt-6 border-b py-4" style={{ borderBottomColor: "var(--line)" }}>
+        <dt className="text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>Signed in as</dt>
         <dd className="mt-1 font-mono text-[14.5px]" style={{ color: "var(--ink)" }}>
           {session.email}
         </dd>
@@ -47,8 +43,8 @@ export default function AccountPage() {
       >
         Sign out
       </button>
-      <Link href="/feed" className="mt-6 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-        ← Back to your feed
+      <Link href="/feed" className="mt-6 text-[13.5px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>
+        Back to the chart
       </Link>
     </div>
   );

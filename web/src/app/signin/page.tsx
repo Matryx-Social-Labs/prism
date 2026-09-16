@@ -27,34 +27,25 @@ export default function SignInPage() {
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
-      <h1 className="text-[30px] font-semibold leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-        Sign in to Prism
-      </h1>
+      <h1 className="text-[30px] font-medium leading-[1.15] text-balance">Sign in to Prism</h1>
       <p className="mt-2.5 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-        Enter your email and we&apos;ll send a one-time sign-in link — no password.
-        New here? You&apos;ll set up your feed right after.
+        Enter your email and we&apos;ll send a one-time sign-in link. No password.
+        New here? You&apos;ll set up your chart right after.
       </p>
 
       {sent ? (
-        <div
-          className="mt-8 rounded-[18px] border px-5 py-6"
-          style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}
-        >
+        <div className="rule-live mt-8 border-b py-6" style={{ borderBottomColor: "var(--line)" }}>
           <p className="text-[15px] font-medium">Check your inbox.</p>
           <p className="mt-2 text-[13.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
             If you have an account or want one, a sign-in link is on its way to{" "}
-            <span className="font-medium" style={{ fontFamily: "var(--font-mono), monospace", color: "var(--ink)" }}>
-              {email}
-            </span>
+            <span className="font-mono" style={{ color: "var(--ink)" }}>{email}</span>
             . It expires in 15 minutes.
           </p>
         </div>
       ) : (
         <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
-              Email
-            </span>
+            <span className="text-[13.5px] font-medium" style={{ color: "var(--ink)" }}>Email</span>
             <input
               type="email"
               required
@@ -62,8 +53,8 @@ export default function SignInPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="rounded-[12px] border px-3.5 py-3 text-[16px] outline-none"
-              style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
+              className="h-12 border px-4 text-[16px] outline-none"
+              style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
             />
           </label>
 
@@ -84,8 +75,8 @@ export default function SignInPage() {
         </form>
       )}
 
-      <Link href="/feed" className="mt-8 text-[13px]" style={{ color: "var(--ink-faint)" }}>
-        ← Keep browsing without an account
+      <Link href="/feed" className="mt-8 text-[13.5px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>
+        Keep reading without an account
       </Link>
     </div>
   );
