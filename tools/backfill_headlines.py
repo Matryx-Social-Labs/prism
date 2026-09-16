@@ -57,6 +57,7 @@ async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--concurrency", type=int, default=8)
     args = ap.parse_args()
 
     async with get_session_factory()() as session:
@@ -70,23 +71,32 @@ async def main() -> int:
             print("dry run — pass --apply to write (try --limit 20 first)")
             return 0
         written = skipped = 0
-        for ev in todo:
-            heads = (await session.execute(text(
-                "SELECT ri.title FROM event_memberships m JOIN articles a ON a.id = m.article_id JOIN raw_items ri ON ri.id = a.raw_item_id "
-                "WHERE m.event_id = :eid ORDER BY m.is_survivor DESC, ri.published_at ASC NULLS LAST LIMIT 4"
-            ), {"eid": ev["id"]})).scalars().all()
-            try:
-                h = await write_one(session, ev, [t for t in heads if t] or [ev["title"]])
-            except Exception as e:  # one bad call must not end the pass
-                print(f"  ! {ev['id']}: {e}", file=sys.stderr)
-                h = None
-            if not h:
-                skipped += 1
-                continue
-            await session.execute(text("UPDATE events SET title = :t, headline_by = 'prism' WHERE id = :eid"), {"t": h, "eid": ev["id"]})
-            await session.commit()
-            written += 1
-            print(f"  {ev['id']}  {h}")
+        # Eight in flight: sequential, seven thousand events is hours; the
+        # light model tolerates this comfortably. Each event commits alone, so
+        # a crash leaves nothing half-written and a rerun resumes.
+        sem = asyncio.Semaphore(args.concurrency)
+
+        async def one(ev) -> None:
+            nonlocal written, skipped
+            async with sem, get_session_factory()() as s:
+                heads = (await s.execute(text(
+                    "SELECT ri.title FROM event_memberships m JOIN articles a ON a.id = m.article_id JOIN raw_items ri ON ri.id = a.raw_item_id "
+                    "WHERE m.event_id = :eid ORDER BY m.is_survivor DESC, ri.published_at ASC NULLS LAST LIMIT 4"
+                ), {"eid": ev["id"]})).scalars().all()
+                try:
+                    h = await write_one(s, ev, [t for t in heads if t] or [ev["title"]])
+                except Exception as e:  # one bad call must not end the pass
+                    print(f"  ! {ev['id']}: {e}", file=sys.stderr)
+                    h = None
+                if not h:
+                    skipped += 1
+                    return
+                await s.execute(text("UPDATE events SET title = :t, headline_by = 'prism' WHERE id = :eid"), {"t": h, "eid": ev["id"]})
+                await s.commit()
+                written += 1
+                print(f"  {ev['id']}  {h}", flush=True)
+
+        await asyncio.gather(*(one(ev) for ev in todo))
         print(f"written {written}, skipped {skipped}")
     return 0
 
