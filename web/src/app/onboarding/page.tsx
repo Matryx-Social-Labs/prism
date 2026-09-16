@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { interestsToPicks, picksToInterests, useTaxonomy, type Picks } from "@/components/ProfileEditor";
-import {
-  Field, LanguagesField, ProfessionField, SectorsField, StateField, useLanguageOptions, useProfessionGroups,
-} from "@/components/ReservationForm";
+import { Field, ProfessionField, SectorsField, StateField, useProfessionGroups } from "@/components/ReservationForm";
 import { loadProfile, saveProfile } from "@/lib/profile";
 import type { ProfessionOption } from "@/lib/api";
 import { setProfile, useSession } from "@/lib/session";
@@ -16,7 +14,6 @@ export default function OnboardingPage() {
   const router = useRouter();
   const taxonomy = useTaxonomy();
   const groups = useProfessionGroups();
-  const { options: langOptions, defaults: langDefaults } = useLanguageOptions();
   const [step, setStep] = useState(0);
   const [state, setState] = useState("");
   const [lens, setLens] = useState("reader");
@@ -24,7 +21,6 @@ export default function OnboardingPage() {
   const [profession, setProfession] = useState<ProfessionOption | null>(null);
   const session = useSession();
   const [name, setName] = useState("");
-  const [languages, setLanguages] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -34,14 +30,8 @@ export default function OnboardingPage() {
       setLens(existing.lens);
       if (existing.state) setState(existing.state);
       setPicks(interestsToPicks(existing.interests));
-      if (existing.languages?.length) setLanguages(existing.languages);
     }
   }, []);
-
-  // The API's default order until the reader has picked any.
-  useEffect(() => {
-    setLanguages((cur) => (cur.length ? cur : langDefaults));
-  }, [langDefaults]);
 
   function pickProfession(p: ProfessionOption) {
     setProfession(p);
@@ -56,7 +46,8 @@ export default function OnboardingPage() {
       region: "IN",
       state: state || null,
       interests: picksToInterests(picks),
-      languages: languages.length ? languages : undefined,
+      // English only for now (founder, 2026-09-16); languages are not collected.
+      languages: loadProfile()?.languages ?? ["en"],
     });
     // Account profile (name/profession/state/languages/consent) persists server-side
     // once the reader is signed in. Non-blocking: a failure never traps them here.
@@ -67,7 +58,7 @@ export default function OnboardingPage() {
           name: name.trim(),
           profession: profession.slug,
           state: state || null,
-          languages,
+          languages: ["en"],
           consent,
         });
       } catch {
@@ -113,7 +104,6 @@ export default function OnboardingPage() {
           </p>
           <div className="mt-4">
             <StateField value={state} onChange={setState} />
-            <LanguagesField value={languages} onChange={setLanguages} options={langOptions} />
           </div>
         </section>
       )}

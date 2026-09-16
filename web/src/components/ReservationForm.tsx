@@ -1,8 +1,10 @@
 "use client";
 
-// The reservation form (shape brief §8): four fields on stationery — where you
-// are, what you do, what you follow, the languages you read — shared by /you
+// The reservation form (shape brief §8): three fields on stationery — where you
+// are, what you do, what you follow — shared by /you
 // (all at once) and onboarding (one step at a time), so the two never drift.
+// (Languages are not collected while the platform runs English-only, founder
+// 2026-09-16; the profile keeps a default of ["en"].)
 // Each field is a label in the reading voice above a control on a hairline;
 // helper text is prose, not mono. The one place colour appears is the lens a
 // profession reads as, because that is a lens speaking.
@@ -14,7 +16,6 @@
 import { useEffect, useState } from "react";
 import { StateSelect, type Picks } from "@/components/ProfileEditor";
 import { fetchProfessions, type ProfessionGroup, type ProfessionOption, type TaxonomySector } from "@/lib/api";
-import { fetchLanguages, type LanguageOption } from "@/lib/session";
 import { lensMeta } from "@/lib/lenses";
 import { SECTOR_GROUPS } from "@/lib/sectors";
 
@@ -32,44 +33,6 @@ export function StateField({ value, onChange }: { value: string; onChange: (code
   return (
     <Field label="Where you are" hint="Prism leads with news from your state, then the rest of India.">
       <StateSelect value={value} onChange={onChange} />
-    </Field>
-  );
-}
-
-export function useLanguageOptions(): { options: LanguageOption[]; defaults: string[] } {
-  const [o, setO] = useState<{ options: LanguageOption[]; defaults: string[] }>({ options: [], defaults: [] });
-  useEffect(() => {
-    fetchLanguages().then((r) => setO({ options: r.languages, defaults: r.default })).catch(() => {});
-  }, []);
-  return o;
-}
-
-/** Tap to add in preference order; the number is the rank. The last language cannot be removed. */
-export function LanguagesField({ value, onChange, options }: { value: string[]; onChange: (v: string[]) => void; options: LanguageOption[] }) {
-  if (options.length === 0) return null;
-  const toggle = (code: string) => {
-    if (value.includes(code)) {
-      if (value.length === 1) return; // a reader always reads something
-      onChange(value.filter((c) => c !== code));
-    } else onChange([...value, code]);
-  };
-  return (
-    <Field label="Languages you read" hint="Your first pick leads. Nothing is ever hidden: languages rank the chart, they never filter it." flush>
-      <div className="flex flex-wrap gap-x-6 gap-y-2">
-        {options.map((l) => {
-          const idx = value.indexOf(l.code);
-          const sel = idx >= 0;
-          return (
-            <button key={l.code} type="button" onClick={() => toggle(l.code)} aria-pressed={sel}
-              aria-label={`${l.name}${sel ? `, preference ${idx + 1}` : ""}`}
-              className="flex min-h-[44px] items-baseline gap-2 border-b-2 px-0.5 text-[15px] transition-[border-color]"
-              style={{ borderColor: sel ? "var(--ink)" : "transparent", color: sel ? "var(--ink)" : "var(--ink-muted)", marginBottom: -1 }}>
-              {l.native}
-              {sel && <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>{idx + 1}</span>}
-            </button>
-          );
-        })}
-      </div>
     </Field>
   );
 }

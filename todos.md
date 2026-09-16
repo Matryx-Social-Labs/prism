@@ -26,7 +26,17 @@ at once (c244aa6), which is why a half-built dev looks worse than either end sta
 | 10 | Sign-in / unlock — the paywall moment | DONE (this commit) | the unlock sheet was already re-set with the ticket (9d8b026); sign-in, account and the arc page's headings follow. Left for the finish review: AskPanel's chrome (mechanics untouched per the brief), /label (internal tool) |
 | F | Finish — detector, finish review, documenter → new DESIGN.md | DONE (this commit) | detector clean at 390/1440 on every surface; finish review: fix → fix → **ship** (scoped to the fix list); DESIGN.md + `.impeccable/design.json` rewritten from the shipped build; CLAUDE.md core rules synced. Left for a later pass: /label (internal tool), the orphaned 3D hero files, unused CSS leftovers (`--shadow-*`, `.spectrum-*`, `.beam-*`, `.stagger`) |
 
-All rows done on `dev`; nothing promoted. Next: founder review on the preview, then `make promote`. Checkpoint (commit + preview) after each row.
+All rows done on `dev`; nothing promoted. Next: founder review on the preview, then `make promote`.
+
+**After the redesign (founder, 2026-09-16):**
+- **Google / OAuth sign-in replaces the browser-saved profile as the account model** (P1). Today the
+  profile is `prism.profile.v1` in localStorage and sign-in is a magic link; the founder wants an
+  OAuth login (Google first) so the profile follows the reader. Touches `lib/session.ts`,
+  `lib/profile.ts`, the API auth routes, and the onboarding hand-off. Do it as one change at the end
+  of the redesign, not piecemeal.
+- **English-only for now**: languages are no longer collected in onboarding or on /you (done
+  2026-09-16); the profile keeps `languages: ["en"]` so the feed contract is unchanged. Re-add the
+  field when non-English display is switched on. Checkpoint (commit + preview) after each row.
 
 
 Deferred work captured from the CEO plan review (2026-07-19, freemium lens model).

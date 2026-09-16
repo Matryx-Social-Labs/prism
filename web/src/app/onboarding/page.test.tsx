@@ -42,10 +42,9 @@ beforeEach(() => {
 });
 
 describe("Onboarding — three steps of the reservation form", () => {
-  it("collects state and languages, then profession, then subjects, and saves them as one profile", async () => {
+  it("collects state, then profession, then subjects, and saves them as one profile", async () => {
     render(<OnboardingPage />);
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Your state" }), "IN-KL");
-    await userEvent.click(await screen.findByRole("button", { name: /^Kannada/ }));
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Your profession" }), "trader");
@@ -58,7 +57,7 @@ describe("Onboarding — three steps of the reservation form", () => {
     await userEvent.click(screen.getByRole("button", { name: /^SPO\s*Sports/ }));
     await userEvent.click(screen.getByRole("button", { name: "Build my feed" }));
 
-    expect(saved()).toEqual({ lens: "markets", region: "IN", state: "IN-KL", interests: ["finance:markets", "sports"], languages: ["en", "kn"] });
+    expect(saved()).toEqual({ lens: "markets", region: "IN", state: "IN-KL", interests: ["finance:markets", "sports"], languages: ["en"] });
     expect(router.push).toHaveBeenCalledWith("/feed");
   });
 

@@ -31,7 +31,6 @@ const save = () => userEvent.click(screen.getByRole("button", { name: /Save and 
 const settled = async () => {
   await screen.findByRole("option", { name: "Karnataka" });
   await screen.findByRole("button", { name: /Politics/ });
-  await screen.findByRole("button", { name: /^English/ });
 };
 
 beforeEach(() => {
@@ -112,25 +111,6 @@ describe("You — subjects are the six, picks stay the pipeline's ten", () => {
     await userEvent.click(screen.getByRole("button", { name: /Business & Markets/ }));
     await save();
     expect(saved().interests).toEqual([]);
-  });
-});
-
-describe("You — languages", () => {
-  it("saves the reader's preference order, not the order of the options", async () => {
-    render(<YouPage />);
-    await settled();
-    await userEvent.click(screen.getByRole("button", { name: /^Hindi/ }));
-    await userEvent.click(screen.getByRole("button", { name: /^English, preference 1/ })); // drop English
-    await userEvent.click(screen.getByRole("button", { name: /^English$/ })); // re-add it last
-    await save();
-    expect(saved().languages).toEqual(["hi", "en"]);
-  });
-
-  it("will not let the reader remove their last language", async () => {
-    render(<YouPage />);
-    await settled();
-    await userEvent.click(screen.getByRole("button", { name: /^English, preference 1/ }));
-    expect(screen.getByRole("button", { name: /^English, preference 1/ })).toHaveAttribute("aria-pressed", "true");
   });
 });
 

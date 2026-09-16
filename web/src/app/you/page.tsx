@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Masthead } from "@/components/Masthead";
 import { interestsToPicks, picksToInterests, useTaxonomy, type Picks } from "@/components/ProfileEditor";
-import {
-  LanguagesField, ProfessionField, SectorsField, StateField, useLanguageOptions, useProfessionGroups,
-} from "@/components/ReservationForm";
+import { ProfessionField, SectorsField, StateField, useProfessionGroups } from "@/components/ReservationForm";
 import { SectionHead } from "@/components/SectionHead";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { ProfessionOption } from "@/lib/api";
@@ -27,13 +25,11 @@ export default function YouPage() {
   const session = useSession();
   const taxonomy = useTaxonomy();
   const groups = useProfessionGroups();
-  const { options: langOptions } = useLanguageOptions();
   const [loaded, setLoaded] = useState(false);
   const [state, setState] = useState("");
   const [lens, setLens] = useState("reader");
   const [profession, setProfession] = useState<string | null>(null);
   const [picks, setPicks] = useState<Picks>({});
-  const [languages, setLanguages] = useState<string[]>(["en"]);
   const [follows, setFollows] = useState<WatchItem[]>([]);
   const [recent, setRecent] = useState<WatchEvent[]>([]);
 
@@ -43,7 +39,6 @@ export default function YouPage() {
       setLens(p.lens);
       if (p.state) setState(p.state);
       setPicks(interestsToPicks(p.interests));
-      if (p.languages?.length) setLanguages(p.languages);
     }
     setLoaded(true);
   }, []);
@@ -63,7 +58,9 @@ export default function YouPage() {
   };
 
   const save = () => {
-    saveProfile({ lens, region: "IN", state: state || null, interests: picksToInterests(picks), languages });
+    // English only for now (founder, 2026-09-16): the profile keeps whatever
+    // language order it already had, and defaults to English.
+    saveProfile({ lens, region: "IN", state: state || null, interests: picksToInterests(picks), languages: loadProfile()?.languages ?? ["en"] });
     router.push("/feed");
   };
 
@@ -85,7 +82,6 @@ export default function YouPage() {
       {loaded && (
         <form className="mt-4" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <StateField value={state} onChange={setState} />
-          <LanguagesField value={languages} onChange={setLanguages} options={langOptions} />
           <ProfessionField groups={groups} profession={profession} lens={lens} onPick={pickProfession} />
           <SectorsField taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
           <div className="rule-live flex flex-wrap items-center gap-x-5 gap-y-3 py-6">
