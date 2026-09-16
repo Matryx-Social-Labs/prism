@@ -1,11 +1,24 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SearchRail } from "@/components/SearchDesktop";
-import { StoryRowCard } from "@/components/StoryCard";
+import { ChartRow } from "@/components/ChartRow";
+import { Masthead } from "@/components/Masthead";
+import { SectorStrip } from "@/components/SectorStrip";
 import { fetchTrending, searchEvents, type FeedItem } from "@/lib/api";
+import { chartOrder } from "@/lib/chart";
+import { loadProfile } from "@/lib/profile";
+import { sectorGroup } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
+
+/**
+ * Search (shape brief §6): the chart with a query field on the masthead's
+ * second line. Results are chart rows, most-corroborated first; the sector
+ * strip filters them in place. A failed request says so, in its own line —
+ * never "no matches" for an error.
+ */
+const MONO = "font-mono text-[10.5px] uppercase tracking-[0.06em]";
+const TRY = ["RELIANCE", "CVE-2026-62144", "Kerala"];
 
 function SearchInner() {
   const params = useSearchParams();
@@ -14,21 +27,20 @@ function SearchInner() {
   const [results, setResults] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  // A rejected search is NOT the same as no results. Without this the page went
-  // completely blank on a failed request: `searched` stays false because it is
-  // set after the await, `loading` is false, `results` is empty, and a term of 2+
-  // characters hides the start screen — so every render branch was false and the
-  // reader got nothing to read and nothing to do.
+  // A rejected search is NOT the same as no results: without this flag every
+  // render branch was false on a failed request and the page went blank.
   const [failed, setFailed] = useState(false);
-  // Which term produced `results`. Without it, a new query inherits the
-  // previous query's results as "ready" and restores that key's offset
-  // before its own results exist.
+  // Which term produced `results`, so a new query never restores the previous
+  // query's scroll offset before its own results exist.
   const [resultsTerm, setResultsTerm] = useState("");
-  // Real entities off the live trending cast — a hardcoded list would go stale
+  const [group, setGroup] = useState<string | null>(null);
+  const [primaryLang, setPrimaryLang] = useState("en");
+  // Real entities off the live trending cast: a hardcoded list would go stale
   // and, on a product that sells provenance, would be quietly dishonest.
   const [entities, setEntities] = useState<string[]>([]);
 
   useEffect(() => {
+    setPrimaryLang(loadProfile()?.languages?.[0] ?? "en");
     fetchTrending({ limit: 6 })
       .then((s) => setEntities([...new Set(s.flatMap((x) => x.cast ?? []))].slice(0, 6)))
       .catch(() => setEntities([]));
@@ -40,17 +52,14 @@ function SearchInner() {
       setResults([]);
       setSearched(false);
       setFailed(false);
-      // Clearing the box while a request is still in flight used to strand
-      // `loading` at true: the cleanup below cancels, and the in-flight finally
-      // is guarded by `if (!cancelled)` so it never resets it. The reader was
-      // left on "Searching…" forever, with the start screen hidden behind the
-      // same !loading gate — an empty box that never came back.
+      // Clearing the box mid-flight used to strand `loading` at true: the
+      // cleanup cancels, and the in-flight finally is guarded by !cancelled.
       setLoading(false);
       return;
     }
     setLoading(true);
     setFailed(false);
-    // clearTimeout cancels the timer, not an in-flight request — without the
+    // clearTimeout cancels the timer, not an in-flight request: without the
     // flag a slow response for an abandoned query overwrites a newer one.
     let cancelled = false;
     const t = setTimeout(async () => {
@@ -62,9 +71,7 @@ function SearchInner() {
         setSearched(true);
         router.replace(`/search?q=${encodeURIComponent(term)}`, { scroll: false });
       } catch {
-        // A network failure REJECTS (searchEvents only swallows !res.ok), and an
-        // escaped rejection left setLoading(true) — "Searching…" forever, which
-        // is the common case on a flaky mobile connection.
+        // A network failure REJECTS (searchEvents only swallows !res.ok).
         if (!cancelled) {
           setResults([]);
           setFailed(true);
@@ -79,114 +86,88 @@ function SearchInner() {
     };
   }, [q, router]);
 
-  // Keyed per query: with a route-wide key, the first results for a NEW search
-  // would restore a previous search's offset and jump the page out from under
-  // a reader who is still typing (the input autofocuses).
-  useScrollRestore(`search:${q.trim()}:scrollY`, resultsTerm === q.trim() && results.length > 0);
-
   const term = q.trim();
+  useScrollRestore(`search:${term}:scrollY`, resultsTerm === term && results.length > 0);
+
+  // The strip filters what came back; the API searches everything.
+  const shown = useMemo(() => {
+    const g = sectorGroup(group);
+    const rows = g ? results.filter((r) => g.sectors.includes(r.sector ?? "")) : results;
+    return chartOrder(rows);
+  }, [results, group]);
+
+  const count = searched && !loading && !failed ? `${shown.length} ${shown.length === 1 ? "result" : "results"}` : null;
+  const sources = shown.reduce((n, i) => n + (i.source_count || 0), 0);
+  const dateline = count ? `${count}${sources ? ` · ${sources} ${sources === 1 ? "source" : "sources"}` : ""}` : null;
+
+  const chip = (label: string, mono = false) => (
+    <button
+      key={label}
+      onClick={() => setQ(label)}
+      className={`${mono ? "font-mono text-[11.5px]" : "text-[13.5px]"} border px-3 py-1.5 transition hover:opacity-70`}
+      style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+    >
+      {label}
+    </button>
+  );
 
   return (
-    // Desktop is The Stone (Prism Desktop.dc.html, SEARCH): a 104px mono ledger
-    // rail outside a 1240px field — the grid the desktop Feed already uses.
-    // Below lg this is untouched: one 760px column, the phone's screen.
-    <div className="mx-auto w-full max-w-[760px] px-5 pb-28 pt-9 lg:grid lg:w-[1376px] lg:max-w-none lg:grid-cols-[104px_1240px] lg:gap-x-8 lg:px-0 lg:pb-20 lg:pt-10">
-      <SearchRail results={results} />
+    <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
+      <Masthead dateline={dateline} />
+      {/* The query is the masthead's second line: the thing you typed is the headline of this screen. */}
+      <input
+        autoFocus
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && setQ("")}
+        placeholder="Search"
+        aria-label="Search stories, entities and sources"
+        className="w-full border-0 bg-transparent p-0 pb-2 text-[26px] font-medium leading-tight outline-none placeholder:opacity-40 sm:text-[32px]"
+        style={{ color: "var(--ink)" }}
+      />
+      <p className={`${MONO} pb-2`} style={{ color: "var(--ink-faint)" }}>
+        stories · entities · tickers · CVE ids · Esc clears
+      </p>
+      <SectorStrip active={group} onPick={setGroup} allLabel="All" />
 
-      <div className="min-w-0">
-        {/* The query sets in the display voice — the thing you typed is the headline
-            of this screen (Prism Desktop.dc.html). */}
-        <input
-          autoFocus
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          // The rail promises "ESC CLEAR"; this is the only key that promise rests on.
-          onKeyDown={(e) => e.key === "Escape" && setQ("")}
-          placeholder="Search"
-          aria-label="Search stories, entities and sources"
-          className="w-full border-0 bg-transparent p-0 text-[28px] leading-tight tracking-[-0.02em] outline-none placeholder:opacity-40 sm:text-[34px]"
-          style={{ fontFamily: "var(--font-display), serif", fontWeight: 400, color: "var(--ink)" }}
-        />
-        <div className="mt-3 border-b lg:mt-[18px]" style={{ borderColor: "var(--line)" }} />
-
-        {/* What is searchable, in the provenance voice. */}
-        <p className="mt-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>
-          stories · entities · tickers · CVE ids
-        </p>
-
-        {/* EMPTY STATE — the screen used to be blank until you typed, which is the
-            emptiest surface in the app. Give the reader somewhere to start. */}
-        {term.length < 2 && !loading && (
-          // Desktop lays the same two blocks on the field's twelve 74px columns
-          // (cols 1–6 and 8–12, Prism Desktop.dc.html) and squares the chips off —
-          // a pill is a phone tap target. Same elements, same copy: two trees would
-          // put two "Adani Group" buttons in the DOM and break the start-screen
-          // tests, which count them.
-          <div className="mt-8 flex flex-col gap-8 lg:mt-[26px] lg:grid lg:grid-cols-[repeat(12,74px)] lg:gap-x-8 lg:gap-y-0">
-            <div className="min-w-0 flex-1 lg:col-span-6">
-              <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] lg:tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
-                Trending entities
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {entities.map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => setQ(e)}
-                    className="rounded-full border px-3 py-[7px] text-[13px] transition hover:opacity-70 lg:rounded-none lg:px-[11px] lg:py-1.5 lg:text-[13.5px]"
-                    style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="min-w-0 flex-1 lg:col-span-5 lg:col-start-8">
-              <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] lg:tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
-                Try
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["RELIANCE", "CVE-2026-62144", "Kerala"].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setQ(t)}
-                    className="rounded-full border px-3 py-[7px] font-mono text-[11.5px] transition hover:opacity-70 lg:rounded-none lg:px-[9px] lg:py-1 lg:text-[11px]"
-                    style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {term.length < 2 && !loading && (
+        <div className="grid gap-8 pt-6 lg:grid-cols-2 lg:gap-14">
+          <div>
+            <p className={MONO} style={{ color: "var(--ink-faint)" }}>Trending entities</p>
+            <div className="mt-3 flex flex-wrap gap-2">{entities.map((e) => chip(e))}</div>
           </div>
-        )}
-
-        <div className="mt-6 flex flex-col gap-3">
-          {loading && (
-            <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-              Searching…
-            </p>
-          )}
-          {!loading && failed && (
-            <p className="text-[14px]" style={{ color: "var(--ink-muted)" }} role="status">
-              Search is unreachable right now — check your connection and try again.
-            </p>
-          )}
-          {!loading && !failed && searched && results.length === 0 && (
-            <p className="text-[14px]" style={{ color: "var(--ink-muted)" }}>
-              No stories match “{term}”.
-            </p>
-          )}
-          {/* Two columns of ruled rows on desktop, one on the phone. The rows keep
-              their tap padding below lg and lose it above, so the first column's
-              text sits on the field's left edge under the query — the whole point
-              of a grid this rigid. */}
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-0 lg:[&_a]:px-0">
-            {results.map((item) => (
-              <StoryRowCard key={item.id} item={item} lens="reader" />
-            ))}
+          <div>
+            <p className={MONO} style={{ color: "var(--ink-faint)" }}>Try</p>
+            <div className="mt-3 flex flex-wrap gap-2">{TRY.map((t) => chip(t, true))}</div>
           </div>
         </div>
-      </div>
+      )}
+
+      <section aria-label="Results" className="pt-3">
+        {loading && (
+          <p className={`${MONO} rule-live py-6`} style={{ color: "var(--ink-faint)" }}>Searching…</p>
+        )}
+        {!loading && failed && (
+          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }} role="status">
+            Search is unreachable right now: check your connection and try again.
+          </p>
+        )}
+        {!loading && !failed && searched && results.length === 0 && (
+          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            No stories match &ldquo;{term}&rdquo;.
+          </p>
+        )}
+        {!loading && !failed && searched && results.length > 0 && shown.length === 0 && (
+          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.
+          </p>
+        )}
+        {shown.length > 0 && (
+          <ol className="chart-print">
+            {shown.map((item) => <ChartRow key={item.id} item={item} primaryLang={primaryLang} />)}
+          </ol>
+        )}
+      </section>
     </div>
   );
 }

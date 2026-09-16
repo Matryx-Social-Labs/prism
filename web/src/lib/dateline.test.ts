@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FeedItem } from "@/lib/api";
-import { bandOrigins, istTime, newsTime, origins, shortDate } from "@/lib/dateline";
+import { istTime, newsTime, origins, shortDate } from "@/lib/dateline";
 
 function item(id: string, sector: string, over: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -36,16 +36,6 @@ describe("the ledger rail", () => {
       coverage: { origins: { AE: 3, IN: 27, UK: 1, US: 9 }, unknown: 0, single_origin: false },
     } as Partial<FeedItem>);
     expect(origins(i)).toBe("IN ×27 · US ×9 · AE ×3");
-  });
-
-  it("sums origins across a band", () => {
-    const a = item("a", "politics", {
-      coverage: { origins: { IN: 4 }, unknown: 0, single_origin: false },
-    } as Partial<FeedItem>);
-    const b = item("b", "politics", {
-      coverage: { origins: { IN: 3, US: 2 }, unknown: 0, single_origin: false },
-    } as Partial<FeedItem>);
-    expect(bandOrigins([a, b])).toBe("IN ×7 · US ×2");
   });
 
 });

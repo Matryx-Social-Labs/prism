@@ -78,18 +78,3 @@ export function origins(item: FeedItem, max = 3): string {
     .map(([iso, n]) => `${iso} ×${n}`)
     .join(" · ");
 }
-
-/** Summed origins across a band, for the band's rail. */
-export function bandOrigins(items: FeedItem[], max = 2): string {
-  const total: Record<string, number> = {};
-  for (const i of items) {
-    for (const [iso, n] of Object.entries(i.coverage?.origins ?? {})) {
-      total[iso] = (total[iso] ?? 0) + n;
-    }
-  }
-  return Object.entries(total)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, max)
-    .map(([iso, n]) => `${iso} ×${n}`)
-    .join(" · ");
-}

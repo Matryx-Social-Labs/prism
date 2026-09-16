@@ -217,31 +217,21 @@ describe("Search — a failed request", () => {
   });
 });
 
-describe("Search — the desktop ledger rail", () => {
-  // jsdom applies no CSS, so `hidden lg:block` hides nothing here and the rail is
-  // in the tree at every "viewport" — which is why it must never repeat what the
-  // field already prints (a headline, "Searching…", an error line). Every query
-  // in this file is singular; a second copy would fail them, not the layout.
-  it("counts what matched, and where it was filed", async () => {
+describe("Search — the masthead counts the results", () => {
+  it("counts what matched and the sources behind it, on the masthead's dateline", async () => {
     searchEvents.mockResolvedValue([
-      item({ id: "a", source_count: 5, coverage: { origins: { IN: 4, AE: 1 }, unknown: 0, single_origin: false } }),
-      item({ id: "b", title: "Second hit", source_count: 3, coverage: { origins: { IN: 3 }, unknown: 0, single_origin: false } }),
+      item({ id: "a", source_count: 5 }),
+      item({ id: "b", title: "Second hit", source_count: 3 }),
     ]);
     render(<SearchPage />);
     await userEvent.type(input(), "freight");
-
-    expect(await screen.findByText("2 results")).toBeInTheDocument();
-    // Summed, not per row — the row cards print "5 sources · just now", so an
-    // exact match here can only be the rail's total.
-    expect(screen.getByText("8 sources")).toBeInTheDocument();
-    expect(screen.getByText("IN ×7 · AE ×1")).toBeInTheDocument();
+    // Summed, not per row: the rows print their own counts, so an exact match here is the masthead's.
+    expect(await screen.findByText("2 results · 8 sources")).toBeInTheDocument();
   });
 
-  // The mock's hint strip promises ↑↓ / ⏎ / ⌘⏎ / ESC. Only ESC is wired, so only
-  // ESC is printed — and this is the test that keeps that promise honest.
-  it("promises Esc, and Esc empties the box", async () => {
+  it("says Esc clears, and Esc empties the box", async () => {
     render(<SearchPage />);
-    expect(screen.getByText("Esc clear")).toBeInTheDocument();
+    expect(screen.getByText(/Esc clears/)).toBeInTheDocument();
 
     await userEvent.type(input(), "kerala");
     await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("kerala"));
@@ -249,6 +239,22 @@ describe("Search — the desktop ledger rail", () => {
     await userEvent.type(input(), "{Escape}");
     expect(input()).toHaveValue("");
     expect(await screen.findByText("Trending entities")).toBeInTheDocument();
+  });
+
+  // The strip filters what came back; the API searched everything.
+  it("filters the results by sector group in place, and says so when the group is empty", async () => {
+    searchEvents.mockResolvedValue([
+      item({ id: "a", title: "Rupee slides", sector: "finance" }),
+      item({ id: "b", title: "Poll result", sector: "politics" }),
+    ]);
+    render(<SearchPage />);
+    await userEvent.type(input(), "result");
+    await screen.findByRole("link", { name: /Poll result/ });
+    await userEvent.click(screen.getByRole("button", { name: /BIZ/ }));
+    expect(screen.getByRole("link", { name: /Rupee slides/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Poll result/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /SPO/ }));
+    expect(screen.getByText(/None of the 2 matches for “result” are in Sports/)).toBeInTheDocument();
   });
 });
 

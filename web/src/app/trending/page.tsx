@@ -113,7 +113,7 @@ export default function TrendingPage() {
  * days prints at half weight. No thumbnail: the chart has no pictures in its
  * rows, and a 56px crop of one outlet's photo said nothing about an arc.
  */
-export function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean }) {
+function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean }) {
   const single = story.source_count <= 1;
   const stale = isStale(story);
   const rule = single ? "rule-single" : stale ? "rule-stale" : "rule-live";
