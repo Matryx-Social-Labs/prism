@@ -1,5 +1,20 @@
 import { OG_COLORS, OG_DISPLAY, OG_MONO, displayStack } from "@/lib/ogFonts";
 
+/** The mark as PrismMark draws it, for Satori: a solid triangle on the spectrum bar. */
+export function PrismMarkSvg({ size, ink }: { size: number; ink: string }) {
+  return (
+    <svg width={size} height={Math.round((size * 22) / 24)} viewBox="0 0 24 22" fill="none">
+      <path d="M12 1 L23 21 L1 21 Z" fill={ink} stroke={ink} strokeWidth={1.5} strokeLinejoin="round" />
+      <rect x="1" y="19" width="22" height="3" fill="url(#sp)" />
+      <defs>
+        <linearGradient id="sp" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#ef4444" /><stop offset="35%" stopColor="#f59e0b" /><stop offset="70%" stopColor="#06b6d4" /><stop offset="100%" stopColor="#8b5cf6" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 /**
  * The share card, 1200 × 630: the chart's row grammar at poster scale
  * (design 12-share-card). The wordmark and the tagline on top; the count in
@@ -13,7 +28,7 @@ export function OgCard({ count, countLabel, headline, grid, foot, host }: { coun
     <div style={{ height: "100%", width: "100%", display: "flex", flexDirection: "column", background: c.ground, color: c.ink, padding: "48px 56px", fontFamily: displayStack(headline) }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <svg width="30" height="28" viewBox="0 0 24 22"><path d="M12 1 L23 17 H1 Z" fill={c.ink} /><rect x="1" y="18" width="22" height="3" fill="url(#sp)" /><defs><linearGradient id="sp" x1="0" x2="1"><stop offset="0" stopColor="#F59E0B" /><stop offset=".5" stopColor="#06B6D4" /><stop offset="1" stopColor="#8B5CF6" /></linearGradient></defs></svg>
+          <PrismMarkSvg size={30} ink={c.ink} />
           <span style={{ fontFamily: OG_DISPLAY, fontSize: 40, letterSpacing: 2, lineHeight: 1 }}>PRISM</span>
         </div>
         <span style={{ fontFamily: OG_MONO, fontSize: 16, color: c.inkMuted }}>One story. Every perspective.</span>
