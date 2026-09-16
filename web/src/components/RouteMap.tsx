@@ -32,6 +32,8 @@ type Props = {
 };
 
 const GAP = { full: 230, compact: 190 };
+// Five satellites and their labels fit the route page's 860px column.
+const SAT_GAP = 150;
 
 function short(t: string, max = 24, lines = 2): string[] {
   const words = t.split(" "); const out: string[] = []; let cur = "";
@@ -87,7 +89,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
   }
   const upLanes = used.branch.length, downLanes = used.line.length;
   const ySat = yMain + (downLanes ? 84 + (downLanes - 1) * 62 + 86 : 96);
-  const reach = Math.max(x0 + gap * (trunk.length - 1) + (compact ? 140 : 320), ...[...used.branch, ...used.line].flat().map(([, b]) => b + 60), compact || !shape.satellites.length ? 0 : x0 + Math.min(5, shape.satellites.length) * 250 + (shape.satellites.length > 5 ? 120 : 0));
+  const reach = Math.max(x0 + gap * (trunk.length - 1) + (compact ? 140 : 320), ...[...used.branch, ...used.line].flat().map(([, b]) => b + 60), compact || !shape.satellites.length ? 0 : x0 + Math.min(5, shape.satellites.length) * SAT_GAP + (shape.satellites.length > 5 ? 100 : 0));
   const W = reach;
   const H = compact ? (downLanes ? 210 + (downLanes - 1) * 62 : 170) : ySat + (shape.satellites.length ? 60 : 10);
   const yTop = upLanes ? -(upLanes - 1) * 48 : 40;
@@ -235,13 +237,13 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
           {!compact && shape.satellites.length > 0 && (
             <g>
               <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc">Also reported, off the main line</text>
-              {shape.satellites.length > 5 && <text x={x0 + 5 * 250 - 40} y={ySat + 4} className="rm-k rm-k-lc">+{shape.satellites.length - 5} more, in the list</text>}
+              {shape.satellites.length > 5 && <text x={x0 + 5 * SAT_GAP - 30} y={ySat + 4} className="rm-k rm-k-lc">+{shape.satellites.length - 5} more, in the list</text>}
               {shape.satellites.slice(0, 5).map((s, i) => {
-                const cx = x0 + i * 250;
+                const cx = x0 + i * SAT_GAP;
                 return (
                   <g key={s.id}>
                     <text x={cx + 12} y={ySat - 2} className="rm-lab">{s.occurred_at ? shortDate(s.occurred_at) : ""}</text>
-                    <text x={cx + 12} y={ySat + 12} className="rm-ttl">{short(s.title, 30, 1)[0]}</text>
+                    <text x={cx + 12} y={ySat + 12} className="rm-ttl">{short(s.title, 18, 1)[0]}</text>
                     {station(s, cx, ySat, "rm-dotted")}
                   </g>
                 );

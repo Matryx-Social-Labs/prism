@@ -1,4 +1,4 @@
-import type { BranchTreeData } from "@/lib/api";
+import type { BranchTreeData, StoryDevelopment } from "@/lib/api";
 
 /**
  * How many developments the trunk of a story has: the longest chain of
@@ -27,4 +27,11 @@ export function spineLength(tree: BranchTreeData | null | undefined): number {
     return 1 + longest;
   };
   return chain(tree.root_id, new Set());
+}
+
+/** Calendar days from the first dated development to the last, inclusive; null when nothing is dated. */
+export function spanDays(devs: StoryDevelopment[]): number | null {
+  const ts = devs.map((d) => Date.parse(d.occurred_at ?? "")).filter((t) => !Number.isNaN(t));
+  if (!ts.length) return null;
+  return Math.floor((Math.max(...ts) - Math.min(...ts)) / 86_400_000) + 1;
 }

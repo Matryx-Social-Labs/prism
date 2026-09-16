@@ -5,6 +5,7 @@ import { ChevronDown, Corner } from "@/components/icons";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { spanDays } from "@/lib/spine";
 import type { BranchNode, BranchTreeData, StoryDevelopment } from "@/lib/api";
 
 // The storyline branch tree (Prism Mobile.dc.html, screen 2).
@@ -31,6 +32,10 @@ type Props = {
   developments: StoryDevelopment[];
   /** The development the reader arrived on, if any — carries the lens hue. */
   currentId?: string | null;
+  /** Open on ALL rather than the trunk: the route page, where the whole story is the point. */
+  defaultAll?: boolean;
+  /** The counted shape line above the list; off where the page's strip already prints it. */
+  readout?: boolean;
 };
 
 type Row = {
@@ -71,15 +76,9 @@ function span(devs: StoryDevelopment[]): string {
   return am === bm ? `${ad}-${bd} ${bm}` : `${a} - ${b}`;
 }
 
-/** Calendar days from the first dated development to the last, inclusive; null when nothing is dated. */
-export function spanDays(devs: StoryDevelopment[]): number | null {
-  const ts = devs.map((d) => Date.parse(d.occurred_at ?? "")).filter((t) => !Number.isNaN(t));
-  if (!ts.length) return null;
-  return Math.floor((Math.max(...ts) - Math.min(...ts)) / 86_400_000) + 1;
-}
 
-export function BranchTree({ tree, developments, currentId = null }: Props) {
-  const [showAll, setShowAll] = useState(false);
+export function BranchTree({ tree, developments, currentId = null, defaultAll = false, readout = true }: Props) {
+  const [showAll, setShowAll] = useState(defaultAll);
   const [openBranch, setOpenBranch] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(developments.map((d) => [d.id, d])), [developments]);
@@ -250,12 +249,14 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
 
   return (
     <section aria-label="Storyline structure">
-      <div
-        className="font-mono text-[11px] uppercase leading-[1.7] tracking-[0.06em]"
-        style={{ color: "var(--ink-muted)" }}
-      >
-        {shapeLine}
-      </div>
+      {readout && (
+        <div
+          className="font-mono text-[11px] uppercase leading-[1.7] tracking-[0.06em]"
+          style={{ color: "var(--ink-muted)" }}
+        >
+          {shapeLine}
+        </div>
+      )}
 
       <div
         className="sticky top-0 z-20 mt-3 flex items-center gap-2.5 border-y px-1 py-2"

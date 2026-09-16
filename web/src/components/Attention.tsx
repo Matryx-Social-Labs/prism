@@ -21,10 +21,15 @@ export function Attention({ tree, developments }: { tree: BranchTreeData; develo
   const day0 = shape.day0 ? shortDate(shape.day0) : "";
   return (
     <div className="mt-3">
-      <label className="inline-flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
-        <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} style={{ accentColor: "var(--ink)" }} />
-        Show attention · sources per day
-      </label>
+      <button
+        type="button"
+        onClick={() => setOn((v) => !v)}
+        aria-pressed={on}
+        className="flex h-9 items-center border-b-2 font-mono text-[11px]"
+        style={{ borderColor: on ? "var(--ink)" : "transparent", color: on ? "var(--ink)" : "var(--ink-muted)" }}
+      >
+        Attention · sources per day
+      </button>
       {on && (
         <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 block w-full" role="img" aria-label="Sources per day, all lines">
           <path d={d} style={{ fill: "var(--bg-sunken)" }} />
