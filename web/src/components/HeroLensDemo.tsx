@@ -1,10 +1,12 @@
 "use client";
 
-// The flip, demonstrated: one story re-read through four lenses, two of them
-// drafted and not yet served. Illustrative on the about page (the story is an
-// example, not a record); the real product lens set is whatever /api/v1/lenses
-// returns. Mechanics are the story page's: scan line and re-ink, layout never
-// moves, instant under reduced motion.
+// The flip, demonstrated on one story a general reader gets at a glance: the
+// same event re-read for four kinds of reader. An ILLUSTRATION and labelled as
+// one; the briefs are written, not extracted, because a professional read of
+// a real story is paid and a stranger on the landing cannot fetch it. The
+// mechanics are the story page's: scan line and re-ink, layout never moves,
+// instant under reduced motion. Two of the four reads are marked next: they
+// are being built, and the tab says so.
 import Link from "next/link";
 import { useState } from "react";
 
@@ -13,10 +15,14 @@ interface HeroLens {
   label: string;
   color: string;
   bg: string;
+  next?: boolean;
   /** What this reading tells you, in plain words, for the unlock prompt. */
   plain: string;
   brief: string;
 }
+
+const HEADLINE = "Delhi bans diesel cars older than ten years from Monday";
+const FACTS = "POL · 31 outlets · IN";
 
 const LENSES: HeroLens[] = [
   {
@@ -24,42 +30,40 @@ const LENSES: HeroLens[] = [
     label: "Reader",
     color: "var(--lens-general)",
     bg: "var(--lens-general-bg)",
-    plain: "what happened, and why it matters",
+    plain: "what happened, and what it means for you",
     brief:
-      "The patent office cleared three manufacturers to make semaglutide from January, with prices projected to fall up to 80%. Two narratives are already competing, a public-health milestone against patent erosion, and both are grouped on the story page.",
+      "From Monday, diesel cars registered before 2016 cannot be driven in Delhi; the transport department will impound them at checkpoints. Owners who scrap get a certificate that cuts road tax on a new car. Two-wheelers and commercial fleets are not covered yet.",
   },
   {
     key: "markets",
     label: "Markets",
     color: "var(--lens-finance)",
     bg: "var(--lens-finance-bg)",
-    plain: "which tickers move, and what the catalyst is",
+    plain: "which companies this moves, and why",
     brief:
-      "Generics names (SUNPHARMA, CIPLA, DRREDDY) catch a bid on volume upside while the innovator faces price erosion in its fastest-growing market. Watch API-capacity announcements and the innovator's India revenue guidance.",
+      "A forced replacement cycle for the capital: carmakers with petrol and CNG line-ups gain, used-car platforms lose diesel inventory overnight, and scrappage yards get a quarter of volume. Watch dealer bookings and the rebate's fine print.",
   },
   {
     key: "health",
     label: "Health",
-    // Reserved hues (DESIGN.md) have no tokens yet, so the tint is mixed from
-    // the hue itself and reads the same on both grounds.
     color: "#be123c",
     bg: "color-mix(in srgb, #be123c 14%, transparent)",
-    plain: "what changes for clinicians and patients",
+    next: true,
+    plain: "what changes for patients and clinicians",
     brief:
-      "Prescribing will widen beyond endocrinology once prices fall; the immediate clinical questions are supply consistency and cold-chain reliability outside metros.",
+      "Old diesel engines are the city's largest single source of winter particulates. Clinicians expect fewer asthma and COPD emergencies if enforcement holds through November, when the smog season starts.",
   },
   {
     key: "policy",
     label: "Policy",
     color: "#0369a1",
     bg: "color-mix(in srgb, #0369a1 14%, transparent)",
+    next: true,
     plain: "what precedent this sets",
     brief:
-      "The ruling becomes a reference point for compulsory-licensing and access-to-medicine arguments; expect it cited well beyond pharma, including in trade negotiations.",
+      "The order retires vehicles by age rather than by emissions test, which the courts have not ruled on. Mumbai and Bengaluru have similar drafts waiting on how this one survives challenge.",
   },
 ];
-
-const MONO = "font-mono text-[11px] uppercase tracking-[0.06em]";
 
 export function HeroLensDemo({
   locked = [],
@@ -76,18 +80,19 @@ export function HeroLensDemo({
   const isLocked = locked.includes(lens.key);
 
   return (
-    <div className="border" style={{ borderColor: "var(--line)", background: "var(--bg-elevated)" }}>
-      <div className={`${MONO} flex items-center justify-between border-b px-5 py-3`} style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+    <div className="border" style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)" }}>
+      <div className="flex items-center justify-between border-b px-5 py-3 font-mono text-[12px]" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
         <span>{title}</span>
         <span style={{ color: "var(--ink-faint)" }}>Illustration</span>
       </div>
 
-      {/* A paragraph, not a heading: the demo sits inside the hero and must not break the page's outline. */}
-      <p className="px-5 pt-4 text-[18px] font-medium leading-[1.35] text-balance">
-        Blockbuster obesity drug goes generic in India after landmark patent ruling
-      </p>
+      <div className="px-5 pt-5">
+        <p className="font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{FACTS}</p>
+        {/* A paragraph, not a heading: the demo sits inside the hero and must not break the page's outline. */}
+        <p className="mt-1.5 text-[21px] font-medium leading-[1.3] text-balance sm:text-[23px]">{HEADLINE}</p>
+      </div>
 
-      <div className="flex flex-wrap gap-1.5 px-5 pt-3.5" role="tablist" aria-label="Lens">
+      <div className="flex flex-wrap gap-1.5 px-5 pt-4" role="tablist" aria-label="Lens">
         {LENSES.map((l, i) => {
           const selected = i === active;
           const lock = locked.includes(l.key);
@@ -101,7 +106,7 @@ export function HeroLensDemo({
                 setFlipped(true);
                 setActive(i);
               }}
-              className="flex min-h-[36px] items-center gap-1 rounded-full px-3.5 text-xs font-semibold transition"
+              className="flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition"
               style={
                 selected
                   ? { background: l.bg, color: l.color, boxShadow: `inset 0 0 0 1.5px ${l.color}` }
@@ -115,6 +120,7 @@ export function HeroLensDemo({
                 </svg>
               )}
               {l.label}
+              {l.next && <span className="font-mono text-[11px] tracking-[0.04em]" aria-label="coming next">next</span>}
             </button>
           );
         })}
@@ -123,7 +129,7 @@ export function HeroLensDemo({
       <div key={active} className={`${flipped ? "flip-body" : ""} relative overflow-hidden px-5 pb-5 pt-4`}>
         {flipped && <span aria-hidden className="flip-scanline" style={{ background: lens.color }} />}
         {isLocked ? (
-          <p className="mt-2 text-[14px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+          <p className="text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
             The {lens.label} lens reads this story for {lens.plain}. It is a professional reading, so
             the brief is behind a sign-in; the flip is not.{" "}
             <Link href="/signin" className="underline underline-offset-4" style={{ color: "var(--ink)" }}>
@@ -131,7 +137,8 @@ export function HeroLensDemo({
             </Link>
           </p>
         ) : (
-          <p className="mt-2 text-[14px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+          <p className="text-[15px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+            <span className="font-semibold" style={{ color: lens.color }}>Through the {lens.label} lens: </span>
             {lens.brief}
           </p>
         )}

@@ -7,17 +7,22 @@ describe("HeroLensDemo — the flip, demonstrated", () => {
   it("re-inks the reading when a lens is picked", async () => {
     render(<HeroLensDemo />);
     expect(screen.getByRole("tab", { name: "Reader" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText(/The patent office cleared/)).toBeInTheDocument();
+    expect(screen.getByText(/From Monday, diesel cars/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Markets" }));
     expect(screen.getByRole("tab", { name: "Markets" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText(/Generics names/)).toBeInTheDocument();
+    expect(screen.getByText(/forced replacement cycle/)).toBeInTheDocument();
   });
 
   it("flips to a locked lens and shows the unlock prompt instead of the reading — the paywall moment", async () => {
     render(<HeroLensDemo locked={["markets"]} />);
     await userEvent.click(screen.getByRole("tab", { name: "Markets lens, locked" }));
-    expect(screen.getByRole("tab", { name: "Markets lens, locked" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByText(/Generics names/)).toBeNull();
+    expect(screen.queryByText(/forced replacement cycle/)).toBeNull();
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/signin");
+  });
+
+  it("says it is an illustration and marks the reads still being built", () => {
+    render(<HeroLensDemo />);
+    expect(screen.getByText("Illustration")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("coming next")).toHaveLength(2);
   });
 });

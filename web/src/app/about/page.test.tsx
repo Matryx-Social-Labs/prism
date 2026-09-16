@@ -31,8 +31,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-describe("/about — three proofs, live", () => {
-  it("pulls the passenger list and the coaches from the most-corroborated stories, never inventing them", async () => {
+describe("/about — the product as the proof, live", () => {
+  it("leads with the most-corroborated general story and quotes from the story that has a verified quote", async () => {
     // The API's order is newest-first; the quoted story is thinner than the lead.
     fetchFeed.mockResolvedValue([item("quoted", 2), item("strong", 9)]);
     fetchEvent.mockImplementation(async (id: string) =>
@@ -42,16 +42,24 @@ describe("/about — three proofs, live", () => {
     );
     render(await AboutPage());
 
-    // The passenger list comes from a story that HAS quotes, even if it is not the lead.
-    const said = screen.getByRole("heading", { name: "What was said" }).closest("div")!.parentElement!;
+    // The count cell: the nine-outlet story leads, by the chart's order, not the API's.
+    const count = screen.getByRole("heading", { name: "One story, not fifty headlines" }).parentElement!;
+    expect(within(count).getByText("9")).toBeInTheDocument();
+    expect(within(count).getByRole("link", { name: "Story strong" })).toHaveAttribute("href", "/story/strong");
+    // The quote cell comes from a story that HAS quotes, even if it is not the lead.
+    const said = screen.getByRole("heading", { name: "Who said what, in their own words" }).parentElement!;
     expect(within(said).getByText("“We were receiving proposals”")).toBeInTheDocument();
-    expect(within(said).getByRole("link", { name: "Story quoted" })).toHaveAttribute("href", "/story/quoted");
-    // The chart's order, not the API's: the nine-outlet story leads the coaches.
-    const sources = screen.getByRole("heading", { name: "Sources" }).closest("div")!.parentElement!;
-    expect(within(sources).getByRole("link", { name: "Story strong" })).toBeInTheDocument();
-    // No slug on either event, so no route and no fetch for one.
-    expect(screen.queryByRole("heading", { name: "The route" })).toBeNull();
+    // No slug on either event, so no route cell and no fetch for one.
+    expect(screen.queryByRole("heading", { name: "Follow the story as it moves" })).toBeNull();
     expect(fetchTrendingStory).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cyber record off the landing: a general reader meets general news first", async () => {
+    fetchFeed.mockResolvedValue([item("cve", 40), item("poll", 5)].map((i, n) => ({ ...i, sector: n === 0 ? "cybersecurity" : "politics" })));
+    fetchEvent.mockImplementation(async (id: string) => event(id));
+    render(await AboutPage());
+    expect(screen.queryByRole("link", { name: "Story cve" })).toBeNull();
+    expect(screen.getAllByRole("link", { name: "Story poll" }).length).toBeGreaterThan(0);
   });
 
   it("renders the route from the owner of the arc when a story carries a tree", async () => {
@@ -67,22 +75,15 @@ describe("/about — three proofs, live", () => {
     });
     render(await AboutPage());
     expect(fetchTrendingStory).toHaveBeenCalledWith("s");
-    expect(screen.getByRole("heading", { name: "The route" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Follow the story as it moves" })).toBeInTheDocument();
     expect(screen.getByText(/2 DEVELOPMENTS · 0 BRANCHES · 0 SATELLITES · 3 DAYS/)).toBeInTheDocument();
-  });
-
-  it("omits the coaches when no story names at least two sources — one source proves nothing", async () => {
-    fetchFeed.mockResolvedValue([item("lone", 1)]);
-    fetchEvent.mockResolvedValue(event("lone"));
-    render(await AboutPage());
-    expect(screen.queryByRole("heading", { name: "Sources" })).toBeNull();
   });
 
   it("says the chart is unreachable rather than showing an empty or made-up proof", async () => {
     fetchFeed.mockRejectedValue(new Error("offline"));
     render(await AboutPage());
-    expect(screen.getByText(/The chart is unreachable right now/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /What was said|Sources|The route/ })).toBeNull();
+    expect(screen.getAllByText(/The chart is unreachable right now/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("heading", { name: "Follow the story as it moves" })).toBeNull();
   });
 
   it("has one action, with one label, and no eyebrow or em-dash anywhere", async () => {

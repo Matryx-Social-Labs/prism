@@ -23,11 +23,12 @@ describe("Landing", () => {
     for (const a of actions) expect(a).toHaveAttribute("href", "/feed");
   });
 
-  it("labels every written example as an illustration and every unbuilt section as next", async () => {
+  it("labels the two written pieces as illustrations and names what is being built next", async () => {
     render(await Landing());
-    // both sides, so what, blindspots, ask, plus the two flip demos' own labels
-    expect(screen.getAllByText(/^Illustration/i)).toHaveLength(6);
-    expect(screen.getAllByText(/^Being built next\./)).toHaveLength(3);
+    // the flip demo and the Ask example; nothing else on the page is written
+    expect(screen.getAllByText(/^Illustration$/)).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Being built next" })).toBeInTheDocument();
+    for (const t of ["Both sides", "What happens next", "Blindspots"]) expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
   });
 
   it("renders the live registry, not a typed list of lenses", async () => {

@@ -383,7 +383,7 @@ export function BranchTree({ tree, developments, currentId = null }: Props) {
       </div>
 
       <p
-        className="px-1 pb-5 pt-3.5 font-mono text-[12px] leading-[1.7] tracking-[0.02em]"
+        className="max-w-[40em] px-1 pb-5 pt-3.5 font-mono text-[12px] leading-[1.7] tracking-[0.02em]"
         style={{ color: "var(--ink-faint)" }}
       >
         Root is the most-corroborated development; every other attaches forward in time

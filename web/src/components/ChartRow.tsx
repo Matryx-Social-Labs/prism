@@ -114,7 +114,7 @@ export function ChartRow({
             )}
           </h2>
           {lead && item.summary && (
-            <p className="mt-2 text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
+            <p className="mt-2 max-w-[36em] text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
               {item.summary}
             </p>
           )}
