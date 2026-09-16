@@ -162,9 +162,9 @@ export function BriefPlayer({
 
       {points.length > 0 && (
         <div>
-          <h3 className="mb-2 font-display text-[20px] font-medium uppercase leading-none tracking-[0.03em]">
+          <h2 className="mb-2 font-display text-[20px] font-medium uppercase leading-none tracking-[0.03em]">
             {pointsHeading}
-          </h3>
+          </h2>
           <ul className="flex flex-col gap-1.5">
             {points.map((pt, i) => {
               const isActive = active === briefSentences.length + i;

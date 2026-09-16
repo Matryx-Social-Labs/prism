@@ -10,6 +10,7 @@ import { indexSources } from "@/components/SourceList";
 import { fetchEvent, fetchFeed, fetchTrendingStory, type EventDetail, type FeedItem, type TrendingStoryDetail } from "@/lib/api";
 import { chartOrder } from "@/lib/chart";
 import { istDate } from "@/lib/dateline";
+import { spineLength } from "@/lib/spine";
 
 /**
  * The landing: `/` for a first visitor (returning readers are redirected to
@@ -51,8 +52,10 @@ async function loadEvidence(): Promise<Evidence | null> {
     for (const event of events.slice(0, 8)) {
       if (!event.story_slug) continue;
       const story = await fetchTrendingStory(event.story_slug).catch(() => null);
-      // Three on the spine, at least: a route with one station shows no route.
-      if (story?.branches && story.branches.nodes.filter((n) => !n.off_spine).length >= 3) {
+      // Three on the trunk, at least, as BranchTree counts it: a story with
+      // twenty-five developments can still have a spine of one, and a route
+      // with one station shows no route.
+      if (story?.branches && spineLength(story.branches) >= 3) {
         route = { event, story };
         break;
       }
@@ -83,7 +86,7 @@ function Action({ href, children }: { href: string; children: React.ReactNode })
 /** A cell of the feature grid: the claim, one line on it, then the product doing it. */
 function Cell({ title, body, wide = false, children }: { title: string; body: string; wide?: boolean; children: React.ReactNode }) {
   return (
-    <div className={`rule-live py-8 ${wide ? "lg:col-span-2" : ""}`}>
+    <div className={`rule-live min-w-0 py-8 ${wide ? "lg:col-span-2" : ""}`}>
       <h3 className="font-display text-[24px] font-medium uppercase leading-none tracking-[0.03em]">{title}</h3>
       <p className="mt-2 max-w-[44ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>{body}</p>
       <div className="mt-5">{children}</div>
@@ -218,7 +221,7 @@ export async function Landing() {
           </Cell>
 
           <Cell wide title="Six subjects, your state first" body="Politics to entertainment on one strip, on every page. Tell us your state and its news leads the chart; follow a subject and For you appears.">
-            <div className="[&_nav]:static [&_nav]:border-b-0 [&_nav_a>span:last-child]:!inline">
+            <div className="min-w-0 overflow-x-auto [&_nav]:static [&_nav]:border-b-0 [&_nav_a>span:last-child]:!inline">
               <SectorStrip active={null} allHref="/feed" allLabel="Today" />
             </div>
           </Cell>
