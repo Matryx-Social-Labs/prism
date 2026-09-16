@@ -42,7 +42,7 @@ async def trending(
             text(
                 """
                 SELECT st.slug, st.label, st."cast" AS cast, st.source_count, st.velocity,
-                       st.sector, st.regions, st.hero_event_id,
+                       st.sector, st.regions, st.hero_event_id, st.member_event_ids,
                        st.first_seen_at, st.last_updated_at,
                        jsonb_array_length(st.member_event_ids) AS developments,
                        e.title AS hero_title, e.image_url AS hero_image
@@ -58,9 +58,11 @@ async def trending(
             {"state": state, "sectors": sectors, "lim": limit},
         )
     ).mappings().all()
+    routes = [await _route_for(db, r["member_event_ids"]) for r in rows]
     return {
         "stories": [
             {
+                "route": route,
                 "slug": r["slug"],
                 "label": r["label"],
                 "cast": (r["cast"] or [])[:3],
@@ -76,8 +78,29 @@ async def trending(
                 "first_seen_at": r["first_seen_at"].isoformat() if r["first_seen_at"] else None,
                 "last_updated_at": r["last_updated_at"].isoformat() if r["last_updated_at"] else None,
             }
-            for r in rows
+            for r, route in zip(rows, routes, strict=True)
         ]
+    }
+
+
+async def _route_for(db: AsyncSession, member_ids: list | None) -> dict | None:
+    """The route glyph's data for one row: the persisted branch tree, each node
+    with the day it happened. One small query per row on a list of at most 50."""
+    from correlation.threads import branch_tree_for_members
+
+    tree = await branch_tree_for_members(member_ids)
+    if not tree:
+        return None
+    days = (
+        await db.execute(
+            text("SELECT id::text AS id, occurred_at FROM events WHERE id = ANY(CAST(:ids AS uuid[]))"),
+            {"ids": [n["id"] for n in tree["nodes"]]},
+        )
+    ).mappings().all()
+    when = {d["id"]: d["occurred_at"].isoformat() if d["occurred_at"] else None for d in days}
+    return {
+        "root_id": tree["root_id"],
+        "nodes": [{"id": n["id"], "parent_id": n["parent_id"], "off_spine": n["off_spine"], "occurred_at": when.get(n["id"])} for n in tree["nodes"]],
     }
 
 

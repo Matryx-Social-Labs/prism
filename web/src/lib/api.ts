@@ -224,6 +224,19 @@ export interface TrendingStory {
   hero_event_id: string | null; // the ticket a row opens
   first_seen_at: string | null; // SPAN = last_updated_at - first_seen_at
   last_updated_at: string | null; // LAST MOVED
+  route: RouteData | null; // the route glyph's data; null when the story predates the partition
+}
+
+export interface RouteNode {
+  id: string;
+  parent_id: string | null;
+  off_spine: boolean;
+  occurred_at: string | null;
+}
+
+export interface RouteData {
+  root_id: string;
+  nodes: RouteNode[];
 }
 
 export async function fetchTrending(

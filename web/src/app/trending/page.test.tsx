@@ -19,7 +19,7 @@ function story(over: Partial<TrendingStory> = {}): TrendingStory {
   return {
     slug: "kerala-power", label: "CPI(M) · Pinarayi Vijayan", cast: ["CPI(M)", "Pinarayi Vijayan"],
     source_count: 4, velocity: 3, developments: 5, sector: "politics",
-    hero_title: "Kerala power crisis deepens", hero_image: null,
+    hero_title: "Kerala power crisis deepens", hero_image: null, route: null,
     hero_event_id: "ev-1", first_seen_at: iso(6 * DAY), last_updated_at: iso(2 * 3_600_000),
     ...over,
   };

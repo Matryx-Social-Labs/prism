@@ -28,7 +28,7 @@ def _row(label: str, sector: str, hero: uuid.UUID | None = None) -> dict:
         "slug": label.lower().replace(" ", "-"), "label": label, "cast": [label], "source_count": 4,
         "velocity": 1, "sector": sector, "regions": ["IN"], "hero_event_id": hero,
         "first_seen_at": T0, "last_updated_at": T1, "developments": 3,
-        "hero_title": None, "hero_image": None,
+        "hero_title": None, "hero_image": None, "member_event_ids": [],
     }
 
 

@@ -12,6 +12,7 @@ import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
 import { sectorCode, sectorGroup, sectorParam } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
+import { RouteGlyph } from "@/components/RouteGlyph";
 
 /**
  * Trending: the chart of arcs (shape brief §4). Rows are stories, not events;
@@ -145,6 +146,7 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
           >
             {story.label ?? story.hero_title}
           </h2>
+          <RouteGlyph route={story.route} />
           <div
             className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[11px] uppercase tracking-[0.04em]"
             style={{ color: "var(--ink-faint)" }}

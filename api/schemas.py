@@ -216,6 +216,22 @@ class AskRequest(BaseModel):
 # interface, and test_trending_contract.py asserts the served key sets exactly.
 
 
+class RouteNodeOut(BaseModel):
+    """One member of a story's route, enough to draw its glyph: the branch tree's
+    node plus the day it happened, so the client reads it with the same routeShape
+    the route page uses and the glyph is the map in miniature."""
+
+    id: str
+    parent_id: str | None
+    off_spine: bool
+    occurred_at: str | None
+
+
+class RouteOut(BaseModel):
+    root_id: str
+    nodes: list[RouteNodeOut]
+
+
 class TrendingStoryOut(BaseModel):
     slug: str
     label: str
@@ -229,6 +245,8 @@ class TrendingStoryOut(BaseModel):
     hero_event_id: str | None = None
     first_seen_at: str | None = None
     last_updated_at: str | None = None
+    # The route glyph's data; None when the story predates the current partition.
+    route: RouteOut | None = None
 
 
 class TrendingResponse(BaseModel):
