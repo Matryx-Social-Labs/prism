@@ -420,66 +420,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden py-5`}
         >
           {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
-          {gateState?.lens === lens && gateState.kind === "no_samples" ? (
-            // OUT OF SAMPLES is a different wall from NOT SIGNED IN, and the
-            // reader needs a different next step for each. The server sends the
-            // remaining count; `null` means no quota row was ever granted, which
-            // is not the same as having spent everything, so it is not shown as
-            // "0 left".
-            <div className="flex flex-col items-start gap-3">
-              <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-                You&apos;ve used your free{" "}
-                <span className="font-semibold" style={{ color: meta.color }}>
-                  {meta.short}
-                </span>{" "}
-                reads
-                {typeof gateState.remaining === "number"
-                  ? `, ${gateState.remaining} left`
-                  : ""}
-                . The reader view of this story stays open.
-              </p>
-              <button
-                onClick={() => setLens("reader")}
-                className="rounded-full border px-4 py-2 text-[13px] font-semibold"
-                style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
-              >
-                Back to the reader view
-              </button>
-            </div>
-          ) : isLocked(lens) || gateState?.lens === lens ? (
-            <div className="flex flex-col items-start gap-3">
-              <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-                Read this story through the{" "}
-                <span className="font-semibold" style={{ color: meta.color }}>
-                  {meta.short} lens
-                </span>{" "}
-: {meta.plain ?? meta.tagline}. Free with an account.
-              </p>
-              <button
-                onClick={() => router.push("/signin")}
-                className="rounded-full px-4 py-2 text-[13px] font-semibold"
-                style={{ background: "var(--ink)", color: "var(--bg)" }}
-              >
-                Sign in to unlock
-              </button>
-            </div>
-          ) : briefLoading && !brief ? (
-            <div aria-label="Generating lens brief">
-              <div className="pulse-skel h-[13px] rounded-md" style={{ background: "var(--bg-sunken)" }} />
-              <div className="pulse-skel mt-2 h-[13px] w-[92%] rounded-md" style={{ background: "var(--bg-sunken)" }} />
-              <div className="pulse-skel mt-2 h-[13px] w-[78%] rounded-md" style={{ background: "var(--bg-sunken)" }} />
-              <p className="mt-2.5 text-xs" style={{ color: "var(--ink-faint)" }}>
-                Writing the {meta.short} read of this story…
-              </p>
-            </div>
-          ) : brief ? (
-            <BriefPlayer brief={brief} points={lensPoints} meta={meta} pointsHeading={pointsHeading} />
-          ) : (
-            <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-              No {meta.short} read of this story yet.
-            </p>
-          )}
-
+          {/* Facts first — they are the record; the brief beneath is a reading of it. */}
           {lens === "cyber" && cyber && !isLocked(lens) && (
             <div className="flex flex-col gap-3.5">
               {/* The lens's facts as codes on one line, in the lens's own hue —
@@ -553,41 +494,87 @@ export function StoryView({ event }: { event: EventDetail }) {
 
           {lens === "markets" && finance && !isLocked(lens) && (
             <div className="flex flex-col gap-3">
-            <div
-              className="flex flex-wrap gap-x-6 gap-y-2 border-y py-3 text-[13.5px]"
-              style={{ borderColor: "var(--lens-finance)", color: "var(--ink)" }}
-            >
-              {(finance.tickers ?? []).length > 0 && (
-                <span>
-                  <strong>Tickers:</strong>{" "}
-                  <span className="font-mono">{(finance.tickers ?? []).map((t) => `$${t}`).join(", ")}</span>
-                </span>
-              )}
-              {finance.sector && (
-                <span>
-                  <strong>Sector:</strong> {finance.sector}
-                </span>
-              )}
-              {finance.catalyst && (
-                <span>
-                  <strong>Catalyst:</strong> {finance.catalyst.replaceAll("_", " ")}
-                </span>
-              )}
-              {finance.price_impact?.direction && (
-                <span>
-                  <strong>Price read:</strong>{" "}
-                  <span className="inline-flex translate-y-[1px]" aria-label={finance.price_impact.direction}>
-                    {finance.price_impact.direction === "up" ? <ArrowUp /> : finance.price_impact.direction === "down" ? <ArrowDown /> : <Dash />}
-                  </span>{" "}
-                  {finance.price_impact.magnitude ?? ""}
-                  {finance.price_impact.confidence != null &&
-                    ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
-                </span>
-              )}
-            </div>
-            <FollowSignals tickers={finance.tickers ?? []} sector={finance.sector ?? null} />
+              {/* The lens's facts as codes on one line, in the lens's own hue —
+                  colour because a lens is speaking, mono because they are read
+                  off the record. */}
+              <div className={`${MONO_LABEL} flex flex-wrap gap-x-4 gap-y-1`} style={{ color: "var(--lens-finance)" }}>
+                {(finance.tickers ?? []).length > 0 && <span>Tickers</span>}
+                {(finance.tickers ?? []).map((t) => <span key={t} className="border-b" style={{ borderColor: "var(--lens-finance)" }}>{t}</span>)}
+                {finance.catalyst && <span>· catalyst · {finance.catalyst.replaceAll("_", " ")}</span>}
+                {finance.price_impact?.direction && (
+                  <span>
+                    · price read ·{" "}
+                    <span className="inline-flex translate-y-[1px]" aria-label={finance.price_impact.direction}>
+                      {finance.price_impact.direction === "up" ? <ArrowUp /> : finance.price_impact.direction === "down" ? <ArrowDown /> : <Dash />}
+                    </span>{" "}
+                    {finance.price_impact.magnitude ?? ""}
+                    {finance.price_impact.confidence != null && ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
+                  </span>
+                )}
+              </div>
+              <FollowSignals tickers={finance.tickers ?? []} sector={finance.sector ?? null} />
             </div>
           )}
+          {gateState?.lens === lens && gateState.kind === "no_samples" ? (
+            // OUT OF SAMPLES is a different wall from NOT SIGNED IN, and the
+            // reader needs a different next step for each. The server sends the
+            // remaining count; `null` means no quota row was ever granted, which
+            // is not the same as having spent everything, so it is not shown as
+            // "0 left".
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+                You&apos;ve used your free{" "}
+                <span className="font-semibold" style={{ color: meta.color }}>
+                  {meta.short}
+                </span>{" "}
+                reads
+                {typeof gateState.remaining === "number"
+                  ? `, ${gateState.remaining} left`
+                  : ""}
+                . The reader view of this story stays open.
+              </p>
+              <button
+                onClick={() => setLens("reader")}
+                className="rounded-full border px-4 py-2 text-[13px] font-semibold"
+                style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
+              >
+                Back to the reader view
+              </button>
+            </div>
+          ) : isLocked(lens) || gateState?.lens === lens ? (
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-[14.5px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+                Read this story through the{" "}
+                <span className="font-semibold" style={{ color: meta.color }}>
+                  {meta.short} lens
+                </span>{" "}
+: {meta.plain ?? meta.tagline}. Free with an account.
+              </p>
+              <button
+                onClick={() => router.push("/signin")}
+                className="rounded-full px-4 py-2 text-[13px] font-semibold"
+                style={{ background: "var(--ink)", color: "var(--bg)" }}
+              >
+                Sign in to unlock
+              </button>
+            </div>
+          ) : briefLoading && !brief ? (
+            <div aria-label="Generating lens brief">
+              <div className="pulse-skel h-[13px] rounded-md" style={{ background: "var(--bg-sunken)" }} />
+              <div className="pulse-skel mt-2 h-[13px] w-[92%] rounded-md" style={{ background: "var(--bg-sunken)" }} />
+              <div className="pulse-skel mt-2 h-[13px] w-[78%] rounded-md" style={{ background: "var(--bg-sunken)" }} />
+              <p className="mt-2.5 text-xs" style={{ color: "var(--ink-faint)" }}>
+                Writing the {meta.short} read of this story…
+              </p>
+            </div>
+          ) : brief ? (
+            <BriefPlayer brief={brief} points={lensPoints} meta={meta} pointsHeading={pointsHeading} />
+          ) : (
+            <p className="text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
+              No {meta.short} read of this story yet.
+            </p>
+          )}
+
         </div>
       </section>
 
