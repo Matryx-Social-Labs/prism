@@ -59,6 +59,9 @@ const EVENT = {
 
 beforeEach(() => {
   localStorage.clear();
+  // jsdom implements no scrollIntoView, and the pinned rail — the one
+  // tablist on the page now — calls it on every pick.
+  Element.prototype.scrollIntoView = vi.fn();
 });
 
 // jsdom has no viewport, so BOTH the desktop composition and the mobile tree
