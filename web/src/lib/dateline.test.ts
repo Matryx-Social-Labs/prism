@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FeedItem } from "@/lib/api";
-import { istTime, newsTime, origins, shortDate } from "@/lib/dateline";
+import { istDate, istStamp, istTime, newsTime, origins, shortDate } from "@/lib/dateline";
 
 function item(id: string, sector: string, over: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -84,5 +84,15 @@ describe("shortDate", () => {
     // depending on the reader's machine. A 23:30Z probe would NOT catch a
     // missing pin on a European dev box; this one does.
     expect(shortDate("2026-07-27T20:00:00Z")).toBe("28 Jul");
+  });
+});
+
+describe("the month words are ours, not ICU's", () => {
+  // en-IN's short September is "Sep" in one ICU build and "Sept" in another,
+  // so a server-printed dateline failed to hydrate in a browser with the other.
+  it("prints September as Sept whatever the runtime's locale data says", () => {
+    expect(shortDate("2026-09-17T06:00:00Z")).toBe("17 Sept");
+    expect(istDate(new Date("2026-09-17T06:00:00Z"))).toBe("THU 17 SEPT 2026");
+    expect(istStamp("2026-09-05T20:55:00Z")).toBe("06 SEPT 2026 02:25 IST");
   });
 });

@@ -175,7 +175,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
     let ySatV = y + 6;
     const sats: React.ReactNode[] = [];
     if (!compact && shape.satellites.length) {
-      sats.push(<text key="sk" x={LX - 24} y={ySatV} className="rm-k">Also reported, off the main line</text>);
+      sats.push(<text key="sk" x={LX - 24} y={ySatV} className="rm-k rm-k-lc">Also reported, off the main line</text>);
       ySatV += 22;
       for (const s of shape.satellites.slice(0, 5)) {
         sats.push(
@@ -187,7 +187,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
         );
         ySatV += 40;
       }
-      if (shape.satellites.length > 5) { sats.push(<text key="sm" x={LX} y={ySatV - 8} className="rm-k">+{shape.satellites.length - 5} more, in the list below</text>); ySatV += 16; }
+      if (shape.satellites.length > 5) { sats.push(<text key="sm" x={LX} y={ySatV - 8} className="rm-k rm-k-lc">+{shape.satellites.length - 5} more, in the list below</text>); ySatV += 16; }
     }
     const HV = (compact || !shape.satellites.length ? y : ySatV) + 8, WV = 360;
     return (
@@ -234,8 +234,8 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
           {/* satellites */}
           {!compact && shape.satellites.length > 0 && (
             <g>
-              <text x={x0 - 40} y={ySat - 14} className="rm-k">Also reported, off the main line</text>
-              {shape.satellites.length > 5 && <text x={x0 + 5 * 250 - 40} y={ySat + 4} className="rm-k">+{shape.satellites.length - 5} more, in the list</text>}
+              <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc">Also reported, off the main line</text>
+              {shape.satellites.length > 5 && <text x={x0 + 5 * 250 - 40} y={ySat + 4} className="rm-k rm-k-lc">+{shape.satellites.length - 5} more, in the list</text>}
               {shape.satellites.slice(0, 5).map((s, i) => {
                 const cx = x0 + i * 250;
                 return (

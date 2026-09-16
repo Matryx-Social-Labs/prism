@@ -62,14 +62,14 @@ export function SourceList({
                 href={s.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block truncate underline-offset-4 hover:underline"
+                className="block underline-offset-4 hover:underline"
                 style={{ color: "var(--ink-muted)" }}
               >
                 {s.title}
               </a>
             ) : (
               <span
-                className="block truncate"
+                className="block"
                 style={{ color: "var(--ink-muted)" }}
               >
                 {s.title}

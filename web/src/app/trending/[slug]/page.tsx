@@ -60,7 +60,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
         <span>{s.sector ?? "story"}</span><span>· {shape}</span><span>· {s.source_count} outlets</span>{s.velocity > 0 && <span style={{ color: "var(--ink)" }}>· moving</span>}
       </div>
       <h1 className="mt-2 text-[26px] font-medium leading-[1.2] text-balance sm:text-[32px] lg:max-w-[30ch]">{s.label}</h1>
-      <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>
+      <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
         Story headline · from {s.developments.length} developments
       </p>
 

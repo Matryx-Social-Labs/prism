@@ -394,6 +394,7 @@ a {
 .rm-ttl-here { fill: var(--ink); font-weight: 600; }
 .rm-k { font-family: var(--font-mono), monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; fill: var(--ink-faint); }
 .rm-k-here { fill: var(--ink); }
+.rm-k-lc { text-transform: none; letter-spacing: .02em; }
 .rm-hit { fill: transparent; cursor: pointer; outline: none; }
 .rm-hit:focus-visible { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 2 2; }
 .rm-tip { position: absolute; z-index: 5; width: 260px; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--line-strong); font-size: 13px; line-height: 1.45; pointer-events: none; }

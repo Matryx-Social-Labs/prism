@@ -43,12 +43,12 @@ export function StoryRoute({ slug, currentId }: { slug: string; currentId: strin
     <div>
       <RouteMap tree={story.branches} developments={story.developments} currentId={currentId} compact />
       <details className="rule-live mt-2">
-        <summary className="cursor-pointer list-none py-3 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-muted)" }}>
+        <summary className="cursor-pointer list-none py-3 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
           Every station, as a list
         </summary>
         <BranchTree tree={story.branches} developments={story.developments} currentId={currentId} />
       </details>
-      <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+      <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
         The whole route, every branch and satellite →
       </a>
       <RelatedRoutes related={story.related ?? []} />

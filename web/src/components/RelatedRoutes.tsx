@@ -12,7 +12,7 @@ export function RelatedRoutes({ related }: { related: RelatedStory[] }) {
   if (!related.length) return null;
   return (
     <div className="mt-6">
-      <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
+      <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
         Related routes · different stories, not part of this one
       </p>
       <ul className="mt-1">

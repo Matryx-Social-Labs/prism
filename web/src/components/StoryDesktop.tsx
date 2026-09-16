@@ -126,7 +126,7 @@ export function StoryDesktop({
           <h1 className="mt-3 max-w-[922px] text-[40px] font-medium leading-[1.1]" style={{ textWrap: "balance" }}>
             {event.title}
           </h1>
-          <p className="mt-2.5 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>{headlineByline(event)}</p>
+          <p className="mt-2.5 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>{headlineByline(event)}</p>
           <div className="mt-[22px] border-b" style={{ borderColor: "var(--line)" }} />
         </div>
       </div>

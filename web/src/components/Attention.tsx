@@ -21,7 +21,7 @@ export function Attention({ tree, developments }: { tree: BranchTreeData; develo
   const day0 = shape.day0 ? shortDate(shape.day0) : "";
   return (
     <div className="mt-3">
-      <label className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-muted)" }}>
+      <label className="inline-flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} style={{ accentColor: "var(--ink)" }} />
         Show attention · sources per day
       </label>
