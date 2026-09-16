@@ -119,9 +119,13 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
   const stale = isStale(story);
   const rule = single ? "rule-single" : stale ? "rule-stale" : "rule-live";
   const span = spanDays(story);
+  // The count column is developments here, not outlets as on the chart, so
+  // the grid says so first; "moving" replaces the last-moved date rather
+  // than joining it.
   const grid = [
+    `${story.developments} ${story.developments === 1 ? "development" : "developments"}`,
     `${story.source_count} ${story.source_count === 1 ? "outlet" : "outlets"}`,
-    story.last_updated_at ? `moved ${shortDate(story.last_updated_at)}` : null,
+    story.velocity > 0 ? null : story.last_updated_at ? `moved ${shortDate(story.last_updated_at)}` : null,
     span != null ? `span ${span}d` : null,
     sectorCode(story.sector) || null,
   ].filter((x): x is string => Boolean(x));

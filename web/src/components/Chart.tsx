@@ -21,11 +21,14 @@ export function rememberOpened(id: string) {
 export function Chart({
   items,
   primaryLang = "en",
+  pageCode = null,
   emptyLabel,
   yesterdayHref,
 }: {
   items: FeedItem[];
   primaryLang?: string;
+  /** The sector code the page is filtered to; rows omit it. */
+  pageCode?: string | null;
   /** What to say when the chart has no rows — names the subject, offers yesterday. */
   emptyLabel: string;
   yesterdayHref?: string;
@@ -75,6 +78,7 @@ export function Chart({
             lead={i === 0}
             lastOpened={it.id === lastOpened}
             primaryLang={primaryLang}
+            pageCode={pageCode}
           />
         ))}
       </ol>

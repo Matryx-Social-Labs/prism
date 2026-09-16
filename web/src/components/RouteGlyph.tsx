@@ -22,7 +22,7 @@ export function RouteGlyph({ route, className = "" }: { route: RouteData | null;
   const under = new Map<number, number>();
   const satAt = (day: number) => { let k = 0; shape.trunk.forEach((s, i) => { if (s.day <= day) k = i; }); const n = under.get(k) ?? 0; under.set(k, n + 1); return xs[k] + 9 * n; };
   return (
-    <svg viewBox="0 0 280 22" className={`rg ${className}`} aria-hidden="true">
+    <svg viewBox="0 0 280 22" className={`rg ${className}`} aria-hidden="true" preserveAspectRatio="xMinYMid meet">
       <line x1={xs[0]} y1={11} x2={xs[n - 1]} y2={11} />
       {shape.lines.map((l) => {
         const x = at(l.from), len = Math.min(l.stations.length, 4);

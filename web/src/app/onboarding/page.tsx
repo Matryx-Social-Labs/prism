@@ -91,7 +91,8 @@ export default function OnboardingPage() {
               color: i === step ? "var(--ink)" : "var(--ink-faint)",
             }}
           >
-            {label}
+            <span className="mr-1.5" style={{ color: i === step ? "var(--ink)" : "var(--ink-faint)" }}>{i + 1}</span>
+            <span className={i === step ? "" : "sr-only sm:not-sr-only"}>{label}</span>
           </button>
         ))}
       </nav>

@@ -101,7 +101,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
           ))}
         </div>
       ) : null} />
-      <SectorStrip active={group?.slug ?? null} />
+      <SectorStrip active={group?.slug ?? null} allLabel="" />
       <h1 id="chart-title" className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">
         {group ? group.name : tab === "foryou" ? "For you" : "Today"}
       </h1>
@@ -128,7 +128,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
             Printing today&rsquo;s chart…
           </p>
         ) : (
-          <Chart items={scoped} primaryLang={primaryLang} emptyLabel={emptyLabel} yesterdayHref="/feed/yesterday" />
+          <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} yesterdayHref="/feed/yesterday" />
         )}
       </section>
     </div>

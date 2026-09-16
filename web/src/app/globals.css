@@ -411,7 +411,9 @@ a {
 @media (prefers-reduced-motion: reduce) { .rm-halo { display: none; } .rm-main, .rm-bline { stroke-dasharray: none !important; stroke-dashoffset: 0 !important; animation: none !important; } .rm-branch { opacity: 1 !important; animation: none !important; } }
 
 /* The route glyph on the chart of arcs: the map in one line. */
-.rg { display: block; margin-top: 8px; height: 22px; width: 100%; max-width: 260px; }
+/* From 640px: at phone width it is a scribble; the counts beside it do the work there. */
+.rg { display: none; margin-top: 8px; height: 26px; width: 100%; max-width: 330px; }
+@media (min-width: 640px) { .rg { display: block; } }
 .rg line, .rg path { stroke: var(--ink-muted); stroke-width: 1.5; fill: none; }
 .rg .rg-branch { stroke-dasharray: 3 3; }
 .rg .rg-sat { stroke-dasharray: 2 2; }

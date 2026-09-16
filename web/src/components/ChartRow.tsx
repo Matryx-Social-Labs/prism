@@ -35,13 +35,16 @@ export function lensMarkers(it: FeedItem): LensMarker[] {
   return out;
 }
 
-function labelGrid(it: FeedItem, primaryLang: string): string[] {
+function labelGrid(it: FeedItem, primaryLang: string, pageCode: string | null): string[] {
   const parts: string[] = [];
   const o = origins(it, 2);
   if (o) parts.push(o);
   const t = it.latest_published_at ?? it.last_updated_at;
   if (t) parts.push(istTime(t));
-  parts.push(sectorCode(it.sector));
+  // On a sector page every row shares the code the strip already shows; a
+  // fact that is constant for the whole page is not a fact of the row.
+  const code = sectorCode(it.sector);
+  if (code && code !== pageCode) parts.push(code);
   if (it.headline_lang && it.headline_lang !== primaryLang) parts.push(langNative(it.headline_lang));
   return parts;
 }
@@ -51,16 +54,19 @@ export function ChartRow({
   lead = false,
   lastOpened = false,
   primaryLang = "en",
+  pageCode = null,
 }: {
   item: FeedItem;
   lead?: boolean;
   /** The row the reader last opened carries a small mark on return. */
   lastOpened?: boolean;
   primaryLang?: string;
+  /** The sector code the whole page is filtered to, omitted from every row's grid. */
+  pageCode?: string | null;
 }) {
   const single = item.source_count <= 1;
   const markers = lensMarkers(item);
-  const grid = labelGrid(item, primaryLang);
+  const grid = labelGrid(item, primaryLang, pageCode);
   const count = single ? "1" : String(item.source_count);
 
   return (

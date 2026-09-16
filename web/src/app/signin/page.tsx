@@ -1,11 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { type FormEvent, Suspense, useState } from "react";
 
 import { requestMagicLink } from "@/lib/session";
 
 export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignIn />
+    </Suspense>
+  );
+}
+
+function SignIn() {
+  // Where the reader came from, when a gate sent them: the way out goes back
+  // there, not to the chart they were not reading.
+  const next = useSearchParams().get("next");
+  const back = next && next.startsWith("/") ? next : "/feed";
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,8 +88,8 @@ export default function SignInPage() {
         </form>
       )}
 
-      <Link href="/feed" className="mt-8 text-[13.5px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>
-        Keep reading without an account
+      <Link href={back} className="mt-8 text-[13.5px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>
+        {back.startsWith("/story/") ? "Back to the story, without an account" : "Keep reading without an account"}
       </Link>
     </div>
   );

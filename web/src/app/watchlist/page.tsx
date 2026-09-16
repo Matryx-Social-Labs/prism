@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
@@ -20,7 +20,6 @@ const MONO = "font-mono text-[11px] uppercase tracking-[0.06em]";
 
 function WatchlistInner() {
   const session = useSession();
-  const router = useRouter();
   const only = useSearchParams().get("ticker");
   const [items, setItems] = useState<WatchItem[]>([]);
   const [events, setEvents] = useState<WatchEvent[]>([]);
@@ -36,13 +35,14 @@ function WatchlistInner() {
     setReady(true);
   }, [session]);
 
-  // Redirect to sign-in only once we've confirmed there's no session in storage.
+  // Signed out: the page stays and says what it is, the way the ticket gates
+  // a locked lens — never a bounce to /signin with no context. Decided once
+  // storage has been read, so a signed-in reader never sees the gate flash.
+  const [signedOut, setSignedOut] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => {
-      if (!localStorage.getItem("prism.session.v1")) router.replace("/signin");
-    }, 0);
+    const t = setTimeout(() => setSignedOut(!localStorage.getItem("prism.session.v1")), 0);
     return () => clearTimeout(t);
-  }, [router]);
+  }, [session]);
 
   useEffect(() => {
     refresh();
@@ -64,7 +64,25 @@ function WatchlistInner() {
 
   const rows = useMemo(() => (only ? events.filter((e) => e.tickers.includes(only)) : events), [events, only]);
 
-  if (!session) return null;
+  if (!session) {
+    if (!signedOut) return null;
+    return (
+      <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
+        <Masthead dateline={istDate(new Date())} />
+        <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">Watchlist</h1>
+        <p className="rule-live mt-4 max-w-[44ch] py-4 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+          Follow tickers and sectors, and the stories that touch them line up here. Free with an account.
+        </p>
+        <Link
+          href="/signin?next=/watchlist"
+          className="inline-flex h-12 items-center rounded-full px-6 text-[14.5px] font-semibold transition hover:opacity-85"
+          style={{ background: "var(--ink)", color: "var(--bg)" }}
+        >
+          Sign in
+        </Link>
+      </div>
+    );
+  }
 
   const dateline = `${istDate(new Date())} · ${items.length} followed`;
 

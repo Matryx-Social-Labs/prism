@@ -118,7 +118,7 @@ function SearchInner() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
-      <Masthead dateline={dateline} />
+      <Masthead dateline={null} />
       {/* The query is the masthead's second line: the thing you typed is the headline of this screen. */}
       <input
         ref={box}
@@ -130,8 +130,8 @@ function SearchInner() {
         className="w-full border-0 bg-transparent p-0 pb-2 text-[26px] font-medium leading-tight outline-none placeholder:opacity-40 sm:text-[32px]"
         style={{ color: "var(--ink)" }}
       />
-      <p className={`${HINT} pb-2`} style={{ color: "var(--ink-faint)" }}>
-        Stories · entities · tickers · CVE ids · Esc clears
+      <p className={`${HINT} mt-1 pb-2`} style={{ color: "var(--ink-faint)" }}>
+        {dateline ?? <>Stories · entities · tickers · CVE ids<span className="hidden sm:inline"> · Esc clears</span></>}
       </p>
       <SectorStrip active={group} onPick={setGroup} allLabel="" />
 
