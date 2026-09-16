@@ -26,7 +26,7 @@ describe("Landing", () => {
   it("labels the two written pieces as illustrations and names what is being built next", async () => {
     render(await Landing());
     // the flip demo and the Ask example; nothing else on the page is written
-    expect(screen.getAllByText(/^Illustration$/)).toHaveLength(2);
+    expect(screen.getAllByText(/^Illustration/)).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "Being built next" })).toBeInTheDocument();
     for (const t of ["Both sides", "What happens next", "Blindspots"]) expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
   });

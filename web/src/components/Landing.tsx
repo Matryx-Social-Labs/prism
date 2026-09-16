@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AskDemo } from "@/components/AskDemo";
 import { BranchTree } from "@/components/BranchTree";
 import { ChartRow } from "@/components/ChartRow";
 import { HeroLensDemo } from "@/components/HeroLensDemo";
@@ -198,26 +199,8 @@ export async function Landing() {
           </Cell>
 
           <Cell title="Ask the story, get sources" body="Ask anything about a story. The answer cites the story's own sources, or says it cannot. Refusal is a feature.">
-            <p className="font-mono text-[12px]" style={{ color: "var(--ink-faint)" }}>Illustration</p>
-            <dl className="max-w-[44ch]">
-              {[
-                ["Why was the order rushed before winter?", "The transport minister cited the November smog forecast [2]; two outlets add a pending court deadline [4][5]."],
-                ["Will Mumbai follow?", null],
-              ].map(([q, a]) => (
-                <div key={q as string} className="rule-live mt-2 grid grid-cols-[20px_1fr] gap-x-2 py-3 text-[14.5px] leading-[1.6]">
-                  <dt className="font-mono text-[11px] leading-[2.2]" style={{ color: "var(--ink-faint)" }}>Q</dt>
-                  <dd style={{ color: "var(--ink)" }}>{q}</dd>
-                  <dt className="font-mono text-[11px] leading-[2.2]" style={{ color: "var(--ink-faint)" }}>A</dt>
-                  <dd style={{ color: "var(--ink-muted)" }}>
-                    {a ?? (
-                      <>
-                        <span className="font-mono text-[11px]" style={{ color: "var(--ink)" }}>Not in sources.</span> The sources for this story don&rsquo;t cover that.
-                      </>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+            <p className="mb-2 font-mono text-[12px]" style={{ color: "var(--ink-faint)" }}>Illustration · on the Delhi diesel story</p>
+            <AskDemo />
           </Cell>
 
           <Cell wide title="Six subjects, your state first" body="Politics to entertainment on one strip, on every page. Tell us your state and its news leads the chart; follow a subject and For you appears.">
