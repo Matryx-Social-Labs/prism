@@ -23,9 +23,11 @@ import { sectorGroup, sectorParam } from "@/lib/sectors";
  *
  * A sector code re-sorts the chart in place: the same day's rows, filtered,
  * none of the chrome moving. The URL follows (/sector/<slug>) so it can be shared.
+ *
+ * No promise line: a first visitor reaches the chart from the landing at `/`,
+ * which is the pitch (D5 revised), and the phone's first viewport is the list.
  */
 type Tab = "today" | "foryou";
-const PROMISE_SEEN = "prism.promise.seen";
 const WINDOW = 60;
 
 export function FrontPage({ sector = null }: { sector?: string | null }) {
@@ -36,19 +38,12 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   const [tab, setTab] = useState<Tab>("today");
   const [items, setItems] = useState<FeedItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showPromise, setShowPromise] = useState(false);
 
   useEffect(() => {
     markReturning();
     const p = loadProfile();
     setProfile(p);
     setScope(loadScope(Boolean(p?.state)) ?? "all");
-    try {
-      if (!p && !window.sessionStorage.getItem(PROMISE_SEEN)) {
-        setShowPromise(true);
-        window.sessionStorage.setItem(PROMISE_SEEN, "1");
-      }
-    } catch { /* ignore */ }
     setReady(true);
   }, []);
 
@@ -110,14 +105,6 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
       <h1 id="chart-title" className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">
         {group ? group.name : tab === "foryou" ? "For you" : "Today"}
       </h1>
-      {showPromise && !group && (
-        <p className="rule-live py-3 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          One story. Every perspective.{" "}
-          <Link href="/about" className="underline underline-offset-4" style={{ color: "var(--ink)" }}>
-            How Prism reads a story&nbsp;→
-          </Link>
-        </p>
-      )}
       {hasInterests && !group && (
         <div role="tablist" className="flex gap-5 pt-4 font-display text-[18px] uppercase tracking-[0.04em]">
           {(["today", "foryou"] as Tab[]).map((t) => (

@@ -159,28 +159,6 @@ describe("FrontPage — mount fetches", () => {
   });
 });
 
-describe("FrontPage — the promise line", () => {
-  it("shows the promise to a signed-out first visitor once per session", async () => {
-    render(<FrontPage />);
-    expect(await screen.findByText(/One story\. Every perspective\./)).toBeInTheDocument();
-    render(<FrontPage />);
-    await waitFor(() => expect(screen.getAllByText("A story on the chart")).toHaveLength(2));
-    expect(screen.getAllByText(/One story\. Every perspective\./)).toHaveLength(1);
-  });
-
-  it("never shows it to a reader with a profile, nor on a sector page", async () => {
-    loadProfile.mockReturnValue({ state: "IN-KL" });
-    render(<FrontPage />);
-    await screen.findByText("A story on the chart");
-    expect(screen.queryByText(/One story\. Every perspective\./)).toBeNull();
-
-    loadProfile.mockReturnValue(null);
-    render(<FrontPage sector="politics" />);
-    await waitFor(() => expect(fetchFeed).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText(/One story\. Every perspective\./)).toBeNull();
-  });
-});
-
 describe("FrontPage — marks the reader as returning", () => {
   // `/` reads this cookie server-side to skip the landing. jsdom implements
   // document.cookie, so assert the real thing rather than a spy.

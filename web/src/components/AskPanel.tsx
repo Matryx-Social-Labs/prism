@@ -249,8 +249,8 @@ export function AskPanel({
             <button
               onClick={() => submit(input)}
               aria-label="Send"
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-full"
-              style={{ background: "var(--ink)", color: "var(--bg)" }}
+              className="flex h-[42px] w-[42px] items-center justify-center border"
+              style={{ borderColor: "var(--ink)", color: "var(--ink)" }}
             >
               <ArrowUp size={15} />
             </button>
