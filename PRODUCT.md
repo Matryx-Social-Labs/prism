@@ -98,6 +98,10 @@ reader — is the memorable thing and the brand.
   heading; its stories are reachable through search and the story page. The Markets
   and Cyber *lenses* stay separate from sectors — a lens is a way of reading, not a
   subject.
+- **D5** (2026-09-15, revised 2026-09-16) `/` opens on the landing for a first visitor
+  and on the chart for anyone who has reached the chart once; `/feed` is always the
+  chart; `/about` is the landing's permanent address. The landing keeps its outline —
+  roadmap sections are shown, marked NEXT — and counts nothing it did not count.
 - Mobile-first, responsive. Desktop is a composition of the same content, not a
   different product.
 - The most-corroborated stories lead. Single-source stories do not lead a front page

@@ -180,3 +180,14 @@ describe("FrontPage — the promise line", () => {
     expect(screen.queryByText(/One story\. Every perspective\./)).toBeNull();
   });
 });
+
+describe("FrontPage — marks the reader as returning", () => {
+  // `/` reads this cookie server-side to skip the landing. jsdom implements
+  // document.cookie, so assert the real thing rather than a spy.
+  it("sets the prism.returning cookie on mount", async () => {
+    document.cookie = "prism.returning=; path=/; max-age=0";
+    render(<FrontPage />);
+    await screen.findByRole("list");
+    expect(document.cookie).toContain("prism.returning=1");
+  });
+});

@@ -14,7 +14,7 @@ function at(path: string) {
 }
 
 describe("BottomTabBar — where it shows", () => {
-  it.each(["/", "/feed", "/trending", "/pulse", "/search", "/you", "/sector/business", "/watchlist"])(
+  it.each(["/feed", "/trending", "/pulse", "/search", "/you", "/sector/business", "/watchlist"])(
     "shows on %s",
     (path) => {
       at(path);
@@ -25,6 +25,7 @@ describe("BottomTabBar — where it shows", () => {
 
   it.each([
     ["/story/abc", "story pins its own lens rail + Share/Ask in the thumb zone"],
+    ["/", "the landing — a first visitor is not inside the app yet"],
     ["/about", "about"],
     ["/onboarding", "onboarding"],
     ["/signin", "auth"],
@@ -60,9 +61,9 @@ describe("BottomTabBar — active tab", () => {
     expect(screen.getByRole("link", { name: /today/i })).not.toHaveAttribute("aria-current");
   });
 
-  // The chart is / and /feed, and a sector is the chart filtered (D5, D6).
+  // The chart is /feed, and a sector is the chart filtered (D5 revised, D6).
   it("keeps Today active across the chart's routes, and only there", () => {
-    for (const path of ["/", "/feed", "/sector/business"]) {
+    for (const path of ["/feed", "/sector/business"]) {
       at(path);
       const { unmount } = render(<BottomTabBar />);
       expect(screen.getByRole("link", { name: /today/i })).toHaveAttribute("aria-current", "page");
@@ -103,14 +104,8 @@ describe("SiteHeader — the double-header fix", () => {
     expect(container.querySelector("header")?.className).toContain("hidden");
   });
 
-  it("hides it on the chart at / — the masthead is the header there", () => {
-    at("/");
-    const { container } = render(<SiteHeader />);
-    expect(container.querySelector("header")?.className).toContain("hidden");
-  });
-
-  it("keeps it on marketing and auth routes", () => {
-    for (const path of ["/about", "/signin"]) {
+  it("keeps it on the landing, marketing and auth routes", () => {
+    for (const path of ["/", "/about", "/signin"]) {
       at(path);
       const { container, unmount } = render(<SiteHeader />);
       expect(container.querySelector("header")?.className).not.toContain("hidden");

@@ -17,7 +17,7 @@ const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you"
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const isApp = pathname === "/" || APP_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isApp = APP_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return (
     <>
       <div className="spectrum-bar h-[3px] w-full" aria-hidden />

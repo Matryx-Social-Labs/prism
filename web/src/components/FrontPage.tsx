@@ -9,6 +9,7 @@ import { fetchFeed, type FeedItem } from "@/lib/api";
 import { istDate } from "@/lib/dateline";
 import { loadProfile, type Profile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope } from "@/lib/scope";
+import { markReturning } from "@/lib/returning";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
 
 /**
@@ -37,6 +38,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   const [showPromise, setShowPromise] = useState(false);
 
   useEffect(() => {
+    markReturning();
     const p = loadProfile();
     setProfile(p);
     setScope(loadScope(Boolean(p?.state)) ?? "all");

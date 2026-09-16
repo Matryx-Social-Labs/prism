@@ -1,5 +1,34 @@
 # TODOS
 
+## Redesign — the Reservation Chart (status, one line per surface)
+
+Brief: `~/.gstack/projects/Matryx-Social-Labs-prism/designs/redesign-20260915/01-shape-brief.md`
+(surfaces 1–11, states, anti-goals). Contract: `.impeccable/surfaces/web-src-app-page-tsx.md`.
+Truth: `PRODUCT.md`. Everything lands on `dev`; nothing promotes until the founder has seen
+the preview. **Until every row below is DONE, untouched surfaces render the OLD layout in the
+NEW type and palette** — the foundation swapped the global fonts and grounds for every page
+at once (c244aa6), which is why a half-built dev looks worse than either end state.
+
+| # | Surface | Status | Notes |
+|---|---|---|---|
+| 0 | Foundation — palette, three voices, six sectors, `?sector=` list, SectorStrip, Masthead | DONE c244aa6 | |
+| 1 | Front page `/feed` — the chart (Today · For you, scope, sector re-sort) | DONE c61dcc8 | not yet: `/feed/yesterday` (API has no day window), in-place FLIP re-sort, sub-sector chips, desktop rail, "Moving now" |
+| 2 | Sector `/sector/<slug>` | DONE c61dcc8 | |
+| 11 | Landing `/` (first visit) + `/about`; returning readers → `/feed` | DONE 4550eab | 8c6930b's live proofs + this session's roadmap sections (marked "being built next", examples marked ILLUSTRATION), merged into one component |
+| 3 | Story `/story/<id>` — the ticket (strip · route · passenger list · coaches; lens flip kept, Perspectives cards retired per D4) | DONE 9d8b026 | not yet: tapping a station re-typesets in place (stations still navigate) |
+| — | Chrome: SiteHeader (desktop header still pill CTA + spectrum bar), footer copy | NOT STARTED | |
+| 4 | Trending `/trending` | NOT STARTED | |
+| 6 | Search `/search` | NOT STARTED | |
+| 8 | You `/you` — the reservation form | NOT STARTED | |
+| 9 | Onboarding `/onboarding` | FIRST SCREEN DONE 8c6930b | steps two and three still the old layout |
+| 5 | Pulse `/pulse` | NOT STARTED | waits on markets inventory (see memory: 3 % of events carry a ticker) |
+| 7 | Watchlist `/watchlist` | NOT STARTED | |
+| 10 | Sign-in / unlock — the paywall moment | NOT STARTED | |
+| F | Finish — impeccable-finish-reviewer, `impeccable detect`, /design-review, documenter → new DESIGN.md | NOT STARTED | DESIGN.md still describes the old world; it is rewritten last, from the shipped artifact |
+
+Order: chrome → 4 → 6 → 8/9 → 5/7 → 10 → F. Checkpoint (commit + preview) after each row.
+
+
 Deferred work captured from the CEO plan review (2026-07-19, freemium lens model).
 Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-freemium-lens-model.md`
 
@@ -48,20 +77,6 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
 ## Positioning
 - **Distribution plan is hand-wavy** (P2). FinTwit/Telegram/YouTube are crowded + pay-to-play.
   Name concrete channels, a creator list, an offer, and a CAC assumption before spending.
-- **Landing page: markets-first coherence** (P2). Page says "role-aware news for everyone" while
-  the sell is "markets intelligence, India." Lead the hero proof with the Markets lens on an
-  Indian market-moving event.
-
-## Design resilience (ship WITH E5 — public SEO story pages)
-- **`.reveal` content is JS-dependent** (P2, from /design-review 2026-07-19). `globals.css:155`
-  sets `.reveal { opacity:0 }` unconditionally; only client JS (`Reveal.tsx` useEffect) or the
-  reduced-motion CSS restores it. Default-motion + no-JS (crawlers, social-preview bots, JS
-  failure) render 6 content sections invisible. Low impact for real users now; becomes a real
-  SEO problem when E5's public story pages ship. Fix (~3 lines): add
-  `document.documentElement.classList.add('js')` inline in the layout `<head>`, change
-  `.reveal { opacity:0 }` → `.js .reveal { opacity:0 }` so content is visible without JS.
-  Files: `web/src/app/globals.css`, `web/src/app/layout.tsx`.
-
 ## Broader unit metrics (feed the cost cockpit, E3)
 - Track cost per acquired user, per active free user, per trial, per paid subscriber, and
   worst-case Ask abuse — not just cost per served event (P2).
@@ -109,6 +124,11 @@ Full context: `~/.gstack/projects/Matryx-Social-Labs-prism/ceo-plans/2026-07-19-
 
 
 ## Completed
+- **Landing page: markets-first coherence** (was P2). Superseded by D1:A (the general reader
+  leads) and closed by the 2026-09-16 rebuild: one pitch, no lens names in prose.
+- **`.reveal` content is JS-dependent** (was P2). `Reveal.tsx` and `.reveal` were deleted with
+  the old landing (c487212); the rebuilt landing has no scroll-reveal — every section is in
+  the HTML.
 - **Scope chip claims to apply everywhere but doesn't** (was P2). Scope now lives in
   `web/src/lib/scope.ts` (localStorage, `parse.scope.v2`) and is read by both Feed and
   Trending, so the sheet's promise holds. The tiers were also unified to All / <state> /

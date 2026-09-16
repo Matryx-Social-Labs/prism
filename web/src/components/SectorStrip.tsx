@@ -15,7 +15,7 @@ import { SECTOR_GROUPS } from "@/lib/sectors";
 export function SectorStrip({
   active,
   onPick,
-  allHref = "/",
+  allHref = "/feed",
 }: {
   active: string | null;
   /** When present, codes call this instead of navigating — the chart re-sorts in place. */

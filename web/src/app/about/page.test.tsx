@@ -83,7 +83,8 @@ describe("/about — three proofs, live", () => {
     render(await AboutPage());
     const actions = screen.getAllByRole("link", { name: "Read today's chart" });
     expect(actions.length).toBeGreaterThan(0);
-    for (const a of actions) expect(a).toHaveAttribute("href", "/");
+    // /feed, never /: under the revised D5 a first visitor at / gets this page again.
+    for (const a of actions) expect(a).toHaveAttribute("href", "/feed");
     expect(document.body.textContent).not.toMatch(/[—–]/);
   });
 });

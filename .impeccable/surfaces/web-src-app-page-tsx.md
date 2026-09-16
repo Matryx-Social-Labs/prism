@@ -6,7 +6,7 @@ related_targets: ["web/src/app/feed/page.tsx","web/src/app/story/[id]/page.tsx",
 ---
 
 ## Scope
-The complete product, mobile-first: front page (`/`, the chart), sector, story (the ticket), trending, pulse, search, watchlist, you, onboarding, unlock. Visitor mode: Read on the chart and the ticket; Operate on search, watchlist, the form. Founder decisions binding this build: D1 general reader leads; D2 Today + For you; D3 six sectors, no "Other"; D4 Perspectives cards retired; D5 `/` is the chart; D6 bottom bar Today · Trending · Pulse · Search · You with the sector strip as subject nav.
+The complete product, mobile-first: front page (`/`, the chart), sector, story (the ticket), trending, pulse, search, watchlist, you, onboarding, unlock. Visitor mode: Read on the chart and the ticket; Operate on search, watchlist, the form. Founder decisions binding this build: D1 general reader leads; D2 Today + For you; D3 six sectors, no "Other"; D4 Perspectives cards retired; D5 (revised 2026-09-16) `/` is the landing for a first visitor and the chart for anyone who has reached it once (cookie), `/feed` is always the chart, `/about` is the landing's permanent address; D6 bottom bar Today · Trending · Pulse · Search · You with the sector strip as subject nav.
 
 ## Direction contract
 
