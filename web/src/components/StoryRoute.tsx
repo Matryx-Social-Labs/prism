@@ -36,7 +36,7 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
   if (story === undefined) {
     return (
       <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }} aria-busy="true">
-        Printing the route…
+        Loading the story…
       </p>
     );
   }
@@ -48,12 +48,12 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
       <details className="rule-live mt-2 group">
         <summary className="flex cursor-pointer list-none items-center gap-2 py-3 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
           <ChevronDown className="transition-transform group-open:rotate-180" />
-          Every station, as a list
+          All developments
         </summary>
         <BranchTree tree={story.branches} developments={story.developments} currentId={currentId} />
       </details>
       <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
-        The whole route, every branch and satellite →
+        The whole story, every development →
       </a>
     </div>
   );

@@ -127,9 +127,9 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
       <span className="mt-2 block font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{facts(p)}{p.id === currentId ? " · you are here" : ""}</span>
       <b className="mt-1.5 block text-[16px] font-medium leading-[1.35]">{p.title}</b>
       {p.id === currentId ? (
-        <span className="mt-3 block font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-muted)" }}>This is the ticket you are on</span>
+        <span className="mt-3 block font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-muted)" }}>You are reading this one</span>
       ) : (
-        <Link href={href(p)} className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline underline-offset-4">Open the ticket →</Link>
+        <Link href={href(p)} className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline underline-offset-4">Read this development →</Link>
       )}
       <button type="button" className="rm-close" aria-label="Close" onClick={() => setPicked(null)}>✕</button>
     </div>
@@ -144,7 +144,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
     for (const s of trunk) {
       pos.set(s.id, y);
       const here = s.id === currentId;
-      const tag = s.id === shape.trunk[0]?.id ? "Root" : s.id === shape.trunk.at(-1)?.id ? "Latest" : here ? "You are here" : null;
+      const tag = s.id === shape.trunk[0]?.id ? "First" : s.id === shape.trunk.at(-1)?.id ? "Latest" : here ? "You are here" : null;
       rows.push(
         <g key={s.id}>
           <text x={LX} y={y - 8} className="rm-lab">{s.occurred_at ? shortDate(s.occurred_at) : ""}{tag ? ` · ${tag}` : ""}</text>
@@ -158,7 +158,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
       for (const l of lines.filter((l) => l.from === s.id)) {
         const up = l.kind === "branch", bx = X + 26, by0 = y + dy;
         rows.push(<path key={`${l.stations[0].id}-rail`} d={`M${X} ${y} C${X} ${y + 14}, ${bx} ${y + 12}, ${bx} ${by0 - 10} V${by0 + (l.stations.length - 1) * 44}`} className={up ? "rm-branch" : "rm-bline"} />);
-        rows.push(<text key={`${l.stations[0].id}-k`} x={bx + 16} y={by0 - 18} className="rm-k">{up ? "A branch" : "A branch line"} · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>);
+        rows.push(<text key={`${l.stations[0].id}-k`} x={bx + 16} y={by0 - 18} className="rm-k">Branched off · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>);
         l.stations.forEach((bs, i) => {
           const by = by0 + i * 44;
           rows.push(
@@ -177,7 +177,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
     let ySatV = y + 6;
     const sats: React.ReactNode[] = [];
     if (!compact && shape.satellites.length) {
-      sats.push(<text key="sk" x={LX - 24} y={ySatV} className="rm-k rm-k-lc">Also reported, off the main line</text>);
+      sats.push(<text key="sk" x={LX - 24} y={ySatV} className="rm-k rm-k-lc">Also reported, not on the main story</text>);
       ySatV += 22;
       for (const s of shape.satellites.slice(0, 5)) {
         sats.push(
@@ -194,7 +194,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
     const HV = (compact || !shape.satellites.length ? y : ySatV) + 8, WV = 360;
     return (
       <div ref={wrap} className="rm relative" onKeyDown={onKey}>
-        <svg viewBox={`0 0 ${WV} ${HV}`} width="100%" height={HV} role="img" aria-label="The route" className={`rm-svg${drawn ? " rm-drawn" : ""}${reduce ? " rm-still" : ""}`} style={{ maxWidth: WV }}>
+        <svg viewBox={`0 0 ${WV} ${HV}`} width="100%" height={HV} role="img" aria-label="How this story unfolded" className={`rm-svg${drawn ? " rm-drawn" : ""}${reduce ? " rm-still" : ""}`} style={{ maxWidth: WV }}>
           <path d={`M${X} ${pos.get(trunk[0].id)} V${yEnd}`} className="rm-main" />
           {rows}
           {sats}
@@ -213,7 +213,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
   return (
     <div ref={wrap} className="rm relative" onKeyDown={onKey}>
       <div className="overflow-x-auto">
-        <svg viewBox={`0 ${yTop} ${W} ${H - yTop}`} width={W} height={H - yTop} role="img" aria-label="The route" className={`rm-svg${drawn ? " rm-drawn" : ""}${reduce ? " rm-still" : ""}`}>
+        <svg viewBox={`0 ${yTop} ${W} ${H - yTop}`} width={W} height={H - yTop} role="img" aria-label="How this story unfolded" className={`rm-svg${drawn ? " rm-drawn" : ""}${reduce ? " rm-still" : ""}`}>
           {/* the main line */}
           <path d={`M${xs.get(trunk[0].id)} ${yMain} H${xs.get(trunk.at(-1)!.id)}`} className="rm-main" />
           {/* branches and branch lines */}
@@ -229,14 +229,14 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
                     {station(s, bx[i], y, up ? "rm-dashed" : "")}
                   </g>
                 ))}
-                <text x={bx[0] - 6} y={y + (up ? -16 : 24)} className="rm-k">{up ? "A branch" : "A branch line"} · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>
+                <text x={bx[0] - 6} y={y + (up ? -16 : 24)} className="rm-k">Branched off · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>
               </g>
             );
           })}
           {/* satellites */}
           {!compact && shape.satellites.length > 0 && (
             <g>
-              <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc">Also reported, off the main line{shape.satellites.length > 5 ? ` · ${shape.satellites.length - 5} more in the list` : ""}</text>
+              <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc">Also reported, not on the main story{shape.satellites.length > 5 ? ` · ${shape.satellites.length - 5} more in the list` : ""}</text>
               {shape.satellites.slice(0, 5).map((s, i) => {
                 const cx = x0 + i * SAT_GAP;
                 return (
@@ -252,7 +252,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
           {/* the main line's stations, labels beneath */}
           {trunk.map((s, i) => {
             const x = xs.get(s.id)!, here = s.id === currentId;
-            const tag = i === 0 && s.id === shape.trunk[0]?.id ? "Root" : s.id === shape.trunk.at(-1)?.id ? "Latest" : here ? "You are here" : null;
+            const tag = i === 0 && s.id === shape.trunk[0]?.id ? "First" : s.id === shape.trunk.at(-1)?.id ? "Latest" : here ? "You are here" : null;
             return (
               <g key={s.id}>
                 {tag && <text x={x - 12} y={yMain + 4} textAnchor="end" className={`rm-k${here ? " rm-k-here" : ""}`}>{tag}</text>}

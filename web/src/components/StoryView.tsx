@@ -185,7 +185,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   const facts = ticketFacts(event);
   const navItems: { id: string; label: string; count?: number }[] = [
     { id: "lens-brief", label: "Lens" },
-    ...(event.story_slug ? [{ id: "route", label: "Route" }] : []),
+    ...(event.story_slug ? [{ id: "route", label: "Story" }] : []),
     // Only when there is something to jump to: 55% of stories have no attributed
     // quote, and a permanent "Said 0" would advertise absence on every other page.
     ...(quoteCount > 0 ? [{ id: "said", label: "Said", count: quoteCount }] : []),
@@ -557,7 +557,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           of the arc. Only when the ticket carries a slug. */}
       {event.story_slug && (
         <section id="route" className="mt-10 scroll-mt-24" aria-labelledby="route-title">
-          <Head id="route-title" title="The route" hint="Every development in this story, counted, with the branches and satellites the partitioner recorded." />
+          <Head id="route-title" title="How this story unfolded" hint="Every development in this story, counted: what came first, what followed, what branched off." />
           <StoryRoute slug={event.story_slug} currentId={event.id} onLoad={setRouteStory} />
         </section>
       )}
@@ -629,7 +629,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           part of it, so they come after everything that is. */}
       {(routeStory?.related?.length ?? 0) > 0 && (
         <section className="mt-10" aria-labelledby="related-title">
-          <Head id="related-title" title="Related routes" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
+          <Head id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
           <RelatedRoutes related={routeStory!.related} />
         </section>
       )}
@@ -637,7 +637,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       <p className={`rule-live mt-10 flex justify-between gap-4 py-3 ${MONO_LABEL}`}>
         <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>← Today&rsquo;s chart</Link>
         {event.story_slug && (
-          <Link href={`/trending/${event.story_slug}`} className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>The whole route →</Link>
+          <Link href={`/trending/${event.story_slug}`} className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>The whole story →</Link>
         )}
       </p>
       </article>
@@ -652,7 +652,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             {navItems.map((n) => (
               <li key={n.id} className="rule-live">
                 <a href={`#${n.id}`} className="flex items-baseline justify-between py-2.5 text-[13.5px] font-medium underline-offset-4 hover:underline" style={{ color: activeSection === n.id ? "var(--ink)" : "var(--ink-muted)" }}>
-                  <span>{n.label === "Lens" ? `${meta.short} brief` : n.label === "Said" ? "What was said" : n.label === "Route" ? "The route" : n.label}</span>
+                  <span>{n.label === "Lens" ? `${meta.short} brief` : n.label === "Said" ? "What was said" : n.label === "Story" ? "How this story unfolded" : n.label}</span>
                   {n.count != null && <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>{n.count}</span>}
                 </a>
               </li>

@@ -58,7 +58,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
   const days = spanDays(s.developments);
   // One shape line, at the top, counted: developments · branches · satellites · days.
   const shape = tree
-    ? [`${tree.shape.developments} developments`, `${tree.shape.branches} ${tree.shape.branches === 1 ? "branch" : "branches"}`, `${tree.shape.satellites} ${tree.shape.satellites === 1 ? "satellite" : "satellites"}`, ...(days != null ? [`${days} ${days === 1 ? "day" : "days"}`] : [])]
+    ? [`${tree.shape.developments} developments`, `${tree.shape.branches} branched off`, `${tree.shape.satellites} also reported`, ...(days != null ? [`${days} ${days === 1 ? "day" : "days"}`] : [])]
     : [`${s.developments.length} developments`];
   // A main line of one or two stations has nothing to fold: open the list on everything.
   const openAll = !tree || spineLength(tree) < 3;
@@ -91,7 +91,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
           {/* The route: the whole story as the rail map, the attention curve on request */}
           {tree ? (
             <section aria-labelledby="route-title">
-              <SectionHead id="route-title" title="The route" hint="Every development on its line. Tap a station to read it." />
+              <SectionHead id="route-title" title="How this story unfolded" hint="Every development in order. Tap one to read it." />
               <RouteMap tree={tree} developments={s.developments} />
               <Attention tree={tree} developments={s.developments} />
             </section>
@@ -99,7 +99,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
 
           {/* Every station, as a list: the table view of the map */}
           <section className={tree ? "mt-8" : ""} aria-labelledby="list-title">
-            <SectionHead id="list-title" title="Every station, as a list" count={s.developments.length} />
+            <SectionHead id="list-title" title="All developments" count={s.developments.length} />
             {tree ? (
               <BranchTree tree={tree} developments={s.developments} defaultAll={openAll} readout={false} />
             ) : (
@@ -121,7 +121,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
       {/* Related routes: different stories, so they come after everything that is this one */}
       {(s.related?.length ?? 0) > 0 && (
         <section className="mt-10 lg:max-w-[860px]" aria-labelledby="related-title">
-          <SectionHead id="related-title" title="Related routes" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
+          <SectionHead id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
           <RelatedRoutes related={s.related} />
         </section>
       )}

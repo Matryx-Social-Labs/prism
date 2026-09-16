@@ -101,7 +101,7 @@ const NEXT: [string, string][] = [
   ["Blindspots", "When every source on a story comes from one side, the story says so. You are told what you are not being told."],
 ];
 
-const READER = ["Today's chart, every story, every subject", "Every quote, verbatim, with its source", "The route a story took", "Ask the story, three questions a day"];
+const READER = ["Today's chart, every story, every subject", "Every quote, verbatim, with its source", "How a story unfolded", "Ask the story, three questions a day"];
 const PRO = ["Your profession's reading of every story", "Tickers and catalysts on the stories that move markets", "Which systems a security story exposes, and what to fix first", "A watchlist of what you follow"];
 
 export async function Landing() {
@@ -180,7 +180,7 @@ export async function Landing() {
           </Cell>
 
           {ev?.route && (
-            <Cell wide title="Follow the story as it moves" body="A story is a route: what started it, what followed, where it branched. Counted from the record, never summarised by a model.">
+            <Cell wide title="Follow the story as it moves" body="What started it, what followed, where it branched off. Counted from the record, never summarised by a model.">
               <div className={ev.route.event.image_url ? "grid gap-6 lg:grid-cols-[320px_minmax(0,600px)] lg:gap-10" : "max-w-[600px]"}>
                 {ev.route.event.image_url && (
                   // eslint-disable-next-line @next/next/no-img-element

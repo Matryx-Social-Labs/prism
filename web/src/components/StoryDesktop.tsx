@@ -107,7 +107,7 @@ export function LensBoard({
 }) {
   return (
     <div>
-      <h2 className="mb-3.5 font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">The lens board</h2>
+      <h2 className="mb-3.5 font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">Read it as</h2>
       {/* items-start, because a <button> centres its content vertically by
           default: stretched to the tallest column, a lens whose opening is
           one line sat 19px below one whose opening is three. */}

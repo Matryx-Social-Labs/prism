@@ -29,8 +29,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     const shape = s.branches?.shape;
     grid = [
       `${s.source_count} ${s.source_count === 1 ? "outlet" : "outlets"}`,
-      shape ? `${shape.branches} ${shape.branches === 1 ? "branch" : "branches"}` : "",
-      shape ? `${shape.satellites} ${shape.satellites === 1 ? "satellite" : "satellites"}` : "",
+      shape ? `${shape.branches} branched off` : "",
+      shape ? `${shape.satellites} also reported` : "",
       sectorCode(s.sector),
       s.velocity > 0 ? "moving" : "",
     ].filter(Boolean);
@@ -40,7 +40,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     degraded = true;
   }
   const headline = label.length > 120 ? `${label.slice(0, 118)}…` : label;
-  const countLabel = developments ? `${developments} ${developments === 1 ? "development" : "developments"} on the route` : "";
+  const countLabel = developments ? `${developments} ${developments === 1 ? "development" : "developments"} in this story` : "";
   const host = SITE_URL.replace(/^https?:\/\//, "");
   const fonts = await ogFonts(headline, countLabel, ...grid, foot, host, "PRISM One story. Every perspective.", String(developments));
 

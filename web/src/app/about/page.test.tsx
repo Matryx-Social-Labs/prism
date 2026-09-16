@@ -82,7 +82,7 @@ describe("/about — the product as the proof, live", () => {
     render(await AboutPage());
     expect(fetchTrendingStory).toHaveBeenCalledWith("s");
     expect(screen.getByRole("heading", { name: "Follow the story as it moves" })).toBeInTheDocument();
-    expect(screen.getByText(/3 DEVELOPMENTS · 0 BRANCHES · 0 SATELLITES · 4 DAYS/)).toBeInTheDocument();
+    expect(screen.getByText(/3 DEVELOPMENTS · 0 BRANCHED OFF · 0 ALSO REPORTED · 4 DAYS/)).toBeInTheDocument();
   });
 
   it("skips the route when a story has fewer than three developments on the spine", async () => {

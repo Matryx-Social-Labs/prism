@@ -20,8 +20,8 @@ describe("RouteMap — the rail map", () => {
     render(<RouteMap tree={tree} developments={devs} currentId="b" />);
     expect(screen.getByRole("button", { name: /Expansion postponed, 30 Aug, 44 sources/ })).toBeInTheDocument();
     expect(screen.getByText(/You are here/)).toBeInTheDocument();
-    expect(screen.getByText(/A branch · 1 development$/)).toBeInTheDocument();
-    expect(screen.getByText("Also reported, off the main line")).toBeInTheDocument();
+    expect(screen.getByText(/Branched off · 1 development$/)).toBeInTheDocument();
+    expect(screen.getByText("Also reported, not on the main story")).toBeInTheDocument();
     // the main line runs down the page
     expect(document.querySelector(".rm-main")!.getAttribute("d")).toMatch(/^M36 \d+ V\d+$/);
   });
@@ -38,9 +38,9 @@ describe("RouteMap — the rail map", () => {
     await userEvent.click(screen.getByRole("button", { name: /Aspirants summoned/ }));
     const card = screen.getByRole("dialog", { name: "Aspirants summoned" });
     expect(card).toHaveTextContent("31");
-    expect(screen.getByRole("link", { name: /Open the ticket/ })).toHaveAttribute("href", "/story/r");
+    expect(screen.getByRole("link", { name: /Read this development/ })).toHaveAttribute("href", "/story/r");
     await userEvent.click(screen.getByRole("button", { name: /Expansion postponed/ }));
-    expect(screen.getByText("This is the ticket you are on")).toBeInTheDocument();
+    expect(screen.getByText("You are reading this one")).toBeInTheDocument();
   });
 
   it("in compact form shows only this station and its neighbours, without satellites", () => {
@@ -50,6 +50,6 @@ describe("RouteMap — the rail map", () => {
     expect(screen.getByRole("button", { name: /Aspirants summoned/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Expansion postponed/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Set for 12 September/ })).toBeNull();
-    expect(screen.queryByText("Also reported, off the main line")).toBeNull();
+    expect(screen.queryByText("Also reported, not on the main story")).toBeNull();
   });
 });

@@ -61,8 +61,8 @@ describe("BranchTree — TRUNK is the flat timeline", () => {
     );
     // Counted, never summarised — the partitioner's numbers, then the span the
     // developments' own dates make (12th to 20th inclusive is nine days).
-    expect(screen.getByText(/14 DEVELOPMENTS · 3 BRANCHES · 1 SATELLITE · 9 DAYS/)).toBeInTheDocument();
-    expect(screen.getByText(/ROOT/)).toBeInTheDocument();
+    expect(screen.getByText(/14 DEVELOPMENTS · 3 BRANCHED OFF · 1 ALSO REPORTED · 9 DAYS/)).toBeInTheDocument();
+    expect(screen.getByText(/FIRST/)).toBeInTheDocument();
   });
 
   it("follows the LONGEST on-spine chain, not the first child", () => {
@@ -126,7 +126,7 @@ describe("BranchTree — satellites are a deliberate detour", () => {
   it("hides satellites in TRUNK", () => {
     render(<BranchTree tree={t} developments={devs} />);
     expect(screen.queryByText("Loosely attached")).not.toBeInTheDocument();
-    expect(screen.getByText(/TRUNK · \d+ ON THE SPINE/)).toBeInTheDocument();
+    expect(screen.getByText(/MAIN STORY · \d+/)).toBeInTheDocument();
   });
 
   it("adds them in ALL, tagged so the reader is told they are loose", async () => {
@@ -134,16 +134,16 @@ describe("BranchTree — satellites are a deliberate detour", () => {
     await userEvent.click(screen.getByRole("button", { name: "ALL" }));
     expect(screen.getByText("Loosely attached")).toBeInTheDocument();
     // The shape readout also says "1 SATELLITE" — assert the ROW's own tag.
-    expect(screen.getByText(/^\d{2} [A-Z]{3} · SATELLITE$/)).toBeInTheDocument();
+    expect(screen.getByText(/^\d{2} [A-Z]{3,4} · ALSO REPORTED$/)).toBeInTheDocument();
     expect(screen.getByText(/ALL · \d+ SHOWN/)).toBeInTheDocument();
   });
 
   it("keeps the pressed state on the active view", async () => {
     render(<BranchTree tree={t} developments={devs} />);
-    expect(screen.getByRole("button", { name: "TRUNK" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "MAIN" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "ALL" }));
     expect(screen.getByRole("button", { name: "ALL" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "TRUNK" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "MAIN" })).toHaveAttribute("aria-pressed", "false");
   });
 });
 

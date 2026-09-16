@@ -127,24 +127,24 @@ describe("the ticket — the route", () => {
     fetchTrendingStory.mockResolvedValue(TREE);
     render(<StoryView event={event({ story_slug: "s" })} />);
     expect(fetchTrendingStory).toHaveBeenCalledWith("s");
-    const route = await screen.findByRole("region", { name: /the route/i });
-    expect(within(route).getByText(/2 DEVELOPMENTS · 0 BRANCHES · 0 SATELLITES · 4 DAYS/)).toBeInTheDocument();
+    const route = await screen.findByRole("region", { name: /how this story unfolded/i });
+    expect(within(route).getByText(/2 DEVELOPMENTS · 0 BRANCHED OFF · 0 ALSO REPORTED · 4 DAYS/)).toBeInTheDocument();
     expect(within(route).getByRole("link", { name: /How it started/ })).toHaveAttribute("href", "/story/e0");
-    expect(mobile().getByRole("link", { name: "Route" })).toHaveAttribute("href", "#route");
+    expect(mobile().getByRole("link", { name: "Story" })).toHaveAttribute("href", "#route");
   });
 
   it("shows no route section and no Route anchor when the ticket carries no slug", async () => {
     render(<StoryView event={event()} />);
     expect(await mobile().findByText("The reader take.")).toBeInTheDocument();
     expect(fetchTrendingStory).not.toHaveBeenCalled();
-    expect(screen.queryByRole("region", { name: /the route/i })).toBeNull();
-    expect(mobile().queryByRole("link", { name: "Route" })).toBeNull();
+    expect(screen.queryByRole("region", { name: /how this story unfolded/i })).toBeNull();
+    expect(mobile().queryByRole("link", { name: "Story" })).toBeNull();
   });
 
   it("prints nothing when the owner has no tree for the story", async () => {
     fetchTrendingStory.mockResolvedValue({ ...TREE, branches: null });
     render(<StoryView event={event({ story_slug: "s" })} />);
-    const route = await screen.findByRole("region", { name: /the route/i });
+    const route = await screen.findByRole("region", { name: /how this story unfolded/i });
     await vi.waitFor(() => expect(within(route).queryByText(/Printing the route/)).toBeNull());
     expect(within(route).queryByLabelText("Storyline structure")).toBeNull();
   });

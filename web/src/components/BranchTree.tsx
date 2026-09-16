@@ -161,7 +161,7 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
       key: id,
       kind: "dev",
       title: dev?.title ?? "Untitled development",
-      meta: [stamp(dev?.occurred_at ?? null), isRoot ? "ROOT" : id === currentId ? "YOU ARE HERE" : ""]
+      meta: [stamp(dev?.occurred_at ?? null), isRoot ? "FIRST" : id === currentId ? "YOU ARE HERE" : ""]
         .filter(Boolean)
         .join(" · "),
       depth: 0,
@@ -220,7 +220,7 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
           key: sat.id,
           kind: "dev",
           title: sd?.title ?? "Untitled development",
-          meta: [stamp(sd?.occurred_at ?? null), "SATELLITE"].filter(Boolean).join(" · "),
+          meta: [stamp(sd?.occurred_at ?? null), "ALSO REPORTED"].filter(Boolean).join(" · "),
           depth: 1,
           rail: "dashed",
           muted: true,
@@ -242,8 +242,8 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
   const days = spanDays(developments);
   const shapeLine = [
     `${n} DEVELOPMENT${n === 1 ? "" : "S"}`,
-    `${b} BRANCH${b === 1 ? "" : "ES"}`,
-    `${sat} SATELLITE${sat === 1 ? "" : "S"}`,
+    `${b} BRANCHED OFF`,
+    `${sat} ALSO REPORTED`,
     ...(days != null ? [`${days} DAY${days === 1 ? "" : "S"}`] : []),
   ].join(" · ");
 
@@ -263,10 +263,10 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
         style={{ borderColor: "var(--line)", background: "var(--bg)" }}
       >
         <span className="font-mono text-[11px] tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
-          {showAll ? `ALL · ${shown} SHOWN` : `TRUNK · ${onSpineCount} ON THE SPINE`}
+          {showAll ? `ALL · ${shown} SHOWN` : `MAIN STORY · ${onSpineCount}`}
         </span>
         <div className="ml-auto flex gap-4">
-          {([["TRUNK", false], ["ALL", true]] as const).map(([label, all]) => (
+          {([["MAIN", false], ["ALL", true]] as const).map(([label, all]) => (
             <button
               key={label}
               onClick={() => setShowAll(all)}
@@ -387,7 +387,7 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
         className="max-w-[44ch] px-1 pb-5 pt-3.5 text-[12.5px] leading-[1.6]"
         style={{ color: "var(--ink-faint)" }}
       >
-        Root is the most-corroborated development; every other attaches forward in time
+        The first row is the most-reported development; every other follows it in time
       </p>
     </section>
   );
