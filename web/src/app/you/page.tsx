@@ -1,228 +1,150 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Masthead } from "@/components/Masthead";
+import { interestsToPicks, picksToInterests, useTaxonomy, type Picks } from "@/components/ProfileEditor";
+import {
+  LanguagesField, ProfessionField, SectorsField, StateField, useLanguageOptions, useProfessionGroups,
+} from "@/components/ReservationForm";
+import { SectionHead } from "@/components/SectionHead";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { YouDesktop } from "@/components/YouDesktop";
-import { useTaxonomy } from "@/components/ProfileEditor";
-import { timeAgo } from "@/components/StoryCard";
-import { fetchRegions } from "@/lib/api";
-import { langNative } from "@/lib/languages";
-import { lensMeta } from "@/lib/lenses";
-import { loadProfile, type Profile } from "@/lib/profile";
+import type { ProfessionOption } from "@/lib/api";
+import { shortDate } from "@/lib/dateline";
+import { loadProfile, saveProfile } from "@/lib/profile";
 import { clearSession, useSession } from "@/lib/session";
 import { getWatchlist, watchlistEvents, type WatchEvent, type WatchItem } from "@/lib/watchlist";
 
-const CARD = "mx-5 mt-2.5 overflow-hidden rounded-[16px] border";
-const CARD_STYLE = { borderColor: "var(--line)", background: "var(--bg-elevated)" } as const;
-const H2 = "mx-5 mt-[18px] text-[12px] font-semibold uppercase tracking-[0.14em]";
-
+/**
+ * You (shape brief §8): the reservation form, all four fields at once, then
+ * what the reader follows and the account row. Saving re-sorts For you, so
+ * Save returns to the chart. The form is the same component onboarding walks
+ * through in three steps.
+ */
 export default function YouPage() {
+  const router = useRouter();
   const session = useSession();
   const taxonomy = useTaxonomy();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [stateName, setStateName] = useState<string | null>(null);
+  const groups = useProfessionGroups();
+  const { options: langOptions } = useLanguageOptions();
+  const [loaded, setLoaded] = useState(false);
+  const [state, setState] = useState("");
+  const [lens, setLens] = useState("reader");
+  const [profession, setProfession] = useState<string | null>(null);
+  const [picks, setPicks] = useState<Picks>({});
+  const [languages, setLanguages] = useState<string[]>(["en"]);
   const [follows, setFollows] = useState<WatchItem[]>([]);
   const [recent, setRecent] = useState<WatchEvent[]>([]);
 
-  useEffect(() => setProfile(loadProfile()), []);
   useEffect(() => {
-    if (!profile?.state) return;
-    fetchRegions().then((rs) => setStateName(rs.find((r) => r.code === profile.state)?.name ?? null)).catch(() => {});
-  }, [profile?.state]);
+    const p = loadProfile();
+    if (p) {
+      setLens(p.lens);
+      if (p.state) setState(p.state);
+      setPicks(interestsToPicks(p.interests));
+      if (p.languages?.length) setLanguages(p.languages);
+    }
+    setLoaded(true);
+  }, []);
+
   useEffect(() => {
     if (!session) return;
     getWatchlist(session).then(setFollows).catch(() => setFollows([]));
     watchlistEvents(session).then(setRecent).catch(() => setRecent([]));
   }, [session]);
 
-  const lens = lensMeta(profile?.lens ?? "reader");
-  const languages = profile?.languages?.length ? profile.languages : ["en"];
-  const interestName = (slug: string) => {
-    const [sec, sub] = slug.split(":");
-    const s = taxonomy.find((t) => t.slug === sec);
-    const name = s?.name ?? sec.replaceAll("_", " ");
-    return sub ? `${name} · ${sub.replaceAll("_", " ")}` : name;
+  // On this page a profession sets the lens and nothing else: the reader's
+  // subjects are theirs, and are only pre-set when they have picked none.
+  const pickProfession = (p: ProfessionOption) => {
+    setProfession(p.slug);
+    setLens(p.lens);
+    setPicks((cur) => (Object.keys(cur).length ? cur : interestsToPicks(p.interests)));
   };
-  const initial = (session?.email ?? "G").charAt(0).toUpperCase();
+
+  const save = () => {
+    saveProfile({ lens, region: "IN", state: state || null, interests: picksToInterests(picks), languages });
+    router.push("/feed");
+  };
 
   const signOut = () => {
     clearSession();
     window.location.href = "/feed";
   };
 
+  const identity = session ? `signed in as ${session.email}` : "browsing without an account";
+
   return (
-    <div className="mx-auto max-w-[620px] pb-28 lg:max-w-[1376px] lg:pb-20">
-      {/* Desktop gets its own composition — the colophon ledger, with EDIT in
-          the mono rail (Prism Desktop.dc.html). The card stack below is the
-          phone's and stays the phone's. */}
-      <YouDesktop
-        email={session?.email ?? null}
-        lensName={lens.name}
-        stateName={stateName}
-        languages={languages}
-        interests={(profile?.interests ?? []).map(interestName)}
-        follows={follows.map((w) => w.value)}
-        onSignOut={signOut}
-      />
+    <div className="mx-auto max-w-[720px] px-5 pb-24 sm:px-8 lg:pb-16">
+      <Masthead dateline={identity} />
+      <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">You</h1>
+      <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+        Everything your chart is built from. Your profile lives in this browser.
+      </p>
 
-      <div className="lg:hidden">
-      {/* identity */}
-      <div className="flex items-center gap-3 border-b px-5 py-4" style={{ borderColor: "var(--line)" }}>
-        <span
-          className="flex h-12 w-12 items-center justify-center rounded-full border text-[19px] font-semibold"
-          style={{ background: "var(--bg-sunken)", borderColor: "var(--line)", fontFamily: "var(--font-display), serif" }}
-        >
-          {initial}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[20px] font-semibold" style={{ fontFamily: "var(--font-display), serif" }}>
-            {session ? session.email.split("@")[0] : "Guest"}
-          </p>
-          <p className="mt-0.5 font-mono text-[10.5px]" style={{ color: "var(--ink-faint)" }}>
-            {session ? "signed in · synced across devices" : "browsing without an account"}
-          </p>
-        </div>
-        {!session && (
-          <Link href="/signin" className="rounded-full px-4 py-2 text-[13px] font-semibold" style={{ background: "var(--ink)", color: "var(--bg)" }}>
-            Sign in
-          </Link>
-        )}
-      </div>
-
-      {/* Your Prism */}
-      <h2 className={H2} style={{ color: "var(--ink-muted)" }}>
-        Your Prism
-      </h2>
-      <div className={CARD} style={CARD_STYLE}>
-        <Row label="Default lens">
-          <span className="rounded-full px-2.5 py-[3px] text-[12px] font-semibold" style={{ background: lens.bg, color: lens.color }}>
-            {lens.short}
-          </span>
-        </Row>
-        <Row label="Region">
-          <span className="rounded-full px-2.5 py-[3px] text-[12px] font-semibold" style={{ background: "var(--bg-sunken)", color: "var(--ink)" }}>
-            ◉ {stateName ?? "India"}
-          </span>
-        </Row>
-        <div className="border-b px-[14px] py-3" style={{ borderColor: "var(--line)" }}>
-          <p className="text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
-            Languages
-          </p>
-          <p className="mb-2 mt-0.5 text-[11.5px]" style={{ color: "var(--ink-faint)" }}>
-            Rank your feed — they never filter it.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {languages.map((l, i) => (
-              <span key={l} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: "var(--bg-sunken)", color: "var(--ink)" }}>
-                <span className="font-mono text-[10px]" style={{ color: "var(--ink-faint)" }}>
-                  {i + 1}
-                </span>
-                {langNative(l)}
-              </span>
-            ))}
+      {loaded && (
+        <form className="mt-4" onSubmit={(e) => { e.preventDefault(); save(); }}>
+          <StateField value={state} onChange={setState} />
+          <LanguagesField value={languages} onChange={setLanguages} options={langOptions} />
+          <ProfessionField groups={groups} profession={profession} lens={lens} onPick={pickProfession} />
+          <SectorsField taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
+          <div className="rule-live flex flex-wrap items-center gap-x-5 gap-y-3 py-6">
+            <button type="submit" className="rounded-full px-6 py-3 text-[14.5px] font-semibold transition hover:opacity-85" style={{ background: "var(--ink)", color: "var(--bg)" }}>
+              Save and re-sort my chart
+            </button>
+            <Link href="/feed" className="text-[14px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>Cancel</Link>
           </div>
-        </div>
-        <div className="px-[14px] py-3">
-          <p className="mb-2 text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
-            Interests
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {(profile?.interests ?? []).map((s) => (
-              <span key={s} className="rounded-full px-3 py-1.5 text-[12px] font-semibold" style={{ background: "var(--ink)", color: "var(--bg)" }}>
-                {interestName(s)}
-              </span>
-            ))}
-            <Link href="/interests" className="rounded-full border px-3 py-1.5 text-[12px] font-semibold" style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}>
-              + Edit
-            </Link>
-          </div>
-        </div>
-      </div>
+        </form>
+      )}
 
-      {/* Following */}
-      <h2 className={H2} style={{ color: "var(--ink-muted)" }}>
-        Following
-      </h2>
-      <div className={`${CARD} p-[14px]`} style={CARD_STYLE}>
+      <section className="mt-6" aria-labelledby="following-title">
+        <SectionHead id="following-title" title="Following" count={session ? follows.length : undefined} />
         {session ? (
           <>
             {follows.length > 0 ? (
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {follows.map((w) => (
-                  <span key={`${w.kind}:${w.value}`} className="rounded-full px-3 py-[5px] font-mono text-[11px] font-medium" style={{ background: "var(--bg-sunken)", color: "var(--ink)" }}>
-                    {w.value}
-                  </span>
-                ))}
-              </div>
+              <ul className="flex flex-wrap gap-x-4 gap-y-2 font-mono text-[12px]" style={{ color: "var(--ink)" }}>
+                {follows.map((w) => <li key={`${w.kind}:${w.value}`}>{w.value}</li>)}
+              </ul>
             ) : (
-              <p className="mb-3 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-                Nothing followed yet. Follow tickers and sectors from any story.
-              </p>
+              <p className="text-[14px]" style={{ color: "var(--ink-muted)" }}>Nothing followed yet. Follow tickers and sectors from any story.</p>
             )}
-            <Link href="/watchlist" className="text-[13px] font-semibold" style={{ color: "var(--ink)" }}>
-              Manage signals →
+            <Link href="/watchlist" className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+              Manage the watchlist →
             </Link>
             {recent.length > 0 && (
-              <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--line)" }}>
+              <ol className="mt-4">
                 {recent.slice(0, 3).map((e) => (
-                  <Link key={e.id} href={`/story/${e.id}`} className="block py-1.5">
-                    <p className="text-[13px] font-semibold leading-[1.4]">{e.title}</p>
-                    <span className="font-mono text-[10px]" style={{ color: "var(--ink-faint)" }}>
-                      {timeAgo(e.last_updated_at)}
-                    </span>
-                  </Link>
+                  <li key={e.id} className="rule-live">
+                    <Link href={`/story/${e.id}`} className="block py-3">
+                      <p className="text-[15px] font-medium leading-[1.4]">{e.title}</p>
+                      <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{shortDate(e.last_updated_at)}</p>
+                    </Link>
+                  </li>
                 ))}
-              </div>
+              </ol>
             )}
           </>
         ) : (
-          <Link href="/signin" className="text-[13px] font-semibold" style={{ color: "var(--ink)" }}>
+          <Link href="/signin" className="text-[14.5px] font-medium underline underline-offset-4" style={{ color: "var(--ink)" }}>
             Sign in to follow tickers and sectors →
           </Link>
         )}
-      </div>
+      </section>
 
-      {/* Account */}
-      <h2 className={H2} style={{ color: "var(--ink-muted)" }}>
-        Account
-      </h2>
-      <div className={CARD} style={CARD_STYLE}>
-        <div className="flex min-h-[52px] items-center border-b px-[14px]" style={{ borderColor: "var(--line)" }}>
-          <span className="text-[13.5px] font-medium">Theme</span>
-          <span className="ml-auto">
-            <ThemeToggle />
-          </span>
+      <section className="mt-10" aria-labelledby="account-title">
+        <SectionHead id="account-title" title="Account" />
+        <div className="rule-live flex min-h-[52px] items-center">
+          <span className="text-[14.5px]">Theme</span>
+          <span className="ml-auto"><ThemeToggle /></span>
         </div>
         {session ? (
-          <button
-            onClick={signOut}
-            className="flex min-h-[52px] w-full items-center px-[14px] text-left text-[13.5px] font-medium"
-            style={{ color: "var(--danger)" }}
-          >
+          <button onClick={signOut} className="rule-live flex min-h-[52px] w-full items-center text-left text-[14.5px] font-medium" style={{ color: "var(--danger)" }}>
             Sign out
           </button>
         ) : (
-          <Link href="/signin" className="flex min-h-[52px] items-center px-[14px] text-[13.5px] font-medium">
-            Sign in
-          </Link>
+          <Link href="/signin" className="rule-live flex min-h-[52px] items-center text-[14.5px] font-medium">Sign in</Link>
         )}
-      </div>
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-[52px] items-center gap-2.5 border-b px-[14px]" style={{ borderColor: "var(--line)" }}>
-      <span className="w-24 text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
-        {label}
-      </span>
-      {children}
-      <span className="ml-auto" style={{ color: "var(--ink-faint)" }}>
-        ›
-      </span>
+      </section>
     </div>
   );
 }

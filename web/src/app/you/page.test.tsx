@@ -1,149 +1,165 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import YouPage from "@/app/you/page";
 
-// jsdom has no viewport, so BOTH trees render: the desktop colophon (`lg:block`)
-// and the phone's card stack (`lg:hidden`). Anything the reader set shows up on
-// both, hence getAllBy* below — the desktop-only assertions live in their own
-// describe at the bottom and can stay singular.
-
+// /you is the reservation form plus Following and Account. @/lib/profile and
+// the picks codec stay REAL: the localStorage round-trip is the thing under test.
 const useSession = vi.hoisted(() => vi.fn());
 const clearSession = vi.hoisted(() => vi.fn());
-const loadProfile = vi.hoisted(() => vi.fn());
+const fetchLanguages = vi.hoisted(() => vi.fn());
 const fetchRegions = vi.hoisted(() => vi.fn());
+const fetchTaxonomy = vi.hoisted(() => vi.fn());
+const fetchProfessions = vi.hoisted(() => vi.fn());
+const fetchLenses = vi.hoisted(() => vi.fn());
 const getWatchlist = vi.hoisted(() => vi.fn());
 const watchlistEvents = vi.hoisted(() => vi.fn());
-const useTaxonomy = vi.hoisted(() => vi.fn());
+const router = vi.hoisted(() => ({ push: vi.fn() }));
 
-vi.mock("@/lib/session", () => ({ useSession, clearSession }));
-vi.mock("@/lib/profile", () => ({ loadProfile }));
-vi.mock("@/lib/api", () => ({ fetchRegions }));
+vi.mock("@/lib/session", () => ({ useSession, clearSession, fetchLanguages }));
+vi.mock("@/lib/api", () => ({ fetchRegions, fetchTaxonomy, fetchProfessions, fetchLenses }));
 vi.mock("@/lib/watchlist", () => ({ getWatchlist, watchlistEvents }));
-vi.mock("@/components/ProfileEditor", () => ({ useTaxonomy }));
 vi.mock("@/components/ThemeToggle", () => ({ ThemeToggle: () => <button>Theme</button> }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
+const KEY = "prism.profile.v1";
+const SAVED = { lens: "markets", region: "IN", state: "IN-KL", interests: ["politics:elections"], languages: ["hi", "en"] };
+const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");
+const stateSelect = () => screen.getByRole("combobox", { name: "Your state" });
+const save = () => userEvent.click(screen.getByRole("button", { name: /Save and re-sort my chart/ }));
+// Everything the form pulls has landed, otherwise a click races the taxonomy.
+const settled = async () => {
+  await screen.findByRole("option", { name: "Karnataka" });
+  await screen.findByRole("button", { name: /Politics/ });
+  await screen.findByRole("button", { name: /^English/ });
+};
 
 beforeEach(() => {
+  localStorage.clear();
   useSession.mockReset().mockReturnValue(null);
   clearSession.mockReset();
-  loadProfile.mockReset().mockReturnValue(null);
-  fetchRegions.mockReset().mockResolvedValue([{ code: "IN-KL", name: "Kerala" }]);
+  router.push.mockReset();
+  fetchRegions.mockReset().mockResolvedValue([{ code: "IN-KL", name: "Kerala", covered: true }, { code: "IN-KA", name: "Karnataka", covered: false }]);
+  fetchTaxonomy.mockReset().mockResolvedValue([
+    { slug: "politics", name: "Politics", subsectors: [{ slug: "elections", name: "Elections" }] },
+    { slug: "business", name: "Business", subsectors: [] },
+    { slug: "finance", name: "Finance", subsectors: [{ slug: "markets", name: "Stock market" }] },
+  ]);
+  fetchProfessions.mockReset().mockResolvedValue([
+    { group: "Finance", options: [{ slug: "trader", label: "Trader", lens: "markets", interests: ["finance"] }] },
+  ]);
+  fetchLanguages.mockReset().mockResolvedValue({
+    languages: [{ code: "en", name: "English", native: "English" }, { code: "hi", name: "Hindi", native: "हिंदी" }],
+    default: ["en"],
+  });
+  fetchLenses.mockReset().mockResolvedValue([]);
   getWatchlist.mockReset().mockResolvedValue([]);
   watchlistEvents.mockReset().mockResolvedValue([]);
-  useTaxonomy.mockReset().mockReturnValue([{ slug: "politics", name: "Politics", subsectors: [] }]);
 });
 
-describe("You — signed out", () => {
-  it("presents the reader as a guest and offers sign-in", async () => {
+describe("You — round-trip", () => {
+  it("re-saves a stored profile unchanged", async () => {
+    localStorage.setItem(KEY, JSON.stringify(SAVED));
     render(<YouPage />);
-    expect(await screen.findByText(/guest/i)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /sign in/i }).length).toBeGreaterThan(0);
+    await settled();
+    await save();
+    expect(saved()).toEqual(SAVED);
+    expect(router.push).toHaveBeenCalledWith("/feed");
   });
 
-  it("does not ask the API for a watchlist it cannot have", () => {
+  it("starts from the defaults when nothing is stored", async () => {
     render(<YouPage />);
-    expect(getWatchlist).not.toHaveBeenCalled();
-    expect(watchlistEvents).not.toHaveBeenCalled();
-  });
-});
-
-describe("You — signed in", () => {
-  const SESSION = { token: "t", userId: "u1", email: "sagar@example.com" };
-  beforeEach(() => useSession.mockReturnValue(SESSION));
-
-  it("identifies the reader by the local part of their email", async () => {
-    render(<YouPage />);
-    expect(await screen.findByText("sagar")).toBeInTheDocument();
+    await settled();
+    await save();
+    expect(saved()).toEqual({ lens: "reader", region: "IN", state: null, interests: [], languages: ["en"] });
   });
 
-  it("loads the watchlist", async () => {
+  it("persists a changed state, profession and subject", async () => {
     render(<YouPage />);
-    expect(getWatchlist).toHaveBeenCalledWith(SESSION);
-    expect(watchlistEvents).toHaveBeenCalledWith(SESSION);
+    await settled();
+    await userEvent.selectOptions(stateSelect(), "IN-KA");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Your profession" }), "trader");
+    await userEvent.click(screen.getByRole("button", { name: /Politics/ }));
+    await save();
+    // The trader's default subject was pre-set because the reader had none; then Politics was added.
+    expect(saved()).toEqual({ lens: "markets", region: "IN", state: "IN-KA", interests: ["finance", "politics"], languages: ["en"] });
   });
 
-  it("lists what the reader follows", async () => {
-    getWatchlist.mockResolvedValue([{ kind: "ticker", value: "RELIANCE" }]);
+  it("does not save what the reader cancelled", async () => {
+    localStorage.setItem(KEY, JSON.stringify(SAVED));
     render(<YouPage />);
-    expect(await screen.findAllByText("RELIANCE")).toHaveLength(2);
-  });
-
-  it("signs the reader out", async () => {
-    render(<YouPage />);
-    // Both surfaces offer it; either one has to actually sign the reader out.
-    for (const button of await screen.findAllByRole("button", { name: /sign out/i })) {
-      clearSession.mockClear();
-      await userEvent.click(button);
-      expect(clearSession).toHaveBeenCalled();
-    }
+    await settled();
+    await userEvent.selectOptions(stateSelect(), "IN-KA");
+    await userEvent.click(screen.getByRole("link", { name: "Cancel" }));
+    expect(saved()).toEqual(SAVED);
   });
 });
 
-describe("You — Your Prism", () => {
-  it("shows the reader's saved lens", async () => {
-    loadProfile.mockReturnValue({ lens: "markets" });
+describe("You — subjects are the six, picks stay the pipeline's ten", () => {
+  it("following Business & Markets follows both sectors, and a beat narrows one of them", async () => {
     render(<YouPage />);
-    expect(await screen.findByText(/Markets/)).toBeInTheDocument();
+    await settled();
+    await userEvent.click(screen.getByRole("button", { name: /Business & Markets/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Stock market" }));
+    await save();
+    expect(saved().interests).toEqual(["business", "finance:markets"]);
   });
 
-  it("resolves the region code to a name instead of showing the code", async () => {
-    loadProfile.mockReturnValue({ state: "IN-KL" });
+  it("unfollowing a subject drops every sector it groups", async () => {
+    localStorage.setItem(KEY, JSON.stringify({ ...SAVED, interests: ["business", "finance:markets"] }));
     render(<YouPage />);
-    expect(await screen.findAllByText(/Kerala/)).toHaveLength(2);
+    await settled();
+    await userEvent.click(screen.getByRole("button", { name: /Business & Markets/ }));
+    await save();
+    expect(saved().interests).toEqual([]);
+  });
+});
+
+describe("You — languages", () => {
+  it("saves the reader's preference order, not the order of the options", async () => {
+    render(<YouPage />);
+    await settled();
+    await userEvent.click(screen.getByRole("button", { name: /^Hindi/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^English, preference 1/ })); // drop English
+    await userEvent.click(screen.getByRole("button", { name: /^English$/ })); // re-add it last
+    await save();
+    expect(saved().languages).toEqual(["hi", "en"]);
   });
 
-  it("survives the regions lookup failing", async () => {
-    loadProfile.mockReturnValue({ state: "IN-KL" });
+  it("will not let the reader remove their last language", async () => {
+    render(<YouPage />);
+    await settled();
+    await userEvent.click(screen.getByRole("button", { name: /^English, preference 1/ }));
+    expect(screen.getByRole("button", { name: /^English, preference 1/ })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("You — when an API is down", () => {
+  it("does not take the page down when regions fail to load, and the state select keeps its name", async () => {
     fetchRegions.mockRejectedValue(new Error("down"));
     render(<YouPage />);
-    expect((await screen.findAllByText(/Your Prism/i)).length).toBeGreaterThan(0);
-  });
-
-  it("defaults to English when no language is saved", async () => {
-    loadProfile.mockReturnValue({});
-    render(<YouPage />);
-    // Languages render in their own script; English's token is "EN".
-    expect(await screen.findAllByText("EN")).toHaveLength(2);
-  });
-
-  it("renders a saved language in its own script", async () => {
-    loadProfile.mockReturnValue({ languages: ["hi", "ta"] });
-    render(<YouPage />);
-    expect(await screen.findByText("हिंदी")).toBeInTheDocument();
-    expect(screen.getByText("தமிழ்")).toBeInTheDocument();
-  });
-
-  it("names an interest through the taxonomy, including its subsector", async () => {
-    loadProfile.mockReturnValue({ interests: ["politics:elections"] });
-    render(<YouPage />);
-    expect(await screen.findAllByText(/Politics · elections/)).toHaveLength(2);
+    await screen.findByRole("button", { name: /Politics/ });
+    expect(stateSelect()).toBeInTheDocument();
   });
 });
 
-describe("You — the desktop colophon", () => {
-  // Only the desktop composition renders these strings, so singular queries hold.
-  it("reads as a colophon of what the reader actually set", async () => {
-    useSession.mockReturnValue({ token: "t", userId: "u1", email: "sagar@example.com" });
-    loadProfile.mockReturnValue({ lens: "markets", state: "IN-KL", languages: ["hi"] });
+describe("You — identity, following, account", () => {
+  it("presents a guest as browsing without an account and offers sign-in, asking for no watchlist", async () => {
     render(<YouPage />);
-
-    expect(await screen.findByText("How your Prism is made")).toBeInTheDocument();
-    expect(screen.getByText(/Signed in as sagar@example.com/)).toBeInTheDocument();
-    // The full lens name, not the phone's abbreviated pill.
-    expect(screen.getByText("Finance / Trader")).toBeInTheDocument();
+    expect(await screen.findByText("browsing without an account")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Sign in to follow/ })).toBeInTheDocument();
+    expect(getWatchlist).not.toHaveBeenCalled();
   });
 
-  it("says what is unset instead of leaving a blank line", async () => {
-    loadProfile.mockReturnValue({ lens: "reader" });
+  it("names the signed-in reader, lists what they follow, and signs them out", async () => {
+    useSession.mockReturnValue({ token: "t", userId: "u", email: "asha@example.in" });
+    getWatchlist.mockResolvedValue([{ id: "1", kind: "ticker", value: "RELIANCE" }]);
     render(<YouPage />);
-    expect(await screen.findByText("Nothing chosen yet")).toBeInTheDocument();
-    expect(screen.getByText("All India")).toBeInTheDocument();
-  });
-
-  it("offers a guest the way in, not a sign-out", async () => {
-    render(<YouPage />);
-    expect(await screen.findByText(/nothing is synced/)).toBeInTheDocument();
-    expect(screen.getByText("Sign in to follow tickers and sectors")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /sign out/i })).not.toBeInTheDocument();
+    expect(await screen.findByText("signed in as asha@example.in")).toBeInTheDocument();
+    expect(await screen.findByText("RELIANCE")).toBeInTheDocument();
+    Object.defineProperty(window, "location", { value: { href: "" }, writable: true });
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(clearSession).toHaveBeenCalled();
+    await waitFor(() => expect(window.location.href).toBe("/feed"));
   });
 });

@@ -16,17 +16,17 @@ at once (c244aa6), which is why a half-built dev looks worse than either end sta
 | 2 | Sector `/sector/<slug>` | DONE c61dcc8 | |
 | 11 | Landing `/` (first visit) + `/about`; returning readers → `/feed` | DONE 4550eab | 8c6930b's live proofs + this session's roadmap sections (marked "being built next", examples marked ILLUSTRATION), merged into one component |
 | 3 | Story `/story/<id>` — the ticket (strip · route · passenger list · coaches; lens flip kept, Perspectives cards retired per D4) | DONE 9d8b026 | not yet: tapping a station re-typesets in place (stations still navigate) |
-| — | Chrome: SiteHeader (desktop header still pill CTA + spectrum bar), footer copy | NOT STARTED | |
-| 4 | Trending `/trending` | NOT STARTED | |
-| 6 | Search `/search` | NOT STARTED | |
-| 8 | You `/you` — the reservation form | NOT STARTED | |
-| 9 | Onboarding `/onboarding` | FIRST SCREEN DONE 8c6930b | steps two and three still the old layout |
+| — | Chrome: SiteHeader, footer | DONE 41da9ab | Teko wordmark and nav, no spectrum bar, monochrome toggle |
+| 4 | Trending `/trending` — the chart of arcs | DONE 19500ee | API: comma-list ?sector=, hero_event_id / first_seen_at / last_updated_at (needs promote before the preview shows them) |
+| 6 | Search `/search` | DONE dc44247 | query on the masthead's second line, ChartRows, strip filters in place |
+| 8 | You `/you` — the reservation form | DONE (this commit) | ReservationForm: state · languages · profession → lens · six subjects with beats; /interests redirects here; YouDesktop retired |
+| 9 | Onboarding `/onboarding` | DONE (this commit) | the same fields in three steps |
 | 5 | Pulse `/pulse` | NOT STARTED | waits on markets inventory (see memory: 3 % of events carry a ticker) |
 | 7 | Watchlist `/watchlist` | NOT STARTED | |
 | 10 | Sign-in / unlock — the paywall moment | NOT STARTED | |
 | F | Finish — impeccable-finish-reviewer, `impeccable detect`, /design-review, documenter → new DESIGN.md | NOT STARTED | DESIGN.md still describes the old world; it is rewritten last, from the shipped artifact |
 
-Order: chrome → 4 → 6 → 8/9 → 5/7 → 10 → F. Checkpoint (commit + preview) after each row.
+Order: 5/7 → 10 → F. Checkpoint (commit + preview) after each row.
 
 
 Deferred work captured from the CEO plan review (2026-07-19, freemium lens model).
