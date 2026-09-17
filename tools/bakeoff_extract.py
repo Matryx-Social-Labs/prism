@@ -37,7 +37,7 @@ from pathlib import Path
 
 import asyncpg
 
-from common.llm import structured_chat
+from common.llm import REASONING_OFF, structured_chat
 from common.observability import fetch_prompt
 from common.text import entity_slug
 from enrichment.claims import verify_claims
@@ -94,7 +94,7 @@ async def run_model(model: str, rows: list[dict], prompt) -> dict:
             ext = await structured_chat(
                 model=model,
                 messages=prompt.compile(title=r["title"], source=r["src"], published_at=str(r["published_at"] or "unknown"), text=(r["clean_text"] or "")[:12000]),
-                output_model=ArticleExtraction, trace_name="bakeoff-extract", prune_fields={"impacts"}, max_tokens=3000,
+                output_model=ArticleExtraction, trace_name="bakeoff-extract", prune_fields={"impacts"}, max_tokens=6000, reasoning=REASONING_OFF,
             )
         except Exception as e:  # noqa: BLE001 — the failure IS the measurement
             m["schema_fail"] += 1

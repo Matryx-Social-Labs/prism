@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from common.config import get_settings
 from common.db import session_scope
-from common.llm import structured_chat
+from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
 from correlation.clustering import _scale
@@ -69,6 +69,7 @@ async def link_event_threads(event_id: uuid.UUID) -> None:
         output_model=ThreadLinkResult,
         trace_name="thread-link",
         max_tokens=2500,
+        reasoning=REASONING_OFF,
         metadata={"stage": "correlation", "event_id": str(event_id)},
         langfuse_prompt=prompt if prompt.version else None,
     )

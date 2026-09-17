@@ -89,6 +89,14 @@ def get_llm() -> AsyncOpenAI:
     return _client
 
 
+# No thinking aloud: the ceiling is spent on the answer. For the stages whose
+# output is a JSON record of the article, not a judgement. Measured 2026-09-17
+# on one gate call: qwen3.7-plus 758 output tokens (690 of them reasoning,
+# 13.3s) by default, 64 tokens and 2.0s with this; qwen3.7-flash 743 -> 51;
+# gemini-3.1-flash-lite reasons nothing either way.
+REASONING_OFF: dict[str, Any] = {"enabled": False}
+
+
 async def structured_chat[T: BaseModel](
     *,
     model: str,
@@ -101,6 +109,7 @@ async def structured_chat[T: BaseModel](
     max_tokens: int = 8192,
     max_retries: int = 2,
     prune_fields: set[str] | None = None,
+    reasoning: dict[str, Any] | None = None,
 ) -> T:
     """Chat completion constrained to a JSON schema, validated into a Pydantic model.
 
@@ -114,6 +123,13 @@ async def structured_chat[T: BaseModel](
     (across the top level and every $def) so it doesn't spend output tokens
     generating fields the caller discards. Only pass fields that have a default
     on the model — validation still fills them in.
+
+    reasoning is OpenRouter's control over thinking tokens, which on most
+    providers share max_tokens and are billed. A structured extraction gains
+    nothing from a model thinking aloud first: pass REASONING_OFF and the
+    ceiling is spent on the JSON. A model that marks reasoning mandatory
+    rejects "off" and gets the smallest effort instead, so the choice never
+    costs an article.
     """
     client = get_llm()
     schema = output_model.model_json_schema()
@@ -142,16 +158,29 @@ async def structured_chat[T: BaseModel](
         kwargs["langfuse_prompt"] = langfuse_prompt
     if temperature is not None:
         kwargs["temperature"] = temperature
+    if reasoning is not None and get_settings().llm_provider == "openrouter":
+        kwargs["extra_body"] = {"reasoning": reasoning}
 
     last_err: Exception | None = None
     for attempt in range(max_retries):
         await _respect_cooldown()
         try:
             response = await client.chat.completions.create(**kwargs)
+        except APIStatusError as e:
+            if e.status_code == 400 and "extra_body" in kwargs and "reasoning" in str(e).lower():
+                # A model that marks reasoning mandatory (glm-5.3-flash, gpt-5-nano)
+                # rejects "off"; it accepts the smallest effort, which measured at
+                # ~40-70 output tokens against 230-460 with the default.
+                logger.info("reasoning_control_rejected", model=model, trace=trace_name)
+                kwargs["extra_body"] = {"reasoning": {"effort": "minimal"}}
+                response = await client.chat.completions.create(**kwargs)
+            else:
+                _maybe_start_cooldown(e)
+                if e.status_code in _QUOTA_STATUS:
+                    raise LlmQuotaError(f"llm quota exhausted ({e.status_code})") from e
+                raise
         except Exception as e:
             _maybe_start_cooldown(e)
-            if isinstance(e, APIStatusError) and e.status_code in _QUOTA_STATUS:
-                raise LlmQuotaError(f"llm quota exhausted ({e.status_code})") from e
             raise
         content = response.choices[0].message.content or ""
         try:

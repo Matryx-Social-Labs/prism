@@ -13,7 +13,7 @@ from classification.shadow_gate import shadow_score
 from common import stream
 from common.config import get_settings
 from common.db import session_scope
-from common.llm import structured_chat
+from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
 from common.models import RawItem, Source
 from common.observability import fetch_prompt, observe
@@ -125,6 +125,7 @@ async def _run_gate(title: str, body: str | None, meta: dict) -> GateResult:
         output_model=GateResult,
         trace_name="relevance-gate",
         max_tokens=1500,
+        reasoning=REASONING_OFF,
         metadata=meta,
         langfuse_prompt=prompt if prompt.version else None,
     )
@@ -146,6 +147,7 @@ async def _run_classifier(
         output_model=ClassificationResult,
         trace_name="classifier",
         max_tokens=1500,
+        reasoning=REASONING_OFF,
         metadata=meta,
         langfuse_prompt=prompt if prompt.version else None,
     )
