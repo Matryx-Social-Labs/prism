@@ -56,7 +56,12 @@ class Settings(BaseSettings):
     # returns nothing at all. Re-measure before trusting either direction again.
     prism_model_extract: str = "google/gemini-3.1-flash-lite"
     prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
-    prism_model_correlate: str = "qwen/qwen3.7-plus"  # analysis/briefs/digest — content quality
+    # analysis / briefs / thread-link / digest. Bake-off 2026-09-17 on 30 live
+    # multi-source events, judged blind (tools/bakeoff_brief): glm-5.3-flash
+    # grounded 0.92 vs qwen3.7-plus 0.91, complete 0.99 vs 0.98, neutral 0.98
+    # vs 0.96, zero failures vs three, 19.8s vs 40.1s a brief, a quarter of
+    # the price. Ask stays on prism_model_agent.
+    prism_model_correlate: str = "z-ai/glm-5.3-flash"
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning
     prism_model_guard: str = "google/gemini-3.1-flash-lite"  # Ask moderation — cheap + fast
