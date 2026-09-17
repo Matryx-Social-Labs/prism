@@ -43,10 +43,10 @@ async def handle_classified_item(payload: dict) -> None:
         if item is None or item.relevance != "relevant":
             return
         existing = await session.execute(
-            select(Article.id).where(Article.raw_item_id == raw_item_id)
+            select(Article.id).where(Article.raw_item_id == raw_item_id).limit(1)
         )
-        if existing.scalar_one_or_none() is not None:
-            return  # already enriched (stream replay)
+        if existing.first() is not None:
+            return  # already enriched (stream replay, or a reclaimed twin that finished first)
         source = await session.get(Source, item.source_id)
         source_slug = source.slug if source else "unknown"
         source_id = item.source_id
