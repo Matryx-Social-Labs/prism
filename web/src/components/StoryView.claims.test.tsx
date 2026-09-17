@@ -60,7 +60,8 @@ describe("What was said", () => {
     // number Sources gives that article.
     const cite = within(section).getByRole("link", { name: "Source 2: The Hindu" });
     expect(cite).toHaveTextContent("[2]");
-    expect(cite).toHaveAttribute("href", "https://x.example/a2");
+    // The citation opens the article ON the quote: the URL carries a text fragment.
+    expect(cite.getAttribute("href")).toMatch(/^https:\/\/x\.example\/a2#:~:text=/);
     expect(cite.className).toMatch(/font-mono/);
     expect(within(section).getByText("The Hindu")).toBeInTheDocument();
     expect(within(section).getByText("· 27 Jul")).toBeInTheDocument();
@@ -115,5 +116,17 @@ describe("What was said", () => {
     expect(chip).toHaveTextContent("2");
     expect(chip).toHaveAttribute("href", "#said");
     expect(screen.getByText("2 quotes", { selector: "div" })).toBeInTheDocument();
+  });
+});
+
+
+describe("What was said — the quote in the article", () => {
+  it("shows the article's own words around the quote when the server sends them, folded", () => {
+    render(<StoryView event={withClaims([
+      { speaker: "Anita Dipke", claims: [{ quote_text: QUOTE, quote_start: 20, quote_end: 30, context_before: "Earlier that day,", context_after: "she added later.", article_id: "a2", source_name: "The Hindu", url: "https://x.example/a2", published_at: null }] },
+    ])} />);
+    expect(screen.getByText("In the article")).toBeInTheDocument();
+    expect(screen.getByText(/Earlier that day,/)).toBeInTheDocument();
+    expect(screen.getByText(/she added later\./)).toBeInTheDocument();
   });
 });

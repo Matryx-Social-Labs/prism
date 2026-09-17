@@ -80,6 +80,9 @@ export interface ClaimOut {
   quote_text: string;
   quote_start: number | null;
   quote_end: number | null;
+  /** The article's own words either side of the quote; empty when the span could not be re-verified. */
+  context_before?: string;
+  context_after?: string;
   article_id: string;
   source_name: string;
   url: string | null;

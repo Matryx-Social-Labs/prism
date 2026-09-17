@@ -43,7 +43,8 @@ def test_only_verified_fields_leave_the_server():
     out = group_claims([_src("a1", [_c("Alice", "q", start=40)])])
     cl = out[0].claims[0]
     assert cl.model_dump().keys() == {
-        "quote_text", "quote_start", "quote_end", "article_id", "source_name", "url", "published_at"
+        "quote_text", "quote_start", "quote_end", "context_before", "context_after",
+        "article_id", "source_name", "url", "published_at",
     }
     assert cl.quote_start == 40
     assert cl.published_at == T0.isoformat()
@@ -172,7 +173,8 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
             assert body["claims"] == [{
                 "speaker": "Anita Dipke",
                 "claims": [{"quote_text": "We were receiving proposals", "quote_start": 12,
-                            "quote_end": None, "article_id": str(aid), "source_name": "Mint",
+                            "quote_end": None, "context_before": "", "context_after": "",
+                            "article_id": str(aid), "source_name": "Mint",
                             "url": "https://m.example/x", "published_at": T0.isoformat()}],
             }], "the route did not pass claims through, or leaked an unverified field"
             assert body["sources"] and body["sources"][0]["article_id"] == str(aid), (
@@ -180,3 +182,29 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
             )
     finally:
         app.dependency_overrides.pop(events.get_db, None)
+
+
+def test_the_context_is_the_articles_own_words_around_a_re_verified_span():
+    """A reader can see the quote in place: the words either side, cut at word
+    boundaries, and only when the span still points at the quote."""
+    from api.routes.events import quote_context
+
+    text = "Earlier in the day the minister met the delegation. " + "We will not roll back the fee, he said. " + "The traders left without a meeting."
+    q = "We will not roll back the fee"
+    start = text.index(q)
+    before, after = quote_context(text, q, start, start + len(q))
+    assert before.endswith("met the delegation.") and not before.startswith(" ")
+    assert after.startswith(", he said.")
+    # a stale offset shows nothing rather than the wrong sentence
+    assert quote_context(text, q, start + 3, start + 3 + len(q)) == ("", "")
+    assert quote_context(None, q, start, start + len(q)) == ("", "")
+
+
+def test_context_rides_the_claim_when_the_row_carries_the_article_text():
+    text = "Intro words here. The quote itself. Trailing words here."
+    q = "The quote itself."
+    src = _src("a1", [_c("Alice", q, start=text.index(q))])
+    src["claims"][0]["quote_end"] = text.index(q) + len(q)
+    src["clean_text"] = text
+    cl = group_claims([src])[0].claims[0]
+    assert cl.context_before == "Intro words here." and cl.context_after == "Trailing words here."

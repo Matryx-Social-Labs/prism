@@ -123,6 +123,10 @@ class ClaimOut(BaseModel):
     quote_text: str
     quote_start: int | None
     quote_end: int | None
+    # The words around the quote in the article's own text, so a reader can see
+    # it in place without leaving; empty when the span could not be re-verified.
+    context_before: str = ""
+    context_after: str = ""
     article_id: str
     source_name: str
     url: str | None

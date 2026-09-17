@@ -1,5 +1,7 @@
 import type { SpeakerClaims } from "@/lib/api";
+import { ChevronDown } from "@/components/icons";
 import { shortDate } from "@/lib/dateline";
+import { quoteLink } from "@/lib/quoteLink";
 
 /**
  * The passenger list: who said what, verbatim, grouped by speaker.
@@ -56,7 +58,7 @@ export function Said({
                     {n != null &&
                       (c.url ? (
                         <a
-                          href={c.url}
+                          href={quoteLink(c.url, c.quote_text)}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Source ${n}: ${c.source_name}`}
@@ -71,7 +73,24 @@ export function Said({
                     {c.published_at && (
                       <span>· {shortDate(c.published_at)}</span>
                     )}
+                    {c.url && <span>· opens on the quote</span>}
                   </div>
+                  {/* The quote in place: the article's own words either side,
+                      the quote itself in ink. The reader checks us without
+                      leaving; the [n] link opens the article on the quote. */}
+                  {(c.context_before || c.context_after) && (
+                    <details className="group mt-1.5">
+                      <summary className="flex cursor-pointer list-none items-center gap-1.5 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                        <ChevronDown className="transition-transform group-open:rotate-180" />
+                        In the article
+                      </summary>
+                      <p className="mt-2 border-l pl-3 text-[13.5px] leading-[1.6]" style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}>
+                        {c.context_before && <>…{c.context_before} </>}
+                        <mark className="bg-transparent font-medium" style={{ color: "var(--ink)" }}>{c.quote_text}</mark>
+                        {c.context_after && <> {c.context_after}…</>}
+                      </p>
+                    </details>
+                  )}
                 </li>
               );
             })}

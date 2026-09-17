@@ -61,6 +61,25 @@ def _speaker_key(name: str) -> str:
     return " ".join(name.replace(".", " ").split()).casefold()
 
 
+CONTEXT_CHARS = 220
+
+
+def quote_context(clean_text: str | None, quote: str, start: int | None, end: int | None) -> tuple[str, str]:
+    """The article's own words either side of a verified quote, cut at word
+    boundaries. Empty unless the span still points at the quote: the text is
+    re-checked here, so a stale offset shows nothing rather than the wrong
+    sentence."""
+    if not clean_text or start is None or end is None or clean_text[start:end] != quote:
+        return "", ""
+    before = clean_text[max(0, start - CONTEXT_CHARS):start]
+    after = clean_text[end:end + CONTEXT_CHARS]
+    if start - CONTEXT_CHARS > 0 and " " in before:
+        before = before.split(" ", 1)[1]
+    if end + CONTEXT_CHARS < len(clean_text) and " " in after:
+        after = after.rsplit(" ", 1)[0]
+    return before.strip(), after.strip()
+
+
 def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
     """Speaker-grouped, most-quoted first; newest article first, article order within it.
 
@@ -103,10 +122,13 @@ def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
                 first_seen[key] = len(first_seen)
             # newest article first, then the order the article said them
             sort_key = (-(pub.timestamp() if pub else 0.0), start or 0)
+            before, after = quote_context(src.get("clean_text"), quote, start, end)
             by[key].append((sort_key, ClaimOut(
                 quote_text=quote,
                 quote_start=start,
                 quote_end=end,
+                context_before=before,
+                context_after=after,
                 article_id=str(src["article_id"]),
                 source_name=src["source_name"],
                 url=src["url"],
@@ -147,7 +169,10 @@ async def get_event(
                        s.reliability ->> 'funding' AS funding,
                        ri.url, ri.title, ri.published_at,
                        e.shared_fields -> 'stance' ->> 'label' AS stance,
-                       e.shared_fields -> 'claims' AS claims
+                       e.shared_fields -> 'claims' AS claims,
+                       CASE WHEN jsonb_typeof(e.shared_fields -> 'claims') = 'array'
+                             AND jsonb_array_length(e.shared_fields -> 'claims') > 0
+                            THEN a.clean_text END AS clean_text
                 FROM event_memberships em
                 JOIN articles a ON a.id = em.article_id
                 JOIN raw_items ri ON ri.id = a.raw_item_id
