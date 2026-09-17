@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import functools
 import json
 import sys
 import time
@@ -29,9 +30,10 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+import correlation.briefs as briefs_mod
 from common.config import get_settings
 from common.db import session_scope
-from common.llm import structured_chat
+from common.llm import REASONING_OFF, structured_chat
 from correlation.briefs import generate_briefs
 from evals.brief_groundedness import _judge as judge_grounded
 from evals.brief_groundedness import _record
@@ -90,11 +92,19 @@ async def main() -> int:
     print(f"  {len(items)} events with >= 3 sources from the last 3 days")
     settings = get_settings()
     incumbent = settings.prism_model_correlate
+    real_structured_chat = briefs_mod.structured_chat
     results = []
     try:
-        for model in a.models:
+        for spec in a.models:
+            # "model@nothink" runs the same model with reasoning off, so the
+            # cost of thinking aloud on prose is measured, not assumed.
+            model, _, variant = spec.partition("@")
             settings.prism_model_correlate = model  # generate_briefs reads it at call time
-            print(f"  {model} …", flush=True)
+            if variant == "nothink":
+                briefs_mod.structured_chat = functools.partial(real_structured_chat, reasoning=REASONING_OFF)
+            else:
+                briefs_mod.structured_chat = real_structured_chat
+            print(f"  {spec} …", flush=True)
             rows = []
             for it in items:
                 t0 = time.monotonic()
@@ -120,9 +130,10 @@ async def main() -> int:
                     rows.append({"id": it["id"], "secs": secs, "words": len(brief.split()), "unjudged": True, "brief": brief})
                 finally:
                     settings.prism_model_correlate = model
-            results.append(summarise(model, len(items), rows))
+            results.append(summarise(spec, len(items), rows))
     finally:
         settings.prism_model_correlate = incumbent
+        briefs_mod.structured_chat = real_structured_chat
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(results, indent=1))
     keys = ["failed", "grounded", "clear", "complete", "neutral", "words", "secs"]
