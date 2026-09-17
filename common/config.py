@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     # quantity that cannot drift, and it fails safe: the check runs before
     # collection, so exceeding it costs nothing further.
     prism_ingest_max_articles: int = 0
+    # Stop COLLECTING when the recorded OpenRouter balance is under this many
+    # dollars, so a stalled enrichment never grows a backlog that becomes a bill
+    # the moment credits return. 0 disables the floor. common/budget.py.
+    prism_llm_budget_floor_usd: float = 5.0
     prism_cve_feeds_enabled: bool = False
     prism_ingestion_enabled: bool = True
 

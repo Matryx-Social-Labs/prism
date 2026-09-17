@@ -58,6 +58,21 @@ def parse_stages() -> list[str]:
 SWEEP_INTERVAL_S = 5
 
 
+BUDGET_INTERVAL_S = int(os.environ.get("PRISM_BUDGET_INTERVAL_S", "900"))
+
+
+async def _budget_watch() -> None:
+    """Record the LLM balance every fifteen minutes (common/budget.py)."""
+    from common import budget
+
+    while True:
+        try:
+            await budget.refresh()
+        except Exception:
+            logger.exception("budget_watch_error")
+        await asyncio.sleep(BUDGET_INTERVAL_S)
+
+
 async def _analysis_sweeper() -> None:
     """Poll for due (debounced) story analyses and run them off the ingest path."""
     while True:
@@ -245,6 +260,7 @@ async def main(stages: list[str]) -> None:
         # Debounced analysis sweeper: attach is real-time (above); the expensive
         # per-story LLM analysis runs here, coalesced, off the ingest hot path.
         tasks.append(asyncio.create_task(_analysis_sweeper()))
+        tasks.append(asyncio.create_task(_budget_watch()))
         tasks.append(asyncio.create_task(_trending_reconciler()))
         tasks.append(asyncio.create_task(_partition_reconciler()))
         tasks.append(asyncio.create_task(_veto_reconciler()))

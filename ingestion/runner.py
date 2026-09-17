@@ -2,7 +2,7 @@
 
 from sqlalchemy import select, text
 
-from common import stream
+from common import budget, stream
 from common.config import get_settings
 from common.db import session_scope
 from common.logging import get_logger
@@ -23,6 +23,12 @@ async def run_all() -> dict[str, int]:
     # Stop condition, checked BEFORE any collector runs so hitting the ceiling
     # costs nothing. A cap that is only enforced after collection is a report,
     # not a brake.
+    # The balance is a fact the worker recorded; under the floor, collect
+    # nothing — the queue must not grow while enrichment cannot follow.
+    rec = await budget.current()
+    if budget.below_floor(rec):
+        logger.warning("ingestion_budget_floor", balance=rec["balance"], floor=get_settings().prism_llm_budget_floor_usd)
+        return {"budget_floor": 1}
     cap = get_settings().prism_ingest_max_articles
     if cap:
         async with session_scope() as session:

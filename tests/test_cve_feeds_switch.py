@@ -37,6 +37,11 @@ async def _run(monkeypatch) -> list[str]:
         return 0
 
     monkeypatch.setattr(runner, "requeue_stalled", no_requeue)
+
+    async def no_balance():
+        return None
+
+    monkeypatch.setattr(runner.budget, "current", no_balance)
     await runner.run_all()
     return called
 

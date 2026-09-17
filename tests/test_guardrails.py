@@ -238,3 +238,20 @@ def test_settings_repr_does_not_leak_credentials():
         assert field not in text, f"{field} appears in Settings repr — it will reach CI logs"
     # Non-secret config must still be visible, or debugging becomes guesswork.
     assert "prism_langfuse_enabled" in text
+
+
+async def test_ingestion_stops_collecting_under_the_budget_floor(monkeypatch):
+    """A stalled enrichment must not grow a backlog: under the recorded LLM
+    balance floor, run_all collects nothing — before seeding, collectors or the
+    DB are touched."""
+    monkeypatch.setenv("PRISM_INGESTION_ENABLED", "true")
+    monkeypatch.setenv("PRISM_LLM_BUDGET_FLOOR_USD", "5")
+    get_settings.cache_clear()
+    import ingestion.runner as runner
+
+    async def low():
+        return {"balance": 1.25, "at": 0}
+
+    monkeypatch.setattr(runner.budget, "current", low)
+    monkeypatch.setattr(runner, "seed_sources", lambda: (_ for _ in ()).throw(AssertionError("collected under the floor")))
+    assert await runner.run_all() == {"budget_floor": 1}
