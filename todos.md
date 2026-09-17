@@ -44,6 +44,15 @@ All rows done on `dev`; nothing promoted. Next: founder review on the preview, t
 | Sign-in with Google | WAITS on OAuth (end of redesign) | the design's "Continue with Google · next" is not shown until it works |
 | The design prototype's rail map on a phone | NOT PORTED | `designs/pages-20260917/spine.js` draws the desk form only; the app has the tall form |
 
+**Labelling round 3 (2026-09-17)** — two batches on prod, invites minted for Tejas and Vijay
+(tokens are in the links sent, never here): `7tfe0eIBu1GH` = "Stories · the live window ·
+September 2026" (121 story-boundary tasks, seeds from the last 14 days, `tools/gold_candidates
+--since-days 14`); `MGDmtLPZOdjy` = "Same happening, across languages · September 2026" (150
+event_identity tasks, `tools/gold_crosslingual`). Watch with `--status --batch KEY`, agreement
+with `--agreement`, compile with `gold_candidates --compile-batch` / `gold_crosslingual --compile`.
+The cross-language answers become batch 3 of `tools/gold_pairs.GOLD_PAIRS`; the story answers
+extend `tools/gold_stories.STORIES` (keep the CJP slice, quote it as such).
+
 **After the redesign (founder, 2026-09-16):**
 - **Google / OAuth sign-in replaces the browser-saved profile as the account model** (P1). Today the
   profile is `prism.profile.v1` in localStorage and sign-in is a magic link; the founder wants an
