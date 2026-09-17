@@ -12,7 +12,7 @@ on the prompt store being reachable.
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from common.config import get_settings
-from common.llm import structured_chat
+from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
 
 logger = get_logger(__name__)
@@ -56,6 +56,8 @@ async def guard_question(question: str) -> GuardResult:
             messages=[{"role": "system", "content": _SYSTEM}, {"role": "user", "content": question[:2000]}],
             output_model=GuardResult,
             trace_name="ask-guard",
+            max_tokens=400,
+            reasoning=REASONING_OFF,
         )
         if not result.allowed:
             logger.info("ask_guard_blocked", category=result.category)
