@@ -83,11 +83,20 @@ async def trending(
     }
 
 
+# Shared-cast weight a related story must reach: one actor named by two active
+# stories (1/2), or several named by a handful. Two national magnets (1/15 each)
+# do not get there.
+RELATED_MIN_WEIGHT = 0.5
+
+
 async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: list[str]) -> list[dict]:
     """Different stories that touch this one, two ways the record can say so:
-    a causal note in event_links crossing the story boundary, or two or more
-    protagonists in common. At most five, the strongest overlap first. Nothing
-    is inferred beyond what those two tables hold."""
+    a causal note in event_links crossing the story boundary, or protagonists
+    in common — weighted 1/df over the active stories, so two stories that
+    share only a national magnet (a party, a prime minister) are not related
+    by it, while one specific actor in common is. The same lesson as
+    clustering's IDF rule: down-weight the ubiquitous, never cut it off. At
+    most five, the strongest first."""
     members = [str(m) for m in member_ids]
     if not members and not cast:
         return []
@@ -103,9 +112,18 @@ async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: l
                     WHERE el.relation <> 'none'
                       AND (el.from_event_id::text = ANY(:members) OR el.to_event_id::text = ANY(:members))
                 ),
-                shared AS (
-                    SELECT st.id, array_agg(c.name ORDER BY c.name) AS names
+                df AS (
+                    SELECT c.name, count(*) AS df
                     FROM stories st, jsonb_array_elements_text(st."cast") AS c(name)
+                    WHERE st.status = 'active' AND st.merged_into IS NULL
+                    GROUP BY c.name
+                ),
+                shared AS (
+                    SELECT st.id,
+                           array_agg(c.name ORDER BY df.df, c.name) AS names,
+                           sum(1.0 / df.df) AS weight
+                    FROM stories st, jsonb_array_elements_text(st."cast") AS c(name)
+                    JOIN df ON df.name = c.name
                     WHERE c.name = ANY(:cast)
                     GROUP BY st.id
                 )
@@ -117,12 +135,12 @@ async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: l
                 LEFT JOIN causal ca ON ca.id = st.id
                 LEFT JOIN shared sh ON sh.id = st.id
                 WHERE st.id <> :sid AND st.status = 'active' AND st.merged_into IS NULL
-                  AND (ca.id IS NOT NULL OR array_length(sh.names, 1) >= 2)
-                ORDER BY (ca.id IS NOT NULL) DESC, COALESCE(array_length(sh.names, 1), 0) DESC, st.source_count DESC
+                  AND (ca.id IS NOT NULL OR sh.weight >= :min_weight)
+                ORDER BY (ca.id IS NOT NULL) DESC, COALESCE(sh.weight, 0) DESC, st.source_count DESC
                 LIMIT 5
                 """
             ),
-            {"members": members, "cast": cast, "sid": story_id},
+            {"members": members, "cast": cast, "sid": story_id, "min_weight": RELATED_MIN_WEIGHT},
         )
     ).mappings().all()
     return [
