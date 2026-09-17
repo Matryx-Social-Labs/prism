@@ -829,7 +829,9 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
                         style={{ color: "var(--ink-faint)" }}
                       >
                         {provenance(c)}
-                        {c.signals.length ? `  ·  ${c.signals.join("+")}` : ""}
+                        {/* Provenance, never a score: a number on the line would
+                            anchor the judgement this set exists to collect. */}
+                        {c.signals.length ? `  ·  ${c.signals.map((x) => x.split(":")[0]).join("+")}` : ""}
                       </span>
                     </span>
                     <span
