@@ -45,6 +45,14 @@ class LlmQuotaError(ConnectionError):
     is redelivered, so the pipeline self-heals when the quota resets."""
 
 
+class LlmEmptyResponse(ConnectionError):
+    """The provider answered with no content (finish_reason "error", content
+    null). Seen intermittently from Google through OpenRouter on 2026-09-17:
+    the same request succeeds seconds later. A ConnectionError so the stream
+    consumer keeps the message rather than dropping the article as a parse
+    failure — which is what it did, six times in one log window."""
+
+
 async def _respect_cooldown() -> None:
     wait = _cooldown_until - time.monotonic()
     if wait > 0:
@@ -182,7 +190,15 @@ async def structured_chat[T: BaseModel](
         except Exception as e:
             _maybe_start_cooldown(e)
             raise
-        content = response.choices[0].message.content or ""
+        choice = response.choices[0]
+        content = choice.message.content or ""
+        if not content.strip():
+            # Not a parse failure: the provider gave nothing. Try once more
+            # after a beat, then hand the message back to the stream.
+            last_err = LlmEmptyResponse(f"empty response (finish_reason={choice.finish_reason})")
+            logger.warning("llm_empty_response", attempt=attempt + 1, trace=trace_name, finish_reason=choice.finish_reason, model=model)
+            await asyncio.sleep(2)
+            continue
         try:
             parsed = _parse_json_loose(content)
         except Exception as e:
@@ -239,6 +255,8 @@ async def structured_chat[T: BaseModel](
                     "Return a corrected JSON object matching the schema exactly.",
                 },
             ]
+    if isinstance(last_err, LlmEmptyResponse):
+        raise last_err
     raise ValueError(f"structured_chat failed after {max_retries} attempts: {last_err}")
 
 

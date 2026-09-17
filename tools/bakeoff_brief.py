@@ -68,7 +68,7 @@ async def rubric(record: str, brief: str) -> ReaderRubric:
             {"role": "system", "content": "You judge a short news brief for a general Indian reader. Score each criterion from 0 to 1. Judge only the brief against the record; do not reward length."},
             {"role": "user", "content": f"RECORD:\n{record}\n\nBRIEF:\n{brief}"},
         ],
-        output_model=ReaderRubric, trace_name="bakeoff-brief-rubric", max_tokens=200,
+        output_model=ReaderRubric, trace_name="bakeoff-brief-rubric", max_tokens=1500, reasoning=REASONING_OFF,
     )
 
 

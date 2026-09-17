@@ -47,3 +47,32 @@ async def test_reasoning_off_is_sent_and_mandatory_reasoning_falls_back_to_minim
 
 async def _noop():
     return None
+
+
+@pytest.mark.asyncio
+async def test_an_empty_provider_answer_is_transient_not_a_parse_failure(monkeypatch):
+    """finish_reason 'error' with null content: retried once, then raised as a
+    ConnectionError so the stream keeps the message instead of dropping it."""
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        ok: bool
+
+    class _Completions:
+        async def create(self, **kw):
+            r = _Resp(None)
+            r.choices[0].finish_reason = "error"
+            return r
+
+    class _Client:
+        chat = type("Chat", (), {"completions": _Completions()})()
+
+    monkeypatch.setattr(llm, "get_llm", lambda: _Client())
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setattr(llm.asyncio, "sleep", _sleep0)
+    with pytest.raises(llm.LlmEmptyResponse):
+        await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t")
+
+
+async def _sleep0(_):
+    return None
