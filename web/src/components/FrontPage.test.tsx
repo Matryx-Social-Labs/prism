@@ -169,3 +169,12 @@ describe("FrontPage — marks the reader as returning", () => {
     expect(document.cookie).toContain("prism.returning=1");
   });
 });
+
+describe("the masthead says when the chart went quiet", () => {
+  it("prints 'nothing new since' once no report has arrived for twelve hours", async () => {
+    const old = new Date(Date.now() - 20 * 3_600_000).toISOString();
+    fetchFeed.mockResolvedValue([item({ latest_published_at: old, last_updated_at: old })]);
+    render(<FrontPage />);
+    expect(await screen.findByText(/nothing new since/i)).toBeInTheDocument();
+  });
+});

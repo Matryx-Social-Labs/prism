@@ -6,7 +6,8 @@ import { Chart } from "@/components/Chart";
 import { Masthead } from "@/components/Masthead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { fetchFeed, type FeedItem } from "@/lib/api";
-import { istDate } from "@/lib/dateline";
+import { staleSince } from "@/lib/staleness";
+import { istDate, istTime, shortDate } from "@/lib/dateline";
 import { loadProfile, type Profile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { markReturning } from "@/lib/returning";
@@ -78,7 +79,11 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
     if (!items) return d;
     const n = scoped.length >= WINDOW ? `${WINDOW}+` : String(scoped.length);
     const sources = scoped.reduce((t, i) => t + (i.source_count || 0), 0);
-    return `${d} · ${n} ${scoped.length === 1 ? "story" : "stories"} · ${sources.toLocaleString("en-IN")} ${sources === 1 ? "source" : "sources"}`;
+    // When nothing new has arrived in twelve hours the masthead says so; a
+    // frozen chart that looks current is the one thing it must not be.
+    const quiet = staleSince(items);
+    const since = quiet ? ` · nothing new since ${shortDate(quiet)} ${istTime(quiet)}` : "";
+    return `${d} · ${n} ${scoped.length === 1 ? "story" : "stories"} · ${sources.toLocaleString("en-IN")} ${sources === 1 ? "source" : "sources"}${since}`;
   }, [items, scoped]);
 
   const primaryLang = profile?.languages?.[0] ?? "en";
