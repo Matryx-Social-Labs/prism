@@ -281,3 +281,46 @@ def test_the_member_ordering_has_a_deterministic_tiebreaker():
     assert src.count("ORDER BY em.created_at, ri.published_at NULLS LAST, a.id") == 2, (
         "both member queries need the same deterministic order"
     )
+
+
+async def test_a_rebuild_keeps_the_cached_briefs():
+    """Briefs are written by the analysis pass and the extractor, not derived by
+    the rebuild; replacing the projection wholesale dropped them the moment a
+    second outlet arrived, and the next reader paid for a live generation."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    eid = uuid.uuid4()
+    src = uuid.uuid4()
+    created = []
+    try:
+        async with session_scope() as s:
+            await s.execute(
+                text("INSERT INTO sources (id, slug, name, source_type) VALUES (:i, :s, :n, 'rss')"),
+                {"i": str(src), "s": f"t-{eid.hex[:8]}", "n": "test"},
+            )
+            await s.execute(
+                text("INSERT INTO events (id, title, summary, sector, regions, last_updated_at, projection) "
+                     "VALUES (:i, 't', 's', 'politics', CAST(:r AS text[]), now(), "
+                     "CAST(:p AS jsonb))"),
+                {"i": str(eid), "r": ["IN"],
+                 "p": '{"lens_briefs": {"reader": "The cached read."}, "lens_points": {"reader": ["Watch this"]}, "source_count": 1}'},
+            )
+            created.append(await _add_member(s, eid, minutes_ago=10, title="t", summary="s", source_id=src))
+
+        await _rebuild_projection(eid)
+
+        async with session_scope() as s:
+            proj = (await s.execute(text("SELECT projection FROM events WHERE id = :i"), {"i": str(eid)})).scalar_one()
+        assert proj["lens_briefs"] == {"reader": "The cached read."}
+        assert proj["lens_points"] == {"reader": ["Watch this"]}
+        assert proj["source_count"] == 1  # the rest is rebuilt as before
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_memberships WHERE event_id = :e"), {"e": str(eid)})
+            for raw_id, art_id in created:
+                await s.execute(text("DELETE FROM enrichments WHERE article_id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM articles WHERE id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM raw_items WHERE id = :r"), {"r": str(raw_id)})
+            await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
+            await s.execute(text("DELETE FROM sources WHERE id = :s"), {"s": str(src)})

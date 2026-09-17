@@ -54,6 +54,28 @@ def canonical_title(shared: dict, raw_title: str) -> tuple[str, str | None]:
     return (headline, "prism") if headline else (raw_title, None)
 
 
+def extracted_reader_brief(shared: dict) -> dict | None:
+    """The Reader brief the extractor wrote, in persist_briefs' shape; None when
+    the model gave nothing usable (a brief under two sentences is not one)."""
+    text = (shared.get("reader_brief") or "").strip()
+    if len(text) < 80 or text.count(".") < 2:
+        return None
+    points = [str(p).strip() for p in (shared.get("watch_points") or []) if str(p).strip()][:3]
+    return {"text": text, "points": points}
+
+
+async def _has_reader_brief(event_id: uuid.UUID) -> bool:
+    async with session_scope() as session:
+        return bool(
+            (
+                await session.execute(
+                    text("SELECT projection->'lens_briefs'->>'reader' IS NOT NULL FROM events WHERE id = :eid"),
+                    {"eid": str(event_id)},
+                )
+            ).scalar()
+        )
+
+
 async def handle_enriched_item(payload: dict) -> None:
     article_id = uuid.UUID(payload["article_id"])
     enrichment_id = uuid.UUID(payload["enrichment_id"])
@@ -146,6 +168,13 @@ async def handle_enriched_item(payload: dict) -> None:
     # Real-time path: rebuild the served projection (fast, DB-only) and publish so
     # the feed reflects the new coverage immediately — before any LLM runs.
     await _rebuild_projection(event_id)
+    # The extractor wrote the Reader brief; a ticket opens with it rather than
+    # paying for a live generation. A new event takes it; an event that has no
+    # brief yet (single-source before this shipped, or wiped) takes it too. The
+    # analysis pass still rewrites it at each membership tier.
+    brief = extracted_reader_brief(shared)
+    if brief and (is_new_event or not await _has_reader_brief(event_id)):
+        await persist_briefs(event_id, {"reader": brief})
     # Defer the expensive per-story analysis (perspectives/impacts/briefs/threads)
     # to the debounced sweeper: a burst of coverage for one story then costs a
     # single analysis pass, off the ingest hot path.
@@ -475,7 +504,13 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         # newest member would also be coherent, but it rewrites the headline a
         # reader may have arrived on, which is a bigger product change than this.
         event.summary = summaries[0] if summaries else event.summary
+        # Briefs are written by the analysis pass and the extractor, not derived
+        # here; rebuilding the projection used to drop them, so a cached brief
+        # vanished the moment a second outlet arrived and the next reader paid
+        # for it again (565 of 1,658 multi-source events had none).
+        kept = {k: v for k, v in (event.projection or {}).items() if k in ("lens_briefs", "lens_points") and v}
         event.projection = {
+            **kept,
             "event_type": max(set(event_types), key=event_types.count) if event_types else None,
             "source_count": len(rows),
             # The newest member's publication time. events.last_updated_at is
@@ -621,6 +656,7 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
             messages=messages,
             output_model=EventAnalysis,
             trace_name="event-analysis",
+            max_tokens=4000,
             metadata={"stage": "correlation", "event_id": str(event_id)},
             langfuse_prompt=prompt if prompt.version else None,
         )

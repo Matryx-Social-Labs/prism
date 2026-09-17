@@ -124,6 +124,7 @@ async def _run_gate(title: str, body: str | None, meta: dict) -> GateResult:
         messages=messages,
         output_model=GateResult,
         trace_name="relevance-gate",
+        max_tokens=200,
         metadata=meta,
         langfuse_prompt=prompt if prompt.version else None,
     )
@@ -144,6 +145,7 @@ async def _run_classifier(
         messages=messages,
         output_model=ClassificationResult,
         trace_name="classifier",
+        max_tokens=400,
         metadata=meta,
         langfuse_prompt=prompt if prompt.version else None,
     )

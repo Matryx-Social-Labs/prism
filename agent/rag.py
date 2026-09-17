@@ -130,6 +130,9 @@ async def answer_stream(
             model=settings.prism_model_agent,
             messages=messages,
             stream=True,
+            # An answer is a paragraph with citations; the provider's default
+            # ceiling was reserved against the balance on every question.
+            max_tokens=1200,
             name="agent-qa",
             metadata={
                 "stage": "agent",

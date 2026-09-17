@@ -68,6 +68,7 @@ async def link_event_threads(event_id: uuid.UUID) -> None:
         messages=messages,
         output_model=ThreadLinkResult,
         trace_name="thread-link",
+        max_tokens=600,
         metadata={"stage": "correlation", "event_id": str(event_id)},
         langfuse_prompt=prompt if prompt.version else None,
     )

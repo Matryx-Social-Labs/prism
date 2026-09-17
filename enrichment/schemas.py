@@ -95,6 +95,18 @@ class SharedExtraction(BaseModel):
         default=None,
         description="A news headline for the event in English: at most twelve words, present tense, neutral, no quotation marks, only what the article states",
     )
+    # The Reader brief, written here rather than on first view: 78% of events
+    # are single-source and were skipping the analysis pass, so the first reader
+    # of most tickets paid for a live generation (27s measured). One extraction
+    # call already reads the article; this is ~250 more output tokens on it.
+    reader_brief: str | None = Field(
+        default=None,
+        description="For a general reader, in English: three or four plain sentences on what happened and why it matters, only what the article states, no opinion, no lists",
+    )
+    watch_points: list[str] = Field(
+        default_factory=list,
+        description="Up to three short things to watch next, each one line, only what the article points to",
+    )
     occurred_at: str | None = Field(default=None, description="ISO date the event occurred, null if not stated")
     entities: list[ExtractedEntity] = Field(default_factory=list)
     regions: list[str] = Field(default_factory=list, description="ISO country codes involved")
@@ -103,7 +115,7 @@ class SharedExtraction(BaseModel):
     impacts: list[ExtractedImpact] = Field(default_factory=list)
     sentiment: float | None = Field(default=None, ge=-1.0, le=1.0)
 
-    @field_validator("entities", "regions", "claims", "impacts", mode="before")
+    @field_validator("entities", "regions", "claims", "impacts", "watch_points", mode="before")
     @classmethod
     def _none_to_list(cls, v):
         return v or []
