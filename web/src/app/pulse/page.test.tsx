@@ -34,3 +34,17 @@ describe("Market Pulse — the chart supplement", () => {
     expect(await screen.findByText(/isn’t available right now/)).toBeInTheDocument();
   });
 });
+
+describe("the pulse shows the record under the reading", () => {
+  it("lists the stories the digest was written from as chart rows", async () => {
+    const { fetchDigest } = await import("@/lib/api");
+    (fetchDigest as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce({
+      headline: "Markets hold", narrative: "Calm.", movers: [], event_ids: ["e1"], generated_at: null,
+      stories: [{ id: "e1", title: "RBI holds the repo rate", headline_lang: "en", available_languages: ["en"], summary: null, sector: "finance", subsector: null, regions: ["IN"], image_url: null, is_regional: false, source_count: 12, score: 1, cyber: null, finance: null, latest_published_at: null, last_updated_at: "2026-09-17T06:00:00Z", occurred_at: null, coverage: null, headlines: [] }],
+    });
+    const { default: Page } = await import("@/app/pulse/page");
+    render(<Page />);
+    expect(await screen.findByText("Written from")).toBeInTheDocument();
+    expect(screen.getByText("RBI holds the repo rate")).toBeInTheDocument();
+  });
+});

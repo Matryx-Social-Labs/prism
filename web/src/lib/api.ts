@@ -312,6 +312,8 @@ export interface MarketDigest {
   movers: { ticker: string; note: string }[];
   event_ids: string[];
   generated_at: string | null;
+  /** The stories the digest was written from, as chart rows; empty on an older payload. */
+  stories?: FeedItem[];
 }
 
 export async function fetchDigest(): Promise<MarketDigest | null> {

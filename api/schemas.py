@@ -201,6 +201,9 @@ class DigestResponse(BaseModel):
     movers: list[MoverOut] = []
     event_ids: list[str] = []
     generated_at: str | None = None
+    # The stories the digest was written from, as chart rows (the record
+    # under the reading); empty when the ids no longer resolve.
+    stories: list[FeedItem] = []
 
 
 class AskRequest(BaseModel):

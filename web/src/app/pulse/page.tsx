@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ChartRow } from "@/components/ChartRow";
 import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
 import { fetchDigest, type MarketDigest } from "@/lib/api";
+import { chartOrder } from "@/lib/chart";
 import { istDate, istTime } from "@/lib/dateline";
 import { useSession } from "@/lib/session";
 
@@ -57,6 +59,19 @@ export default function PulsePage() {
               <p key={i} className="text-[16px] leading-[1.7]" style={{ color: "var(--ink-muted)" }}>{para}</p>
             ))}
           </div>
+
+          {/* The record under the reading: every story the digest was written
+              from, as chart rows, so the page never shows a verdict alone. */}
+          {(digest.stories?.length ?? 0) > 0 && (
+            <section className="mt-10" aria-labelledby="from-title">
+              <SectionHead id="from-title" title="Written from" count={digest.stories!.length} hint="The stories on the chart the pulse was synthesized across, most-corroborated first." />
+              <ol>
+                {chartOrder(digest.stories!).map((it) => (
+                  <ChartRow key={it.id} item={it} />
+                ))}
+              </ol>
+            </section>
+          )}
 
           {digest.movers.length > 0 && (
             <section className="mt-10" aria-labelledby="movers-title">
