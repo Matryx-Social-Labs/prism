@@ -70,7 +70,7 @@ describe("/about — the product as the proof, live", () => {
     fetchFeed.mockResolvedValue([item("e1", 4)]);
     fetchEvent.mockResolvedValue(event("e1", { story_slug: "s" }));
     fetchTrendingStory.mockResolvedValue({
-      slug: "s", canonical_slug: "s", label: "L", cast: [], sector: null, source_count: 4, velocity: 0, status: "active", timeline_cast: [],
+      slug: "s", canonical_slug: "s", label: "L", cast: [], sector: null, source_count: 4, velocity: 0, status: "active", timeline_cast: [], boundary_status: "verified",
       developments: [
         { id: "e0", title: "How it started", sector: null, occurred_at: "2026-09-01T00:00:00Z", image_url: null, is_current: false, why: null },
         { id: "e1", title: "Story e1", sector: null, occurred_at: "2026-09-03T00:00:00Z", image_url: null, is_current: false, why: null },

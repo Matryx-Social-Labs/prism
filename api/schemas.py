@@ -254,6 +254,9 @@ class TrendingStoryOut(BaseModel):
     last_updated_at: str | None = None
     # The route glyph's data; None when the story predates the current partition.
     route: RouteOut | None = None
+    # Story boundaries remain provisional until the recent two-labeller set
+    # passes its precision gate. Clients must not render chronology otherwise.
+    boundary_status: str = "provisional"
 
 
 class TrendingResponse(BaseModel):
@@ -326,3 +329,4 @@ class TrendingStoryDetail(BaseModel):
     # falls back to the flat timeline, so null is a real value, not an error.
     branches: BranchTreeOut | None = None
     related: list[RelatedStoryOut] = []
+    boundary_status: str = "provisional"

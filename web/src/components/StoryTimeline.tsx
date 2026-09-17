@@ -19,7 +19,7 @@ function dateLabel(iso: string | null): string {
   return iso ? shortDate(iso) : "";
 }
 
-export function StoryTimeline({ story }: { story?: StoryTimelineData }) {
+export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimelineData; mode?: "timeline" | "related" }) {
   const [shown, setShown] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -44,6 +44,44 @@ export function StoryTimeline({ story }: { story?: StoryTimelineData }) {
   const cast = story?.cast ?? [];
   // A timeline only exists when there's more than just this event.
   if (developments.filter((d) => !d.is_current).length === 0) return null;
+
+  if (mode === "related") {
+    return (
+      <section ref={ref} className="mt-6" aria-labelledby="related-coverage-title">
+        <h2 id="related-coverage-title" className="mb-1.5 font-display text-[26px] font-medium uppercase leading-none tracking-[0.03em]">
+          Related coverage under review
+        </h2>
+        <p className="mb-4 max-w-[70ch] text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+          These events share subject or cast signals. Prism has not yet verified that they form one unfolding story, so no chronology or causal path is implied.
+        </p>
+        <ul className="flex flex-col">
+          {developments.map((n, i) => (
+            <li
+              key={n.id}
+              className="rule-live grid grid-cols-[52px_1fr] gap-3 py-3"
+              style={{
+                opacity: shown ? 1 : 0,
+                transform: shown ? "none" : "translateY(6px)",
+                transition: "opacity 180ms ease, transform 180ms ease",
+                transitionDelay: `${Math.min(i, 8) * 40}ms`,
+              }}
+            >
+              <span className="pt-[3px] font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                {dateLabel(n.occurred_at)}
+              </span>
+              {n.is_current ? (
+                <span className="text-[14.5px] font-semibold leading-snug">{n.title}</span>
+              ) : (
+                <Link href={`/story/${n.id}`} className="text-[14.5px] font-medium leading-snug underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+                  {n.title}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
 
   return (
     <section ref={ref} className="mt-11">

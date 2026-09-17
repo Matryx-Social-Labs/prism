@@ -165,11 +165,15 @@ async def test_a_served_story_carries_every_declared_key():
         assert detail.status_code == 200, detail.text
         assert set(detail.json()) == ts_fields("TrendingStoryDetail")
         assert detail.json()["canonical_slug"] == slug
+        assert detail.json()["boundary_status"] == "provisional"
+        assert detail.json()["branches"] is None
 
         assert listing.status_code == 200
         served = {s["slug"]: s for s in listing.json()["stories"]}
         if slug in served:  # ranked list; a busy dev DB may push it past the limit
             assert set(served[slug]) == ts_fields("TrendingStory")
+            assert served[slug]["boundary_status"] == "provisional"
+            assert served[slug]["route"] is None
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM stories WHERE id = :i"), {"i": str(sid)})

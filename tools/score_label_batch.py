@@ -105,9 +105,12 @@ def _score(judged, labels, title):
     scored = tp + fp + fn + tn
     print(f"\n{title}")
     if not scored:
-        print(f"  NOTHING SCORABLE — all {unplaced} pairs fell outside the window. "
-              f"Check --as-of.")
-        return
+        from tools.score_stories import require_coverage
+
+        require_coverage(0, len(judged), what="judged pairs")
+    from tools.score_stories import require_coverage
+
+    require_coverage(scored, len(judged), what="judged pairs")
     P = tp / (tp + fp) if tp + fp else 0.0
     R = tp / (tp + fn) if tp + fn else 0.0
     F = 2 * P * R / (P + R) if P + R else 0.0

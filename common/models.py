@@ -74,6 +74,9 @@ class RawItem(TimestampMixin, Base):
     source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sources.id"), nullable=False)
     external_id: Mapped[str] = mapped_column(Text, nullable=False)
     url: Mapped[str | None] = mapped_column(Text)
+    # Comparison key only; `url` remains the exact publisher observation.
+    url_canonical: Mapped[str | None] = mapped_column(Text)
+    url_canonical_version: Mapped[int | None] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     body: Mapped[str | None] = mapped_column(Text)
     language: Mapped[str | None] = mapped_column(Text)
@@ -84,6 +87,9 @@ class RawItem(TimestampMixin, Base):
     raw: Mapped[dict] = mapped_column(JSONB, nullable=False)  # untouched source payload
     image_url: Mapped[str | None] = mapped_column(Text)
     relevance: Mapped[str] = mapped_column(Text, default="pending", nullable=False)  # pending|relevant|rejected
+    # A dedicated stage clock. ``updated_at`` is not classification time: later
+    # enrichment can update this row when it discovers an image.
+    classified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     classification: Mapped[dict | None] = mapped_column(JSONB)
 
@@ -163,6 +169,9 @@ class Event(TimestampMixin, Base):
     last_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # First instant a published partition made this event addressable as part of
+    # a story (including a singleton story). NULL means not yet published.
+    story_visible_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     projection: Mapped[dict | None] = mapped_column(JSONB)  # promoted shared + lens fields for serving
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBED_DIM))
 

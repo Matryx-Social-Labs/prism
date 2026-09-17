@@ -7,6 +7,7 @@ are kept with a reason for audit; relevant items emit classified.items.
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from classification.schemas import ClassificationResult, GateResult
 from classification.shadow_gate import shadow_score
@@ -79,6 +80,7 @@ async def handle_raw_item(payload: dict) -> None:
         item = await session.get(RawItem, raw_item_id)
         if item is None or item.relevance != "pending":
             return
+        item.classified_at = datetime.now(UTC)
         if gate.is_relevant and classification is not None:
             item.relevance = "relevant"
             item.classification = classification.model_dump()

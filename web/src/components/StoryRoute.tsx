@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BranchTree } from "@/components/BranchTree";
 import { ChevronDown } from "@/components/icons";
 import { RouteMap } from "@/components/RouteMap";
+import { StoryTimeline } from "@/components/StoryTimeline";
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
 
 /**
@@ -40,7 +41,20 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
       </p>
     );
   }
-  if (!story?.branches || story.branches.nodes.length < 2) return null;
+  if (!story || story.developments.length < 2) return null;
+
+  if (story.boundary_status !== "verified") {
+    return (
+      <div>
+        <StoryTimeline story={{ developments: story.developments, cast: [] }} mode="related" />
+        <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+          Open this coverage group →
+        </a>
+      </div>
+    );
+  }
+
+  if (!story.branches || story.branches.nodes.length < 2) return null;
 
   return (
     <div>

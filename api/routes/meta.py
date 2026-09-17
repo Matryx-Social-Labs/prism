@@ -13,6 +13,7 @@ from api.schemas import (
 )
 from common.db import get_db
 from common.embeddings import check_corpus_model
+from common.freshness import pipeline_freshness
 from common.lenses import DEFAULT_LENS, active_lenses
 from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
@@ -40,6 +41,7 @@ async def healthz(db: AsyncSession = Depends(get_db)):
     return {
         "status": "ok",
         "streams": await backlog(),
+        "freshness": await pipeline_freshness(db),
         "embeddings": await check_corpus_model(db),
     }
 

@@ -56,7 +56,7 @@ STREAM_MAXLEN = int(os.environ.get("PRISM_STREAM_MAXLEN", "100000"))
 
 
 async def backlog() -> dict[str, dict[str, int]]:
-    """Undelivered and in-flight message counts per topic.
+    """Undelivered, in-flight, stalled, and dead-letter counts per topic.
 
     `pending` is the consumer group's PEL — messages handed out and not yet
     acked. `waiting` is what has not been handed out at all: the number that
@@ -73,15 +73,36 @@ async def backlog() -> dict[str, dict[str, int]]:
         (CLASSIFIED_ITEMS, "enrichment"),
         (ENRICHED_ITEMS, "correlation"),
     ):
+        report = {
+            "waiting": -1,
+            "pending": -1,
+            "oldest_pending_ms": -1,
+            "dead_lettered": -1,
+        }
         try:
             groups = await r.xinfo_groups(topic)
             info = next((g for g in groups if str(g.get("name")) == group), {})
-            out[topic] = {
-                "waiting": int(info.get("lag") or 0),
-                "pending": int(info.get("pending") or 0),
-            }
+            report["waiting"] = int(info.get("lag") or 0)
+            report["pending"] = int(info.get("pending") or 0)
+            if report["pending"] == 0:
+                report["oldest_pending_ms"] = 0
+            else:
+                try:
+                    rows = await r.xpending_range(topic, group, min="-", max="+", count=1)
+                    row = rows[0] if rows else {}
+                    report["oldest_pending_ms"] = int(
+                        row.get("time_since_delivered", row.get("idle", -1))
+                    )
+                except Exception:
+                    # Queue depth is still useful if only XPENDING detail fails.
+                    pass
         except Exception:
-            out[topic] = {"waiting": -1, "pending": -1}  # -1: unknown, not zero
+            pass  # -1 means unknown, not zero
+        try:
+            report["dead_lettered"] = int(await r.xlen(f"{topic}.dead"))
+        except Exception:
+            pass
+        out[topic] = report
     return out
 
 
@@ -101,12 +122,6 @@ STALE_CLAIM_IDLE_MS = 300_000  # reclaim messages a dead consumer held > 5 min
 # model) is never mistaken for a dead consumer's and worked twice. Measured
 # 2026-09-17: six raw items got two articles each this way under the 402s.
 HEARTBEAT_S = 60
-# A message redelivered this many times is poison, not unlucky: it goes to
-# `<topic>.dead` with its delivery count and is acked, so the stream moves on
-# and the payload is still there to read.
-MAX_DELIVERIES = 5
-
-
 async def consume(
     topic: str,
     group: str,
@@ -118,9 +133,11 @@ async def consume(
 ) -> None:
     """Consume a topic forever with a consumer group.
 
-    Failed messages are logged and acked (recorded, not retried forever) —
-    the DB keeps the authoritative state, so a stage can be re-driven from
-    persisted rows; poison messages must not wedge the stream. Messages
+    Permanent failures are logged, copied to ``<topic>.dead``, and acked — the
+    DB keeps the authoritative state, so a stage can be re-driven from persisted
+    rows; poison messages must not wedge the stream. Transient infrastructure
+    failures remain pending regardless of delivery count and recover through
+    XAUTOCLAIM. Messages
     stranded in a dead consumer's pending list (e.g. after a restart under
     a different consumer name) are reclaimed via XAUTOCLAIM.
 
@@ -259,16 +276,27 @@ async def _heartbeat(r, topic: str, group: str, consumer_name: str, entry_id) ->
             pass
 
 
+async def _dead_letter(r, topic: str, group: str, entry_id, fields: dict, exc: Exception) -> None:
+    """Preserve a permanently failed payload for inspection and replay."""
+    deliveries = await _deliveries(r, topic, group, entry_id)
+    try:
+        await r.xadd(
+            f"{topic}.dead",
+            {
+                "data": (fields or {}).get("data", ""),
+                "entry_id": str(entry_id),
+                "deliveries": str(deliveries),
+                "error": f"{type(exc).__name__}: {exc}"[:500],
+            },
+            maxlen=1000,
+            approximate=True,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("dead_letter_failed", topic=topic, entry_id=entry_id)
+
+
 async def _handle_one(r, topic: str, group: str, handler, message, consumer_name: str = "") -> None:
     entry_id, fields = message
-    if await _deliveries(r, topic, group, entry_id) > MAX_DELIVERIES:
-        logger.error("message_dead_lettered", topic=topic, entry_id=entry_id, payload=(fields or {}).get("data", "")[:500])
-        try:
-            await r.xadd(f"{topic}.dead", {"data": (fields or {}).get("data", ""), "entry_id": str(entry_id)}, maxlen=1000, approximate=True)
-        except Exception:  # noqa: BLE001
-            logger.exception("dead_letter_failed", topic=topic, entry_id=entry_id)
-        await r.xack(topic, group, entry_id)
-        return
     beat = asyncio.create_task(_heartbeat(r, topic, group, consumer_name, entry_id)) if consumer_name else None
     try:
         payload = json.loads(fields["data"])
@@ -291,6 +319,7 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
             entry_id=entry_id,
             payload=(fields or {}).get("data", "")[:500],
         )
+        await _dead_letter(r, topic, group, entry_id, fields, exc)
     finally:
         if beat:
             beat.cancel()

@@ -33,6 +33,20 @@ import asyncpg
 from tools.gold_stories import STORIES, STORY_OF, event_count, pairs, story_count
 
 C_MISS, C_FA = 1.0, 4.0
+MIN_COVERAGE = 0.90
+
+
+def require_coverage(found: int, total: int, *, what: str,
+                     minimum: float = MIN_COVERAGE) -> float:
+    """Refuse to turn a stale/partial join into a plausible quality score."""
+    coverage = found / total if total else 0.0
+    if coverage < minimum:
+        raise SystemExit(
+            f"INVALID SCORE: only {found}/{total} {what} covered "
+            f"({coverage:.1%}; need >= {minimum:.0%}). Rebuild with the gold "
+            "set's --as-of date or refresh the labels."
+        )
+    return coverage
 
 
 def _db_url() -> str:
@@ -90,6 +104,7 @@ def report(predicted: dict[str, str], label: str = "current partition") -> None:
     covered = len([e for e in STORY_OF if e in predicted])
     print(f"\n── {label} ──")
     print(f"  {covered}/{event_count()} labelled events found, {scored['n']} pairs scored")
+    require_coverage(covered, event_count(), what="labelled events")
     print(f"  P {prec:.4f}   R {rec:.4f}   F1 {f1:.4f}   Cdet {cdet:.4f}")
     print(f"  tp {tp}  fp {fp} (wrong merges)  fn {fn} (wrong splits)")
 

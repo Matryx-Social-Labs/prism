@@ -51,10 +51,10 @@ reader — is the memorable thing and the brand.
 
 ## Operating Context
 
-- **Corpus:** 42 sources, 6 languages (English, Hindi, Kannada, Tamil, Marathi,
-  Telugu). Display is English-first; a reader's chosen languages rank and localise,
-  never filter. Ingestion runs on a cadence when enabled (currently off; the corpus
-  is frozen at 2026-09-05 until sources are decided).
+- **Corpus:** 42 registered sources; 27 RSS feeds are currently active, spanning
+  English and Indian-language coverage. Display is English-first. Production
+  ingestion is active at a 120-minute Railway override as of 2026-09-17; `dev`
+  targets five-minute conditional polling, pending deploy and canary validation.
 - **Corpus shape today:** ~1,357 stories in the live window — politics 40%,
   business+finance 18%, sports 9%, health/science/tech/cyber the rest. 22% carry no
   sector. 3% carry a validated ticker. 45% carry at least one verbatim claim.
@@ -64,7 +64,7 @@ reader — is the memorable thing and the brand.
 - **The review ritual:** the founder and team open the live site and spot-check
   stories against the pipeline's facts. A shared front page is what makes this possible.
 - **Pipeline surfaces the reader meets:** Feed (front page), Story, Sector pages with
-  sub-sectors, Trending (story arcs), Market Pulse (a daily markets digest), Search,
+  sub-sectors, Trending (coverage groups; story arcs only after boundary verification), Market Pulse (a daily markets digest), Search,
   Watchlist (tickers/sectors), You (profile: state, role/lens, interests, languages),
   Onboarding (three steps: where you are, what you do, what you follow), Ask (grounded
   Q&A per story, metered).
@@ -72,8 +72,11 @@ reader — is the memorable thing and the brand.
 ## Capabilities and Constraints
 
 **Confirmed capabilities**
-- Canonical story clustering with a branch tree (developments · branches · satellites ·
-  span), counted not summarised.
+- Canonical event clustering across outlets. A story partition and branch tree exist,
+  but its recent boundary set is still under two-person review; the serving contract
+  therefore marks it `provisional` and the product shows **related coverage under
+  review**, not a development chronology. Branches return only after the held-out
+  evaluation explicitly promotes the boundary to `verified`.
 - Lens re-read per story: Reader (free), Markets and Cyber (paid; health and policy
   drafted, not served). A locked lens still flips — the reader sees what they are
   missing — and the brief is gated server-side.
@@ -109,7 +112,8 @@ reader — is the memorable thing and the brand.
 - English-first display for a reader with no language preference.
 
 **Undecided (recorded, not invented)**
-- Which markets sources to add and when ingestion resumes.
+- Which markets sources to add, and which additional regional feeds meet the
+  freshness/reliability bar.
 - Whether the LLM "Perspectives" cards on the story page are retired now that verbatim
   claims exist beside them.
 - Whether reported (indirect) speech should display as a claim.
@@ -141,7 +145,8 @@ reader — is the memorable thing and the brand.
   every binding design rule.
 - 1,285 verbatim-verified claims across 755 articles; attribution precision 0.983 on a
   59-claim adjudicated gold set (`tools/gold_claims.py`).
-- A 1,147-pair adjudicated story-boundary gold set (`tools/gold_story_pairs.py`).
+- A 1,147-pair historical story-boundary gold set (`tools/gold_story_pairs.py`), plus
+  current invite-only same-event and story-boundary batches awaiting Tejas and Vijay.
 - A 15,701-row securities master with ISINs.
 - Screenshots of every current surface at 1440 and 390:
   `~/.gstack/projects/Matryx-Social-Labs-prism/designs/redesign-20260915/`.

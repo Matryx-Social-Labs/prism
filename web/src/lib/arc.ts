@@ -23,7 +23,10 @@ export function isStale(s: Pick<TrendingStory, "last_updated_at">, now = Date.no
   return Number.isFinite(t) && now - t > STALE_AFTER_MS;
 }
 
-/** A row opens the ticket of the story's hero event with the route in view; a story without one opens its arc page. */
-export function arcHref(s: Pick<TrendingStory, "hero_event_id" | "slug">): string {
-  return s.hero_event_id ? `/story/${s.hero_event_id}#route` : `/trending/${s.slug}`;
+/** Verified arcs open on their hero's route. Provisional groups open on the
+ * group page, whose copy explicitly refuses to imply chronology. */
+export function arcHref(s: Pick<TrendingStory, "hero_event_id" | "slug" | "boundary_status">): string {
+  return s.boundary_status === "verified" && s.hero_event_id
+    ? `/story/${s.hero_event_id}#route`
+    : `/trending/${s.slug}`;
 }

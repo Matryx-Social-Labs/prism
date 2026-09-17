@@ -88,14 +88,22 @@ describe("Trending — the sector strip", () => {
 });
 
 describe("Trending — the chart of arcs", () => {
-  it("names the arc, weighs it by developments, and opens the ticket with the route in view", async () => {
+  it("fails a provisional boundary closed to related events and opens its honest group page", async () => {
+    render(<TrendingPage />);
+    const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
+    expect(r).toHaveAttribute("href", "/trending/kerala-power");
+    expect(screen.getByLabelText("5 related events")).toBeInTheDocument();
+    expect(r.textContent).toMatch(/4 outlets/);
+    expect(r.textContent).toMatch(/span 5d/); // 6 days less two hours, floored
+    expect(r.textContent).toMatch(/moving/);
+  });
+
+  it("shows a route and opens its hero only after the boundary is verified", async () => {
+    fetchTrending.mockResolvedValue([story({ boundary_status: "verified" })]);
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(r).toHaveAttribute("href", "/story/ev-1#route");
     expect(screen.getByLabelText("5 developments")).toBeInTheDocument();
-    expect(r.textContent).toMatch(/4 outlets/);
-    expect(r.textContent).toMatch(/span 5d/); // 6 days less two hours, floored
-    expect(r.textContent).toMatch(/moving/);
   });
 
   it("opens the arc page when a story has no hero event, and falls back to the hero headline without a label", async () => {

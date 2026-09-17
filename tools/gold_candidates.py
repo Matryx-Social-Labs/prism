@@ -752,6 +752,177 @@ def merge_votes(answers: list[tuple[list[str], bool, bool]], candidates: list[st
     return members, len(definite)
 
 
+def topic_followup_tasks(
+    rows: list[dict], *, max_pairs: int = 150, min_labellers: int = 2,
+    max_candidates_per_task: int = 4, rng_seed: int = 19,
+) -> list[dict]:
+    """Build the *third* relation set from consensus story negatives.
+
+    The first two human questions are already live: "same happening?" and
+    "same unfolding story?".  The remaining distinction is between a useful
+    related topic and something merely retrieved by a noisy signal.  Asking that
+    question before the story round finishes wastes attention and, worse, allows
+    true story members into a set intended to measure topic-to-story leakage.
+
+    ``rows`` contains one source-task/response row per labeller.  A candidate is
+    eligible only when at least ``min_labellers`` gave a definite story answer and
+    *every one* left it unticked.  The follow-up therefore asks only:
+
+        agreed not the same story -> related context, or unrelated?
+
+    Unsure and language-skip answers do not vote.  Disagreements do not become
+    negatives.  Those two rules mirror ``merge_votes`` and keep absence of
+    evidence out of the gold set.
+    """
+    import random
+
+    grouped: dict[str, dict] = {}
+    for raw in rows:
+        r = dict(raw)
+        task_id = str(r["task_id"])
+        candidates = (json.loads(r["candidates"])
+                      if isinstance(r["candidates"], str) else r["candidates"])
+        selected = (json.loads(r["selected"])
+                    if isinstance(r["selected"], str) else (r["selected"] or []))
+        entry = grouped.setdefault(task_id, {
+            "seed": str(r["seed"]), "sector": r.get("sector"),
+            "position": int(r.get("position") or 0), "candidates": candidates,
+            "answers": [],
+        })
+        entry["answers"].append(
+            ({str(x) for x in selected}, bool(r["unsure"]), bool(r["skipped"])))
+
+    eligible: list[dict] = []
+    for entry in grouped.values():
+        definite = [selected for selected, unsure, skipped in entry["answers"]
+                    if not unsure and not skipped]
+        if len(definite) < min_labellers:
+            continue
+        negatives = [
+            c for c in entry["candidates"]
+            if all(str(c["id"]) not in selected for selected in definite)
+        ]
+        # Spend the follow-up on the hardest candidates first: pairs proposed by
+        # two independent signals are more likely to leak into a topic-shaped
+        # story than an arbitrary nearest neighbour.  IDs make ties deterministic.
+        negatives.sort(key=lambda c: (-len(c.get("signals") or []), str(c["id"])))
+        if negatives:
+            eligible.append({
+                "seed": entry["seed"], "sector": entry["sector"],
+                "position": entry["position"],
+                "candidates": negatives[:max_candidates_per_task],
+            })
+
+    # The source story batch is stratified by sector already.  A fixed shuffle
+    # keeps that distribution while preventing the first (usually politics-heavy)
+    # positions from consuming the entire pair budget.
+    random.Random(rng_seed).shuffle(eligible)
+    out: list[dict] = []
+    used = 0
+    for entry in eligible:
+        if used >= max_pairs:
+            break
+        take = entry["candidates"][:max_pairs - used]
+        if take:
+            out.append({**entry, "candidates": take})
+            used += len(take)
+    return out
+
+
+async def push_topic_followup(
+    source_batch_key: str, name: str, *, max_pairs: int = 150,
+    url: str | None = None,
+) -> None:
+    """Create a topic-vs-unrelated batch from completed story judgements.
+
+    This deliberately refuses to run early.  The third set is useful only after
+    two independent labellers have agreed that each offered pair is *not* the same
+    story.  The new batch reuses the same event/task schema and invite machinery;
+    only its wording and compiled meaning differ.
+    """
+    import secrets
+    import uuid
+
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        source = await c.fetchrow(
+            "SELECT id, kind FROM label_batches WHERE key = $1", source_batch_key)
+        if source is None:
+            raise SystemExit(f"no source batch with key {source_batch_key}")
+        if source["kind"] != "story_boundary":
+            raise SystemExit("topic follow-up must start from a story_boundary batch")
+        total_tasks = await c.fetchval(
+            "SELECT count(*) FROM label_tasks WHERE batch_id = $1", source["id"])
+        progress = await c.fetch(
+            """
+            SELECT i.name, count(r.id) AS answered
+            FROM label_invites i
+            LEFT JOIN label_responses r ON r.invite_id = i.id
+            WHERE i.batch_id = $1 AND NOT i.revoked
+            GROUP BY i.id, i.name
+            """,
+            source["id"],
+        )
+        if len(progress) < 2 or any(r["answered"] < total_tasks for r in progress):
+            state = ", ".join(
+                f"{r['name'] or 'anonymous'} {r['answered']}/{total_tasks}" for r in progress
+            ) or "no active invites"
+            raise SystemExit(
+                "story batch is not complete for two independent labellers "
+                f"({state})"
+            )
+        rows = await c.fetch(
+            """
+            SELECT t.id::text AS task_id, t.position,
+                   t.seed_event_id::text AS seed, t.sector, t.candidates,
+                   r.selected, r.unsure, r.skipped
+            FROM label_tasks t
+            JOIN label_responses r ON r.task_id = t.id
+            JOIN label_invites i ON i.id = r.invite_id
+            WHERE t.batch_id = $1 AND NOT i.revoked
+            ORDER BY t.position, i.name
+            """,
+            source["id"],
+        )
+        tasks = topic_followup_tasks([dict(r) for r in rows], max_pairs=max_pairs)
+        if not tasks:
+            raise SystemExit(
+                "no consensus story negatives yet — wait until both labellers "
+                "have answered the story batch"
+            )
+
+        key, bid = secrets.token_urlsafe(9), uuid.uuid4()
+        async with c.transaction():
+            await c.execute(
+                "INSERT INTO label_batches (id, key, name, kind, notes) "
+                "VALUES ($1,$2,$3,'topic_relation',$4)",
+                bid, key, name,
+                "These pairs were already judged NOT to be the same unfolding "
+                "story. Tick only the headlines that are useful related context "
+                "for the same issue; same sector, place or person is not enough.",
+            )
+            await c.executemany(
+                "INSERT INTO label_tasks (id, batch_id, position, seed_event_id, "
+                "candidates, sector) VALUES ($1,$2,$3,$4,$5::jsonb,$6)",
+                [
+                    (uuid.uuid4(), bid, pos, uuid.UUID(t["seed"]),
+                     json.dumps(t["candidates"]), t["sector"])
+                    for pos, t in enumerate(tasks)
+                ],
+            )
+    finally:
+        await c.close()
+
+    pair_count = sum(len(t["candidates"]) for t in tasks)
+    print(f"  batch '{name}': {len(tasks)} tasks, {pair_count} consensus story negatives")
+    print(f"  key: {key}")
+    print(f"  next: uv run python -m tools.gold_candidates --invite Tejas Vijay --batch {key}")
+
+
 async def compile_from_batch(batch_key: str, url: str | None = None,
                              min_agree: float = 0.5) -> None:
     """Build a gold_stories block from what people actually answered on the page.
@@ -842,6 +1013,90 @@ async def compile_from_batch(batch_key: str, url: str | None = None,
     for a, b in sorted(disputed):
         print(f'    frozenset({{"{a}", "{b}"}}),')
     print("\n  paste into tools/gold_stories.STORIES, keeping the existing CJP slice")
+
+
+async def compile_topic_batch(batch_key: str, url: str | None = None) -> None:
+    """Print consensus topic labels without folding them into story truth.
+
+    Every candidate in this batch is already a two-person consensus *story
+    negative*.  This second judgement divides those hard negatives into
+    ``related_topic`` and ``unrelated``.  Disagreement stays outside both sets;
+    turning it into either label would manufacture certainty.
+    """
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        await c.execute("SET default_transaction_read_only = on")
+        batch = await c.fetchrow(
+            "SELECT id, kind FROM label_batches WHERE key = $1", batch_key)
+        if batch is None:
+            raise SystemExit(f"no batch with key {batch_key}")
+        if batch["kind"] != "topic_relation":
+            raise SystemExit("--compile-topic requires a topic_relation batch")
+        rows = await c.fetch(
+            """
+            SELECT t.id::text AS task_id, t.position,
+                   t.seed_event_id::text AS seed, t.candidates,
+                   r.selected, r.unsure, r.skipped
+            FROM label_tasks t
+            JOIN label_responses r ON r.task_id = t.id
+            JOIN label_invites i ON i.id = r.invite_id
+            WHERE t.batch_id = $1 AND NOT i.revoked
+            ORDER BY t.position, i.name
+            """,
+            batch["id"],
+        )
+        total = await c.fetchval(
+            "SELECT count(*) FROM label_tasks WHERE batch_id = $1", batch["id"])
+    finally:
+        await c.close()
+
+    grouped: dict[str, dict] = {}
+    for raw in rows:
+        r = dict(raw)
+        candidates = (json.loads(r["candidates"])
+                      if isinstance(r["candidates"], str) else r["candidates"])
+        selected = (json.loads(r["selected"])
+                    if isinstance(r["selected"], str) else (r["selected"] or []))
+        entry = grouped.setdefault(r["task_id"], {
+            "seed": r["seed"], "candidates": [str(c["id"]) for c in candidates],
+            "answers": [],
+        })
+        entry["answers"].append(
+            ({str(x) for x in selected}, bool(r["unsure"]), bool(r["skipped"])))
+
+    related: list[tuple[str, str]] = []
+    unrelated: list[tuple[str, str]] = []
+    disputed: list[tuple[str, str]] = []
+    incomplete = 0
+    for entry in grouped.values():
+        definite = [s for s, unsure, skipped in entry["answers"]
+                    if not unsure and not skipped]
+        if len(definite) < 2:
+            incomplete += 1
+            continue
+        for candidate in entry["candidates"]:
+            votes = {candidate in selected for selected in definite}
+            pair = (entry["seed"], candidate)
+            if len(votes) != 1:
+                disputed.append(pair)
+            elif True in votes:
+                related.append(pair)
+            else:
+                unrelated.append(pair)
+
+    print(f"  batch {batch_key}: {len(grouped)} of {total} tasks answered")
+    print(f"  related_topic {len(related)}   unrelated {len(unrelated)}   "
+          f"disputed {len(disputed)}")
+    if incomplete:
+        print(f"  WARNING: {incomplete} task(s) do not yet have two definite opinions")
+    print(json.dumps({
+        "related_topic": related, "unrelated": unrelated,
+        "disputed": disputed,
+    }, indent=2))
 
 
 def compile_gold() -> None:
@@ -939,6 +1194,14 @@ def main() -> None:
                     help="do the labellers mean the same thing? pairwise, exact-set")
     ap.add_argument("--compile-batch", metavar="KEY",
                     help="build a gold block from what labellers answered on the page")
+    ap.add_argument("--push-topic-followup", metavar="NAME",
+                    help="create topic-vs-unrelated tasks from consensus story negatives")
+    ap.add_argument("--source-batch", metavar="KEY",
+                    help="completed story batch used by --push-topic-followup")
+    ap.add_argument("--topic-pairs", type=int, default=150,
+                    help="maximum pairs in the topic follow-up (default 150)")
+    ap.add_argument("--compile-topic", metavar="KEY",
+                    help="compile a topic_relation batch into related/unrelated pairs")
     ap.add_argument("--min-agree", type=float, default=0.5,
                     help="fraction of definite answers a candidate needs (default 0.5)")
     ap.add_argument("--site", default="https://www.readprism.news",
@@ -986,8 +1249,22 @@ def main() -> None:
         import asyncio
 
         asyncio.run(compile_from_batch(a.compile_batch, a.db, a.min_agree))
+    if a.push_topic_followup:
+        import asyncio
+
+        if not a.source_batch:
+            raise SystemExit("--push-topic-followup needs --source-batch <key>")
+        asyncio.run(push_topic_followup(
+            a.source_batch, a.push_topic_followup,
+            max_pairs=a.topic_pairs, url=a.db,
+        ))
+    if a.compile_topic:
+        import asyncio
+
+        asyncio.run(compile_topic_batch(a.compile_topic, a.db))
     if not (a.propose or a.review or a.compile or a.push or a.invite
-            or a.revoke or a.status or a.compile_batch or a.agreement or a.build_claims):
+            or a.revoke or a.status or a.compile_batch or a.agreement or a.build_claims
+            or a.push_topic_followup or a.compile_topic):
         ap.print_help()
 
 

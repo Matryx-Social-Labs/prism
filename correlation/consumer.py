@@ -97,7 +97,7 @@ async def handle_enriched_item(payload: dict) -> None:
         lens = (enrichment.lens_fields or {}).get("cyber") or {}
         cve_ids = lens.get("cve_ids") or []
         title = raw_item.title if raw_item else "(untitled)"
-        url = raw_item.url if raw_item else None
+        url = (raw_item.url_canonical or raw_item.url) if raw_item else None
         published_at = raw_item.published_at if raw_item else None
         classification = (raw_item.classification or {}) if raw_item else {}
         cve_record = (enrichment.model or "").startswith("deterministic:")

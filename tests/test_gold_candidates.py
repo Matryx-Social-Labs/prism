@@ -12,7 +12,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from tools.gold_candidates import DAY, _neighbours
+from tools.gold_candidates import DAY, _neighbours, topic_followup_tasks
 from tools.l2 import Snap
 
 BASE = 1_700_000_000.0
@@ -258,3 +258,62 @@ def test_perfect_agreement_is_kappa_one():
     cands = [f"c{i}" for i in range(10)]
     _, kappa, _, _ = candidate_kappa([({"c0"}, {"c0"}, cands)] * 5)
     assert kappa == 1.0
+
+
+# --- the third relation set starts only after the story judgement --------------
+
+
+def _topic_rows(*answers):
+    candidates = [
+        {"id": "hard", "signals": ["embedding", "actors"]},
+        {"id": "easy", "signals": ["embedding"]},
+    ]
+    return [
+        {
+            "task_id": "t1", "position": 0, "seed": "seed", "sector": "politics",
+            "candidates": candidates, "selected": selected,
+            "unsure": unsure, "skipped": skipped,
+        }
+        for selected, unsure, skipped in answers
+    ]
+
+
+def test_topic_followup_contains_only_consensus_story_negatives():
+    """A true story member must never reach the set used to measure topic leakage."""
+    rows = _topic_rows(
+        (["hard"], False, False),
+        (["hard"], False, False),
+    )
+    got = topic_followup_tasks(rows)
+    assert [c["id"] for c in got[0]["candidates"]] == ["easy"]
+
+
+def test_topic_followup_excludes_story_disagreements():
+    """One no and one yes is uncertainty, not a hard negative."""
+    rows = _topic_rows(
+        (["hard"], False, False),
+        ([], False, False),
+    )
+    got = topic_followup_tasks(rows)
+    assert [c["id"] for c in got[0]["candidates"]] == ["easy"]
+
+
+def test_topic_followup_waits_for_two_independent_opinions():
+    assert topic_followup_tasks(_topic_rows(([], False, False))) == []
+
+
+def test_topic_followup_does_not_treat_unsure_or_skip_as_no():
+    rows = _topic_rows(
+        ([], False, False),
+        ([], True, False),
+        ([], False, True),
+    )
+    assert topic_followup_tasks(rows) == []
+
+
+def test_topic_followup_prefers_multi_signal_hard_negatives():
+    got = topic_followup_tasks(
+        _topic_rows(([], False, False), ([], False, False)),
+        max_pairs=1,
+    )
+    assert [c["id"] for c in got[0]["candidates"]] == ["hard"]

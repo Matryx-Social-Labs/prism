@@ -178,6 +178,10 @@ export function StoryView({ event }: { event: EventDetail }) {
     myRegion && coverageEntries.length > 0 && !coveredOrigins.includes(myRegion)
       ? `No ${regionName(myRegion)} outlet has covered this yet.`
       : null;
+  // Loaded by StoryRoute from the story owner. Missing/older payloads fail
+  // closed: they are related coverage, never verified chronology.
+  const [routeStory, setRouteStory] = useState<TrendingStoryDetail | null>(null);
+  const boundaryVerified = routeStory?.boundary_status === "verified";
 
   // ── "On this story" section nav ────────────────────────
   const sourceCount = event.sources.length;
@@ -185,7 +189,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   const facts = ticketFacts(event);
   const navItems: { id: string; label: string; count?: number }[] = [
     { id: "lens-brief", label: "Lens" },
-    ...(event.story_slug ? [{ id: "route", label: "Story" }] : []),
+    ...(event.story_slug ? [{ id: "route", label: boundaryVerified ? "Story" : "Coverage" }] : []),
     // Only when there is something to jump to: 55% of stories have no attributed
     // quote, and a permanent "Said 0" would advertise absence on every other page.
     ...(quoteCount > 0 ? [{ id: "said", label: "Said", count: quoteCount }] : []),
@@ -199,10 +203,6 @@ export function StoryView({ event }: { event: EventDetail }) {
   // The first eight outlets, then the rest on request: forty-four rows is a
   // wall, and the [n] index is the same either way.
   const [allSources, setAllSources] = useState(false);
-  // The route page owns the story; the ticket learns its related routes from
-  // the same fetch StoryRoute makes, so nothing is asked for twice.
-  const [routeStory, setRouteStory] = useState<TrendingStoryDetail | null>(null);
-
   // Picking a lens from the pinned rail must SHOW the result: the brief is
   // off-screen behind the reader's scroll position, so the re-typeset flip
   // happens where nobody can see it and the tap reads as a dead button.
@@ -557,7 +557,13 @@ export function StoryView({ event }: { event: EventDetail }) {
           of the arc. Only when the ticket carries a slug. */}
       {event.story_slug && (
         <section id="route" className="mt-10 scroll-mt-24" aria-labelledby="route-title">
-          <Head id="route-title" title="How this story unfolded" hint="Every development in this story, counted: what came first, what followed, what branched off." />
+          <Head
+            id="route-title"
+            title={boundaryVerified ? "How this story unfolded" : "Related coverage"}
+            hint={boundaryVerified
+              ? "Every development in this story, counted: what came first, what followed, what branched off."
+              : "Grouped by subject or cast signals while the story boundary is under human review. No chronology is implied."}
+          />
           <StoryRoute slug={event.story_slug} currentId={event.id} onLoad={setRouteStory} />
         </section>
       )}
@@ -637,7 +643,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       <p className={`rule-live mt-10 flex justify-between gap-4 py-3 ${MONO_LABEL}`}>
         <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>← Today&rsquo;s chart</Link>
         {event.story_slug && (
-          <Link href={`/trending/${event.story_slug}`} className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>The whole story →</Link>
+          <Link href={`/trending/${event.story_slug}`} className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>{boundaryVerified ? "The whole story" : "Open coverage group"} →</Link>
         )}
       </p>
       </article>
@@ -652,7 +658,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             {navItems.map((n) => (
               <li key={n.id} className="rule-live">
                 <a href={`#${n.id}`} className="flex items-baseline justify-between py-2.5 text-[13.5px] font-medium underline-offset-4 hover:underline" style={{ color: activeSection === n.id ? "var(--ink)" : "var(--ink-muted)" }}>
-                  <span>{n.label === "Lens" ? `${meta.short} brief` : n.label === "Said" ? "What was said" : n.label === "Story" ? "How this story unfolded" : n.label}</span>
+                  <span>{n.label === "Lens" ? `${meta.short} brief` : n.label === "Said" ? "What was said" : n.label === "Story" ? "How this story unfolded" : n.label === "Coverage" ? "Related coverage" : n.label}</span>
                   {n.count != null && <span className={MONO_LABEL} style={{ color: "var(--ink-faint)" }}>{n.count}</span>}
                 </a>
               </li>

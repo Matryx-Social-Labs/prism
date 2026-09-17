@@ -14,6 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from common.db import session_scope
+from common.urls import canonicalize_url
 from enrichment.consumer import _extraction_for_same_url
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -35,9 +36,10 @@ async def _enriched(s, url, tag, body="the body"):
     await s.execute(text("INSERT INTO sources (id,slug,name,source_type) VALUES (:i,:s,:s,'rss')"),
                     {"i": str(sid), "s": f"src-{tag}-{sid.hex[:6]}"})
     await s.execute(
-        text("INSERT INTO raw_items (id,source_id,external_id,url,title,raw,relevance) "
-             "VALUES (:i,:s,:e,:u,'t','{}'::jsonb,'relevant')"),
-        {"i": str(rid), "s": str(sid), "e": f"ext-{rid.hex[:8]}", "u": url},
+        text("INSERT INTO raw_items (id,source_id,external_id,url,url_canonical,title,raw,relevance) "
+             "VALUES (:i,:s,:e,:u,:uc,'t','{}'::jsonb,'relevant')"),
+        {"i": str(rid), "s": str(sid), "e": f"ext-{rid.hex[:8]}", "u": url,
+         "uc": canonicalize_url(url)},
     )
     await s.execute(
         text("INSERT INTO articles (id,raw_item_id,clean_text,retrieval_tier,word_count) "
@@ -86,6 +88,23 @@ async def test_a_url_we_have_never_seen_still_gets_extracted():
     if not await _db_reachable():
         pytest.skip("no database")
     assert await _extraction_for_same_url(f"https://example.test/{uuid.uuid4().hex}/new") is None
+
+
+async def test_tracking_parameters_reuse_the_same_extraction():
+    """RSS/newsletter decoration changes per observation, not per article."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:6]
+    first = f"http://example.test/{tag}/story?id=7&utm_source=rss#top"
+    second = f"https://example.test/{tag}/story?fbclid=another&id=7"
+    made = []
+    try:
+        async with session_scope() as s:
+            made.append(await _enriched(s, first, tag))
+        found = await _extraction_for_same_url(canonicalize_url(second))
+        assert found is not None, "tracking decoration caused a second model extraction"
+    finally:
+        await _cleanup(made)
 
 
 async def test_a_missing_url_is_not_treated_as_a_match():
@@ -137,9 +156,10 @@ async def test_the_handler_does_not_call_the_model_for_a_url_it_already_extracte
                 {"i": str(sid2), "s": f"second-{tag}"},
             )
             await s.execute(
-                text("INSERT INTO raw_items (id,source_id,external_id,url,title,raw,relevance,classification) "
-                     "VALUES (:i,:s,:e,:u,'t','{}'::jsonb,'relevant','{}'::jsonb)"),
-                {"i": str(rid2), "s": str(sid2), "e": f"ext-{rid2.hex[:8]}", "u": url},
+                text("INSERT INTO raw_items (id,source_id,external_id,url,url_canonical,title,raw,relevance,classification) "
+                     "VALUES (:i,:s,:e,:u,:uc,'t','{}'::jsonb,'relevant','{}'::jsonb)"),
+                {"i": str(rid2), "s": str(sid2), "e": f"ext-{rid2.hex[:8]}", "u": url,
+                 "uc": canonicalize_url(url)},
             )
 
         ec.structured_chat, ec.retrieve_fulltext, ec.embed_texts = _boom_llm, _boom_fulltext, _fake_embed

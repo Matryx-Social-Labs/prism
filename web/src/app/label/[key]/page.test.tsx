@@ -568,6 +568,25 @@ describe("the primer is read before the first judgement", () => {
     expect(screen.queryByText(/Monsoon Session/)).not.toBeInTheDocument();
   });
 
+  it("teaches topic relation as a third, narrower judgement", async () => {
+    ready("topic_relation", {
+      id: "t1", position: 0, sector: "news",
+      seed: { id: "s", title: "Seed headline", at: null, source_count: 1, actors: [], signals: [] },
+      candidates: [{
+        id: "c", title: "Candidate headline", at: null,
+        source_count: 1, actors: [], signals: ["embedding"],
+      }],
+    });
+
+    expect(await screen.findByText(/already agreed these are/i)).toBeInTheDocument();
+    expect(screen.getByText(/useful related context/i)).toBeInTheDocument();
+    expect(screen.getByText(/same person, place, organisation/i)).toBeInTheDocument();
+    expect(screen.queryByText(/same unfolding story/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /I have read this/ }));
+    expect((await screen.findAllByText(/genuinely useful context/i)).length).toBeGreaterThan(0);
+  });
+
   it("does not show again once acknowledged", async () => {
     stubStorage({
       "prism.label.token.batch-key": "t", "prism.labeller": "ana",

@@ -24,6 +24,14 @@ class FakeRedis:
             raise self._groups
         return self._groups[topic]
 
+    async def xpending_range(self, topic, group, min, max, count):
+        return [{"time_since_delivered": 45_000}]
+
+    async def xlen(self, topic):
+        if isinstance(self._groups, Exception):
+            raise self._groups
+        return 2 if topic == f"{stream.RAW_ITEMS}.dead" else 0
+
 
 async def test_reports_waiting_and_pending_per_stage(monkeypatch):
     monkeypatch.setattr(stream, "get_redis", lambda: FakeRedis({
@@ -33,8 +41,14 @@ async def test_reports_waiting_and_pending_per_stage(monkeypatch):
     }))
     out = await stream.backlog()
     # The number that was invisible: 5,800 items nobody has even looked at.
-    assert out[stream.RAW_ITEMS] == {"waiting": 5800, "pending": 4}
-    assert out[stream.CLASSIFIED_ITEMS] == {"waiting": 12, "pending": 12}
+    assert out[stream.RAW_ITEMS] == {
+        "waiting": 5800,
+        "pending": 4,
+        "oldest_pending_ms": 45_000,
+        "dead_lettered": 2,
+    }
+    assert out[stream.CLASSIFIED_ITEMS]["waiting"] == 12
+    assert out[stream.CLASSIFIED_ITEMS]["pending"] == 12
 
 
 async def test_an_unknown_depth_is_minus_one_not_zero(monkeypatch):
@@ -42,7 +56,8 @@ async def test_an_unknown_depth_is_minus_one_not_zero(monkeypatch):
     'nothing is waiting', which is the most reassuring possible lie here."""
     monkeypatch.setattr(stream, "get_redis", lambda: FakeRedis(ConnectionError("redis down")))
     out = await stream.backlog()
-    assert all(v == {"waiting": -1, "pending": -1} for v in out.values())
+    assert all(v["waiting"] == -1 and v["pending"] == -1 for v in out.values())
+    assert all(v["dead_lettered"] == -1 for v in out.values())
 
 
 async def test_a_missing_consumer_group_reads_as_empty_not_as_an_error(monkeypatch):
@@ -54,4 +69,25 @@ async def test_a_missing_consumer_group_reads_as_empty_not_as_an_error(monkeypat
         stream.ENRICHED_ITEMS: [],
     }))
     out = await stream.backlog()
-    assert out[stream.RAW_ITEMS] == {"waiting": 0, "pending": 0}
+    assert out[stream.RAW_ITEMS] == {
+        "waiting": 0,
+        "pending": 0,
+        "oldest_pending_ms": 0,
+        "dead_lettered": 2,
+    }
+
+
+async def test_pending_detail_failure_keeps_known_queue_depth(monkeypatch):
+    class NoPendingDetail(FakeRedis):
+        async def xpending_range(self, *args, **kwargs):
+            raise RuntimeError("unsupported")
+
+    monkeypatch.setattr(stream, "get_redis", lambda: NoPendingDetail({
+        stream.RAW_ITEMS: [{"name": "classification", "lag": 3, "pending": 1}],
+        stream.CLASSIFIED_ITEMS: [],
+        stream.ENRICHED_ITEMS: [],
+    }))
+    out = await stream.backlog()
+    assert out[stream.RAW_ITEMS]["waiting"] == 3
+    assert out[stream.RAW_ITEMS]["pending"] == 1
+    assert out[stream.RAW_ITEMS]["oldest_pending_ms"] == -1

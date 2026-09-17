@@ -3,6 +3,36 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.24] - 2026-09-17
+
+### Added
+- Canonical URL identity for ingested articles, with versioned normalization,
+  duplicate reuse across tracking variants, a safe dry-run backfill, and a migration
+  that preserves every publisher URL shown to readers.
+- Durable freshness clocks for classification and first story visibility, plus API
+  health telemetry for stage latency, oldest pending work, stream lag, and dead work.
+- Conditional RSS polling with ETag and Last-Modified support, bounded feed
+  concurrency, per-feed watermarks, isolated failures, and a five-minute default.
+- Invite-only labelling support for current story-boundary and same-event sets, with
+  coverage-aware scoring that refuses to bless an incomplete evaluation.
+
+### Changed
+- Story routes now fail closed while the held-out boundary evaluation is pending:
+  readers see related coverage under review, never an unverified chronology or causal
+  branch map. The API exposes the provisional boundary state explicitly.
+- Transient dependency failures remain claimable in Redis instead of being converted
+  into false permanent deaths after an arbitrary delivery count. Permanent failures
+  retain their error and delivery metadata in the dead stream.
+- Trending and landing surfaces now distinguish verified developments from related
+  coverage, and product documentation records the evidence threshold required to
+  restore timelines.
+
+### Fixed
+- Article extraction, event matching, and duplicate detection now agree on one URL
+  identity without collapsing meaningful publisher query parameters.
+- RSS timestamps are normalized to UTC before freshness comparisons, preventing naive
+  and aware datetime mismatches from silently stalling feeds.
+
 ## [0.0.81.23] - 2026-08-03
 
 ### Fixed

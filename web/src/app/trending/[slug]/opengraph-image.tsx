@@ -21,12 +21,14 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   let grid: string[] = [];
   let foot = "";
   let degraded = false;
+  let verified = false;
   try {
     const s = await fetchTrendingStory(slug);
     if (!s) throw new Error("no story");
     label = s.label;
     developments = s.developments.length;
-    const shape = s.branches?.shape;
+    verified = s.boundary_status === "verified";
+    const shape = verified ? s.branches?.shape : null;
     grid = [
       `${s.source_count} ${s.source_count === 1 ? "outlet" : "outlets"}`,
       shape ? `${shape.branches} branched off` : "",
@@ -35,12 +37,18 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       s.velocity > 0 ? "moving" : "",
     ].filter(Boolean);
     const first = s.developments[0]?.occurred_at, last = s.developments.at(-1)?.occurred_at;
-    foot = `Story headline · from ${developments} ${developments === 1 ? "development" : "developments"}${first && last ? ` · ${shortDate(first)} to ${shortDate(last)}` : ""}`;
+    foot = verified
+      ? `Story headline · from ${developments} ${developments === 1 ? "development" : "developments"}${first && last ? ` · ${shortDate(first)} to ${shortDate(last)}` : ""}`
+      : `Provisional grouping · ${developments} related ${developments === 1 ? "event" : "events"} · no chronology implied`;
   } catch {
     degraded = true;
   }
   const headline = label.length > 120 ? `${label.slice(0, 118)}…` : label;
-  const countLabel = developments ? `${developments} ${developments === 1 ? "development" : "developments"} in this story` : "";
+  const countLabel = developments
+    ? verified
+      ? `${developments} ${developments === 1 ? "development" : "developments"} in this story`
+      : `${developments} related ${developments === 1 ? "event" : "events"}`
+    : "";
   const host = SITE_URL.replace(/^https?:\/\//, "");
   const fonts = await ogFonts(headline, countLabel, ...grid, foot, host, "PRISM One story. Every perspective.", String(developments));
 

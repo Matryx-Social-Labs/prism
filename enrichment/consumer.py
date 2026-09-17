@@ -53,6 +53,7 @@ async def handle_classified_item(payload: dict) -> None:
         title = item.title
         body = item.body
         url = item.url
+        url_canonical = item.url_canonical or item.url
         raw = dict(item.raw)
         published_at = item.published_at
         sector = (item.classification or {}).get("sector")
@@ -62,7 +63,7 @@ async def handle_classified_item(payload: dict) -> None:
     settings = get_settings()
 
     # Pay for one extraction per URL, not one per feed that carried it.
-    reused = await _extraction_for_same_url(url)
+    reused = await _extraction_for_same_url(url_canonical)
 
     # 1. Full text
     og_image: str | None = None
@@ -240,13 +241,13 @@ def _parse_date(value: str | None) -> date | None:
 
 
 async def _extraction_for_same_url(url: str | None) -> tuple[str, dict, str] | None:
-    """An enrichment already produced for this exact URL, if there is one.
+    """An enrichment already produced for this canonical URL, if there is one.
 
     534 URL groups in production arrive more than once — 533 of them CROSS-source,
     the same article reaching us through a national feed and a regional one under
-    different external_ids. Dedupe keys on (source_id, external_id), so URL is
-    never compared and both copies are fetched and sent to the model: 355 excess
-    enrichments, entirely wasted spend.
+    different external_ids. The comparison key removes tracking parameters while
+    the original URL remains untouched for provenance. Both observations remain,
+    but only one is fetched and sent to the model.
 
     Reused rather than skipped. Skipping the second article would drop the record
     that a second feed carried it, and event membership is what corroboration and
@@ -264,7 +265,8 @@ async def _extraction_for_same_url(url: str | None) -> tuple[str, dict, str] | N
                     FROM enrichments e
                     JOIN articles a ON a.id = e.article_id
                     JOIN raw_items ri ON ri.id = a.raw_item_id
-                    WHERE ri.url = :url AND e.raw_model_output IS NOT NULL
+                    WHERE coalesce(ri.url_canonical, ri.url) = :url
+                      AND e.raw_model_output IS NOT NULL
                     ORDER BY e.created_at ASC
                     LIMIT 1
                     """

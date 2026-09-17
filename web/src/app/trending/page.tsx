@@ -122,8 +122,12 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
   // The count column is developments here, not outlets as on the chart, so
   // the grid says so first; "moving" replaces the last-moved date rather
   // than joining it.
+  const verified = story.boundary_status === "verified";
+  const memberLabel = verified
+    ? `${story.developments} ${story.developments === 1 ? "development" : "developments"}`
+    : `${story.developments} related ${story.developments === 1 ? "event" : "events"}`;
   const grid = [
-    `${story.developments} ${story.developments === 1 ? "development" : "developments"}`,
+    memberLabel,
     `${story.source_count} ${story.source_count === 1 ? "outlet" : "outlets"}`,
     story.velocity > 0 ? null : story.last_updated_at ? `moved ${shortDate(story.last_updated_at)}` : null,
     span != null ? `span ${span}d` : null,
@@ -139,7 +143,7 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
         <span
           className={`${lead ? "font-display text-[44px] leading-[0.9] tracking-[-0.01em]" : "font-mono text-[13px] leading-[1.9]"} tabular-nums text-right`}
           style={{ color: single ? "var(--ink-faint)" : "var(--ink)" }}
-          aria-label={`${story.developments} ${story.developments === 1 ? "development" : "developments"}`}
+          aria-label={memberLabel}
         >
           {story.developments}
         </span>
@@ -150,7 +154,7 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
           >
             {story.label ?? story.hero_title}
           </h2>
-          <RouteGlyph route={story.route} />
+          <RouteGlyph route={verified ? story.route : null} />
           <div
             className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[11px] uppercase tracking-[0.04em]"
             style={{ color: "var(--ink-faint)" }}

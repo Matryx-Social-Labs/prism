@@ -1010,6 +1010,17 @@ async def _flip_current(session, run_id: uuid.UUID) -> None:
     # Vacate the old current BEFORE claiming the new one (partial-unique index).
     await session.execute(text("UPDATE partition_runs SET status='superseded', updated_at=now() WHERE status='current'"))
     await session.execute(text("UPDATE partition_runs SET status='current', updated_at=now() WHERE id=:id"), {"id": run_id})
+    # The cutover and the visibility clock share one transaction: health can
+    # never observe a current partition whose newly introduced events still
+    # claim they are not story-visible. COALESCE preserves first publication
+    # across later base/overlay runs and retention pruning.
+    await session.execute(
+        text(
+            "UPDATE events e SET story_visible_at=COALESCE(e.story_visible_at, now()) "
+            "FROM event_story es WHERE es.run_id=:id AND es.event_id=e.id"
+        ),
+        {"id": run_id},
+    )
 
 
 async def _prune_runs(session, keep: int = PARTITION_RETENTION) -> None:

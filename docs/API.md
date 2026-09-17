@@ -32,7 +32,21 @@ route, update that test.
 ## Discovery
 
 ### `GET /healthz`
-Liveness probe. Returns `200 ok`. Used by Railway healthchecks.
+Liveness probe and best-effort pipeline telemetry. Returns `200` while the API and
+database are alive; queue or telemetry trouble is reported in the body rather than
+taking the API out of Railway's rotation. `streams` reports waiting, in-flight,
+oldest-in-flight milliseconds, and dead-letter counts for every stage. `freshness`
+reports a 24-hour window of p50/p95 publication→observation,
+observation→classification, classification→enrichment, enrichment→event, and
+event→story-visible clocks, plus end-to-end publication/observation→story clocks
+and each stage's oldest unfinished row. A value of `-1` or
+`"ok": null` means the measurement is unavailable, not zero.
+
+Existing rows intentionally have no classification clock: `classified_at` starts
+with the migration that introduced this telemetry because the older `updated_at`
+field can be changed by enrichment and cannot be truthfully backfilled.
+Existing members of the current partition receive a story-visibility instrumentation
+baseline at migration; future events retain their exact first partition cutover time.
 
 ### `GET /api/v1/lenses` → `LensesResponse`
 Shipped lenses only (upcoming/drafted lenses are excluded).
@@ -100,7 +114,10 @@ Full-text + semantic search over events. Same `FeedItem` shape as the feed.
 ## Trending
 
 ### `GET /api/v1/trending`
-Velocity-ranked, persistent trending **stories** (durable, shareable, slugged).
+Velocity-ranked, persistent coverage groups (durable, shareable, slugged).
+`boundary_status` is currently `provisional`; while provisional, `route` is always
+`null` and `developments` is only a legacy count of related canonical events, not a
+claim that they form a verified timeline.
 
 | Param | Type | Effect |
 |---|---|---|
@@ -113,15 +130,19 @@ Velocity-ranked, persistent trending **stories** (durable, shareable, slugged).
                  "label": "Dharmendra Pradhan · Delhi Police · Cockroach Janta Party",
                  "cast": ["Dharmendra Pradhan", "Delhi Police", …],
                  "source_count": 13, "velocity": 0, "developments": 30,
-                 "sector": "politics", "hero_title": "…", "hero_image": "…" } ] }
+                 "sector": "politics", "hero_title": "…", "hero_image": "…",
+                 "boundary_status": "provisional", "route": null } ] }
 ```
 Only `active`, non-merged stories are returned. Velocity = distinct new news
 outlets in the last 6h. See [STORY-GRAPH.md](./STORY-GRAPH.md#trending).
 
 ### `GET /api/v1/trending/{slug}`
-One trending story with its developments timeline. **Slugs are frozen** — a merged
-story's slug redirects to the canonical one via `canonical_slug`, so a shared link
-never breaks. `404` if the slug is unknown.
+One trending coverage group. **Slugs are frozen** — a merged story's slug redirects
+to the canonical one via `canonical_slug`, so a shared link never breaks. While
+`boundary_status` is `provisional`, `branches` is `null` and clients show the members
+as related coverage with no chronological or causal claim. After the current,
+time-held-out two-labeller evaluation passes, an explicit promotion to `verified`
+allows the development tree to be served. `404` if the slug is unknown.
 
 ---
 
@@ -136,12 +157,10 @@ last_updated_at, projection{}, lens_briefs{lens:text}, lens_points{lens:[…]},
 available_lenses[], coverage{}, entities[{name,entity_type,role}],
 sources[SourceRef], perspectives[PerspectiveOut], impacts[ImpactOut]
 ```
-**No story timeline here.** The arc belongs to
-[`GET /api/v1/trending/{slug}`](#get-apiv1trendingslug--trendingstorydetail), which builds it from the
-story's *frozen* `member_event_ids`. This route used to serve the same arc from the
-*live* partition, so one story could present two different development sets
-depending on which page you opened. `thread`/`related` went with it — the timeline
-superseded them and nothing ever read them.
+**No story timeline here.** The coverage group belongs to
+[`GET /api/v1/trending/{slug}`](#get-apiv1trendingslug--trendingstorydetail), built
+from frozen `member_event_ids`. Chronology is withheld while that group's boundary
+is provisional.
 
 `sources[]` carry `stance` and `funding` (`state`/`public`/null) for
 outlet-transparency chips.

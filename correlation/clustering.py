@@ -289,7 +289,7 @@ async def _match_by_url(session: AsyncSession, url: str) -> Match | None:
             FROM event_memberships em
             JOIN articles a ON a.id = em.article_id
             JOIN raw_items ri ON ri.id = a.raw_item_id
-            WHERE ri.url = :url
+            WHERE coalesce(ri.url_canonical, ri.url) = :url
             LIMIT 1
             """
         ),

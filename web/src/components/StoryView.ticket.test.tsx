@@ -115,6 +115,7 @@ describe("the ticket — retired sections (D4) and So what (founder, 2026-09-17)
 describe("the ticket — the route", () => {
   const TREE = {
     slug: "s", canonical_slug: "s", label: "L", cast: [], sector: null, source_count: 3, velocity: 0, status: "active",
+    boundary_status: "verified" as const,
     developments: [
       { id: "e0", title: "How it started", sector: null, occurred_at: "2026-09-01T00:00:00Z", image_url: null, is_current: false, why: null },
       { id: "e1", title: "A story", sector: null, occurred_at: "2026-09-04T00:00:00Z", image_url: null, is_current: false, why: null },
@@ -147,6 +148,15 @@ describe("the ticket — the route", () => {
     const route = await screen.findByRole("region", { name: /how this story unfolded/i });
     await vi.waitFor(() => expect(within(route).queryByText(/Printing the route/)).toBeNull());
     expect(within(route).queryByLabelText("Storyline structure")).toBeNull();
+  });
+
+  it("renders a provisional group as related coverage without a route or chronology", async () => {
+    fetchTrendingStory.mockResolvedValue({ ...TREE, boundary_status: "provisional" });
+    render(<StoryView event={event({ story_slug: "s" })} />);
+    const coverage = await screen.findByRole("region", { name: /related coverage/i });
+    expect(within(coverage).getByText(/not yet verified/i)).toBeInTheDocument();
+    expect(within(coverage).queryByLabelText("Storyline structure")).toBeNull();
+    expect(mobile().getByRole("link", { name: "Coverage" })).toHaveAttribute("href", "#route");
   });
 });
 

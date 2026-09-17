@@ -113,6 +113,57 @@ function Guide({ open = false }: { open?: boolean }) {
 }
 
 
+/** The third judgement is intentionally asked only about pairs already agreed
+ *  NOT to be the same story. It separates useful context from retrieval noise;
+ *  it must not quietly teach the story boundary again. */
+function TopicGuide({ open = false }: { open?: boolean }) {
+  return (
+    <details open={open} className="mt-6 border-t pt-5" style={{ borderColor: "var(--line)" }}>
+      <summary className="cursor-pointer text-[14.5px] font-medium" style={{ color: "var(--ink)" }}>
+        How to decide
+      </summary>
+      <div className="mt-4 space-y-5">
+        <div className="border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
+          <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+            RELATED CONTEXT — TICK IT
+          </p>
+          <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
+            &ldquo;Court pauses new coastal zoning rules&rdquo;
+          </p>
+          <p className="text-[14.5px]" style={{ color: "var(--ink)" }}>
+            &ldquo;Fishing groups challenge the same coastal policy&rdquo;
+          </p>
+          <p className="mt-2 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+            Different proceedings, but one policy issue. A reader of either would
+            reasonably want the other under related context.
+          </p>
+        </div>
+        <div className="border-l pl-4" style={{ borderColor: "var(--line-strong)" }}>
+          <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+            RETRIEVAL NOISE — LEAVE IT
+          </p>
+          <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            &ldquo;State bank signs rural credit agreement&rdquo;
+          </p>
+          <p className="text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+            &ldquo;State bank appoints a new technology chief&rdquo;
+          </p>
+          <p className="mt-2 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+            The organisation is shared, but the subject is not. Same person, place,
+            organisation, country, or broad sector is not enough by itself.
+          </p>
+        </div>
+        <p className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          These pairs have already been judged as different stories. Ask only:
+          <strong style={{ color: "var(--ink)" }}> would this be genuinely useful
+          context beside the first headline?</strong>
+        </p>
+      </div>
+    </details>
+  );
+}
+
+
 /** The claim task: a quote, where it sits in the article, and who the extractor
  *  says said it.
  *
@@ -315,6 +366,35 @@ function EventPrimer({ onStart }: { onStart: () => void }) {
 function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
   const claim = kind === "claim_attribution";
   if (kind === "event_identity") return <EventPrimer onStart={onStart} />;
+  if (kind === "topic_relation") {
+    return (
+      <div className="mx-auto max-w-[640px] pt-2">
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+          READ THIS FIRST · ABOUT ONE MINUTE
+        </p>
+        <h1 className="mt-2 text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+          Is this useful related context?
+        </h1>
+        <p className="mt-4 text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+          Both reviewers already agreed these are <strong>different stories</strong>.
+          Now tick only the headlines that concern the same issue closely enough to
+          help a reader understand the first one.
+        </p>
+        <TopicGuide open />
+        <button
+          type="button"
+          onClick={onStart}
+          className="mt-8 h-11 rounded-full px-6 text-[14.5px] font-medium"
+          style={{ background: "var(--ink)", color: "var(--bg)" }}
+        >
+          I have read this — start
+        </button>
+        <p className="mt-3 text-[13px]" style={{ color: "var(--ink-faint)" }}>
+          You can stop whenever you like; it remembers where you got to.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-[640px] pt-2">
       <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
@@ -480,6 +560,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   // The same-happening task (article -> event) is narrower than the story task:
   // the copy on screen says so at every step.
   const sameEvent = batch?.kind === "event_identity";
+  const sameTopic = batch?.kind === "topic_relation";
   // Null until read from storage, so the first paint does not flash the primer at
   // someone who has already dismissed it.
   const [primed, setPrimed] = useState<boolean | null>(null);
@@ -785,7 +866,11 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           </p>
 
           <p className="mt-8 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-            {sameEvent ? "Which of these report the same happening — the same incident, the same day?" : "Which of these are part of the same unfolding story?"}
+            {sameEvent
+              ? "Which of these report the same happening — the same incident, the same day?"
+              : sameTopic
+                ? "Which of these are genuinely useful context about the same issue?"
+                : "Which of these are part of the same unfolding story?"}
           </p>
 
           <ul className="mt-3">
@@ -858,7 +943,9 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
               className="h-11 rounded-full px-5 text-[14.5px] font-medium disabled:opacity-50"
               style={{ background: "var(--ink)", color: "var(--bg)" }}
             >
-              {picked.size ? `Yes — ${picked.size} selected` : "None of these"}
+              {picked.size
+                ? `${sameTopic ? "Related" : "Yes"} — ${picked.size} selected`
+                : "None of these"}
             </button>
             <button
               type="button"
@@ -892,6 +979,8 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           <p className="mt-6 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
             {sameEvent ? (
               <>The follow-up is a different happening here; a different incident of the same kind is too. <strong>Not sure</strong> is a real answer.</>
+            ) : sameTopic ? (
+              <>These are already different stories. Tick only useful context about the same issue; a shared name, place, or sector is not enough.</>
             ) : (
               <>Same topic isn&apos;t enough — two different court cases about one law are two
               stories. <strong>Not sure</strong> is a real answer; it keeps genuinely hard
@@ -902,7 +991,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           {/* An INVITED labeller never sees the join screen, so this is the only
               route the worked example has to them. Collapsed, because it is
               reference rather than instruction once you are going. */}
-          <Guide />
+          {sameTopic ? <TopicGuide /> : <Guide />}
         </>
         )
       )}

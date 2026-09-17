@@ -25,7 +25,8 @@ async function load(slug: string): Promise<TrendingStoryDetail | null> {
 function blurb(s: TrendingStoryDetail): string {
   const lead = s.developments.find((d) => !d.is_current) ?? s.developments[0];
   const base = lead?.title ?? s.label;
-  return `${s.source_count} outlets · ${s.developments.length} developments — ${base}`.slice(0, 200);
+  const members = s.boundary_status === "verified" ? "developments" : "related events";
+  return `${s.source_count} outlets · ${s.developments.length} ${members} — ${base}`.slice(0, 200);
 }
 
 // The OG image comes from opengraph-image.tsx in this route (branded card) — we
@@ -54,12 +55,13 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
   // Merged story → the request slug resolved to a canonical one; move the URL there.
   if (s.canonical_slug !== slug) redirect(`/trending/${s.canonical_slug}`);
 
-  const tree = s.branches && s.branches.nodes.length > 0 ? s.branches : null;
+  const verified = s.boundary_status === "verified";
+  const tree = verified && s.branches && s.branches.nodes.length > 0 ? s.branches : null;
   const days = spanDays(s.developments);
   // One shape line, at the top, counted: developments · branches · satellites · days.
   const shape = tree
     ? [`${tree.shape.developments} developments`, `${tree.shape.branches} branched off`, `${tree.shape.satellites} also reported`, ...(days != null ? [`${days} ${days === 1 ? "day" : "days"}`] : [])]
-    : [`${s.developments.length} developments`];
+    : [`${s.developments.length} ${verified ? "developments" : "related events"}`];
   // A main line of one or two stations has nothing to fold: open the list on everything.
   const openAll = !tree || spineLength(tree) < 3;
 
@@ -83,13 +85,13 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
       </div>
       <h1 className="mt-2 text-[26px] font-medium leading-[1.2] text-balance sm:text-[32px] lg:max-w-[30ch]">{s.label}</h1>
       <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-        Story headline · from {s.developments.length} developments
+        {verified ? "Story headline" : "Provisional grouping"} · from {s.developments.length} {verified ? "developments" : "related events"}
       </p>
 
       <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,860px)_1fr] lg:gap-16">
         <div className="min-w-0">
           {/* The route: the whole story as the rail map, the attention curve on request */}
-          {tree ? (
+          {verified && tree ? (
             <section aria-labelledby="route-title">
               <SectionHead id="route-title" title="How this story unfolded" hint="Every development in order. Tap one to read it." />
               <RouteMap tree={tree} developments={s.developments} />
@@ -98,14 +100,16 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
           ) : null}
 
           {/* Every station, as a list: the table view of the map */}
-          <section className={tree ? "mt-8" : ""} aria-labelledby="list-title">
+          {verified ? <section className={tree ? "mt-8" : ""} aria-labelledby="list-title">
             <SectionHead id="list-title" title="All developments" count={s.developments.length} />
             {tree ? (
               <BranchTree tree={tree} developments={s.developments} defaultAll={openAll} readout={false} />
             ) : (
               <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
             )}
-          </section>
+          </section> : (
+            <StoryTimeline story={{ developments: s.developments, cast: [] }} mode="related" />
+          )}
         </div>
 
         <aside className="lg:sticky lg:top-20 lg:self-start">

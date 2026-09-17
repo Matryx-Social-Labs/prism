@@ -135,3 +135,18 @@ def test_key_restriction_scores_only_the_named_stories():
     # Cross-fold pairs must be excluded, not merely down-weighted.
     inside = sum(len(STORIES[k]) for k in subset)
     assert s["pairs"] <= inside * (inside - 1) // 2
+
+
+def test_coverage_gate_rejects_a_plausible_score_from_a_stale_join():
+    """The live partition once found 2/86 gold events and still printed P/R/F1.
+    Those numbers described the join failure, not the story layer."""
+    from tools.score_stories import require_coverage
+
+    with pytest.raises(SystemExit, match=r"INVALID SCORE.*2/86"):
+        require_coverage(2, 86, what="labelled events")
+
+
+def test_coverage_gate_accepts_the_documented_ninety_percent_floor():
+    from tools.score_stories import require_coverage
+
+    assert require_coverage(90, 100, what="labelled events") == pytest.approx(0.9)

@@ -228,6 +228,7 @@ export interface TrendingStory {
   first_seen_at: string | null; // SPAN = last_updated_at - first_seen_at
   last_updated_at: string | null; // LAST MOVED
   route: RouteData | null; // the route glyph's data; null when the story predates the partition
+  boundary_status?: "provisional" | "verified";
 }
 
 export interface RouteNode {
@@ -285,6 +286,8 @@ export interface TrendingStoryDetail {
   branches: BranchTreeData | null;
   /** Different stories that touch this one; never drawn on the route. */
   related: RelatedStory[];
+  /** Provisional groups are related coverage, never a chronology. */
+  boundary_status?: "provisional" | "verified";
 }
 
 export interface RelatedStory {

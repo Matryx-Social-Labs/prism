@@ -32,7 +32,7 @@ from ingestion.runner import run_all
 setup_logging()
 logger = get_logger("worker")
 
-INGEST_INTERVAL_MINUTES = int(os.environ.get("PRISM_INGEST_INTERVAL_MINUTES", "30"))
+INGEST_INTERVAL_MINUTES = int(os.environ.get("PRISM_INGEST_INTERVAL_MINUTES", "5"))
 CONSUMER_NAME = os.environ.get("PRISM_CONSUMER_NAME", "worker-1")
 
 ALL_STAGES = ["ingestion", "classification", "enrichment", "correlation"]

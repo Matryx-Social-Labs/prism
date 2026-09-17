@@ -9,9 +9,9 @@ describe("RelatedRoutes — different stories, said beside the route", () => {
       { slug: "caste", label: "The caste survey", developments: 7, source_count: 9, velocity: 0, last_updated_at: "2026-09-04T06:00:00Z", shared_cast: ["Siddaramaiah", "Congress"], causal: false },
     ]} />);
     expect(screen.getByRole("link", { name: "The NEET protests" })).toHaveAttribute("href", "/trending/neet");
-    expect(screen.getByText(/linked by a causal note · shares Dharmendra Pradhan · 25 developments/)).toBeInTheDocument();
+    expect(screen.getByText(/linked by a causal note · shares Dharmendra Pradhan · 25 related events/)).toBeInTheDocument();
     expect(screen.getByText("moving")).toBeInTheDocument();
-    expect(screen.getByText(/shares Siddaramaiah · Congress · 7 developments · quiet since/)).toBeInTheDocument();
+    expect(screen.getByText(/shares Siddaramaiah · Congress · 7 related events · quiet since/)).toBeInTheDocument();
   });
   it("renders nothing when there are none", () => {
     expect(render(<RelatedRoutes related={[]} />).container.innerHTML).toBe("");

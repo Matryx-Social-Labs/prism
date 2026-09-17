@@ -161,7 +161,7 @@ Local dev can point at this same instance (put the three values in `.env`).
    - **Start command**: `python -m worker`
    - No public domain needed.
 3. **Variables**: same set as `api` (Railway shared variables help here), plus optionally
-   `PRISM_INGEST_INTERVAL_MINUTES` (default `30`).
+   `PRISM_INGEST_INTERVAL_MINUTES` (default `5`).
 
 ### 2.4 Verify
 

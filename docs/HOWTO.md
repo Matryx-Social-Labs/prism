@@ -142,7 +142,7 @@ uv run python -m worker                    # all stages + scheduled collectors
 uv run python -m worker --stages ingestion # collectors only
 ```
 The worker kicks off one ingestion run at startup, then every
-`PRISM_INGEST_INTERVAL_MINUTES` (default 30).
+`PRISM_INGEST_INTERVAL_MINUTES` (default 5).
 
 ### On demand (admin trigger, prod or local)
 ```bash

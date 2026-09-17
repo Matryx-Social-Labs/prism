@@ -10,7 +10,7 @@ that makes all-sector ingestion affordable.
 """
 
 import asyncio
-import time
+import calendar
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -19,7 +19,12 @@ import httpx
 
 from common.logging import get_logger
 from common.schemas import RawItemEnvelope
-from ingestion.base import clean_text, persist_envelopes
+from ingestion.base import (
+    clean_text,
+    get_watermark,
+    persist_envelopes,
+    set_watermark,
+)
 
 logger = get_logger(__name__)
 
@@ -93,50 +98,122 @@ FEEDS: list[FeedSpec] = [
 USER_AGENT = "Prism/1.0 (+https://www.readprism.news)"
 
 SPEC_BY_SLUG: dict[str, FeedSpec] = {spec.slug: spec for spec in FEEDS}
+RSS_CONCURRENCY = 8
+
+
+def _conditional_headers(watermark: dict) -> dict[str, str]:
+    """HTTP validators from the last successful response, never article cursors."""
+    headers: dict[str, str] = {}
+    if watermark.get("rss_etag"):
+        headers["If-None-Match"] = str(watermark["rss_etag"])
+    if watermark.get("rss_last_modified"):
+        headers["If-Modified-Since"] = str(watermark["rss_last_modified"])
+    return headers
+
+
+def _response_watermark(current: dict, response: httpx.Response) -> dict:
+    """Preserve other collector state while recording feed freshness."""
+    out = dict(current)
+    out.update({
+        "rss_last_checked_at": datetime.now(UTC).isoformat(),
+        "rss_last_status": response.status_code,
+    })
+    for header, key in (("etag", "rss_etag"), ("last-modified", "rss_last_modified")):
+        if response.headers.get(header):
+            out[key] = response.headers[header]
+        elif response.status_code == 200:
+            out.pop(key, None)
+    if response.status_code == 200:
+        out["rss_last_success_at"] = out["rss_last_checked_at"]
+        out.pop("rss_last_error", None)
+    return out
+
+
+async def _collect_one(
+    client: httpx.AsyncClient, spec: FeedSpec, semaphore: asyncio.Semaphore,
+) -> int:
+    async with semaphore:
+        watermark: dict = {}
+        try:
+            watermark = await get_watermark(spec.slug)
+            response = await client.get(spec.url, headers=_conditional_headers(watermark))
+            if response.status_code == 304:
+                await set_watermark(spec.slug, _response_watermark(watermark, response))
+                logger.info("collector_not_modified", collector=f"rss:{spec.slug}")
+                return 0
+            response.raise_for_status()
+            parsed = await asyncio.to_thread(feedparser.parse, response.text)
+        except Exception as exc:
+            # A feed failure is isolated from the other 26 concurrent requests.
+            # Keep the last good validators and expose when/why this source failed.
+            watermark = dict(watermark)
+            watermark.update({
+                "rss_last_checked_at": datetime.now(UTC).isoformat(),
+                "rss_last_error": f"{type(exc).__name__}: {exc}"[:500],
+            })
+            try:
+                await set_watermark(spec.slug, watermark)
+            except Exception:
+                logger.exception("rss_watermark_failed", feed=spec.slug)
+            logger.exception("rss_fetch_failed", feed=spec.slug)
+            return 0
+
+        envelopes: list[RawItemEnvelope] = []
+        for entry in parsed.entries:
+            external_id = entry.get("id") or entry.get("link")
+            if not external_id:
+                continue
+            summary = entry.get("summary", "")
+            envelopes.append(
+                RawItemEnvelope(
+                    source_slug=spec.slug,
+                    source_type="rss",
+                    external_id=external_id,
+                    url=entry.get("link"),
+                    title=entry.get("title", "(untitled)"),
+                    body=_strip_html(summary) or None,
+                    # None, not "en" — the source is the authority (see
+                    # ingestion/base.py::persist_envelopes).
+                    language=None,
+                    published_at=_entry_datetime(entry),
+                    image_url=_entry_image(entry),
+                    raw={k: str(v)[:2000] for k, v in dict(entry).items()},
+                )
+            )
+        try:
+            inserted = await persist_envelopes(envelopes)
+        except Exception as exc:
+            failed = dict(watermark)
+            failed.update({
+                "rss_last_checked_at": datetime.now(UTC).isoformat(),
+                "rss_last_error": f"persist {type(exc).__name__}: {exc}"[:500],
+            })
+            try:
+                await set_watermark(spec.slug, failed)
+            except Exception:
+                logger.exception("rss_watermark_failed", feed=spec.slug)
+            logger.exception("rss_persist_failed", feed=spec.slug)
+            return 0
+        try:
+            await set_watermark(spec.slug, _response_watermark(watermark, response))
+        except Exception:
+            # The articles are already durable and published; a telemetry write
+            # must not report the collection itself as failed.
+            logger.exception("rss_watermark_failed", feed=spec.slug)
+        logger.info(
+            "collector_run", collector=f"rss:{spec.slug}",
+            new=inserted, candidates=len(envelopes),
+        )
+        return inserted
 
 
 async def collect() -> int:
-    inserted_total = 0
     async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
-        for spec in FEEDS:
-            if not spec.enabled:
-                continue
-            try:
-                response = await client.get(spec.url)
-                response.raise_for_status()
-                parsed = await asyncio.to_thread(feedparser.parse, response.text)
-            except Exception:
-                logger.exception("rss_fetch_failed", feed=spec.slug)
-                continue
-
-            envelopes: list[RawItemEnvelope] = []
-            for entry in parsed.entries:
-                external_id = entry.get("id") or entry.get("link")
-                if not external_id:
-                    continue
-                summary = entry.get("summary", "")
-                envelopes.append(
-                    RawItemEnvelope(
-                        source_slug=spec.slug,
-                        source_type="rss",
-                        external_id=external_id,
-                        url=entry.get("link"),
-                        title=entry.get("title", "(untitled)"),
-                        body=_strip_html(summary) or None,
-                        # None, not "en" — the source is the authority (see
-                        # ingestion/base.py::persist_envelopes). A collector
-                        # asserting a language it cannot know is how every
-                        # non-Latin article ended up labelled English.
-                        language=None,
-                        published_at=_entry_datetime(entry),
-                        image_url=_entry_image(entry),
-                        raw={k: str(v)[:2000] for k, v in dict(entry).items()},
-                    )
-                )
-            inserted = await persist_envelopes(envelopes)
-            inserted_total += inserted
-            logger.info("collector_run", collector=f"rss:{spec.slug}", new=inserted, candidates=len(envelopes))
-    return inserted_total
+        semaphore = asyncio.Semaphore(RSS_CONCURRENCY)
+        inserted = await asyncio.gather(*(
+            _collect_one(client, spec, semaphore) for spec in FEEDS if spec.enabled
+        ))
+    return sum(inserted)
 
 
 def _entry_image(entry) -> str | None:
@@ -155,7 +232,10 @@ def _entry_datetime(entry) -> datetime | None:
     parsed = entry.get("published_parsed") or entry.get("updated_parsed")
     if not parsed:
         return None
-    return datetime.fromtimestamp(time.mktime(parsed), tz=UTC)
+    # feedparser's struct_time is UTC. `time.mktime` interprets it in the machine's
+    # local timezone, so a worker region change silently shifts every publication
+    # time; timegm is the UTC inverse the feed value requires.
+    return datetime.fromtimestamp(calendar.timegm(parsed), tz=UTC)
 
 
 def _strip_html(text: str) -> str:

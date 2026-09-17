@@ -56,7 +56,11 @@ async function loadEvidence(): Promise<Evidence | null> {
       // Three on the trunk, at least, as BranchTree counts it: a story with
       // twenty-five developments can still have a spine of one, and a route
       // with one station shows no route.
-      if (story?.branches && spineLength(story.branches) >= 3) {
+      if (
+        story?.boundary_status === "verified"
+        && story.branches
+        && spineLength(story.branches) >= 3
+      ) {
         route = { event, story };
         break;
       }
@@ -101,7 +105,7 @@ const NEXT: [string, string][] = [
   ["Blindspots", "When every source on a story comes from one side, the story says so. You are told what you are not being told."],
 ];
 
-const READER = ["Today's chart, every story, every subject", "Every quote, verbatim, with its source", "How a story unfolded", "Ask the story, three questions a day"];
+const READER = ["Today's chart, every story, every subject", "Every quote, verbatim, with its source", "Related coverage without invented chronology", "Ask the story, three questions a day"];
 const PRO = ["Your profession's reading of every story", "Tickers and catalysts on the stories that move markets", "Which systems a security story exposes, and what to fix first", "A watchlist of what you follow"];
 
 export async function Landing() {

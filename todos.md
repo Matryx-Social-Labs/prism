@@ -53,6 +53,13 @@ with `--agreement`, compile with `gold_candidates --compile-batch` / `gold_cross
 The cross-language answers become batch 3 of `tools/gold_pairs.GOLD_PAIRS`; the story answers
 extend `tools/gold_stories.STORIES` (keep the CJP slice, quote it as such).
 
+Do not issue a broad third batch yet. Once both people finish the story batch, run
+`tools.gold_candidates --push-topic-followup "Topics · related context · September 2026"
+--source-batch 7tfe0eIBu1GH --topic-pairs 150`, then invite Tejas and Vijay with the existing
+`--invite` command. It asks only about pairs both people already rejected as the same story and
+compiles them with `--compile-topic KEY` into `related_topic` / `unrelated`; this is the hard-negative
+set needed to measure topic-to-story leakage without making them re-label obvious story positives.
+
 **After the redesign (founder, 2026-09-16):**
 - **Google / OAuth sign-in replaces the browser-saved profile as the account model** (P1). Today the
   profile is `prism.profile.v1` in localStorage and sign-in is a magic link; the founder wants an

@@ -21,6 +21,10 @@ router = APIRouter()
 
 # Chains observed in production are 1-2 hops; this is a corruption guard, not a limit.
 _MAX_MERGE_HOPS = 8
+# Promotion is a deliberate code/config change after the time-held-out,
+# two-labeller story evaluation passes. Until then, do not even serve a route
+# tree that a client could mistake for verified chronology.
+STORY_BOUNDARY_STATUS = "provisional"
 
 
 @router.get("/api/v1/trending", response_model=TrendingResponse)
@@ -58,11 +62,16 @@ async def trending(
             {"state": state, "sectors": sectors, "lim": limit},
         )
     ).mappings().all()
-    routes = [await _route_for(db, r["member_event_ids"]) for r in rows]
+    routes = (
+        [await _route_for(db, r["member_event_ids"]) for r in rows]
+        if STORY_BOUNDARY_STATUS == "verified"
+        else [None] * len(rows)
+    )
     return {
         "stories": [
             {
                 "route": route,
+                "boundary_status": STORY_BOUNDARY_STATUS,
                 "slug": r["slug"],
                 "label": r["label"],
                 "cast": (r["cast"] or [])[:3],
@@ -238,9 +247,14 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         # The L3 branch tree for the SAME frozen member set. None when the story
         # predates the current partition run — the client falls back to the flat
         # timeline it already renders, so this is additive with no regression.
-        branches = await branch_tree_for_members(story["member_event_ids"])
+        if STORY_BOUNDARY_STATUS == "verified":
+            branches = await branch_tree_for_members(story["member_event_ids"])
     related = await _related_stories(db, story["id"], story["member_event_ids"] or [], story["cast"] or [])
     return {
+        # Fail closed until the live, two-labeller boundary evaluation passes.
+        # The members remain available as related coverage, but clients must not
+        # present the generated branch order as verified chronology.
+        "boundary_status": STORY_BOUNDARY_STATUS,
         "related": related,
         "slug": story["slug"],
         "canonical_slug": story["slug"],  # if != the requested slug, the client should redirect

@@ -163,6 +163,16 @@ async def test_persist_base_run_invariant_and_read():
             assert await _current_run_id(s) == run_id
             rows = (await s.execute(text("SELECT count(*) FROM event_story WHERE run_id=:r"), {"r": run_id})).scalar()
             assert rows >= 0  # every windowed event got a membership row
+            stamped = (
+                await s.execute(
+                    text(
+                        "SELECT count(*) FROM event_story es JOIN events e ON e.id=es.event_id "
+                        "WHERE es.run_id=:r AND e.story_visible_at IS NOT NULL"
+                    ),
+                    {"r": run_id},
+                )
+            ).scalar()
+            assert stamped == rows  # visibility is atomic with the current-run cutover
             # a member reads its own story's full set from any entry point
             sample = (await s.execute(text("SELECT event_id FROM event_story WHERE run_id=:r LIMIT 1"), {"r": run_id})).scalar()
             if sample is not None:

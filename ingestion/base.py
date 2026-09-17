@@ -19,6 +19,7 @@ from common.db import session_scope
 from common.logging import get_logger
 from common.models import RawItem, Source
 from common.schemas import RawItemEnvelope, RawItemMessage
+from common.urls import CANONICAL_URL_VERSION, canonicalize_url
 
 logger = get_logger(__name__)
 
@@ -83,6 +84,7 @@ async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
             if env.source_slug not in source_cache:
                 source_cache[env.source_slug] = await get_source(session, env.source_slug)
             source = source_cache[env.source_slug]
+            url_canonical = canonicalize_url(env.url)
 
             stmt = (
                 pg_insert(RawItem)
@@ -91,6 +93,8 @@ async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
                     source_id=source.id,
                     external_id=env.external_id,
                     url=env.url,
+                    url_canonical=url_canonical,
+                    url_canonical_version=CANONICAL_URL_VERSION if url_canonical else None,
                     title=clean_text(env.title)[:2000],
                     body=clean_text(env.body) if env.body else env.body,
                     # The SOURCE knows its language; the collector does not.

@@ -160,20 +160,20 @@ async def test_a_failing_handler_does_not_kill_its_worker(monkeypatch):
     assert len(fake.acked) == 5      # the poison message is acked, not retried forever
 
 
-async def test_a_message_delivered_too_often_is_dead_lettered_and_acked(monkeypatch):
-    """Poison is not unlucky: past MAX_DELIVERIES the entry goes to <topic>.dead
-    with its payload and the stream moves on."""
+async def test_a_permanent_failure_is_dead_lettered_and_acked(monkeypatch):
+    """A poison payload remains inspectable while the stream moves on."""
     class Fake(FakeRedis):
         def __init__(self, messages):
             super().__init__(messages)
             self.dead = []
         async def xpending_range(self, topic, group, min, max, count):
-            return [{"times_delivered": stream.MAX_DELIVERIES + 1}]
+            return [{"times_delivered": 1}]
         async def xadd(self, topic, fields, **kw):
             self.dead.append((topic, fields))
     handled = []
     async def handler(p):
         handled.append(p)
+        raise ValueError("bad payload")
     fake = Fake(_msgs(1))
     monkeypatch.setattr(stream, "get_redis", lambda: fake)
     task = asyncio.create_task(stream.consume("topic", "g", handler, concurrency=1, batch_size=1, block_ms=1))
@@ -183,9 +183,59 @@ async def test_a_message_delivered_too_often_is_dead_lettered_and_acked(monkeypa
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-    assert handled == []
+    assert handled == [{"n": 0}]
     assert fake.dead and fake.dead[0][0] == "topic.dead"
+    assert "ValueError" in fake.dead[0][1]["error"]
     assert fake.acked == ["0-0"]
+
+
+async def test_a_transient_failure_is_never_dead_lettered_by_delivery_count(monkeypatch):
+    """An outage is not a poison article, even after many re-deliveries."""
+    class Fake(FakeRedis):
+        def __init__(self):
+            super().__init__([])
+            self.dead = []
+
+        async def xpending_range(self, *args, **kwargs):
+            return [{"times_delivered": 99}]
+
+        async def xadd(self, topic, fields, **kwargs):
+            self.dead.append((topic, fields))
+
+    async def handler(payload):
+        raise ConnectionError("provider unavailable")
+
+    async def no_wait(_seconds):
+        return None
+
+    monkeypatch.setattr(stream.asyncio, "sleep", no_wait)
+    fake = Fake()
+    await stream._handle_one(fake, "topic", "g", handler, _msgs(1)[0])
+    assert fake.acked == []
+    assert fake.dead == []
+
+
+async def test_a_high_delivery_message_can_recover_and_ack():
+    """A message previously hit by an outage must still execute after recovery."""
+    class Fake(FakeRedis):
+        async def xpending_range(self, *args, **kwargs):
+            return [{"times_delivered": 99}]
+
+    handled = []
+    fake = Fake([])
+    await stream._handle_one(
+        fake,
+        "topic",
+        "g",
+        lambda payload: _record(handled, payload),
+        _msgs(1)[0],
+    )
+    assert handled == [{"n": 0}]
+    assert fake.acked == ["0-0"]
+
+
+async def _record(target, value):
+    target.append(value)
 
 
 async def test_a_long_handler_renews_its_claim(monkeypatch):
