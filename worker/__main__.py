@@ -59,6 +59,10 @@ SWEEP_INTERVAL_S = 5
 
 
 BUDGET_INTERVAL_S = int(os.environ.get("PRISM_BUDGET_INTERVAL_S", "900"))
+# LLM calls in flight for enrichment. OpenRouter reserves each call's ceiling
+# against the balance, so this is also how hard the pipeline leans on it;
+# lower it (a redeploy) when the balance is thin.
+ENRICH_CONCURRENCY = int(os.environ.get("PRISM_ENRICH_CONCURRENCY", "12"))
 
 
 async def _budget_watch() -> None:
@@ -242,7 +246,7 @@ async def main(stages: list[str]) -> None:
                     # minutes), and the extract model was returning a bare number for
                     # every call, so roughly half of each attempt was paid for and
                     # discarded. Re-measure before tuning this number again.
-                    consumer_name=f"enr-{CONSUMER_NAME}", concurrency=12, batch_size=12,
+                    consumer_name=f"enr-{CONSUMER_NAME}", concurrency=ENRICH_CONCURRENCY, batch_size=ENRICH_CONCURRENCY,
                 )
             )
         )
