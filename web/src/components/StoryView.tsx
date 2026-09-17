@@ -187,12 +187,16 @@ export function StoryView({ event }: { event: EventDetail }) {
   const sourceCount = event.sources.length;
   const single = sourceCount <= 1;
   const facts = ticketFacts(event);
+  // In the order the page reads: the brief, what was said, the story (or the
+  // coverage group), so what, the sources. A nav that lists sections in another
+  // order than they appear is a small lie the reader notices on the second tap.
   const navItems: { id: string; label: string; count?: number }[] = [
     { id: "lens-brief", label: "Lens" },
-    ...(event.story_slug ? [{ id: "route", label: boundaryVerified ? "Story" : "Coverage" }] : []),
     // Only when there is something to jump to: 55% of stories have no attributed
     // quote, and a permanent "Said 0" would advertise absence on every other page.
     ...(quoteCount > 0 ? [{ id: "said", label: "Said", count: quoteCount }] : []),
+    ...(event.story_slug ? [{ id: "route", label: boundaryVerified ? "Story" : "Coverage" }] : []),
+    ...(event.impacts.length > 0 ? [{ id: "so-what", label: "So what", count: event.impacts.length }] : []),
     { id: "sources", label: "Sources", count: sourceCount },
   ];
 

@@ -98,7 +98,7 @@ describe("the ticket — retired sections (D4) and So what (founder, 2026-09-17)
     expect(screen.queryByText("Perspectives")).toBeNull();
     expect(screen.queryByText("A model's summary.")).toBeNull();
     expect(screen.queryByText("What to expect")).toBeNull();
-    expect(screen.getByText("So what")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /So what/ })).toBeInTheDocument();
     expect(screen.getByText("Someone")).toBeInTheDocument();
     expect(screen.getByText("loses")).toBeInTheDocument();
     expect(screen.getByLabelText("negative")).toBeInTheDocument();
@@ -169,5 +169,22 @@ describe("the ticket — sources fold", () => {
     await userEvent.click(screen.getByRole("button", { name: "All 12 sources" }));
     expect(screen.getAllByText("A report")).toHaveLength(12);
     expect(screen.getByText("[12]")).toBeInTheDocument();
+  });
+});
+
+
+describe("the ticket — the section nav reads in page order", () => {
+  it("lists Lens · Said · Story · So what · Sources in the order the sections appear", () => {
+    render(<StoryView event={event({
+      story_slug: "s",
+      claims: [{ speaker: "A", claims: [{ quote_text: "q", quote_start: 0, quote_end: 1, article_id: "a1", source_name: "The Hindu", url: null, published_at: null }] }],
+      impacts: [{ id: "i1", entity_name: "Someone", effect: "loses", direction: "negative", horizon: "weeks", confidence: 0.5, parent_impact_id: null }],
+    })} />);
+    const nav = screen.getAllByRole("navigation", { name: "On this story" })[0];
+    const hrefs = [...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["#lens-brief", "#said", "#route", "#so-what", "#sources"]);
+    // and the sections themselves come in that order on the page
+    const ids = [...document.querySelectorAll("section[id]")].map((s) => s.id).filter((id) => hrefs.includes(`#${id}`));
+    expect(ids).toEqual(["lens-brief", "said", "route", "so-what", "sources"]);
   });
 });
