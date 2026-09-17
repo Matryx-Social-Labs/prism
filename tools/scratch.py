@@ -147,6 +147,7 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: di
     members = await prod.fetch(
         """SELECT a.id aid, ri.title, ri.url, ri.published_at, a.created_at,
                   ac.embedding::text vec, e.shared_fields->'entities' ents,
+                  e.shared_fields->>'headline' xh,
                   e.model, e.lens_fields
            FROM event_memberships em
            JOIN articles a ON a.id = em.article_id
@@ -197,6 +198,7 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: di
                     embedding=vec,
                     entity_slugs=slugs or None,
                     cve_record=(m["model"] or "").startswith("deterministic:"),
+                    english_title=m["xh"] or None,
                 )
                 if match is None:
                     # A new event, written exactly as the consumer writes one.

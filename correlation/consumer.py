@@ -118,6 +118,7 @@ async def handle_enriched_item(payload: dict) -> None:
             embedding=embedding,
             entity_slugs=entity_slugs or None,
             cve_record=cve_record,
+            english_title=(shared.get("headline") or "").strip() or None,
         )
 
         if match is not None:

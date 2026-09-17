@@ -198,6 +198,7 @@ async def find_event(
     embedding: list[float] | None,
     entity_slugs: list[str] | None = None,
     cve_record: bool = False,
+    english_title: str | None = None,
 ) -> Match | None:
     if cve_ids:
         match = await _match_by_cve(session, cve_ids)
@@ -219,6 +220,14 @@ async def find_event(
     match = await _match_by_title(session, title, published_at)
     if match:
         return match
+
+    # Cross-language, on the one field every article now carries in one
+    # voice: the extractor's English headline against the events' Prism
+    # headlines. Off until its threshold is set from labels.
+    if english_title and get_settings().prism_headline_tier_threshold > 0:
+        match = await _match_by_headline(session, english_title, published_at)
+        if match:
+            return match
 
     # Distance alone is only evidence where the model's subspace for this script
     # isn't collapsed (see EMBEDDING_TRUSTED_SCRIPTS). Where it is, skipping
@@ -437,6 +446,61 @@ async def _match_by_title_cosine(
 # The mechanism is compounding, which no pairwise measurement can see: a rejected
 # merge does not merely fail to merge, it CREATES a new event, and that event is
 # then a smaller, wronger candidate for the next article. Leave this off.
+# IDF over the in-window English event headlines, rebuilt every ten minutes in
+# process. No file, no table: the window is ~2k titles and the whole point is
+# that a deploy carries nothing but code.
+_HEADLINE_IDF: tuple[float, dict[str, float]] = (0.0, {})
+HEADLINE_IDF_TTL_S = 600
+
+
+def headline_best(english_title: str, rows: list[tuple[object, str]], idf: dict[str, float]) -> tuple[object | None, float]:
+    """The in-window event whose Prism headline is nearest to the article's
+    extracted English headline, by IDF word-cosine; deterministic on ties."""
+    from tools.title_cosine import cosine
+
+    best, best_score = None, 0.0
+    for eid, ev_title in rows:
+        score = cosine(english_title, ev_title, idf)
+        if score > best_score:
+            best, best_score = eid, score
+    return best, best_score
+
+
+async def _match_by_headline(session: AsyncSession, english_title: str, published_at) -> Match | None:
+    """The cross-language tier. Measured 2026-09-17: 19% of the non-English
+    articles that founded an event had an English twin at >= 0.39 on this
+    score; above 0.55 every pair read was the same happening, in 0.39-0.50
+    about half were not. The threshold comes from labels (gold_crosslingual)."""
+    global _HEADLINE_IDF
+    import time
+
+    from tools.title_cosine import build_idf
+
+    rows = (await session.execute(
+        text(
+            f"""
+            SELECT e.id, e.title
+            FROM events e
+            WHERE e.headline_by = 'prism' AND e.title <> ''
+              AND (CAST(:published_at AS timestamptz) IS NULL
+                   OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
+            ORDER BY e.id
+            """
+        ),
+        {"published_at": published_at},
+    )).all()
+    if not rows:
+        return None
+    built_at, idf = _HEADLINE_IDF
+    if not idf or time.monotonic() - built_at > HEADLINE_IDF_TTL_S:
+        idf = build_idf([r.title for r in rows])
+        _HEADLINE_IDF = (time.monotonic(), idf)
+    best, score = headline_best(english_title, [(r.id, r.title) for r in rows], idf)
+    if best is None or score < get_settings().prism_headline_tier_threshold:
+        return None
+    return Match(event_id=best, match_type="headline_xlang", match_score=score)
+
+
 TITLE_COSINE_GATE: float | None = None
 
 

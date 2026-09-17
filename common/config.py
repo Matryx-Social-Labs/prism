@@ -104,6 +104,11 @@ class Settings(BaseSettings):
     # and briefs, which no article count predicts exactly. But it is the one
     # quantity that cannot drift, and it fails safe: the check runs before
     # collection, so exceeding it costs nothing further.
+    # The cross-language headline tier (correlation/clustering._match_by_headline):
+    # IDF word-cosine between an article's EXTRACTED ENGLISH headline and the
+    # in-window events' Prism headlines. 0 = off. The threshold is a labelled
+    # decision — tools/gold_crosslingual, batch MGDmtLPZOdjy — not an eyeballed one.
+    prism_headline_tier_threshold: float = 0.0
     prism_ingest_max_articles: int = 0
     # Stop COLLECTING when the recorded OpenRouter balance is under this many
     # dollars, so a stalled enrichment never grows a backlog that becomes a bill
