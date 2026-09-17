@@ -158,3 +158,57 @@ async def test_a_failing_handler_does_not_kill_its_worker(monkeypatch):
     fake = await _run(handler, _msgs(5), 1, monkeypatch)
     assert sorted(handled) == [1, 2, 3, 4]
     assert len(fake.acked) == 5      # the poison message is acked, not retried forever
+
+
+async def test_a_message_delivered_too_often_is_dead_lettered_and_acked(monkeypatch):
+    """Poison is not unlucky: past MAX_DELIVERIES the entry goes to <topic>.dead
+    with its payload and the stream moves on."""
+    class Fake(FakeRedis):
+        def __init__(self, messages):
+            super().__init__(messages)
+            self.dead = []
+        async def xpending_range(self, topic, group, min, max, count):
+            return [{"times_delivered": stream.MAX_DELIVERIES + 1}]
+        async def xadd(self, topic, fields, **kw):
+            self.dead.append((topic, fields))
+    handled = []
+    async def handler(p):
+        handled.append(p)
+    fake = Fake(_msgs(1))
+    monkeypatch.setattr(stream, "get_redis", lambda: fake)
+    task = asyncio.create_task(stream.consume("topic", "g", handler, concurrency=1, batch_size=1, block_ms=1))
+    try:
+        await asyncio.wait_for(asyncio.shield(_drain(fake, 1)), 2.0)
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert handled == []
+    assert fake.dead and fake.dead[0][0] == "topic.dead"
+    assert fake.acked == ["0-0"]
+
+
+async def test_a_long_handler_renews_its_claim(monkeypatch):
+    """While a handler runs past the idle threshold its message must not look
+    abandoned: the heartbeat XCLAIMs it (JUSTID) on an interval."""
+    class Fake(FakeRedis):
+        def __init__(self, messages):
+            super().__init__(messages)
+            self.claims = []
+        async def xpending_range(self, *a, **kw):
+            return [{"times_delivered": 1}]
+        async def xclaim(self, topic, group, consumer, min_idle_time, message_ids, justid):
+            self.claims.append((message_ids, justid))
+    monkeypatch.setattr(stream, "HEARTBEAT_S", 0.02)
+    async def slow(p):
+        await asyncio.sleep(0.1)
+    fake = Fake(_msgs(1))
+    monkeypatch.setattr(stream, "get_redis", lambda: fake)
+    task = asyncio.create_task(stream.consume("topic", "g", slow, consumer_name="w1", concurrency=1, batch_size=1, block_ms=1))
+    try:
+        await asyncio.wait_for(asyncio.shield(_drain(fake, 1)), 2.0)
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert len(fake.claims) >= 2 and all(j is True for _, j in fake.claims)

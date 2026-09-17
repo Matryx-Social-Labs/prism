@@ -96,6 +96,15 @@ async def publish(topic: str, message: dict) -> str:
 
 
 STALE_CLAIM_IDLE_MS = 300_000  # reclaim messages a dead consumer held > 5 min
+# A live handler renews its claim this often, so a message being processed for
+# longer than the idle threshold (an LLM cooldown of 120s, retries, a slow
+# model) is never mistaken for a dead consumer's and worked twice. Measured
+# 2026-09-17: six raw items got two articles each this way under the 402s.
+HEARTBEAT_S = 60
+# A message redelivered this many times is poison, not unlucky: it goes to
+# `<topic>.dead` with its delivery count and is acked, so the stream moves on
+# and the payload is still there to read.
+MAX_DELIVERIES = 5
 
 
 async def consume(
@@ -153,7 +162,7 @@ async def consume(
         while True:
             message = await queue.get()
             try:
-                await _handle_one(r, topic, group, handler, message)
+                await _handle_one(r, topic, group, handler, message, consumer_name)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -230,8 +239,37 @@ async def consume(
             w.cancel()
 
 
-async def _handle_one(r, topic: str, group: str, handler, message) -> None:
+async def _deliveries(r, topic: str, group: str, entry_id) -> int:
+    """How many times this entry has been delivered; 1 when Redis cannot say."""
+    try:
+        rows = await r.xpending_range(topic, group, min=entry_id, max=entry_id, count=1)
+        return int(rows[0]["times_delivered"]) if rows else 1
+    except Exception:  # noqa: BLE001 — not knowing is not a reason to drop it
+        return 1
+
+
+async def _heartbeat(r, topic: str, group: str, consumer_name: str, entry_id) -> None:
+    """Renew our claim on a long-running message. JUSTID resets the idle clock
+    without counting as a delivery."""
+    while True:
+        await asyncio.sleep(HEARTBEAT_S)
+        try:
+            await r.xclaim(topic, group, consumer_name, min_idle_time=0, message_ids=[entry_id], justid=True)
+        except Exception:  # noqa: BLE001 — a missed heartbeat is the old behaviour, not a failure
+            pass
+
+
+async def _handle_one(r, topic: str, group: str, handler, message, consumer_name: str = "") -> None:
     entry_id, fields = message
+    if await _deliveries(r, topic, group, entry_id) > MAX_DELIVERIES:
+        logger.error("message_dead_lettered", topic=topic, entry_id=entry_id, payload=(fields or {}).get("data", "")[:500])
+        try:
+            await r.xadd(f"{topic}.dead", {"data": (fields or {}).get("data", ""), "entry_id": str(entry_id)}, maxlen=1000, approximate=True)
+        except Exception:  # noqa: BLE001
+            logger.exception("dead_letter_failed", topic=topic, entry_id=entry_id)
+        await r.xack(topic, group, entry_id)
+        return
+    beat = asyncio.create_task(_heartbeat(r, topic, group, consumer_name, entry_id)) if consumer_name else None
     try:
         payload = json.loads(fields["data"])
         await handler(payload)
@@ -253,6 +291,9 @@ async def _handle_one(r, topic: str, group: str, handler, message) -> None:
             entry_id=entry_id,
             payload=(fields or {}).get("data", "")[:500],
         )
+    finally:
+        if beat:
+            beat.cancel()
     await r.xack(topic, group, entry_id)
 
 
