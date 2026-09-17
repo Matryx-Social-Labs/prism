@@ -132,7 +132,7 @@ async def answer_stream(
             stream=True,
             # An answer is a paragraph with citations; the provider's default
             # ceiling was reserved against the balance on every question.
-            max_tokens=1200,
+            max_tokens=3000,
             name="agent-qa",
             metadata={
                 "stage": "agent",

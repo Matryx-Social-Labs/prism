@@ -158,7 +158,7 @@ async def generate_briefs(event_id: uuid.UUID, lenses: list[str]) -> dict[str, d
         messages=messages,
         output_model=LensBriefs,
         trace_name="lens-brief",
-        max_tokens=1500,
+        max_tokens=3000,
         metadata={"stage": "lens-brief", "event_id": str(event_id), "lenses": lenses},
         langfuse_prompt=prompt if prompt.version else None,
     )

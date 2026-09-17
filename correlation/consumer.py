@@ -657,7 +657,7 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
             messages=messages,
             output_model=EventAnalysis,
             trace_name="event-analysis",
-            max_tokens=4000,
+            max_tokens=6000,
             metadata={"stage": "correlation", "event_id": str(event_id)},
             langfuse_prompt=prompt if prompt.version else None,
         )

@@ -111,7 +111,7 @@ async def handle_classified_item(payload: dict) -> None:
             messages=messages,
             output_model=ArticleExtraction,
             trace_name="extract-shared",
-            max_tokens=3000,
+            max_tokens=6000,
             metadata=meta,
             langfuse_prompt=prompt if prompt.version else None,
             # `impacts` stays pruned: correlation re-derives them in
