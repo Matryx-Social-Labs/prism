@@ -246,8 +246,75 @@ function ClaimTask({
  *  are worth the screen space: they are the mistakes these two people actually
  *  make, not invented ones.
  */
+/** The same-happening task: stricter than the story task. One incident, any
+ *  language, any wording — but the follow-up is a different happening here. */
+function EventPrimer({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="mx-auto max-w-[640px] pt-2">
+      <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+        READ THIS FIRST · ABOUT TWO MINUTES
+      </p>
+      <h1 className="mt-2 text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+        Is this the same happening?
+      </h1>
+      <p className="mt-4 text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+        You will see one report — usually in Hindi, Kannada or another language, with our English
+        headline above it — then English reports from the same days. Tick the ones that report the
+        <strong> same incident</strong>: the same thing, the same people, the same day. Wording and
+        language do not matter. This is narrower than &ldquo;the same story&rdquo;.
+      </p>
+      <div className="mt-7 border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO</p>
+        <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
+          <li>Tick every English report of <strong>the one incident</strong>, however it is worded.</li>
+          <li>Read the outlet&apos;s own headline under ours when they seem to disagree; the outlet&apos;s is the truth.</li>
+          <li>Tick nothing when nothing matches — that is the most common right answer here.</li>
+          <li>Answer <strong>Not sure</strong> when you cannot tell from the headlines. It is a real answer.</li>
+        </ul>
+      </div>
+      <div className="mt-6 border-l-2 pl-4" style={{ borderColor: "var(--danger, #b91c1c)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO NOT</p>
+        <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+          <li>Do not tick the <strong>follow-up</strong>. The arrests the day after the attack are a different happening in this task (they were the same <em>story</em> in the other one).</li>
+          <li>Do not tick a <strong>different incident of the same kind</strong>: two foundation stones laid in two towns, two Lokayukta arrests, two road crashes.</li>
+          <li>Do not tick because the two share a name, a place, or a subject.</li>
+        </ul>
+      </div>
+      <p className="mt-7 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+        EXAMPLES FROM THE DATA THIS ROUND CAME FROM
+      </p>
+      <div className="mt-3 space-y-4">
+        {[
+          ["TICK — “India rejects China-Pakistan Boundary Joint Commission” (Aaj Tak, Hindi) with “India rejects Pakistan-China Boundary Joint Commission” (The Hindu)",
+           "One statement by the MEA, reported in two languages. The order of the country names is the only difference."],
+          ["TICK — a Kannada report that Anant Nag will receive the Dadasaheb Phalke Award, with the English reports of the same announcement",
+           "Same award, same day, same actor. The words share nothing because the scripts share nothing."],
+          ["DO NOT TICK — “Foundation stone laid for Bidar Fort development” with “Foundation stone laid for Mahadeshwara Swamy temple”",
+           "Same kind of thing happening in two places. Two incidents."],
+          ["DO NOT TICK — “Jarange ends 20-day fast” with “Jarange dehydrated, doctors warn”, if they are a day apart",
+           "Same man, same story, two happenings. In this task that is a No."],
+        ].map(([head, body]) => (
+          <div key={head}>
+            <p className="text-[14px] font-medium" style={{ color: "var(--ink)" }}>{head}</p>
+            <p className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{body}</p>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onStart}
+        className="mt-8 h-11 rounded-full px-6 text-[14.5px] font-medium"
+        style={{ background: "var(--ink)", color: "var(--bg)" }}
+      >
+        Start
+      </button>
+    </div>
+  );
+}
+
 function Primer({ kind, onStart }: { kind: string; onStart: () => void }) {
   const claim = kind === "claim_attribution";
+  if (kind === "event_identity") return <EventPrimer onStart={onStart} />;
   return (
     <div className="mx-auto max-w-[640px] pt-2">
       <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
@@ -410,6 +477,9 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   const [draftWho, setDraftWho] = useState("");
   const [joinError, setJoinError] = useState("");
   const [batch, setBatch] = useState<LabelBatch | null>(null);
+  // The same-happening task (article -> event) is narrower than the story task:
+  // the copy on screen says so at every step.
+  const sameEvent = batch?.kind === "event_identity";
   // Null until read from storage, so the first paint does not flash the primer at
   // someone who has already dismissed it.
   const [primed, setPrimed] = useState<boolean | null>(null);
@@ -705,12 +775,17 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           >
             {task.seed?.title}
           </h1>
+          {sameEvent && task.seed?.native_title && task.seed.native_title !== task.seed.title && (
+            <p className="mt-2 text-[15px] leading-[1.5]" style={{ color: "var(--ink)" }} lang={task.seed.language || undefined}>
+              {task.seed.native_title}
+            </p>
+          )}
           <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
             {task.seed ? provenance(task.seed) : ""}
           </p>
 
           <p className="mt-8 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-            Which of these are part of the same unfolding story?
+            {sameEvent ? "Which of these report the same happening — the same incident, the same day?" : "Which of these are part of the same unfolding story?"}
           </p>
 
           <ul className="mt-3">
@@ -813,9 +888,13 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           </div>
 
           <p className="mt-6 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-            Same topic isn&apos;t enough — two different court cases about one law are two
-            stories. <strong>Not sure</strong> is a real answer; it keeps genuinely hard
-            calls out of the training data rather than guessing at them.
+            {sameEvent ? (
+              <>The follow-up is a different happening here; a different incident of the same kind is too. <strong>Not sure</strong> is a real answer.</>
+            ) : (
+              <>Same topic isn&apos;t enough — two different court cases about one law are two
+              stories. <strong>Not sure</strong> is a real answer; it keeps genuinely hard
+              calls out of the training data rather than guessing at them.</>
+            )}
           </p>
 
           {/* An INVITED labeller never sees the join screen, so this is the only

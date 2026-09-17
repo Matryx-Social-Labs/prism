@@ -154,7 +154,7 @@ def _neighbours(snap, postings, idf, s: int) -> list[tuple[int, set[str]]]:
     return sorted(sig.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:MAX_NEIGHBOURS]
 
 
-def propose(seed_n: int = 123, rng_seed: int = 7) -> None:
+def propose(seed_n: int = 123, rng_seed: int = 7, since_days: int | None = None) -> None:
     snap, raw = _load()
     sectors, src = raw["sector"], raw["source_count"]
     rng = random.Random(rng_seed)
@@ -162,11 +162,22 @@ def propose(seed_n: int = 123, rng_seed: int = 7) -> None:
     from tools.gold_stories import STORIES
 
     already = {e for v in STORIES.values() for e in v}
+    # The live window: the stories a reader meets are the ones the boundary is
+    # judged on, so seeds come from the last N days when asked. Neighbours are
+    # still drawn from the whole snapshot, so a story that began earlier can
+    # still be found.
+    import time
+
+    cutoff = time.time() - since_days * 86_400 if since_days else None
+    ts = raw.get("ts") or [None] * len(snap.ids)
 
     by_sector: dict[str, list[int]] = defaultdict(list)
     for i, eid in enumerate(snap.ids):
-        if eid not in already:
-            by_sector[sectors[i] or "other"].append(i)
+        if eid in already:
+            continue
+        if cutoff is not None and (ts[i] is None or ts[i] < cutoff):
+            continue
+        by_sector[sectors[i] or "other"].append(i)
 
     # Prefer events several outlets covered, because a story with developments is
     # what the L2 boundary is about — but keep a slice of single-source events so
@@ -911,6 +922,8 @@ def main() -> None:
     ap.add_argument("--review", action="store_true")
     ap.add_argument("--compile", action="store_true")
     ap.add_argument("--seeds", type=int, default=123)
+    ap.add_argument("--since-days", type=int, default=None, dest="since_days",
+                    help="seeds only from events of the last N days (the live window)")
     ap.add_argument("--push", metavar="NAME", help="load candidates into a label batch")
     ap.add_argument("--build-claims", metavar="NAME",
                     help="sample articles uniformly, extract claims, load a claim batch (COSTS LLM CREDITS)")
@@ -932,7 +945,7 @@ def main() -> None:
                     help="origin to print in invite links")
     a = ap.parse_args()
     if a.propose:
-        propose(a.seeds)
+        propose(a.seeds, since_days=a.since_days)
     if a.review:
         review()
     if a.push:

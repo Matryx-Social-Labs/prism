@@ -236,7 +236,13 @@ async def next_task(
                            (SELECT array_agg(en.name ORDER BY en.name)
                             FROM event_entities ee JOIN entities en ON en.id = ee.entity_id
                             WHERE ee.event_id = e.id
-                              AND en.entity_type IN ('person','organization')) AS actors
+                              AND en.entity_type IN ('person','organization')) AS actors,
+                           (SELECT ri.title FROM event_memberships m JOIN articles a ON a.id = m.article_id
+                            JOIN raw_items ri ON ri.id = a.raw_item_id
+                            WHERE m.event_id = e.id ORDER BY m.is_survivor DESC, ri.published_at LIMIT 1) AS native_title,
+                           (SELECT ri.language FROM event_memberships m JOIN articles a ON a.id = m.article_id
+                            JOIN raw_items ri ON ri.id = a.raw_item_id
+                            WHERE m.event_id = e.id ORDER BY m.is_survivor DESC, ri.published_at LIMIT 1) AS language
                     FROM events e WHERE e.id = ANY(:ids)
                     """
                 ),
@@ -254,6 +260,11 @@ async def next_task(
             "source_count": e.get("source_count") or 0,
             "actors": (e.get("actors") or [])[:4],
             "signals": signals or [],
+            # What the founding outlet actually printed, in its own language;
+            # the title above is Prism's English headline. A same-event
+            # judgement across languages needs both.
+            "native_title": e.get("native_title") or "",
+            "language": e.get("language") or "",
         }
 
     return {

@@ -588,6 +588,8 @@ export interface LabelEvent {
   source_count: number;
   actors: string[];
   signals: string[]; // which proposer suggested it — provenance, not a verdict
+  native_title?: string; // the founding outlet's own headline, in its language
+  language?: string;
 }
 
 /** A quote and the speaker the extractor attributed it to. The judgement is
