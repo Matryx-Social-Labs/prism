@@ -6,18 +6,19 @@ import { Suspense, type FormEvent, useCallback, useEffect, useMemo, useState } f
 import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
 import { Close } from "@/components/icons";
-import { istDate, shortDate } from "@/lib/dateline";
-import { sectorCode } from "@/lib/sectors";
+import { relativeTime } from "@/lib/dateline";
+import { sectorGroup } from "@/lib/sectors";
 import { useSession } from "@/lib/session";
 import { follow, getWatchlist, unfollow, watchlistEvents, type WatchEvent, type WatchItem } from "@/lib/watchlist";
 
 /**
- * Watchlist (shape brief §7): a chart of the reader's followed tickers and
- * sectors. Rows are stories that mention them, the ticker in mono at the left
- * where the chart keeps its sources count. Empty: the form to follow one.
- * `?ticker=X` (from Market Pulse) narrows the rows to one ticker.
+ * Watchlist: the reader's followed tickers and sectors, and the stories that
+ * touch them on the story row grammar. Empty: the form to follow one.
+ * `?ticker=X` (from Market Pulse) narrows the rows to one ticker. Pulse is
+ * linked from here on the phone, where it has no tab of its own.
  */
-const MONO = "font-mono text-[11px] uppercase tracking-[0.06em]";
+const SHELL = "mx-auto max-w-[var(--reading)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:max-w-[880px] lg:pb-16";
+const today = () => new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 
 function WatchlistInner() {
   const session = useSession();
@@ -68,91 +69,90 @@ function WatchlistInner() {
   if (!session) {
     if (!signedOut) return null;
     return (
-      <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
-        <Masthead dateline={istDate(new Date())} />
-        <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">Watchlist</h1>
-        <p className="rule-live mt-4 max-w-[44ch] py-4 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-          Follow tickers and sectors, and the stories that touch them line up here. Free with an account.
-        </p>
-        <Link
-          href="/signin?next=/watchlist"
-          className="inline-flex h-12 items-center rounded-full px-6 text-[14.5px] font-semibold transition hover:opacity-85"
-          style={{ background: "var(--ink)", color: "var(--bg)" }}
-        >
-          Sign in
-        </Link>
+      <div className={SHELL}>
+        <Masthead dateline={today()} />
+        <SectionHead id="watch-title" title="Watchlist" hint="Follow tickers and sectors, and the stories that touch them line up here. Free with an account." />
+        <div className="card flex flex-col items-start gap-4">
+          <p className="text-[15px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>Sign in to follow a ticker or a sector. Your list stays yours; the stories come from the same record everyone reads.</p>
+          <Link href="/signin?next=/watchlist" className="btn btn-primary">Sign in</Link>
+        </div>
       </div>
     );
   }
 
-  const dateline = `${istDate(new Date())} · ${items.length} followed`;
+  const dateline = `${today()} · ${items.length} followed`;
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
+    <div className={SHELL}>
       <Masthead dateline={dateline} />
-      <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">Watchlist</h1>
+      <div className="lg:pt-6">
+        <SectionHead
+          id="watch-title"
+          title="Watchlist"
+          hint={items.length ? `${items.length} followed · stories that mention them, newest first` : "Follow a ticker or a sector to start."}
+          right={<Link href="/pulse" className="btn btn-secondary btn-sm">Market Pulse</Link>}
+        />
 
-      {items.length > 0 && (
-        <ul className="mt-4 flex flex-wrap gap-2">
-          {items.map((it) => (
-            <li key={it.id} className="inline-flex items-center gap-2 border px-3 py-1.5 font-mono text-[12px]" style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}>
-              {it.value}
-              <button
-                onClick={() => remove(it)}
-                aria-label={`Unfollow ${it.value}`}
-                className="-m-2 inline-flex h-11 w-11 items-center justify-center"
-                style={{ color: "var(--ink-faint)" }}
-              >
-                <Close />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <form onSubmit={add} className="rule-live mt-4 flex flex-wrap gap-2 py-4">
-        <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="What to follow"
-          className="h-12 border px-3 text-[15px]" style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}>
-          <option value="ticker">Ticker</option>
-          <option value="sector">Sector</option>
-        </select>
-        <input value={value} onChange={(e) => setValue(e.target.value)} aria-label={kind === "ticker" ? "Ticker" : "Sector"}
-          placeholder={kind === "ticker" ? "e.g. RELIANCE" : "e.g. finance"}
-          className="h-12 min-w-0 flex-1 border px-4 text-[15px] outline-none" style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }} />
-        <button type="submit" className="h-12 rounded-full px-5 text-[14px] font-semibold" style={{ background: "var(--ink)", color: "var(--bg)" }}>Follow</button>
-      </form>
-
-      <section className="mt-6" aria-labelledby="rows-title">
-        <SectionHead id="rows-title" title={only ? `On ${only}` : "On your signals"} count={ready ? rows.length : undefined} />
-        {only && (
-          <Link href="/watchlist" className={`${MONO} mb-3 inline-block underline-offset-4 hover:underline`} style={{ color: "var(--ink-muted)" }}>All signals →</Link>
-        )}
-        {ready && rows.length === 0 ? (
-          <p className="text-[15px]" style={{ color: "var(--ink-muted)" }}>
-            {items.length === 0 ? "Follow a ticker or sector above and its stories collect here." : only ? `No recent stories mention ${only}.` : "No recent stories on your signals yet."}
-          </p>
-        ) : (
-          <ol className="chart-print">
-            {rows.map((ev) => {
-              const mark = ev.tickers[0] ?? (ev.sector ? sectorCode(ev.sector) : "");
-              const grid = [shortDate(ev.last_updated_at), sectorCode(ev.sector) || null, ev.catalyst?.replaceAll("_", " ") ?? null].filter((x): x is string => Boolean(x));
-              return (
-                <li key={ev.id} className="rule-live">
-                  <Link href={`/story/${ev.id}`} className="group grid grid-cols-[88px_1fr] gap-x-4 py-3.5">
-                    <span className="truncate font-mono text-[12px] leading-[1.9]" style={{ color: "var(--ink)" }}>{mark}</span>
-                    <span className="min-w-0">
-                      <span className="block text-[15.5px] font-medium leading-[1.4] group-hover:underline underline-offset-4" style={{ color: "var(--ink)" }}>{ev.title}</span>
-                      <span className={`${MONO} mt-1.5 flex flex-wrap gap-x-2.5`} style={{ color: "var(--ink-faint)" }}>
-                        {grid.map((g) => <span key={g}>{g}</span>)}
-                      </span>
-                    </span>
-                  </Link>
+        <form onSubmit={add} className="card flex flex-wrap items-center gap-2">
+          <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="What to follow"
+            className="h-11 rounded-full border px-3 text-[15px]" style={{ borderColor: "var(--line-strong)", background: "var(--surface)", color: "var(--ink)" }}>
+            <option value="ticker">Ticker</option>
+            <option value="sector">Sector</option>
+          </select>
+          <input value={value} onChange={(e) => setValue(e.target.value)} aria-label={kind === "ticker" ? "Ticker" : "Sector"}
+            placeholder={kind === "ticker" ? "e.g. RELIANCE" : "e.g. finance"}
+            className="h-11 min-w-0 flex-1 rounded-full border px-4 text-[16px] outline-none" style={{ borderColor: "var(--line-strong)", background: "var(--surface)", color: "var(--ink)" }} />
+          <button type="submit" className="btn btn-primary">Follow</button>
+          {items.length > 0 && (
+            <ul className="mt-1 flex w-full flex-wrap gap-2 border-t pt-3" style={{ borderColor: "var(--line)" }}>
+              {items.map((it) => (
+                <li key={it.id} className="chip h-8 gap-1 pr-1 font-mono text-[12px]">
+                  {it.value}
+                  <button onClick={() => remove(it)} aria-label={`Unfollow ${it.value}`} className="icon-btn h-7 w-7" style={{ color: "var(--ink-3)" }}>
+                    <Close />
+                  </button>
                 </li>
-              );
-            })}
-          </ol>
-        )}
-      </section>
+              ))}
+            </ul>
+          )}
+        </form>
+
+        <section className="mt-6" aria-labelledby="rows-title">
+          <SectionHead id="rows-title" title={only ? `On ${only}` : "On your signals"} count={ready ? rows.length : undefined}
+            right={only ? <Link href="/watchlist" className="btn btn-ghost btn-sm">All signals</Link> : undefined} />
+          {ready && rows.length === 0 ? (
+            <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>
+              {items.length === 0 ? "Follow a ticker or sector above and its stories collect here." : only ? `No recent stories mention ${only}.` : "No recent stories on your signals yet."}
+            </p></div>
+          ) : (
+            <ol className="chart-print flex flex-col gap-3">
+              {rows.map((ev) => {
+                const g = sectorGroup(ev.sector);
+                return (
+                  <li key={ev.id}>
+                    <Link href={`/story/${ev.id}`} className="row-card group px-4 py-3.5">
+                      <div className="meta-line">
+                        {g && <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{g.name}</span>}
+                        {g && <span className="dot" />}
+                        <span>{relativeTime(ev.last_updated_at)}</span>
+                        {ev.catalyst && (<><span className="dot" /><span>{ev.catalyst.replaceAll("_", " ")}</span></>)}
+                      </div>
+                      <h2 className="font-record mt-1.5 text-[19px] font-medium leading-[1.3] group-hover:underline underline-offset-4 decoration-1" style={{ color: "var(--ink)" }}>{ev.title}</h2>
+                      {ev.tickers.length > 0 && (
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {ev.tickers.slice(0, 4).map((t) => (
+                            <span key={t} className="chip h-7 px-2.5 font-mono text-[11.5px] l-markets" style={{ borderColor: "var(--lens-markets-soft)", background: "var(--lens-markets-soft)" }}>{t}</span>
+                          ))}
+                        </div>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

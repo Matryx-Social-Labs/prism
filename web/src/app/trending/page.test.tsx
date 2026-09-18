@@ -92,10 +92,11 @@ describe("Trending — the chart of arcs", () => {
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(r).toHaveAttribute("href", "/trending/kerala-power");
-    expect(screen.getByLabelText("5 related events")).toBeInTheDocument();
+    expect(r.textContent).toMatch(/5 related reports/);
     expect(r.textContent).toMatch(/4 outlets/);
-    expect(r.textContent).toMatch(/span 5d/); // 6 days less two hours, floored
-    expect(r.textContent).toMatch(/moving/);
+    expect(r.textContent).toMatch(/5 days/); // 6 days less two hours, floored
+    expect(r.textContent).toMatch(/moving now/);
+    expect(r.textContent).toMatch(/Grouping under review/);
   });
 
   it("shows a route and opens its hero only after the boundary is verified", async () => {
@@ -103,7 +104,8 @@ describe("Trending — the chart of arcs", () => {
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(r).toHaveAttribute("href", "/story/ev-1#route");
-    expect(screen.getByLabelText("5 developments")).toBeInTheDocument();
+    expect(r.textContent).toMatch(/5 developments/);
+    expect(r.textContent).toMatch(/Verified/);
   });
 
   it("opens the arc page when a story has no hero event, and falls back to the hero headline without a label", async () => {
@@ -113,7 +115,7 @@ describe("Trending — the chart of arcs", () => {
   });
 
   // State is line form: dashed for a single outlet, half-weight when the arc has not moved in three days.
-  it("prints a single-outlet arc on a dashed rule and a stale arc at half weight", async () => {
+  it("prints a single-outlet story on a dashed card and a stale one at reduced weight", async () => {
     fetchTrending.mockResolvedValue([
       story({ slug: "one", label: "One outlet", source_count: 1 }),
       story({ slug: "old", label: "Old arc", last_updated_at: iso(5 * DAY), velocity: 0 }),
@@ -121,15 +123,16 @@ describe("Trending — the chart of arcs", () => {
     ]);
     render(<TrendingPage />);
     await screen.findByRole("list");
-    expect(row(/One outlet/).closest("li")!.className).toBe("rule-single");
-    expect(row(/Old arc/).closest("li")!.className).toBe("rule-stale");
-    expect(row(/Live arc/).closest("li")!.className).toBe("rule-live");
+    expect(row(/One outlet/).className).toContain("single");
+    expect(row(/Old arc/).style.opacity).toBe("0.75");
+    expect(row(/Live arc/).className).not.toContain("single");
+    expect(row(/Live arc/).style.opacity).toBe("");
   });
 
   it("says so when nothing is moving, and when the API is down", async () => {
     fetchTrending.mockResolvedValue([]);
     const { unmount } = render(<TrendingPage />);
-    expect(await screen.findByText(/No story is moving in all sectors/)).toBeInTheDocument();
+    expect(await screen.findByText(/No story is developing in all sectors/)).toBeInTheDocument();
     unmount();
     fetchTrending.mockRejectedValue(new Error("down"));
     render(<TrendingPage />);

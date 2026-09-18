@@ -81,7 +81,7 @@ describe("Search — querying", () => {
     await new Promise((r) => setTimeout(r, DEBOUNCE_SETTLED));
     expect(searchEvents).not.toHaveBeenCalled();
     // Still on the start screen, not a half-committed search.
-    expect(screen.getByText("Trending entities")).toBeInTheDocument();
+    expect(screen.getByText("In the news now")).toBeInTheDocument();
   });
 
   it("writes the query back to the URL, escaped", async () => {
@@ -225,20 +225,22 @@ describe("Search — the masthead counts the results", () => {
     ]);
     render(<SearchPage />);
     await userEvent.type(input(), "freight");
-    // Summed, not per row: the rows print their own counts, so an exact match here is the masthead's.
-    expect(await screen.findByText("2 results · 8 sources")).toBeInTheDocument();
+    // Distinct mastheads across the results, not a per-row sum: two rows from
+    // the same two outlets count two, and rows that predate outlet data count none.
+    expect(await screen.findByText("2 results")).toBeInTheDocument();
   });
 
-  it("says Esc clears, and Esc empties the box", async () => {
+  it("Esc empties the box, and so does the Clear button", async () => {
     render(<SearchPage />);
-    expect(screen.getByText(/Esc clears/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
 
     await userEvent.type(input(), "kerala");
+    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
     await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("kerala"));
 
     await userEvent.type(input(), "{Escape}");
     expect(input()).toHaveValue("");
-    expect(await screen.findByText("Trending entities")).toBeInTheDocument();
+    expect(await screen.findByText("In the news now")).toBeInTheDocument();
   });
 
   // The strip filters what came back; the API searched everything.
@@ -282,11 +284,11 @@ describe("Search — clearing the box", () => {
     await userEvent.clear(box);
 
     await waitFor(() => expect(screen.queryByText(/Searching/i)).not.toBeInTheDocument());
-    expect(screen.getByText(/Trending entities/i)).toBeInTheDocument();
+    expect(screen.getByText(/In the news now/i)).toBeInTheDocument();
 
     // The abandoned response landing later must not resurrect anything.
     release([]);
-    await waitFor(() => expect(screen.getByText(/Trending entities/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/In the news now/i)).toBeInTheDocument());
     expect(screen.queryByText(/Searching/i)).not.toBeInTheDocument();
   });
 });

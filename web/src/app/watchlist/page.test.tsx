@@ -21,11 +21,11 @@ beforeEach(() => {
 });
 
 describe("Watchlist — a chart of the reader's signals", () => {
-  it("prints every story on the reader's signals with the ticker where the chart keeps its count", async () => {
+  it("prints every story on the reader's signals with its tickers as chips", async () => {
     render(<WatchlistPage />);
     const row = await screen.findByRole("link", { name: /Refining margins widen/ });
     expect(row).toHaveAttribute("href", "/story/a");
-    expect(row.textContent).toMatch(/^RELIANCE/);
+    expect(row.textContent).toMatch(/RELIANCE/);
     expect(screen.getByRole("link", { name: /IT hiring slows/ })).toBeInTheDocument();
   });
 
@@ -34,7 +34,7 @@ describe("Watchlist — a chart of the reader's signals", () => {
     render(<WatchlistPage />);
     expect(await screen.findByRole("link", { name: /IT hiring slows/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Refining margins widen/ })).toBeNull();
-    expect(screen.getByRole("link", { name: "All signals →" })).toHaveAttribute("href", "/watchlist");
+    expect(screen.getByRole("link", { name: "All signals" })).toHaveAttribute("href", "/watchlist");
   });
 
   it("offers the form, not a dead screen, when nothing is followed", async () => {

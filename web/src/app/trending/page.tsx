@@ -2,23 +2,26 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { CoverageBar } from "@/components/Coverage";
 import { Masthead } from "@/components/Masthead";
+import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
+import { StatusPill } from "@/components/StatusPill";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { arcHref, isStale, spanDays } from "@/lib/arc";
-import { istDate, shortDate } from "@/lib/dateline";
+import { relativeTime } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
-import { sectorCode, sectorGroup, sectorParam } from "@/lib/sectors";
+import { sectorGroup, sectorParam } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 import { RouteGlyph } from "@/components/RouteGlyph";
 
 /**
- * Trending: the chart of arcs (shape brief §4). Rows are stories, not events;
- * the number at the left is how many developments the arc has, and the label
- * grid beneath prints OUTLETS · MOVED · SPAN · CODE. Scope and the sector strip
- * are the front page's. A row opens the ticket with the route in view.
+ * Stories: what is developing over days (the URL stays /trending). Rows are
+ * stories, not events, on the same row grammar as Today: subject · last moved ·
+ * span, the story's name in the record voice, a counted line, then the coverage
+ * bar and the verification status. A row opens the record with the route in view.
  *
  * Trending has no "all" tier — National IS everything here — so the shared
  * scope is narrowed at this one call site, and writing it back never narrows
@@ -66,44 +69,49 @@ export default function TrendingPage() {
   useScrollRestore("trending:scrollY", stories !== null);
 
   const dateline = useMemo(() => {
-    const d = istDate(new Date());
-    if (!stories) return d;
+    const day = new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+    return day;
+  }, []);
+  const subline = useMemo(() => {
+    if (!stories) return undefined;
     const moving = stories.filter((s) => s.velocity > 0).length;
-    return `${d} · ${stories.length} ${stories.length === 1 ? "story" : "stories"}${moving ? ` · ${moving} moving` : ""}`;
+    return `${stories.length} developing ${stories.length === 1 ? "story" : "stories"}${moving ? ` · ${moving} moving now` : ""} · ranked by new reporting`;
   }, [stories]);
 
   const scopes: [Scope, string][] = [["region", stateName ?? "Your state"], ["national", "National"]];
   const subject = sectorGroup(group)?.name ?? "all sectors";
 
   return (
-    <div className="mx-auto max-w-[1400px] px-5 pb-24 sm:px-8 lg:pb-16 xl:px-10">
-      <Masthead dateline={dateline} right={state ? (
-        <div className="flex gap-3 font-mono text-[11px] uppercase tracking-[0.06em]">
-          {scopes.map(([s, l]) => (
-            <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s}
-              className="min-h-11 underline-offset-4 aria-pressed:underline"
-              style={{ color: scope === s ? "var(--ink)" : "var(--ink-faint)" }}>{l}</button>
-          ))}
-        </div>
-      ) : null} />
-      <div className="lg:grid lg:grid-cols-[188px_minmax(0,1fr)] lg:gap-10 xl:gap-12">
-        <SectorStrip active={group} onPick={setGroup} allHref="/trending" allLabel="" responsiveRail />
+    <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
+      <Masthead dateline={dateline} />
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-10 lg:pt-6">
+        <SectorStrip active={group} onPick={setGroup} allHref="/trending" allLabel="All stories" responsiveRail />
         <div className="min-w-0">
-          <div className="pt-4 lg:pt-0">
-            <h1 className="font-display text-[28px] uppercase leading-none tracking-[0.03em] lg:text-[34px]">Trending</h1>
-            <p className="mt-2 hidden max-w-[52ch] text-[14px] leading-[1.5] lg:block" style={{ color: "var(--ink-muted)" }}>
-              Developing stories ranked by new reporting, source breadth and movement over time.
-            </p>
-          </div>
-          <section aria-label={`Trending, ${subject}`} className="pt-3">
+          {state && (
+            <div className="flex gap-2 pt-2 lg:pt-0" role="group" aria-label="Scope">
+              {scopes.map(([s, l]) => (
+                <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s} className="chip h-8 px-3 text-[13px]">{l}</button>
+              ))}
+            </div>
+          )}
+          <SectionHead id="stories-title" title="Stories" hint={subline} />
+          <section aria-label={`Stories, ${subject}`}>
             {error ? (
-              <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }}>{error}</p>
+              <div className="card" role="status"><p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>{error}</p></div>
             ) : stories === null ? (
-              <p className="rule-live py-6 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>Printing…</p>
+              <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading stories">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="row-card px-4 py-4" aria-hidden>
+                    <span className="pulse-skel block h-2.5 w-24 rounded" style={{ background: "var(--sunken)" }} />
+                    <span className="pulse-skel mt-3 block h-4 rounded" style={{ background: "var(--sunken)", width: ["76%", "64%", "70%"][i] }} />
+                    <span className="pulse-skel mt-4 block h-1.5 w-20 rounded" style={{ background: "var(--sunken)" }} />
+                  </div>
+                ))}
+              </div>
             ) : stories.length === 0 ? (
-              <p className="rule-live py-8 text-[15px]" style={{ color: "var(--ink-muted)" }}>No story is moving in {subject} right now.</p>
+              <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>No story is developing in {subject} right now.</p></div>
             ) : (
-              <ol className="chart-print">
+              <ol className="chart-print flex flex-col gap-3">
                 {stories.map((s, i) => <ArcRow key={s.slug} story={s} lead={i === 0} />)}
               </ol>
             )}
@@ -115,62 +123,60 @@ export default function TrendingPage() {
 }
 
 /**
- * One arc on the chart. Same grammar as a chart row: the count at the left is
- * the row's weight (developments here, not outlets), the story's NAME in the
- * reading voice (the cast we generated, so the row and the page agree on what
- * the story is called), then the label grid in mono. State is line form: a
- * single-outlet arc sits on a dashed rule; one that has not moved in three
- * days prints at half weight. No thumbnail: the chart has no pictures in its
- * rows, and a 56px crop of one outlet's photo said nothing about an arc.
+ * One developing story, on the story row grammar. The counted line says what
+ * the row is made of — developments and outlets — and the status pill says
+ * whether the chronology is verified or the grouping is still under review
+ * (fail-closed: a provisional route is never drawn as one).
  */
 function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean }) {
   const single = story.source_count <= 1;
   const stale = isStale(story);
-  const rule = single ? "rule-single" : stale ? "rule-stale" : "rule-live";
   const span = spanDays(story);
-  // The count column is developments here, not outlets as on the chart, so
-  // the grid says so first; "moving" replaces the last-moved date rather
-  // than joining it.
   const verified = story.boundary_status === "verified";
+  const group = sectorGroup(story.sector);
   const memberLabel = verified
     ? `${story.developments} ${story.developments === 1 ? "development" : "developments"}`
-    : `${story.developments} related ${story.developments === 1 ? "event" : "events"}`;
-  const grid = [
-    memberLabel,
-    `${story.source_count} ${story.source_count === 1 ? "outlet" : "outlets"}`,
-    story.velocity > 0 ? null : story.last_updated_at ? `moved ${shortDate(story.last_updated_at)}` : null,
-    span != null ? `span ${span}d` : null,
-    sectorCode(story.sector) || null,
-  ].filter((x): x is string => Boolean(x));
+    : `${story.developments} related ${story.developments === 1 ? "report" : "reports"}`;
+  const outlets = `${story.source_count} ${story.source_count === 1 ? "outlet" : "outlets"}`;
+  const cast = story.cast?.length ? story.cast.slice(0, 4).join(", ") : null;
 
   return (
-    <li className={rule}>
-      <Link
-        href={arcHref(story)}
-        className={`group grid gap-x-4 ${lead ? "grid-cols-[56px_1fr] py-5" : "grid-cols-[40px_1fr] py-3.5"} focus-visible:outline-none`}
-      >
-        <span
-          className={`${lead ? "font-display text-[44px] leading-[0.9] tracking-[-0.01em]" : "font-mono text-[13px] leading-[1.9]"} tabular-nums text-right`}
-          style={{ color: single ? "var(--ink-faint)" : "var(--ink)" }}
-          aria-label={memberLabel}
+    <li>
+      <Link href={arcHref(story)} className={`row-card group ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"}`} style={stale ? { opacity: 0.75 } : undefined}>
+        <div className="meta-line">
+          {group && <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{group.name}</span>}
+          {group && <span className="dot" />}
+          {story.velocity > 0 ? (
+            <span style={{ color: "var(--accent)", fontWeight: 600 }}>moving now</span>
+          ) : story.last_updated_at ? (
+            <span>moved {relativeTime(story.last_updated_at)}</span>
+          ) : null}
+          {span != null && span > 0 && (
+            <>
+              <span className="dot" />
+              <span>{span} {span === 1 ? "day" : "days"}</span>
+            </>
+          )}
+        </div>
+        <h2
+          className={`font-record font-medium text-balance ${lead ? "mt-2 text-[26px] leading-[1.18] sm:text-[30px]" : "mt-1.5 text-[19px] leading-[1.3]"} group-hover:underline group-focus-visible:underline underline-offset-4 decoration-1`}
+          style={{ color: "var(--ink)", letterSpacing: "-0.005em" }}
         >
-          {story.developments}
-        </span>
-        <div className="min-w-0">
-          <h2
-            className={`${lead ? "text-[22px] leading-[1.25] sm:text-[26px]" : "text-[15.5px] leading-[1.4]"} font-medium text-balance group-hover:underline group-focus-visible:underline underline-offset-4`}
-            style={{ color: "var(--ink)" }}
-          >
-            {story.label ?? story.hero_title}
-          </h2>
-          <RouteGlyph route={verified ? story.route : null} />
-          <div
-            className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 font-mono text-[11px] uppercase tracking-[0.04em]"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            {story.velocity > 0 && <span style={{ color: "var(--ink)" }}>moving</span>}
-            {grid.map((g) => <span key={g}>{g}</span>)}
-          </div>
+          {story.label ?? story.hero_title}
+        </h2>
+        <p className="mt-1 text-[14.5px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
+          {memberLabel} across {outlets}.{cast ? ` Named: ${cast}.` : ""}
+        </p>
+        <RouteGlyph route={verified ? story.route : null} />
+        <div className="mt-3 flex min-w-0 items-center gap-3">
+          <span className="inline-flex min-w-0 items-center gap-2.5">
+            <CoverageBar outlets={[]} fallbackCount={story.source_count} />
+            <span className="truncate font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
+              {outlets} · {story.developments} {story.developments === 1 ? "report" : "reports"}
+            </span>
+          </span>
+          <span className="flex-1" />
+          <StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : "Grouping under review"} />
         </div>
       </Link>
     </li>

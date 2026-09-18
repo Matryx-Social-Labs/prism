@@ -18,7 +18,7 @@ describe("Market Pulse — the chart supplement", () => {
   it("prints the digest, counts the stories behind it, and sends a ticker to search for a reader with no watchlist", async () => {
     render(<PulsePage />);
     expect(await screen.findByRole("heading", { level: 1, name: "Rupee steadies" })).toBeInTheDocument();
-    expect(screen.getByText(/synthesized across 2 stories/)).toBeInTheDocument();
+    expect(screen.getByText(/written from 2 stories/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "RELIANCE" })).toHaveAttribute("href", "/search?q=RELIANCE");
   });
 
