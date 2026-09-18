@@ -37,7 +37,9 @@ MIN_QUOTE_CHARS = 25
 _WS = re.compile(r"\s+")
 
 
-def _flat(s: str) -> str:
+def flat_ws(s: str) -> str:
+    """Whitespace-collapsed text. quote_start/quote_end index THIS string, not
+    the raw clean_text — every reader of the offsets must flatten first."""
     return _WS.sub(" ", s or "").strip()
 
 
@@ -51,13 +53,13 @@ def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], di
     if not clean_text:
         return [], rejected
 
-    flat_text = _flat(clean_text)
+    flat_text = flat_ws(clean_text)
     kept: list[Claim] = []
     for c in claims:
         if not c.speaker:
             rejected["no_speaker"] += 1
             continue
-        quote = _flat(c.quote_text)
+        quote = flat_ws(c.quote_text)
         if len(quote) < MIN_QUOTE_CHARS:
             rejected["short_quote"] += 1
             continue

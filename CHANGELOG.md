@@ -3,6 +3,13 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.28] - 2026-09-18
+
+### Fixed
+- "In the article" now appears on every verified quote. Claim offsets are measured on
+  whitespace-flattened article text, but the ticket sliced the raw text, so any quote
+  after a paragraph break (12% of live claims) lost its context.
+
 ## [0.0.81.27] - 2026-09-18
 
 ### Fixed

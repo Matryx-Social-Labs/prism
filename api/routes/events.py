@@ -44,6 +44,7 @@ from common.quota import (
     unlocked_lenses,
 )
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
+from enrichment.claims import flat_ws
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -69,6 +70,7 @@ def quote_context(clean_text: str | None, quote: str, start: int | None, end: in
     boundaries. Empty unless the span still points at the quote: the text is
     re-checked here, so a stale offset shows nothing rather than the wrong
     sentence."""
+    clean_text = flat_ws(clean_text)  # the span was measured on the flattened text
     if not clean_text or start is None or end is None or clean_text[start:end] != quote:
         return "", ""
     before = clean_text[max(0, start - CONTEXT_CHARS):start]

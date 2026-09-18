@@ -200,6 +200,23 @@ def test_the_context_is_the_articles_own_words_around_a_re_verified_span():
     assert quote_context(None, q, start, start + len(q)) == ("", "")
 
 
+def test_context_survives_the_newlines_the_verifier_collapsed():
+    """verify_claims computes the span on whitespace-flattened text, so an article
+    with a paragraph break before the quote has offsets that do not index the
+    raw text. Prod 2026-09-18: 534 of 4,444 claims (12%) lost their context this
+    way. The context must be cut from the same flattened text the span was
+    measured on."""
+    from api.routes.events import quote_context
+    from enrichment.claims import flat_ws
+
+    raw = "First paragraph ends here.\n\n  Second one:  We will not roll back the fee, he said. Then more."
+    q = "We will not roll back the fee"
+    start = flat_ws(raw).index(q)
+    assert raw[start:start + len(q)] != q  # the raw slice is off by the collapsed whitespace
+    before, after = quote_context(raw, q, start, start + len(q))
+    assert before.endswith("Second one:") and after.startswith(", he said.")
+
+
 def test_context_rides_the_claim_when_the_row_carries_the_article_text():
     text = "Intro words here. The quote itself. Trailing words here."
     q = "The quote itself."
