@@ -159,7 +159,7 @@ describe("the record — the route", () => {
     render(<StoryView event={event({ story_slug: "s" })} />);
     expect(await screen.findByText("Provisional grouping")).toBeInTheDocument();
     const coverage = await screen.findByRole("region", { name: /^related reporting$/i });
-    expect(within(coverage).getByText(/not yet verified/i)).toBeInTheDocument();
+    expect(within(coverage).getByText(/under human review\. No chronology is implied/i)).toBeInTheDocument();
     expect(within(coverage).queryByLabelText("Storyline structure")).toBeNull();
     expect(screen.getByRole("link", { name: "Related reporting" })).toHaveAttribute("href", "#route");
   });

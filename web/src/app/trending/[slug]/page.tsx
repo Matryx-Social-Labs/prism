@@ -109,7 +109,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
 
             {verified ? (
               <section className={tree ? "mt-8" : ""} aria-labelledby="list-title">
-                <SectionHead id="list-title" title="All developments" count={s.developments.length} />
+                <SectionHead id="list-title" title="All developments" count={s.developments.length} hint={tree ? undefined : "Oldest to latest, with how each followed from the last."} />
                 {tree ? (
                   <BranchTree tree={tree} developments={s.developments} defaultAll={openAll} readout={false} />
                 ) : (

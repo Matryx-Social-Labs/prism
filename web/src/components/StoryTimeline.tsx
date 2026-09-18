@@ -11,9 +11,10 @@ import { shortDate } from "@/lib/dateline";
 // component). Replaces the old per-event "The thread" (causal) + "The story so
 // far" (branches): a leaf no longer collapses to a 1-node view, and causal
 // rationale now rides inline as a "why" note under the development it explains.
-// DESIGN.md: monochrome chrome (no lens hue), IBM Plex Mono for dates
-// (provenance), General Sans for titles/cast, hairline rule; reveal-on-scroll
-// stagger collapsing to instant under reduced-motion.
+// The section title and hint belong to the caller (SectionHead: "All
+// developments", "Related reporting"); this prints the cast and the list. Mono for
+// dates (provenance), hairline rules; reveal-on-scroll stagger collapsing to
+// instant under reduced-motion.
 
 function dateLabel(iso: string | null): string {
   return iso ? shortDate(iso) : "";
@@ -47,13 +48,7 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
 
   if (mode === "related") {
     return (
-      <section ref={ref} className="mt-6" aria-labelledby="related-coverage-title">
-        <h2 id="related-coverage-title" className="mb-1.5 font-display text-[26px] font-medium uppercase leading-none tracking-[0.03em]">
-          Related coverage under review
-        </h2>
-        <p className="mb-4 max-w-[70ch] text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-          These events share subject or cast signals. Prism has not yet verified that they form one unfolding story, so no chronology or causal path is implied.
-        </p>
+      <div ref={ref}>
         <ul className="flex flex-col">
           {developments.map((n, i) => (
             <li
@@ -66,48 +61,30 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
                 transitionDelay: `${Math.min(i, 8) * 40}ms`,
               }}
             >
-              <span className="pt-[3px] font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
+              <span className="pt-[3px] font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
                 {dateLabel(n.occurred_at)}
               </span>
               {n.is_current ? (
-                <span className="text-[14.5px] font-semibold leading-snug">{n.title}</span>
+                <span className="text-[15px] font-semibold leading-snug">{n.title}</span>
               ) : (
-                <Link href={`/story/${n.id}`} className="text-[14.5px] font-medium leading-snug underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+                <Link href={`/story/${n.id}`} className="text-[15px] font-medium leading-snug underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>
                   {n.title}
                 </Link>
               )}
             </li>
           ))}
         </ul>
-      </section>
+      </div>
     );
   }
 
   return (
-    <section ref={ref} className="mt-11">
-      <h2 className="mb-1.5 font-display text-[26px] font-medium uppercase leading-none tracking-[0.03em]">
-        The story so far
-      </h2>
-      <p className="mb-4 text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
-        Every development in this story, oldest to latest, with how each followed from the last.
-      </p>
-
+    <div ref={ref}>
       {cast.length > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-1.5">
-          <span
-            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            Following
-          </span>
+        <div className="mb-5 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[12.5px] font-semibold" style={{ color: "var(--ink-3)" }}>Following</span>
           {cast.map((name) => (
-            <span
-              key={name}
-              className="rounded-full border px-2.5 py-0.5 text-[12px] font-medium"
-              style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-            >
-              {name}
-            </span>
+            <span key={name} className="chip h-[30px] px-2.5 text-[13px]">{name}</span>
           ))}
         </div>
       )}
@@ -141,7 +118,7 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
             />
             <span
               className="w-[52px] shrink-0 pt-[3px] font-mono text-[11px]"
-              style={{ color: "var(--ink-faint)" }}
+              style={{ color: "var(--ink-3)" }}
             >
               {dateLabel(n.occurred_at)}
             </span>
@@ -149,14 +126,14 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
               {n.is_current ? (
                 <>
                   <span
-                    className="text-[14.5px] font-semibold leading-snug"
+                    className="text-[15px] font-semibold leading-snug"
                     style={{ color: "var(--ink)" }}
                   >
                     {n.title}
                   </span>
                   <span
-                    className="font-mono text-[9.5px] uppercase tracking-[0.14em]"
-                    style={{ color: "var(--ink-faint)" }}
+                    className="font-mono text-[11px] uppercase tracking-[0.08em]"
+                    style={{ color: "var(--ink-3)" }}
                   >
                     You are here
                   </span>
@@ -164,14 +141,14 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
               ) : (
                 <Link
                   href={`/story/${n.id}`}
-                  className="text-[14.5px] font-medium leading-snug"
-                  style={{ color: "var(--ink-muted)" }}
+                  className="text-[15px] font-medium leading-snug underline-offset-4 hover:underline"
+                  style={{ color: "var(--ink-2)" }}
                 >
                   {n.title}
                 </Link>
               )}
               {n.why && (
-                <span className="flex items-start gap-1.5 text-[12px] leading-snug" style={{ color: "var(--ink-faint)" }}>
+                <span className="flex items-start gap-1.5 text-[13px] leading-snug" style={{ color: "var(--ink-3)" }}>
                   <Corner className="mt-[2px] shrink-0" /> {n.why}
                 </span>
               )}
@@ -179,6 +156,6 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
           </li>
         ))}
       </ol>
-    </section>
+    </div>
   );
 }
