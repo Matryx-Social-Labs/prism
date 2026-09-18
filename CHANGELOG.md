@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.30] - 2026-09-18
+
+### Fixed
+- The morning's "empty responses" were Gemini refusing crime reports on content policy
+  (`PROHIBITED_CONTENT` / `SAFETY`, 13 of 44 gate calls in one window) and the stream
+  redelivering each five times as if the provider were down. A refused article now goes
+  once to `PRISM_MODEL_FALLBACK` (glm-5.3-flash), which answers it; with the fallback
+  unset the call fails permanently instead of round-tripping the queue.
+
 ## [0.0.81.29] - 2026-09-18
 
 ### Fixed

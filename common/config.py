@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     prism_model_correlate: str = "z-ai/glm-5.3-flash"
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning
+    # Where a request goes when the primary model refuses it on content policy
+    # (Gemini PROHIBITED_CONTENT on sexual-violence reporting, 2026-09-18: 13 of
+    # 44 gate calls in one window). glm-5.3-flash answers our schemas and does
+    # not refuse news. Empty string disables the fallback (the call then fails
+    # permanently instead of being redelivered).
+    prism_model_fallback: str = "z-ai/glm-5.3-flash"
     prism_model_guard: str = "google/gemini-3.1-flash-lite"  # Ask moderation — cheap + fast
 
     # Embeddings (fastembed, in-process). Multilingual so cross-language coverage

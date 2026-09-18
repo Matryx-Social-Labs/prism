@@ -53,6 +53,39 @@ class LlmEmptyResponse(ConnectionError):
     failure — which is what it did, six times in one log window."""
 
 
+class LlmContentBlocked(ValueError):
+    """The provider refused the REQUEST on content policy (Gemini
+    PROHIBITED_CONTENT, 403). Crime reporting — sexual assault, child abuse —
+    trips it, and it is per-article and permanent, so it is a ValueError: the
+    stream dead-letters once instead of redelivering five times. structured_chat
+    only raises this when no fallback model is configured; with one, the
+    article is answered by the fallback and this never surfaces."""
+
+
+# Gemini's finish reasons for "I will not answer this article": the request
+# refused outright (PROHIBITED_CONTENT), the answer withheld (SAFETY), or the
+# answer withheld for quoting the source (RECITATION — a hazard for a product
+# whose claims layer wants verbatim quotes). All per-article, none transient.
+_BLOCKED_NATIVE_REASONS = frozenset({"SAFETY", "PROHIBITED_CONTENT", "RECITATION", "BLOCKLIST", "SPII"})
+
+
+def _blocked_error(obj: Any) -> dict | None:
+    """The content-policy refusal on a response or a choice, if there is one.
+    OpenRouter reports it two ways: an `error` object in `model_extra` (request
+    blocked: `choices: null`, code 403) or a choice with finish_reason "error"
+    and `native_finish_reason` "SAFETY" (answer withheld). Both measured on
+    2026-09-18 for the same Kannada crime report."""
+    extra = getattr(obj, "model_extra", None) or {}
+    if str(extra.get("native_finish_reason", "")).upper() in _BLOCKED_NATIVE_REASONS:
+        return {"native_finish_reason": extra["native_finish_reason"]}
+    err = extra.get("error")
+    if not isinstance(err, dict):
+        return None
+    meta = err.get("metadata") or {}
+    blocked = meta.get("error_type") == "content_policy_violation" or "PROHIBITED_CONTENT" in str(err.get("message", ""))
+    return err if blocked else None
+
+
 async def _respect_cooldown() -> None:
     wait = _cooldown_until - time.monotonic()
     if wait > 0:
@@ -210,13 +243,17 @@ async def structured_chat[T: BaseModel](
             # envelope with `choices: null`. It is the same provider failure as
             # an empty choice, not a permanent article/schema error. Keeping it a
             # ConnectionError lets the stream retry instead of dead-lettering.
+            if _blocked_error(response):
+                if _swap_to_fallback(kwargs, reasoning, trace_name):
+                    continue
+                raise LlmContentBlocked(f"{kwargs['model']} refused the request on content policy")
             last_err = LlmEmptyResponse("empty response (no choices)")
             logger.warning(
                 "llm_empty_response",
                 attempt=attempt + 1,
                 trace=trace_name,
                 finish_reason="missing_choices",
-                model=model,
+                model=kwargs["model"],
                 # OpenRouter puts the upstream failure (429, 502, moderation) in
                 # an `error` object beside the null choices; without it a burst
                 # of these is indistinguishable from a dead model.
@@ -227,10 +264,19 @@ async def structured_chat[T: BaseModel](
         choice = choices[0]
         content = choice.message.content or ""
         if not content.strip():
+            # OpenRouter reports the refusal either on the choice or beside it.
+            if _blocked_error(choice) or _blocked_error(response):
+                if _swap_to_fallback(kwargs, reasoning, trace_name):
+                    continue
+                raise LlmContentBlocked(f"{kwargs['model']} refused the request on content policy")
             # Not a parse failure: the provider gave nothing. Try once more
             # after a beat, then hand the message back to the stream.
             last_err = LlmEmptyResponse(f"empty response (finish_reason={choice.finish_reason})")
-            logger.warning("llm_empty_response", attempt=attempt + 1, trace=trace_name, finish_reason=choice.finish_reason, model=model)
+            err = (getattr(choice, "model_extra", None) or {}).get("error") or (getattr(response, "model_extra", None) or {}).get("error")
+            logger.warning(
+                "llm_empty_response", attempt=attempt + 1, trace=trace_name, finish_reason=choice.finish_reason,
+                model=kwargs["model"], error=str(err)[:300],
+            )
             await asyncio.sleep(2)
             continue
         try:
@@ -292,6 +338,19 @@ async def structured_chat[T: BaseModel](
     if isinstance(last_err, LlmEmptyResponse):
         raise last_err
     raise ValueError(f"structured_chat failed after {max_retries} attempts: {last_err}")
+
+
+def _swap_to_fallback(kwargs: dict[str, Any], reasoning: dict[str, Any] | None, trace_name: str) -> bool:
+    """Re-aim a blocked request at prism_model_fallback, once. False when there
+    is no fallback or the request is already on it."""
+    fallback = get_settings().prism_model_fallback
+    if not fallback or kwargs["model"] == fallback:
+        return False
+    logger.info("llm_content_blocked_fallback", trace=trace_name, blocked_model=kwargs["model"], model=fallback)
+    kwargs["model"] = fallback
+    if reasoning is not None and get_settings().llm_provider == "openrouter":
+        kwargs["extra_body"] = {"reasoning": _reasoning_payload(fallback, reasoning)}
+    return True
 
 
 def _looks_like_json_schema(obj: Any) -> bool:
