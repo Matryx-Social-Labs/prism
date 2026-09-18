@@ -1,6 +1,6 @@
 """Meta routes: health, lens registry, taxonomy. No LLM, no heavy queries."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,7 @@ from api.schemas import (
 )
 from common.db import get_db
 from common.embeddings import check_corpus_model
-from common.freshness import pipeline_freshness
+from common.freshness import MAX_WINDOW_HOURS, MIN_WINDOW_HOURS, WINDOW_HOURS, pipeline_freshness
 from common.lenses import DEFAULT_LENS, active_lenses
 from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
@@ -22,7 +22,15 @@ router = APIRouter()
 
 
 @router.get("/healthz")
-async def healthz(db: AsyncSession = Depends(get_db)):
+async def healthz(
+    db: AsyncSession = Depends(get_db),
+    freshness_window_hours: int = Query(
+        default=WINDOW_HOURS,
+        ge=MIN_WINDOW_HOURS,
+        le=MAX_WINDOW_HOURS,
+        description="Recent observation window used for stage-latency telemetry.",
+    ),
+):
     """Liveness, plus the queue depth behind each stage.
 
     `SELECT 1` alone was the whole check, and it is exactly the wrong thing to
@@ -41,7 +49,7 @@ async def healthz(db: AsyncSession = Depends(get_db)):
     return {
         "status": "ok",
         "streams": await backlog(),
-        "freshness": await pipeline_freshness(db),
+        "freshness": await pipeline_freshness(db, window_hours=freshness_window_hours),
         "embeddings": await check_corpus_model(db),
     }
 

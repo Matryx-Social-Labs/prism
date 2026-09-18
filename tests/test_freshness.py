@@ -108,6 +108,27 @@ async def test_reports_each_pipeline_clock_and_backlog_age():
     assert out["end_to_end"]["publish_to_story"]["samples"] == 43
 
 
+async def test_accepts_a_bounded_clean_cohort_window():
+    session = FakeSession({})
+
+    out = await pipeline_freshness(session, window_hours=6)
+
+    assert session.params == {"window_hours": 6}
+    assert out["window_hours"] == 6
+
+
+async def test_clamps_internal_window_callers_to_one_week():
+    session = FakeSession({})
+
+    low = await pipeline_freshness(session, window_hours=0)
+    assert session.params == {"window_hours": 1}
+    assert low["window_hours"] == 1
+
+    high = await pipeline_freshness(session, window_hours=10_000)
+    assert session.params == {"window_hours": 168}
+    assert high["window_hours"] == 168
+
+
 async def test_database_failure_is_unknown_not_a_health_failure():
     out = await pipeline_freshness(FakeSession(RuntimeError("old schema")))
     assert out == {"ok": None, "window_hours": WINDOW_HOURS, "error": "unavailable"}

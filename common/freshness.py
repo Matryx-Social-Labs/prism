@@ -17,6 +17,8 @@ from common.logging import get_logger
 logger = get_logger(__name__)
 
 WINDOW_HOURS = 24
+MIN_WINDOW_HOURS = 1
+MAX_WINDOW_HOURS = 168
 
 # One bounded pass over the recent raw-item window. DISTINCT ON protects the
 # timings from historical duplicate article rows while choosing the first time
@@ -230,20 +232,29 @@ def _latency(row: Any, prefix: str, samples: int) -> dict[str, int | float | Non
     }
 
 
-async def pipeline_freshness(db: AsyncSession) -> dict[str, Any]:
-    """Return stage counts and clocks without ever raising to ``/healthz``."""
+async def pipeline_freshness(
+    db: AsyncSession,
+    *,
+    window_hours: int = WINDOW_HOURS,
+) -> dict[str, Any]:
+    """Return stage counts and clocks without ever raising to ``/healthz``.
+
+    A bounded window lets operators distinguish a recovered live path from an
+    older catch-up cohort. The default remains 24 hours for existing callers.
+    """
+    window_hours = max(MIN_WINDOW_HOURS, min(MAX_WINDOW_HOURS, int(window_hours)))
     try:
-        result = await db.execute(_FRESHNESS_SQL, {"window_hours": WINDOW_HOURS})
+        result = await db.execute(_FRESHNESS_SQL, {"window_hours": window_hours})
         row = result.mappings().one()
     except Exception:  # noqa: BLE001 - a telemetry query cannot break liveness
         logger.exception("pipeline_freshness_unavailable")
-        return {"ok": None, "window_hours": WINDOW_HOURS, "error": "unavailable"}
+        return {"ok": None, "window_hours": window_hours, "error": "unavailable"}
 
     published_samples = _int(row, "publish_observe_samples")
     enriched = _int(row, "enriched_count")
     return {
         "ok": True,
-        "window_hours": WINDOW_HOURS,
+        "window_hours": window_hours,
         "observation": {
             "count": _int(row, "observed_count"),
             "latest_at": _time(row, "latest_observed_at"),

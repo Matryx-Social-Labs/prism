@@ -46,3 +46,18 @@ def test_route_surface_matches_expected():
     paths = app.openapi().get("paths", {})
     served = {(method.upper(), path) for path, ops in paths.items() for method in ops}
     assert served == EXPECTED, {"missing": EXPECTED - served, "extra": served - EXPECTED}
+
+
+def test_healthz_exposes_a_bounded_freshness_window():
+    parameters = app.openapi()["paths"]["/healthz"]["get"]["parameters"]
+    window = next(p for p in parameters if p["name"] == "freshness_window_hours")
+
+    assert window["in"] == "query"
+    assert window["schema"] == {
+        "type": "integer",
+        "maximum": 168,
+        "minimum": 1,
+        "description": "Recent observation window used for stage-latency telemetry.",
+        "default": 24,
+        "title": "Freshness Window Hours",
+    }
