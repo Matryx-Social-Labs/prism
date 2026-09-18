@@ -217,6 +217,10 @@ async def structured_chat[T: BaseModel](
                 trace=trace_name,
                 finish_reason="missing_choices",
                 model=model,
+                # OpenRouter puts the upstream failure (429, 502, moderation) in
+                # an `error` object beside the null choices; without it a burst
+                # of these is indistinguishable from a dead model.
+                error=str((getattr(response, "model_extra", None) or {}).get("error"))[:300],
             )
             await asyncio.sleep(2)
             continue

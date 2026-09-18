@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.29] - 2026-09-18
+
+### Fixed
+- Gate, classification, extraction and Ask moderation are back on gemini-3.1-flash-lite.
+  The morning's empty OpenRouter envelopes were upstream bursts, not the model: they hit
+  gemini-3.5-flash (6x the price) on 70% of gate calls twenty minutes after the switch,
+  while the lite answered every probe. `llm_empty_response` now logs the envelope's
+  error object so the next burst is diagnosed rather than routed around.
+
 ## [0.0.81.28] - 2026-09-18
 
 ### Fixed

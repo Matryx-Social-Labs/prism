@@ -28,13 +28,16 @@ class Settings(BaseSettings):
     # high-volume structured stages (free models proved unreliable at JSON output —
     # tencent/hy3:free returned empty content), cheap-paid for the content the
     # product sells. All near-free at India-only volume.
-    # gemini-3.1-flash-lite began returning empty responses with
-    # finish_reason=error through OpenRouter on 2026-09-18. The gate then retried
-    # forever while the five-minute ingestion loop requeued another 500 pending
-    # rows, growing raw.items past 42k entries. gemini-3.5-flash was probed against
-    # both structured schemas in production before this default was changed.
-    prism_model_gate: str = "google/gemini-3.5-flash"  # binary relevance — high volume
-    prism_model_classify: str = "google/gemini-3.5-flash"
+    # 2026-09-18: a burst of empty OpenRouter envelopes (`choices: null`) on
+    # gemini-3.1-flash-lite was read as the model failing and the gate/classify/
+    # extract stages were moved to gemini-3.5-flash ($1.50/$9.00 per M, 6x the
+    # lite). Twenty minutes later gemini-3.5-flash returned the same null
+    # envelopes on 70% of gate calls, and 3.1-flash-lite answered 36/36 probes
+    # and 15/15 extractions. The bursts are upstream (rate/5xx), not the model;
+    # `llm_empty_response` now logs the envelope's error object so the next one
+    # is diagnosed, not switched around.
+    prism_model_gate: str = "google/gemini-3.1-flash-lite"  # binary relevance — high volume
+    prism_model_classify: str = "google/gemini-3.1-flash-lite"
     # Extraction emits a nested JSON (entities/stance/cyber/finance). Entities drive
     # clustering, so the model MUST reliably fill them. Benchmarked on 25 real India
     # articles (recall vs qwen3.7-plus): gemini-3.1-flash-lite left 40% empty (recall
@@ -59,8 +62,8 @@ class Settings(BaseSettings):
     # note said gemini "empties entities", which is why qwen was chosen. On this
     # sample gemini returns 77 entities and qwen returns none, because qwen
     # returns nothing at all. Re-measure before trusting either direction again.
-    prism_model_extract: str = "google/gemini-3.5-flash"
-    prism_model_extract_light: str = "google/gemini-3.5-flash"
+    prism_model_extract: str = "google/gemini-3.1-flash-lite"
+    prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
     # analysis / briefs / thread-link / digest. Bake-off 2026-09-17 on 30 live
     # multi-source events, judged blind (tools/bakeoff_brief): glm-5.3-flash
     # grounded 0.92 vs qwen3.7-plus 0.91, complete 0.99 vs 0.98, neutral 0.98
@@ -69,7 +72,7 @@ class Settings(BaseSettings):
     prism_model_correlate: str = "z-ai/glm-5.3-flash"
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning
-    prism_model_guard: str = "google/gemini-3.5-flash"  # Ask moderation — cheap + fast
+    prism_model_guard: str = "google/gemini-3.1-flash-lite"  # Ask moderation — cheap + fast
 
     # Embeddings (fastembed, in-process). Multilingual so cross-language coverage
     # (Hindi/Tamil/Telugu now, Spanish/etc. as we add countries) clusters into the
