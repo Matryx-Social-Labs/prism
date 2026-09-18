@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Close } from "@/components/icons";
 import type { BranchTreeData, StoryDevelopment } from "@/lib/api";
 import { shortDate } from "@/lib/dateline";
 import { routeShape, type Line, type Station } from "@/lib/route";
@@ -131,7 +132,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
       ) : (
         <Link href={href(p)} className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline underline-offset-4">Read this development →</Link>
       )}
-      <button type="button" className="rm-close" aria-label="Close" onClick={() => setPicked(null)}>✕</button>
+      <button type="button" className="rm-close" aria-label="Close" onClick={() => setPicked(null)}><Close /></button>
     </div>
   );
 

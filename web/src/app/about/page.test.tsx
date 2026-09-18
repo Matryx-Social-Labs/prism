@@ -42,19 +42,17 @@ describe("/about — the product as the proof, live", () => {
     );
     render(await AboutPage());
 
-    // The chart rows: the nine-outlet story leads, by the chart's order, not the API's.
-    const rows = screen.getByRole("heading", { name: "Today's chart" }).parentElement!.parentElement!;
-    const links = within(rows).getAllByRole("link", { name: /Story/ });
-    expect(links[0]).toHaveAttribute("href", "/story/strong");
-    // The count cell shows the feature in the row's own grammar: a real row with its count.
-    const count = screen.getByRole("heading", { name: "One story, not fifty headlines" }).parentElement!;
-    expect(within(count).getByRole("link", { name: /Story quoted/ })).toHaveAttribute("href", "/story/quoted");
-    expect(within(count).getByLabelText("2 sources")).toBeInTheDocument();
+    // The nine-outlet story leads in the live record, by the chart's order, not the API's.
+    expect(screen.getByRole("link", { name: "Open live record: Story strong" })).toHaveAttribute("href", "/story/strong");
+    // The remaining live rows keep the chart's real count grammar.
+    const rows = screen.getByRole("heading", { name: "Live now" }).parentElement!.parentElement!;
+    expect(within(rows).getByRole("link", { name: /Story quoted/ })).toHaveAttribute("href", "/story/quoted");
+    expect(within(rows).getByLabelText("2 sources")).toBeInTheDocument();
     // The quote cell comes from a story that HAS quotes, even if it is not the lead.
-    const said = screen.getByRole("heading", { name: "Who said what, in their own words" }).parentElement!;
+    const said = screen.getByRole("heading", { name: "Exact words. Exact source." }).parentElement!.parentElement!;
     expect(within(said).getByText("“We were receiving proposals”")).toBeInTheDocument();
     // No slug on either event, so no route cell and no fetch for one.
-    expect(screen.queryByRole("heading", { name: "Follow the story as it moves" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "See what changed" })).toBeNull();
     expect(fetchTrendingStory).not.toHaveBeenCalled();
   });
 
@@ -81,7 +79,7 @@ describe("/about — the product as the proof, live", () => {
     });
     render(await AboutPage());
     expect(fetchTrendingStory).toHaveBeenCalledWith("s");
-    expect(screen.getByRole("heading", { name: "Follow the story as it moves" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "See what changed" })).toBeInTheDocument();
     expect(screen.getByText(/3 DEVELOPMENTS · 0 BRANCHED OFF · 0 ALSO REPORTED · 4 DAYS/)).toBeInTheDocument();
   });
 
@@ -97,20 +95,20 @@ describe("/about — the product as the proof, live", () => {
       branches: { root_id: "e0", nodes: [{ id: "e0", parent_id: null, off_spine: false, depth: 0 }, { id: "e1", parent_id: "e0", off_spine: false, depth: 1 }], shape: { developments: 2, branches: 0, satellites: 0, max_depth: 1 } },
     });
     render(await AboutPage());
-    expect(screen.queryByRole("heading", { name: "Follow the story as it moves" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "See what changed" })).toBeNull();
   });
 
   it("says the chart is unreachable rather than showing an empty or made-up proof", async () => {
     fetchFeed.mockRejectedValue(new Error("offline"));
     render(await AboutPage());
-    expect(screen.getAllByText(/The chart is unreachable right now/).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("heading", { name: "Follow the story as it moves" })).toBeNull();
+    expect(screen.getByText(/The live chart is unreachable right now/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "See what changed" })).toBeNull();
   });
 
   it("has one action, with one label, and no eyebrow or em-dash anywhere", async () => {
     fetchFeed.mockResolvedValue([]);
     render(await AboutPage());
-    const actions = screen.getAllByRole("link", { name: "Read today's chart" });
+    const actions = screen.getAllByRole("link", { name: "Open today’s chart" });
     expect(actions.length).toBeGreaterThan(0);
     // /feed, never /: under the revised D5 a first visitor at / gets this page again.
     for (const a of actions) expect(a).toHaveAttribute("href", "/feed");

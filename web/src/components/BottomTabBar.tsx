@@ -46,10 +46,10 @@ export function BottomTabBar() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t backdrop-blur-md lg:hidden"
       style={{
         borderColor: "var(--line)",
-        background: "var(--bg)",
+        background: "var(--glass)",
         paddingTop: 6,
         paddingBottom: "calc(env(safe-area-inset-bottom) + 6px)",
       }}
@@ -65,7 +65,7 @@ export function BottomTabBar() {
             // --ink-faint at 10px measures 2.57:1 on light — under WCAG AA (4.5:1)
             // for the app's primary navigation. --ink-muted is 5.28:1, and weight
             // plus full-strength ink still carry the active state.
-            className="flex min-h-[44px] flex-col items-center justify-center gap-[3px] text-[11px]"
+            className="flex min-h-[48px] touch-manipulation flex-col items-center justify-center gap-[3px] text-[11px] transition-opacity active:opacity-65"
             style={{ color: active ? "var(--ink)" : "var(--ink-muted)", fontWeight: active ? 600 : 500 }}
           >
             <span aria-hidden>{t.icon}</span>

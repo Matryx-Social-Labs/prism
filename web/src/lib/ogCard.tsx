@@ -31,7 +31,7 @@ export function OgCard({ count, countLabel, headline, grid, foot, host }: { coun
           <PrismMarkSvg size={30} ink={c.ink} />
           <span style={{ fontFamily: OG_DISPLAY, fontSize: 40, letterSpacing: 2, lineHeight: 1 }}>PRISM</span>
         </div>
-        <span style={{ fontFamily: OG_MONO, fontSize: 16, color: c.inkMuted }}>One story. Every perspective.</span>
+        <span style={{ fontFamily: OG_MONO, fontSize: 16, color: c.inkMuted }}>Follow the story, not the headlines.</span>
       </div>
       <div style={{ display: "flex", gap: 32, paddingTop: 36, flex: 1 }}>
         <span style={{ fontFamily: OG_DISPLAY, fontSize: 150, lineHeight: 0.85, letterSpacing: -3, width: 140, display: "flex", justifyContent: "flex-end" }}>{count}</span>

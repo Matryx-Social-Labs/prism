@@ -1,6 +1,6 @@
 ---
 name: Prism
-description: "One story. Every perspective."
+description: "Follow the story, not the headlines."
 colors:
   # Light ground (default; `data-theme="light"` or no preference)
   bg: "#f2f4ee"
@@ -301,11 +301,11 @@ A monochrome stationery ground with one ink; the three lens hues are semantic id
 
 ## Layout
 
-One column at every width, hard left edge, no centring except the landing's final call. Content shells are 1240px (`px-5 sm:px-8`) so the chart, trending, search and landing share a left edge; the desktop brand header is 1280px with `xl:px-10`; the form pages (you, onboarding) are 720px. The desktop ticket steps out of the shell to a 1376px field with a 136px ledger margin and a 604px reading column.
+One column at every phone width, hard left edge, no centring except the landing's final call. Public and app shells now cap at 1400px (`px-5 sm:px-8 xl:px-10`) so the header, landing, chart, trending and search share a left edge. At `lg`, feed, trending and search use the first 188px for the persistent subject rail and keep the story river in the remaining field. Form pages (you, onboarding) remain 720px. The desktop ticket uses the same fluid 1400px field: a 72–104px ledger margin, a reading column capped at 604px, and the remaining width for the sticky lens/evidence board. It never sets a viewport-wider fixed width at the 1024px breakpoint.
 
 Vertical rhythm is the rule: every unit of the page (row, section head, field, source, quote) begins with a 1px hairline and its own top padding. Chart rows are `py-3.5` (14px) on a `40px + 16px gap` count column; the lead row is `py-5` (20px) on a 56px column. Section heads are `pt-4` with `mb-4`. Form fields are `pt-6 pb-6`. The base unit is 4px; the scale actually used is 4 / 8 / 16 / 24 / 32.
 
-Fixed chrome: desktop header 56px (57px with its border, which is the sector strip's sticky offset); sector strip 44px, sticky at the top on the phone and under the header at `lg`; bottom tab bar five equal columns with 44px targets plus the safe-area inset, hidden at `lg`. The lead row's image sits above the headline on a phone and beside it in a 400px column at `lg`; it is present only when the story has one, never a placeholder.
+Fixed chrome: desktop header 56px (57px with its border); the single sector navigation is a 44px sticky horizontal rail on the phone and reflows into the 188px sticky left subject rail at `lg` without creating a duplicate accessible control; bottom tab bar has five equal columns with 48px targets plus the safe-area inset, hidden at `lg`. The lead row's image sits above the headline on a phone and beside it in a 400px column at `lg`; it is present only when the story has one, never a placeholder.
 
 Breakpoints are Tailwind's defaults: `sm` 640px shows sector names beside codes and header nav text; `lg` 1024px shows the brand header and hides the bottom bar and phone masthead.
 
@@ -328,15 +328,15 @@ The unit of the product; every row the same. A two-column grid: the source count
 ### Masthead
 The mark (a `currentColor` triangle on the spectrum bar, 21px) and PRISM in Teko 26px at +0.01em, then the dateline in mono 12px print grey: date · N sources · N stories. The theme toggle sits right. Phone only; on desktop the brand header carries the same wordmark at the same size.
 
-### Sector Strip
-The subject nav on every surface, sticky, on the page ground with a bottom hairline. Seven items: ALL then six codes in mono 12px at +0.06em, names in Hind 13.5px 500 from `sm`. Each item is 44px tall with a 2px bottom border: ink when active, transparent otherwise; text ink when active, print grey otherwise. On the chart a code re-sorts in place; elsewhere it is a link.
+### Sector Strip / Desktop Subject Rail
+One accessible subject nav on every surface. On phones it is a sticky horizontal strip on the page ground with a bottom hairline; at `lg` the same DOM reflows into a persistent left rail with names visible, a left active rule, and a short explanation of the monitored-outlet record. Seven items: ALL then six codes in mono 12px at +0.06em, names in Hind 13.5px 500 from `sm`. Each item is at least 44px tall. On the chart a code re-sorts in place; elsewhere it is a link. Never render separate hidden mobile and desktop copies: CSS-hidden duplicate controls still produce a confusing accessibility tree in non-visual and test environments.
 
 ### Section Head
 Teko 26px uppercase on a top hairline with `pt-4`; the count follows in mono 11px faint; an optional hint beneath at 12.5px faint, max 36em.
 
 ### Navigation
 - **Desktop header** (56px, `--glass`, bottom hairline): wordmark left; Today · Trending · Pulse · Watchlist in Teko 18px uppercase with a 2px bottom border (ink when active); a 32px round search target; Sign in; the theme toggle; then either the 28px round avatar (1px `line-strong` border, initial in 12px semibold) or the one primary pill.
-- **Bottom tab bar** (phone): five equal columns, 44px targets, 19px stroke icons above 11px labels; active is ink at weight 600, inactive print grey at 500. Hidden on the ticket, which pins its own rail.
+- **Bottom tab bar** (phone): five equal columns, 48px targets, 19px stroke icons above 11px labels; active is ink at weight 600, inactive print grey at 500. The glass ground includes the device safe-area inset. Hidden on the ticket, which pins its own rail.
 
 ### Buttons
 - **Primary** (pill, ink fill, ground-coloured text, 13–14.5px semibold, `px-4 py-2` or `h-12 px-6`): one per page. Hover drops to 85% opacity; the landing's call adds `active:translate-y-px`.
@@ -348,7 +348,7 @@ The one place a pill carries colour. Unselected: no fill, print grey (faint when
 
 ### Inputs / Fields
 - **Field:** label in Hind 13.5px 500 above; hint prose in print grey (max 52ch); the control 12px below; the whole field on a top hairline with 24px padding.
-- **Control:** `h-12`, 1px `line-strong` border, `bg-elevated`, 16px text, `px-4`, 0 radius. The Ask composer is the same border on the page ground with a 42px square send button bordered in ink.
+- **Control:** `h-12`, 1px `line-strong` border, `bg-elevated`, 16px text, `px-4`, 0 radius. The Ask composer is the same border on the page ground with a 44px square send button bordered in ink.
 - **Focus:** the global 2px ink outline; no glow, no colour.
 
 ### The Ticket (StoryView / StoryDesktop)
@@ -361,7 +361,7 @@ Never a crossfade. On a lens change the block re-mounts with `.flip-body` (opaci
 A square `line-strong` sheet on `bg-elevated` (docked on the phone, floating on desktop). Title in Teko 20px uppercase; turns are ruled lines with Q / A in a mono 11px column; the model's citations are `[n]` mono links; suggested questions are square secondary buttons.
 
 ### Landing (Persuade surface)
-The same world: 1240px shell, headline in Hind 38/48/56px 500, prose at 16–17px in print grey at 44ch, one primary pill, sections headed in Teko 22px uppercase on hairlines, and every written example marked ILLUSTRATION in the provenance voice. The HeroLensDemo is a 1px `line` frame on `bg-elevated` running the real flip with real pill tabs.
+The same world in a 1400px shell. The promise is “Follow the story, not the headlines.” in Hind 42/54/64px 600; prose is 16–17px print grey at 42ch; there is one primary pill. The other half of the first desktop viewport is a real live story record with its latest report time, source support, subject and evidence link. Tablet stays in normal document flow instead of vertically centring two stacked blocks. Lower sections use current product evidence, and every written interaction is marked ILLUSTRATION in the provenance voice. Product status is separated into Available now / In validation / Next, so future work cannot read as shipped.
 
 ## Do's and Don'ts
 
@@ -371,7 +371,7 @@ The same world: 1240px shell, headline in Hind 38/48/56px 500, prose at 16–17p
 - **Do** print counted structure as counts (sources, stories, developments, branches, quotes) in the provenance voice; never let an LLM summarise what can be counted.
 - **Do** quote verbatim or not at all; every quote carries `[n] · outlet · date` in mono 11px and `[n]` is the same index the sources list uses.
 - **Do** mark every written example ILLUSTRATION in mono; no invented numbers on any surface.
-- **Do** render whatever `/api/v1/lenses` returns; lens names are data, never enumerated in generic or marketing copy. The tagline is "One story. Every perspective."
+- **Do** render whatever `/api/v1/lenses` returns; lens names are data, never enumerated in generic or marketing copy. The public promise is "Follow the story, not the headlines."
 - **Do** put every unit on a top hairline with its own padding: rows `py-3.5`, lead `py-5`, section heads `pt-4`, fields `pt-6 pb-6`.
 - **Do** hold the floors: 11px for functional mono labels, 14.5px for body, 16px inside inputs, 4.5:1 on both grounds, measures ≤ ~36em for hints and ≤ 44ch for prose.
 - **Do** ration the pill to lens tabs and one primary action per page; every other choice is a square 1px `line-strong` button or an underlined tab.
@@ -396,6 +396,10 @@ Historical entries were written under whichever name was current; the design dec
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-18 | Landing promise narrowed to “Follow the story, not the headlines”; public copy says monitored outlets, not every source | The visible promise now matches what the ingestion and quality system can verify today |
+| 2026-09-18 | Desktop feed, trending and search use one responsive subject navigation as a left rail; mobile keeps the same DOM as a horizontal strip | Particle's root news product demonstrated the value of a persistent desktop topic edge, while a single DOM avoids duplicate keyboard and screen-reader controls |
+| 2026-09-18 | Public/app shells move to 1400px; story keeps a 604px reading measure inside a fluid three-column field | Wider screens buy simultaneous navigation and evidence, never longer prose; the fluid grid also removes the old 1376px overflow at 1024px |
+| 2026-09-18 | Story boundary status is printed in plain language once loaded | A reader must be able to distinguish verified chronological developments from a provisional coverage grouping before interpreting the route |
 | 2026-09-17 | Plain words on reader surfaces | The railway metaphor (route, station, main line, branch line, satellite, trunk, ticket, lens board) stays in code and design notes; the page says *How this story unfolded · All developments · Main story / All · Branched off · Also reported · First / Latest / You are here · Read this development · Related stories · Read it as*. A first-time reader should not have to learn a vocabulary to read the news |
 | 2026-07-19 | Initial DESIGN.md via /design-consultation | Live research + outside voice + approved interactive preview |
 | 2026-07-19 | Memorable thing = the lens flip | Founder choice (D2) |

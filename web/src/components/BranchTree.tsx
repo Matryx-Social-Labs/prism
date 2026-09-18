@@ -271,7 +271,7 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
               key={label}
               onClick={() => setShowAll(all)}
               aria-pressed={showAll === all}
-              className="flex h-9 items-center border-b-2 px-1 font-mono text-[11px] tracking-[0.1em]"
+              className="flex h-11 items-center border-b-2 px-1 font-mono text-[11px] tracking-[0.1em]"
               style={{
                 borderColor: showAll === all ? "var(--ink)" : "transparent",
                 color: showAll === all ? "var(--ink)" : "var(--ink-muted)",

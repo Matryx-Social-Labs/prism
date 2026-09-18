@@ -29,7 +29,7 @@ export function SiteHeader() {
         {/* h-14: a fixed row, not padding, so the height is the same signed in
             (32px avatar) and out (36px CTA) — the sector strip sticks under it
             at a known offset (57px with the border) on every surface. */}
-        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-3 px-5 sm:px-8 xl:px-10">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-3 px-5 sm:px-8 xl:px-10">
           {/* One wordmark treatment everywhere: the mark, then PRISM in the structural voice (Masthead does the same). */}
           <Link href="/" className="flex items-center gap-2" style={{ color: "var(--ink)" }} aria-label="Prism">
             <PrismMark />

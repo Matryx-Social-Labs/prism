@@ -16,19 +16,27 @@ import { Landing } from "@/components/Landing";
 beforeEach(() => fetchFeed.mockReset().mockResolvedValue([]));
 
 describe("Landing", () => {
-  it("sends every 'Read today's chart' action to /feed, never to /", async () => {
+  it("sends every 'Open today’s chart' action to /feed, never to /", async () => {
     render(await Landing());
-    const actions = screen.getAllByRole("link", { name: "Read today's chart" });
+    const actions = screen.getAllByRole("link", { name: "Open today’s chart" });
     expect(actions.length).toBeGreaterThan(0);
     for (const a of actions) expect(a).toHaveAttribute("href", "/feed");
   });
 
-  it("labels the two written pieces as illustrations and names what is being built next", async () => {
+  it("labels written interactions as illustrations and separates current work from future work", async () => {
     render(await Landing());
-    // the flip demo and the Ask example; nothing else on the page is written
+    // the flip demo and the Ask example; live records are never labelled as examples
     expect(screen.getAllByText(/^Illustration/)).toHaveLength(2);
-    expect(screen.getByRole("heading", { name: "Being built next" })).toBeInTheDocument();
-    for (const t of ["Both sides", "What happens next", "Blindspots"]) expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What is ready, and what is not" })).toBeInTheDocument();
+    for (const t of ["The inspectable record", "Quality before reach", "Return only when it matters"]) {
+      expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
+    }
+  });
+
+  it("leads with the product's narrower, verifiable promise", async () => {
+    render(await Landing());
+    expect(screen.getByRole("heading", { name: "Follow the story, not the headlines." })).toBeInTheDocument();
+    expect(screen.getByText("One live record from monitored outlets, with every development, quote and source open to inspection.")).toBeInTheDocument();
   });
 
   it("renders the live registry, not a typed list of lenses", async () => {

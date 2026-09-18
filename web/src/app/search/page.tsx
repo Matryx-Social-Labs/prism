@@ -109,7 +109,7 @@ function SearchInner() {
     <button
       key={label}
       onClick={() => setQ(label)}
-      className={`${mono ? "font-mono text-[11.5px]" : "text-[13.5px]"} border px-3 py-1.5 transition hover:opacity-70`}
+      className={`${mono ? "font-mono text-[11.5px]" : "text-[13.5px]"} min-h-11 border px-3 py-2 transition hover:opacity-70`}
       style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
     >
       {label}
@@ -117,62 +117,65 @@ function SearchInner() {
   );
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
+    <div className="mx-auto max-w-[1400px] px-5 pb-24 sm:px-8 lg:pb-16 xl:px-10">
       <Masthead dateline={null} />
-      {/* The query is the masthead's second line: the thing you typed is the headline of this screen. */}
-      <input
-        ref={box}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && setQ("")}
-        placeholder="Search"
-        aria-label="Search stories, entities and sources"
-        className="w-full border-0 bg-transparent p-0 pb-2 text-[26px] font-medium leading-tight outline-none placeholder:opacity-40 sm:text-[32px]"
-        style={{ color: "var(--ink)" }}
-      />
-      <p className={`${HINT} mt-1 pb-2`} style={{ color: "var(--ink-faint)" }}>
-        {dateline ?? <>Stories · entities · tickers · CVE ids<span className="hidden sm:inline"> · Esc clears</span></>}
-      </p>
-      <SectorStrip active={group} onPick={setGroup} allLabel="" />
+      <div className="lg:grid lg:grid-cols-[188px_minmax(0,1fr)] lg:gap-10 xl:gap-12">
+        <SectorStrip active={group} onPick={setGroup} allHref="/search" allLabel="" responsiveRail />
+        <div className="min-w-0">
+          {/* The query is the headline of this screen. */}
+          <input
+            ref={box}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setQ("")}
+            placeholder="Search"
+            aria-label="Search stories, entities and sources"
+            className="w-full border-0 bg-transparent p-0 pb-2 text-[28px] font-medium leading-tight outline-none placeholder:opacity-40 sm:text-[34px] lg:text-[40px]"
+            style={{ color: "var(--ink)" }}
+          />
+          <p className={`${HINT} mt-1 pb-2`} style={{ color: "var(--ink-faint)" }}>
+            {dateline ?? <>Stories · entities · tickers · CVE ids<span className="hidden sm:inline"> · Esc clears</span></>}
+          </p>
+          {term.length < 2 && !loading && (
+            <div className="grid gap-8 pt-6 lg:grid-cols-2 lg:gap-14">
+              <div>
+                <p className={MONO} style={{ color: "var(--ink-faint)" }}>Trending entities</p>
+                <div className="mt-3 flex flex-wrap gap-2">{entities.map((e) => chip(e))}</div>
+              </div>
+              <div>
+                <p className={MONO} style={{ color: "var(--ink-faint)" }}>Try</p>
+                <div className="mt-3 flex flex-wrap gap-2">{TRY.map((t) => chip(t, true))}</div>
+              </div>
+            </div>
+          )}
 
-      {term.length < 2 && !loading && (
-        <div className="grid gap-8 pt-6 lg:grid-cols-2 lg:gap-14">
-          <div>
-            <p className={MONO} style={{ color: "var(--ink-faint)" }}>Trending entities</p>
-            <div className="mt-3 flex flex-wrap gap-2">{entities.map((e) => chip(e))}</div>
-          </div>
-          <div>
-            <p className={MONO} style={{ color: "var(--ink-faint)" }}>Try</p>
-            <div className="mt-3 flex flex-wrap gap-2">{TRY.map((t) => chip(t, true))}</div>
-          </div>
+          <section aria-label="Results" className="pt-3">
+            {loading && (
+              <p className={`${MONO} rule-live py-6`} style={{ color: "var(--ink-faint)" }}>Searching…</p>
+            )}
+            {!loading && failed && (
+              <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }} role="status">
+                Search is unreachable right now: check your connection and try again.
+              </p>
+            )}
+            {!loading && !failed && searched && results.length === 0 && (
+              <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+                No stories match &ldquo;{term}&rdquo;.
+              </p>
+            )}
+            {!loading && !failed && searched && results.length > 0 && shown.length === 0 && (
+              <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+                None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.
+              </p>
+            )}
+            {shown.length > 0 && (
+              <ol className="chart-print">
+                {shown.map((item) => <ChartRow key={item.id} item={item} primaryLang={primaryLang} />)}
+              </ol>
+            )}
+          </section>
         </div>
-      )}
-
-      <section aria-label="Results" className="pt-3">
-        {loading && (
-          <p className={`${MONO} rule-live py-6`} style={{ color: "var(--ink-faint)" }}>Searching…</p>
-        )}
-        {!loading && failed && (
-          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }} role="status">
-            Search is unreachable right now: check your connection and try again.
-          </p>
-        )}
-        {!loading && !failed && searched && results.length === 0 && (
-          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
-            No stories match &ldquo;{term}&rdquo;.
-          </p>
-        )}
-        {!loading && !failed && searched && results.length > 0 && shown.length === 0 && (
-          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
-            None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.
-          </p>
-        )}
-        {shown.length > 0 && (
-          <ol className="chart-print">
-            {shown.map((item) => <ChartRow key={item.id} item={item} primaryLang={primaryLang} />)}
-          </ol>
-        )}
-      </section>
+      </div>
     </div>
   );
 }

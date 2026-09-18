@@ -66,7 +66,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
   const openAll = !tree || spineLength(tree) < 3;
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-24 pt-4 sm:px-8 lg:pb-16">
+    <div className="mx-auto max-w-[1400px] px-5 pb-24 pt-4 sm:px-8 lg:pb-16 xl:px-10">
       <Link href="/trending" className={`${MONO} mb-3 block lg:hidden`} style={{ color: "var(--ink-muted)" }}>
         ← All trending
       </Link>
@@ -83,12 +83,12 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
           <ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} />
         </span>
       </div>
-      <h1 className="mt-2 text-[26px] font-medium leading-[1.2] text-balance sm:text-[32px] lg:max-w-[30ch]">{s.label}</h1>
+      <h1 className="mt-3 max-w-[32ch] text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px] lg:text-[40px] lg:leading-[1.1]">{s.label}</h1>
       <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
         {verified ? "Story headline" : "Provisional grouping"} · from {s.developments.length} {verified ? "developments" : "related events"}
       </p>
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,860px)_1fr] lg:gap-16">
+      <div className="mt-7 grid gap-10 lg:grid-cols-[minmax(0,920px)_minmax(220px,1fr)] lg:gap-12 xl:gap-16">
         <div className="min-w-0">
           {/* The route: the whole story as the rail map, the attention curve on request */}
           {verified && tree ? (

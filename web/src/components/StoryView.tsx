@@ -266,7 +266,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         604px reading column, and a sticky column beside it that reads the page
         with you (the lens board, the section nav); the header spans both
         columns. Width buys simultaneity, never longer lines. */}
-    <div className="mx-auto max-w-[1240px] px-5 pb-[164px] pt-5 sm:px-8 lg:grid lg:w-[1376px] lg:max-w-none lg:grid-cols-[104px_604px_604px] lg:gap-x-8 lg:px-0 lg:pb-20 lg:pt-[22px]">
+    <div className="mx-auto max-w-[1400px] px-5 pb-[164px] pt-5 sm:px-8 lg:grid lg:w-full lg:grid-cols-[72px_minmax(0,604px)_minmax(0,1fr)] lg:gap-x-6 lg:pb-20 lg:pt-[22px] xl:grid-cols-[104px_604px_minmax(0,1fr)] xl:gap-x-8 xl:px-10 2xl:px-0">
       <div className="hidden lg:block" aria-hidden />
 
       {/* ── The header: the strip, the headline, whose words it is ──── */}
@@ -304,6 +304,18 @@ export function StoryView({ event }: { event: EventDetail }) {
           {event.title}
         </h1>
         <p className="mt-2.5 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>{headlineByline(event)}</p>
+        {routeStory && event.story_slug && (
+          <p
+            className="mt-3 w-fit border-l-2 py-1 pl-3 text-[13px] leading-[1.45]"
+            style={{ borderColor: boundaryVerified ? "var(--ink)" : "var(--line-strong)", color: "var(--ink-muted)" }}
+            role="status"
+            aria-atomic="true"
+          >
+            {boundaryVerified
+              ? "Story boundary verified. Developments below are shown in sequence."
+              : "Grouping provisional. Related reporting is shown without implying chronology."}
+          </p>
+        )}
         <div className="hidden lg:mt-[22px] lg:block lg:border-b" style={{ borderColor: "var(--line)" }} />
       </header>
 
@@ -627,7 +639,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           <button
             type="button"
             onClick={() => setAllSources(true)}
-            className="mt-3 inline-flex h-9 items-center border px-3 text-[13px] font-medium transition hover:opacity-80"
+            className="mt-3 inline-flex h-11 items-center border px-3 text-[13px] font-medium transition hover:opacity-80"
             style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
           >
             All {event.sources.length} sources

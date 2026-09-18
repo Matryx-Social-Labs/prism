@@ -168,6 +168,14 @@ a {
   text-underline-offset: 0.18em;
   text-decoration-thickness: 1px;
 }
+button:not(:disabled),
+summary,
+label[for] {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
 /* The provenance voice is tabular by definition: a column of counts and
    times must align. Every .font-mono inherits it. */
 .font-mono {
@@ -400,7 +408,7 @@ a {
 .rm-tip { position: absolute; z-index: 5; width: 260px; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--line-strong); font-size: 13px; line-height: 1.45; pointer-events: none; }
 .rm-tip b { display: block; font-weight: 600; } .rm-tip span { display: block; margin-top: 4px; }
 .rm-card { position: relative; margin-top: 12px; border: 1px solid var(--ink); background: var(--bg-elevated); padding: 14px 44px 16px 16px; max-width: 520px; }
-.rm-close { position: absolute; right: 8px; top: 8px; width: 32px; height: 32px; border: 1px solid var(--line); display: grid; place-items: center; font-size: 12px; }
+.rm-close { position: absolute; right: 8px; top: 8px; width: 44px; height: 44px; border: 1px solid var(--line); display: grid; place-items: center; }
 /* the line draws itself in once; still under reduced motion */
 .rm-svg:not(.rm-still) .rm-main, .rm-svg:not(.rm-still) .rm-bline { stroke-dasharray: 2000; stroke-dashoffset: 2000; }
 .rm-svg.rm-drawn:not(.rm-still) .rm-main, .rm-svg.rm-drawn:not(.rm-still) .rm-bline { animation: rm-draw 700ms cubic-bezier(.16,1,.3,1) forwards; }

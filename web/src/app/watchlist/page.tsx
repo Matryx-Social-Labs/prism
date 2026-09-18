@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
+import { Close } from "@/components/icons";
 import { istDate, shortDate } from "@/lib/dateline";
 import { sectorCode } from "@/lib/sectors";
 import { useSession } from "@/lib/session";
@@ -96,7 +97,14 @@ function WatchlistInner() {
           {items.map((it) => (
             <li key={it.id} className="inline-flex items-center gap-2 border px-3 py-1.5 font-mono text-[12px]" style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}>
               {it.value}
-              <button onClick={() => remove(it)} aria-label={`Unfollow ${it.value}`} style={{ color: "var(--ink-faint)" }}>✕</button>
+              <button
+                onClick={() => remove(it)}
+                aria-label={`Unfollow ${it.value}`}
+                className="-m-2 inline-flex h-11 w-11 items-center justify-center"
+                style={{ color: "var(--ink-faint)" }}
+              >
+                <Close />
+              </button>
             </li>
           ))}
         </ul>
@@ -111,7 +119,7 @@ function WatchlistInner() {
         <input value={value} onChange={(e) => setValue(e.target.value)} aria-label={kind === "ticker" ? "Ticker" : "Sector"}
           placeholder={kind === "ticker" ? "e.g. RELIANCE" : "e.g. finance"}
           className="h-12 min-w-0 flex-1 border px-4 text-[15px] outline-none" style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }} />
-        <button type="submit" className="rounded-full px-5 text-[14px] font-semibold" style={{ background: "var(--ink)", color: "var(--bg)" }}>Follow</button>
+        <button type="submit" className="h-12 rounded-full px-5 text-[14px] font-semibold" style={{ background: "var(--ink)", color: "var(--bg)" }}>Follow</button>
       </form>
 
       <section className="mt-6" aria-labelledby="rows-title">

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "How Prism reads a story: every outlet's report of one event, gathered into one story you can re-read through a professional lens.",
+  description: "How Prism builds one inspectable story record from monitored outlets, then lets readers re-read it through a professional lens.",
 };
 
 export default async function AboutPage() {

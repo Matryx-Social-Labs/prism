@@ -8,7 +8,7 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 
 Core rules worth restating (the world is "The Reservation Chart", 2026-09-15; PRODUCT.md holds
 the product truth and the founder decisions D1–D6):
-- Tagline is "One story. Every perspective." Never enumerate lens names in generic/marketing copy — the lens set grows (pickers render whatever /api/v1/lenses returns).
+- Product promise is "Follow the story, not the headlines." Never enumerate lens names in generic/marketing copy — the lens set grows (pickers render whatever /api/v1/lenses returns).
 - Chrome is monochrome; color only ever means a lens is speaking (lens hues: general amber, cyber cyan, markets violet — discrete, never gradients; the mark's own base is the only spectrum).
 - Three type voices: Teko (structure: masthead, sector codes, section heads, big counts — never running text), Hind and its Indic siblings (everything read), Martian Mono (provenance only: counts, times, origins, codes, citations, tickers, CVE ids — never prose or a heading). 11px floor for mono labels; 4.5:1 on both grounds.
 - Structure is hairlines, never cards: every unit sits on a top rule. State is line form — solid live, dashed single-source, half-weight stale — never hue. No eyebrow or kicker above a heading. No text glyphs as icons (use `web/src/components/icons.tsx`). Pills only for lens tabs and one primary action per page.

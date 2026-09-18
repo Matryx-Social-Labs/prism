@@ -6,28 +6,23 @@ import { HeroLensDemo } from "@/components/HeroLensDemo";
 import { LensRegistry } from "@/components/LensRegistry";
 import { Said } from "@/components/Said";
 import { SectionHead } from "@/components/SectionHead";
-import { SectorStrip } from "@/components/SectorStrip";
 import { indexSources } from "@/components/SourceList";
-import { fetchEvent, fetchFeed, fetchTrendingStory, type EventDetail, type FeedItem, type TrendingStoryDetail } from "@/lib/api";
+import {
+  fetchEvent,
+  fetchFeed,
+  fetchTrendingStory,
+  type EventDetail,
+  type FeedItem,
+  type TrendingStoryDetail,
+} from "@/lib/api";
 import { chartOrder } from "@/lib/chart";
-import { istDate } from "@/lib/dateline";
+import { istDate, istTime } from "@/lib/dateline";
+import { sectorCode } from "@/lib/sectors";
 import { spineLength } from "@/lib/spine";
 
-/**
- * The landing: `/` for a first visitor (returning readers are redirected to
- * the chart; see app/page.tsx) and `/about` always. A general Indian reader
- * arriving from a link or a search: what this is, why it matters, what to do,
- * in one screen; then the product itself as the proof.
- *
- * Every visual is the product: today's real chart rows with the lead's own
- * photograph, a real verbatim quote, a real route map, the live lens
- * registry, the real sector strip. General subjects only; the cyber record
- * is real news but not the first thing a general reader should meet. The one
- * written piece, the flip demo, says ILLUSTRATION. Every action goes to /feed,
- * never `/`, which would show a first visitor this page again.
- */
-const CTA = "Read today's chart";
-const SHELL = "mx-auto w-full max-w-[1240px] px-5 sm:px-8";
+/** The landing is a working front page, not a feature catalogue. */
+const CTA = "Open today’s chart";
+const SHELL = "mx-auto w-full max-w-[1400px] px-5 sm:px-8 xl:px-10";
 
 type Evidence = {
   rows: FeedItem[];
@@ -36,39 +31,28 @@ type Evidence = {
   route: { event: EventDetail; story: TrendingStoryDetail } | null;
 };
 
-/**
- * Today's chart as a general reader meets it: the window, minus the cyber
- * record, most-corroborated first. Then, from the top sixteen, the first story
- * with a verbatim quote, and from the top eight the first with a route of three
- * or more developments on the spine. A proof the chart cannot supply is absent, never invented.
- */
 async function loadEvidence(): Promise<Evidence | null> {
   try {
     const all = await fetchFeed({ limit: 60 });
-    const rows = chartOrder(all.filter((i) => i.sector !== "cybersecurity"));
-    const events = (await Promise.all(rows.slice(0, 16).map((i) => fetchEvent(i.id).catch(() => null)))).filter(
-      (e): e is EventDetail => e !== null,
-    );
+    const rows = chartOrder(all.filter((item) => item.sector !== "cybersecurity"));
+    const events = (
+      await Promise.all(rows.slice(0, 16).map((item) => fetchEvent(item.id).catch(() => null)))
+    ).filter((event): event is EventDetail => event !== null);
+
     let route: Evidence["route"] = null;
     for (const event of events.slice(0, 8)) {
       if (!event.story_slug) continue;
       const story = await fetchTrendingStory(event.story_slug).catch(() => null);
-      // Three on the trunk, at least, as BranchTree counts it: a story with
-      // twenty-five developments can still have a spine of one, and a route
-      // with one station shows no route.
-      if (
-        story?.boundary_status === "verified"
-        && story.branches
-        && spineLength(story.branches) >= 3
-      ) {
+      if (story?.boundary_status === "verified" && story.branches && spineLength(story.branches) >= 3) {
         route = { event, story };
         break;
       }
     }
+
     return {
-      rows: rows.slice(0, 4),
-      sources: rows.reduce((n, i) => n + (i.source_count || 0), 0),
-      said: events.find((e) => (e.claims ?? []).length > 0) ?? null,
+      rows: rows.slice(0, 5),
+      sources: rows.reduce((total, item) => total + (item.source_count || 0), 0),
+      said: events.find((event) => (event.claims ?? []).length > 0) ?? null,
       route,
     };
   } catch {
@@ -76,11 +60,11 @@ async function loadEvidence(): Promise<Evidence | null> {
   }
 }
 
-function Action({ href, children }: { href: string; children: React.ReactNode }) {
+function Action({ children }: { children: React.ReactNode }) {
   return (
     <Link
-      href={href}
-      className="inline-flex h-12 items-center rounded-full px-6 text-[14.5px] font-semibold transition hover:opacity-85 active:translate-y-px"
+      href="/feed"
+      className="inline-flex h-12 items-center whitespace-nowrap rounded-full px-6 text-[14.5px] font-semibold transition-opacity hover:opacity-85 active:opacity-70"
       style={{ background: "var(--ink)", color: "var(--bg)" }}
     >
       {children}
@@ -88,173 +72,252 @@ function Action({ href, children }: { href: string; children: React.ReactNode })
   );
 }
 
-/** A cell of the feature grid: the claim, one line on it, then the product doing it. */
-function Cell({ title, body, wide = false, children }: { title: string; body: string; wide?: boolean; children: React.ReactNode }) {
+function LiveRecord({ item }: { item: FeedItem | null }) {
+  if (!item) {
+    return (
+      <div className="border" style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)" }} role="status">
+        <div className="border-b px-4 py-3 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
+          Live story record
+        </div>
+        <div className="grid min-h-[300px] content-end px-5 py-6 sm:min-h-[360px] sm:p-7">
+          <p className="max-w-[28ch] text-[22px] font-medium leading-[1.25] text-balance">
+            The live record is unavailable right now.
+          </p>
+          <p className="mt-3 max-w-[42ch] text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
+            Prism will show current reporting here when the monitored feed reconnects.
+          </p>
+          <Link href="/feed" className="mt-5 w-fit font-mono text-[11px] uppercase tracking-[0.06em] underline underline-offset-4">
+            Try today&rsquo;s chart
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const latestReport = item.latest_published_at ?? item.last_updated_at;
   return (
-    <div className={`rule-live min-w-0 py-8 ${wide ? "lg:col-span-2" : ""}`}>
-      <h3 className="font-display text-[24px] font-medium uppercase leading-none tracking-[0.03em]">{title}</h3>
-      <p className="mt-2 max-w-[44ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>{body}</p>
-      <div className="mt-5">{children}</div>
+    <Link
+      href={`/story/${item.id}`}
+      className="group block border"
+      style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)" }}
+      aria-label={`Open live record: ${item.title}`}
+    >
+      <div className="flex items-center justify-between gap-4 border-b px-4 py-3 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}>
+        <span style={{ color: "var(--ink)" }}>Live story record</span>
+        <span>{latestReport ? `Latest report ${istTime(latestReport)}` : "Current record"}</span>
+      </div>
+      {item.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.image_url}
+          alt=""
+          className="aspect-[16/9] w-full object-cover"
+          style={{ filter: "grayscale(0.12) contrast(1.02)" }}
+        />
+      )}
+      <div className="grid grid-cols-[52px_1fr] gap-4 px-4 py-5 sm:grid-cols-[64px_1fr] sm:p-6">
+        <span className="font-display text-[46px] leading-[0.85] tabular-nums sm:text-[56px]" aria-label={`${item.source_count} sources`}>
+          {item.source_count}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[20px] font-medium leading-[1.2] text-balance group-hover:underline group-focus-visible:underline underline-offset-4 sm:text-[24px]">
+            {item.title}
+          </span>
+          {item.summary && (
+            <span className="mt-2 block text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>
+              {item.summary}
+            </span>
+          )}
+          <span className="mt-3 flex flex-wrap gap-x-3 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>
+            <span>{item.source_count === 1 ? "source" : "sources"}</span>
+            {sectorCode(item.sector) && <span>{sectorCode(item.sector)}</span>}
+            <span>Open evidence</span>
+          </span>
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function StatusRow({ label, title, items }: { label: string; title: string; items: string[] }) {
+  return (
+    <div className="rule-live grid gap-3 py-6 md:grid-cols-[180px_240px_minmax(0,1fr)] md:gap-8">
+      <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>{label}</p>
+      <h3 className="text-[17px] font-semibold leading-[1.35]">{title}</h3>
+      <ul className="grid gap-x-8 gap-y-2 text-[14.5px] leading-[1.5] sm:grid-cols-2" style={{ color: "var(--ink-muted)" }}>
+        {items.map((item) => (
+          <li key={item} className="flex gap-3">
+            <span aria-hidden className="mt-[10px] h-px w-3 shrink-0" style={{ background: "var(--ink)" }} />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-const NEXT: [string, string][] = [
-  ["Both sides", "When a story splits the press, the two framings sit side by side with every outlet's origin labelled, so you see who is saying what and where they stand."],
-  ["What happens next", "Who is affected first and what likely follows, each with a direction and a horizon, spelled out under the story."],
-  ["Blindspots", "When every source on a story comes from one side, the story says so. You are told what you are not being told."],
+const AVAILABLE = [
+  "One event record built from monitored outlets",
+  "Exact source links and verified quotes",
+  "Professional rereads on supported stories",
+  "Developments shown when the story boundary is verified",
 ];
 
-const READER = ["Today's chart, every story, every subject", "Every quote, verbatim, with its source", "Related coverage without invented chronology", "Ask the story, three questions a day"];
-const PRO = ["Your profession's reading of every story", "Tickers and catalysts on the stories that move markets", "Which systems a security story exposes, and what to fix first", "A watchlist of what you follow"];
+const VALIDATION = [
+  "Story-boundary quality with two independent labellers",
+  "Freshness measured over a clean 72-hour window",
+  "Coverage gaps stated against a defined monitored set",
+  "Backlog and historical duplicate cleanup",
+];
+
+const NEXT = [
+  "Follow a story and see only material changes",
+  "Original-language text beside translation",
+  "Visible correction and version history",
+  "Coverage differences by language, origin and ownership",
+];
 
 export async function Landing() {
-  const ev = await loadEvidence();
-  const lead = ev?.rows[0] ?? null;
-  const said = ev?.said ?? null;
-  const dateline = ev
-    ? `${istDate(new Date())}. ${ev.rows.length ? `The four most-corroborated stories on the chart, from ${ev.sources.toLocaleString("en-IN")} outlet reports.` : "Nothing on the chart yet."}`
-    : "The chart is unreachable right now.";
+  const evidence = await loadEvidence();
+  const lead = evidence?.rows[0] ?? null;
+  const said = evidence?.said ?? null;
+  const dateline = evidence
+    ? `${istDate(new Date())}. ${evidence.sources.toLocaleString("en-IN")} source reports in the current window.`
+    : "The live chart is unreachable right now.";
 
   return (
     <div className="pb-24 lg:pb-20">
-      {/* The promise and the flip, in one screen. */}
-      <section className={`${SHELL} grid gap-8 pt-8 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:gap-14 lg:pt-14`}>
-        <div>
-          <h1 className="text-[38px] font-medium leading-[1.02] text-balance sm:text-[48px] lg:text-[56px]">
-            One story. Every perspective.
+      <section className={`${SHELL} grid gap-9 py-10 md:py-14 lg:min-h-[calc(100dvh-57px)] lg:grid-cols-[minmax(0,0.78fr)_minmax(520px,1.22fr)] lg:content-center lg:gap-14 lg:py-16`}>
+        <div className="self-center">
+          <h1 className="max-w-[10ch] text-[42px] font-semibold leading-[0.98] tracking-[-0.025em] text-balance sm:text-[54px] lg:text-[64px]">
+            Follow the story, not the headlines.
           </h1>
-          <p className="mt-5 max-w-[44ch] text-[16px] leading-[1.6] sm:text-[17px]" style={{ color: "var(--ink-muted)" }}>
-            Every outlet&rsquo;s report of one event, gathered into one story you can check, and re-read for your work.
+          <p className="mt-5 max-w-[42ch] text-[16px] leading-[1.55] sm:text-[17px]" style={{ color: "var(--ink-muted)" }}>
+            One live record from monitored outlets, with every development, quote and source open to inspection.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Action href="/feed">{CTA}</Action>
-            <a href="#what-you-get" className="text-[14.5px] font-medium underline underline-offset-4" style={{ color: "var(--ink)" }}>
-              See what you get
-            </a>
+            <Action>{CTA}</Action>
+            <a href="#live-proof" className="text-[14.5px] font-medium underline underline-offset-4">See the live proof</a>
           </div>
         </div>
-        <HeroLensDemo />
+        <LiveRecord item={lead} />
       </section>
 
-      {/* Today's chart, the real rows, the lead with its own photograph. */}
-      <section className={`${SHELL} mt-16`} aria-labelledby="chart-title">
-        <SectionHead id="chart-title" title="Today's chart" hint={dateline} />
-        {ev && ev.rows.length > 0 ? (
+      <section className={`${SHELL} border-y py-5`} style={{ borderColor: "var(--line)" }} aria-label="What Prism is">
+        <div className="grid gap-5 sm:grid-cols-3 sm:gap-8">
+          {[
+            ["One record", "Matching reports are combined before you read."],
+            ["Open evidence", "Quotes and summaries lead back to the reporting."],
+            ["Built for India", "Regional context and Indian-language reading belong in the core product."],
+          ].map(([title, body]) => (
+            <div key={title}>
+              <p className="font-display text-[22px] uppercase leading-none tracking-[0.03em]">{title}</p>
+              <p className="mt-2 max-w-[34ch] text-[14px] leading-[1.5]" style={{ color: "var(--ink-muted)" }}>{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="live-proof" className={`${SHELL} mt-16 scroll-mt-20`} aria-labelledby="chart-title">
+        <SectionHead id="chart-title" title="Live now" hint={dateline} />
+        {evidence && evidence.rows.length > 0 ? (
           <>
-            <ol className="chart-print">
-              {ev.rows.map((it, i) => <ChartRow key={it.id} item={it} lead={i === 0} />)}
+            <ol className="chart-print lg:grid lg:grid-cols-2 lg:gap-x-10">
+              {evidence.rows.slice(1).map((item) => <ChartRow key={item.id} item={item} />)}
             </ol>
             <Link href="/feed" className="rule-live block py-4 font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
-              The whole chart →
+              Open the full chart
             </Link>
           </>
         ) : (
-          <p className="py-6 text-[15px]" style={{ color: ev ? "var(--ink-muted)" : "var(--danger)" }}>
-            {ev ? "Nothing on today's chart yet." : "The chart is unreachable right now, so there is nothing to show here yet."}
+          <p className="rule-live py-6 text-[15px]" style={{ color: evidence ? "var(--ink-muted)" : "var(--danger)" }}>
+            {evidence ? "Nothing is on today’s chart yet." : "The live record cannot be reached right now."}
           </p>
         )}
       </section>
 
-      {/* What you get: each claim followed by the product doing it. */}
-      <section id="what-you-get" className={`${SHELL} mt-16 scroll-mt-20`} aria-labelledby="get-title">
-        <SectionHead id="get-title" title="What you get" />
-        <div className="grid lg:grid-cols-2 lg:gap-x-14">
-          <Cell title="One story, not fifty headlines" body="Every outlet's report of the same event is gathered into one story. The number at the left of a row is how many outlets filed it, so you can see how much of the press agrees it happened.">
-            {lead ? (
-              <ol className="border-b" style={{ borderColor: "var(--line)" }}>
-                <ChartRow item={ev?.rows[1] ?? lead} />
-              </ol>
-            ) : (
-              <p className="text-[14.5px]" style={{ color: "var(--ink-faint)" }}>Today&rsquo;s count appears here when the chart is reachable.</p>
-            )}
-          </Cell>
+      {evidence?.route && (
+        <section className={`${SHELL} mt-16`} aria-labelledby="developments-title">
+          <SectionHead id="developments-title" title="See what changed" hint="Verified developments stay in order, so a new report does not erase what happened before it." />
+          <div className="grid gap-8 py-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(480px,1.2fr)] lg:gap-14">
+            <div>
+              {evidence.route.event.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={evidence.route.event.image_url} alt="" className="aspect-[16/10] w-full object-cover" style={{ filter: "grayscale(0.14) contrast(1.02)" }} loading="lazy" />
+              )}
+              <Link href={`/story/${evidence.route.event.id}`} className="mt-4 block text-[20px] font-medium leading-[1.3] text-balance underline-offset-4 hover:underline">
+                {evidence.route.event.title}
+              </Link>
+            </div>
+            <div className="min-w-0">
+              <BranchTree tree={evidence.route.story.branches!} developments={evidence.route.story.developments} currentId={evidence.route.event.id} />
+            </div>
+          </div>
+        </section>
+      )}
 
-          <Cell title="Who said what, in their own words" body="A quote appears only when its exact words are in the article, with the outlet and the date beside it. No paraphrase, no stance we invented.">
+      <section className={`${SHELL} mt-16`} aria-labelledby="evidence-title">
+        <SectionHead id="evidence-title" title="Exact words. Exact source." hint="A quote appears only when the same words are present in the article. Open it in place to check the context." />
+        <div className="grid gap-10 py-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16">
+          <div>
             {said ? (
-              <div>
-                <Said claims={(said.claims ?? []).slice(0, 1).map((s) => ({ ...s, claims: s.claims.slice(0, 2) }))} sourceIndex={indexSources(said.sources)} />
-                <Link href={`/story/${said.id}`} className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
-                  The story →
+              <>
+                <Said claims={(said.claims ?? []).slice(0, 2).map((speaker) => ({ ...speaker, claims: speaker.claims.slice(0, 2) }))} sourceIndex={indexSources(said.sources)} />
+                <Link href={`/story/${said.id}#said`} className="mt-4 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+                  Open every verified quote
                 </Link>
-              </div>
+              </>
             ) : (
-              <p className="text-[14.5px]" style={{ color: "var(--ink-faint)" }}>No story on today&rsquo;s chart carries a verified quote yet.</p>
+              <p className="text-[14.5px]" style={{ color: "var(--ink-faint)" }}>No story in the current window carries a verified quote yet.</p>
             )}
-          </Cell>
+          </div>
+          <div className="rule-live pt-5">
+            <p className="font-display text-[22px] uppercase leading-none tracking-[0.03em]">Evidence before confidence</p>
+            <p className="mt-3 text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
+              Source count, outlet, publication time and article context stay visible. If a story group is provisional, Prism says so.
+            </p>
+          </div>
+        </div>
+      </section>
 
-          {ev?.route && (
-            <Cell wide title="Follow the story as it moves" body="What started it, what followed, where it branched off. Counted from the record, never summarised by a model.">
-              <div className={ev.route.event.image_url ? "grid gap-6 lg:grid-cols-[320px_minmax(0,600px)] lg:gap-10" : "max-w-[600px]"}>
-                {ev.route.event.image_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ev.route.event.image_url} alt="" className="aspect-[4/3] w-full object-cover" style={{ filter: "grayscale(0.15) contrast(1.02)" }} loading="lazy" />
-                )}
-                <div className="min-w-0">
-                  <Link href={`/story/${ev.route.event.id}`} className="mb-3 block text-[15.5px] font-medium leading-[1.35] underline-offset-4 hover:underline">{ev.route.event.title}</Link>
-                  <BranchTree tree={ev.route.story.branches!} developments={ev.route.story.developments} currentId={ev.route.event.id} />
-                </div>
-              </div>
-            </Cell>
-          )}
-
-          <Cell title="Read it your way" body="Say what you do and every story is re-read for it: what is pulled out, how the chart ranks, what the agent asks. The Reader lens is free; professional reads are one tap away.">
+      <section className={`${SHELL} mt-16`} aria-labelledby="lens-title">
+        <SectionHead id="lens-title" title="The record first. Your work second." hint="The underlying evidence stays fixed. A professional lens changes what the reading pulls forward." />
+        <div className="grid gap-10 py-6 lg:grid-cols-[minmax(480px,1.15fr)_minmax(0,0.85fr)] lg:gap-14">
+          <HeroLensDemo />
+          <div>
             <LensRegistry />
-          </Cell>
-
-          <Cell title="Ask the story, get sources" body="Ask anything about a story. The answer cites the story's own sources, or says it cannot. Refusal is a feature.">
-            <p className="mb-2 font-mono text-[12px]" style={{ color: "var(--ink-faint)" }}>Illustration · on the Delhi diesel story</p>
-            <AskDemo />
-          </Cell>
-
-          <Cell wide title="Six subjects, your state first" body="Politics to entertainment on one strip, on every page. Tell us your state and its news leads the chart; follow a subject and For you appears.">
-            <div className="min-w-0 overflow-x-auto [&_nav]:static [&_nav]:border-b-0 [&_nav_a>span:last-child]:!inline">
-              <SectorStrip active={null} allHref="/feed" allLabel="Today" />
+            <div className="rule-live mt-7 pt-5">
+              <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>Illustration</p>
+              <AskDemo />
             </div>
-          </Cell>
+          </div>
         </div>
       </section>
 
-      {/* Being built next: named, in one line each, no invented examples. */}
-      <section className={`${SHELL} mt-16`} aria-labelledby="next-title">
-        <SectionHead id="next-title" title="Being built next" />
-        <div className="grid gap-x-14 lg:grid-cols-3">
-          {NEXT.map(([title, body]) => (
-            <div key={title} className="rule-live py-6">
-              <h3 className="font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">{title}</h3>
-              <p className="mt-2 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>{body}</p>
-            </div>
-          ))}
+      <section className={`${SHELL} mt-16`} aria-labelledby="status-title">
+        <SectionHead id="status-title" title="What is ready, and what is not" />
+        <StatusRow label="Available now" title="The inspectable record" items={AVAILABLE} />
+        <StatusRow label="In validation" title="Quality before reach" items={VALIDATION} />
+        <StatusRow label="Next" title="Return only when it matters" items={NEXT} />
+      </section>
+
+      <section className={`${SHELL} mt-16`} aria-labelledby="access-title">
+        <SectionHead id="access-title" title="Free record. Professional depth." />
+        <div className="grid gap-x-14 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <div className="rule-live py-6">
+            <h3 className="text-[18px] font-semibold">For every reader</h3>
+            <p className="mt-2 max-w-[42ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>The live record, sources, verified quotes and visible story status belong in the free product.</p>
+          </div>
+          <div className="rule-live py-6">
+            <h3 className="text-[18px] font-semibold">For work that depends on news</h3>
+            <p className="mt-2 max-w-[58ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>Professional rereads, high-signal watchlists, material-change alerts, team digests and audit-ready exports can support a paid product.</p>
+          </div>
         </div>
       </section>
 
-      {/* The tiers. No pricing UI: the checkout does not exist yet and this page does not pretend it does. */}
-      <section className={`${SHELL} mt-16`} aria-labelledby="tiers-title">
-        <SectionHead id="tiers-title" title="Free to read. Paid to read as a professional." />
-        <div className="grid gap-x-14 lg:grid-cols-2">
-          {[["Reader", "Free, no account needed", READER], ["Professional reads", "For people whose work depends on the news", PRO]].map(([name, sub, items]) => (
-            <div key={name as string} className="rule-live py-6">
-              <h3 className="font-display text-[22px] font-medium uppercase leading-none tracking-[0.03em]">{name}</h3>
-              <p className="mt-1.5 text-[14px]" style={{ color: "var(--ink-muted)" }}>{sub}</p>
-              <ul className="mt-4 flex flex-col gap-2.5">
-                {(items as string[]).map((line) => (
-                  <li key={line} className="flex gap-3 text-[15px] leading-[1.5]">
-                    <span aria-hidden className="mt-[11px] inline-block h-[2px] w-3 shrink-0" style={{ background: "var(--ink)" }} />
-                    {line}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* One action. */}
       <section className={`${SHELL} rule-live mt-16 flex flex-wrap items-center gap-x-6 gap-y-3 pt-8`}>
-        <Action href="/feed">{CTA}</Action>
-        <Link href="/onboarding" className="text-[14.5px] font-medium underline underline-offset-4" style={{ color: "var(--ink)" }}>
-          Pick your sectors
-        </Link>
+        <Action>{CTA}</Action>
+        <Link href="/onboarding" className="text-[14.5px] font-medium underline underline-offset-4">Set up my feed</Link>
       </section>
     </div>
   );

@@ -110,7 +110,7 @@ export function HeroLensDemo({
                 setFlipped(true);
                 setActive(i);
               }}
-              className="flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition"
+              className="flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition"
               style={
                 selected
                   ? { background: l.bg, color: l.color, boxShadow: `inset 0 0 0 1.5px ${l.color}` }

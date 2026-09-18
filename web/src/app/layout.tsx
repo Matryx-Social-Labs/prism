@@ -44,22 +44,22 @@ const mono = Martian_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Prism: One story. Every perspective.",
+    default: "Prism: Follow the story, not the headlines.",
     template: "%s | Prism",
   },
   description:
-    "Every outlet's report of one event, gathered into one story you can re-read through a professional lens. Who said what, verbatim, and which outlets.",
+    "One live story record from monitored outlets, with every development, verified quote and source open to inspection.",
   openGraph: {
     type: "website",
     siteName: "Prism",
-    title: "Prism: One story. Every perspective.",
-    description: "Every outlet's report of one event, gathered into one story you can re-read through a professional lens.",
+    title: "Prism: Follow the story, not the headlines.",
+    description: "One live story record from monitored outlets, with every development, verified quote and source open to inspection.",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Prism: One story. Every perspective.",
-    description: "Every outlet's report of one event, gathered into one story you can re-read through a professional lens.",
+    title: "Prism: Follow the story, not the headlines.",
+    description: "One live story record from monitored outlets, with every development, verified quote and source open to inspection.",
   },
 };
 
@@ -75,17 +75,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body
-        className={`${display.variable} ${ui.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-screen flex-col antialiased`}
+        className={`${display.variable} ${ui.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-dvh flex-col antialiased`}
         style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
       >
+        <a
+          href="#main-content"
+          className="fixed left-3 top-3 z-[100] -translate-y-20 border px-4 py-2 text-[14px] font-semibold focus:translate-y-0"
+          style={{ borderColor: "var(--ink)", background: "var(--bg-elevated)", color: "var(--ink)" }}
+        >
+          Skip to content
+        </a>
         <SiteHeader />
-        <main className="w-full flex-1">{children}</main>
+        <main id="main-content" tabIndex={-1} className="w-full flex-1 outline-none">{children}</main>
         <BottomTabBar />
         {/* Footer is desktop-only — on mobile the bottom tab bar is the chrome,
             and the marketing footer would just hide behind it. */}
         <footer className="mt-auto hidden border-t lg:block" style={{ borderColor: "var(--line)" }}>
           <div
-            className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
+            className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
             style={{ color: "var(--ink-muted)" }}
           >
             <span>Prism. Every claim traceable to its source.</span>

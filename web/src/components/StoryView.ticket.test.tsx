@@ -128,6 +128,7 @@ describe("the ticket — the route", () => {
     fetchTrendingStory.mockResolvedValue(TREE);
     render(<StoryView event={event({ story_slug: "s" })} />);
     expect(fetchTrendingStory).toHaveBeenCalledWith("s");
+    expect(await screen.findByText("Story boundary verified. Developments below are shown in sequence.")).toBeInTheDocument();
     const route = await screen.findByRole("region", { name: /how this story unfolded/i });
     expect(within(route).getByText(/2 DEVELOPMENTS · 0 BRANCHED OFF · 0 ALSO REPORTED · 4 DAYS/)).toBeInTheDocument();
     expect(within(route).getByRole("link", { name: /How it started/ })).toHaveAttribute("href", "/story/e0");
@@ -153,7 +154,8 @@ describe("the ticket — the route", () => {
   it("renders a provisional group as related coverage without a route or chronology", async () => {
     fetchTrendingStory.mockResolvedValue({ ...TREE, boundary_status: "provisional" });
     render(<StoryView event={event({ story_slug: "s" })} />);
-    const coverage = await screen.findByRole("region", { name: /related coverage/i });
+    expect(await screen.findByText("Grouping provisional. Related reporting is shown without implying chronology.")).toBeInTheDocument();
+    const coverage = await screen.findByRole("region", { name: /^related coverage$/i });
     expect(within(coverage).getByText(/not yet verified/i)).toBeInTheDocument();
     expect(within(coverage).queryByLabelText("Storyline structure")).toBeNull();
     expect(mobile().getByRole("link", { name: "Coverage" })).toHaveAttribute("href", "#route");

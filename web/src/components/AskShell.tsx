@@ -72,7 +72,7 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid h-8 w-8 flex-none place-items-center border"
+            className="grid h-11 w-11 flex-none place-items-center border"
             style={{ borderColor: "var(--line)", color: "var(--ink)" }}
           >
             <Close />
@@ -143,7 +143,7 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
             key={q}
             type="button"
             onClick={() => onSubmit(q)}
-            className="h-8 border px-2.5 text-[12.5px] transition hover:opacity-75"
+            className="min-h-11 border px-3 py-2 text-[12.5px] transition hover:opacity-75"
             style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
           >
             {q}
@@ -159,14 +159,14 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
           onKeyDown={onKeyDown}
           placeholder="Ask anything about this story…"
           aria-label="Ask"
-          className="h-[42px] min-w-0 flex-1 border px-3 text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+          className="h-11 min-w-0 flex-1 border px-3 text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
           style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
         />
         <button
           type="button"
           onClick={() => onSubmit(input)}
           aria-label="Send"
-          className="grid h-[42px] w-[42px] flex-none place-items-center border"
+          className="grid h-11 w-11 flex-none place-items-center border"
           style={{ borderColor: "var(--ink)", color: "var(--ink)" }}
         >
           <ArrowUp size={15} />

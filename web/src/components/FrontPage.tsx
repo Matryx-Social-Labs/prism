@@ -87,7 +87,6 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   }, [items, scoped]);
 
   const primaryLang = profile?.languages?.[0] ?? "en";
-  const subject = group ? group.name : "today";
   const emptyLabel = group
     ? `No ${group.name} stories on today's chart`
     : "Nothing on today's chart yet";
@@ -96,46 +95,63 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   const pick = (s: Scope) => { setScope(s); saveScope(s); };
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-20">
+    <div className="mx-auto max-w-[1400px] px-5 pb-24 sm:px-8 lg:pb-20 xl:px-10">
       <Masthead dateline={dateline} right={profile?.state ? (
         <div className="flex gap-3 font-mono text-[11px] uppercase tracking-[0.06em]">
           {scopes.map(([s, l]) => (
             <button key={s} onClick={() => pick(s)} aria-pressed={scope === s}
-              className="underline-offset-4 aria-pressed:underline"
+              className="min-h-11 underline-offset-4 aria-pressed:underline"
               style={{ color: scope === s ? "var(--ink)" : "var(--ink-faint)" }}>{l}</button>
           ))}
         </div>
       ) : null} />
-      <SectorStrip active={group?.slug ?? null} allLabel="" />
-      <h1 id="chart-title" className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">
-        {group ? group.name : tab === "foryou" ? "For you" : "Today"}
-      </h1>
-      {hasInterests && !group && (
-        <div role="tablist" className="flex gap-5 pt-4 font-display text-[18px] uppercase tracking-[0.04em]">
-          {(["today", "foryou"] as Tab[]).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-              className="border-b-2 pb-1"
-              style={{ borderColor: tab === t ? "var(--ink)" : "transparent", color: tab === t ? "var(--ink)" : "var(--ink-faint)" }}>
-              {t === "today" ? "Today" : "For you"}
-            </button>
-          ))}
+      <div className="lg:grid lg:grid-cols-[188px_minmax(0,1fr)] lg:gap-10 xl:gap-12">
+        <SectorStrip active={group?.slug ?? null} allLabel="" responsiveRail />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pt-4 lg:pt-0">
+            <div>
+              <h1 id="chart-title" className="font-display text-[28px] uppercase leading-none tracking-[0.03em] lg:text-[34px]">
+                {group ? group.name : tab === "foryou" ? "For you" : "Today"}
+              </h1>
+              <p className="mt-2 hidden max-w-[52ch] text-[14px] leading-[1.5] lg:block" style={{ color: "var(--ink-muted)" }}>
+                Live story records from monitored outlets, ordered by corroboration and recency.
+              </p>
+            </div>
+            {hasInterests && !group && (
+              <div role="tablist" className="flex gap-5 font-display text-[18px] uppercase tracking-[0.04em]">
+                {(["today", "foryou"] as Tab[]).map((t) => (
+                  <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                    className="min-h-[44px] border-b-2 px-1 pt-2"
+                    style={{ borderColor: tab === t ? "var(--ink)" : "transparent", color: tab === t ? "var(--ink)" : "var(--ink-faint)" }}>
+                    {t === "today" ? "Today" : "For you"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <section aria-labelledby="chart-title" className="pt-3">
+            {error ? (
+              <div className="rule-live py-6" role="status">
+                <p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>Today&rsquo;s record could not load.</p>
+                <p className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>{error}</p>
+              </div>
+            ) : items === null ? (
+              <div className="rule-live py-5" aria-busy="true" aria-label="Loading today's chart">
+                <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
+                  Printing today&rsquo;s chart…
+                </p>
+                <div className="mt-5 grid gap-4" aria-hidden>
+                  {["82%", "68%", "74%", "57%"].map((width) => (
+                    <span key={width} className="pulse-skel block h-3" style={{ width, background: "var(--bg-sunken)" }} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} yesterdayHref="/feed/yesterday" />
+            )}
+          </section>
         </div>
-      )}
-      <section aria-labelledby="chart-title" className="pt-3">
-        {error ? (
-          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }}>{error}</p>
-        ) : items === null ? (
-          <p
-            className="rule-live py-6 font-mono text-[11px] uppercase tracking-[0.06em]"
-            style={{ color: "var(--ink-faint)" }}
-            aria-busy="true"
-          >
-            Printing today&rsquo;s chart…
-          </p>
-        ) : (
-          <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} yesterdayHref="/feed/yesterday" />
-        )}
-      </section>
+      </div>
     </div>
   );
 }

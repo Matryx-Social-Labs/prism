@@ -38,7 +38,7 @@ export function HeaderNav() {
         <Link
           key={n.href}
           href={n.href}
-          className="hidden border-b-2 px-1 pb-0.5 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] sm:block"
+          className="hidden min-h-11 items-center border-b-2 px-1 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] md:flex"
           style={{ borderColor: active(n.href) ? "var(--ink)" : "transparent", color: active(n.href) ? "var(--ink)" : "var(--ink-muted)" }}
           aria-current={active(n.href) ? "page" : undefined}
         >
@@ -48,7 +48,7 @@ export function HeaderNav() {
       <Link
         href="/search"
         aria-label="Search"
-        className="hidden h-8 w-8 items-center justify-center rounded-full sm:flex"
+        className="hidden h-11 w-11 items-center justify-center rounded-full md:flex"
         style={{ color: active("/search") ? "var(--ink)" : "var(--ink-muted)" }}
       >
         <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -59,7 +59,7 @@ export function HeaderNav() {
       {!session && (
         <Link
           href="/signin"
-          className="hidden px-1 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] sm:block"
+          className="hidden min-h-11 items-center px-1 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] md:flex"
           style={{ color: active("/signin") ? "var(--ink)" : "var(--ink-muted)" }}
         >
           Sign in
@@ -69,16 +69,17 @@ export function HeaderNav() {
       {session ? (
         <Link
           href="/account"
-          className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] font-semibold uppercase"
+          className="flex h-11 w-11 items-center justify-center rounded-full border text-[12px] font-semibold uppercase"
           style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
           title={`Signed in as ${session.email}`}
+          aria-label={`Account for ${session.email}`}
         >
           {session.email.slice(0, 1)}
         </Link>
       ) : landing || ownAction ? null : (
         <Link
           href="/onboarding"
-          className="whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition hover:opacity-85 sm:px-[18px]"
+          className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition hover:opacity-85 sm:px-[18px]"
           style={{ background: "var(--ink)", color: "var(--bg)" }}
         >
           Pick your sectors

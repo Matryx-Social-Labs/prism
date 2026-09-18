@@ -29,7 +29,7 @@ export function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label="Toggle color theme"
-      className="flex h-8 w-8 items-center justify-center rounded-full border transition hover:opacity-70"
+      className="flex h-11 w-11 items-center justify-center rounded-full border transition hover:opacity-70"
       style={{ borderColor: "var(--line)" }}
     >
       {/* Stroked glyphs in currentColor: the emoji sun rendered in amber, which

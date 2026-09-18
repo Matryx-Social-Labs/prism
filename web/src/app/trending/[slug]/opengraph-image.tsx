@@ -50,7 +50,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       : `${developments} related ${developments === 1 ? "event" : "events"}`
     : "";
   const host = SITE_URL.replace(/^https?:\/\//, "");
-  const fonts = await ogFonts(headline, countLabel, ...grid, foot, host, "PRISM One story. Every perspective.", String(developments));
+  const fonts = await ogFonts(headline, countLabel, ...grid, foot, host, "PRISM Follow the story, not the headlines.", String(developments));
 
   return new ImageResponse(
     <OgCard count={developments || ""} countLabel={countLabel} headline={headline} grid={grid} foot={foot} host={host} />,

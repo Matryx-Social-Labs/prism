@@ -13,8 +13,8 @@ export const contentType = "image/png";
 
 export default async function Image() {
   const c = OG_COLORS;
-  const headline = "One story. Every perspective.";
-  const line = "Every outlet's report of one event, gathered into one story you can check: who said what, verbatim, and which outlets.";
+  const headline = "Follow the story, not the headlines.";
+  const line = "One live record from monitored outlets, with every development, verified quote and source open to inspection.";
   const host = SITE_URL.replace(/^https?:\/\//, "");
   const fonts = await ogFonts(headline, line, host, "PRISM Today's chart");
   return new ImageResponse(

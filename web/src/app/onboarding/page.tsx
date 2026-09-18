@@ -115,7 +115,7 @@ export default function OnboardingPage() {
           <div className="mt-4">
             {session && (
               <Field label="Your name" hint="For the account you are signed in to.">
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" aria-label="Your name"
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" aria-label="Your name" autoComplete="name"
                   className="h-12 w-full max-w-[360px] border px-4 text-[16px] outline-none"
                   style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }} />
               </Field>

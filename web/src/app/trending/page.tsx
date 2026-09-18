@@ -76,31 +76,40 @@ export default function TrendingPage() {
   const subject = sectorGroup(group)?.name ?? "all sectors";
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 pb-24 sm:px-8 lg:pb-16">
+    <div className="mx-auto max-w-[1400px] px-5 pb-24 sm:px-8 lg:pb-16 xl:px-10">
       <Masthead dateline={dateline} right={state ? (
         <div className="flex gap-3 font-mono text-[11px] uppercase tracking-[0.06em]">
           {scopes.map(([s, l]) => (
             <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s}
-              className="underline-offset-4 aria-pressed:underline"
+              className="min-h-11 underline-offset-4 aria-pressed:underline"
               style={{ color: scope === s ? "var(--ink)" : "var(--ink-faint)" }}>{l}</button>
           ))}
         </div>
       ) : null} />
-      <SectorStrip active={group} onPick={setGroup} allLabel="" />
-      <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">Trending</h1>
-      <section aria-label={`Trending, ${subject}`} className="pt-3">
-        {error ? (
-          <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }}>{error}</p>
-        ) : stories === null ? (
-          <p className="rule-live py-6 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>Printing…</p>
-        ) : stories.length === 0 ? (
-          <p className="rule-live py-8 text-[15px]" style={{ color: "var(--ink-muted)" }}>No story is moving in {subject} right now.</p>
-        ) : (
-          <ol className="chart-print">
-            {stories.map((s, i) => <ArcRow key={s.slug} story={s} lead={i === 0} />)}
-          </ol>
-        )}
-      </section>
+      <div className="lg:grid lg:grid-cols-[188px_minmax(0,1fr)] lg:gap-10 xl:gap-12">
+        <SectorStrip active={group} onPick={setGroup} allHref="/trending" allLabel="" responsiveRail />
+        <div className="min-w-0">
+          <div className="pt-4 lg:pt-0">
+            <h1 className="font-display text-[28px] uppercase leading-none tracking-[0.03em] lg:text-[34px]">Trending</h1>
+            <p className="mt-2 hidden max-w-[52ch] text-[14px] leading-[1.5] lg:block" style={{ color: "var(--ink-muted)" }}>
+              Developing stories ranked by new reporting, source breadth and movement over time.
+            </p>
+          </div>
+          <section aria-label={`Trending, ${subject}`} className="pt-3">
+            {error ? (
+              <p className="rule-live py-6 text-[14.5px]" style={{ color: "var(--danger)" }}>{error}</p>
+            ) : stories === null ? (
+              <p className="rule-live py-6 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>Printing…</p>
+            ) : stories.length === 0 ? (
+              <p className="rule-live py-8 text-[15px]" style={{ color: "var(--ink-muted)" }}>No story is moving in {subject} right now.</p>
+            ) : (
+              <ol className="chart-print">
+                {stories.map((s, i) => <ArcRow key={s.slug} story={s} lead={i === 0} />)}
+              </ol>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

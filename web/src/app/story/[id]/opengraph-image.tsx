@@ -17,7 +17,7 @@ export const contentType = "image/png";
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let title = "One story. Every perspective.";
+  let title = "Follow the story, not the headlines.";
   let sources = 0;
   let grid: string[] = [];
   let foot = "";
@@ -39,7 +39,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const countLabel = sources ? `${sources} ${sources === 1 ? "outlet" : "outlets"} filed this story` : "";
   const host = SITE_URL.replace(/^https?:\/\//, "");
   // Every string the card draws — see ogFonts: an omitted glyph vanishes.
-  const fonts = await ogFonts(headline, countLabel, ...grid, foot, host, "PRISM One story. Every perspective.", String(sources));
+  const fonts = await ogFonts(headline, countLabel, ...grid, foot, host, "PRISM Follow the story, not the headlines.", String(sources));
 
   return new ImageResponse(
     <OgCard count={sources || ""} countLabel={countLabel} headline={headline} grid={grid} foot={foot} host={host} />,
