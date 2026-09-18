@@ -3,6 +3,14 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.25] - 2026-09-18
+
+### Fixed
+- Replaced the failing Gemini 3.1 Flash Lite defaults for relevance, classification,
+  extraction, and Ask moderation with the production-probed Gemini 3.5 Flash model.
+- Send minimal reasoning on the first request to models that require it, avoiding a
+  rejected request and noisy provider error on every structured pipeline call.
+
 ## [0.0.81.24] - 2026-09-17
 
 ### Added

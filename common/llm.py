@@ -103,6 +103,20 @@ def get_llm() -> AsyncOpenAI:
 # 13.3s) by default, 64 tokens and 2.0s with this; qwen3.7-flash 743 -> 51;
 # gemini-3.1-flash-lite reasons nothing either way.
 REASONING_OFF: dict[str, Any] = {"enabled": False}
+# These OpenRouter endpoints reject `enabled: false`. Sending the known-good
+# minimal setting on the first request avoids one paid-stage round trip and one
+# noisy 400 for every gate/classify/extract call. Unknown models still use the
+# defensive 400 fallback below.
+_MANDATORY_REASONING_MODELS = frozenset({
+    "google/gemini-3.5-flash",
+    "z-ai/glm-5.3-flash",
+})
+
+
+def _reasoning_payload(model: str, reasoning: dict[str, Any]) -> dict[str, Any]:
+    if reasoning == REASONING_OFF and model in _MANDATORY_REASONING_MODELS:
+        return {"effort": "minimal"}
+    return reasoning
 
 
 async def structured_chat[T: BaseModel](
@@ -167,7 +181,7 @@ async def structured_chat[T: BaseModel](
     if temperature is not None:
         kwargs["temperature"] = temperature
     if reasoning is not None and get_settings().llm_provider == "openrouter":
-        kwargs["extra_body"] = {"reasoning": reasoning}
+        kwargs["extra_body"] = {"reasoning": _reasoning_payload(model, reasoning)}
 
     last_err: Exception | None = None
     for attempt in range(max_retries):

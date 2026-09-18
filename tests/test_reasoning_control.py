@@ -45,6 +45,40 @@ async def test_reasoning_off_is_sent_and_mandatory_reasoning_falls_back_to_minim
     assert calls == [{"reasoning": {"enabled": False}}, {"reasoning": {"effort": "minimal"}}]
 
 
+@pytest.mark.asyncio
+async def test_known_mandatory_reasoning_model_starts_at_minimal(monkeypatch):
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        ok: bool
+
+    calls = []
+
+    class _Completions:
+        async def create(self, **kw):
+            calls.append(kw.get("extra_body"))
+            return _Resp('{"ok": true}')
+
+    class _Client:
+        chat = type("Chat", (), {"completions": _Completions()})()
+
+    monkeypatch.setattr(llm, "get_llm", lambda: _Client())
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    from common.config import get_settings
+
+    get_settings.cache_clear()
+    out = await llm.structured_chat(
+        model="google/gemini-3.5-flash",
+        messages=[{"role": "user", "content": "x"}],
+        output_model=Out,
+        trace_name="t",
+        reasoning=llm.REASONING_OFF,
+    )
+    assert out.ok is True
+    assert calls == [{"reasoning": {"effort": "minimal"}}]
+
+
 async def _noop():
     return None
 
