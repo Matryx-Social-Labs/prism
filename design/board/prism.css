@@ -304,7 +304,7 @@ img{display:block;max-width:100%}
 .hero .cta{display:flex;gap:10px;margin-top:24px;flex-wrap:wrap;align-items:center}
 .hero .proof{margin-top:32px}
 @media(min-width:1024px){.hero{padding:64px 0 48px}.hero .shell{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:56px;align-items:center}.hero h1{font-size:60px}.hero .proof{margin-top:0}}
-.disperse{display:block;width:100%;height:auto;margin:0 0 20px}
+.disperse{display:block;width:100%;max-width:520px;height:auto;margin:0 auto 20px}
 .eyebrow{font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
 .lsection{padding:40px 0;border-top:1px solid var(--line)}
 @media(min-width:1024px){.lsection{padding:64px 0}}

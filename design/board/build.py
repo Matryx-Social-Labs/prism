@@ -292,7 +292,7 @@ img{display:block;max-width:100%}
 .hero .cta{display:flex;gap:10px;margin-top:24px;flex-wrap:wrap;align-items:center}
 .hero .proof{margin-top:32px}
 @media(min-width:1024px){.hero{padding:64px 0 48px}.hero .shell{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:56px;align-items:center}.hero h1{font-size:60px}.hero .proof{margin-top:0}}
-.disperse{display:block;width:100%;height:auto;margin:0 0 20px}
+.disperse{display:block;width:100%;max-width:520px;height:auto;margin:0 auto 20px}
 .eyebrow{font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
 .lsection{padding:40px 0;border-top:1px solid var(--line)}
 @media(min-width:1024px){.lsection{padding:64px 0}}
@@ -704,24 +704,67 @@ def page_stories(trending) -> str:
 </div></div></main>{tabbar("stories")}</body></html>"""
 
 
-def disperse_svg(outlets: list[str], reports: int | None = None) -> str:
-    """The brand figure: many reports enter the prism, one record leaves — in colour."""
-    left = outlets[:7]
-    ys = [40 + i * 30 for i in range(len(left))]
-    dots = "".join(
-        f'<g transform="translate(24,{y})"><circle r="13" fill="var(--surface)" stroke="var(--line-strong)"/><text x="0" y="3.5" text-anchor="middle" font-family="Hind,sans-serif" font-weight="600" font-size="9" fill="var(--ink-2)">{initials(o)}</text></g>'
-        for o, y in zip(left, ys)
-    )
-    beams = "".join(f'<path d="M40 {y} C 120 {y}, 150 130, 196 130" stroke="var(--ink-3)" stroke-opacity=".45" stroke-width="1" fill="none"/>' for y in ys)
-    cols = ["#ef4444", "#f59e0b", "#06b6d4", "#8b5cf6"]
-    fan = "".join(f'<path d="M262 128 C 300 {128 + (i-1.5)*22}, 330 {128+(i-1.5)*26}, 372 {128+(i-1.5)*26}" stroke="{c}" stroke-width="3" stroke-linecap="round" fill="none" opacity=".95"/>' for i, c in enumerate(cols))
-    return f"""<svg class="disperse" viewBox="0 0 400 260" role="img" aria-label="Many reports enter the prism; one record with every perspective leaves">
-  {beams}{dots}
-  <g transform="translate(228,130)"><path d="M0 -34 L34 30 L-34 30 Z" fill="var(--ink)"/><rect x="-34" y="26" width="68" height="6" fill="url(#g1)"/></g>
-  {fan}
-  <text x="372" y="88" font-family="Hind,sans-serif" font-size="10.5" font-weight="600" fill="var(--ink-3)" text-anchor="end" letter-spacing="1">ONE RECORD</text>
-  <text x="26" y="20" font-family="Hind,sans-serif" font-size="10.5" font-weight="600" fill="var(--ink-3)" letter-spacing="1">{reports or len(outlets)} REPORTS · {len(outlets)} OUTLETS</text>
+def _refract(d, n_vec, eta):
+    """Vector Snell. `n_vec` points against the incoming ray. None on total internal reflection."""
+    ci = -(d[0] * n_vec[0] + d[1] * n_vec[1])
+    k = 1 - eta * eta * (1 - ci * ci)
+    if k < 0:
+        return None
+    f = eta * ci - k ** 0.5
+    v = (eta * d[0] + f * n_vec[0], eta * d[1] + f * n_vec[1])
+    ln = (v[0] ** 2 + v[1] ** 2) ** 0.5
+    return (v[0] / ln, v[1] / ln)
+
+
+def _hit(p, d, a, b):
+    r, sg = d, (b[0] - a[0], b[1] - a[1])
+    den = r[0] * sg[1] - r[1] * sg[0]
+    if abs(den) < 1e-9:
+        return None
+    qp = (a[0] - p[0], a[1] - p[1])
+    t = (qp[0] * sg[1] - qp[1] * sg[0]) / den
+    u = (qp[0] * r[1] - qp[1] * r[0]) / den
+    return (p[0] + t * r[0], p[1] + t * r[1]) if t > 0 and 0 <= u <= 1 else None
+
+
+def disperse_svg(*_args, **_kw) -> str:
+    """The brand figure, drawn as the physics actually happens: ONE beam of white
+    light enters the left face, bends toward the base on entry and again on exit,
+    and leaves as a fan — red least deviated, violet most. Snell's law with an
+    exaggerated dispersion (n 1.44 → 1.58) so the fan is legible at 400px.
+    One story in; every perspective out. Nothing "combines" in a prism, so the
+    figure no longer pretends many reports flow into it."""
+    import math
+    apex, bl, br = (170.0, 61.4), (90.0, 200.0), (250.0, 200.0)
+    def unit(v):
+        ln = (v[0] ** 2 + v[1] ** 2) ** 0.5
+        return (v[0] / ln, v[1] / ln)
+    n_left = unit((-138.6, -80.0))   # outward normal, left face
+    n_right_in = unit((-138.6, 80.0))  # inward normal, right face (against the exiting ray)
+    ang = math.radians(-10)  # the beam rises slightly into the prism, as in every textbook figure
+    d0 = (math.cos(ang), math.sin(ang))
+    m1 = ((apex[0] + bl[0]) / 2 + 6, (apex[1] + bl[1]) / 2 + 10)
+    start = (m1[0] - 118 * d0[0], m1[1] - 118 * d0[1])
+    cols = [("#ef4444", 1.44), ("#f59e0b", 1.47), ("#06b6d4", 1.52), ("#8b5cf6", 1.58)]
+    inside, outside = [], []
+    for c, n in cols:
+        t1 = _refract(d0, n_left, 1 / n)
+        h = _hit(m1, t1, apex, br)
+        t2 = _refract(t1, n_right_in, n)
+        if not h or not t2:
+            continue
+        end = (h[0] + 135 * t2[0], h[1] + 135 * t2[1])
+        inside.append(f'<line x1="{m1[0]:.1f}" y1="{m1[1]:.1f}" x2="{h[0]:.1f}" y2="{h[1]:.1f}" stroke="{c}" stroke-width="2" stroke-opacity=".7"/>')
+        outside.append(f'<line x1="{h[0]:.1f}" y1="{h[1]:.1f}" x2="{end[0]:.1f}" y2="{end[1]:.1f}" stroke="{c}" stroke-width="3" stroke-linecap="round"/>')
+    return f"""<svg class="disperse" viewBox="0 0 400 260" role="img" aria-label="One beam of white light enters a prism and leaves as a spectrum: one story in, every perspective out">
   <defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#ef4444"/><stop offset=".35" stop-color="#f59e0b"/><stop offset=".7" stop-color="#06b6d4"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+  <path d="M{apex[0]} {apex[1]} L{br[0]} {br[1]} L{bl[0]} {bl[1]} Z" fill="var(--surface)" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="{bl[0]}" y="{bl[1]-4}" width="{br[0]-bl[0]}" height="5" fill="url(#g1)"/>
+  <line x1="{start[0]:.1f}" y1="{start[1]:.1f}" x2="{m1[0]:.1f}" y2="{m1[1]:.1f}" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+  {"".join(inside)}
+  {"".join(outside)}
+  <text x="{start[0]:.0f}" y="{start[1]-12:.0f}" font-family="Hind,sans-serif" font-size="10.5" font-weight="600" fill="var(--ink-3)" letter-spacing="1">ONE STORY</text>
+  <text x="398" y="254" text-anchor="end" font-family="Hind,sans-serif" font-size="10.5" font-weight="600" fill="var(--ink-3)" letter-spacing="1">EVERY PERSPECTIVE</text>
 </svg>"""
 
 
@@ -738,17 +781,18 @@ def page_landing(feed, event, lenses) -> str:
     devs = sorted(event["sources"], key=lambda s: s.get("published_at") or "", reverse=True)[:3]
     tl = "".join(f'<li{" class=now" if i==0 else ""}><div class="t">{ago(s.get("published_at"))} · {s["source_name"]}</div><div class="h" style="font-size:15px">{(s.get("title") or "")[:90]}</div></li>' for i, s in enumerate(devs))
     return head("Landing") + topbar("about", cta="Open today's record") + f"""
+<div class="masthead"><div class="row"><a class="brand" href="#">{mark(24, "lm")}<span>Prism</span></a><a class="btn btn-ghost btn-sm" href="#">Sign in</a></div></div>
 <main>
 <section class="hero"><div class="shell">
   <div>
-    <p class="eyebrow">News for India · every language · every source open</p>
+    <p class="eyebrow">News for India · every source open</p>
     <h1>Follow the story, not the headlines.</h1>
     <p class="lede">Prism turns the day's reports from monitored outlets into one live record per story — what changed, who said what, exactly, and which outlets covered it. Then read the same facts through the lens of your work.</p>
     <div class="cta"><a class="btn btn-primary btn-lg" href="#">Open today's record {ICONS["arrow"]}</a><a class="btn btn-ghost btn-lg" href="#">How it works</a></div>
     <div class="kpi"><div><b>27</b><span>monitored outlets</span></div><div><b>10</b><span>languages read</span></div><div><b>1</b><span>record per story</span></div></div>
   </div>
   <div class="proof">
-    {disperse_svg(sorted(set(names)), reports=len(names))}
+    {disperse_svg()}
     <div class="rows">{story_row(lead, lead=True, sources_for_monos=names)}</div>
     <p class="mono-s faint" style="margin:10px 2px 0">LIVE · updated {ago(event.get("last_updated_at"))}</p>
   </div>
