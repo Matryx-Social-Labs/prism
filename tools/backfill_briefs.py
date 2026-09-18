@@ -10,6 +10,9 @@ which is the right shape for a backfill and the wrong one for the live path.
   (default)       count and estimate; write nothing, submit nothing
   --submit [N]    submit one batch of up to N events (default 500); prints the batch id
   --collect ID    fetch a finished batch and persist its briefs
+  --sync [N]      no batch: call the chat endpoint directly for up to N events
+                  (default all), newest first, 8 at a time, persisting as it goes.
+                  Full price; the trial batch sat in_progress for 22h with 0/10 done.
   --model M       the model slug (default: the light extract model)
 
 State is the event row itself: a collected brief lands in projection.lens_briefs,
@@ -26,6 +29,7 @@ from sqlalchemy import text
 
 from common.config import get_settings
 from common.db import get_session_factory
+from common.llm import _parse_json_loose
 from correlation.briefs import persist_briefs
 from correlation.consumer import extracted_reader_brief
 
@@ -60,21 +64,71 @@ def request_for(ev) -> dict:
 
 
 def parse(content: str) -> dict | None:
-    """The model's JSON, tolerating a fence; None when it is not a brief."""
-    s = content.strip()
-    if s.startswith("```"):
-        s = s.strip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
+    """The model's JSON, tolerating a fence or trailing prose; None when it is
+    not a brief."""
     try:
-        data = json.loads(s)
-    except json.JSONDecodeError:
+        data = _parse_json_loose(content)
+    except ValueError:
         return None
-    return extracted_reader_brief(data) if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    # glm-5.3-flash under json_object (no schema) sometimes wraps the object in a
+    # single key ({"answer": {...}} or {"answer": "<json string>"}) and sometimes
+    # writes the brief as a list of sentences — 7 of 40 on the first sync runs.
+    # Unwrap and join; nothing else.
+    if len(data) == 1 and "reader_brief" not in data:
+        inner = next(iter(data.values()))
+        if isinstance(inner, str):
+            try:
+                inner = _parse_json_loose(inner)
+            except ValueError:
+                return None
+        if isinstance(inner, dict):
+            data = inner
+    if isinstance(data.get("reader_brief"), list):
+        data = {**data, "reader_brief": " ".join(str(x).strip() for x in data["reader_brief"])}
+    return extracted_reader_brief(data)
+
+
+async def run_sync(todo, model: str, headers: dict) -> int:
+    """The batch bodies, sent one by one through the live endpoint. Mandatory-
+    reasoning models (glm) get the smallest effort so the 400-token ceiling is
+    spent on the brief, not on thinking."""
+    sem = asyncio.Semaphore(8)
+    written = skipped = 0
+
+    async def one(http, ev):
+        nonlocal written, skipped
+        # English is asked for again here, and the ceiling raised: a Hindi source
+        # had glm answer in Devanagari and run out of tokens at 400.
+        body = {"model": model, "reasoning": {"effort": "minimal"}, **request_for(ev)["body"], "max_tokens": 700}
+        body["messages"][-1]["content"] += "\n\nWrite the brief in English."
+        async with sem:
+            try:
+                r = await http.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, content=json.dumps(body))
+                content = ((((r.json().get("choices") or [{}])[0]).get("message") or {}).get("content") or "") if r.status_code == 200 else ""
+            except (httpx.HTTPError, ValueError):
+                content = ""
+        brief = parse(content)
+        if not brief:
+            skipped += 1
+            return
+        await persist_briefs(__import__("uuid").UUID(ev["id"]), {"reader": brief})
+        written += 1
+        if written % 200 == 0:
+            print(f"  {written} written, {skipped} skipped", flush=True)
+
+    async with httpx.AsyncClient(timeout=120) as http:
+        await asyncio.gather(*[one(http, ev) for ev in todo])
+    print(f"written {written}, skipped {skipped} of {len(todo)} on {model}")
+    return 0
 
 
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--submit", nargs="?", const=500, type=int, default=None)
     ap.add_argument("--collect", default=None)
+    ap.add_argument("--sync", nargs="?", const=0, type=int, default=None)
     ap.add_argument("--model", default=None)
     args = ap.parse_args()
     settings = get_settings()
@@ -102,8 +156,11 @@ async def main() -> int:
         print(f"written {written}, skipped {skipped}")
         return 0
 
+    limit = args.submit or args.sync or None
     async with get_session_factory()() as session:
-        todo = (await session.execute(text(MISSING + " ORDER BY e.last_updated_at DESC" + (f" LIMIT {int(args.submit)}" if args.submit else "")))).mappings().all()
+        todo = (await session.execute(text(MISSING + " ORDER BY e.last_updated_at DESC" + (f" LIMIT {int(limit)}" if limit else "")))).mappings().all()
+    if args.sync is not None:
+        return await run_sync(todo, model, headers)
     print(f"{len(todo)} events without a Reader brief; ~{len(todo) * 1.6 / 1000:.2f}M input + ~{len(todo) * 0.25 / 1000:.2f}M output tokens on {model} at batch price")
     if not args.submit:
         print("dry run — pass --submit [N] to send one batch, then --collect <id> when it completes")
