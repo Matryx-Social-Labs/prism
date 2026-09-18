@@ -22,7 +22,7 @@ describe("HeroLensDemo — the flip, demonstrated", () => {
 
   it("says it is an illustration and marks the reads still being built", () => {
     render(<HeroLensDemo />);
-    expect(screen.getByText("Illustration")).toBeInTheDocument();
+    expect(screen.getByText(/Illustration/)).toBeInTheDocument();
     expect(screen.getAllByLabelText("coming next")).toHaveLength(2);
   });
 });

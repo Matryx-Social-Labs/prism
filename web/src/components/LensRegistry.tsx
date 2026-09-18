@@ -8,13 +8,13 @@ import { useLenses } from "@/lib/lenses";
 export function LensRegistry() {
   const lenses = useLenses();
   return (
-    <ul className="rule-live">
+    <ul className="flex flex-col gap-2">
       {lenses.map((l) => (
-        <li key={l.slug} className="flex items-baseline gap-3 border-b py-3" style={{ borderColor: "var(--line)" }}>
-          <span aria-hidden className="inline-block h-[7px] w-[7px] shrink-0 translate-y-[-1px] rounded-full" style={{ background: l.color }} />
+        <li key={l.slug} className="card flex items-start gap-3 py-3">
+          <span aria-hidden className="mt-[7px] inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: l.color }} />
           <span className="min-w-0">
-            <span className="text-[15.5px] font-medium" style={{ color: "var(--ink)" }}>{l.name}</span>
-            <span className="block text-[13.5px] leading-[1.5]" style={{ color: "var(--ink-muted)" }}>{l.plain ?? l.tagline}</span>
+            <span className="text-[15px] font-semibold" style={{ color: "var(--ink)" }}>{l.name}</span>
+            <span className="block text-[13.5px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>{l.plain ?? l.tagline}</span>
           </span>
         </li>
       ))}

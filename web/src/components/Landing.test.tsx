@@ -16,9 +16,9 @@ import { Landing } from "@/components/Landing";
 beforeEach(() => fetchFeed.mockReset().mockResolvedValue([]));
 
 describe("Landing", () => {
-  it("sends every 'Open today’s chart' action to /feed, never to /", async () => {
+  it("sends every 'Open today’s record' action to /feed, never to /", async () => {
     render(await Landing());
-    const actions = screen.getAllByRole("link", { name: "Open today’s chart" });
+    const actions = screen.getAllByRole("link", { name: /Open today’s record/ });
     expect(actions.length).toBeGreaterThan(0);
     for (const a of actions) expect(a).toHaveAttribute("href", "/feed");
   });
@@ -26,9 +26,9 @@ describe("Landing", () => {
   it("labels written interactions as illustrations and separates current work from future work", async () => {
     render(await Landing());
     // the flip demo and the Ask example; live records are never labelled as examples
-    expect(screen.getAllByText(/^Illustration/)).toHaveLength(2);
-    expect(screen.getByRole("heading", { name: "What is ready, and what is not" })).toBeInTheDocument();
-    for (const t of ["The inspectable record", "Quality before reach", "Return only when it matters"]) {
+    expect(screen.getAllByText(/Illustration/)).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Honest about what’s live." })).toBeInTheDocument();
+    for (const t of ["Available now", "In validation", "Next"]) {
       expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
     }
   });
@@ -36,7 +36,7 @@ describe("Landing", () => {
   it("leads with the product's narrower, verifiable promise", async () => {
     render(await Landing());
     expect(screen.getByRole("heading", { name: "Follow the story, not the headlines." })).toBeInTheDocument();
-    expect(screen.getByText("One live record from monitored outlets, with every development, quote and source open to inspection.")).toBeInTheDocument();
+    expect(screen.getByText(/one live record per story: what changed, who said what, exactly, and which outlets covered it/)).toBeInTheDocument();
   });
 
   it("renders the live registry, not a typed list of lenses", async () => {

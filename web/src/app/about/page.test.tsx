@@ -43,7 +43,8 @@ describe("/about — the product as the proof, live", () => {
     render(await AboutPage());
 
     // The nine-outlet story leads in the live record, by the chart's order, not the API's.
-    expect(screen.getByRole("link", { name: "Open live record: Story strong" })).toHaveAttribute("href", "/story/strong");
+    const hero = screen.getByRole("list", { name: "Open live record: Story strong" });
+    expect(within(hero).getByRole("link", { name: /Story strong/ })).toHaveAttribute("href", "/story/strong");
     // The remaining live rows keep the chart's real count grammar.
     const rows = screen.getByRole("heading", { name: "Live now" }).closest("section")!;
     expect(within(rows).getByRole("link", { name: /Story quoted/ })).toHaveAttribute("href", "/story/quoted");
@@ -101,14 +102,14 @@ describe("/about — the product as the proof, live", () => {
   it("says the chart is unreachable rather than showing an empty or made-up proof", async () => {
     fetchFeed.mockRejectedValue(new Error("offline"));
     render(await AboutPage());
-    expect(screen.getByText(/The live chart is unreachable right now/)).toBeInTheDocument();
+    expect(screen.getByText(/The live record is unreachable right now/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "See what changed" })).toBeNull();
   });
 
   it("has one action, with one label, and no eyebrow or em-dash anywhere", async () => {
     fetchFeed.mockResolvedValue([]);
     render(await AboutPage());
-    const actions = screen.getAllByRole("link", { name: "Open today’s chart" });
+    const actions = screen.getAllByRole("link", { name: /Open today’s record/ });
     expect(actions.length).toBeGreaterThan(0);
     // /feed, never /: under the revised D5 a first visitor at / gets this page again.
     for (const a of actions) expect(a).toHaveAttribute("href", "/feed");
