@@ -3,6 +3,12 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.26] - 2026-09-18
+
+### Fixed
+- Treat provider completion envelopes with no choices as transient empty responses,
+  so the stream retries them instead of permanently dead-lettering the article.
+
 ## [0.0.81.25] - 2026-09-18
 
 ### Fixed

@@ -204,7 +204,23 @@ async def structured_chat[T: BaseModel](
         except Exception as e:
             _maybe_start_cooldown(e)
             raise
-        choice = response.choices[0]
+        choices = response.choices or []
+        if not choices:
+            # OpenRouter occasionally returns a syntactically valid completion
+            # envelope with `choices: null`. It is the same provider failure as
+            # an empty choice, not a permanent article/schema error. Keeping it a
+            # ConnectionError lets the stream retry instead of dead-lettering.
+            last_err = LlmEmptyResponse("empty response (no choices)")
+            logger.warning(
+                "llm_empty_response",
+                attempt=attempt + 1,
+                trace=trace_name,
+                finish_reason="missing_choices",
+                model=model,
+            )
+            await asyncio.sleep(2)
+            continue
+        choice = choices[0]
         content = choice.message.content or ""
         if not content.strip():
             # Not a parse failure: the provider gave nothing. Try once more

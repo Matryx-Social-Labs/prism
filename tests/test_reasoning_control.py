@@ -108,5 +108,31 @@ async def test_an_empty_provider_answer_is_transient_not_a_parse_failure(monkeyp
         await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t")
 
 
+@pytest.mark.asyncio
+async def test_a_provider_answer_without_choices_is_transient(monkeypatch):
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        ok: bool
+
+    class _Completions:
+        async def create(self, **kw):
+            return type("Response", (), {"choices": None})()
+
+    class _Client:
+        chat = type("Chat", (), {"completions": _Completions()})()
+
+    monkeypatch.setattr(llm, "get_llm", lambda: _Client())
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setattr(llm.asyncio, "sleep", _sleep0)
+    with pytest.raises(llm.LlmEmptyResponse):
+        await llm.structured_chat(
+            model="m",
+            messages=[{"role": "user", "content": "x"}],
+            output_model=Out,
+            trace_name="t",
+        )
+
+
 async def _sleep0(_):
     return None
