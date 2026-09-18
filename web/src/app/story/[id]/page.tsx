@@ -28,11 +28,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const description = metaDescription(event);
   const url = `/story/${id}`;
-  // Only set `images` when the story has a publisher photo. An explicit
-  // `images: undefined` still counts as the page defining its own images, which
-  // suppresses the opengraph-image.tsx fallback — shipping a share card with no
-  // image at all in the common case, since most stories carry no photo.
-  const images = event.image_url ? { images: [event.image_url] } : {};
+  // The share card is always Prism's own (opengraph-image.tsx): a publisher's
+  // photograph is never presented as our card (legal review, 2026-09-18).
   return {
     title: event.title,
     description,
@@ -43,7 +40,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title: event.title,
       description,
       url,
-      ...images,
       publishedTime: event.occurred_at ?? undefined,
       modifiedTime: event.last_updated_at,
       section: event.sector ?? undefined,
@@ -53,7 +49,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       card: "summary_large_image",
       title: event.title,
       description,
-      ...images,
     },
   };
 }
@@ -64,13 +59,13 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   if (!event) notFound();
 
   // NewsArticle structured data — lets search + social render this as a news
-  // result with headline, image, and dates instead of a bare link.
+  // result with headline and dates instead of a bare link. No image: the
+  // publisher's photograph is not ours to declare.
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: event.title,
     description: metaDescription(event),
-    ...(event.image_url ? { image: [event.image_url] } : {}),
     datePublished: event.occurred_at ?? event.last_updated_at,
     dateModified: event.last_updated_at,
     url: `${SITE_URL}/story/${id}`,

@@ -23,6 +23,7 @@ class OutletRef(BaseModel):
     code: str
     origin: str  # national | intl | regional | wire
     language: str | None = None
+    domain: str | None = None  # the outlet's site, for its favicon
 
 
 class FeedItem(BaseModel):
@@ -100,6 +101,8 @@ class SourceRef(BaseModel):
     code: str | None = None  # monogram, from common/outlets.py
     origin: str | None = None  # national | intl | regional | wire
     language: str | None = None
+    publisher: str | None = None  # the masthead: The Hindu's state feeds share one
+    domain: str | None = None
 
 
 class PerspectiveOut(BaseModel):

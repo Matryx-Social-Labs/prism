@@ -29,8 +29,8 @@ export const LENS_META: Record<string, LensMeta> = {
     short: "Reader",
     tagline: "Every story with every perspective, consequences, and answers",
     plain: "what happened, and why it matters",
-    color: "var(--lens-general)",
-    bg: "var(--lens-general-bg)",
+    color: "var(--ink)", // the record is neutral: the Reader lens has no hue
+    bg: "var(--sunken)",
   },
   cyber: {
     slug: "cyber",
@@ -39,7 +39,7 @@ export const LENS_META: Record<string, LensMeta> = {
     tagline: "CVEs, incidents, and what they mean for your controls",
     plain: "who's exposed by this, and what to fix first",
     color: "var(--lens-cyber)",
-    bg: "var(--lens-cyber-bg)",
+    bg: "var(--lens-cyber-soft)",
   },
   markets: {
     slug: "markets",
@@ -47,19 +47,20 @@ export const LENS_META: Record<string, LensMeta> = {
     short: "Markets",
     tagline: "Market-moving news with tickers, catalysts, and price reads",
     plain: "what this moves in the market, and why",
-    color: "var(--lens-finance)",
-    bg: "var(--lens-finance-bg)",
+    color: "var(--lens-markets)",
+    bg: "var(--lens-markets-soft)",
   },
 };
 
 export const LENS_ORDER = ["reader", "cyber", "markets"];
 
-// Styling fallback for lenses the client doesn't know yet.
+// Styling for lenses the client doesn't know yet: the next unused stops of the
+// spectrum (DESIGN.md § Lenses — health rose, policy amber), then a repeat.
 const FALLBACK_PALETTE: [string, string][] = [
-  ["#0ea5e9", "rgba(14, 165, 233, 0.12)"],
-  ["#f43f5e", "rgba(244, 63, 94, 0.12)"],
-  ["#84cc16", "rgba(132, 204, 22, 0.14)"],
-  ["#d946ef", "rgba(217, 70, 239, 0.12)"],
+  ["var(--lens-health)", "var(--lens-health-soft)"],
+  ["var(--lens-policy)", "var(--lens-policy-soft)"],
+  ["var(--lens-cyber)", "var(--lens-cyber-soft)"],
+  ["var(--lens-markets)", "var(--lens-markets-soft)"],
 ];
 
 export function lensMeta(slug: string): LensMeta {

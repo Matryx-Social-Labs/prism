@@ -1,10 +1,11 @@
 /**
- * "What was said" — the perspectives layer's first read surface.
+ * "Who said what" — the perspectives layer's read surface.
  *
  * Every assertion here is a product rule, not a render check: verified text in
- * the body voice, provenance in mono, the citation IS the link, and nothing at
- * all when there is nothing to say. jsdom renders both the mobile and desktop
- * trees, so queries use getAllBy* / scope.
+ * the record voice, [n] in mono and the same index Coverage uses, the link
+ * opens the article on the quote, and nothing at all when there is nothing to
+ * say. jsdom renders both the mobile and desktop trees, so queries use
+ * getAllBy* / scope.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
@@ -43,28 +44,27 @@ function withClaims(claims: unknown): EventDetail {
 beforeEach(() => localStorage.clear());
 
 describe("What was said", () => {
-  it("renders speaker, verbatim quote, and a mono citation that links to the article", () => {
+  it("renders speaker, verbatim quote, the mono [n] and a link that opens the article on the quote", () => {
     render(<StoryView event={withClaims([
       { speaker: "Anita Dipke", claims: [{ quote_text: QUOTE, quote_start: 1, quote_end: 2,
         article_id: "a2", source_name: "The Hindu", url: "https://x.example/a2",
         published_at: "2026-07-27T10:00:00Z" }] },
     ])} />);
-    const section = screen.getAllByRole("region", { name: /what was said/i })[0];
+    const section = screen.getAllByRole("region", { name: /who said what/i })[0];
     expect(within(section).getByText("Anita Dipke")).toBeInTheDocument();
     const bq = within(section).getByText(`“${QUOTE}”`);
-    // DESIGN.md: mono is provenance only. The quote and the speaker are the body voice.
+    // DESIGN.md: the quote is the record voice, never mono.
     expect(bq.tagName).toBe("BLOCKQUOTE");
+    expect(bq.className).toMatch(/font-record/);
     expect(bq.className).not.toMatch(/font-mono/);
-    // The citation is the link, its accessible name says where it goes (a screen
-    // reader listing links must not hear "[2]" five times), and it is the SAME
-    // number Sources gives that article.
+    // The link's accessible name says where it goes (a screen reader listing
+    // links must not hear "Open at the quote" five times) and the [n] beside
+    // it is the SAME number Coverage gives that article.
     const cite = within(section).getByRole("link", { name: "Source 2: The Hindu" });
-    expect(cite).toHaveTextContent("[2]");
-    // The citation opens the article ON the quote: the URL carries a text fragment.
+    expect(within(section).getByText("[2]").className).toMatch(/font-mono/);
+    // The link opens the article ON the quote: the URL carries a text fragment.
     expect(cite.getAttribute("href")).toMatch(/^https:\/\/x\.example\/a2#:~:text=/);
-    expect(cite.className).toMatch(/font-mono/);
     expect(within(section).getByText("The Hindu")).toBeInTheDocument();
-    expect(within(section).getByText("· 27 Jul")).toBeInTheDocument();
   });
 
   it("uses one index for Sources and for citations, so they cannot disagree", () => {
@@ -72,11 +72,12 @@ describe("What was said", () => {
       { speaker: "X", claims: [{ quote_text: QUOTE, quote_start: 0, quote_end: 0, article_id: "a3",
         source_name: "PTI", url: null, published_at: null }] },
     ])} />);
-    const sources = screen.getAllByRole("region", { name: /^sources/i })[0];
-    const said = screen.getAllByRole("region", { name: /what was said/i })[0];
-    // a3 is third in event.sources → [3] in both places; a3 has no url → plain text citation
+    const sources = screen.getAllByRole("region", { name: /^coverage/i })[0];
+    const said = screen.getAllByRole("region", { name: /who said what/i })[0];
+    // a3 is third in event.sources → [3] in both places; a3 has no url → no "open" link
     expect(within(sources).getAllByText("[3]").length).toBeGreaterThan(0);
     expect(within(said).getByText("[3]").tagName).toBe("SPAN");
+    expect(within(said).queryByRole("link", { name: /Source 3/ })).toBeNull();
   });
 
   it("shows one speaker once with a count when they have several quotes", () => {
@@ -86,17 +87,17 @@ describe("What was said", () => {
         { quote_text: "second thing said here at length", quote_start: 0, quote_end: 0, article_id: "a1", source_name: "Mint", url: "u", published_at: null },
       ] },
     ])} />);
-    const said = screen.getAllByRole("region", { name: /what was said/i })[0];
+    const said = screen.getAllByRole("region", { name: /who said what/i })[0];
     expect(within(said).getAllByText("Jose Pradeep")).toHaveLength(1);
-    const count = within(said).getByText("2 quotes");
+    const count = within(said).getByText(/2 quotes · 1 outlet/);
     expect(count).toBeInTheDocument();
-    expect(count.className).not.toMatch(/font-mono/); // a bare count is UI voice, like "Sources (n)"
+    expect(count.className).not.toMatch(/font-mono/); // a bare count is UI voice
   });
 
   it("renders NOTHING when there are no claims — no section, no chip", () => {
     render(<StoryView event={withClaims([])} />);
-    expect(screen.queryByRole("region", { name: /what was said/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^Said/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /who said what/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Who said what/ })).not.toBeInTheDocument();
   });
 
   it("survives a payload with no claims field at all (old backend, cached response)", () => {
@@ -104,23 +105,22 @@ describe("What was said", () => {
     // new page WILL meet an old payload for a window. It must not crash.
     render(<StoryView event={withClaims(undefined)} />);
     expect(screen.getAllByText("A story").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("region", { name: /what was said/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /who said what/i })).not.toBeInTheDocument();
   });
 
-  it("puts the count in the mobile nav and the desktop rail", () => {
+  it("puts the count in the section nav", () => {
     render(<StoryView event={withClaims([
       { speaker: "A", claims: [{ quote_text: QUOTE, quote_start: 0, quote_end: 0, article_id: "a1", source_name: "Mint", url: "u", published_at: null }] },
       { speaker: "B", claims: [{ quote_text: QUOTE + "!", quote_start: 0, quote_end: 0, article_id: "a2", source_name: "H", url: "u", published_at: null }] },
     ])} />);
-    const chip = screen.getByRole("link", { name: /^Said/ });
-    expect(chip).toHaveTextContent("2");
-    expect(chip).toHaveAttribute("href", "#said");
-    expect(screen.getByText("2 quotes", { selector: "div" })).toBeInTheDocument();
+    const item = screen.getByRole("link", { name: /^Who said what/ });
+    expect(item).toHaveTextContent("2");
+    expect(item).toHaveAttribute("href", "#said");
   });
 });
 
 
-describe("What was said — the quote in the article", () => {
+describe("Who said what — the quote in the article", () => {
   it("shows the article's own words around the quote when the server sends them, folded", () => {
     render(<StoryView event={withClaims([
       { speaker: "Anita Dipke", claims: [{ quote_text: QUOTE, quote_start: 20, quote_end: 30, context_before: "Earlier that day,", context_after: "she added later.", article_id: "a2", source_name: "The Hindu", url: "https://x.example/a2", published_at: null }] },

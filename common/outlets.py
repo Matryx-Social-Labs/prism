@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,6 +55,39 @@ CODES: dict[str, str] = {
 ORIGINS = ("national", "intl", "regional", "wire")  # the bar's fixed slot order
 
 
+# The outlet's own site, for its favicon — an identifier of the source, the way
+# a byline names a paper. Keyed by publisher; unlisted publishers fall back to
+# the host of their feed URL.
+DOMAINS: dict[str, str] = {
+    "thehindu": "thehindu.com",
+    "timesofindia": "timesofindia.indiatimes.com",
+    "ndtv": "ndtv.com",
+    "hindustantimes": "hindustantimes.com",
+    "livemint": "livemint.com",
+    "hindu_businessline": "thehindubusinessline.com",
+    "espncricinfo": "espncricinfo.com",
+    "aajtak": "aajtak.in",
+    "amarujala": "amarujala.com",
+    "prajavani": "prajavani.net",
+    "tv9kannada": "tv9kannada.com",
+    "thehackernews": "thehackernews.com",
+    "bleepingcomputer": "bleepingcomputer.com",
+    "bbc": "bbc.com",
+    "aljazeera": "aljazeera.com",
+    "anadolu": "aa.com.tr",
+    "cgtn": "cgtn.com",
+    "dawn": "dawn.com",
+    "dw": "dw.com",
+    "france24": "france24.com",
+    "guardian_world": "theguardian.com",
+    "presstv": "presstv.ir",
+    "scmp": "scmp.com",
+    "tass": "tass.com",
+    "nvd": "nvd.nist.gov",
+    "cisa_kev": "cisa.gov",
+}
+
+
 @dataclass(frozen=True)
 class Outlet:
     slug: str
@@ -63,6 +97,7 @@ class Outlet:
     origin: str  # one of ORIGINS
     language: str | None
     country: str | None
+    domain: str | None = None
 
 
 def classify(country: str | None, language: str | None, source_type: str | None = None) -> str:
@@ -84,6 +119,19 @@ def _initials(name: str) -> str:
 
 def code_for(publisher: str, name: str) -> str:
     return CODES.get(publisher) or _initials(name)
+
+
+def domain_for(publisher: str, slug: str) -> str | None:
+    if publisher in DOMAINS:
+        return DOMAINS[publisher]
+    try:  # the feed registry knows the host; import lazily to keep this module light
+        from ingestion.rss import SPEC_BY_SLUG
+
+        spec = SPEC_BY_SLUG.get(slug)
+        host = urlparse(spec.url).hostname if spec else None
+        return host.removeprefix("www.").removeprefix("feeds.") if host else None
+    except Exception:  # noqa: BLE001 — an icon is a courtesy, never a failure
+        return None
 
 
 _cache: tuple[float, dict[str, Outlet]] | None = None
@@ -111,6 +159,7 @@ async def registry(db: AsyncSession) -> dict[str, Outlet]:
             origin=classify(r["country"], r["language"], r["source_type"]),
             language=r["language"],
             country=r["country"],
+            domain=domain_for(publisher, r["slug"]),
         )
     _cache = (now, reg)
     return reg

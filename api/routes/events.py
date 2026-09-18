@@ -360,6 +360,8 @@ async def get_event(
                 code=reg[s["source_slug"]].code if s["source_slug"] in reg else None,
                 origin=reg[s["source_slug"]].origin if s["source_slug"] in reg else None,
                 language=reg[s["source_slug"]].language if s["source_slug"] in reg else None,
+                publisher=reg[s["source_slug"]].publisher if s["source_slug"] in reg else None,
+                domain=reg[s["source_slug"]].domain if s["source_slug"] in reg else None,
             )
             for s in sources
         ],

@@ -211,6 +211,12 @@ Status pill · updated time · subject, then the title (display-l), the summary 
 ### Record sections (in this order, always)
 **The record** (the Reader brief, 16.5px, with "What to watch" bullets) → **What changed** (timeline: accent "now" dot, then ink dots on a `line-strong` spine; mono time · outlet, serif headline) → **Who said what** (quote cards) → **Coverage** (large bar, legend with counts, entities, the report list on the phone) → **Why it matters** (impacts) → **Ask** (input pill + suggested questions). The desktop left rail lists the same six with counts; the right rail holds Reports and Named in the reports.
 
+### Entity marks (`.ent`)
+The story's named entities, marked in the record's prose — the summary, the brief, the watch points. A mark is ink text with a 1.5px underline in the accent at 55%, lifting to `accent-soft` on hover and focus; never blue text, never bold. One mark per entity per passage (its first mention), longest name first, whole words, case-sensitive for names under four letters ("US" never marks "us"); the text is never altered. Hover or focus (desktop) and tap (touch) open a 260px card anchored under the mark: the name · its kind (Person, Government, Company…), "Quoted N times on this story ↓" when the entity spoke, and one action, "All stories about X →". A second tap follows the action; Escape and an outside tap close it. Quotes are never marked — verbatim text stays visually verbatim.
+
+### Report card (`.row-card`, compact)
+One report as the reader sees it: the outlet's icon (its own favicon, 20–28px in the monogram disc, the monogram as fallback) and name, when it published (relative time, mono), the headline the outlet wrote (Hind 500, three lines), and a foot of `[n]` · origin (English national, Indian-language, International) · funding label when known. The whole card opens the article. Cards stack in the desktop evidence rail (compact) and under Coverage on the phone (eight, then "All N reports"). The same reports appear in "What changed" as a timeline — the sequence view — with the outlet icon and time on each row.
+
 ### Quote card (`.quote`)
 `surface`, 14px radius: speaker avatar (accent-soft, initials) + name + "quoted in N outlets"; the quote in Newsreader italic 17.5px; outlet pill · time · "Open at the quote ↗" (text fragment link); an "In the article" disclosure that prints the surrounding sentence with the quote in `accent-soft` `<mark>`.
 
@@ -244,7 +250,7 @@ Skeletons are `sunken` bars in the exact geometry of the row (no spinner on the 
 - **Do** keep one primary pill per screen and give it the screen's one job (Follow, Open, Save).
 - **Do** print counts as counts, quote verbatim or not at all, and mark provisional groupings in words.
 - **Do** design every phone screen as an app screen: bottom tabs, thumb-zone actions, 44px targets, `100dvh`, safe-area insets.
-- **Do** use outlet monograms from the registry for identity; a favicon or logo only under a written licence.
+- **Do** identify an outlet by its own favicon (nominative — the way a byline names a paper) with the registry monogram as the fallback; never a publisher's photographs.
 - **Do** render whatever `/api/v1/lenses` returns and never name lenses in generic copy.
 
 ### Don't
@@ -269,6 +275,8 @@ Historical entries were written under whichever name and world was current; the 
 | 2026-09-18 | Bottom tabs Today · Stories · Search · Watchlist · You; Pulse becomes a module on Today and a route | Five tabs is the ceiling; "Stories" (developing arcs) is a reader's word and "Trending" implies popularity theatre |
 | 2026-09-18 | Record sections fixed: The record · What changed · Who said what · Coverage · Why it matters · Ask | Same order on phone, desktop rail and share card; a reader learns it once |
 | 2026-09-18 | Tokens live in design/tokens.json; web CSS and the future React Native theme are generated from it | One source of truth for two platforms |
+| 2026-09-18 | Entity marks in the record's prose: thin accent underline, first mention only, a hover/tap card with kind · quotes · one action | Founder ask for rich text on the entities; NN/G: links read by contrast, not by painting the paragraph blue |
+| 2026-09-18 | Reports as cards with the outlet's favicon, name, time and its own headline; the timeline keeps the sequence view | Founder ask (Particle's articles rail); a reader recognises a masthead by its mark faster than by its initials |
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-09-18 | Landing promise narrowed to “Follow the story, not the headlines”; public copy says monitored outlets, not every source | The visible promise now matches what the ingestion and quality system can verify today |

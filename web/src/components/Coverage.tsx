@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { OutletRef } from "@/lib/api";
 
 /**
@@ -108,7 +111,7 @@ export function MonogramStack({ outlets, limit = 3, size = 26 }: { outlets: Outl
   return (
     <span className="monogram-stack" aria-label={list.map((o) => o.name).join(", ")} role="img">
       {shown.map((o) => (
-        <Monogram key={o.publisher} code={o.code} name={o.name} size={size} />
+        <OutletIcon key={o.publisher} domain={o.domain} code={o.code} name={o.name} size={size} />
       ))}
       {more > 0 && (
         <span className="monogram" style={{ width: size, height: size, fontFamily: "var(--font-mono)", fontWeight: 500 }} aria-hidden>
@@ -123,6 +126,26 @@ export function Monogram({ code, name, size = 26 }: { code: string; name: string
   return (
     <span className={`monogram ${code.length >= 4 ? "n4" : ""}`} style={{ width: size, height: size }} title={name} aria-hidden>
       {code}
+    </span>
+  );
+}
+
+/** The outlet's favicon (its own site, via Google's cache) — an identifier of the source, the way a byline names a paper. */
+export function faviconUrl(domain: string, size = 64): string {
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
+}
+
+/**
+ * The outlet's icon in a monogram-sized disc; the monogram is the fallback when
+ * there is no domain or the icon does not load, so a row never shows a hole.
+ */
+export function OutletIcon({ domain, code, name, size = 26 }: { domain?: string | null; code: string; name: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (!domain || failed) return <Monogram code={code} name={name} size={size} />;
+  return (
+    <span className="monogram overflow-hidden" style={{ width: size, height: size, background: "var(--surface)" }} title={name} aria-hidden>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={faviconUrl(domain)} alt="" width={Math.round(size * 0.62)} height={Math.round(size * 0.62)} loading="lazy" decoding="async" onError={() => setFailed(true)} style={{ borderRadius: 3 }} />
     </span>
   );
 }

@@ -1,18 +1,28 @@
+"use client";
+
+import { useState } from "react";
 import type { SpeakerClaims } from "@/lib/api";
 import { ChevronDown } from "@/components/icons";
-import { shortDate } from "@/lib/dateline";
+import { relativeTime } from "@/lib/dateline";
 import { quoteLink } from "@/lib/quoteLink";
 
 /**
- * The passenger list: who said what, verbatim, grouped by speaker.
- *
- * The quote and the speaker are the body voice; only the provenance line
- * ([n] · outlet · date) is mono. Nothing here is lens-coloured and nothing
- * here is unverified: every quote was checked against its article at write
- * time, and the model's stance never reaches the payload. `sourceIndex` is
- * the ONE index the sources list also uses, so the two can never number one
- * article differently.
+ * Who said what, verbatim, grouped by speaker — one card per speaker
+ * (DESIGN.md § Quote card). The quote is set in the record voice, italic; the
+ * speaker, outlet and time are the reading voice; `[n]` is mono and is the ONE
+ * index the Coverage list also uses, so the two can never number one article
+ * differently. Nothing here is lens-coloured and nothing here is unverified:
+ * every quote was checked against its article at write time.
  */
+function initials(name: string): string {
+  const words = name.replace(/[^\p{L}\p{N} ]/gu, " ").split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+const QUOTES_FOLD = 2;
+
 export function Said({
   claims,
   sourceIndex,
@@ -21,82 +31,89 @@ export function Said({
   sourceIndex: Map<string, number>;
 }) {
   return (
-    <div className="flex flex-col">
-      {claims.map((sp, i) => (
-        <div
-          key={sp.speaker}
-          className={i === 0 ? "" : "mt-5 border-t pt-5"}
-          style={i === 0 ? undefined : { borderColor: "var(--line)" }}
-        >
-          <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-[14.5px] font-semibold">{sp.speaker}</h3>
-            <span
-              className="shrink-0 text-[12.5px]"
-              style={{ color: "var(--ink-faint)" }}
-            >
-              {sp.claims.length} {sp.claims.length === 1 ? "quote" : "quotes"}
-            </span>
-          </div>
-          <ul className="mt-2 flex flex-col gap-3.5">
-            {sp.claims.map((c, j) => {
-              const n = sourceIndex.get(c.article_id);
-              return (
-                <li key={`${c.article_id}-${j}`}>
-                  <blockquote
-                    className="text-[14.5px] leading-[1.6]"
-                    style={{ color: "var(--ink)" }}
-                  >
-                    “{c.quote_text}”
-                  </blockquote>
-                  <div
-                    className="mt-1 flex items-baseline gap-2 font-mono text-[11px]"
-                    style={{ color: "var(--ink-faint)" }}
-                  >
-                    {/* The citation IS the link: one tap to check us, same target/rel as
-                          Sources. A 10.5px mono glyph is a 19x16 target, so the pseudo-element
-                          grows the hit area to ~47x44 without moving the glyph or the line. */}
-                    {n != null &&
-                      (c.url ? (
+    <div className="grid gap-3 md:grid-cols-2">
+      {claims.map((sp) => (
+        <SpeakerCard key={sp.speaker} sp={sp} sourceIndex={sourceIndex} />
+      ))}
+    </div>
+  );
+}
+
+function SpeakerCard({ sp, sourceIndex }: { sp: SpeakerClaims; sourceIndex: Map<string, number> }) {
+  // Two quotes per speaker, the rest on request: a minister with nine quotes
+  // is a column of italics that buries the next speaker.
+  const [all, setAll] = useState(false);
+  const shown = all ? sp.claims : sp.claims.slice(0, QUOTES_FOLD);
+  const outlets = new Set(sp.claims.map((c) => c.source_name)).size;
+  return (
+          <article className="card flex flex-col gap-3">
+            <header className="flex items-center gap-2.5">
+              <span
+                aria-hidden
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold"
+                style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+              >
+                {initials(sp.speaker)}
+              </span>
+              <div className="min-w-0">
+                <h3 className="truncate text-[14.5px] font-semibold leading-tight">{sp.speaker}</h3>
+                <p className="text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+                  {sp.claims.length} {sp.claims.length === 1 ? "quote" : "quotes"} · {outlets} {outlets === 1 ? "outlet" : "outlets"}
+                </p>
+              </div>
+            </header>
+            <ul className="flex flex-col gap-4">
+              {shown.map((c, j) => {
+                const n = sourceIndex.get(c.article_id);
+                return (
+                  <li key={`${c.article_id}-${j}`} className={j > 0 ? "border-t pt-4" : ""} style={j > 0 ? { borderColor: "var(--line)" } : undefined}>
+                    <blockquote className="font-record text-[17px] italic leading-[1.5]" style={{ color: "var(--ink)", textWrap: "pretty" }}>
+                      “{c.quote_text}”
+                    </blockquote>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+                      {n != null && (
+                        <span className="font-mono text-[11px]">[{n}]</span>
+                      )}
+                      <span className="chip h-6 px-2 text-[12px]">{c.source_name}</span>
+                      {c.published_at && <span className="font-mono text-[11px]">{relativeTime(c.published_at)}</span>}
+                      {c.url && n != null && (
                         <a
                           href={quoteLink(c.url, c.quote_text)}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Source ${n}: ${c.source_name}`}
-                          className="relative font-mono underline-offset-2 before:absolute before:-inset-3.5 before:content-[''] hover:underline"
+                          className="relative font-semibold underline-offset-4 before:absolute before:-inset-3 before:content-[''] hover:underline"
+                          style={{ color: "var(--accent)" }}
                         >
-                          [{n}]
+                          Open at the quote ↗
                         </a>
-                      ) : (
-                        <span>[{n}]</span>
-                      ))}
-                    <span>{c.source_name}</span>
-                    {c.published_at && (
-                      <span>· {shortDate(c.published_at)}</span>
+                      )}
+                    </div>
+                    {/* The quote in place: the article's own words either side,
+                        the quote itself marked. The reader checks us without
+                        leaving; the link opens the article on the quote. */}
+                    {(c.context_before || c.context_after) && (
+                      <details className="group mt-2">
+                        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                          In the article
+                          <ChevronDown className="transition-transform group-open:rotate-180" />
+                        </summary>
+                        <p className="mt-2 border-l-2 pl-3 text-[14px] leading-[1.6]" style={{ borderColor: "var(--line-strong)", color: "var(--ink-2)" }}>
+                          {c.context_before && <>…{c.context_before} </>}
+                          <mark className="rounded-[3px] px-0.5" style={{ background: "var(--accent-soft)", color: "var(--ink)" }}>{c.quote_text}</mark>
+                          {c.context_after && <> {c.context_after}…</>}
+                        </p>
+                      </details>
                     )}
-                    {c.url && <span>· opens on the quote</span>}
-                  </div>
-                  {/* The quote in place: the article's own words either side,
-                      the quote itself in ink. The reader checks us without
-                      leaving; the [n] link opens the article on the quote. */}
-                  {(c.context_before || c.context_after) && (
-                    <details className="group mt-1.5">
-                      <summary className="flex cursor-pointer list-none items-center gap-1.5 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                        <ChevronDown className="transition-transform group-open:rotate-180" />
-                        In the article
-                      </summary>
-                      <p className="mt-2 border-l pl-3 text-[13.5px] leading-[1.6]" style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}>
-                        {c.context_before && <>…{c.context_before} </>}
-                        <mark className="bg-transparent font-medium" style={{ color: "var(--ink)" }}>{c.quote_text}</mark>
-                        {c.context_after && <> {c.context_after}…</>}
-                      </p>
-                    </details>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {!all && sp.claims.length > QUOTES_FOLD && (
+              <button type="button" onClick={() => setAll(true)} className="btn btn-ghost btn-sm self-start -ml-3" style={{ color: "var(--accent)" }}>
+                {sp.claims.length - QUOTES_FOLD} more {sp.claims.length - QUOTES_FOLD === 1 ? "quote" : "quotes"}
+              </button>
+            )}
+          </article>
   );
 }

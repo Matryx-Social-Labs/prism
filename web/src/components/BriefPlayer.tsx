@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LensMeta } from "@/lib/lenses";
+import type { EntityOut, SpeakerClaims } from "@/lib/api";
+import { EntityText } from "@/components/EntityText";
+import { markBlocks } from "@/lib/entities";
 
 // Read-along player for a lens brief. Uses the browser's built-in Web Speech
 // API (speechSynthesis) — no server TTS, no dependency, no model call. The
@@ -38,11 +41,16 @@ export function BriefPlayer({
   points,
   meta,
   pointsHeading,
+  entities = [],
+  claims = [],
 }: {
   brief: string;
   points: string[];
   meta: LensMeta;
   pointsHeading: string;
+  /** The story's named entities, marked inline in the brief (first mention each). */
+  entities?: EntityOut[];
+  claims?: SpeakerClaims[];
 }) {
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const [supported, setSupported] = useState(false);
@@ -50,6 +58,9 @@ export function BriefPlayer({
   const [active, setActive] = useState(-1); // index into [...briefSentences, ...points]
 
   const briefSentences = useMemo(() => sentences(brief), [brief]);
+  // One entity mark per passage — sentences first, then the points — computed
+  // once, purely, so the server and the client mark the same words.
+  const marked = useMemo(() => markBlocks([...briefSentences, ...points], entities), [briefSentences, points, entities]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -118,8 +129,7 @@ export function BriefPlayer({
           <button
             onClick={toggle}
             aria-label={status === "playing" ? "Pause narration" : status === "paused" ? "Resume narration" : "Listen to this brief"}
-            className="flex items-center gap-1.5 border-b-2 pb-0.5 text-[12px] font-medium"
-            style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
+            className="btn btn-secondary btn-sm gap-1.5"
           >
             {status === "playing" ? (
               <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
@@ -137,8 +147,7 @@ export function BriefPlayer({
             <button
               onClick={stop}
               aria-label="Stop narration"
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border"
-              style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+              className="icon-btn h-8 w-8"
             >
               <svg aria-hidden width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="6" width="12" height="12" rx="1.5" />
@@ -148,13 +157,11 @@ export function BriefPlayer({
         </div>
       )}
 
-      <p className="text-[14.5px] leading-[1.7]">
-        <span className="font-semibold" style={{ color: meta.color }}>
-          Through the {meta.short} lens:{" "}
-        </span>
+      <p className="text-[16.5px] leading-[1.65]" style={{ color: "var(--ink)" }}>
         {briefSentences.map((s, i) => (
-          <span key={i} style={active === i ? spoken : { color: "var(--ink-muted)" }}>
-            {s}
+          <span key={i} style={active === i ? spoken : undefined}>
+            {/* Entities are marked per sentence so the read-along span stays intact. */}
+            <EntityText text={s} entities={entities} claims={claims} segments={marked[i]} />
             {i < briefSentences.length - 1 ? " " : ""}
           </span>
         ))}
@@ -162,16 +169,16 @@ export function BriefPlayer({
 
       {points.length > 0 && (
         <div>
-          <h2 className="mb-2 font-display text-[20px] font-medium uppercase leading-none tracking-[0.03em]">
+          <h3 className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
             {pointsHeading}
-          </h2>
-          <ul className="flex flex-col gap-1.5">
+          </h3>
+          <ul className="flex flex-col gap-2">
             {points.map((pt, i) => {
               const isActive = active === briefSentences.length + i;
               return (
-                <li key={pt} className="flex gap-2 text-[13.5px] leading-[1.55]" style={{ color: isActive ? "var(--ink)" : "var(--ink-muted)" }}>
-                  <span aria-hidden className="mt-[9px] inline-block h-[2px] w-3 shrink-0" style={{ background: meta.color }} />
-                  <span style={isActive ? spoken : undefined}>{pt}</span>
+                <li key={pt} className="flex gap-2.5 text-[14.5px] leading-[1.55]" style={{ color: isActive ? "var(--ink)" : "var(--ink-2)" }}>
+                  <span aria-hidden className="mt-[9px] inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: meta.slug === "reader" ? "var(--accent)" : meta.color }} />
+                  <span style={isActive ? spoken : undefined}><EntityText text={pt} entities={entities} claims={claims} segments={marked[briefSentences.length + i]} /></span>
                 </li>
               );
             })}

@@ -21,6 +21,14 @@ def test_monogram_prefers_the_registry_then_initials():
     assert code_for("solo", "Prajavani") == "PRA"
 
 
+def test_domain_comes_from_the_registry_then_the_feed_host():
+    from common.outlets import domain_for
+
+    assert domain_for("thehindu", "thehindu_karnataka") == "thehindu.com"
+    assert domain_for("bbc", "bbc_hindi") == "bbc.com"
+    assert domain_for("unlisted", "no-such-feed") is None
+
+
 def test_outlet_refs_follow_the_bar_order_then_name():
     reg = {
         "prajavani": Outlet("prajavani", "prajavani", "Prajavani", "PV", "regional", "kn", "IN"),

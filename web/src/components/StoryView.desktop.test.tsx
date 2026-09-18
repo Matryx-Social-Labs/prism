@@ -55,7 +55,7 @@ describe("the desktop story page", () => {
   // them. The whole web suite stayed green because these tests were scoped to
   // the mobile tree. (Perspectives and What to expect were retired in the
   // redesign — D4 — so Sources is the evidence section that remains here.)
-  it.each(["Sources"])(
+  it.each(["Coverage", "The record"])(
     "renders %s outside the mobile-only tree, so desktop can see it",
     (heading) => {
       render(<StoryView event={EVENT} />);
@@ -70,10 +70,12 @@ describe("the desktop story page", () => {
     },
   );
 
-  it("reaches the sources themselves on desktop, not just the heading", () => {
+  it("reaches the reports themselves on desktop, not just the heading", () => {
     render(<StoryView event={EVENT} />);
-    const link = screen.getAllByText("A report")[0].closest("a, li") as HTMLElement;
-    expect(hiddenOnDesktop(link)).toBe(false);
+    // The phone lists the reports under Coverage; the desktop lists them in the
+    // evidence rail beside the record. At least one copy must be visible at lg.
+    const copies = screen.getAllByText("A report").map((e) => e.closest("a, li") as HTMLElement);
+    expect(copies.some((c) => !hiddenOnDesktop(c))).toBe(true);
   });
 
   // REGRESSION: Ask had exactly one desktop mount and it sat in a rail marked

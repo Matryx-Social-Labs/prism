@@ -3,6 +3,31 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.82.1] - 2026-09-18
+
+### Changed
+- **Spectrum, wave 3 — the record.** The story page is rebuilt in the new world: a header
+  that answers how current and how supported (status pill · updated · subject, the title
+  in the record voice, the summary with entity marks, monograms + coverage bar + counts),
+  one segmented lens control (keys 1/2/3 kept), then six sections in one order — The
+  record · What changed · Who said what · How it unfolded / Related reporting · Why it
+  matters · Coverage — and Ask beneath the evidence. Desktop rails: "On this story" and
+  the reports as cards; phone: a back bar and a thumb bar with Ask and Share.
+- **Who said what** is speaker cards: avatar, name, quotes in italic Newsreader, the
+  outlet chip, time, `[n]`, "Open at the quote ↗" and "In the article"; two quotes per
+  speaker, the rest on request.
+- **Reports** are cards with the outlet's favicon, name, time and its own headline;
+  "What changed" lists them as a timeline with the same icons.
+- **Entity marks:** the story's named entities are underlined once each in the summary,
+  the brief and the watch points; hover or tap opens a card with the kind, how often they
+  are quoted here, and "All stories about X".
+- Publisher photographs are gone from the record, the share card and the JSON-LD.
+
+### Added
+- `SourceRef.code/origin/language/publisher/domain` and `OutletRef.domain` from the source
+  registry; outlet favicons are drawn from the outlet's own site with the monogram as
+  the fallback.
+
 ## [0.0.82.0] - 2026-09-18
 
 ### Changed

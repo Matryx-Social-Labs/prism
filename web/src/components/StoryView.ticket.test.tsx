@@ -43,50 +43,53 @@ function event(over: Partial<EventDetail> = {}): EventDetail {
   } as unknown as EventDetail;
 }
 
-const mobile = () => within(document.querySelector("article") as HTMLElement);
-
 beforeEach(() => {
   localStorage.clear();
   fetchTrendingStory.mockReset().mockResolvedValue(null);
 });
 
-describe("the ticket — the header strip", () => {
-  it("prints code · sources · origins · the newest article's IST stamp, on both trees", () => {
+describe("the record — the header", () => {
+  it("answers how current and how supported before anything else: updated · subject, then the coverage line", () => {
     render(<StoryView event={event()} />);
-    for (const strip of screen.getAllByLabelText("Story facts")) {
-      expect([...strip.querySelectorAll("span")].map((s) => s.textContent)).toEqual([
-        "BIZ", "2 sources", "IN ×6 · US ×2", "05 SEPT 2026 01:25 IST",
-      ]);
-      expect(strip.className).toMatch(/font-mono/);
-      expect(strip.parentElement!.className).toMatch(/rule-live/);
-    }
+    const meta = document.querySelector("header .meta-line")!;
+    expect(meta.textContent).toMatch(/Updated/);
+    expect(meta.textContent).toMatch(/Business & Markets/);
+    // Two reports from one masthead: the coverage line counts outlets AND reports.
+    expect(screen.getByText(/1 outlet · 2 reports/)).toBeInTheDocument();
   });
 
-  it("sets a single-source story on a dashed rule — state is line form, never hue", () => {
+  it("says so when there is one source, in words — never colour alone", () => {
     render(<StoryView event={event({ sources: [src("a1", "2026-09-04T19:55:00Z")] })} />);
-    for (const strip of screen.getAllByLabelText("Story facts")) {
-      expect(strip.parentElement!.className).toMatch(/rule-single/);
-      expect(within(strip).getByText("1 source")).toBeInTheDocument();
+    expect(screen.getByText("One source so far")).toBeInTheDocument();
+    expect(screen.getByText(/1 outlet · 1 report/)).toBeInTheDocument();
+  });
+
+  it("sends the reader back to /feed — never to /, which is the landing for a first visitor", () => {
+    render(<StoryView event={event()} />);
+    for (const a of [...screen.getAllByRole("link", { name: /back to today/i }), ...screen.getAllByRole("link", { name: /today.s record/i })]) {
+      expect(a).toHaveAttribute("href", "/feed");
     }
   });
 
-  it("sends the reader back to the chart at /feed — never to /, which is the landing for a first visitor", () => {
-    render(<StoryView event={event()} />);
-    for (const a of screen.getAllByRole("link", { name: /today.s chart/i })) expect(a).toHaveAttribute("href", "/feed");
-  });
-
-  it("puts Share on the strip row and in the thumb zone, nowhere else", () => {
+  it("puts Share on the header (desktop) and in the thumb zone (phone), nowhere else", () => {
     render(<StoryView event={event()} />);
     expect(screen.getAllByRole("button", { name: /share this story/i })).toHaveLength(2);
   });
+
+  it("offers the lenses as one segmented control, with keys announced on desktop", () => {
+    render(<StoryView event={event()} />);
+    const tabs = screen.getAllByRole("tablist", { name: /read it as/i });
+    expect(tabs).toHaveLength(1);
+    expect(within(tabs[0]).getByRole("tab", { name: "Reader" })).toHaveAttribute("aria-selected", "true");
+  });
 });
 
-describe("the ticket — retired sections (D4) and So what (founder, 2026-09-17)", () => {
+describe("the record — retired sections (D4) and Why it matters", () => {
   // The route and the passenger list are the perspectives, counted and verbatim.
   // A payload that still carries the LLM cards must not revive them. The
   // impacts, though, are back as "So what": extracted per report, direction
   // as an arrow, horizon in mono.
-  it("renders no Perspectives cards; renders the impacts as So what", () => {
+  it("renders no Perspectives cards; renders the impacts as Why it matters", () => {
     render(
       <StoryView
         event={event({
@@ -98,11 +101,11 @@ describe("the ticket — retired sections (D4) and So what (founder, 2026-09-17)
     expect(screen.queryByText("Perspectives")).toBeNull();
     expect(screen.queryByText("A model's summary.")).toBeNull();
     expect(screen.queryByText("What to expect")).toBeNull();
-    expect(screen.getByRole("heading", { name: /So what/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Why it matters/ })).toBeInTheDocument();
     expect(screen.getByText("Someone")).toBeInTheDocument();
     expect(screen.getByText("loses")).toBeInTheDocument();
     expect(screen.getByLabelText("negative")).toBeInTheDocument();
-    expect(mobile().queryByRole("link", { name: /Perspectives|What to expect/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Perspectives|What to expect/ })).toBeNull();
   });
 
   it("prints where the reports were filed from, and single origin when the record says so", () => {
@@ -112,7 +115,7 @@ describe("the ticket — retired sections (D4) and So what (founder, 2026-09-17)
   });
 });
 
-describe("the ticket — the route", () => {
+describe("the record — the route", () => {
   const TREE = {
     slug: "s", canonical_slug: "s", label: "L", cast: [], sector: null, source_count: 3, velocity: 0, status: "active",
     boundary_status: "verified" as const,
@@ -128,19 +131,19 @@ describe("the ticket — the route", () => {
     fetchTrendingStory.mockResolvedValue(TREE);
     render(<StoryView event={event({ story_slug: "s" })} />);
     expect(fetchTrendingStory).toHaveBeenCalledWith("s");
-    expect(await screen.findByText("Story boundary verified. Developments below are shown in sequence.")).toBeInTheDocument();
+    expect(await screen.findByText("Verified record")).toBeInTheDocument();
     const route = await screen.findByRole("region", { name: /how this story unfolded/i });
     expect(within(route).getByText(/2 DEVELOPMENTS · 0 BRANCHED OFF · 0 ALSO REPORTED · 4 DAYS/)).toBeInTheDocument();
     expect(within(route).getByRole("link", { name: /How it started/ })).toHaveAttribute("href", "/story/e0");
-    expect(mobile().getByRole("link", { name: "Story" })).toHaveAttribute("href", "#route");
+    expect(screen.getByRole("link", { name: "How it unfolded" })).toHaveAttribute("href", "#route");
   });
 
   it("shows no route section and no Route anchor when the ticket carries no slug", async () => {
     render(<StoryView event={event()} />);
-    expect(await mobile().findByText("The reader take.")).toBeInTheDocument();
+    expect(await screen.findByText("The reader take.")).toBeInTheDocument();
     expect(fetchTrendingStory).not.toHaveBeenCalled();
     expect(screen.queryByRole("region", { name: /how this story unfolded/i })).toBeNull();
-    expect(mobile().queryByRole("link", { name: "Story" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /How it unfolded|Related reporting/ })).toBeNull();
   });
 
   it("prints nothing when the owner has no tree for the story", async () => {
@@ -151,42 +154,58 @@ describe("the ticket — the route", () => {
     expect(within(route).queryByLabelText("Storyline structure")).toBeNull();
   });
 
-  it("renders a provisional group as related coverage without a route or chronology", async () => {
+  it("renders a provisional group as related reporting without a route or chronology", async () => {
     fetchTrendingStory.mockResolvedValue({ ...TREE, boundary_status: "provisional" });
     render(<StoryView event={event({ story_slug: "s" })} />);
-    expect(await screen.findByText("Grouping provisional. Related reporting is shown without implying chronology.")).toBeInTheDocument();
-    const coverage = await screen.findByRole("region", { name: /^related coverage$/i });
+    expect(await screen.findByText("Provisional grouping")).toBeInTheDocument();
+    const coverage = await screen.findByRole("region", { name: /^related reporting$/i });
     expect(within(coverage).getByText(/not yet verified/i)).toBeInTheDocument();
     expect(within(coverage).queryByLabelText("Storyline structure")).toBeNull();
-    expect(mobile().getByRole("link", { name: "Coverage" })).toHaveAttribute("href", "#route");
+    expect(screen.getByRole("link", { name: "Related reporting" })).toHaveAttribute("href", "#route");
   });
 });
 
-describe("the ticket — sources fold", () => {
-  it("prints the first eight outlets and opens the rest on request, the [n] index unchanged", async () => {
+describe("the record — the reports", () => {
+  it("prints the first eight reports on the phone and opens the rest on request, the [n] index unchanged; the desktop rail carries them all", async () => {
     const many = Array.from({ length: 12 }, (_, i) => src(`a${i + 1}`, "2026-09-04T19:55:00Z"));
     render(<StoryView event={event({ sources: many })} />);
-    expect(screen.getAllByText("A report")).toHaveLength(8);
+    const phone = document.querySelector("#sources .lg\\:hidden") as HTMLElement;
+    expect(within(phone).getAllByText("A report")).toHaveLength(8);
+    const rail = screen.getByRole("complementary", { name: "Evidence" });
+    expect(within(rail).getAllByText("A report")).toHaveLength(12);
     const { default: userEvent } = await import("@testing-library/user-event");
-    await userEvent.click(screen.getByRole("button", { name: "All 12 sources" }));
-    expect(screen.getAllByText("A report")).toHaveLength(12);
-    expect(screen.getByText("[12]")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "All 12 reports" }));
+    expect(within(phone).getAllByText("A report")).toHaveLength(12);
+    expect(within(phone).getByText("[12]")).toBeInTheDocument();
+  });
+
+  it("lists what changed newest first, folded past five, each with its outlet and time", async () => {
+    const many = Array.from({ length: 7 }, (_, i) => src(`a${i + 1}`, `2026-09-0${(i % 7) + 1}T10:00:00Z`));
+    render(<StoryView event={event({ sources: many })} />);
+    const changed = screen.getByRole("region", { name: /what changed/i });
+    const items = within(changed).getAllByRole("listitem");
+    expect(items).toHaveLength(5);
+    // a7 is newest (07 Sept) and leads
+    expect(within(items[0]).getByText("[7]")).toBeInTheDocument();
+    const { default: userEvent } = await import("@testing-library/user-event");
+    await userEvent.click(within(changed).getByRole("button", { name: "Show all 7" }));
+    expect(within(changed).getAllByRole("listitem")).toHaveLength(7);
   });
 });
 
 
-describe("the ticket — the section nav reads in page order", () => {
-  it("lists Lens · Said · Story · So what · Sources in the order the sections appear", () => {
+describe("the record — the section nav reads in page order", () => {
+  it("lists The record · What changed · Who said what · Story · Why it matters · Coverage · Ask in the order the sections appear", () => {
     render(<StoryView event={event({
       story_slug: "s",
       claims: [{ speaker: "A", claims: [{ quote_text: "q", quote_start: 0, quote_end: 1, article_id: "a1", source_name: "The Hindu", url: null, published_at: null }] }],
       impacts: [{ id: "i1", entity_name: "Someone", effect: "loses", direction: "negative", horizon: "weeks", confidence: 0.5, parent_impact_id: null }],
     })} />);
-    const nav = screen.getAllByRole("navigation", { name: "On this story" })[0];
+    const nav = screen.getByRole("complementary", { name: "On this story" });
     const hrefs = [...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["#lens-brief", "#said", "#route", "#so-what", "#sources"]);
+    expect(hrefs).toEqual(["#lens-brief", "#changed", "#said", "#route", "#so-what", "#sources", "#ask"]);
     // and the sections themselves come in that order on the page
     const ids = [...document.querySelectorAll("section[id]")].map((s) => s.id).filter((id) => hrefs.includes(`#${id}`));
-    expect(ids).toEqual(["lens-brief", "said", "route", "so-what", "sources"]);
+    expect(ids).toEqual(["lens-brief", "changed", "said", "route", "so-what", "sources", "ask"]);
   });
 });

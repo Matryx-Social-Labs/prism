@@ -242,6 +242,7 @@ button:disabled {
 /* ── Spectrum components ──────────────────────────────────────────────
    Shared classes rather than per-file utilities so the Next app and the
    future React Native theme describe the same objects (DESIGN.md § Components). */
+@layer components {
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 40px; padding: 0 16px; border-radius: var(--r-pill);
@@ -327,6 +328,19 @@ button:disabled {
 .meta-line { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.03em; color: var(--ink-3); text-transform: uppercase; }
 .meta-line .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line-strong); display: inline-block; }
 .glass { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+/* Entity marks: ink text, a thin accent underline — the record stays a record,
+   not a page of blue. Hover/focus lifts to the accent tint. */
+.ent {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  border-radius: 3px;
+  transition: background var(--t-micro) var(--ease), text-decoration-color var(--t-micro) var(--ease);
+}
+.ent:hover, .ent:focus-visible { background: var(--accent-soft); text-decoration-color: var(--accent); }
+}
 
 /* ── Motion primitives (all gated on prefers-reduced-motion) ───────── */
 

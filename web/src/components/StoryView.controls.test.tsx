@@ -231,8 +231,9 @@ describe("story timeline ownership", () => {
     render(<StoryView event={event({ story: STORY_WITH_SIBLINGS } as unknown as Partial<EventDetail>)} />);
     expect(await mobile().findByText(READER_BRIEF)).toBeInTheDocument();
 
-    // Sources still anchors, so the nav itself is proven to render.
-    expect(mobile().getByRole("link", { name: /Sources/ })).toBeInTheDocument();
-    expect(mobile().queryByRole("link", { name: /The story so far/ })).not.toBeInTheDocument();
+    // Coverage still anchors, so the nav itself is proven to render.
+    const nav = screen.getByRole("complementary", { name: "On this story" });
+    expect(within(nav).getByRole("link", { name: /Coverage/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { name: /The story so far/ })).not.toBeInTheDocument();
   });
 });

@@ -16,6 +16,7 @@ export interface OutletRef {
   code: string; // monogram, from the source registry
   origin: "national" | "intl" | "regional" | "wire" | string;
   language: string | null;
+  domain?: string | null; // the outlet's site, for its favicon
 }
 
 export interface FeedItem {
@@ -59,6 +60,8 @@ export interface SourceRef {
   code?: string | null;
   origin?: string | null;
   language?: string | null;
+  publisher?: string | null;
+  domain?: string | null;
   url: string | null;
   title: string;
   published_at: string | null;

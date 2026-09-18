@@ -39,7 +39,7 @@ def outlet_refs(slugs: list[str], registry: dict[str, Outlet] | None) -> list[Ou
     order = {"national": 0, "intl": 1, "regional": 2, "wire": 3}
     found.sort(key=lambda o: (order.get(o.origin, 9), o.name))
     return [
-        OutletRef(slug=o.slug, publisher=o.publisher, name=o.name, code=o.code, origin=o.origin, language=o.language)
+        OutletRef(slug=o.slug, publisher=o.publisher, name=o.name, code=o.code, origin=o.origin, language=o.language, domain=o.domain)
         for o in found
     ]
 
