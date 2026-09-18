@@ -80,12 +80,44 @@ async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
     new_ids: list[uuid.UUID] = []
     async with session_scope() as session:
         source_cache: dict[str, Source] = {}
+        prepared: list[tuple[RawItemEnvelope, Source, str | None]] = []
+        canonical_by_source: dict[uuid.UUID, set[str]] = {}
         for env in envelopes:
             if env.source_slug not in source_cache:
                 source_cache[env.source_slug] = await get_source(session, env.source_slug)
             source = source_cache[env.source_slug]
             url_canonical = canonicalize_url(env.url)
+            prepared.append((env, source, url_canonical))
+            if url_canonical:
+                canonical_by_source.setdefault(source.id, set()).add(url_canonical)
 
+        # ``external_id`` is a feed observation, not a reliable document key.
+        # BBC has changed only its URL fragment as an article moves through the
+        # feed (#0 -> #2 -> #5), which used to create a new raw item each time.
+        # Canonical URL is the document identity within one source. Keep
+        # cross-source observations because they are useful provenance, but do
+        # not send the same source document through the pipeline repeatedly.
+        seen_documents: set[tuple[uuid.UUID, str]] = set()
+        for source_id, urls in canonical_by_source.items():
+            existing = await session.execute(
+                select(RawItem.url_canonical).where(
+                    RawItem.source_id == source_id,
+                    RawItem.url_canonical.in_(urls),
+                )
+            )
+            seen_documents.update(
+                (source_id, canonical)
+                for canonical in existing.scalars()
+                if canonical
+            )
+
+        for env, source, url_canonical in prepared:
+            document_key = (source.id, url_canonical) if url_canonical else None
+            if document_key and document_key in seen_documents:
+                continue
+            if document_key:
+                # Also dedupe two unstable ids for one URL inside this batch.
+                seen_documents.add(document_key)
             stmt = (
                 pg_insert(RawItem)
                 .values(

@@ -14,8 +14,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from common.db import session_scope
+from common.schemas import RawItemEnvelope
 from common.urls import canonicalize_url
 from enrichment.consumer import _extraction_for_same_url
+from ingestion.base import persist_envelopes
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -113,6 +115,44 @@ async def test_a_missing_url_is_not_treated_as_a_match():
         pytest.skip("no database")
     assert await _extraction_for_same_url(None) is None
     assert await _extraction_for_same_url("") is None
+
+
+async def test_one_source_cannot_ingest_one_document_under_changing_external_ids(monkeypatch):
+    """BBC changed one RSS id from URL#0 to URL#2 to URL#5 in production."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    async def _published(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("ingestion.base.stream.publish", _published)
+    tag = uuid.uuid4().hex[:8]
+    source_id = uuid.uuid4()
+    slug = f"same-doc-{tag}"
+    url = f"https://example.test/{tag}/article?utm_source=rss"
+    try:
+        async with session_scope() as s:
+            await s.execute(
+                text("INSERT INTO sources (id,slug,name,source_type) VALUES (:i,:s,:s,'rss')"),
+                {"i": str(source_id), "s": slug},
+            )
+        first = RawItemEnvelope(
+            source_slug=slug, source_type="rss", external_id=f"{url}#0",
+            url=url, title="First observation",
+        )
+        moved = first.model_copy(update={"external_id": f"{url}#5"})
+        assert await persist_envelopes([first]) == 1
+        assert await persist_envelopes([moved]) == 0
+        async with session_scope() as s:
+            count = (await s.execute(
+                text("SELECT count(*) FROM raw_items WHERE source_id = :s"),
+                {"s": str(source_id)},
+            )).scalar_one()
+        assert count == 1
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM raw_items WHERE source_id = :s"), {"s": str(source_id)})
+            await s.execute(text("DELETE FROM sources WHERE id = :s"), {"s": str(source_id)})
 
 
 async def test_the_handler_does_not_call_the_model_for_a_url_it_already_extracted():

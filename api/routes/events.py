@@ -7,6 +7,8 @@ Redis lock so it holds across API replicas.
 
 import json
 import uuid
+from collections.abc import Mapping
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -43,6 +45,7 @@ from common.quota import (
     try_consume_sample,
     unlocked_lenses,
 )
+from common.urls import canonicalize_url
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 from enrichment.claims import flat_ws
 
@@ -63,6 +66,34 @@ def _speaker_key(name: str) -> str:
 
 
 CONTEXT_CHARS = 220
+
+
+def dedupe_sources(sources: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Keep one reader-facing row per publisher document.
+
+    A feed's external id is not always stable. BBC, for example, has emitted
+    one article URL with ``#0``, ``#2`` and ``#5`` ids as the item moved in its
+    feed. Those observations remain in the database for provenance, but they
+    are one document, not three sources and not three copies of every quote.
+
+    Rows arrive newest-first, so the first row is the latest observation. The
+    runtime canonicalizer is a fallback for rows created before the canonical
+    URL column was backfilled.
+    """
+    seen: set[tuple[str, str]] = set()
+    unique: list[Mapping[str, Any]] = []
+    for src in sources:
+        canonical = src.get("url_canonical") or canonicalize_url(src.get("url"))
+        key = (
+            ("url", canonical)
+            if canonical
+            else ("article", str(src["article_id"]))
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(src)
+    return unique
 
 
 def quote_context(clean_text: str | None, quote: str, start: int | None, end: int | None) -> tuple[str, str]:
@@ -163,13 +194,13 @@ async def get_event(
     if event is None:
         raise HTTPException(status_code=404, detail="event not found")
 
-    sources = (
+    source_rows = (
         await db.execute(
             text(
                 """
                 SELECT a.id AS article_id, s.name AS source_name, s.slug AS source_slug,
                        s.reliability ->> 'funding' AS funding,
-                       ri.url, ri.title, ri.published_at,
+                       ri.url, ri.url_canonical, ri.title, ri.published_at,
                        e.shared_fields -> 'stance' ->> 'label' AS stance,
                        e.shared_fields -> 'claims' AS claims,
                        CASE WHEN jsonb_typeof(e.shared_fields -> 'claims') = 'array'
@@ -187,6 +218,7 @@ async def get_event(
             {"eid": str(event_id)},
         )
     ).mappings().all()
+    sources = dedupe_sources(list(source_rows))
 
     perspectives = (
         await db.execute(

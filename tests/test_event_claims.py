@@ -13,15 +13,16 @@ from datetime import UTC, datetime
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from api.routes.events import _speaker_key, group_claims
+from api.routes.events import _speaker_key, dedupe_sources, group_claims
 
 T0 = datetime(2026, 7, 27, 10, 0, tzinfo=UTC)
 T1 = datetime(2026, 7, 28, 10, 0, tzinfo=UTC)
 
 
-def _src(article_id, claims, published_at=T0, name="The Hindu", url="https://h.example/a"):
+def _src(article_id, claims, published_at=T0, name="The Hindu", url="https://h.example/a",
+         canonical=None):
     return {"article_id": article_id, "source_name": name, "url": url,
-            "published_at": published_at, "claims": claims}
+            "url_canonical": canonical, "published_at": published_at, "claims": claims}
 
 
 def _c(speaker, quote, start=None):
@@ -121,6 +122,32 @@ def test_published_at_none_is_tolerated():
     assert out[0].claims[0].published_at is None
 
 
+def test_one_document_observed_three_times_is_one_source_and_one_quote():
+    """Production regression: BBC emitted one page as #0, #2 and #5.
+
+    The fragment lived in external_id while every row carried the same article
+    URL. Stored observations may remain separate, but the reader must see one
+    document and one copy of its claims.
+    """
+    url = "https://www.bbc.com/hindi/articles/example?at_medium=RSS&at_campaign=rss"
+    canonical = "https://www.bbc.com/hindi/articles/example"
+    rows = [
+        _src(f"a{i}", [_c("Alice", "एक ही बयान")], published_at=T0, name="BBC News Hindi",
+             url=url, canonical=canonical)
+        for i in range(3)
+    ]
+    unique = dedupe_sources(rows)
+    assert [s["article_id"] for s in unique] == ["a0"]
+    claims = group_claims(unique)
+    assert len(claims) == 1
+    assert [c.quote_text for c in claims[0].claims] == ["एक ही बयान"]
+
+
+def test_rows_without_a_url_are_distinct_documents():
+    rows = [_src("a1", [], url=None), _src("a2", [], url=None)]
+    assert [s["article_id"] for s in dedupe_sources(rows)] == ["a1", "a2"]
+
+
 @pytest.mark.asyncio(loop_scope="session")
 async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources():
     """The wiring, and the paywall decision made explicit.
@@ -135,6 +162,7 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
 
     eid = uuid.uuid4()
     aid = uuid.uuid4()
+    duplicate_aid = uuid.uuid4()
 
     class _R:
         def __init__(self, sql):
@@ -151,10 +179,14 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
             return None
         def all(self):
             if "FROM event_memberships em" in self.sql:
-                return [{"article_id": aid, "source_name": "Mint", "source_slug": "mint",
-                         "funding": None, "url": "https://m.example/x", "title": "T",
-                         "published_at": T0, "stance": None,
-                         "claims": [_c("Anita Dipke", "We were receiving proposals", start=12)]}]
+                article = {"source_name": "Mint", "source_slug": "mint", "funding": None,
+                           "url": "https://m.example/x?utm_source=rss",
+                           "url_canonical": "https://m.example/x", "title": "T",
+                           "published_at": T0, "stance": None,
+                           "claims": [_c("Anita Dipke", "We were receiving proposals", start=12)]}
+                # The same publisher document was observed under two unstable
+                # feed ids. The route, not only the helper, must collapse it.
+                return [{"article_id": aid, **article}, {"article_id": duplicate_aid, **article}]
             return []
 
     class _S:
@@ -175,11 +207,13 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
                 "claims": [{"quote_text": "We were receiving proposals", "quote_start": 12,
                             "quote_end": None, "context_before": "", "context_after": "",
                             "article_id": str(aid), "source_name": "Mint",
-                            "url": "https://m.example/x", "published_at": T0.isoformat()}],
+                            "url": "https://m.example/x?utm_source=rss",
+                            "published_at": T0.isoformat()}],
             }], "the route did not pass claims through, or leaked an unverified field"
             assert body["sources"] and body["sources"][0]["article_id"] == str(aid), (
                 "the sources query was changed and sources stopped arriving"
             )
+            assert len(body["sources"]) == 1, "one document leaked through as two source rows"
     finally:
         app.dependency_overrides.pop(events.get_db, None)
 
