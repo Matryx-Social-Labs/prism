@@ -1,399 +1,274 @@
 ---
 name: Prism
 description: "Follow the story, not the headlines."
+world: "Spectrum (v3, 2026-09-18) — replaces The Reservation Chart"
+tokens: design/tokens.json
+board: design/board (uv run python design/board/build.py)
 colors:
-  # Light ground (default; `data-theme="light"` or no preference)
-  bg: "#f2f4ee"
-  bg-elevated: "#fafbf8"
-  bg-sunken: "#e8ece2"
-  ink: "#141414"
-  ink-muted: "#5c5f58"
-  ink-faint: "#6d7068"
-  line: "#d6dbcf"
-  line-strong: "#b9c0b1"
-  lens-general: "#b45309"
-  lens-cyber: "#0e7490"
-  lens-finance: "#6d28d9"
-  lens-general-bg: "#fef3e2"
-  lens-cyber-bg: "#e0f4f8"
-  lens-finance-bg: "#ede9fe"
-  danger: "#b91c1c"
-  up: "#047857"
-  # Dark ground (`data-theme="dark"` or system preference)
-  bg-dark: "#141613"
-  bg-elevated-dark: "#1b1e19"
-  bg-sunken-dark: "#0f110e"
-  ink-dark: "#ebeee6"
-  ink-muted-dark: "#a3a79d"
-  ink-faint-dark: "#82867f"
-  line-dark: "#2a2e27"
-  line-strong-dark: "#3d423a"
-  lens-general-dark: "#fbbf24"
-  lens-cyber-dark: "#22d3ee"
-  lens-finance-dark: "#a78bfa"
-  lens-general-bg-dark: "rgba(251, 191, 36, 0.12)"
-  lens-cyber-bg-dark: "rgba(34, 211, 238, 0.12)"
-  lens-finance-bg-dark: "rgba(167, 139, 250, 0.14)"
-  danger-dark: "#f87171"
-  up-dark: "#34d399"
+  # Light (default). Full scale, dark values and roles live in design/tokens.json.
+  bg: "#FAFAF7"
+  surface: "#FFFFFF"
+  sunken: "#F1F1EC"
+  ink: "#15151A"
+  ink-2: "#4B4D57"
+  ink-3: "#6C6F7A"
+  line: "#E6E6E1"
+  line-strong: "#CFCFC8"
+  accent: "#5B3FE6"
+  accent-fill: "#6B4EF6"
+  accent-soft: "#EEEAFE"
+  coverage-national: "#DC9412"
+  coverage-regional: "#E4573D"
+  coverage-intl: "#0E9FB8"
+  coverage-wire: "#8A6CF2"
+  lens-markets: "#0F9D6A"
+  lens-cyber: "#2563EB"
+  lens-health: "#DB2777"
+  lens-policy: "#B7770D"
+  danger: "#D93A2B"
+  up: "#0F9D6A"
+  down: "#D93A2B"
+  bg-dark: "#0F0F12"
+  surface-dark: "#16161B"
+  ink-dark: "#F1F1EE"
+  accent-dark: "#A08BF6"
 typography:
-  display:
-    fontFamily: "Teko, sans-serif"
-    fontSize: "26px"
-    fontWeight: 500
-    lineHeight: 1
-    letterSpacing: "0.03em"
-  display-count:
-    fontFamily: "Teko, sans-serif"
-    fontSize: "44px"
-    fontWeight: 400
-    lineHeight: 0.9
-    letterSpacing: "-0.01em"
-  display-nav:
-    fontFamily: "Teko, sans-serif"
-    fontSize: "18px"
-    fontWeight: 400
-    lineHeight: 1
-    letterSpacing: "0.04em"
-  headline:
-    fontFamily: "Hind, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif"
-    fontSize: "22px"
-    fontWeight: 500
-    lineHeight: 1.25
-  headline-row:
-    fontFamily: "Hind, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif"
-    fontSize: "15.5px"
-    fontWeight: 500
-    lineHeight: 1.4
-  title:
-    fontFamily: "Hind, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif"
-    fontSize: "30px"
-    fontWeight: 500
-    lineHeight: 1.15
-  body:
-    fontFamily: "Hind, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif"
-    fontSize: "14.5px"
-    fontWeight: 400
-    lineHeight: 1.6
-  ui-label:
-    fontFamily: "Hind, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif"
-    fontSize: "13.5px"
-    fontWeight: 500
-    lineHeight: 1.55
-  hint:
-    fontFamily: "Hind, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif"
-    fontSize: "12.5px"
-    fontWeight: 400
-    lineHeight: 1.45
-  label:
-    fontFamily: "Martian Mono, ui-monospace, Menlo, monospace"
-    fontSize: "11px"
-    fontWeight: 400
-    lineHeight: 1.7
-    letterSpacing: "0.06em"
-  mono-dateline:
-    fontFamily: "Martian Mono, ui-monospace, Menlo, monospace"
-    fontSize: "12px"
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: "0.04em"
-rounded:
-  none: "0px"
-  focus: "2px"
-  pill: "9999px"
-spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
-  row: "14px"
-  row-lead: "20px"
-  header: "56px"
-  strip: "44px"
-  control: "48px"
-components:
-  chart-row:
-    typography: "{typography.headline-row}"
-    textColor: "{colors.ink}"
-    padding: "14px 0"
-    rounded: "{rounded.none}"
-  chart-row-lead:
-    typography: "{typography.headline}"
-    textColor: "{colors.ink}"
-    padding: "20px 0"
-    rounded: "{rounded.none}"
-  chart-row-count:
-    typography: "{typography.display-count}"
-    textColor: "{colors.ink}"
-    width: "56px"
-  chart-row-label:
-    typography: "{typography.label}"
-    textColor: "{colors.ink-faint}"
-  section-head:
-    typography: "{typography.display}"
-    textColor: "{colors.ink}"
-    padding: "16px 0 0"
-  masthead-wordmark:
-    typography: "{typography.display}"
-    textColor: "{colors.ink}"
-  masthead-dateline:
-    typography: "{typography.mono-dateline}"
-    textColor: "{colors.ink-muted}"
-  nav-header-link:
-    typography: "{typography.display-nav}"
-    textColor: "{colors.ink-muted}"
-    padding: "4px 4px 2px"
-  nav-header-link-active:
-    typography: "{typography.display-nav}"
-    textColor: "{colors.ink}"
-    padding: "4px 4px 2px"
-  sector-code:
-    typography: "{typography.mono-dateline}"
-    textColor: "{colors.ink-muted}"
-    height: "{spacing.strip}"
-    padding: "12px 8px 8px"
-  sector-code-active:
-    typography: "{typography.mono-dateline}"
-    textColor: "{colors.ink}"
-    height: "{spacing.strip}"
-    padding: "12px 8px 8px"
-  tab-underline:
-    typography: "{typography.label}"
-    textColor: "{colors.ink-muted}"
-    height: "{spacing.strip}"
-  tab-underline-active:
-    typography: "{typography.label}"
-    textColor: "{colors.ink}"
-    height: "{spacing.strip}"
-  button-primary:
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.bg}"
-    rounded: "{rounded.pill}"
-    padding: "8px 16px"
-    typography: "{typography.ui-label}"
-  button-secondary:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.none}"
-    padding: "6px 12px"
-    typography: "{typography.ui-label}"
-  lens-tab:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink-muted}"
-    rounded: "{rounded.pill}"
-    padding: "6px 14px"
-  lens-tab-selected:
-    backgroundColor: "{colors.lens-general-bg}"
-    textColor: "{colors.lens-general}"
-    rounded: "{rounded.pill}"
-    padding: "6px 14px"
-  input:
-    backgroundColor: "{colors.bg-elevated}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.none}"
-    height: "{spacing.control}"
-    padding: "0 16px"
-  field-label:
-    typography: "{typography.ui-label}"
-    textColor: "{colors.ink}"
-  bottom-tab:
-    typography: "{typography.label}"
-    textColor: "{colors.ink-muted}"
-    height: "44px"
-  bottom-tab-active:
-    typography: "{typography.label}"
-    textColor: "{colors.ink}"
-    height: "44px"
+  display: { fontFamily: "Newsreader, Tiro Devanagari Hindi, Noto Serif Kannada, Noto Serif Tamil, Noto Serif Telugu, serif", fontWeight: 500 }
+  sans: { fontFamily: "Hind, Hind Siliguri, Hind Vadodara, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif", fontWeight: 400 }
+  mono: { fontFamily: "JetBrains Mono, ui-monospace, Menlo, monospace", fontWeight: 400 }
+rounded: { xs: "4px", sm: "6px", md: "10px", lg: "14px", xl: "20px", pill: "9999px" }
+spacing: { 1: "4px", 2: "8px", 3: "12px", 4: "16px", 5: "20px", 6: "24px", 7: "32px", 8: "40px", 9: "48px", 10: "64px" }
 ---
 
-# Design System: Prism
+# Design System: Prism — Spectrum
 
-> The world changed on 2026-09-15. The old system (Fraunces / General Sans / IBM
-> Plex Mono on ivory, 18px cards, "Perspectives") is retired; this file records
-> the reservation chart as it shipped, derived from `web/src/app/globals.css`,
-> `web/src/app/layout.tsx` and the components. What survived the change is the
-> brand, not the costume: the colour rule, the three-voice commitment, the lens
-> flip, the tagline, and the refusal to enumerate lens names in prose. The
-> Decisions Log at the end carries the old history forward.
+> The world changed on 2026-09-18. "The Reservation Chart" (Teko / Hind / Martian
+> Mono, monochrome stationery, hairlines-not-cards, 0-radius) is retired. The
+> founder's brief: the product read as dull, readers could not tell what Prism is
+> for, and the mobile web has to become a React Native app without a second design.
+> What survives is the brand, not the costume: the mark, the record-not-verdict
+> principle, verbatim-or-nothing, counted structure, the lens flip, the refusal to
+> enumerate lens names in prose, and the accessibility floors. The Decisions Log at
+> the end carries the whole history forward.
 
 ## Overview
 
-**Creative North Star: "The Reservation Chart"**
+**Creative North Star: "White light in, spectrum out."**
 
-The day's news is the reservation chart pinned at the platform: one public list,
-every name on it, read the same way by everyone, re-sorted rather than rewritten
-when the reader changes how they read. The ground is pale continuous stationery,
-the ink is one black, and the structure is a strict table of hairlines, codes and
-counts. Nothing is decorated; the evidence is the design. The number at the left
-of a row is how many outlets reported it, the code is the subject, and the label
-grid beneath is the same three facts in the same order on every row.
+The mark is a prism: many reports enter as white light and leave as a spectrum.
+That is now the visual grammar of the whole product. The page ground is white
+light — near-white, calm, uncoloured. The **record** (the story) is written in a
+serif on that ground, the way a paper of record would print it. Colour appears
+exactly where the prism does its work: when the coverage of a story is split into
+its parts (the **coverage bar**), when the same facts are re-read through a
+professional **lens**, and on the single brand accent that says "this is
+interactive". Nothing else is coloured. The result should feel like a serious
+newspaper that has been rebuilt as an instrument: quiet ground, confident type,
+and a small set of coloured glyphs that mean something every time they appear.
 
-The system is dense but never crowded: rows are 14px apart on 1px rules, the lead
-row is set large, and the page is one column at every width. Colour is absent
-from chrome so that when it appears it means exactly one thing: a professional
-lens is speaking. State is carried by line form (solid, dashed, half-weight),
-never hue. Confirmed rejections: the category default of a cream broadsheet with
-a serif lead and cards beneath; perforations, dot-matrix faces and distressing;
-a marketing hero on the chart.
+Three things a first-time reader must understand within one screen, without
+reading a manual:
 
-**Key Characteristics:**
-- One ink, three greys, one rule colour; the three lens hues are the only colour.
-- Three voices: Teko for structure, Hind (six scripts) for reading, Martian Mono for provenance.
-- Hairlines for structure, no cards, no shadows, no gradients in chrome.
-- Counts are printed as counts; quotes are verbatim; single-source rows sit on a dashed rule.
-- One signature motion (the lens flip) plus one authored entrance (the chart printing).
+1. **This is one story from many reports** — the coverage bar and the outlet
+   monograms say so on every row.
+2. **Nothing here is invented** — quotes carry the speaker, the outlet, the time and
+   a link to the line; counts are printed as counts; provisional groupings say so.
+3. **I can read it for my work** — the lens control sits on the record, and a
+   locked lens still shows what it would add.
 
-## Colors
+**Key characteristics**
+- One ground, one ink, one accent (violet). Four coverage hues and the lens hues are semantic, discrete, never decorative.
+- Three voices: **Newsreader** for the record (headlines, titles, quotes), **Hind** for everything read or tapped in every Indian script, **JetBrains Mono** for provenance only.
+- Soft geometry: 10–20px radii on cards and sheets, pills for actions and chips, 1px lines for structure. No heavy shadows; one soft shadow for floating sheets.
+- Mobile is the product (bottom tabs, thumb-zone actions, 44px targets, safe areas). Desktop is the same components with room for evidence beside the record.
+- Two signature motions: the **lens flip** (scan line + re-ink, 500ms) and the **coverage bar drawing in** (segments grow left→right, 240ms, staggered 30ms). Reduced motion collapses both.
 
-A monochrome stationery ground with one ink; the three lens hues are semantic identifiers, present only where a lens speaks.
+## Colour
 
-### Primary
-- **Ink** (`{colors.ink}` / dark `{colors.ink-dark}`): every heading, headline, count, active tab underline, primary pill fill, focus ring, and text selection. There is no other primary.
+Roles, not hues, are the API. Every consumer reads a semantic token; the hex lives once in `design/tokens.json`.
 
-### Secondary
-- **General amber** (`{colors.lens-general}` / dark `{colors.lens-general-dark}`), **Cyber cyan** (`{colors.lens-cyber}` / `{colors.lens-cyber-dark}`), **Markets violet** (`{colors.lens-finance}` / `{colors.lens-finance-dark}`): the 7px lens dot after a headline, the selected lens tab's text and 1.5px inset ring, the flip's scan line, and the "Reads as" dot on the form. The `-bg` tints are the selected lens tab's fill and nothing else. Discrete, never a gradient. Dark mode brightens the hue two steps; it never desaturates.
+### Ground and ink
+- **bg** `#FAFAF7` / dark `#0F0F12` — the page. Faintly warm white: "white light".
+- **surface** `#FFFFFF` / `#16161B` — cards, rows, inputs, sheets.
+- **sunken** `#F1F1EC` / `#0B0B0E` — wells, segmented-control tracks, skeletons, monogram fills.
+- **ink** `#15151A` / `#F1F1EE` — headlines, body, primary icons, the Verified pill's fill.
+- **ink-2** `#4B4D57` / `#B3B4BC` — summaries, secondary text, inactive nav.
+- **ink-3** `#6C6F7A` / `#8E909A` — labels, provenance, tertiary text. 4.9:1 on surface; this is the floor for 11px mono.
+- **line** `#E6E6E1` / `#26262E` — card borders, dividers. **line-strong** `#CFCFC8` / `#36363F` — inputs, dashed provisional rules.
 
-### Tertiary
-- **Danger** (`{colors.danger}` / `{colors.danger-dark}`): fetch failures and destructive confirms only. **Up** (`{colors.up}` / `{colors.up-dark}`): a price move on a markets read. Neither appears in chrome.
+### Accent — brand violet
+- **accent** `#5B3FE6` / `#A08BF6` — links, active nav and tab, focus ring, selected states, the timeline's "now" dot.
+- **accent-fill** `#6B4EF6` / `#7C5CF0` — the primary button (white text, 4.6:1).
+- **accent-soft** `#EEEAFE` / `#241E45` — selected chip/nav fill, speaker avatars, the hero wash, the quote highlight (`<mark>`).
 
-### Neutral
-- **Stationery** (`{colors.bg}` / dark `{colors.bg-dark}`): the page, the sector strip, the bottom tab bar.
-- **Elevated** (`{colors.bg-elevated}` / `{colors.bg-elevated-dark}`): inputs, selects, the Ask sheet, the unselected lens pill on the phone rail, the landing's demo frame.
-- **Sunken** (`{colors.bg-sunken}` / `{colors.bg-sunken-dark}`): a selected square chip's fill and loading skeleton bars.
-- **Print grey** (`{colors.ink-muted}` / `{colors.ink-muted-dark}`): summaries, hints, inactive nav, the dateline, the bottom tab's inactive label (5.28:1 on light).
-- **Faded** (`{colors.ink-faint}` / `{colors.ink-faint-dark}`): the label grid, `[n]` citations, section counts, the single-source count. Set at 4.5:1 on both grounds specifically so 11px mono still reads.
-- **Rule** (`{colors.line}` / `{colors.line-dark}`): every hairline, the header and strip borders, the live row rule.
-- **Rule strong** (`{colors.line-strong}` / `{colors.line-strong-dark}`): the dashed single-source rule, square button and input borders, the scrollbar thumb.
+Violet is the far end of the mark's own spectrum. It is the *only* colour that means "you can act here", and it never appears in a coverage bar or a lens.
 
-### Named Rules
-**The Lens Speaks Rule.** Chrome is monochrome. Colour only ever means a lens is speaking; anything coloured that is not lens-semantic is re-inked to the neutral scale.
+### Coverage — the prism's work
+A story's reporting is split by **outlet origin**, in this fixed order so adjacent segments never collide for colour-blind readers (validated with the dataviz palette checker, both modes, all six checks):
 
-**The Line Form Rule.** State is line form, never hue: solid 1px rule = live, multi-source; dashed 1px `line-strong` = single-source; solid at 60% opacity = stale. No badge, no colour, no icon says these things.
+| Slot | Meaning | Light | Dark |
+|---|---|---|---|
+| `coverage-national` | English-language national outlets | `#DC9412` | `#C48314` |
+| `coverage-intl` | International outlets | `#0E9FB8` | `#1A9DB6` |
+| `coverage-regional` | Indian-language outlets | `#E4573D` | `#E2573E` |
+| `coverage-wire` | Wire / agency (reserved — no agency sources yet) | `#8A6CF2` | `#8A6CF2` |
 
-**The One Gradient Rule.** The mark's own spectrum base (a 3-unit bar under the triangle) is the only gradient on any surface. No spectrum hairline above the header, no gradient text.
+The amber sits below 3:1 against the page on purpose (it is a fill, not text); every bar therefore carries its count in text beside it — the legend is never colour alone.
+
+### Lenses — the same facts, re-read
+| Lens | Hue | Soft |
+|---|---|---|
+| Reader | ink — the record is neutral, it has no colour | — |
+| Markets | `#0F9D6A` green / `#2CC08A` | `#E3F6EE` / `#12301F` |
+| Cyber | `#2563EB` blue / `#5B8DFF` | `#E6EEFE` / `#15213D` |
+| Health *(drafted)* | `#DB2777` rose / `#F472B6` | `#FCE7F1` / `#3B1528` |
+| Policy *(drafted)* | `#B7770D` amber / `#E0A030` | `#FBF0DC` / `#332611` |
+
+A lens hue appears only on: the selected lens tab's text, the flip's scan line, the small "Markets read" dot on a row, and the lens brief's heading rule. Never on chrome, never as a wash. New lenses take the next unused stop of the spectrum; the picker renders whatever `/api/v1/lenses` returns.
+
+### Status
+- **Verified record** — ink pill with a check. No colour: verification is the default, not an alarm.
+- **Provisional grouping** — dashed `line-strong` outline, `ink-3` text.
+- **Disputed** `#B7770D`, **Corrected** `#D93A2B` — text and a 12% tint; rare by design.
+- **danger / down** `#D93A2B`, **up** `#0F9D6A` — destructive confirms and price moves only.
+
+### Named rules
+**The Prism Rule.** Colour appears where light is split: the coverage bar, a lens, and the one accent. Anything else coloured is re-inked to the neutral scale.
+**The Legend Rule.** No coverage or status is conveyed by colour alone — every bar has its count, every pill has its word, every lens dot has its label.
+**The One Gradient Rule.** The mark's spectrum bar and the landing's dispersion figure are the only gradients. No gradient text, no gradient buttons, no tinted photos.
 
 ## Typography
 
-**Display Font:** Teko (with sans-serif)
-**Body Font:** Hind, falling through per glyph to Hind Mysuru (Kannada), Hind Madurai (Tamil), Hind Guntur (Telugu), then system-ui
-**Label/Mono Font:** Martian Mono (with ui-monospace, Menlo)
+**Display: Newsreader** (variable, optical sizes 6–72, weights 400–600, italics). Falls through per script to Tiro Devanagari Hindi, Noto Serif Kannada / Tamil / Telugu / Bengali / Gujarati, then Georgia.
+**Sans: Hind** with Hind Siliguri (Bengali), Vadodara (Gujarati), Mysuru (Kannada), Madurai (Tamil), Guntur (Telugu), then `system-ui`.
+**Mono: JetBrains Mono** 400/500, `font-variant-numeric: tabular-nums` everywhere.
 
-**Character:** Station signage over a reading face over a teletype. Teko is the condensed board lettering of the chart itself; Hind is one family across Latin, Devanagari, Kannada, Tamil and Telugu so a Kannada headline and an English one sit on the same page without a fallback seam; Martian Mono is tabular by definition (`font-variant-numeric: tabular-nums` on every `.font-mono`) because a column of counts and times must align.
+**Character:** a paper of record set on an instrument. Newsreader was drawn for on-screen news reading and has real optical sizes, so a 60px promise and a 19px row headline come from one voice. Hind keeps five Indian scripts on one baseline so a Kannada row and an English row read as one page. JetBrains Mono is narrow enough for a time and a count to sit in a 26px monogram row without wrapping.
 
-### Hierarchy
-- **Display** (Teko 500, 26px, line-height 1, +0.03em, uppercase): section heads (TODAY, FOR YOU, WHAT WAS SAID) and the PRISM wordmark (400, +0.01em). Lens brief heads and landing terms drop to 22px; the Ask sheet title to 20px.
-- **Display count** (Teko 400, 44px, line-height 0.9, -0.01em): the lead row's source count only. Never running text.
-- **Display nav** (Teko 400, 18px, uppercase, +0.04em): the desktop header links.
-- **Title** (Hind 500, 30px → 34px at sm, line-height 1.15; 40px on the desktop ticket): the story headline on the ticket.
-- **Headline** (Hind 500, 22px → 26px at sm, line-height 1.25): the lead row. Landing hero runs 38/48/56px at the same weight.
-- **Headline row** (Hind 500, 15.5px, line-height 1.4): every other chart row, the sources' outlet names, section labels on the form.
-- **Body** (Hind 400, 14.5px, line-height 1.6): summaries, quotes, briefs, prose. Runs 14.5–16px; inputs are 16px so iOS never zooms. Measures cap at ~36em (hints, definitions) to 44ch (landing prose) and 52ch (field hints).
-- **UI label** (Hind 500, 13.5px): field labels above controls, sector names in the strip, pill button text (13–14.5px semibold).
-- **Hint** (Hind 400, 12.5px): the line under a section head, the ticket's sub-line, the lens board's descriptions.
-- **Label** (Martian Mono 400, 11px, +0.04–0.06em, uppercase): the row's label grid (origin · time · code), the ticket strip, `[n]` citations, section counts, "Yesterday's chart →", Q/A markers. This is the floor.
-- **Mono dateline** (Martian Mono 400, 12px, +0.04–0.06em): the masthead's second line, sector codes in the strip and on the form, the branch tree's shape readout.
+### Scale (mobile → desktop)
+| Token | Voice | Size | Line | Weight | Where |
+|---|---|---|---|---|---|
+| display-xl | Newsreader | 40 → 60 | 1.05 | 500, −0.02em | landing promise |
+| display-l | Newsreader | 30 → 38 | 1.12 | 500, −0.015em | story title |
+| display-m | Newsreader | 24 → 30 | 1.2 | 500 | lead row, section titles (Today, The record) |
+| title | Newsreader | 19 → 20 | 1.3 | 500 | every story row headline |
+| quote | Newsreader italic | 17 → 18 | 1.5 | 400 | verbatim quotes only |
+| body | Hind | 16 | 1.6 | 400 | record text, summaries on the story |
+| body-s | Hind | 14.5 | 1.55 | 400 | row summaries, hints, legends |
+| ui | Hind | 14 | 1.4 | 500–600 | buttons, tabs, chips, nav |
+| label | Hind | 12.5 | 1.4 | 500–600, +0.06em, caps | card headings, eyebrows |
+| mono | JetBrains Mono | 12 | 1.5 | 400, +0.02em | times, "5 outlets · 15 reports" |
+| mono-s | JetBrains Mono | 11 | 1.5 | 400, +0.03em, caps | row meta line — the floor |
 
-### Named Rules
-**The Three Jobs Rule.** Teko never sets running text; Martian Mono never sets prose or a heading; Hind sets everything a reader reads. A word in the wrong voice is a bug.
-
-**The 11px Floor Rule.** No functional mono label below 11px; no body below 14.5px; 4.5:1 minimum on both grounds. `ink-faint` was moved from #8a8d85 (3.0:1) to #6d7068 for exactly this reason.
+### Named rules
+**The Three Jobs Rule (kept).** Newsreader never sets a button, a label or running UI; JetBrains Mono never sets prose or a heading; Hind sets everything a reader taps or reads at length. A word in the wrong voice is a bug.
+**The Floors (kept).** 11px mono, 14.5px body, 16px in inputs (iOS zoom), 4.5:1 on both grounds, 44px targets.
+**The Measure Rule.** Reading copy 44–68 characters; the reading column is 640px and never grows with the viewport — width buys evidence beside the record, not longer lines.
 
 ## Layout
 
-One column at every phone width, hard left edge, no centring except the landing's final call. Public and app shells now cap at 1400px (`px-5 sm:px-8 xl:px-10`) so the header, landing, chart, trending and search share a left edge. At `lg`, feed, trending and search use the first 188px for the persistent subject rail and keep the story river in the remaining field. Form pages (you, onboarding) remain 720px. The desktop ticket uses the same fluid 1400px field: a 72–104px ledger margin, a reading column capped at 604px, and the remaining width for the sticky lens/evidence board. It never sets a viewport-wider fixed width at the 1024px breakpoint.
+**Shell** 1360px, gutters 16 / 24 / 32px. **Breakpoints** are Tailwind's: the product switches from phone to desktop at `lg` (1024px); `sm` (640px) only widens type.
 
-Vertical rhythm is the rule: every unit of the page (row, section head, field, source, quote) begins with a 1px hairline and its own top padding. Chart rows are `py-3.5` (14px) on a `40px + 16px gap` count column; the lead row is `py-5` (20px) on a 56px column. Section heads are `pt-4` with `mb-4`. Form fields are `pt-6 pb-6`. The base unit is 4px; the scale actually used is 4 / 8 / 16 / 24 / 32.
+**Phone (the future app):** masthead 52px (mark + wordmark, dateline in mono, theme) · subject chips 34px in a horizontal rail · content · bottom tab bar 56px + safe-area inset. The story page swaps the masthead for a back bar and pins Follow · Ask · Share in the thumb zone above the tab bar.
 
-Fixed chrome: desktop header 56px (57px with its border); the single sector navigation is a 44px sticky horizontal rail on the phone and reflows into the 188px sticky left subject rail at `lg` without creating a duplicate accessible control; bottom tab bar has five equal columns with 48px targets plus the safe-area inset, hidden at `lg`. The lead row's image sits above the headline on a phone and beside it in a 400px column at `lg`; it is present only when the story has one, never a placeholder.
+**Desktop:** top bar 60px (mark + wordmark, Today · Stories · Pulse · Watchlist, a visible 260px search field with `/`, theme, Sign in or the avatar; the primary pill appears only on the landing) · a three-column grid: left rail 220px (subjects on Today/Stories/Search; "On this story" on a record) · main column · right rail 300px (Developing over days on Today; Reports + Named entities on a record). Rails are sticky under the top bar.
 
-Breakpoints are Tailwind's defaults: `sm` 640px shows sector names beside codes and header nav text; `lg` 1024px shows the brand header and hides the bottom bar and phone masthead.
-
-## Elevation & Depth
-
-Flat. There are no shadows on any shipped surface: depth is a hairline and, at most, a change of ground (`bg-elevated` for a control or sheet, `bg-sunken` for a selected chip). The two fixed sheets (the header and the ticket's pinned lens rail) use `--glass` (the ground at 82–86% with `backdrop-blur-md`) so content is seen scrolling under them; that translucency is the only depth cue. The selected lens tab draws a 1.5px inset ring in the lens hue, not a shadow.
-
-### Named Rules
-**The No Shadow Rule.** A box-shadow on a chrome element is a defect. `--shadow-card` and `--shadow-pop` survive in `globals.css` from the old world and are used by nothing; do not revive them.
-
-## Shapes
-
-Square by default: inputs, selects, secondary buttons, chips, the Ask sheet and the landing's demo frame all have 0 radius and a 1px `line-strong` border. The only round shapes are the pill (`9999px`) and the 7px lens dot. Pills are rationed: lens tabs, and one primary action per page (the header's "Pick your sectors", the landing's call, the ticket's "Ask", "Sign in to unlock"). The theme toggle, the 32px avatar and the header search target are circles because they are icon buttons, not choices. The focus ring is a 2px ink outline at 2px offset with a 2px radius so it does not clip at the corners. Icons are one stroke set: 24-unit viewBox, 2px stroke, round caps and joins, `currentColor`, 12–19px.
+**Vertical rhythm** is the 4px scale: rows are 12px apart; cards pad 14–20px; sections on a record are 22px blocks separated by a `line`.
 
 ## Components
 
-### The Chart Row
-The unit of the product; every row the same. A two-column grid: the source count at the left (Teko 44px on the lead, mono 13px `leading-[1.9]` otherwise; `ink-faint` when the count is 1), then the headline in Hind (22/26px lead, 15.5px otherwise, weight 500, `text-balance`), the lens dots (7px, `rounded-full`, one per professional read that exists, `role="img"` with a label), the lead's summary in print grey at 14.5px, and the label grid in mono 11px uppercase faint: origin · time · code, then the headline's language if it differs from the reader's first. A single-source row sits on `.rule-single` (dashed) and prints "1 source" first in the grid; every other row on `.rule-live`. Hover and focus underline the headline (`underline-offset-4`), nothing else moves. The row the reader last opened prints "· read" at the end of the grid. The list prints in with `.chart-print`: opacity 0→1 and a 4px rise, 180ms, exponential ease-out, 40ms stagger, nothing under reduced motion.
+### Story row (`.row`)
+The unit of the product, identical on Today, Stories, Search, Watchlist and the landing's live proof. A `surface` card, `line` border, 10px radius, 14/16px padding; the lead row pads 20/18px and sets its title at 26–30px. Inside, top to bottom:
+1. **Meta** (mono-s caps): subject or region · time since last report · languages when more than one.
+2. **Title** (title voice).
+3. **What changed** (body-s, ink-2, two lines max).
+4. **Foot**: outlet monograms (max 3 + "+N") · **coverage bar** with its text ("9 outlets · 2 languages") · spacer · lens dot ("Markets read") when the story earns one.
+A single-source row has a dashed border. Rows never carry a publisher photo (see Decisions, 2026-09-18).
 
-### Masthead
-The mark (a `currentColor` triangle on the spectrum bar, 21px) and PRISM in Teko 26px at +0.01em, then the dateline in mono 12px print grey: date · N sources · N stories. The theme toggle sits right. Phone only; on desktop the brand header carries the same wordmark at the same size.
+### Coverage bar (`.covbar`)
+Segments in the fixed slot order, 2px gaps, 6px tall on rows and 8px on a record, rounded ends; total width 72px on rows, 120–240px on a record; each segment's width is proportional to its count, minimum 4px. Always followed by mono text with the count. Draws in left→right on first paint.
 
-### Sector Strip / Desktop Subject Rail
-One accessible subject nav on every surface. On phones it is a sticky horizontal strip on the page ground with a bottom hairline; at `lg` the same DOM reflows into a persistent left rail with names visible, a left active rule, and a short explanation of the monitored-outlet record. Seven items: ALL then six codes in mono 12px at +0.06em, names in Hind 13.5px 500 from `sm`. Each item is at least 44px tall. On the chart a code re-sorts in place; elsewhere it is a link. Never render separate hidden mobile and desktop copies: CSS-hidden duplicate controls still produce a confusing accessibility tree in non-visual and test environments.
+### Monogram (`.mono-av`)
+26px circle, `sunken` fill, 2px `surface` ring and 1px `line` halo, two-letter outlet code in Hind 600 9.5px. Stacks overlap by 7px. Codes come from the source registry, never from initials computed at render (The Hindu = TH, Hindustan Times = HT).
 
-### Section Head
-Teko 26px uppercase on a top hairline with `pt-4`; the count follows in mono 11px faint; an optional hint beneath at 12.5px faint, max 36em.
+### Status pill (`.status`)
+24px pill, 12px Hind 600. Verified: ink fill, check icon. Provisional: dashed outline. Corrected/Disputed: 12% tint of their hue.
 
-### Navigation
-- **Desktop header** (56px, `--glass`, bottom hairline): wordmark left; Today · Trending · Pulse · Watchlist in Teko 18px uppercase with a 2px bottom border (ink when active); a 32px round search target; Sign in; the theme toggle; then either the 28px round avatar (1px `line-strong` border, initial in 12px semibold) or the one primary pill.
-- **Bottom tab bar** (phone): five equal columns, 48px targets, 19px stroke icons above 11px labels; active is ink at weight 600, inactive print grey at 500. The glass ground includes the device safe-area inset. Hidden on the ticket, which pins its own rail.
+### Subject navigation
+Phone: pill chips in a scrolling rail, the active chip inverted (ink fill). Desktop: the left rail, 40px items with the mono code in a 28px column, active item `accent-soft` fill with `accent` text. One DOM per breakpoint, never both rendered.
 
 ### Buttons
-- **Primary** (pill, ink fill, ground-coloured text, 13–14.5px semibold, `px-4 py-2` or `h-12 px-6`): one per page. Hover drops to 85% opacity; the landing's call adds `active:translate-y-px`.
-- **Secondary** (square, 1px `line-strong` border, no fill, ink or print-grey text, 12–13px medium, `px-3 py-1.5`): sub-sector chips, "Save", "Back to the reader view" (pill variant exists on the lens gate). Selected chips fill `bg-sunken` and turn the border ink.
-- **Underlined tab** (2px bottom border, ink when on): in-place switches: sector codes, TODAY / FOR YOU, language ranks on the form, the branch tree's "all / spine" toggle.
+- **Primary** pill, `accent-fill`, white text, 40px (48px `.btn-lg`). One per screen: Follow story on a record, Open today's record on the landing, Save on forms.
+- **Secondary** pill, `surface` fill, `line-strong` border. **Ghost** text only. **Icon** 38px round.
+- Hover: 5% darker or `sunken`; active: 1px down; all 160ms.
 
-### Lens Tabs
-The one place a pill carries colour. Unselected: no fill, print grey (faint when locked, with a 10px stroke padlock). Selected: the lens's `-bg` tint, text in the lens hue, `inset 0 0 0 1.5px` ring in the hue. On the phone rail the unselected pill gains a 1px `line-strong` border on `bg-elevated` and a 44px minimum height. Desktop shows the key hints ("Press 1 · 2") in mono 11px far right.
+### Lens control (`.seg`)
+A segmented control on a `sunken` track, 34px pills; the selected pill is `surface` with shadow-1 and the lens hue for its text; locked lenses show a 13px lock at 55% and still flip. Lives on the record header (desktop, right of the actions) and directly above the record text on the phone. Keyboard 1/2/3 on desktop.
 
-### Inputs / Fields
-- **Field:** label in Hind 13.5px 500 above; hint prose in print grey (max 52ch); the control 12px below; the whole field on a top hairline with 24px padding.
-- **Control:** `h-12`, 1px `line-strong` border, `bg-elevated`, 16px text, `px-4`, 0 radius. The Ask composer is the same border on the page ground with a 44px square send button bordered in ink.
-- **Focus:** the global 2px ink outline; no glow, no colour.
+### Record header
+Status pill · updated time · subject, then the title (display-l), the summary (17px ink-2, 62ch), the monogram stack + large coverage bar + text ("5 outlets · 15 reports · English"), then the action row. Follow is the primary; Share is secondary; Ask lives at the foot of the record and in the thumb bar.
 
-### The Ticket (StoryView / StoryDesktop)
-The story page reads as a reservation ticket. The strip first: a mono 11px uppercase line on the row's own rule (dashed if single-source) with facts separated by a middle dot drawn by CSS (`.ticket-strip`): code · sources · origins · stamp. Then the title (30/34px; 40px on desktop), the summary at 15.5px print grey, the lens tabs on a hairline, and the lens block (`.flip-body`) in 18px-gapped sections. Below, on hairlines with Teko heads: the route (BranchTree: a monochrome tree whose branches are `border-left` line styles, with a mono 12px computed readout `N DEVELOPMENTS · N BRANCHES · N SATELLITES · SPAN`), the passenger list (Said: speaker 14.5px semibold, verbatim quote 14.5px/1.6, provenance `[n] · outlet · date` in mono 11px, the `[n]` a link whose hit area is grown to ~47×44 by a pseudo-element), and the coaches (SourceList: `[n]` in a 28px mono column, outlet 13.5px 500, funding label in mono uppercase, headline truncated in print grey). On the phone a `--glass` sheet pins the lens pills and Share + Ask to the thumb zone.
+### Record sections (in this order, always)
+**The record** (the Reader brief, 16.5px, with "What to watch" bullets) → **What changed** (timeline: accent "now" dot, then ink dots on a `line-strong` spine; mono time · outlet, serif headline) → **Who said what** (quote cards) → **Coverage** (large bar, legend with counts, entities, the report list on the phone) → **Why it matters** (impacts) → **Ask** (input pill + suggested questions). The desktop left rail lists the same six with counts; the right rail holds Reports and Named in the reports.
 
-### The Lens Flip (signature motion)
-Never a crossfade. On a lens change the block re-mounts with `.flip-body` (opacity 0.25 → 0.55 at 60% → 1, 500ms ease-out) while a 2px `.flip-scanline` in the lens hue sweeps top to bottom (500ms ease-out, opacity 1 → 0.85). Body text and layout never move. Desktop binds keys 1/2/3 and does not scroll. Under `prefers-reduced-motion` both animations are `none`: an instant swap.
+### Quote card (`.quote`)
+`surface`, 14px radius: speaker avatar (accent-soft, initials) + name + "quoted in N outlets"; the quote in Newsreader italic 17.5px; outlet pill · time · "Open at the quote ↗" (text fragment link); an "In the article" disclosure that prints the surrounding sentence with the quote in `accent-soft` `<mark>`.
 
-### Ask Panel
-A square `line-strong` sheet on `bg-elevated` (docked on the phone, floating on desktop). Title in Teko 20px uppercase; turns are ruled lines with Q / A in a mono 11px column; the model's citations are `[n]` mono links; suggested questions are square secondary buttons.
+### Ask
+Subordinate to the evidence: a card at the foot of the record with a 44px input pill, a round ink send button and three suggested questions as outline chips. Answers cite `[n]` to the report list.
 
-### Landing (Persuade surface)
-The same world in a 1400px shell. The promise is “Follow the story, not the headlines.” in Hind 42/54/64px 600; prose is 16–17px print grey at 42ch; there is one primary pill. The other half of the first desktop viewport is a real live story record with its latest report time, source support, subject and evidence link. Tablet stays in normal document flow instead of vertically centring two stacked blocks. Lower sections use current product evidence, and every written interaction is marked ILLUSTRATION in the provenance voice. Product status is separated into Available now / In validation / Next, so future work cannot read as shipped.
+### Cards and rails (`.card`)
+`surface`, 14px radius, 16px padding, a 12.5px caps heading in `ink-3`. Used only in the desktop rails and on the landing; the main column is rows and blocks.
+
+### Forms (You, Onboarding, Sign in, Account, Interests)
+One shell, 640px: 14px 500 labels above 48px `surface` inputs with `line-strong` borders and 10px radius; hints 13.5px `ink-3`; the primary pill on the right of a sticky footer; errors in `danger` beside the field. Sector and lens pickers are chips; the lens picker is the one place a chip carries a lens hue.
+
+### Landing
+A product page built from the product's own components: the promise (display-xl) with the **dispersion figure** (outlet monograms → the mark → four spectrum strands → the real live story row), three proof cards each running a real component on real data (timeline, quote card, coverage bar), the lens flip on a real record, an honest **Available now / In validation / Next** grid, one final call. No device mockups, no stock photography, no numbers that are not counted.
+
+### Empty, loading, error
+Skeletons are `sunken` bars in the exact geometry of the row (no spinner on the chart). Empty states say what would be here and offer the one action that fills it. Errors are one sentence in `danger` with a retry.
+
+## Motion
+
+- **micro** 160ms, **standard** 240ms, easing `cubic-bezier(.2,.7,.2,1)`.
+- **The lens flip (kept):** a 2px scan line in the lens hue sweeps the reading column top→bottom over 500ms while the text re-inks beneath it; layout never moves. Reduced motion: instant swap.
+- **Coverage bar:** segments scale from 0 on first paint, 240ms, 30ms stagger. Once per page load, never on re-sort.
+- Rows print in with a 40ms stagger (kept). No parallax, no scroll-jacking, no looping animation anywhere.
 
 ## Do's and Don'ts
 
-### Do:
-- **Do** keep chrome monochrome; colour on a surface means a lens is speaking, and only the 7px dot, the selected lens tab, the scan line and the form's "Reads as" dot may carry it.
-- **Do** carry state as line form: solid 1px `line` for live, dashed 1px `line-strong` for single-source, the solid rule at 60% opacity for stale. Never hue.
-- **Do** print counted structure as counts (sources, stories, developments, branches, quotes) in the provenance voice; never let an LLM summarise what can be counted.
-- **Do** quote verbatim or not at all; every quote carries `[n] · outlet · date` in mono 11px and `[n]` is the same index the sources list uses.
-- **Do** mark every written example ILLUSTRATION in mono; no invented numbers on any surface.
-- **Do** render whatever `/api/v1/lenses` returns; lens names are data, never enumerated in generic or marketing copy. The public promise is "Follow the story, not the headlines."
-- **Do** put every unit on a top hairline with its own padding: rows `py-3.5`, lead `py-5`, section heads `pt-4`, fields `pt-6 pb-6`.
-- **Do** hold the floors: 11px for functional mono labels, 14.5px for body, 16px inside inputs, 4.5:1 on both grounds, measures ≤ ~36em for hints and ≤ 44ch for prose.
-- **Do** ration the pill to lens tabs and one primary action per page; every other choice is a square 1px `line-strong` button or an underlined tab.
-- **Do** collapse every animation to nothing under `prefers-reduced-motion`, including the flip and the chart print.
+### Do
+- **Do** put the coverage bar and its count on every story row; it is how a reader learns what Prism is without being told.
+- **Do** keep the record neutral: Reader is ink; colour arrives with a lens or a coverage split.
+- **Do** keep one primary pill per screen and give it the screen's one job (Follow, Open, Save).
+- **Do** print counts as counts, quote verbatim or not at all, and mark provisional groupings in words.
+- **Do** design every phone screen as an app screen: bottom tabs, thumb-zone actions, 44px targets, `100dvh`, safe-area insets.
+- **Do** use outlet monograms from the registry for identity; a favicon or logo only under a written licence.
+- **Do** render whatever `/api/v1/lenses` returns and never name lenses in generic copy.
 
-### Don't:
-- **Don't** put an eyebrow, kicker or label above a heading; the heading carries its own weight and the subject lives in the label grid.
-- **Don't** draw a card: no bordered-and-shadowed box around content already separated by a rule. No shadows, no gradients in chrome; the mark's base is the only spectrum.
-- **Don't** put a thumbnail on every row; the lead's image appears only when the story has one, never a placeholder.
-- **Don't** use "Other" as a heading; six subjects, every story in one of them.
-- **Don't** add a global lens switcher to the header or the tab bar; the lens is set in the form and flipped on the ticket.
-- **Don't** crossfade the lens block, and don't move body text or layout during the flip.
-- **Don't** put a marketing hero on the chart; `/feed` is always the list, and `/about` is the landing's permanent address.
-- **Don't** infinite-scroll; the day is the unit and yesterday's chart is a link at the foot.
-- **Don't** use text glyphs (↗ ▲ ▼ ↳ ▾) as icons; use the stroke set in `icons.tsx`.
-- **Don't** set running text in Teko, or prose or a heading in Martian Mono.
-- **Don't** use perforations, a dot-matrix face, or distressing; the chart is printed stationery, not a costume of one.
+### Don't
+- **Don't** hotlink or embed publisher photographs anywhere (rows, records, share cards, JSON-LD). Image rights are unresolved; the design does not depend on them.
+- **Don't** colour chrome, tint the ground, or use a lens or coverage hue as decoration.
+- **Don't** set body or UI in Newsreader, or a heading in the mono.
+- **Don't** infinite-scroll Today; the day is the unit and yesterday is a link.
+- **Don't** put a marketing hero on Today; the landing is `/about` and `/` for a first visit only.
+- **Don't** use text glyphs as icons; the stroke set in `icons.tsx` (22px, 1.8 stroke) is the only icon set.
+- **Don't** invent a fact for a demo. Every number, quote and outlet on the landing is fetched.
 
 ## Decisions Log
 
-Historical entries were written under whichever name was current; the design decision each records is unaffected. Entries before 2026-09-15 describe the retired ivory/Fraunces world and are kept as history; the brand rules they established (colour, three voices, the flip, no cards, counted structure, no global lens switcher) carried into the chart.
+Historical entries were written under whichever name and world was current; the design decision each records is unaffected. Entries before 2026-09-18 describe the retired Reservation Chart and, before 2026-09-15, the ivory broadsheet; they are kept as history.
 
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-09-18 | New world "Spectrum": Newsreader / Hind / JetBrains Mono, near-white ground, brand violet accent, soft radii, cards for rows | Founder brief: the chart read as dull and un-navigable; readers could not see what Prism does. The prism's own metaphor — white light in, spectrum out — now sets where colour appears |
+| 2026-09-18 | Colour rule widened: coverage hues + lens hues + one accent (was: lenses only) | The coverage bar makes "one story from many reports" visible on every row; the accent makes interaction legible in a mobile app |
+| 2026-09-18 | Coverage bar order national · international · regional · wire, palette validated in both modes | Red and amber are indistinguishable for deutan readers when adjacent; the order keeps them apart and the count text is the legend |
+| 2026-09-18 | Publisher photographs retired from every surface | Indian fair dealing does not cover a whole photograph; the feed T&Cs (TOI, HT, India TV) forbid commercial republication; agency images are not the publisher's to license. Outlet monograms and the coverage bar carry identity instead |
+| 2026-09-18 | Bottom tabs Today · Stories · Search · Watchlist · You; Pulse becomes a module on Today and a route | Five tabs is the ceiling; "Stories" (developing arcs) is a reader's word and "Trending" implies popularity theatre |
+| 2026-09-18 | Record sections fixed: The record · What changed · Who said what · Coverage · Why it matters · Ask | Same order on phone, desktop rail and share card; a reader learns it once |
+| 2026-09-18 | Tokens live in design/tokens.json; web CSS and the future React Native theme are generated from it | One source of truth for two platforms |
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-09-18 | Landing promise narrowed to “Follow the story, not the headlines”; public copy says monitored outlets, not every source | The visible promise now matches what the ingestion and quality system can verify today |
