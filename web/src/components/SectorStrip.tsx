@@ -4,70 +4,60 @@ import Link from "next/link";
 import { SECTOR_GROUPS } from "@/lib/sectors";
 
 /**
- * The subject nav, on every surface. Six codes, like the station codes on a
- * reservation chart; the full name on desktop. Sticky under the masthead.
- *
- * This is the fix for "I can't get to my sector": a reader never has to know a
- * URL or scroll to a band heading. `active` underlines the current one; ALL is
- * the front page. On the feed the parent re-sorts the chart in place when a
- * code is chosen (see Chart.tsx); elsewhere the codes are plain links.
+ * The subject nav, on every list surface. Six subjects and All; pill chips in
+ * a scrolling rail on the phone, the left rail on desktop — one DOM, restyled
+ * by breakpoint, so there is one accessible control. On the chart a chip
+ * re-sorts the list in place (see Chart.tsx); elsewhere it links.
  */
 export function SectorStrip({
   active,
   onPick,
   allHref = "/feed",
-  allLabel = "Today",
+  allLabel = "All stories",
   responsiveRail = false,
+  counts,
 }: {
   active: string | null;
-  /** When present, codes call this instead of navigating — the chart re-sorts in place. */
+  /** When present, chips call this instead of navigating — the chart re-sorts in place. */
   onPick?: (slug: string | null) => void;
   allHref?: string;
-  /** The subject beside the ALL code: Today on the chart; empty where ALL needs no name. */
   allLabel?: string;
-  /** Use the same accessible nav as a horizontal strip on small screens and a left rail on desktop. */
+  /** Rail on desktop, chips on the phone (default: chips everywhere). */
   responsiveRail?: boolean;
+  /** Stories per subject on the current page, printed after the name. */
+  counts?: Record<string, number>;
 }) {
   const item = (slug: string | null, code: string, name: string, href: string) => {
     const on = active === slug;
+    const n = counts?.[slug ?? "all"];
     const cls = responsiveRail
-      ? "group flex h-11 shrink-0 items-end gap-1 border-b-2 px-2 pb-2 pt-3 leading-none transition-colors lg:grid lg:h-auto lg:min-h-[44px] lg:w-full lg:grid-cols-[34px_1fr] lg:items-center lg:gap-2 lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-0 lg:text-left"
-      : "flex h-11 shrink-0 items-end gap-1 border-b-2 px-2 pb-2 pt-3 leading-none transition-[border-color]";
-    const style = {
-      borderColor: on ? "var(--ink)" : "transparent",
-      background: responsiveRail && on ? "var(--bg-sunken)" : "transparent",
-    };
+      ? "chip lg:flex lg:h-10 lg:w-full lg:justify-start lg:gap-2.5 lg:rounded-[var(--r-md)] lg:border-0 lg:bg-transparent lg:px-3 lg:text-[14.5px]"
+      : "chip";
     const inner = (
       <>
-        <span
-          className="font-mono text-[12px] tracking-[0.06em]"
-          style={{ color: on ? "var(--ink)" : "var(--ink-muted)" }}
-        >
-          {code}
-        </span>
-        {(name || responsiveRail) && (
-          <span
-            className={`${name ? "hidden sm:inline" : "hidden"} text-[13.5px] font-medium lg:inline lg:leading-[1.25] group-hover:underline group-focus-visible:underline lg:underline-offset-4`}
-            style={{ color: on ? "var(--ink)" : "var(--ink-muted)" }}
-          >
-            {name || "All stories"}
+        {responsiveRail && (
+          <span className="hidden w-7 font-mono text-[11px] tracking-[0.04em] lg:inline" style={{ color: on ? "var(--accent)" : "var(--ink-3)" }}>
+            {code}
+          </span>
+        )}
+        <span>{name}</span>
+        {n != null && (
+          <span className="font-mono text-[11px] opacity-70 lg:ml-auto lg:opacity-100" style={responsiveRail ? { color: "var(--ink-3)" } : undefined}>
+            {n}
           </span>
         )}
       </>
     );
+    const common = {
+      className: `${cls} ${responsiveRail && on ? "rail-on" : ""}`,
+      "aria-current": on ? ("page" as const) : undefined,
+    };
     return onPick ? (
-      <button
-        key={code}
-        type="button"
-        onClick={() => onPick(slug)}
-        className={cls}
-        style={style}
-        aria-current={on ? "page" : undefined}
-      >
+      <button key={code} type="button" onClick={() => onPick(slug)} {...common}>
         {inner}
       </button>
     ) : (
-      <Link key={code} href={href} className={cls} style={style} aria-current={on ? "page" : undefined}>
+      <Link key={code} href={href} {...common}>
         {inner}
       </Link>
     );
@@ -75,11 +65,12 @@ export function SectorStrip({
 
   const navigation = (
     <nav
-      aria-label="Sectors"
-      className={responsiveRail
-        ? "hide-scroll flex items-stretch gap-1 overflow-x-auto border-b sm:gap-3 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-b-0"
-        : "hide-scroll sticky top-0 z-20 flex items-stretch gap-1 overflow-x-auto border-b sm:gap-3 lg:top-[57px]"}
-      style={{ borderColor: "var(--line)", background: "var(--bg)" }}
+      aria-label="Subjects"
+      className={
+        responsiveRail
+          ? "hide-scroll -mx-5 flex gap-2 overflow-x-auto px-5 py-2.5 sm:-mx-8 sm:px-8 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0 lg:py-0"
+          : "hide-scroll -mx-5 flex gap-2 overflow-x-auto px-5 py-2.5 sm:-mx-8 sm:px-8"
+      }
     >
       {item(null, "ALL", allLabel, allHref)}
       {SECTOR_GROUPS.map((g) => item(g.slug, g.code, g.name, `/sector/${g.slug}`))}
@@ -89,23 +80,14 @@ export function SectorStrip({
   if (!responsiveRail) return navigation;
 
   return (
-    <aside
-      className="sticky top-0 z-20 self-start border-b lg:top-[81px] lg:z-0 lg:border-b-0 lg:border-r lg:pr-5"
-      style={{ borderColor: "var(--line)", background: "var(--bg)" }}
-      aria-label="Browse by subject"
-    >
-      <p className="hidden pb-3 font-display text-[20px] uppercase leading-none tracking-[0.04em] lg:block">Browse</p>
+    <aside className="lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start" aria-label="Browse by subject">
       {navigation}
-      <div className="mt-7 hidden border-t pt-4 lg:block" style={{ borderColor: "var(--line)" }}>
-        <p className="max-w-[19ch] text-[12.5px] leading-[1.5]" style={{ color: "var(--ink-muted)" }}>
-          One live record from monitored outlets. Sources stay open for inspection.
+      <div className="mt-5 hidden border-t pt-4 lg:block" style={{ borderColor: "var(--line)" }}>
+        <p className="max-w-[22ch] text-[13px] leading-[1.5]" style={{ color: "var(--ink-3)" }}>
+          One record per story, from monitored outlets. Every quote and source stays open.
         </p>
-        <Link
-          href="/about"
-          className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline"
-          style={{ color: "var(--ink)" }}
-        >
-          How Prism works
+        <Link href="/about" className="mt-2 inline-block text-[13.5px] font-semibold hover:underline underline-offset-4" style={{ color: "var(--accent)" }}>
+          How Prism works →
         </Link>
       </div>
     </aside>

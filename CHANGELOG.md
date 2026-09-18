@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.82.0] - 2026-09-18
+
+### Changed
+- **Spectrum, wave 1.** The Reservation Chart is retired; DESIGN.md v3 records the new
+  world. Tokens are generated into `globals.css` from `design/tokens.json`; the fonts are
+  Newsreader (record), Hind (reading, every script) and JetBrains Mono (provenance). The
+  shell is rebuilt: a desktop top bar with a visible search field, a phone masthead, the
+  bottom tabs Today · Stories · Search · Watchlist · You, and one subject navigation that
+  is chips on the phone and a rail on desktop.
+- **Today** is rebuilt on the new story row: subject or place · time since the last
+  report · languages; the title in the record voice; what changed; then outlet monograms,
+  the coverage bar with its count, and the lens dot. Single-source rows are dashed.
+  Publisher photographs are gone from every row. Desktop adds a "Developing over days"
+  rail and a legend that teaches the record's glyphs.
+
+### Added
+- `FeedItem.outlets` and `SourceRef.code/origin/language` from a cached source registry,
+  so the coverage bar and monograms are drawn from facts of the source, not a rating.
+
 ## [0.0.81.30] - 2026-09-18
 
 ### Fixed

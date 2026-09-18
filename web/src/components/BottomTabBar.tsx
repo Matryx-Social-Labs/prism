@@ -1,37 +1,29 @@
 "use client";
 
-// Mobile bottom tab bar (mobile-first design). The app's navigation spine on the
-// phone: Today · Trending · Pulse · Search · You (founder decision D6). Hidden on
-// desktop (lg+) and on surfaces with their own thumb-zone controls (onboarding,
-// story detail — which pins a lens rail + Share/Ask — and auth).
+// The phone's navigation spine — the future app's tab bar. Today · Stories ·
+// Search · Watchlist · You (founder call 2026-09-18; Pulse became a module on
+// Today and keeps its route). Hidden on desktop (lg+) and on surfaces that pin
+// their own thumb-zone controls (the story record, onboarding, auth).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SearchIcon, StoriesIcon, TodayIcon, WatchlistIcon, YouIcon } from "@/components/icons";
 
-type Tab = { href: string; label: string; icon: React.ReactNode };
-
-const I = (d: React.ReactNode) => (
-  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    {d}
-  </svg>
-);
+type Tab = { href: string; label: string; Icon: (p: { size?: number }) => React.ReactNode };
 
 const TABS: Tab[] = [
-  { href: "/feed", label: "Today", icon: I(<path d="M4 5h16M4 12h16M4 19h10" />) },
-  { href: "/trending", label: "Trending", icon: I(<><path d="M3 17l6-6 4 4 8-8" /><path d="M14 7h7v7" /></>) },
-  { href: "/pulse", label: "Pulse", icon: I(<path d="M3 12h4l3-7 4 14 3-7h4" />) },
-  { href: "/search", label: "Search", icon: I(<><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>) },
-  { href: "/you", label: "You", icon: I(<><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>) },
+  { href: "/feed", label: "Today", Icon: TodayIcon },
+  { href: "/trending", label: "Stories", Icon: StoriesIcon },
+  { href: "/search", label: "Search", Icon: SearchIcon },
+  { href: "/watchlist", label: "Watchlist", Icon: WatchlistIcon },
+  { href: "/you", label: "You", Icon: YouIcon },
 ];
 
-// Routes that fold into the "You" hub — the You tab stays active across them.
-const YOU_ROUTES = ["/you", "/account", "/interests", "/watchlist"];
-// The chart is /feed, and a sector is the chart filtered — both Today. `/` is
-// the landing for a first visitor (returning readers are redirected to /feed),
-// so the bar stays off it.
+// Routes that fold into a tab: the You hub, and the chart under Today. Pulse
+// lives under Watchlist on the phone (a markets reader's home).
+const YOU_ROUTES = ["/you", "/account", "/interests"];
 const TODAY_ROUTES = ["/feed", "/sector"];
-// Route prefixes where the tab bar is shown (story detail is excluded — it pins
-// its own lens rail + Share/Ask in the thumb zone).
-const SHOW_ON = ["/trending", "/pulse", "/search", ...TODAY_ROUTES, ...YOU_ROUTES];
+const WATCH_ROUTES = ["/watchlist", "/pulse"];
+const SHOW_ON = ["/trending", "/search", ...TODAY_ROUTES, ...YOU_ROUTES, ...WATCH_ROUTES];
 
 export function BottomTabBar() {
   const pathname = usePathname();
@@ -41,35 +33,33 @@ export function BottomTabBar() {
   const isActive = (href: string) => {
     if (href === "/feed") return under(TODAY_ROUTES);
     if (href === "/you") return under(YOU_ROUTES);
+    if (href === "/watchlist") return under(WATCH_ROUTES);
     return under([href]);
   };
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t backdrop-blur-md lg:hidden"
+      className="glass fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidden"
       style={{
         borderColor: "var(--line)",
-        background: "var(--glass)",
-        paddingTop: 6,
-        paddingBottom: "calc(env(safe-area-inset-bottom) + 6px)",
+        height: "calc(var(--tabbar) + env(safe-area-inset-bottom))",
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}
       aria-label="Primary"
     >
-      {TABS.map((t) => {
-        const active = isActive(t.href);
+      {TABS.map(({ href, label, Icon }) => {
+        const active = isActive(href);
         return (
           <Link
-            key={t.href}
-            href={t.href}
+            key={href}
+            href={href}
             aria-current={active ? "page" : undefined}
-            // --ink-faint at 10px measures 2.57:1 on light — under WCAG AA (4.5:1)
-            // for the app's primary navigation. --ink-muted is 5.28:1, and weight
-            // plus full-strength ink still carry the active state.
-            className="flex min-h-[48px] touch-manipulation flex-col items-center justify-center gap-[3px] text-[11px] transition-opacity active:opacity-65"
-            style={{ color: active ? "var(--ink)" : "var(--ink-muted)", fontWeight: active ? 600 : 500 }}
+            className="flex touch-manipulation flex-col items-center justify-center gap-[3px] text-[11px] transition-opacity active:opacity-65"
+            style={{ color: active ? "var(--accent)" : "var(--ink-3)", fontWeight: active ? 600 : 500 }}
           >
-            <span aria-hidden>{t.icon}</span>
-            {t.label}
+            <Icon />
+            {label}
+            <span aria-hidden className="mt-px h-[2px] w-4 rounded-full" style={{ background: active ? "var(--accent)" : "transparent" }} />
           </Link>
         );
       })}

@@ -45,18 +45,13 @@ export function Chart({
 
   if (ordered.length === 0) {
     return (
-      <div className="rule-live py-8">
-        <p className="text-[15px]" style={{ color: "var(--ink-muted)" }}>
-          {emptyLabel}
-          {yesterdayHref && (
-            <>
-              {" · "}
-              <Link href={yesterdayHref} className="underline underline-offset-4" style={{ color: "var(--ink)" }}>
-                yesterday&rsquo;s chart →
-              </Link>
-            </>
-          )}
-        </p>
+      <div className="card py-8 text-center">
+        <p className="text-[15px]" style={{ color: "var(--ink-2)" }}>{emptyLabel}</p>
+        {yesterdayHref && (
+          <Link href={yesterdayHref} className="btn btn-secondary btn-sm mt-4">
+            Yesterday&rsquo;s record
+          </Link>
+        )}
       </div>
     );
   }
@@ -64,7 +59,7 @@ export function Chart({
   return (
     <div>
       <ol
-        className="chart-print"
+        className="chart-print flex flex-col gap-3"
         onClickCapture={(e) => {
           const a = (e.target as HTMLElement).closest("a[href^='/story/']");
           const id = a?.getAttribute("href")?.split("/story/")[1];
@@ -83,13 +78,9 @@ export function Chart({
         ))}
       </ol>
       {yesterdayHref && (
-        <div className="rule-live mt-2 py-5">
-          <Link
-            href={yesterdayHref}
-            className="font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline"
-            style={{ color: "var(--ink-muted)" }}
-          >
-            Yesterday&rsquo;s chart →
+        <div className="flex justify-center py-6">
+          <Link href={yesterdayHref} className="btn btn-secondary">
+            Yesterday&rsquo;s record
           </Link>
         </div>
       )}

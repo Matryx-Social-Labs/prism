@@ -11,118 +11,153 @@
   display: none;
 }
 
-/* ── Prism design tokens ─────────────────────────────────────────────
-   Adaptive light/dark. `data-theme` on <html> (set pre-paint in layout)
-   wins over the system preference. Spectrum = the brand: one beam of
-   news split into its component perspectives. */
-
+/* ── tokens:begin — generated from design/tokens.json by design/gen_css.py; do not edit ── */
 :root,
 :root[data-theme="light"] {
-  /* THE RESERVATION CHART. Pale continuous-stationery ground, one ink, a print
-     grey and a faded grey, and a rule colour. No colour in chrome: the lens hues
-     below are the only colour anywhere, and only where a lens speaks. Light is
-     chosen from the scene — a phone on a morning commute, under daylight — not
-     from the category. */
-  --bg: #f2f4ee;
-  --bg-elevated: #fafbf8;
-  --bg-sunken: #e8ece2;
-  --ink: #141414;
-  --ink-muted: #5c5f58;
-  /* The lightest grey that still reads at 11px on both grounds (4.5:1 on
-     #f2f4ee and #fafbf8). #8a8d85 was the chart's faded ink and sat at 3.0:1,
-     which the label grid printed on every row. */
-  --ink-faint: #6d7068;
-  --line: #d6dbcf;
-  --line-strong: #b9c0b1;
-
-  --lens-general: #b45309; /* amber-700 */
-  --lens-cyber: #0e7490; /* cyan-700 */
-  --lens-finance: #6d28d9; /* violet-700 */
-  --lens-general-bg: #fef3e2;
-  --lens-cyber-bg: #e0f4f8;
-  --lens-finance-bg: #ede9fe;
-
-  --danger: #b91c1c;
-  --danger-bg: #fee2e2;
-  --up: #047857;
-  --up-bg: #d1fae5;
-
-  --spectrum: linear-gradient(
-    90deg,
-    #ef4444,
-    #f59e0b,
-    #eab308,
-    #22c55e,
-    #06b6d4,
-    #8b5cf6
-  );
-  --glass: rgba(242, 244, 238, 0.86);
-  --shadow-card: 0 1px 2px rgb(25 22 19 / 0.05), 0 8px 24px -12px rgb(25 22 19 / 0.12);
-  /* Sheet/modal scrim. Was the raw dark ground copy-pasted into two sheets. */
-  --scrim: rgba(15, 14, 12, 0.4);
-  /* Mobile app header height. The feed's sector rail sticks directly beneath it,
-     and the two were coupled by a hardcoded 53px — so bumping the scope chip to a
-     44px tap target silently left a 12px band of content scrolling through behind
-     the rail. Both read this now. */
-  --app-header-h: 65px;
-  --shadow-pop: 0 2px 6px rgb(25 22 19 / 0.07), 0 20px 44px -16px rgb(25 22 19 / 0.22);
+  color-scheme: light;
+  --bg: #FAFAF7;
+  --surface: #FFFFFF;
+  --sunken: #F1F1EC;
+  --elevated: #FFFFFF;
+  --ink: #15151A;
+  --ink-2: #4B4D57;
+  --ink-3: #6C6F7A;
+  --line: #E6E6E1;
+  --line-strong: #CFCFC8;
+  --accent: #5B3FE6;
+  --accent-fill: #6B4EF6;
+  --accent-soft: #EEEAFE;
+  --on-accent: #FFFFFF;
+  --coverage-national: #DC9412;
+  --coverage-regional: #E4573D;
+  --coverage-intl: #0E9FB8;
+  --coverage-wire: #8A6CF2;
+  --lens-markets: #0F9D6A;
+  --lens-markets-soft: #E3F6EE;
+  --lens-cyber: #2563EB;
+  --lens-cyber-soft: #E6EEFE;
+  --lens-health: #DB2777;
+  --lens-health-soft: #FCE7F1;
+  --lens-policy: #B7770D;
+  --lens-policy-soft: #FBF0DC;
+  --status-verified: #15151A;
+  --status-provisional: #6C6F7A;
+  --status-disputed: #B7770D;
+  --status-corrected: #D93A2B;
+  --danger: #D93A2B;
+  --up: #0F9D6A;
+  --down: #D93A2B;
+  --bg-elevated: var(--surface);
+  --bg-sunken: var(--sunken);
+  --ink-muted: var(--ink-2);
+  --ink-faint: var(--ink-3);
+  --lens-general: var(--ink);
+  --lens-general-bg: var(--sunken);
+  --lens-finance: var(--lens-markets);
+  --lens-finance-bg: var(--lens-markets-soft);
+  --lens-cyber-bg: var(--lens-cyber-soft);
+  --danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);
+  --up-bg: color-mix(in srgb, var(--up) 12%, transparent);
+  --glass: color-mix(in srgb, var(--bg) 88%, transparent);
+  --shadow-card: var(--shadow-1);
+  --shadow-pop: var(--shadow-2);
+  --scrim: rgba(15, 15, 18, 0.45);
+  --app-header-h: 52px;
+  --shadow-1: 0 1px 2px rgba(21,21,26,0.06);
+  --shadow-2: 0 8px 24px -8px rgba(21,21,26,0.18), 0 2px 6px rgba(21,21,26,0.06);
+  --spectrum: linear-gradient(90deg, #EF4444, #F59E0B, #06B6D4, #8B5CF6);
+  --ease: cubic-bezier(.2,.7,.2,1);
+  --t-micro: 160ms;
+  --t-std: 240ms;
+  --shell: 1360px;
+  --reading: 640px;
+  --rail: 220px;
+  --topbar: 60px;
+  --tabbar: 56px;
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 9999px;
 }
-
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #141613;
-    --bg-elevated: #1b1e19;
-    --bg-sunken: #0f110e;
-    --ink: #ebeee6;
-    --ink-muted: #a3a79d;
-    --ink-faint: #82867f;
-    --line: #2a2e27;
-    --line-strong: #3d423a;
-
-    --lens-general: #fbbf24;
-    --lens-cyber: #22d3ee;
-    --lens-finance: #a78bfa;
-    --lens-general-bg: rgba(251, 191, 36, 0.12);
-    --lens-cyber-bg: rgba(34, 211, 238, 0.12);
-    --lens-finance-bg: rgba(167, 139, 250, 0.14);
-
-    --danger: #f87171;
-    --danger-bg: rgba(248, 113, 113, 0.14);
-    --up: #34d399;
-    --up-bg: rgba(52, 211, 153, 0.14);
-
-    --glass: rgba(20, 22, 19, 0.82);
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.5);
-    --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 48px -16px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  --bg: #0F0F12;
+  --surface: #16161B;
+  --sunken: #0B0B0E;
+  --elevated: #1C1C22;
+  --ink: #F1F1EE;
+  --ink-2: #B3B4BC;
+  --ink-3: #8E909A;
+  --line: #26262E;
+  --line-strong: #36363F;
+  --accent: #A08BF6;
+  --accent-fill: #7C5CF0;
+  --accent-soft: #241E45;
+  --on-accent: #FFFFFF;
+  --coverage-national: #C48314;
+  --coverage-regional: #E2573E;
+  --coverage-intl: #1A9DB6;
+  --coverage-wire: #8A6CF2;
+  --lens-markets: #2CC08A;
+  --lens-markets-soft: #12301F;
+  --lens-cyber: #5B8DFF;
+  --lens-cyber-soft: #15213D;
+  --lens-health: #F472B6;
+  --lens-health-soft: #3B1528;
+  --lens-policy: #E0A030;
+  --lens-policy-soft: #332611;
+  --status-verified: #F1F1EE;
+  --status-provisional: #8E909A;
+  --status-disputed: #E0A030;
+  --status-corrected: #F26A5B;
+  --danger: #F26A5B;
+  --up: #2CC08A;
+  --down: #F26A5B;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
   }
 }
-
 :root[data-theme="dark"] {
-  --bg: #141613;
-  --bg-elevated: #1b1e19;
-  --bg-sunken: #0f110e;
-  --ink: #ebeee6;
-  --ink-muted: #a3a79d;
-  --ink-faint: #82867f;
-  --line: #2a2e27;
-  --line-strong: #3d423a;
-
-  --lens-general: #fbbf24;
-  --lens-cyber: #22d3ee;
-  --lens-finance: #a78bfa;
-  --lens-general-bg: rgba(251, 191, 36, 0.12);
-  --lens-cyber-bg: rgba(34, 211, 238, 0.12);
-  --lens-finance-bg: rgba(167, 139, 250, 0.14);
-
-  --danger: #f87171;
-  --danger-bg: rgba(248, 113, 113, 0.14);
-  --up: #34d399;
-  --up-bg: rgba(52, 211, 153, 0.14);
-
-  --glass: rgba(20, 22, 19, 0.82);
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.5);
-  --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 48px -16px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+  --bg: #0F0F12;
+  --surface: #16161B;
+  --sunken: #0B0B0E;
+  --elevated: #1C1C22;
+  --ink: #F1F1EE;
+  --ink-2: #B3B4BC;
+  --ink-3: #8E909A;
+  --line: #26262E;
+  --line-strong: #36363F;
+  --accent: #A08BF6;
+  --accent-fill: #7C5CF0;
+  --accent-soft: #241E45;
+  --on-accent: #FFFFFF;
+  --coverage-national: #C48314;
+  --coverage-regional: #E2573E;
+  --coverage-intl: #1A9DB6;
+  --coverage-wire: #8A6CF2;
+  --lens-markets: #2CC08A;
+  --lens-markets-soft: #12301F;
+  --lens-cyber: #5B8DFF;
+  --lens-cyber-soft: #15213D;
+  --lens-health: #F472B6;
+  --lens-health-soft: #3B1528;
+  --lens-policy: #E0A030;
+  --lens-policy-soft: #332611;
+  --status-verified: #F1F1EE;
+  --status-provisional: #8E909A;
+  --status-disputed: #E0A030;
+  --status-corrected: #F26A5B;
+  --danger: #F26A5B;
+  --up: #2CC08A;
+  --down: #F26A5B;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
 }
+/* ── tokens:end ── */
 
 /* Always reserve the vertical-scrollbar gutter so the viewport width is
    constant across pages — otherwise the centered header/nav shifts sideways
@@ -142,23 +177,34 @@ body {
      review of the landing, 2026-09-17). */
   --font-ui: var(--font-hind), var(--font-hind-kn), var(--font-hind-ta), var(--font-hind-te),
     system-ui, sans-serif;
+  /* The record voice: Newsreader for Latin, the serif siblings per script. */
+  --font-record: var(--font-display), "Tiro Devanagari Hindi", "Noto Serif Kannada", "Noto Serif Tamil",
+    "Noto Serif Telugu", Georgia, serif;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.6;
   caret-color: var(--ink);
+  -webkit-font-smoothing: antialiased;
   transition: background-color 240ms ease, color 240ms ease;
+}
+/* .font-display (Tailwind) maps to --font-display alone; the record voice adds
+   the per-script serif fallbacks so a Hindi title is not a sans in a serif row. */
+.font-record {
+  font-family: var(--font-record);
 }
 
 /* The browser surfaces we did not draw still carry the design. */
 ::selection {
-  /* chrome is monochrome — color only ever means a lens is speaking */
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 :focus-visible {
-  outline: 2px solid var(--ink);
+  /* the one accent: "you can act here" — the focus ring is the same promise */
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 * {
   scrollbar-color: var(--line-strong) transparent;
@@ -192,6 +238,95 @@ button:disabled {
 .rule-live { border-top: 1px solid var(--line); }
 .rule-single { border-top: 1px dashed var(--line-strong); }
 .rule-stale { border-top: 1px solid var(--line); opacity: 0.6; }
+
+/* ── Spectrum components ──────────────────────────────────────────────
+   Shared classes rather than per-file utilities so the Next app and the
+   future React Native theme describe the same objects (DESIGN.md § Components). */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 16px; border-radius: var(--r-pill);
+  font-weight: 600; font-size: 14.5px; line-height: 1; white-space: nowrap;
+  transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease),
+    border-color var(--t-micro) var(--ease), transform var(--t-micro) var(--ease), filter var(--t-micro) var(--ease);
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--accent-fill); color: var(--on-accent); }
+.btn-primary:hover { filter: brightness(0.94); }
+.btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); }
+.btn-secondary:hover { background: var(--sunken); }
+.btn-ghost { color: var(--ink-2); }
+.btn-ghost:hover { background: var(--sunken); color: var(--ink); }
+.btn-lg { height: 48px; padding: 0 22px; font-size: 16px; }
+.btn-sm { height: 32px; padding: 0 12px; font-size: 13.5px; }
+.btn:disabled { opacity: 0.5; transform: none; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: var(--r-pill); display: inline-flex;
+  align-items: center; justify-content: center; color: var(--ink-2);
+  transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease);
+}
+.icon-btn:hover { background: var(--sunken); color: var(--ink); }
+.chip {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px;
+  border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--surface);
+  font-size: 13.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap;
+  transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+}
+.chip:hover { border-color: var(--line-strong); color: var(--ink); }
+.chip[aria-current], .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+@media (min-width: 1024px) {
+  /* the same control as the desktop left rail: no pill, accent for the active row */
+  .rail-on, .rail-on[aria-current] { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .chip.lg\:bg-transparent:hover { background: var(--sunken); }
+}
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; }
+.card-h { margin: 0 0 10px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.row-card {
+  display: block; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+  transition: border-color var(--t-micro) var(--ease), box-shadow var(--t-micro) var(--ease);
+}
+.row-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-1); }
+.row-card.single { border-style: dashed; }
+/* The coverage bar: the prism's work on one story. Segments in the fixed slot
+   order national · intl · regional · wire; the count beside it is the legend. */
+.covbar { display: inline-flex; gap: 2px; height: 6px; flex: none; }
+.covbar > i { display: block; height: 100%; border-radius: 3px; transform-origin: left center; }
+.covbar.lg { height: 8px; } .covbar.lg > i { border-radius: 4px; }
+.cov-national { background: var(--coverage-national); }
+.cov-intl { background: var(--coverage-intl); }
+.cov-regional { background: var(--coverage-regional); }
+.cov-wire { background: var(--coverage-wire); }
+.covbar.draw > i { animation: cov-draw var(--t-std) var(--ease) both; }
+.covbar.draw > i:nth-child(2) { animation-delay: 30ms; } .covbar.draw > i:nth-child(3) { animation-delay: 60ms; } .covbar.draw > i:nth-child(4) { animation-delay: 90ms; }
+@keyframes cov-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.monogram {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--sunken); border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--line); display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 9.5px; line-height: 1; letter-spacing: 0.01em; color: var(--ink-2); flex: none;
+}
+.monogram.n4 { font-size: 8px; letter-spacing: 0; }
+.monogram-stack { display: inline-flex; align-items: center; }
+.monogram-stack > .monogram + .monogram { margin-left: -7px; }
+.status {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap;
+}
+.status-verified { background: var(--ink); color: var(--bg); }
+.status-provisional { border: 1px dashed var(--line-strong); color: var(--ink-3); }
+.status-corrected { background: color-mix(in srgb, var(--status-corrected) 12%, transparent); color: var(--status-corrected); }
+.status-disputed { background: color-mix(in srgb, var(--status-disputed) 12%, transparent); color: var(--status-disputed); }
+.lensdot { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.lensdot > i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.l-markets { color: var(--lens-markets); } .l-cyber { color: var(--lens-cyber); }
+.l-health { color: var(--lens-health); } .l-policy { color: var(--lens-policy); }
+.seg { display: inline-flex; padding: 3px; border-radius: var(--r-pill); background: var(--sunken); gap: 2px; }
+.seg > button {
+  height: 34px; padding: 0 14px; border-radius: var(--r-pill); font-size: 13.5px; font-weight: 600; color: var(--ink-2);
+  display: inline-flex; align-items: center; gap: 6px; transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease);
+}
+.seg > button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+.meta-line { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.03em; color: var(--ink-3); text-transform: uppercase; }
+.meta-line .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line-strong); display: inline-block; }
+.glass { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 
 /* ── Motion primitives (all gated on prefers-reduced-motion) ───────── */
 
@@ -360,7 +495,8 @@ button:disabled {
   .blink-caret,
   .prism-glow,
   .fade-swap,
-  .card-hover {
+  .card-hover,
+  .covbar.draw > i {
     animation: none;
     transition: none;
   }

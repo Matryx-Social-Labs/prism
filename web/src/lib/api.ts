@@ -9,6 +9,15 @@ export const API_URL =
     ""
   ) ?? "http://localhost:8000";
 
+export interface OutletRef {
+  slug: string;
+  publisher: string;
+  name: string;
+  code: string; // monogram, from the source registry
+  origin: "national" | "intl" | "regional" | "wire" | string;
+  language: string | null;
+}
+
 export interface FeedItem {
   id: string;
   title: string;
@@ -33,6 +42,8 @@ export interface FeedItem {
   last_updated_at: string;
   latest_published_at?: string | null;
   score: number;
+  /** Every registered source behind the story; the coverage bar and monograms are drawn from it. */
+  outlets?: OutletRef[];
 }
 
 export interface LensInfo {
@@ -45,6 +56,9 @@ export interface SourceRef {
   article_id: string;
   source_name: string;
   source_slug: string;
+  code?: string | null;
+  origin?: string | null;
+  language?: string | null;
   url: string | null;
   title: string;
   published_at: string | null;

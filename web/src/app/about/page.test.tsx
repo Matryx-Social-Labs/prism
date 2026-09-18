@@ -45,11 +45,11 @@ describe("/about — the product as the proof, live", () => {
     // The nine-outlet story leads in the live record, by the chart's order, not the API's.
     expect(screen.getByRole("link", { name: "Open live record: Story strong" })).toHaveAttribute("href", "/story/strong");
     // The remaining live rows keep the chart's real count grammar.
-    const rows = screen.getByRole("heading", { name: "Live now" }).parentElement!.parentElement!;
+    const rows = screen.getByRole("heading", { name: "Live now" }).closest("section")!;
     expect(within(rows).getByRole("link", { name: /Story quoted/ })).toHaveAttribute("href", "/story/quoted");
-    expect(within(rows).getByLabelText("2 sources")).toBeInTheDocument();
+    expect(within(rows).getByText("2 outlets")).toBeInTheDocument();
     // The quote cell comes from a story that HAS quotes, even if it is not the lead.
-    const said = screen.getByRole("heading", { name: "Exact words. Exact source." }).parentElement!.parentElement!;
+    const said = screen.getByRole("heading", { name: "Exact words. Exact source." }).closest("section")!;
     expect(within(said).getByText("“We were receiving proposals”")).toBeInTheDocument();
     // No slug on either event, so no route cell and no fetch for one.
     expect(screen.queryByRole("heading", { name: "See what changed" })).toBeNull();

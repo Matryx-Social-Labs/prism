@@ -1,29 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, Martian_Mono, Teko } from "next/font/google";
+import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, JetBrains_Mono, Newsreader } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-// THREE VOICES, FROM THE SUBJECT'S WORLD (the reservation chart; see
-// .impeccable/surfaces and PRODUCT.md § Brand Commitments). The rule is the
-// commitment — a structural voice, a reading voice, a provenance voice — and the
-// faces are chosen for this world, not inherited from the last one.
+// THREE VOICES (DESIGN.md § Typography — the Spectrum world, 2026-09-18). The
+// rule is the commitment — a record voice, a reading voice, a provenance voice.
 //
-// Structure: Teko (Indian Type Foundry). The condensed signage of station boards
-// and train names on the chart. Masthead labels, the sector strip, section
-// heads, the ticket's big numbers. Never running text.
-const display = Teko({
+// The record: Newsreader (Production Type), drawn for on-screen news reading with
+// real optical sizes, so a 60px promise and a 19px row headline come from one
+// voice. Headlines, story titles, section titles, quotes. Never a button or label.
+const display = Newsreader({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: "variable", // the whole wght axis; opsz rides along so 60px and 19px set from one face
+  style: ["normal", "italic"],
+  axes: ["opsz"],
   variable: "--font-display",
 });
 
-// Reading: Hind (ITF) and its script siblings. One family across Latin,
-// Devanagari, Kannada, Tamil and Telugu, so a Kannada headline and an English
-// one sit on the same page without a fallback seam — the browser falls through
-// the stack per glyph. Headlines, body, quotes: everything a reader reads.
+// Reading and UI: Hind (ITF) and its script siblings. One family across Latin,
+// Devanagari, Kannada, Tamil and Telugu, so a Kannada row and an English one sit
+// on the same baseline without a fallback seam — the browser falls through per glyph.
 const ui = Hind({ subsets: ["latin", "devanagari"], weight: ["400", "500", "600", "700"], variable: "--font-hind" });
 // next/font has no metrics table for the Indic siblings, so it cannot size a
 // fallback face to them and logs "Failed to find font override values" on
@@ -33,9 +32,9 @@ const uiKannada = Hind_Mysuru({ subsets: ["kannada"], weight: ["400", "500", "60
 const uiTamil = Hind_Madurai({ subsets: ["tamil"], weight: ["400", "500", "600"], variable: "--font-hind-ta", adjustFontFallback: false });
 const uiTelugu = Hind_Guntur({ subsets: ["telugu"], weight: ["400", "500", "600"], variable: "--font-hind-te", adjustFontFallback: false });
 
-// Provenance ONLY: source counts, times, origins, codes, [n], tickers, CVE ids.
-// Tabular by design. Never prose, never a heading.
-const mono = Martian_Mono({
+// Provenance ONLY: times, counts, codes, [n], tickers, CVE ids. Tabular by
+// design, narrow enough for a time and a count beside a 26px monogram.
+const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
   variable: "--font-mono",
@@ -80,8 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <a
           href="#main-content"
-          className="fixed left-3 top-3 z-[100] -translate-y-20 border px-4 py-2 text-[14px] font-semibold focus:translate-y-0"
-          style={{ borderColor: "var(--ink)", background: "var(--bg-elevated)", color: "var(--ink)" }}
+          className="btn btn-secondary fixed left-3 top-3 z-[100] -translate-y-20 focus:translate-y-0"
         >
           Skip to content
         </a>
@@ -92,15 +90,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             and the marketing footer would just hide behind it. */}
         <footer className="mt-auto hidden border-t lg:block" style={{ borderColor: "var(--line)" }}>
           <div
-            className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-xs sm:px-8 xl:px-10"
-            style={{ color: "var(--ink-muted)" }}
+            className="mx-auto flex max-w-[var(--shell)] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-[13px] sm:px-8 xl:px-10"
+            style={{ color: "var(--ink-3)" }}
           >
-            <span>Prism. Every claim traceable to its source.</span>
-            <span className="flex items-center gap-3.5">
-              <Link href="/about" className="underline underline-offset-[3px]">
-                About
-              </Link>
-              <span style={{ color: "var(--ink-faint)" }}>Prototype · Matryx Social Labs</span>
+            <span>Prism · Matryx Social Labs</span>
+            <span className="flex items-center gap-4">
+              <Link href="/about" className="hover:underline underline-offset-[3px]">About</Link>
+              <Link href="/about#status" className="hover:underline underline-offset-[3px]">What&rsquo;s live</Link>
             </span>
           </div>
         </footer>

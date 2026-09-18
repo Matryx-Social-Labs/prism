@@ -79,3 +79,22 @@ export function origins(item: FeedItem, max = 3): string {
     .map(([iso, n]) => `${iso} ×${n}`)
     .join(" · ");
 }
+
+/**
+ * "12m ago" · "3h ago" · "2d ago" — how long since the last report, the
+ * reader's question on every row. Under a minute prints "just now"; past a week
+ * the date itself is more honest than a count. `now` is injectable for tests.
+ */
+export function relativeTime(iso: string, now: Date = new Date()): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const s = Math.max(0, Math.round((now.getTime() - t) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return shortDate(iso);
+}

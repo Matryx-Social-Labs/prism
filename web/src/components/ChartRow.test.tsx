@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { ChartRow, lensMarkers } from "@/components/ChartRow";
-import type { FeedItem } from "@/lib/api";
+import { ChartRow, lensMarkers, rowSubject } from "@/components/ChartRow";
+import type { FeedItem, OutletRef } from "@/lib/api";
+
+const outlet = (slug: string, origin: OutletRef["origin"], language = "en", publisher = slug): OutletRef => ({
+  slug, publisher, name: slug.toUpperCase(), code: slug.slice(0, 2).toUpperCase(), origin, language,
+});
 
 function item(over: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -28,6 +32,7 @@ function item(over: Partial<FeedItem> = {}): FeedItem {
     last_updated_at: "2026-09-05T16:05:00Z",
     latest_published_at: "2026-09-05T16:05:00Z",
     score: 1,
+    outlets: [outlet("th", "national"), outlet("ht", "national"), outlet("pv", "regional", "kn"), outlet("bbc", "intl")],
     ...over,
   } as FeedItem;
 }
@@ -39,51 +44,72 @@ const row = (it: FeedItem, props: Partial<Parameters<typeof ChartRow>[0]> = {}) 
     </ol>,
   );
 
-describe("ChartRow — the label grid", () => {
-  // The grammar: origin · time · code, every row, in that order. The time is the
-  // news's own clock in IST, and the code is the six-sector group's, not the
-  // pipeline's ten (finance prints BIZ).
-  it("prints origin, IST time and the group code in that order", () => {
+describe("ChartRow — the meta line", () => {
+  // Subject or place · time since the last report · languages, in that order.
+  // finance prints its six-subject group, not the pipeline's ten.
+  it("prints the subject group, then the time, then the languages", () => {
     row(item());
-    const grid = screen.getByText("IN ×3 · UK ×1").parentElement!;
-    expect([...grid.querySelectorAll("span")].map((s) => s.textContent)).toEqual(["IN ×3 · UK ×1", "21:35", "BIZ"]);
+    const meta = document.querySelector(".meta-line")!;
+    const texts = [...meta.querySelectorAll("span, time")].map((s) => s.textContent).filter((t) => t && t.trim());
+    expect(texts[0]).toBe("Business & Markets");
+    expect(meta.querySelector("time")).toHaveAttribute("dateTime", "2026-09-05T16:05:00Z");
+    expect(texts.at(-1)).toBe("EN·KN");
   });
 
-  it('prints nothing for "other" — the taxonomy\'s failure is not a label', () => {
-    row(item({ sector: "other" }));
-    expect(screen.queryByText("OTHER")).toBeNull();
+  it("omits the subject the page is already filtered to", () => {
+    row(item(), { pageCode: "BIZ" });
+    expect(screen.queryByText("Business & Markets")).toBeNull();
+  });
+
+  it('names the place when a story has no subject — never "Other"', () => {
+    expect(rowSubject(item({ sector: "other", regions: ["IN", "IN-KA"] }), null)).toBe("Karnataka");
+    expect(rowSubject(item({ sector: null, regions: ["IN"] }), null)).toBe("India");
+    row(item({ sector: "other", regions: ["IN"] }));
+    expect(screen.queryByText(/other/i)).toBeNull();
   });
 
   it("tags a headline in a script the reader did not choose, and only then", () => {
-    row(item({ headline_lang: "kn" }), { primaryLang: "en" });
+    row(item({ headline_lang: "kn", outlets: [outlet("th", "national")] }), { primaryLang: "en" });
     expect(screen.getByText("ಕನ್ನಡ")).toBeInTheDocument();
-    row(item({ id: "e2", headline_lang: "kn" }), { primaryLang: "kn" });
+    row(item({ id: "e2", headline_lang: "kn", outlets: [outlet("th", "national")] }), { primaryLang: "kn" });
     expect(screen.getAllByText("ಕನ್ನಡ")).toHaveLength(1);
   });
 });
 
-describe("ChartRow — state is line form", () => {
-  it("sets a single-source story on a dashed rule and says so", () => {
-    const { container } = row(item({ source_count: 1 }));
-    expect(container.querySelector("li")!.className).toBe("rule-single");
-    expect(screen.getByText("1 source")).toBeInTheDocument();
-    expect(screen.getByLabelText("1 source")).toBeInTheDocument();
+describe("ChartRow — the coverage bar is the row's weight", () => {
+  it("draws one segment per outlet origin in the fixed slot order and prints the count", () => {
+    const { container } = row(item());
+    const segs = [...container.querySelectorAll(".covbar > i")].map((i) => i.className);
+    expect(segs).toEqual(["cov-national", "cov-intl", "cov-regional"]);
+    expect(screen.getByText("4 outlets · 2 languages")).toBeInTheDocument();
   });
 
-  it("sets a corroborated story on a solid rule with its count", () => {
-    const { container } = row(item({ source_count: 8 }));
-    expect(container.querySelector("li")!.className).toBe("rule-live");
-    expect(screen.getByLabelText("8 sources")).toHaveTextContent("8");
-    expect(screen.queryByText("1 source")).toBeNull();
+  it("counts mastheads, not feeds — six Hindu state feeds are one outlet", () => {
+    row(item({ outlets: [outlet("thehindu", "national"), outlet("thehindu_karnataka", "national", "en", "thehindu"), outlet("ndtv", "national")] }));
+    expect(screen.getByText("2 outlets")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "THEHINDU, NDTV" })).toBeInTheDocument();
+  });
+
+  it("falls back to the source count when a row predates outlet data", () => {
+    const { container } = row(item({ outlets: undefined, source_count: 6 }));
+    expect(container.querySelectorAll(".covbar > i")).toHaveLength(1);
+    expect(screen.getByText("6 outlets")).toBeInTheDocument();
+  });
+
+  it("sets a single-source story on a dashed card", () => {
+    const { container } = row(item({ source_count: 1, outlets: [outlet("th", "national")] }));
+    expect(container.querySelector("a")!.className).toContain("single");
+    expect(screen.getByText("1 outlet")).toBeInTheDocument();
   });
 
   it("marks the row the reader last opened", () => {
     row(item(), { lastOpened: true });
     expect(screen.getByRole("link")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByLabelText("Read")).toBeInTheDocument();
   });
 });
 
-describe("ChartRow — the only colour is a lens marker", () => {
+describe("ChartRow — a lens dot says a professional reading exists", () => {
   it("shows a markets read when the pipeline found a ticker or a catalyst", () => {
     expect(lensMarkers(item({ tickers: ["RELIANCE"] })).map((m) => m.key)).toEqual(["markets"]);
     expect(lensMarkers(item({ catalyst: "earnings" })).map((m) => m.key)).toEqual(["markets"]);
@@ -95,44 +121,24 @@ describe("ChartRow — the only colour is a lens marker", () => {
     expect(lensMarkers(item({ cvss_score: 9.8 })).map((m) => m.key)).toEqual(["cyber"]);
   });
 
-  it("shows nothing when no professional reading exists", () => {
-    row(item());
-    expect(lensMarkers(item())).toEqual([]);
-    expect(screen.queryByRole("img")).toBeNull();
-  });
-
-  it("names the read for a screen reader", () => {
+  it("names the read in words, never colour alone", () => {
     row(item({ tickers: ["TCS"], cve_ids: ["CVE-2026-2"] }));
-    expect(screen.getByRole("img", { name: "Markets read" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Cyber read" })).toBeInTheDocument();
+    expect(screen.getByText("Markets read")).toBeInTheDocument();
+    expect(screen.getByText("Cyber read")).toBeInTheDocument();
+    expect(lensMarkers(item())).toEqual([]);
   });
 });
 
-describe("ChartRow — the lead", () => {
-  it("shows the lead's image only when the story has one — never a placeholder", () => {
-    const { container, rerender } = render(
-      <ol>
-        <ChartRow item={item()} lead />
-      </ol>,
-    );
-    expect(container.querySelector("img")).toBeNull();
-    rerender(
-      <ol>
-        <ChartRow item={item({ image_url: "https://x/y.jpg" })} lead />
-      </ol>,
-    );
-    expect(container.querySelector("img")).toHaveAttribute("src", "https://x/y.jpg");
-  });
-
-  it("never shows an image on an ordinary row", () => {
-    const { container } = row(item({ image_url: "https://x/y.jpg" }));
+describe("ChartRow — no publisher photograph, on any row", () => {
+  it("ignores image_url even on the lead", () => {
+    const { container } = row(item({ image_url: "https://x/y.jpg" }), { lead: true });
     expect(container.querySelector("img")).toBeNull();
   });
 
-  it("prints the lead's summary, and only the lead's", () => {
+  it("prints what changed on every row, larger on the lead", () => {
     row(item({ summary: "The summary." }), { lead: true });
-    expect(screen.getByText("The summary.")).toBeInTheDocument();
-    row(item({ id: "e2", summary: "Not shown." }));
-    expect(screen.queryByText("Not shown.")).toBeNull();
+    expect(screen.getByText("The summary.").className).toContain("text-[16px]");
+    row(item({ id: "e2", summary: "Also shown." }));
+    expect(screen.getByText("Also shown.").className).toContain("text-[14.5px]");
   });
 });

@@ -1,90 +1,116 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SearchIcon } from "@/components/icons";
 import { useSession } from "@/lib/session";
 
+// Destinations, in the reader's words. /trending stays the URL; "Stories" is
+// what a reader calls the developing arcs (DESIGN.md decisions, 2026-09-18).
 const NAV = [
   { href: "/feed", label: "Today" },
-  { href: "/trending", label: "Trending" },
+  { href: "/trending", label: "Stories" },
   { href: "/pulse", label: "Pulse" },
   { href: "/watchlist", label: "Watchlist" },
 ];
 
 export function HeaderNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const session = useSession();
-  // The landing has its own one action ("Read today's chart"); a second
-  // filled pill in the same viewport is one more than the world allows.
-  const landing = pathname === "/" || pathname === "/about";
-  // One primary pill per page: the chart, sector, trending, pulse and search
-  // carry "Pick your sectors"; the ticket (Ask), the forms (Save / Continue /
-  // Email me a link) and the watchlist carry their own.
-  const ownAction = ["/story", "/you", "/onboarding", "/signin", "/watchlist", "/account", "/interests", "/auth"].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const searchRef = useRef<HTMLInputElement>(null);
 
+  // `/` focuses the search field from anywhere the field is on screen, the way
+  // a reader of any desktop news site expects; never while typing elsewhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const landing = pathname === "/" || pathname === "/about";
   const active = (href: string) =>
     href === "/feed"
       ? ["/feed", "/sector"].some((p) => pathname === p || pathname.startsWith(`${p}/`))
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <nav className="flex items-center gap-2 sm:gap-4">
-      {/* Text links live on desktop only; on mobile the bottom tab bar owns
-          navigation, so the header stays uncluttered. No lens control here:
-          the lens is set in "Your Prism" (/interests) and flipped per-story
-          in the story view — the header stays monochrome chrome. */}
-      {NAV.map((n) => (
-        <Link
-          key={n.href}
-          href={n.href}
-          className="hidden min-h-11 items-center border-b-2 px-1 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] md:flex"
-          style={{ borderColor: active(n.href) ? "var(--ink)" : "transparent", color: active(n.href) ? "var(--ink)" : "var(--ink-muted)" }}
-          aria-current={active(n.href) ? "page" : undefined}
-        >
-          {n.label}
-        </Link>
-      ))}
-      <Link
-        href="/search"
-        aria-label="Search"
-        className="hidden h-11 w-11 items-center justify-center rounded-full md:flex"
-        style={{ color: active("/search") ? "var(--ink)" : "var(--ink-muted)" }}
+    <nav className="flex min-w-0 flex-1 items-center gap-2" aria-label="Primary">
+      <div className="hidden items-center gap-1 lg:flex">
+        {NAV.map((n) => {
+          const on = active(n.href);
+          return (
+            <Link
+              key={n.href}
+              href={n.href}
+              className="rounded-full px-3 py-2 text-[15px] font-medium transition-colors"
+              style={{
+                color: on ? "var(--accent)" : "var(--ink-2)",
+                background: on ? "var(--accent-soft)" : "transparent",
+              }}
+              aria-current={on ? "page" : undefined}
+            >
+              {n.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* A visible field, not an icon: search is a destination a first visitor
+          should be able to see (DESIGN.md § Navigation). The route owns the
+          results; this only carries the query there. */}
+      <form
+        role="search"
+        className="ml-auto hidden h-[38px] min-w-[260px] items-center gap-2 rounded-full border px-3 text-[14px] lg:flex"
+        style={{ borderColor: "var(--line-strong)", background: "var(--surface)", color: "var(--ink-3)" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = searchRef.current?.value.trim();
+          if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
+        }}
       >
-        <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-          <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      </Link>
-      {!session && (
-        <Link
-          href="/signin"
-          className="hidden min-h-11 items-center px-1 pt-1 font-display text-[18px] uppercase leading-none tracking-[0.04em] md:flex"
-          style={{ color: active("/signin") ? "var(--ink)" : "var(--ink-muted)" }}
-        >
-          Sign in
-        </Link>
-      )}
-      <ThemeToggle />
-      {session ? (
-        <Link
-          href="/account"
-          className="flex h-11 w-11 items-center justify-center rounded-full border text-[12px] font-semibold uppercase"
-          style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
-          title={`Signed in as ${session.email}`}
-          aria-label={`Account for ${session.email}`}
-        >
-          {session.email.slice(0, 1)}
-        </Link>
-      ) : landing || ownAction ? null : (
-        <Link
-          href="/onboarding"
-          className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition hover:opacity-85 sm:px-[18px]"
-          style={{ background: "var(--ink)", color: "var(--bg)" }}
-        >
-          Pick your sectors
-        </Link>
-      )}
+        <SearchIcon size={16} />
+        <input
+          ref={searchRef}
+          name="q"
+          type="search"
+          placeholder="Search stories, people, places"
+          aria-label="Search"
+          className="w-full bg-transparent text-[14px] outline-none placeholder:text-[var(--ink-3)]"
+          style={{ color: "var(--ink)" }}
+        />
+        <kbd className="rounded border px-1.5 font-mono text-[11px]" style={{ borderColor: "var(--line)", color: "var(--ink-3)" }}>/</kbd>
+      </form>
+
+      <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
+        <ThemeToggle />
+        {session ? (
+          <Link
+            href="/account"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-semibold uppercase"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+            title={`Signed in as ${session.email}`}
+            aria-label={`Account for ${session.email}`}
+          >
+            {session.email.slice(0, 1)}
+          </Link>
+        ) : landing ? (
+          <>
+            <Link href="/signin" className="btn btn-ghost hidden sm:inline-flex">Sign in</Link>
+            <Link href="/feed" className="btn btn-primary">Open today&rsquo;s record</Link>
+          </>
+        ) : (
+          <Link href="/signin" className="btn btn-ghost">Sign in</Link>
+        )}
+      </div>
     </nav>
   );
 }

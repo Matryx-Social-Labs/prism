@@ -43,10 +43,11 @@ describe("BottomTabBar — where it shows", () => {
 });
 
 describe("BottomTabBar — active tab", () => {
+  // /trending is the URL; "Stories" is the reader's word for it (2026-09-18).
   it("marks the current tab", () => {
     at("/trending");
     render(<BottomTabBar />);
-    expect(screen.getByRole("link", { name: /trending/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /stories/i })).toHaveAttribute("aria-current", "page");
   });
 
   // Asserting only the positive case lets an over-matching isActive ship green
@@ -75,7 +76,7 @@ describe("BottomTabBar — active tab", () => {
   });
 
   it("keeps You active across the routes that fold into it", () => {
-    for (const path of ["/you", "/account", "/interests", "/watchlist"]) {
+    for (const path of ["/you", "/account", "/interests"]) {
       at(path);
       const { unmount } = render(<BottomTabBar />);
       expect(screen.getByRole("link", { name: /you/i })).toHaveAttribute("aria-current", "page");
@@ -83,10 +84,22 @@ describe("BottomTabBar — active tab", () => {
     }
   });
 
+  // Pulse left the bar (five tabs is the ceiling); a markets reader reaches it
+  // from Watchlist, so the Watchlist tab stays lit there.
+  it("keeps Watchlist active on Pulse", () => {
+    for (const path of ["/watchlist", "/pulse"]) {
+      at(path);
+      const { unmount } = render(<BottomTabBar />);
+      expect(screen.getByRole("link", { name: /watchlist/i })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: /you/i })).not.toHaveAttribute("aria-current");
+      unmount();
+    }
+  });
+
   it("marks a detail route's parent tab", () => {
     at("/trending/kerala-power-crisis");
     render(<BottomTabBar />);
-    expect(screen.getByRole("link", { name: /trending/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /stories/i })).toHaveAttribute("aria-current", "page");
   });
 });
 

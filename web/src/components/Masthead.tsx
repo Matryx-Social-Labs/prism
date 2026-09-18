@@ -1,43 +1,23 @@
-import Link from "next/link";
-import { PrismMark } from "@/components/PrismMark";
+import { Brand } from "@/components/Brand";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
- * The chart's masthead: the mark and name, then the dateline in the provenance
- * voice as a second line — date · sources · stories — the way the chart at the
- * platform carries its train, date and coach count above the list.
- *
- * No kicker, no eyebrow (craft floor: a heading carries its own weight).
- * The mark is the existing logo, unchanged.
- *
- * On desktop the brand header (SiteHeader) already carries the mark and the
- * theme toggle, so here they are phone-only — two stacked wordmarks was the
- * original double-header bug. The dateline stays at every width.
+ * The phone masthead: the brand, the dateline in mono, the theme toggle — 52px,
+ * sticky, glass. Hidden from lg, where the top bar carries the brand. `right`
+ * takes a control that belongs to the page (the scope switch on the chart).
  */
 export function Masthead({ dateline, right }: { dateline: string | null; right?: React.ReactNode }) {
   return (
-    <header className="flex items-end justify-between gap-4 pb-3 pt-4">
-      <div className="min-w-0">
-        <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="Prism, today's chart">
-          <PrismMark />
-          <span
-            className="text-[26px] leading-none"
-            style={{ fontFamily: "var(--font-display), sans-serif", letterSpacing: "0.01em" }}
-          >
-            PRISM
-          </span>
-        </Link>
-        {dateline && (
-          <p className="mt-1.5 font-mono text-[12px] leading-[1.5] tracking-[0.04em]" style={{ color: "var(--ink-muted)" }}>
-            {dateline}
-          </p>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-3">
-        {right}
-        <span className="lg:hidden">
-          <ThemeToggle />
+    <header className="glass sticky top-0 z-30 -mx-5 flex h-[52px] items-center justify-between gap-3 border-b px-5 sm:-mx-8 sm:px-8 lg:hidden" style={{ borderColor: "var(--line)" }}>
+      <Brand size={24} label="Prism, today" />
+      {dateline && (
+        <span className="min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-3)" }}>
+          {dateline}
         </span>
+      )}
+      <div className="flex shrink-0 items-center gap-1">
+        {right}
+        <ThemeToggle />
       </div>
     </header>
   );

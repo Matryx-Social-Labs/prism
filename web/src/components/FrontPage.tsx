@@ -3,30 +3,28 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Chart } from "@/components/Chart";
+import { CoverageBar, CoverageLegend } from "@/components/Coverage";
 import { Masthead } from "@/components/Masthead";
+import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
-import { fetchFeed, type FeedItem } from "@/lib/api";
+import { StatusPill } from "@/components/StatusPill";
+import { fetchFeed, fetchTrending, type FeedItem, type TrendingStory } from "@/lib/api";
 import { staleSince } from "@/lib/staleness";
-import { istDate, istTime, shortDate } from "@/lib/dateline";
+import { istTime, relativeTime, shortDate } from "@/lib/dateline";
 import { loadProfile, type Profile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { markReturning } from "@/lib/returning";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
 
 /**
- * The front page: today's chart.
+ * Today: the day's records, the same list for everyone (D2). FOR YOU appears
+ * once the reader has interests and is the only tab that sends them. Scope
+ * (All / your state / National) is a client-side filter on rows the API already
+ * tagged, so ALL is identical for every reader.
  *
- * TODAY is the same list for everyone — no interests are sent, so a founder, a
- * reviewer and a stranger can point at the same row (D2). FOR YOU appears only
- * once the reader has told us what they follow, and is the only tab that sends
- * interests. Scope (All / your state / National) is a client-side filter on the
- * rows the API already tagged, so ALL is identical for every reader.
- *
- * A sector code re-sorts the chart in place: the same day's rows, filtered,
- * none of the chrome moving. The URL follows (/sector/<slug>) so it can be shared.
- *
- * No promise line: a first visitor reaches the chart from the landing at `/`,
- * which is the pitch (D5 revised), and the phone's first viewport is the list.
+ * A subject chip re-sorts the list in place; the URL follows (/sector/<slug>).
+ * Desktop uses its width for simultaneity: the subject rail on the left, the
+ * developing stories and the legend on the right — never longer lines.
  */
 type Tab = "today" | "foryou";
 const WINDOW = 60;
@@ -38,6 +36,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   const [scope, setScope] = useState<Scope>("all");
   const [tab, setTab] = useState<Tab>("today");
   const [items, setItems] = useState<FeedItem[] | null>(null);
+  const [developing, setDeveloping] = useState<TrendingStory[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,90 +66,153 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
     return () => { cancelled = true; };
   }, [ready, tab, hasInterests, profile, group]);
 
+  // The right rail: stories developing over days — a different cut from the
+  // list, not the same rows twice. Best effort; the list never waits for it.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    fetchTrending({ state: profile?.state ?? null, limit: 5 })
+      .then((s) => { if (!cancelled) setDeveloping(s); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [ready, profile]);
+
   const scoped = useMemo(() => {
     if (!items || scope === "all" || !profile?.state) return items ?? [];
     return items.filter((i) => (scope === "region" ? i.is_regional : !i.is_regional));
   }, [items, scope, profile]);
 
-  // The feed is a window (60), not the day: at the cap say "60+" rather than
-  // print the cap as a count; and count the sources behind the rows shown.
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: scoped.length };
+    for (const i of scoped) {
+      const g = sectorGroup(i.sector);
+      if (g) c[g.slug] = (c[g.slug] ?? 0) + 1;
+    }
+    return c;
+  }, [scoped]);
+
   const dateline = useMemo(() => {
-    const d = istDate(new Date());
-    if (!items) return d;
-    const n = scoped.length >= WINDOW ? `${WINDOW}+` : String(scoped.length);
-    const sources = scoped.reduce((t, i) => t + (i.source_count || 0), 0);
-    // When nothing new has arrived in twelve hours the masthead says so; a
-    // frozen chart that looks current is the one thing it must not be.
+    const d = new Date();
+    const day = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+    if (!items) return day;
     const quiet = staleSince(items);
-    const since = quiet ? ` · nothing new since ${shortDate(quiet)} ${istTime(quiet)}` : "";
-    return `${d} · ${n} ${scoped.length === 1 ? "story" : "stories"} · ${sources.toLocaleString("en-IN")} ${sources === 1 ? "source" : "sources"}${since}`;
+    return quiet ? `${day} · quiet since ${shortDate(quiet)} ${istTime(quiet)}` : day;
+  }, [items]);
+
+  const subline = useMemo(() => {
+    if (!items) return null;
+    const n = scoped.length >= WINDOW ? `${WINDOW}+` : String(scoped.length);
+    const outlets = new Set(scoped.flatMap((i) => (i.outlets ?? []).map((o) => o.publisher)));
+    const parts = [`${n} ${scoped.length === 1 ? "record" : "records"}`];
+    if (outlets.size) parts.push(`${outlets.size} outlets`);
+    parts.push("newest reporting first");
+    return parts.join(" · ");
   }, [items, scoped]);
 
   const primaryLang = profile?.languages?.[0] ?? "en";
-  const emptyLabel = group
-    ? `No ${group.name} stories on today's chart`
-    : "Nothing on today's chart yet";
-
+  const emptyLabel = group ? `No ${group.name} records today` : "Nothing on today's record yet";
   const scopes: [Scope, string][] = [["all", "All"], ["region", "Your state"], ["national", "National"]];
   const pick = (s: Scope) => { setScope(s); saveScope(s); };
 
   return (
-    <div className="mx-auto max-w-[1400px] px-5 pb-24 sm:px-8 lg:pb-20 xl:px-10">
-      <Masthead dateline={dateline} right={profile?.state ? (
-        <div className="flex gap-3 font-mono text-[11px] uppercase tracking-[0.06em]">
-          {scopes.map(([s, l]) => (
-            <button key={s} onClick={() => pick(s)} aria-pressed={scope === s}
-              className="min-h-11 underline-offset-4 aria-pressed:underline"
-              style={{ color: scope === s ? "var(--ink)" : "var(--ink-faint)" }}>{l}</button>
-          ))}
-        </div>
-      ) : null} />
-      <div className="lg:grid lg:grid-cols-[188px_minmax(0,1fr)] lg:gap-10 xl:gap-12">
-        <SectorStrip active={group?.slug ?? null} allLabel="" responsiveRail />
+    <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
+      <Masthead dateline={dateline} />
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)_300px] lg:gap-10 lg:pt-6">
+        <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
+
         <div className="min-w-0">
-          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pt-4 lg:pt-0">
-            <div>
-              <h1 id="chart-title" className="font-display text-[28px] uppercase leading-none tracking-[0.03em] lg:text-[34px]">
-                {group ? group.name : tab === "foryou" ? "For you" : "Today"}
-              </h1>
-              <p className="mt-2 hidden max-w-[52ch] text-[14px] leading-[1.5] lg:block" style={{ color: "var(--ink-muted)" }}>
-                Live story records from monitored outlets, ordered by corroboration and recency.
-              </p>
+          {profile?.state && (
+            <div className="flex gap-2 pt-2 lg:pt-0" role="group" aria-label="Scope">
+              {scopes.map(([s, l]) => (
+                <button key={s} onClick={() => pick(s)} aria-pressed={scope === s} className="chip h-8 px-3 text-[13px]">
+                  {l}
+                </button>
+              ))}
             </div>
-            {hasInterests && !group && (
-              <div role="tablist" className="flex gap-5 font-display text-[18px] uppercase tracking-[0.04em]">
-                {(["today", "foryou"] as Tab[]).map((t) => (
-                  <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-                    className="min-h-[44px] border-b-2 px-1 pt-2"
-                    style={{ borderColor: tab === t ? "var(--ink)" : "transparent", color: tab === t ? "var(--ink)" : "var(--ink-faint)" }}>
-                    {t === "today" ? "Today" : "For you"}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <section aria-labelledby="chart-title" className="pt-3">
-            {error ? (
-              <div className="rule-live py-6" role="status">
-                <p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>Today&rsquo;s record could not load.</p>
-                <p className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>{error}</p>
-              </div>
-            ) : items === null ? (
-              <div className="rule-live py-5" aria-busy="true" aria-label="Loading today's chart">
-                <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
-                  Printing today&rsquo;s chart…
-                </p>
-                <div className="mt-5 grid gap-4" aria-hidden>
-                  {["82%", "68%", "74%", "57%"].map((width) => (
-                    <span key={width} className="pulse-skel block h-3" style={{ width, background: "var(--bg-sunken)" }} />
+          )}
+          <SectionHead
+            id="chart-title"
+            title={group ? group.name : tab === "foryou" ? "For you" : "Today"}
+            hint={subline ?? undefined}
+            right={
+              hasInterests && !group ? (
+                <div role="tablist" className="seg">
+                  {(["today", "foryou"] as Tab[]).map((t) => (
+                    <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
+                      {t === "today" ? "Today" : "For you"}
+                    </button>
                   ))}
                 </div>
+              ) : undefined
+            }
+          />
+          <section aria-labelledby="chart-title">
+            {error ? (
+              <div className="card" role="status">
+                <p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>Today&rsquo;s record could not load.</p>
+                <p className="mt-1 text-[14px]" style={{ color: "var(--ink-2)" }}>{error}</p>
+              </div>
+            ) : items === null ? (
+              <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading today's record">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="row-card px-4 py-4" aria-hidden>
+                    <span className="pulse-skel block h-2.5 w-24 rounded" style={{ background: "var(--sunken)" }} />
+                    <span className="pulse-skel mt-3 block h-4 rounded" style={{ background: "var(--sunken)", width: ["82%", "68%", "74%", "57%"][i] }} />
+                    <span className="pulse-skel mt-2 block h-3 w-[90%] rounded" style={{ background: "var(--sunken)" }} />
+                    <span className="pulse-skel mt-4 block h-1.5 w-20 rounded" style={{ background: "var(--sunken)" }} />
+                  </div>
+                ))}
               </div>
             ) : (
               <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} yesterdayHref="/feed/yesterday" />
             )}
           </section>
         </div>
+
+        <aside className="hidden lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:flex lg:flex-col lg:gap-4 lg:self-start">
+          {developing.length > 0 && (
+            <div className="card">
+              <h3 className="card-h">Developing over days</h3>
+              <ol className="flex flex-col gap-3.5">
+                {developing.map((s) => (
+                  <li key={s.slug}>
+                    <Link href={`/trending/${s.slug}`} className="group block">
+                      <p className="font-record text-[15.5px] font-medium leading-[1.35] group-hover:underline underline-offset-4">
+                        {s.hero_title ?? s.label}
+                      </p>
+                      <p className="mt-1.5 flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
+                        <CoverageBar outlets={[]} fallbackCount={s.source_count} width={56} />
+                        {s.developments} developments · {s.source_count} outlets
+                        {s.last_updated_at && <> · {relativeTime(s.last_updated_at)}</>}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+              <Link href="/trending" className="mt-3 inline-block text-[13.5px] font-semibold hover:underline underline-offset-4" style={{ color: "var(--accent)" }}>
+                All developing stories →
+              </Link>
+            </div>
+          )}
+          <div className="card">
+            <h3 className="card-h">How to read a record</h3>
+            <div className="flex flex-col gap-3 text-[13.5px]" style={{ color: "var(--ink-2)" }}>
+              <p className="flex items-center gap-2.5">
+                <CoverageBar outlets={[{ slug: "a", publisher: "a", name: "", code: "", origin: "national", language: "en" }, { slug: "b", publisher: "b", name: "", code: "", origin: "intl", language: "en" }, { slug: "c", publisher: "c", name: "", code: "", origin: "regional", language: "hi" }]} width={56} />
+                Coverage bar — who reported it
+              </p>
+              <CoverageLegend
+                withCounts={false}
+                outlets={[{ slug: "a", publisher: "a", name: "", code: "", origin: "national", language: "en" }, { slug: "b", publisher: "b", name: "", code: "", origin: "intl", language: "en" }, { slug: "c", publisher: "c", name: "", code: "", origin: "regional", language: "hi" }]}
+              />
+              <p className="flex flex-wrap items-center gap-2">
+                <StatusPill status="verified" label="Verified" />
+                <StatusPill status="provisional" label="Provisional" />
+              </p>
+              <p>A dashed row has one source so far.</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );

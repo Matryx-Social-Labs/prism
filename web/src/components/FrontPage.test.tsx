@@ -5,8 +5,9 @@ import { FrontPage } from "@/components/FrontPage";
 import type { FeedItem } from "@/lib/api";
 
 const fetchFeed = vi.hoisted(() => vi.fn());
+const fetchTrending = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ fetchFeed }));
+vi.mock("@/lib/api", () => ({ fetchFeed, fetchTrending }));
 vi.mock("@/lib/profile", () => ({ loadProfile }));
 // @/lib/scope stays real — the persisted value is the thing under test.
 
@@ -42,6 +43,7 @@ const item = (over: Partial<FeedItem> = {}): FeedItem =>
 const session = { store: new Map<string, string>() };
 beforeEach(() => {
   fetchFeed.mockReset().mockResolvedValue([item()]);
+  fetchTrending.mockReset().mockResolvedValue([]);
   loadProfile.mockReset().mockReturnValue(null);
   localStorage.clear();
   session.store.clear();
@@ -91,7 +93,7 @@ describe("FrontPage — one chart for everyone (D2)", () => {
   it("names the subject when a sector has nothing today", async () => {
     fetchFeed.mockResolvedValue([]);
     render(<FrontPage sector="sports" />);
-    expect(await screen.findByText(/No Sports stories on today's chart/)).toBeInTheDocument();
+    expect(await screen.findByText(/No Sports records today/)).toBeInTheDocument();
   });
 });
 
@@ -170,11 +172,11 @@ describe("FrontPage — marks the reader as returning", () => {
   });
 });
 
-describe("the masthead says when the chart went quiet", () => {
-  it("prints 'nothing new since' once no report has arrived for twelve hours", async () => {
+describe("the masthead says when the record went quiet", () => {
+  it("prints 'quiet since' once no report has arrived for twelve hours", async () => {
     const old = new Date(Date.now() - 20 * 3_600_000).toISOString();
     fetchFeed.mockResolvedValue([item({ latest_published_at: old, last_updated_at: old })]);
     render(<FrontPage />);
-    expect(await screen.findByText(/nothing new since/i)).toBeInTheDocument();
+    expect(await screen.findByText(/quiet since/i)).toBeInTheDocument();
   });
 });
