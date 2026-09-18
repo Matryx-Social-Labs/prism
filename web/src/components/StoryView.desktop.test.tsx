@@ -87,3 +87,36 @@ describe("the desktop story page", () => {
     expect(asks.some((a) => !hiddenOnDesktop(a))).toBe(true);
   });
 });
+
+/**
+ * Tailwind display at a breakpoint, read off the class list: base `hidden`,
+ * `lg:flex`, `xl:hidden`… applied in breakpoint order, last one wins; any
+ * ancestor at display:none hides the element. jsdom cannot tell us this.
+ */
+const BPS = ["sm", "md", "lg", "xl"];
+function visibleAt(el: HTMLElement | null, bp: string): boolean {
+  const upTo = BPS.slice(0, BPS.indexOf(bp) + 1);
+  for (let n = el; n; n = n.parentElement) {
+    let shown = true;
+    for (const c of n.className.split(/\s+/)) {
+      const [pre, name] = c.includes(":") ? c.split(":") : ["", c];
+      if (pre && !upTo.includes(pre)) continue;
+      if (name === "hidden") shown = false;
+      else if (/^(block|flex|grid|inline-flex|inline|contents)$/.test(name)) shown = true;
+    }
+    if (!shown) return false;
+  }
+  return true;
+}
+
+describe("the two-column width (1024–1279px)", () => {
+  // REGRESSION: the evidence rail switched on at lg with a fixed 300px track
+  // beside a 220px rail, which left the reading column 360px at 1024: a
+  // five-line headline and an 80px photo tile. The rail now waits for xl, so
+  // at lg the reports must be reachable INLINE, and at xl in the rail.
+  it.each(["lg", "xl"])("still shows the reports at %s", (bp) => {
+    render(<StoryView event={EVENT} />);
+    const copies = screen.getAllByText("A report").map((e) => e.closest("a, li") as HTMLElement);
+    expect(copies.some((c) => visibleAt(c, bp)), `no copy of the reports is visible at ${bp}`).toBe(true);
+  });
+});

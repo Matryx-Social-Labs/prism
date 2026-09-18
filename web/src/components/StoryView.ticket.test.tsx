@@ -166,10 +166,11 @@ describe("the record — the route", () => {
 });
 
 describe("the record — the reports", () => {
-  it("prints the first eight reports on the phone and opens the rest on request, the [n] index unchanged; the desktop rail carries them all", async () => {
+  it("prints the first eight reports inline (phone and two-column widths) and opens the rest on request, the [n] index unchanged; the xl rail carries them all", async () => {
     const many = Array.from({ length: 12 }, (_, i) => src(`a${i + 1}`, "2026-09-04T19:55:00Z"));
     render(<StoryView event={event({ sources: many })} />);
-    const phone = document.querySelector("#sources .lg\\:hidden") as HTMLElement;
+    // Inline list hides only at xl, where the evidence rail takes over.
+    const phone = document.querySelector("#sources .xl\\:hidden") as HTMLElement;
     expect(within(phone).getAllByText("A report")).toHaveLength(8);
     const rail = screen.getByRole("complementary", { name: "Evidence" });
     expect(within(rail).getAllByText("A report")).toHaveLength(12);

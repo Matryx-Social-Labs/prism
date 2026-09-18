@@ -297,7 +297,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         <span className="w-[76px]" aria-hidden />
       </div>
 
-      <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+40px)] pt-4 sm:px-8 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)_300px] lg:gap-x-10 lg:pb-20 lg:pt-6 xl:px-10">
+      <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+40px)] pt-4 sm:px-8 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10 xl:grid-cols-[var(--rail)_minmax(0,1fr)_300px] lg:pb-20 lg:pt-6 xl:px-10">
         {/* ── On this story (desktop rail) ─────────────────────── */}
         <aside className="hidden lg:block lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start" aria-label="On this story">
           <p className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>On this story</p>
@@ -320,7 +320,7 @@ export function StoryView({ event }: { event: EventDetail }) {
 
         <div className="min-w-0">
           {/* ── The header ─────────────────────────────────────── */}
-          <header className="border-b pb-5" style={{ borderColor: "var(--line)" }}>
+          <header className="border-b pb-5 lg:max-w-[var(--reading)]" style={{ borderColor: "var(--line)" }}>
             <div className="meta-line flex-wrap">
               {routeStory && event.story_slug && (
                 <StatusPill status={boundaryVerified ? "verified" : "provisional"} title={boundaryVerified ? "Story boundary verified; developments below are in sequence." : "Grouping provisional; related reporting is shown without implying chronology."} />
@@ -343,14 +343,16 @@ export function StoryView({ event }: { event: EventDetail }) {
             {event.summary && (
               <EntityText as="p" text={event.summary} entities={event.entities} claims={claims} className="mt-3 max-w-[62ch] text-[17px] leading-[1.55]" style={{ color: "var(--ink-2)", textWrap: "pretty" }} />
             )}
+            {/* Icons and bar are one unit; on a narrow screen the text and the
+                status pill wrap beneath them rather than the icons standing alone. */}
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <MonogramStack outlets={outlets} limit={5} />
-              <span className="inline-flex min-w-0 items-center gap-2.5">
+              <span className="inline-flex items-center gap-3">
+                <MonogramStack outlets={outlets} limit={5} />
                 <CoverageBar outlets={outlets} fallbackCount={sourceCount} size="lg" draw />
-                <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>
-                  {outlets.length ? coverageText(outlets) : `${outletCount} ${outletCount === 1 ? "outlet" : "outlets"}`} · {sourceCount} {sourceCount === 1 ? "report" : "reports"}
-                  {outlets.length > 0 && ` · ${languageNames(languagesOf(outlets))}`}
-                </span>
+              </span>
+              <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>
+                {outlets.length ? coverageText(outlets) : `${outletCount} ${outletCount === 1 ? "outlet" : "outlets"}`} · {sourceCount} {sourceCount === 1 ? "report" : "reports"}
+                {outlets.length > 0 && ` · ${languageNames(languagesOf(outlets))}`}
               </span>
               {single && <StatusPill status="provisional" label="One source so far" />}
             </div>
@@ -602,7 +604,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                   )}
                 </div>
               )}
-              <div className="lg:hidden">
+              <div className="xl:hidden">
                 <SourceList sources={allSources ? event.sources : event.sources.slice(0, SOURCES_FOLD)} sourceIndex={sourceIndex} />
                 {!allSources && event.sources.length > SOURCES_FOLD && (
                   <button type="button" onClick={() => setAllSources(true)} className="btn btn-secondary btn-sm mt-3">
@@ -610,7 +612,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                   </button>
                 )}
               </div>
-              <p className="hidden text-[13.5px] lg:block" style={{ color: "var(--ink-3)" }}>The {sourceCount} {sourceCount === 1 ? "report is" : "reports are"} listed beside the record.</p>
+              <p className="hidden text-[13.5px] xl:block" style={{ color: "var(--ink-3)" }}>The {sourceCount} {sourceCount === 1 ? "report is" : "reports are"} listed beside the record.</p>
             </section>
 
             {/* ── Related stories: different stories that touch this one ── */}
@@ -654,7 +656,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         </div>
 
         {/* ── Beside the record (desktop): the reports, who is named ── */}
-        <aside className="hidden lg:flex lg:flex-col lg:gap-4 lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start" aria-label="Evidence">
+        <aside className="hidden xl:flex xl:flex-col xl:gap-4 xl:sticky xl:top-[calc(var(--topbar)+24px)] xl:self-start" aria-label="Evidence">
           <div className="card max-h-[calc(100dvh-140px)] overflow-y-auto">
             <h3 className="card-h">Reports · {sourceCount}</h3>
             <SourceList sources={event.sources} sourceIndex={sourceIndex} compact />

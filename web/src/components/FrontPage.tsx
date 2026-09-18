@@ -117,7 +117,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   return (
     <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
       <Masthead dateline={dateline} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)_300px] lg:gap-10 lg:pt-6">
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-10 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_300px]">
         <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
 
         <div className="min-w-0">
@@ -169,7 +169,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
           </section>
         </div>
 
-        <aside className="hidden lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:flex lg:flex-col lg:gap-4 lg:self-start">
+        <aside className="hidden xl:sticky xl:top-[calc(var(--topbar)+24px)] xl:flex xl:flex-col xl:gap-4 xl:self-start">
           {developing.length > 0 && (
             <div className="card">
               <h3 className="card-h">Developing over days</h3>
