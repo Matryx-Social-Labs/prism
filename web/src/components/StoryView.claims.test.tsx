@@ -80,6 +80,17 @@ describe("What was said", () => {
     expect(within(said).queryByRole("link", { name: /Source 3/ })).toBeNull();
   });
 
+  it("prints who the speaker is when the articles said, under the name", () => {
+    render(<StoryView event={withClaims([
+      { speaker: "J.D. Vance", role: "Vice President of the United States", claims: [{ quote_text: QUOTE, quote_start: 0, quote_end: 0, article_id: "a1", source_name: "Mint", url: "u", published_at: null }] },
+      { speaker: "Someone", role: null, claims: [{ quote_text: QUOTE + "?", quote_start: 0, quote_end: 0, article_id: "a2", source_name: "H", url: "u", published_at: null }] },
+    ])} />);
+    const said = screen.getAllByRole("region", { name: /who said what/i })[0];
+    expect(within(said).getByText("Vice President of the United States")).toBeInTheDocument();
+    // a speaker without a stated role gets no line, not an empty one
+    expect(within(said).getByText("Someone").parentElement!.querySelectorAll("p")).toHaveLength(1);
+  });
+
   it("shows one speaker once with a count when they have several quotes", () => {
     render(<StoryView event={withClaims([
       { speaker: "Jose Pradeep", claims: [

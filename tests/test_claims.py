@@ -94,3 +94,30 @@ def test_the_rejection_reasons_are_counted_not_swallowed():
          claim(speaker="")], ARTICLE)
     assert len(kept) == 1
     assert why == {"no_speaker": 1, "short_quote": 0, "not_verbatim": 1}
+
+
+def test_a_role_the_article_never_stated_is_dropped_not_printed():
+    """Asked for the role EXACTLY as the article gives it, the model still adds
+    what it knows ('Agriculture Minister (Andhra Pradesh)', 'Vice President of
+    the United States' on an article that says neither). Unverifiable → null:
+    no role is better than a plausible one."""
+    kept, _ = verify_claims([claim(speaker_role="Karnataka Minister for Rural Development")], ARTICLE)
+    assert kept[0].speaker_role is None
+
+
+def test_a_role_in_the_articles_own_words_survives():
+    kept, _ = verify_claims([claim(speaker_role="the minister")], ARTICLE)
+    assert kept[0].speaker_role == "minister"
+
+
+def test_a_composed_or_essay_role_is_dropped_even_if_every_word_appears():
+    kept, _ = verify_claims([claim(speaker_role="minister (state)")], ARTICLE)
+    assert kept[0].speaker_role is None
+    long = "the minister who said the state would double its outlay on rural roads before the monsoon"
+    kept, _ = verify_claims([claim(speaker_role=long)], ARTICLE)
+    assert kept[0].speaker_role is None
+
+
+def test_a_trailing_acronym_is_the_articles_shorthand_not_a_composition():
+    kept, _ = verify_claims([claim(speaker_role="minister (MIN)")], ARTICLE)
+    assert kept[0].speaker_role == "minister"

@@ -204,6 +204,7 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
             body = r.json()
             assert body["claims"] == [{
                 "speaker": "Anita Dipke",
+                "role": None,  # the article named no office; the field is present, never invented
                 "claims": [{"quote_text": "We were receiving proposals", "quote_start": 12,
                             "quote_end": None, "context_before": "", "context_after": "",
                             "article_id": str(aid), "source_name": "Mint",
@@ -216,6 +217,22 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
             assert len(body["sources"]) == 1, "one document leaked through as two source rows"
     finally:
         app.dependency_overrides.pop(events.get_db, None)
+
+
+def test_a_speakers_role_is_the_one_the_articles_repeat_most():
+    """Particle prints who a speaker is under the name; the extractor now carries
+    speaker_role as the article states it, and the record shows the most-repeated
+    one across the speaker's quotes — never a role we made up."""
+    a = _src("a1", [_c("J. D. Vance", "We can't predict the future, but the president is right on this one")])
+    a["claims"][0]["speaker_role"] = "Vice President of the United States"
+    b = _src("a2", [_c("J.D. Vance", "This thing will enter a much different phase in a couple of months")])
+    b["claims"][0]["speaker_role"] = "Vice President of the United States"
+    c = _src("a3", [_c("J.D. Vance", "The second phase is to ensure they are not able to rebuild")])
+    c["claims"][0]["speaker_role"] = "US Vice President"
+    grouped = group_claims([a, b, c])
+    assert len(grouped) == 1 and grouped[0].role == "Vice President of the United States"
+    # no role anywhere → None, not ""
+    assert group_claims([_src("a9", [_c("Someone", "A perfectly long enough quotation here")])])[0].role is None
 
 
 def test_the_context_is_the_articles_own_words_around_a_re_verified_span():

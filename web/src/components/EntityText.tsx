@@ -105,6 +105,7 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
             <b className="text-[15px] font-semibold" style={{ color: "var(--ink)" }}>{entity.name}</b>
             <span className="text-[11.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>{kind}</span>
           </span>
+          {said?.role && <span className="text-[13px]" style={{ color: "var(--ink-2)" }}>{said.role}</span>}
           {said ? (
             <a href="#said" className="text-[13.5px]" style={{ color: "var(--ink-2)" }} onClick={() => setOpen(false)}>
               Quoted {said.claims.length} {said.claims.length === 1 ? "time" : "times"} on this story ↓

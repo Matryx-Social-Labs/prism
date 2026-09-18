@@ -62,7 +62,9 @@ function SpeakerCard({ sp, sourceIndex, outletOf }: { sp: SpeakerClaims; sourceI
               </span>
               <div className="min-w-0">
                 <h3 className="truncate text-[14.5px] font-semibold leading-tight">{sp.speaker}</h3>
-                <p className="text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+                {/* Who they are, as the articles put it — never a title we supplied. */}
+                {sp.role && <p className="truncate text-[12.5px] leading-snug" style={{ color: "var(--ink-2)" }}>{sp.role}</p>}
+                <p className="text-[12px]" style={{ color: "var(--ink-3)" }}>
                   {sp.claims.length} {sp.claims.length === 1 ? "quote" : "quotes"} · {outlets} {outlets === 1 ? "outlet" : "outlets"}
                 </p>
               </div>

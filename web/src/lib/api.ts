@@ -110,6 +110,8 @@ export interface ClaimOut {
 
 export interface SpeakerClaims {
   speaker: string;
+  /** Who they are, as the articles put it ("Vice President of the United States"); null when no article said. */
+  role?: string | null;
   claims: ClaimOut[];
 }
 

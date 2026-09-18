@@ -128,6 +128,7 @@ def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
     by: dict[str, list[tuple[tuple, ClaimOut]]] = {}
     label: dict[str, str] = {}
     first_seen: dict[str, int] = {}
+    roles: dict[str, dict[str, int]] = {}
     for src in sources:
         claims = src["claims"]
         if not isinstance(claims, list):
@@ -154,6 +155,10 @@ def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
                 by[key] = []
                 label[key] = speaker
                 first_seen[key] = len(first_seen)
+            role = c.get("speaker_role")
+            if isinstance(role, str) and role.strip():
+                r = roles.setdefault(key, {})
+                r[role.strip()] = r.get(role.strip(), 0) + 1
             # newest article first, then the order the article said them
             sort_key = (-(pub.timestamp() if pub else 0.0), start or 0)
             before, after = quote_context(src.get("clean_text"), quote, start, end)
@@ -169,7 +174,11 @@ def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
                 published_at=pub.isoformat() if pub else None,
             )))
     return [
-        SpeakerClaims(speaker=label[k], claims=[cl for _, cl in sorted(by[k], key=lambda x: x[0])])
+        SpeakerClaims(
+            speaker=label[k],
+            role=max(roles[k], key=roles[k].get) if k in roles else None,
+            claims=[cl for _, cl in sorted(by[k], key=lambda x: x[0])],
+        )
         for k in sorted(by, key=lambda k: (-len(by[k]), first_seen[k]))
     ]
 

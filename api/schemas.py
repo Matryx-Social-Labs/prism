@@ -159,6 +159,9 @@ class ClaimOut(BaseModel):
 
 class SpeakerClaims(BaseModel):
     speaker: str
+    # Who they are, as the articles put it ("Vice President of the United
+    # States"): the most-repeated non-empty role across the speaker's claims.
+    role: str | None = None
     claims: list[ClaimOut]
 
 

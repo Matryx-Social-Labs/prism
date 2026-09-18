@@ -35,12 +35,43 @@ logger = get_logger(__name__)
 MIN_QUOTE_CHARS = 25
 
 _WS = re.compile(r"\s+")
+_WORD = re.compile(r"[^\W\d_]+")
+
+# A role longer than this is a description, not a title.
+MAX_ROLE_CHARS = 60
+_ROLE_GLUE = {"of", "the", "and", "for", "in", "at", "to", "a", "an"}
 
 
 def flat_ws(s: str) -> str:
     """Whitespace-collapsed text. quote_start/quote_end index THIS string, not
     the raw clean_text — every reader of the offsets must flatten first."""
     return _WS.sub(" ", s or "").strip()
+
+
+def faithful_role(role: str | None, flat_text: str) -> str | None:
+    """The speaker's role only if the article's own words support it.
+
+    Every content word of the role must appear in the article (casefolded),
+    nothing composed with brackets or clauses, and no longer than a title.
+    Asked for "EXACTLY as the article gives it", the model still writes
+    "Agriculture Minister (Andhra Pradesh)" or a 30-word description from what
+    it knows; a null prints no role, which is better than a plausible one. An
+    English role on a Hindi article is unverifiable and so also null.
+    """
+    if not role:
+        return None
+    # "(OCA)" after "Olympic Council of Asia" is the article's own shorthand;
+    # "(Andhra Pradesh)" after "Agriculture Minister" is the model's addition.
+    r = re.sub(r"\s*\([A-Z]{2,7}\)$", "", _WS.sub(" ", role).strip().strip(" .,"))
+    if r[:4].casefold() == "the ":
+        r = r[4:]
+    if not r or len(r) > MAX_ROLE_CHARS or any(ch in r for ch in ";()[]"):
+        return None
+    words = set(_WORD.findall(flat_text.casefold()))
+    for tok in _WORD.findall(r.casefold()):
+        if len(tok) >= 3 and tok not in _ROLE_GLUE and tok not in words:
+            return None
+    return r
 
 
 def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], dict[str, int]]:
@@ -75,6 +106,7 @@ def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], di
                 "quote_text": quote,
                 "quote_start": at,
                 "quote_end": at + len(quote),
+                "speaker_role": faithful_role(c.speaker_role, flat_text),
             })
         )
     if any(rejected.values()):

@@ -48,6 +48,14 @@ class Claim(BaseModel):
     """
 
     speaker: str = Field(description="Who said it, as named in the article")
+    speaker_role: str | None = Field(
+        default=None,
+        description=(
+            "The speaker's title, office or standing EXACTLY as this article gives it, in English "
+            "(e.g. 'Vice President of the United States', 'MEA spokesperson', 'Kerala Chief Minister', "
+            "'senior police officer'); null if the article does not say who they are"
+        ),
+    )
     quote_text: str = Field(description="Their words VERBATIM from the article, not paraphrased")
     claim_text: str = Field(default="", description="One neutral sentence: what they claimed")
     target: str | None = Field(default=None, description="Who or what the claim is about")
