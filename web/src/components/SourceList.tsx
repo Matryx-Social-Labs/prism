@@ -1,6 +1,17 @@
+"use client";
+
 import type { SourceRef } from "@/lib/api";
 import { ORIGIN_LABEL, OutletIcon, type Origin } from "@/components/Coverage";
 import { relativeTime } from "@/lib/dateline";
+
+/**
+ * Publisher images are shown ONLY as link previews to the report they came
+ * from — the outlet's own photo, credited, opening the outlet's page — the way
+ * search engines and messaging apps preview a link. Never proxied, never used
+ * as Prism's own image. A kill switch, because the right to even this much is
+ * not settled in India (DESIGN.md § Images; legal note 2026-09-18).
+ */
+export const REPORT_IMAGES = process.env.NEXT_PUBLIC_REPORT_IMAGES !== "0";
 
 const FUNDING_LABEL: Record<string, string> = {
   state: "State-affiliated",
@@ -46,13 +57,18 @@ export function ReportCard({ source, n, compact = false }: { source: SourceRef; 
       )}
     </>
   );
-  const cls = `row-card block ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`;
+  const thumb = REPORT_IMAGES && s.image_url && !compact ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={s.image_url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-16 w-16 shrink-0 rounded-[var(--r-sm)] object-cover" style={{ background: "var(--sunken)" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+  ) : null;
+  const cls = `row-card ${thumb ? "flex items-start gap-3" : "block"} ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`;
+  const body = thumb ? (<><span className="min-w-0 flex-1">{inner}</span>{thumb}</>) : inner;
   return s.url ? (
     <a href={s.url} target="_blank" rel="noopener noreferrer" className={cls} aria-label={`${s.source_name}: ${s.title}`}>
-      {inner}
+      {body}
     </a>
   ) : (
-    <span className={cls}>{inner}</span>
+    <span className={cls}>{body}</span>
   );
 }
 
@@ -74,6 +90,36 @@ export function SourceList({
       {sources.map((s, i) => (
         <li key={s.article_id ?? `${s.source_name}-${i}`}>
           <ReportCard source={s} n={sourceIndex.get(s.article_id)} compact={compact} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * "From the reports": the outlets' own photographs as a rail of credited link
+ * previews — a horizontal scroll on the phone, a strip on desktop. Each tile
+ * opens the report it came from and names the outlet on the tile itself, so
+ * the photo is never separated from its source. Off when REPORT_IMAGES is off.
+ */
+export function ReportImages({ sources, limit = 8 }: { sources: SourceRef[]; limit?: number }) {
+  if (!REPORT_IMAGES) return null;
+  const seen = new Set<string>();
+  const withImage = sources.filter((s) => s.image_url && s.url && !seen.has(s.image_url) && seen.add(s.image_url)).slice(0, limit);
+  if (withImage.length === 0) return null;
+  return (
+    <ul className="hide-scroll -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 sm:-mx-8 sm:px-8 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0" aria-label="Images from the reports">
+      {withImage.map((s) => (
+        <li key={s.article_id} className="w-[220px] flex-none snap-start lg:w-auto">
+          <a href={s.url!} target="_blank" rel="noopener noreferrer" className="group relative block aspect-[4/3] overflow-hidden rounded-[var(--r-md)] border" style={{ borderColor: "var(--line)", background: "var(--sunken)" }} aria-label={`${s.source_name}: ${s.title}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={s.image_url!} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" onError={(e) => { ((e.currentTarget as HTMLImageElement).closest("li") as HTMLElement).style.display = "none"; }} />
+            <span className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 px-2.5 py-2 text-[12px] font-semibold text-white" style={{ background: "linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,0))" }}>
+              <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} />
+              <span className="truncate">{s.source_name}</span>
+              {s.published_at && <span className="ml-auto font-mono text-[10.5px] font-normal opacity-90">{relativeTime(s.published_at)}</span>}
+            </span>
+          </a>
         </li>
       ))}
     </ul>

@@ -201,7 +201,7 @@ async def get_event(
                 """
                 SELECT a.id AS article_id, s.name AS source_name, s.slug AS source_slug,
                        s.reliability ->> 'funding' AS funding,
-                       ri.url, ri.url_canonical, ri.title, ri.published_at,
+                       ri.url, ri.url_canonical, ri.title, ri.published_at, ri.image_url,
                        e.shared_fields -> 'stance' ->> 'label' AS stance,
                        e.shared_fields -> 'claims' AS claims,
                        CASE WHEN jsonb_typeof(e.shared_fields -> 'claims') = 'array'
@@ -362,6 +362,7 @@ async def get_event(
                 language=reg[s["source_slug"]].language if s["source_slug"] in reg else None,
                 publisher=reg[s["source_slug"]].publisher if s["source_slug"] in reg else None,
                 domain=reg[s["source_slug"]].domain if s["source_slug"] in reg else None,
+                image_url=s.get("image_url"),
             )
             for s in sources
         ],

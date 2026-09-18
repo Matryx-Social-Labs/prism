@@ -103,6 +103,9 @@ class SourceRef(BaseModel):
     language: str | None = None
     publisher: str | None = None  # the masthead: The Hindu's state feeds share one
     domain: str | None = None
+    # The report's own lead image, as the outlet published it. Shown only as a
+    # credited link preview to that article (DESIGN.md § Images), never as ours.
+    image_url: str | None = None
 
 
 class PerspectiveOut(BaseModel):

@@ -157,15 +157,31 @@ export function BriefPlayer({
         </div>
       )}
 
-      <p className="text-[16.5px] leading-[1.65]" style={{ color: "var(--ink)" }}>
-        {briefSentences.map((s, i) => (
-          <span key={i} style={active === i ? spoken : undefined}>
-            {/* Entities are marked per sentence so the read-along span stays intact. */}
-            <EntityText text={s} entities={entities} claims={claims} segments={marked[i]} />
-            {i < briefSentences.length - 1 ? " " : ""}
-          </span>
-        ))}
-      </p>
+      {/* Readability (founder, 2026-09-18; NN/G "How Users Read on the Web"):
+          readers scan. Three or more sentences print as points, one fact per
+          line, each still marked for entities and still read along; a one- or
+          two-sentence brief stays a sentence. */}
+      {briefSentences.length >= 3 ? (
+        <ul className="flex flex-col gap-2.5">
+          {briefSentences.map((s, i) => (
+            <li key={i} className="flex gap-3 text-[16px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+              <span aria-hidden className="mt-[11px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: meta.slug === "reader" ? "var(--ink-3)" : meta.color }} />
+              <span style={active === i ? spoken : undefined}>
+                <EntityText text={s} entities={entities} claims={claims} segments={marked[i]} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[16.5px] leading-[1.65]" style={{ color: "var(--ink)" }}>
+          {briefSentences.map((s, i) => (
+            <span key={i} style={active === i ? spoken : undefined}>
+              <EntityText text={s} entities={entities} claims={claims} segments={marked[i]} />
+              {i < briefSentences.length - 1 ? " " : ""}
+            </span>
+          ))}
+        </p>
+      )}
 
       {points.length > 0 && (
         <div>

@@ -11,6 +11,11 @@ import { RouteMap } from "@/components/RouteMap";
 import { SectionHead } from "@/components/SectionHead";
 import { StoryTimeline } from "@/components/StoryTimeline";
 import { ShareButton } from "@/components/ShareButton";
+import { StatusPill } from "@/components/StatusPill";
+import { CoverageBar } from "@/components/Coverage";
+import { ArrowLeft } from "@/components/icons";
+import { Brand } from "@/components/Brand";
+import { sectorGroup } from "@/lib/sectors";
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +51,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-const MONO = "font-mono text-[11px] uppercase tracking-[0.04em]";
-
 export default async function TrendingStoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const s = await load(slug);
@@ -65,75 +68,89 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
   // A main line of one or two stations has nothing to fold: open the list on everything.
   const openAll = !tree || spineLength(tree) < 3;
 
+  const group = sectorGroup(s.sector);
   return (
-    <div className="mx-auto max-w-[1400px] px-5 pb-24 pt-4 sm:px-8 lg:pb-16 xl:px-10">
-      <Link href="/trending" className={`${MONO} mb-3 block lg:hidden`} style={{ color: "var(--ink-muted)" }}>
-        ← All trending
-      </Link>
-
-      {/* The strip: what is true of the whole story, and Share on the same rule */}
-      <div className="rule-live flex items-start justify-between gap-4 pt-3">
-        <div className={`flex flex-wrap gap-x-3 gap-y-1 ${MONO}`} style={{ color: "var(--ink-faint)" }}>
-          <span style={{ color: "var(--ink)" }}>{s.sector ?? "story"}</span>
-          <span>· {s.source_count} outlets</span>
-          {shape.map((x) => <span key={x}>· {x}</span>)}
-          {s.velocity > 0 && <span style={{ color: "var(--ink)" }}>· moving</span>}
-        </div>
-        <span className="flex-none">
-          <ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} />
-        </span>
+    <>
+      <div className="glass sticky top-0 z-30 flex h-[52px] items-center justify-between border-b px-3 sm:px-6 lg:hidden" style={{ borderColor: "var(--line)" }}>
+        <Link href="/trending" className="btn btn-ghost btn-sm gap-1.5" aria-label="Back to stories"><ArrowLeft /> Stories</Link>
+        <Brand size={22} label="Prism, stories" />
+        <span className="w-[86px]" aria-hidden />
       </div>
-      <h1 className="mt-3 max-w-[32ch] text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px] lg:text-[40px] lg:leading-[1.1]">{s.label}</h1>
-      <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-        {verified ? "Story headline" : "Provisional grouping"} · from {s.developments.length} {verified ? "developments" : "related events"}
-      </p>
+      <div className="mx-auto max-w-[var(--shell)] px-5 pb-24 pt-4 sm:px-8 lg:pb-16 lg:pt-6 xl:px-10">
+        <header className="border-b pb-5" style={{ borderColor: "var(--line)" }}>
+          <div className="meta-line flex-wrap">
+            <StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified story" : "Grouping under review"} />
+            {group && <span>{group.name}</span>}
+            {s.velocity > 0 && <span style={{ color: "var(--accent)", fontWeight: 600 }}>moving now</span>}
+            {days != null && days > 0 && <span>{days} {days === 1 ? "day" : "days"}</span>}
+          </div>
+          <h1 className="font-record mt-3 max-w-[24ch] text-[30px] font-medium leading-[1.12] text-balance sm:text-[38px]" style={{ letterSpacing: "-0.015em" }}>{s.label}</h1>
+          <p className="mt-2 text-[15px]" style={{ color: "var(--ink-2)" }}>
+            {verified ? "A story headline written from its developments." : "Related reporting, grouped by subject and cast while the story boundary is under human review. No chronology is implied."}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="inline-flex items-center gap-2.5">
+              <CoverageBar outlets={[]} fallbackCount={s.source_count} size="lg" />
+              <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>{s.source_count} outlets · {shape.join(" · ")}</span>
+            </span>
+          </div>
+          <div className="mt-4 hidden lg:flex"><ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} /></div>
+        </header>
 
-      <div className="mt-7 grid gap-10 lg:grid-cols-[minmax(0,920px)_minmax(220px,1fr)] lg:gap-12 xl:gap-16">
-        <div className="min-w-0">
-          {/* The route: the whole story as the rail map, the attention curve on request */}
-          {verified && tree ? (
-            <section aria-labelledby="route-title">
-              <SectionHead id="route-title" title="How this story unfolded" hint="Every development in order. Tap one to read it." />
-              <RouteMap tree={tree} developments={s.developments} />
-              <Attention tree={tree} developments={s.developments} />
-            </section>
-          ) : null}
+        <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-12">
+          <div className="min-w-0">
+            {verified && tree ? (
+              <section aria-labelledby="route-title" className="card p-5">
+                <SectionHead id="route-title" title="How this story unfolded" hint="Every development in order. Tap one to read it." />
+                <RouteMap tree={tree} developments={s.developments} />
+                <Attention tree={tree} developments={s.developments} />
+              </section>
+            ) : null}
 
-          {/* Every station, as a list: the table view of the map */}
-          {verified ? <section className={tree ? "mt-8" : ""} aria-labelledby="list-title">
-            <SectionHead id="list-title" title="All developments" count={s.developments.length} />
-            {tree ? (
-              <BranchTree tree={tree} developments={s.developments} defaultAll={openAll} readout={false} />
+            {verified ? (
+              <section className={tree ? "mt-8" : ""} aria-labelledby="list-title">
+                <SectionHead id="list-title" title="All developments" count={s.developments.length} />
+                {tree ? (
+                  <BranchTree tree={tree} developments={s.developments} defaultAll={openAll} readout={false} />
+                ) : (
+                  <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
+                )}
+              </section>
             ) : (
-              <StoryTimeline story={{ developments: s.developments, cast: s.timeline_cast }} />
+              <section aria-labelledby="related-reporting-title">
+                <SectionHead id="related-reporting-title" title="Related reporting" count={s.developments.length} />
+                <StoryTimeline story={{ developments: s.developments, cast: [] }} mode="related" />
+              </section>
             )}
-          </section> : (
-            <StoryTimeline story={{ developments: s.developments, cast: [] }} mode="related" />
-          )}
+          </div>
+
+          <aside className="lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start">
+            <div className="card">
+              <h2 id="cast-title" className="card-h">Who is in it · {s.cast.length}</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {s.cast.slice(0, 12).map((c) => (
+                  <Link key={c} href={`/search?q=${encodeURIComponent(c)}`} className="chip h-[30px] px-2.5 text-[13px]">{c}</Link>
+                ))}
+              </div>
+            </div>
+          </aside>
         </div>
 
-        <aside className="lg:sticky lg:top-20 lg:self-start">
-          <SectionHead id="cast-title" title="Who is in it" count={s.cast.length} />
-          <ul>
-            {s.cast.slice(0, 8).map((c) => (
-              <li key={c} className="rule-live py-2 text-[14.5px]">{c}</li>
-            ))}
-          </ul>
-        </aside>
+        {(s.related?.length ?? 0) > 0 && (
+          <section className="mt-10 lg:max-w-[860px]" aria-labelledby="related-title">
+            <SectionHead id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
+            <RelatedRoutes related={s.related} />
+          </section>
+        )}
+
+        <p className="mt-10 flex justify-between gap-4 border-t pt-4 text-[13.5px] font-medium" style={{ borderColor: "var(--line)" }}>
+          <Link href="/trending" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>← All stories</Link>
+          <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>Today&rsquo;s record →</Link>
+        </p>
       </div>
-
-      {/* Related routes: different stories, so they come after everything that is this one */}
-      {(s.related?.length ?? 0) > 0 && (
-        <section className="mt-10 lg:max-w-[860px]" aria-labelledby="related-title">
-          <SectionHead id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
-          <RelatedRoutes related={s.related} />
-        </section>
-      )}
-
-      <p className={`rule-live mt-10 flex justify-between gap-4 py-3 ${MONO}`}>
-        <Link href="/trending" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>← All trending</Link>
-        <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>Today&rsquo;s chart →</Link>
-      </p>
-    </div>
+      <div className="glass fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t px-4 pt-2.5 lg:hidden" style={{ borderColor: "var(--line)", paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}>
+        <div className="flex-1"><ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} fill /></div>
+      </div>
+    </>
   );
 }

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { SpeakerClaims } from "@/lib/api";
 import { ChevronDown } from "@/components/icons";
+import { OutletIcon } from "@/components/Coverage";
+import { fallbackCode } from "@/components/SourceList";
 import { relativeTime } from "@/lib/dateline";
 import { quoteLink } from "@/lib/quoteLink";
 
@@ -26,20 +28,23 @@ const QUOTES_FOLD = 2;
 export function Said({
   claims,
   sourceIndex,
+  outletOf,
 }: {
   claims: SpeakerClaims[];
   sourceIndex: Map<string, number>;
+  /** article_id → the outlet's icon facts, when the caller has them. */
+  outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {claims.map((sp) => (
-        <SpeakerCard key={sp.speaker} sp={sp} sourceIndex={sourceIndex} />
+        <SpeakerCard key={sp.speaker} sp={sp} sourceIndex={sourceIndex} outletOf={outletOf} />
       ))}
     </div>
   );
 }
 
-function SpeakerCard({ sp, sourceIndex }: { sp: SpeakerClaims; sourceIndex: Map<string, number> }) {
+function SpeakerCard({ sp, sourceIndex, outletOf }: { sp: SpeakerClaims; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined }) {
   // Two quotes per speaker, the rest on request: a minister with nine quotes
   // is a column of italics that buries the next speaker.
   const [all, setAll] = useState(false);
@@ -74,7 +79,10 @@ function SpeakerCard({ sp, sourceIndex }: { sp: SpeakerClaims; sourceIndex: Map<
                       {n != null && (
                         <span className="font-mono text-[11px]">[{n}]</span>
                       )}
-                      <span className="chip h-6 px-2 text-[12px]">{c.source_name}</span>
+                      <span className="chip h-6 gap-1 px-2 text-[12px]">
+                        <OutletIcon domain={outletOf?.(c.article_id)?.domain} code={outletOf?.(c.article_id)?.code ?? fallbackCode(c.source_name)} name={c.source_name} size={16} />
+                        {c.source_name}
+                      </span>
                       {c.published_at && <span className="font-mono text-[11px]">{relativeTime(c.published_at)}</span>}
                       {c.url && n != null && (
                         <a

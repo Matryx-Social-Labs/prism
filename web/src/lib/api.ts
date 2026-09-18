@@ -62,6 +62,8 @@ export interface SourceRef {
   language?: string | null;
   publisher?: string | null;
   domain?: string | null;
+  /** The report's own lead image; shown only as a credited link preview to that article. */
+  image_url?: string | null;
   url: string | null;
   title: string;
   published_at: string | null;

@@ -21,7 +21,7 @@ import { StoryRoute } from "@/components/StoryRoute";
 import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { Said } from "@/components/Said";
 import { SectionHead as Head } from "@/components/SectionHead";
-import { SourceList, fallbackCode, indexSources } from "@/components/SourceList";
+import { ReportImages, SourceList, fallbackCode, indexSources } from "@/components/SourceList";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
 import { relativeTime } from "@/lib/dateline";
@@ -354,6 +354,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               </span>
               {single && <StatusPill status="provisional" label="One source so far" />}
             </div>
+            <div className="mt-5"><ReportImages sources={event.sources} /></div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="hidden lg:inline-flex"><ShareButton url={`/story/${event.id}`} title={event.title} /></span>
               <button type="button" onClick={() => setAskOpen(true)} className="btn btn-secondary hidden lg:inline-flex">
@@ -539,7 +540,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                   count={quoteCount}
                   hint="Only words found exactly in the article are shown, attributed and linked to the line they came from."
                 />
-                <Said claims={claims} sourceIndex={sourceIndex} />
+                <Said claims={claims} sourceIndex={sourceIndex} outletOf={(id) => event.sources.find((x) => x.article_id === id)} />
               </section>
             )}
 
