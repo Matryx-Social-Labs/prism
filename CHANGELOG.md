@@ -3,6 +3,12 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.81.27] - 2026-09-18
+
+### Fixed
+- Strip PostgreSQL-incompatible NUL characters recursively from otherwise valid
+  model JSON, preventing summaries or entity names from dead-lettering enrichments.
+
 ## [0.0.81.26] - 2026-09-18
 
 ### Fixed

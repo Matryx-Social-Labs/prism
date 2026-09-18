@@ -136,3 +136,10 @@ async def test_a_provider_answer_without_choices_is_transient(monkeypatch):
 
 async def _sleep0(_):
     return None
+
+
+def test_model_json_nul_characters_are_removed_recursively():
+    parsed = llm._parse_json_loose(
+        '{"summary":"safe\\u0000text","nested":{"names":["a\\u0000b"]}}'
+    )
+    assert parsed == {"summary": "safetext", "nested": {"names": ["ab"]}}

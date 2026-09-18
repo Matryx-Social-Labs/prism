@@ -328,7 +328,7 @@ def _parse_json_loose(content: str) -> Any:
     def _braces() -> Any:
         start, end = text.find("{"), text.rfind("}")
         if start != -1 and end > start:
-            return json.loads(text[start : end + 1])
+            return _strip_nul_characters(json.loads(text[start : end + 1]))
         raise ValueError("no JSON object in model output")
 
     try:
@@ -349,7 +349,23 @@ def _parse_json_loose(content: str) -> Any:
             raise ValueError(
                 f"model returned a bare {type(parsed).__name__}, not a JSON object"
             ) from None
-    return parsed
+    return _strip_nul_characters(parsed)
+
+
+def _strip_nul_characters(value: Any) -> Any:
+    """Remove PostgreSQL-incompatible NULs from otherwise valid model JSON.
+
+    JSON permits ``\u0000`` in strings; PostgreSQL text/JSONB does not. Models
+    have emitted it inside summaries and entity names, causing the entire
+    enrichment to be dead-lettered at commit time. Preserve every other byte.
+    """
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, list):
+        return [_strip_nul_characters(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _strip_nul_characters(item) for key, item in value.items()}
+    return value
 
 
 async def plain_chat(
