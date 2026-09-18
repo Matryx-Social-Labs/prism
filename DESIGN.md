@@ -221,7 +221,9 @@ One report as the reader sees it: the outlet's icon (its own favicon, 20–28px 
 Prism has no photographs of its own. An outlet's photograph appears only as a **credited link preview of that outlet's report**: the "From the reports" rail under a record's header (a horizontal snap-scroll on the phone, four-up on desktop) and a 64px thumbnail on a report card. Every tile opens the report it came from; the outlet's icon and "Photo: <outlet>" sit on the image itself, an "opens at the source" mark sits top-right, and the alt text says whose photo it is. Images are hotlinked with `referrerpolicy=no-referrer`, never proxied or resized by us, never the share card, never the JSON-LD image, never a row's hero. `NEXT_PUBLIC_REPORT_IMAGES=0` removes every one of them: the right to even this much is not settled in India (legal note, 2026-09-18), and the design must survive without them.
 
 ### Quote card (`.quote`)
-`surface`, 14px radius: speaker avatar (accent-soft, initials) + name + "quoted in N outlets"; the quote in Newsreader italic 17.5px; outlet pill · time · "Open at the quote ↗" (text fragment link); an "In the article" disclosure that prints the surrounding sentence with the quote in `accent-soft` `<mark>`.
+`surface`, 14px radius: speaker avatar (accent-soft, initials) + name + their role on a line under the name ("Vice President of the United States") + "quoted in N outlets"; the quote in Newsreader italic 17.5px; outlet pill · time · "Open at the quote ↗" (text fragment link); an "In the article" disclosure that prints the surrounding sentence with the quote in `accent-soft` `<mark>`.
+
+The role is printed only when the article's own words support it (`enrichment/claims.faithful_role`: every content word present, no brackets or clauses, title-length; an English role on a Hindi article is unverifiable). No role is better than a plausible one — same rule as the quotes: verbatim or absent.
 
 ### Ask
 Subordinate to the evidence: a card at the foot of the record with a 44px input pill, a round ink send button and three suggested questions as outline chips. Answers cite `[n]` to the report list.
