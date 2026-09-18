@@ -378,9 +378,9 @@ LANG_OF = {"Aaj Tak": "Hindi", "Amar Ujala": "Hindi", "BBC News Hindi": "Hindi",
 def langs_of(names: list[str]) -> str:
     seen = []
     for n in names:
-        l = LANG_OF.get(n, "English")
-        if l not in seen:
-            seen.append(l)
+        lang = LANG_OF.get(n, "English")
+        if lang not in seen:
+            seen.append(lang)
     return ", ".join(seen)
 
 
@@ -402,7 +402,7 @@ def cov_from_feed(item) -> dict[str, int]:
     n_other = sum(v for k, v in o.items() if k != "IN")
     # available_languages tells us whether Indian-language reporting is inside the IN count
     langs = item.get("available_languages") or ["en"]
-    reg = min(n_in, len([l for l in langs if l != "en"])) if n_in else 0
+    reg = min(n_in, len([x for x in langs if x != "en"])) if n_in else 0
     return {"nat": n_in - reg, "reg": reg, "int": n_other}
 
 
@@ -519,7 +519,7 @@ def story_row(item, lead=False, sources_for_monos=None) -> str:
     if item.get("cve_ids"):
         lens = '<span class="lensdot l-cyber"><i></i>Cyber read</span>'
     langs = item.get("available_languages") or ["en"]
-    lang_tag = "" if langs == ["en"] else f'<span class="dot"></span><span>{"·".join(l.upper() for l in langs)}</span>'
+    lang_tag = "" if langs == ["en"] else f'<span class="dot"></span><span>{"·".join(x.upper() for x in langs)}</span>'
     names = sources_for_monos or []
     return f"""<a class="row{" lead" if lead else ""}{" single" if single else ""}" href="#">
   <div class="meta"><span class="sec">{sec}</span><span class="dot"></span><span class="time">{ago(item.get("last_updated_at"))}</span>{lang_tag}</div>
@@ -683,8 +683,9 @@ def page_stories(trending) -> str:
     for s in trending["stories"][:9]:
         span = ""
         try:
-            f = datetime.fromisoformat(s["first_seen_at"]); l = datetime.fromisoformat(s["last_updated_at"])
-            d = (l - f).days
+            first = datetime.fromisoformat(s["first_seen_at"])
+            last = datetime.fromisoformat(s["last_updated_at"])
+            d = (last - first).days
             span = f"{d} day{'s' if d != 1 else ''}" if d else "today"
         except Exception:
             pass
