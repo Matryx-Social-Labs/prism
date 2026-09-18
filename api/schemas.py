@@ -13,6 +13,18 @@ class CoverageOut(BaseModel):
     single_origin: bool = False
 
 
+class OutletRef(BaseModel):
+    """One registered source behind a story, as the reader sees it: a short code
+    for the monogram and its place on the coverage bar (common/outlets.py)."""
+
+    slug: str
+    publisher: str
+    name: str
+    code: str
+    origin: str  # national | intl | regional | wire
+    language: str | None = None
+
+
 class FeedItem(BaseModel):
     id: str
     title: str
@@ -40,6 +52,9 @@ class FeedItem(BaseModel):
     # rebuild and so showed one identical batch timestamp against every story.
     latest_published_at: str | None = None
     score: float
+    # Every registered source behind the story (one per feed slug in the
+    # projection); the row's coverage bar and monogram stack are drawn from it.
+    outlets: list[OutletRef] = []
 
 
 class FeedResponse(BaseModel):
@@ -82,6 +97,9 @@ class SourceRef(BaseModel):
     published_at: str | None
     stance: str | None
     funding: str | None = None  # "state" | "public" | None — outlet transparency chip
+    code: str | None = None  # monogram, from common/outlets.py
+    origin: str | None = None  # national | intl | regional | wire
+    language: str | None = None
 
 
 class PerspectiveOut(BaseModel):

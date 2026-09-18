@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.serialization import build_feed_item
 from api.schemas import FeedItem, FeedResponse
+from common import outlets
 from common.db import get_db
 from common.lenses import get_lens
 from common.taxonomy import TAXONOMY
@@ -89,6 +90,7 @@ async def get_feed(
     # still rides ix_events_sector_last_updated — putting the record test in the
     # PARTITION BY instead cost an index scan and spilled ~10MB of temp files per
     # request (measured: 5ms index scan → 29ms parallel seq scan + external merge).
+    reg = await outlets.registry(db)
     rows = (
         await db.execute(
             text(
@@ -124,7 +126,7 @@ async def get_feed(
             continue
         # is_regional reflects the state when the reader gave one (India-first
         # tiering), else the country region.
-        items.append(build_feed_item(row, active_lens, state or region, langs))
+        items.append(build_feed_item(row, active_lens, state or region, langs, reg))
 
     # Raw records come from their own bounded query — only for the lenses that
     # want them (cyber/GRC); they're noise for readers and traders. Fetching just
@@ -155,7 +157,7 @@ async def get_feed(
                 {"sectors": sectors or None, "cve_only": CVE_ONLY_JSON, "cap": limit},
             )
         ).mappings().all()
-        records = [build_feed_item(r, active_lens, state or region, langs) for r in record_rows]
+        records = [build_feed_item(r, active_lens, state or region, langs, reg) for r in record_rows]
 
     if sort == "top":
         items.sort(key=lambda i: i.score, reverse=True)

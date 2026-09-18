@@ -7,8 +7,9 @@ in the feed route since they're feed-specific; search wants every match.
 from datetime import UTC, datetime
 from typing import Any
 
-from api.schemas import FeedItem
+from api.schemas import FeedItem, OutletRef
 from common.lenses import Lens
+from common.outlets import Outlet
 from personalization.ranking import score_event
 
 
@@ -29,8 +30,26 @@ def _pick_headline(
     return default, None
 
 
+def outlet_refs(slugs: list[str], registry: dict[str, Outlet] | None) -> list[OutletRef]:
+    """The registered sources behind a story, in the bar's slot order then by
+    name, so two rows with the same outlets print the same stack."""
+    if not registry:
+        return []
+    found = [registry[s] for s in slugs if s in registry]
+    order = {"national": 0, "intl": 1, "regional": 2, "wire": 3}
+    found.sort(key=lambda o: (order.get(o.origin, 9), o.name))
+    return [
+        OutletRef(slug=o.slug, publisher=o.publisher, name=o.name, code=o.code, origin=o.origin, language=o.language)
+        for o in found
+    ]
+
+
 def build_feed_item(
-    row: Any, active_lens: Lens, region: str | None, languages: list[str] | None = None
+    row: Any,
+    active_lens: Lens,
+    region: str | None,
+    languages: list[str] | None = None,
+    registry: dict[str, Outlet] | None = None,
 ) -> FeedItem:
     projection = row["projection"] or {}
     cyber = projection.get("cyber") or {}
@@ -71,4 +90,5 @@ def build_feed_item(
         last_updated_at=row["last_updated_at"].isoformat(),
         latest_published_at=projection.get("latest_published_at"),
         score=score,
+        outlets=outlet_refs(projection.get("source_slugs") or [], registry),
     )

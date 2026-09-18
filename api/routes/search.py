@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.serialization import build_feed_item
 from api.schemas import FeedResponse
+from common import outlets
 from common.db import get_db
 from common.lenses import get_lens
 
@@ -46,5 +47,6 @@ async def search(
             {"q": pattern, "limit": limit},
         )
     ).mappings().all()
-    items = [build_feed_item(row, active_lens, None) for row in rows]
+    reg = await outlets.registry(db)
+    items = [build_feed_item(row, active_lens, None, registry=reg) for row in rows]
     return FeedResponse(items=items, lens=active_lens.slug)

@@ -30,6 +30,7 @@ from api.schemas import (
     SourceRef,
     SpeakerClaims,
 )
+from common import outlets
 from common.db import get_db
 from common.lenses import LENSES, PAID_LENS_FIELDS
 from common.locks import single_flight
@@ -325,6 +326,7 @@ async def get_event(
         if lens_slug not in allowed and key in safe_projection:
             safe_projection[key] = None
 
+    reg = await outlets.registry(db)
     return EventDetail(
         id=str(event["id"]),
         title=event["title"],
@@ -355,6 +357,9 @@ async def get_event(
                 published_at=s["published_at"].isoformat() if s["published_at"] else None,
                 stance=s["stance"],
                 funding=s["funding"],
+                code=reg[s["source_slug"]].code if s["source_slug"] in reg else None,
+                origin=reg[s["source_slug"]].origin if s["source_slug"] in reg else None,
+                language=reg[s["source_slug"]].language if s["source_slug"] in reg else None,
             )
             for s in sources
         ],

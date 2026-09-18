@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.serialization import build_feed_item
 from api.schemas import DigestResponse
+from common import outlets
 from common.db import get_db
 from common.lenses import get_lens
 from correlation.digest import get_market_digest
@@ -38,5 +39,6 @@ async def market_digest(db: AsyncSession = Depends(get_db)):
         ).mappings().all()
         by_id = {str(r["id"]): r for r in rows}
         lens = get_lens("markets")
-        stories = [build_feed_item(by_id[i], lens, None) for i in ids if i in by_id]
+        reg = await outlets.registry(db)
+        stories = [build_feed_item(by_id[i], lens, None, registry=reg) for i in ids if i in by_id]
     return DigestResponse(**digest, stories=stories)
