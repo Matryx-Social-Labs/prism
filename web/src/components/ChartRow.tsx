@@ -98,17 +98,19 @@ export function ChartRow({
             {item.summary}
           </p>
         )}
-        <div className="mt-3 flex min-w-0 items-center gap-3">
+        {/* The foot wraps rather than truncates: the count is the legend for the
+            bar and must never be cut to "3 out…"; the lens dot drops to its own
+            line on a narrow phone. */}
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <MonogramStack outlets={outlets} />
-          <span className="inline-flex min-w-0 items-center gap-2.5">
+          <span className="inline-flex items-center gap-2.5">
             <CoverageBar outlets={outlets} fallbackCount={item.source_count} />
-            <span className="truncate font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
+            <span className="whitespace-nowrap font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
               {coverageText(outlets, item.source_count)}
             </span>
           </span>
-          <span className="flex-1" />
           {markers.map((m) => (
-            <span key={m.key} className={`lensdot ${m.className}`}>
+            <span key={m.key} className={`lensdot ${m.className} ml-auto`}>
               <i /> {m.label}
             </span>
           ))}

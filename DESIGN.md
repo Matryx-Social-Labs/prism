@@ -217,6 +217,9 @@ The story's named entities, marked in the record's prose — the summary, the br
 ### Report card (`.row-card`, compact)
 One report as the reader sees it: the outlet's icon (its own favicon, 20–28px in the monogram disc, the monogram as fallback) and name, when it published (relative time, mono), the headline the outlet wrote (Hind 500, three lines), and a foot of `[n]` · origin (English national, Indian-language, International) · funding label when known. The whole card opens the article. Cards stack in the desktop evidence rail (compact) and under Coverage on the phone (eight, then "All N reports"). The same reports appear in "What changed" as a timeline — the sequence view — with the outlet icon and time on each row.
 
+### Images (`ReportImages`, card thumbnails)
+Prism has no photographs of its own. An outlet's photograph appears only as a **credited link preview of that outlet's report**: the "From the reports" rail under a record's header (a horizontal snap-scroll on the phone, four-up on desktop) and a 64px thumbnail on a report card. Every tile opens the report it came from; the outlet's icon and "Photo: <outlet>" sit on the image itself, an "opens at the source" mark sits top-right, and the alt text says whose photo it is. Images are hotlinked with `referrerpolicy=no-referrer`, never proxied or resized by us, never the share card, never the JSON-LD image, never a row's hero. `NEXT_PUBLIC_REPORT_IMAGES=0` removes every one of them: the right to even this much is not settled in India (legal note, 2026-09-18), and the design must survive without them.
+
 ### Quote card (`.quote`)
 `surface`, 14px radius: speaker avatar (accent-soft, initials) + name + "quoted in N outlets"; the quote in Newsreader italic 17.5px; outlet pill · time · "Open at the quote ↗" (text fragment link); an "In the article" disclosure that prints the surrounding sentence with the quote in `accent-soft` `<mark>`.
 
@@ -254,7 +257,7 @@ Skeletons are `sunken` bars in the exact geometry of the row (no spinner on the 
 - **Do** render whatever `/api/v1/lenses` returns and never name lenses in generic copy.
 
 ### Don't
-- **Don't** hotlink or embed publisher photographs anywhere (rows, records, share cards, JSON-LD). Image rights are unresolved; the design does not depend on them.
+- **Don't** present a publisher's photograph as Prism's: never on a row, a share card or in JSON-LD, never proxied. Only as a credited link preview of its own report (§ Images), and never as something the design depends on.
 - **Don't** colour chrome, tint the ground, or use a lens or coverage hue as decoration.
 - **Don't** set body or UI in Newsreader, or a heading in the mono.
 - **Don't** infinite-scroll Today; the day is the unit and yesterday is a link.
@@ -271,7 +274,7 @@ Historical entries were written under whichever name and world was current; the 
 | 2026-09-18 | New world "Spectrum": Newsreader / Hind / JetBrains Mono, near-white ground, brand violet accent, soft radii, cards for rows | Founder brief: the chart read as dull and un-navigable; readers could not see what Prism does. The prism's own metaphor — white light in, spectrum out — now sets where colour appears |
 | 2026-09-18 | Colour rule widened: coverage hues + lens hues + one accent (was: lenses only) | The coverage bar makes "one story from many reports" visible on every row; the accent makes interaction legible in a mobile app |
 | 2026-09-18 | Coverage bar order national · international · regional · wire, palette validated in both modes | Red and amber are indistinguishable for deutan readers when adjacent; the order keeps them apart and the count text is the legend |
-| 2026-09-18 | Publisher photographs retired from every surface | Indian fair dealing does not cover a whole photograph; the feed T&Cs (TOI, HT, India TV) forbid commercial republication; agency images are not the publisher's to license. Outlet monograms and the coverage bar carry identity instead |
+| 2026-09-18 | Publisher photographs retired as Prism's own images; allowed only as credited link previews of the report they came from, behind a kill switch | Indian fair dealing does not cover a whole photograph and the feed T&Cs forbid republication; a credited preview that opens the outlet's page is the search-engine norm and the least exposed use. Founder ask after the Particle comparison; the design still stands without them |
 | 2026-09-18 | Bottom tabs Today · Stories · Search · Watchlist · You; Pulse becomes a module on Today and a route | Five tabs is the ceiling; "Stories" (developing arcs) is a reader's word and "Trending" implies popularity theatre |
 | 2026-09-18 | Record sections fixed: The record · What changed · Who said what · Coverage · Why it matters · Ask | Same order on phone, desktop rail and share card; a reader learns it once |
 | 2026-09-18 | Tokens live in design/tokens.json; web CSS and the future React Native theme are generated from it | One source of truth for two platforms |
