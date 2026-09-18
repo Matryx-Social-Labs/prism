@@ -54,7 +54,7 @@ describe("Onboarding — three steps of the reservation form", () => {
     // Pre-set from the profession, then narrowed to a beat and widened by a subject.
     expect(await screen.findByRole("button", { name: /Business & Markets/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Stock market" }));
-    await userEvent.click(screen.getByRole("button", { name: /^SPO\s*Sports/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Sports/ }));
     await userEvent.click(screen.getByRole("button", { name: "Build my feed" }));
 
     expect(saved()).toEqual({ lens: "markets", region: "IN", state: "IN-KL", interests: ["finance:markets", "sports"], languages: ["en"] });

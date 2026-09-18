@@ -26,7 +26,7 @@ const KEY = "prism.profile.v1";
 const SAVED = { lens: "markets", region: "IN", state: "IN-KL", interests: ["politics:elections"], languages: ["hi", "en"] };
 const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");
 const stateSelect = () => screen.getByRole("combobox", { name: "Your state" });
-const save = () => userEvent.click(screen.getByRole("button", { name: /Save and re-sort my chart/ }));
+const save = () => userEvent.click(screen.getByRole("button", { name: /Save and re-sort my record/ }));
 // Everything the form pulls has landed, otherwise a click races the taxonomy.
 const settled = async () => {
   await screen.findByRole("option", { name: "Karnataka" });

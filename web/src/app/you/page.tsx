@@ -9,7 +9,7 @@ import { ProfessionField, SectorsField, StateField, useProfessionGroups } from "
 import { SectionHead } from "@/components/SectionHead";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { ProfessionOption } from "@/lib/api";
-import { shortDate } from "@/lib/dateline";
+import { relativeTime } from "@/lib/dateline";
 import { loadProfile, saveProfile } from "@/lib/profile";
 import { clearSession, useSession } from "@/lib/session";
 import { getWatchlist, watchlistEvents, type WatchEvent, type WatchItem } from "@/lib/watchlist";
@@ -72,75 +72,73 @@ export default function YouPage() {
   const identity = session ? `Signed in as ${session.email}.` : "Your profile lives in this browser; no account needed.";
 
   return (
-    <div className="mx-auto max-w-[720px] px-5 pb-24 sm:px-8 lg:pb-16">
+    <div className="mx-auto max-w-[var(--reading)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:max-w-[760px] lg:pb-16">
       <Masthead dateline={null} />
-      <h1 className="pt-4 font-display text-[26px] uppercase leading-none tracking-[0.03em]">You</h1>
-      <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
-        Everything your chart is built from. {identity}
-      </p>
+      <div className="lg:pt-6">
+        <SectionHead id="you-title" title="You" hint={`Everything your record is built from. ${identity}`} />
 
-      {loaded && (
-        <form className="mt-4" onSubmit={(e) => { e.preventDefault(); save(); }}>
-          <StateField value={state} onChange={setState} />
-          <ProfessionField groups={groups} profession={profession} lens={lens} onPick={pickProfession} />
-          <SectorsField taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
-          <div className="rule-live flex flex-wrap items-center gap-x-5 gap-y-3 py-6">
-            <button type="submit" className="rounded-full px-6 py-3 text-[14.5px] font-semibold transition hover:opacity-85" style={{ background: "var(--ink)", color: "var(--bg)" }}>
-              Save and re-sort my chart
-            </button>
-            <Link href="/feed" className="text-[14px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>Cancel</Link>
-          </div>
-        </form>
-      )}
+        {loaded && (
+          <form className="card p-5" onSubmit={(e) => { e.preventDefault(); save(); }}>
+            <StateField value={state} onChange={setState} />
+            <ProfessionField groups={groups} profession={profession} lens={lens} onPick={pickProfession} />
+            <SectorsField taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
+            <div className="flex flex-wrap items-center gap-2 border-t pt-5" style={{ borderColor: "var(--line)" }}>
+              <button type="submit" className="btn btn-primary">Save and re-sort my record</button>
+              <Link href="/feed" className="btn btn-ghost">Cancel</Link>
+            </div>
+          </form>
+        )}
 
-      <section className="mt-6" aria-labelledby="following-title">
-        <SectionHead id="following-title" title="Following" count={session ? follows.length : undefined} />
-        {session ? (
-          <>
-            {follows.length > 0 ? (
-              <ul className="flex flex-wrap gap-x-4 gap-y-2 font-mono text-[12px]" style={{ color: "var(--ink)" }}>
-                {follows.map((w) => <li key={`${w.kind}:${w.value}`}>{w.value}</li>)}
-              </ul>
+        <section className="mt-8" aria-labelledby="following-title">
+          <SectionHead id="following-title" title="Following" count={session ? follows.length : undefined}
+            right={session ? <Link href="/watchlist" className="btn btn-secondary btn-sm">Watchlist</Link> : undefined} />
+          {session ? (
+            <div className="card">
+              {follows.length > 0 ? (
+                <ul className="flex flex-wrap gap-2">
+                  {follows.map((w) => <li key={`${w.kind}:${w.value}`} className="chip h-8 font-mono text-[12px]">{w.value}</li>)}
+                </ul>
+              ) : (
+                <p className="text-[14.5px]" style={{ color: "var(--ink-2)" }}>Nothing followed yet. Follow tickers and sectors from any story.</p>
+              )}
+              {recent.length > 0 && (
+                <ol className="mt-4 flex flex-col divide-y border-t pt-2" style={{ borderColor: "var(--line)" }}>
+                  {recent.slice(0, 3).map((e) => (
+                    <li key={e.id} style={{ borderColor: "var(--line)" }}>
+                      <Link href={`/story/${e.id}`} className="block py-3">
+                        <p className="font-record text-[16px] font-medium leading-[1.35]">{e.title}</p>
+                        <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{relativeTime(e.last_updated_at)}</p>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          ) : (
+            <div className="card flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[14.5px]" style={{ color: "var(--ink-2)" }}>Tickers and sectors you follow collect their stories here.</p>
+              <Link href="/signin?next=/you" className="btn btn-secondary btn-sm">Sign in to follow</Link>
+            </div>
+          )}
+        </section>
+
+        <section className="mt-8" aria-labelledby="account-title">
+          <SectionHead id="account-title" title="Account" />
+          <div className="card divide-y p-0" style={{ borderColor: "var(--line)" }}>
+            <div className="flex min-h-[56px] items-center px-4" style={{ borderColor: "var(--line)" }}>
+              <span className="text-[15px]">Theme</span>
+              <span className="ml-auto"><ThemeToggle /></span>
+            </div>
+            {session ? (
+              <button onClick={signOut} className="flex min-h-[56px] w-full items-center px-4 text-left text-[15px] font-semibold" style={{ color: "var(--danger)", borderColor: "var(--line)" }}>
+                Sign out
+              </button>
             ) : (
-              <p className="text-[14px]" style={{ color: "var(--ink-muted)" }}>Nothing followed yet. Follow tickers and sectors from any story.</p>
+              <Link href="/signin" className="flex min-h-[56px] items-center px-4 text-[15px] font-semibold" style={{ borderColor: "var(--line)" }}>Sign in</Link>
             )}
-            <Link href="/watchlist" className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
-              Manage the watchlist →
-            </Link>
-            {recent.length > 0 && (
-              <ol className="mt-4">
-                {recent.slice(0, 3).map((e) => (
-                  <li key={e.id} className="rule-live">
-                    <Link href={`/story/${e.id}`} className="block py-3">
-                      <p className="text-[15px] font-medium leading-[1.4]">{e.title}</p>
-                      <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{shortDate(e.last_updated_at)}</p>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </>
-        ) : (
-          <Link href="/signin" className="text-[14.5px] font-medium underline underline-offset-4" style={{ color: "var(--ink)" }}>
-            Sign in to follow tickers and sectors →
-          </Link>
-        )}
-      </section>
-
-      <section className="mt-10" aria-labelledby="account-title">
-        <SectionHead id="account-title" title="Account" />
-        <div className="rule-live flex min-h-[52px] items-center">
-          <span className="text-[14.5px]">Theme</span>
-          <span className="ml-auto"><ThemeToggle /></span>
-        </div>
-        {session ? (
-          <button onClick={signOut} className="rule-live flex min-h-[52px] w-full items-center text-left text-[14.5px] font-medium" style={{ color: "var(--danger)" }}>
-            Sign out
-          </button>
-        ) : (
-          <Link href="/signin" className="rule-live flex min-h-[52px] items-center text-[14.5px] font-medium">Sign in</Link>
-        )}
-      </section>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

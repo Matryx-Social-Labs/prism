@@ -70,108 +70,94 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[720px] px-5 pb-20 pt-9 sm:px-8">
-      {/* The three steps as codes on a rule, the current one underlined, the
-          way the sector strip marks the active subject. Earlier steps are
-          links back; later ones are not yet reachable. */}
-      <nav
-        className="mb-8 flex flex-wrap gap-x-4 border-b font-mono text-[11px] uppercase tracking-[0.06em]"
-        style={{ borderColor: "var(--line)" }}
-        aria-label={`Step ${step + 1} of 3`}
-      >
+    <div className="mx-auto max-w-[var(--reading)] px-5 pb-20 pt-8 sm:px-8 lg:max-w-[760px]">
+      {/* Three steps as a stepper: the current one filled, earlier ones are links
+          back, later ones not yet reachable. Nothing blocks reading. */}
+      <nav className="mb-7 flex items-center gap-2" aria-label={`Step ${step + 1} of 3`}>
         {STEPS.map((label, i) => (
           <button
             key={label}
             onClick={() => i < step && setStep(i)}
             disabled={i > step}
             aria-current={i === step ? "step" : undefined}
-            className="flex h-11 shrink-0 items-end border-b-2 pb-2 pt-3 leading-none disabled:cursor-default"
-            style={{
-              borderColor: i === step ? "var(--ink)" : "transparent",
-              color: i === step ? "var(--ink)" : "var(--ink-faint)",
-            }}
+            className="flex min-h-11 items-center gap-2 disabled:cursor-default"
           >
-            <span className="mr-1.5" style={{ color: i === step ? "var(--ink)" : "var(--ink-faint)" }}>{i + 1}</span>
-            <span className={i === step ? "" : "sr-only sm:not-sr-only"}>{label}</span>
+            <span
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[12.5px] font-semibold"
+              style={i === step ? { background: "var(--accent)", color: "var(--on-accent)" } : i < step ? { background: "var(--accent-soft)", color: "var(--accent)" } : { background: "var(--sunken)", color: "var(--ink-3)" }}
+            >
+              {i + 1}
+            </span>
+            <span className={`text-[13.5px] font-medium ${i === step ? "" : "sr-only sm:not-sr-only"}`} style={{ color: i === step ? "var(--ink)" : "var(--ink-3)" }}>{label}</span>
+            {i < STEPS.length - 1 && <span aria-hidden className="ml-1 hidden h-px w-6 sm:inline-block" style={{ background: "var(--line-strong)" }} />}
           </button>
         ))}
       </nav>
 
-      {step === 0 && (
-        <section>
-          <h1 className="text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">Which state are you in?</h1>
-          <p className="mt-3 max-w-[52ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-            You can change any of this later, under You.
-          </p>
-          <div className="mt-4">
-            <StateField value={state} onChange={setState} />
-          </div>
-        </section>
-      )}
-
-      {step === 1 && (
-        <section>
-          <h1 className="text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">What do you do?</h1>
-          <div className="mt-4">
-            {session && (
-              <Field label="Your name" hint="For the account you are signed in to.">
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" aria-label="Your name" autoComplete="name"
-                  className="h-12 w-full max-w-[360px] border px-4 text-[16px] outline-none"
-                  style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }} />
-              </Field>
-            )}
-            <ProfessionField groups={groups} profession={profession?.slug ?? null} lens={lens} onPick={pickProfession} />
-            {profession && profession.interests.length > 0 && (
-              <p className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-                Subjects pre-set from your profession. Refine them in the next step.
-              </p>
-            )}
-          </div>
-        </section>
-      )}
-
-      {step === 2 && (
-        <section>
-          <h1 className="text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">What do you follow?</h1>
-          <div className="mt-4">
-            <SectorsField taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
-          </div>
-          {session && (
-            <label className="mt-6 flex items-start gap-2.5 text-[13px] leading-[1.5]" style={{ color: "var(--ink-muted)" }}>
-              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>I agree to the Terms and to Prism creating an account for me and processing my email per the privacy policy.</span>
-            </label>
-          )}
-        </section>
-      )}
-
-      <div className="mt-[34px] flex gap-3">
-        {step > 0 && (
-          <button
-            onClick={() => setStep(step - 1)}
-            className="rounded-full border px-6 py-[13px] text-sm font-semibold"
-            style={{ borderColor: "var(--line)", color: "var(--ink-muted)" }}
-          >
-            Back
-          </button>
+      <div className="card p-5 sm:p-6">
+        {step === 0 && (
+          <section>
+            <h1 className="font-record text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">Which state are you in?</h1>
+            <p className="mt-2 max-w-[52ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>You can change any of this later, under You.</p>
+            <div className="mt-4">
+              <StateField value={state} onChange={setState} />
+            </div>
+          </section>
         )}
-        <button
-          onClick={() => (step < 2 ? setStep(step + 1) : finish())}
-          disabled={saving || (step === 2 && !!session && (!name.trim() || !profession || !consent))}
-          className="flex-1 rounded-full px-7 py-[13px] text-sm font-semibold transition hover:opacity-85 disabled:opacity-45"
-          style={{ background: "var(--ink)", color: "var(--bg)" }}
-        >
-          {saving ? "Saving…" : step < 2 ? "Continue" : "Build my feed"}
-        </button>
+
+        {step === 1 && (
+          <section>
+            <h1 className="font-record text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">What do you do?</h1>
+            <div className="mt-4">
+              {session && (
+                <Field label="Your name" hint="For the account you are signed in to.">
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" aria-label="Your name" autoComplete="name" className="input max-w-[360px]" />
+                </Field>
+              )}
+              <ProfessionField groups={groups} profession={profession?.slug ?? null} lens={lens} onPick={pickProfession} />
+              {profession && profession.interests.length > 0 && (
+                <p className="text-[13.5px]" style={{ color: "var(--ink-2)" }}>Subjects pre-set from your profession. Refine them in the next step.</p>
+              )}
+            </div>
+          </section>
+        )}
+
+        {step === 2 && (
+          <section>
+            <h1 className="font-record text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">What do you follow?</h1>
+            <div className="mt-4">
+              <SectorsField taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
+            </div>
+            {session && (
+              <label className="mt-5 flex items-start gap-2.5 text-[13.5px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
+                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]" />
+                <span>I agree to the Terms and to Prism creating an account for me and processing my email per the privacy policy.</span>
+              </label>
+            )}
+          </section>
+        )}
+
+        <div className="mt-6 flex gap-2 border-t pt-5" style={{ borderColor: "var(--line)" }}>
+          {step > 0 && (
+            <button onClick={() => setStep(step - 1)} className="btn btn-secondary btn-lg">Back</button>
+          )}
+          <button
+            onClick={() => (step < 2 ? setStep(step + 1) : finish())}
+            disabled={saving || (step === 2 && !!session && (!name.trim() || !profession || !consent))}
+            className="btn btn-primary btn-lg flex-1"
+          >
+            {saving ? "Saving…" : step < 2 ? "Continue" : "Build my feed"}
+          </button>
+        </div>
       </div>
-      <p className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+      <p className="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-[13px]" style={{ color: "var(--ink-3)" }}>
         <span>
           {session
             ? `Signed in as ${session.email}. This sets up your feed.`
             : "No account needed. Your profile lives in this browser."}
         </span>
         {/* Nothing blocks reading: the way out is on every step. */}
-        <button onClick={() => router.push("/feed")} className="underline underline-offset-4" style={{ color: "var(--ink)" }}>
+        <button onClick={() => router.push("/feed")} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
           Skip for now
         </button>
       </p>

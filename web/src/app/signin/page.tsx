@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useState } from "react";
 
+import { Brand } from "@/components/Brand";
 import { requestMagicLink } from "@/lib/session";
 
 export default function SignInPage() {
@@ -39,57 +40,54 @@ function SignIn() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
-      <h1 className="text-[30px] font-medium leading-[1.15] text-balance">Sign in to Prism</h1>
-      <p className="mt-2.5 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-        Enter your email and we&apos;ll send a one-time sign-in link. No password.
-        New here? You&apos;ll set up your chart right after.
-      </p>
+    <div className="mx-auto flex min-h-[70dvh] w-full max-w-[440px] flex-col justify-center px-5 py-14">
+      <div className="mb-6 lg:hidden"><Brand size={26} /></div>
+      <div className="card p-6">
+        <h1 className="font-record text-[30px] font-medium leading-[1.15] text-balance">Sign in to Prism</h1>
+        <p className="mt-2 text-[15px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
+          Enter your email and we&apos;ll send a one-time sign-in link. No password.
+          New here? You&apos;ll set up your record right after.
+        </p>
 
-      {sent ? (
-        <div className="rule-live mt-8 border-b py-6" style={{ borderBottomColor: "var(--line)" }}>
-          <p className="text-[15px] font-medium">Check your inbox.</p>
-          <p className="mt-2 text-[13.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-            If you have an account or want one, a sign-in link is on its way to{" "}
-            <span className="font-mono" style={{ color: "var(--ink)" }}>{email}</span>
-            . It expires in 15 minutes.
-          </p>
-        </div>
-      ) : (
-        <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[13.5px] font-medium" style={{ color: "var(--ink)" }}>Email</span>
-            <input
-              type="email"
-              required
-              autoFocus
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="h-12 border px-4 text-[16px] outline-none"
-              style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: "var(--ink)" }}
-            />
-          </label>
-
-          {error && (
-            <p className="text-[13px]" style={{ color: "var(--danger)" }}>
-              {error}
+        {sent ? (
+          <div className="mt-6 rounded-[var(--r-md)] px-4 py-4" style={{ background: "var(--accent-soft)" }} role="status">
+            <p className="text-[15px] font-semibold">Check your inbox.</p>
+            <p className="mt-1.5 text-[14px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
+              If you have an account or want one, a sign-in link is on its way to{" "}
+              <span className="font-mono" style={{ color: "var(--ink)" }}>{email}</span>
+              . It expires in 15 minutes.
             </p>
-          )}
+          </div>
+        ) : (
+          <form onSubmit={submit} className="mt-6 flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="field-label">Email</span>
+              <input
+                type="email"
+                required
+                autoFocus
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="input"
+              />
+            </label>
 
-          <button
-            type="submit"
-            disabled={busy || !email.trim()}
-            className="mt-1 rounded-full px-5 py-3 text-[14px] font-semibold transition-opacity disabled:opacity-45"
-            style={{ background: "var(--ink)", color: "var(--bg)" }}
-          >
-            {busy ? "Sending…" : "Email me a sign-in link"}
-          </button>
-        </form>
-      )}
+            {error && (
+              <p className="text-[13.5px] font-medium" style={{ color: "var(--danger)" }} role="alert">
+                {error}
+              </p>
+            )}
 
-      <Link href={back} className="mt-8 text-[13.5px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>
+            <button type="submit" disabled={busy || !email.trim()} className="btn btn-primary btn-lg mt-1">
+              {busy ? "Sending…" : "Email me a sign-in link"}
+            </button>
+          </form>
+        )}
+      </div>
+
+      <Link href={back} className="mt-6 self-center text-[14px] font-medium underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>
         {back.startsWith("/story/") ? "Back to the story, without an account" : "Keep reading without an account"}
       </Link>
     </div>

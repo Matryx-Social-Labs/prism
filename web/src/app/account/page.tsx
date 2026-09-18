@@ -25,26 +25,28 @@ export default function AccountPage() {
   if (!session) return null;
 
   return (
-    <div className="mx-auto flex min-h-[60vh] w-full max-w-[420px] flex-col justify-center px-5 py-16">
-      <h1 className="font-display text-[26px] uppercase leading-none tracking-[0.03em]">Account</h1>
-      <dl className="rule-live mt-6 border-b py-4" style={{ borderBottomColor: "var(--line)" }}>
-        <dt className="text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>Signed in as</dt>
-        <dd className="mt-1 font-mono text-[14.5px]" style={{ color: "var(--ink)" }}>
-          {session.email}
-        </dd>
-      </dl>
-      <button
-        onClick={() => {
-          clearSession();
-          router.replace("/feed");
-        }}
-        className="mt-6 self-start rounded-full border px-5 py-2.5 text-[14px] font-semibold"
-        style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
-      >
-        Sign out
-      </button>
-      <Link href="/feed" className="mt-6 text-[13.5px] underline underline-offset-4" style={{ color: "var(--ink-muted)" }}>
-        Back to the chart
+    <div className="mx-auto flex min-h-[60dvh] w-full max-w-[440px] flex-col justify-center px-5 py-14">
+      <div className="card p-6">
+        <h1 className="font-record text-[28px] font-medium leading-[1.15]">Account</h1>
+        <dl className="mt-5 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+          <dt className="field-label" style={{ color: "var(--ink-3)" }}>Signed in as</dt>
+          <dd className="mt-1 font-mono text-[14.5px]" style={{ color: "var(--ink)" }}>{session.email}</dd>
+        </dl>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              clearSession();
+              router.replace("/feed");
+            }}
+            className="btn btn-secondary"
+          >
+            Sign out
+          </button>
+          <Link href="/you" className="btn btn-ghost">Your profile</Link>
+        </div>
+      </div>
+      <Link href="/feed" className="mt-6 self-center text-[14px] font-medium underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>
+        Back to today&rsquo;s record
       </Link>
     </div>
   );

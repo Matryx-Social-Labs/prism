@@ -19,11 +19,12 @@ import { fetchProfessions, type ProfessionGroup, type ProfessionOption, type Tax
 import { lensMeta } from "@/lib/lenses";
 import { SECTOR_GROUPS } from "@/lib/sectors";
 
-export function Field({ label, hint, flush = false, children }: { label: string; hint?: string; /** The control ends on the next field's rule (a tab rail), so no bottom padding. */ flush?: boolean; children: React.ReactNode }) {
+export function Field({ label, hint, flush = false, children }: { label: string; hint?: string; /** Kept for callers; the field's padding is uniform in the Spectrum world. */ flush?: boolean; children: React.ReactNode }) {
+  void flush;
   return (
-    <div className={`rule-live pt-6 ${flush ? "" : "pb-6"}`}>
-      <p className="text-[13.5px] font-medium" style={{ color: "var(--ink)" }}>{label}</p>
-      {hint && <p className="mt-1 max-w-[52ch] text-[13.5px] leading-[1.55]" style={{ color: "var(--ink-muted)" }}>{hint}</p>}
+    <div className="field">
+      <p className="field-label">{label}</p>
+      {hint && <p className="field-hint">{hint}</p>}
       <div className="mt-3">{children}</div>
     </div>
   );
@@ -61,8 +62,8 @@ export function ProfessionField({
         value={profession ?? ""}
         onChange={(e) => { const p = all.find((o) => o.slug === e.target.value); if (p) onPick(p); }}
         aria-label="Your profession"
-        className="h-12 w-full border px-4 text-[16px] outline-none"
-        style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", color: profession ? "var(--ink)" : "var(--ink-muted)" }}
+        className="input"
+        style={{ color: profession ? "var(--ink)" : "var(--ink-3)" }}
       >
         <option value="" disabled>Choose your profession…</option>
         {groups.map((g) => (
@@ -71,9 +72,9 @@ export function ProfessionField({
           </optgroup>
         ))}
       </select>
-      <p className="mt-3 flex items-baseline gap-2 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        <span aria-hidden className="inline-block h-[7px] w-[7px] translate-y-[-1px] rounded-full" style={{ background: meta.color }} />
-        <span>Reads as <span className="font-medium" style={{ color: "var(--ink)" }}>{meta.name}</span>: {meta.plain ?? meta.tagline}.</span>
+      <p className="mt-3 flex items-baseline gap-2 text-[13.5px]" style={{ color: "var(--ink-2)" }}>
+        <span aria-hidden className="inline-block h-2 w-2 translate-y-[-1px] rounded-full" style={{ background: meta.color }} />
+        <span>Reads as <span className="font-semibold" style={{ color: "var(--ink)" }}>{meta.name}</span>: {meta.plain ?? meta.tagline}.</span>
       </p>
     </Field>
   );
@@ -100,30 +101,30 @@ export function SectorsField({ taxonomy, picks, onPicks }: { taxonomy: TaxonomyS
   };
   return (
     <Field label="What you follow" hint="Follow nothing and the chart is everyone's. Follow a subject and For you appears; narrow it to the beats you actually read.">
-      <ul>
+      <ul className="flex flex-col gap-2">
         {SECTOR_GROUPS.map((g) => {
           const on = groupOn(picks, g.sectors);
           const subs = g.sectors.flatMap((s) => (taxonomy.find((t) => t.slug === s)?.subsectors ?? []).map((sub) => ({ sector: s, ...sub })));
           const nsubs = g.sectors.reduce((n, s) => n + (Array.isArray(picks[s]) ? (picks[s] as string[]).length : 0), 0);
           return (
-            <li key={g.slug} className="rule-live">
+            <li key={g.slug} className="row-card overflow-hidden" style={on ? { borderColor: "var(--accent)" } : undefined}>
               <button type="button" onClick={() => toggleGroup(g.sectors)} aria-pressed={on}
-                className="flex min-h-[48px] w-full items-baseline gap-3 py-3 text-left">
-                <span className="w-9 font-mono text-[12px] tracking-[0.06em]" style={{ color: on ? "var(--ink)" : "var(--ink-faint)" }}>{g.code}</span>
-                <span className="text-[15.5px] font-medium" style={{ color: on ? "var(--ink)" : "var(--ink-muted)" }}>{g.name}</span>
-                <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }}>
-                  {on ? (nsubs ? `${nsubs} ${nsubs === 1 ? "beat" : "beats"}` : "following") : ""}
+                className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2.5 text-left">
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: on ? "var(--accent)" : "var(--line-strong)", background: on ? "var(--accent)" : "transparent" }} aria-hidden>
+                  {on && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>}
+                </span>
+                <span className="text-[15px] font-medium" style={{ color: on ? "var(--ink)" : "var(--ink-2)" }}>{g.name}</span>
+                <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-3)" }}>
+                  {on ? (nsubs ? `${nsubs} ${nsubs === 1 ? "beat" : "beats"}` : "following") : g.code}
                 </span>
               </button>
               {on && subs.length > 0 && (
-                <div className="flex flex-wrap gap-2 pb-4 pl-12">
+                <div className="flex flex-wrap gap-2 border-t px-4 py-3" style={{ borderColor: "var(--line)" }}>
                   {subs.map((sub) => {
                     const cur = picks[sub.sector];
                     const sel = Array.isArray(cur) && cur.includes(sub.slug);
                     return (
-                      <button key={`${sub.sector}:${sub.slug}`} type="button" onClick={() => toggleSub(sub.sector, sub.slug)} aria-pressed={sel}
-                        className="border px-3 py-1.5 text-[13px] transition"
-                        style={{ borderColor: sel ? "var(--ink)" : "var(--line-strong)", background: sel ? "var(--bg-sunken)" : "transparent", color: sel ? "var(--ink)" : "var(--ink-muted)" }}>
+                      <button key={`${sub.sector}:${sub.slug}`} type="button" onClick={() => toggleSub(sub.sector, sub.slug)} aria-pressed={sel} className="chip h-8 px-3 text-[13px]">
                         {sub.name}
                       </button>
                     );
