@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Script from "next/script";
+import { PLAUSIBLE_DOMAIN } from "@/lib/analytics";
 import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, JetBrains_Mono, Newsreader, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu, Tiro_Devanagari_Hindi } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -92,6 +94,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to content
         </a>
+        {/* Aggregate counts only, cookieless (lib/analytics.ts); absent until the domain is configured. */}
+        {PLAUSIBLE_DOMAIN && <Script defer data-domain={PLAUSIBLE_DOMAIN} src="https://plausible.io/js/script.js" strategy="afterInteractive" />}
         <SiteHeader />
         <main id="main-content" tabIndex={-1} className="w-full flex-1 outline-none">{children}</main>
         <BottomTabBar />

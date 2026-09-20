@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { track } from "@/lib/analytics";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail, type OutletRef, type TrendingStoryDetail } from "@/lib/api";
 import { headlineByline } from "@/lib/headline";
@@ -214,6 +215,7 @@ export function StoryView({ event }: { event: EventDetail }) {
     readerPicked.current = true;
     setFlipped(true);
     setLens(slug);
+    track("Lens", { lens: slug, locked: isLocked(slug) });
     if (!scroll) return;
     document.getElementById("lens-brief")?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",

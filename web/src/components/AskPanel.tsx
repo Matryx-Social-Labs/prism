@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@/lib/analytics";
 import { Speech } from "@/components/icons";
 import { AskShell, type Turn } from "@/components/AskShell";
 
@@ -69,6 +70,7 @@ export function AskPanel({
     setBusy(true);
     setInput("");
     setOpen(true);
+    track("Ask");
 
     // Capture THIS answer's index at submit time. Targeting `prev.length - 1`
     // meant a second question's turn could receive the first's tokens, and its

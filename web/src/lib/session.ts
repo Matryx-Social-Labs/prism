@@ -6,6 +6,7 @@
 // delivery is server-side and pluggable — in dev the sign-in link is printed
 // to the API logs (console sender), so the flow works with no email provider.
 
+import { track } from "@/lib/analytics";
 import { useEffect, useState } from "react";
 
 import { API_URL } from "@/lib/api";
@@ -110,6 +111,7 @@ export async function verifyMagicLink(token: string): Promise<VerifyResult> {
     email: string;
     needs_profile: boolean;
   };
+  track("Sign in", { method: "link" });
   return {
     session: { token: d.token, userId: d.user_id, email: d.email },
     needsProfile: d.needs_profile,
@@ -125,6 +127,7 @@ export async function signInWithGoogle(credential: string): Promise<VerifyResult
   });
   if (!res.ok) throw new Error(await detail(res, "Google sign-in failed"));
   const d = (await res.json()) as { token: string; user_id: string; email: string; needs_profile: boolean };
+  track("Sign in", { method: "google" });
   return { session: { token: d.token, userId: d.user_id, email: d.email }, needsProfile: d.needs_profile };
 }
 
