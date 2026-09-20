@@ -19,7 +19,7 @@ function story(over: Partial<TrendingStory> = {}): TrendingStory {
   return {
     slug: "kerala-power", label: "CPI(M) · Pinarayi Vijayan", cast: ["CPI(M)", "Pinarayi Vijayan"],
     source_count: 4, velocity: 3, developments: 5, sector: "politics",
-    hero_title: "Kerala power crisis deepens", hero_image: null, route: null,
+    hero_title: "Kerala power crisis deepens", hero_image: null, route: null, photos: [],
     hero_event_id: "ev-1", first_seen_at: iso(6 * DAY), last_updated_at: iso(2 * 3_600_000),
     ...over,
   };
@@ -137,5 +137,30 @@ describe("Trending — the chart of arcs", () => {
     fetchTrending.mockRejectedValue(new Error("down"));
     render(<TrendingPage />);
     expect(await screen.findByText(/unreachable/)).toBeInTheDocument();
+  });
+});
+
+// The story's picture is many pictures (founder, 2026-09-21): up to three of
+// the developments' photographs, credited, fanned on the row; a "+N" counts
+// the rest; nothing when there are none.
+describe("Stories — the photo pile", () => {
+  const outlet = { slug: "thehindu", publisher: "thehindu", name: "The Hindu", code: "TH", origin: "national", language: "en", domain: "thehindu.com" };
+  const pics = (n: number) => Array.from({ length: n }, (_, i) => ({ url: `https://x/${i}.jpg`, article_url: `https://h/${i}`, outlet }));
+
+  it("shows at most three photographs, the front one credited, and counts the rest", async () => {
+    fetchTrending.mockResolvedValue([story({ photos: pics(4) })]);
+    render(<TrendingPage />);
+    const pile = await screen.findByRole("figure", { name: "4 photographs from the reports" });
+    // Three photographs (the fourth image is the outlet's favicon on the front card).
+    expect(pile.querySelectorAll('img[alt^="Photo:"]')).toHaveLength(3);
+    expect(pile.querySelector('img[alt^="Photo:"]')).toHaveAttribute("alt", "Photo: The Hindu");
+    expect(pile).toHaveTextContent("+1");
+  });
+
+  it("a story without photographs has no pile", async () => {
+    fetchTrending.mockResolvedValue([story({ photos: [] })]);
+    render(<TrendingPage />);
+    await screen.findAllByText(/CPI\(M\)/);
+    expect(screen.queryByRole("figure")).toBeNull();
   });
 });

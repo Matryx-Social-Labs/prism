@@ -272,9 +272,17 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   return data.items;
 }
 
+export interface StoryPhoto {
+  url: string;
+  article_url: string | null;
+  outlet: OutletRef | null;
+}
+
 export interface TrendingStory {
   slug: string;
   label: string;
+  /** Up to four distinct photographs across the story's developments, credited. */
+  photos: StoryPhoto[];
   cast: string[];
   source_count: number;
   velocity: number; // distinct new outlets in the last 6h

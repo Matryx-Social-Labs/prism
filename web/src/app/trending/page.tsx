@@ -8,6 +8,7 @@ import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { StatusPill } from "@/components/StatusPill";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
+import { PhotoStack } from "@/components/PhotoStack";
 import { arcHref, isStale, spanDays } from "@/lib/arc";
 import { relativeTime } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
@@ -142,7 +143,9 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
 
   return (
     <li>
-      <Link href={arcHref(story)} className={`row-card group ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"}`} style={stale ? { opacity: 0.75 } : undefined}>
+      <Link href={arcHref(story)} className={`row-card group ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"} ${story.photos?.length ? "flex items-start gap-4" : ""}`} style={stale ? { opacity: 0.75 } : undefined}>
+        {story.photos?.length ? <PhotoStack photos={story.photos} size={lead ? "lead" : "row"} /> : null}
+        <div className="min-w-0 flex-1">
         <div className="meta-line">
           {group && <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{group.name}</span>}
           {group && <span className="dot" />}
@@ -177,6 +180,7 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
           </span>
           <span className="flex-1" />
           <StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : "Grouping under review"} />
+        </div>
         </div>
       </Link>
     </li>

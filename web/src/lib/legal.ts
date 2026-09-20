@@ -16,16 +16,36 @@ export const LEGAL_UPDATED = "2026-09-20";
 
 /** A paragraph, or a bullet list. */
 export type Block = string | string[];
-export type Section = { heading: string; blocks: Block[] };
-export type LegalDoc = { slug: "privacy" | "terms" | "refunds"; title: string; lede: string; sections: Section[] };
+/** `short`: the section in one plain sentence, printed under its heading. */
+export type Section = { heading: string; short?: string; blocks: Block[] };
+export type LegalDoc = {
+  slug: "privacy" | "terms" | "refunds";
+  title: string;
+  kind: string; // the mono label: Policy · Terms
+  lede: string;
+  /** The whole document in a few plain lines, for the rail and the phone's top. */
+  inShort: string[];
+  sections: Section[];
+};
+
+/** A stable anchor for a section heading. */
+export const anchor = (heading: string) => heading.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 export const PRIVACY: LegalDoc = {
   slug: "privacy",
   title: "Privacy policy",
+  kind: "Policy",
+  inShort: [
+    "Read without an account and we know nothing about you.",
+    "An account is your email, plus what you choose to tell us at onboarding.",
+    "Your questions are stored to keep the thread; nothing is sold or used for ads.",
+    "Ask, and we delete it all.",
+  ],
   lede: `Prism is owned and operated by ${LEGAL_ENTITY} ("Prism", "we"), and built and run with ${LEGAL_PARTNER} as its technology partner. This page says what we collect, why, where it goes, and how to have it removed. It is written to India's Digital Personal Data Protection Act, 2023, under which ${LEGAL_ENTITY} is the data fiduciary.`,
   sections: [
     {
       heading: "What we collect",
+      short: "Nothing while you read; your email and what you tell us once you sign in.",
       blocks: [
         "Reading without an account: nothing that identifies you. One cookie, prism.returning, tells the front page you have been here before so it can take you straight to the chart. Your browser keeps a few settings on your device (theme, the scope you last chose, the last story you opened) and sends them nowhere.",
         "Asking a question without an account: the question and the answer are stored against a random session id that lives in your browser. To keep the free box open for everyone we count questions per session and per hashed IP address; the hash cannot be turned back into your address and the counter expires within a day.",
@@ -36,6 +56,7 @@ export const PRIVACY: LegalDoc = {
     },
     {
       heading: "Why we collect it",
+      short: "To sign you in, show your state, answer your questions and bill you — nothing else.",
       blocks: [
         [
           "To sign you in and keep you signed in.",
@@ -50,6 +71,7 @@ export const PRIVACY: LegalDoc = {
     },
     {
       heading: "Who processes it for us",
+      short: "Our hosts, our email provider, Google if you use it, Razorpay when you pay, and the model that answers your question.",
       blocks: [
         [
           `${LEGAL_PARTNER} engineers and operates the service for us, and so has access to production systems on our instructions.`,
@@ -65,12 +87,14 @@ export const PRIVACY: LegalDoc = {
     },
     {
       heading: "Cookies and device storage",
+      short: "One routing cookie and a few settings on your device. No trackers.",
       blocks: [
         "One cookie, prism.returning, for routing a returning reader. On your device: your session token, your profile, your theme, your last scope and your last opened story. There are no advertising cookies and no cross-site tracking. If we add usage analytics we will use a tool that sets no cookies, and say so here.",
       ],
     },
     {
       heading: "How long we keep it",
+      short: "Links minutes, sessions a month, accounts until you delete them.",
       blocks: [
         [
           "A sign-in link works for 15 minutes and once.",
@@ -83,24 +107,29 @@ export const PRIVACY: LegalDoc = {
     },
     {
       heading: "Your rights",
+      short: "See it, fix it, erase it, take it back — one email.",
       blocks: [
         `You can ask what we hold about you, have it corrected, have it erased, or withdraw your consent, which closes the account. You can nominate someone to exercise these rights for you. Write to ${CONTACT_EMAIL} from the address on the account; we act within 30 days. If you are not satisfied you may complain to the Data Protection Board of India.`,
       ],
     },
     {
       heading: "Children",
+      short: "Prism is for adults.",
       blocks: ["Prism is not for anyone under 18, and we do not knowingly hold data about a child. If you believe we do, write to us and we will remove it."],
     },
     {
       heading: "Security",
+      short: "HTTPS everywhere; secrets stored only as hashes.",
       blocks: ["Everything travels over HTTPS. Sign-in links and session tokens are stored only as hashes. Access to production data is limited to the people who run the service."],
     },
     {
       heading: "Changes",
+      short: "Dated here; the ones that matter, announced at sign-in.",
       blocks: ["This page carries the date it last changed. If a change matters to you, we will say so at sign-in before it applies."],
     },
     {
       heading: "Contact",
+      short: "One address for everything, including grievances.",
       blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}. The same address reaches our grievance officer. Matters about the engineering of the service reach ${LEGAL_PARTNER} through us.`],
     },
   ],
@@ -109,28 +138,39 @@ export const PRIVACY: LegalDoc = {
 export const TERMS: LegalDoc = {
   slug: "terms",
   title: "Terms of service",
+  kind: "Terms",
+  inShort: [
+    "Prism indexes published reports and links every one of them.",
+    "Reading is free; be 18, keep your sign-in email safe, do not scrape.",
+    "Briefs and answers are written by a machine from the reports — check them.",
+    "Paid plans renew until you cancel, in one click, with access to the period's end.",
+  ],
   lede: `These are the terms between you and ${LEGAL_ENTITY}, which owns and operates Prism at readprism.news (built and run with ${LEGAL_PARTNER}). They are short on purpose. Using Prism means you accept them.`,
   sections: [
     {
       heading: "What Prism is",
+      short: "An index of reports, grouped by event, with quotes verbatim and a machine-written brief.",
       blocks: [
         "Prism is an index of published news reports. It groups reports of one event into one record, counts which outlets covered it, prints what people said in their own words, and writes a short brief from those reports by machine. Every report links to the outlet that published it. Photographs belong to the outlets and open their reports.",
       ],
     },
     {
       heading: "Your account",
+      short: "18 or older; your sign-in email is the key.",
       blocks: [
         "You must be 18 or older. Your account is yours alone; keep the email address it is tied to secure, since a sign-in link sent to it is a key. Tell us if you think someone else has used it.",
       ],
     },
     {
       heading: "Fair use",
+      short: "Read all you like; do not scrape, script or resell.",
       blocks: [
         "Read as much as you like. Do not scrape, crawl or bulk-download Prism; do not drive the question box with a script; do not resell access or our text; do not try to get around a limit. We may suspend an account that does.",
       ],
     },
     {
       heading: "Content and rights",
+      short: "The reports are the outlets'; our text is ours; share with attribution.",
       blocks: [
         "The reports belong to the outlets that published them. We link to them and quote short passages under fair dealing, with attribution. The text Prism writes (briefs, summaries, the structure of a record) belongs to us. You may share links and short excerpts with attribution to Prism and to the outlet.",
         `An outlet that wants a report removed from the index can write to ${CONTACT_EMAIL}; we act on such requests promptly.`,
@@ -138,12 +178,14 @@ export const TERMS: LegalDoc = {
     },
     {
       heading: "Text written by a machine",
+      short: "Briefs and answers can be wrong; the linked reports are the record.",
       blocks: [
         "Briefs, summaries and answers in the question box are generated by a language model from the linked reports. They can be wrong. Check the reports before you rely on anything, and treat a quote as belonging to the report it is linked to. Nothing on Prism is investment, legal or medical advice; a market read is information, not a recommendation.",
       ],
     },
     {
       heading: "Paid plans",
+      short: "GST-inclusive prices, renewing until you cancel; refunds per the Refund policy.",
       blocks: [
         "The price you see when you subscribe includes GST. A plan renews at the end of each period until you cancel; cancelling takes one click on your account page and access continues to the end of the period you paid for. Refunds follow the Refund policy. If a price changes, we tell you before the renewal it applies to.",
         `Payments are processed by Razorpay and collected by ${LEGAL_PARTNER} on behalf of ${LEGAL_ENTITY} until the LLP's own merchant account is live; that is the name you may see on your statement.`,
@@ -151,28 +193,33 @@ export const TERMS: LegalDoc = {
     },
     {
       heading: "Availability",
+      short: "As it is; features change; notice before anything paid is withdrawn.",
       blocks: [
         "Prism is provided as it is. We may change, add or remove features, and we do not promise uninterrupted service. We will give notice before discontinuing something you pay for.",
       ],
     },
     {
       heading: "Liability",
+      short: "Capped at what you paid us in the last twelve months.",
       blocks: [
         "To the extent the law allows, we are not liable for indirect or consequential loss arising from your use of Prism, and our total liability to you is limited to what you paid us in the twelve months before the claim.",
       ],
     },
     {
       heading: "Ending things",
+      short: "You can leave any time; we can close an account that breaks these terms.",
       blocks: [
         "You can delete your account at any time by writing to us. We can suspend or close an account that breaks these terms, and will say why.",
       ],
     },
     {
       heading: "Law",
+      short: "Indian law; the courts named below.",
       blocks: [`Indian law governs these terms. Disputes go to the courts at ${LEGAL_CITY}.`],
     },
     {
       heading: "Contact",
+      short: "One address.",
       blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}`],
     },
   ],
@@ -181,6 +228,12 @@ export const TERMS: LegalDoc = {
 export const REFUNDS: LegalDoc = {
   slug: "refunds",
   title: "Refund policy",
+  kind: "Policy",
+  inShort: [
+    "Monthly: not refunded; cancelling stops the next charge.",
+    "Yearly and founding: refunded in full within 7 days of any charge.",
+    "Mistakes and duplicates: refunded whenever you tell us.",
+  ],
   lede: `Paid plans are not yet on sale. This policy applies from the day they are. Payments are processed by Razorpay and collected by ${LEGAL_PARTNER} on behalf of ${LEGAL_ENTITY}.`,
   sections: [
     {

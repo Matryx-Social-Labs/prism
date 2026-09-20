@@ -301,9 +301,20 @@ class RouteOut(BaseModel):
     nodes: list[RouteNodeOut]
 
 
+class StoryPhoto(BaseModel):
+    """One outlet's photograph of one development, credited, for the stack on a story row."""
+
+    url: str
+    article_url: str | None = None
+    outlet: OutletRef | None = None
+
+
 class TrendingStoryOut(BaseModel):
     slug: str
     label: str
+    # Up to four distinct photographs across the story's developments (one per
+    # publisher first, placeholders out): the row's stack (DESIGN.md § Images).
+    photos: list[StoryPhoto] = []
     cast: list[str] = []
     source_count: int
     velocity: int  # distinct new outlets in the last 6h

@@ -13,8 +13,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.routes.serialization import outlet_refs
 from api.schemas import TrendingResponse, TrendingStoryDetail
+from common import outlets
 from common.db import get_db
+from common.images import hi_res, placeholder_hashes
 from common.taxonomy import TAXONOMY
 
 router = APIRouter()
@@ -67,6 +70,7 @@ async def trending(
         if STORY_BOUNDARY_STATUS == "verified"
         else [None] * len(rows)
     )
+    photos = await story_photos(db, [r["member_event_ids"] or [] for r in rows])
     return {
         "stories": [
             {
@@ -74,6 +78,7 @@ async def trending(
                 "boundary_status": STORY_BOUNDARY_STATUS,
                 "slug": r["slug"],
                 "label": r["label"],
+                "photos": pics,
                 "cast": (r["cast"] or [])[:3],
                 "source_count": r["source_count"],
                 "velocity": r["velocity"],  # distinct new outlets in the last 6h
@@ -87,9 +92,84 @@ async def trending(
                 "first_seen_at": r["first_seen_at"].isoformat() if r["first_seen_at"] else None,
                 "last_updated_at": r["last_updated_at"].isoformat() if r["last_updated_at"] else None,
             }
-            for r, route in zip(rows, routes, strict=True)
+            for r, route, pics in zip(rows, routes, photos, strict=True)
         ]
     }
+
+
+STORY_PHOTOS = 4
+
+
+async def story_photos(db: AsyncSession, member_ids_per_story: list[list]) -> list[list[dict]]:
+    """Up to STORY_PHOTOS distinct photographs per story, across its developments.
+
+    One query for the page: every member report with a real picture (no
+    placeholder — common/images.placeholder_hashes), newest first. Then per
+    story: one per publisher first (BBC's language editions upload the same
+    picture under new ids), near-identical hashes dropped, credited with the
+    outlet that took it."""
+    from common.imagehash import hamming
+
+    all_ids = sorted({str(e) for ids in member_ids_per_story for e in ids})
+    if not all_ids:
+        return [[] for _ in member_ids_per_story]
+    placeholders = list(await placeholder_hashes(db))
+    reg = await outlets.registry(db)
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT m.event_id, ri.image_url, ri.image_phash, ri.url, s.slug AS source_slug, ri.published_at
+                FROM event_memberships m
+                JOIN articles a ON a.id = m.article_id
+                JOIN raw_items ri ON ri.id = a.raw_item_id
+                JOIN sources s ON s.id = ri.source_id
+                WHERE m.event_id = ANY(CAST(:ids AS uuid[])) AND ri.image_url IS NOT NULL
+                  AND (ri.image_phash IS NULL OR NOT (ri.image_phash = ANY(CAST(:placeholders AS text[]))))
+                ORDER BY ri.published_at DESC NULLS LAST
+                """
+            ),
+            {"ids": all_ids, "placeholders": placeholders},
+        )
+    ).mappings().all()
+    by_event: dict[str, list] = {}
+    for r in rows:
+        by_event.setdefault(str(r["event_id"]), []).append(r)
+    out: list[list[dict]] = []
+    for ids in member_ids_per_story:
+        cands = [r for e in ids for r in by_event.get(str(e), [])]
+        seen_urls: set[str] = set()
+        hashes: list[str] = []
+        picked: list = []
+        for r in cands:
+            if r["image_url"] in seen_urls:
+                continue
+            h = r["image_phash"]
+            if h and any(hamming(h, x) <= 8 for x in hashes):
+                continue
+            seen_urls.add(r["image_url"])
+            if h:
+                hashes.append(h)
+            picked.append(r)
+        # One per publisher first, then the rest.
+        first: set[str] = set()
+        lead, rest = [], []
+        for r in picked:
+            pub = reg[r["source_slug"]].publisher if r["source_slug"] in reg else r["source_slug"]
+            (rest if pub in first else lead).append(r)
+            first.add(pub)
+        chosen = (lead + rest)[:STORY_PHOTOS]
+        out.append(
+            [
+                {
+                    "url": hi_res(r["image_url"]),
+                    "article_url": r["url"],
+                    "outlet": next(iter(outlet_refs([r["source_slug"]], reg)), None),
+                }
+                for r in chosen
+            ]
+        )
+    return out
 
 
 # Shared-cast weight a related story must reach: one actor named by two active
