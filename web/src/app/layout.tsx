@@ -106,7 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             className="mx-auto flex max-w-[var(--shell)] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-[13px] sm:px-8 xl:px-10"
             style={{ color: "var(--ink-3)" }}
           >
-            <span>Prism · Matryx Social Labs</span>
+            <span>Prism · Prism Media Intelligence LLP · built with Matrix Social Labs</span>
             <span className="flex items-center gap-4">
               <Link href="/about" className="hover:underline underline-offset-[3px]">About</Link>
               <Link href="/about#status" className="hover:underline underline-offset-[3px]">What&rsquo;s live</Link>

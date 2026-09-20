@@ -5,7 +5,11 @@
 // product changes, this file changes in the same commit. Facts about the
 // company (entity, contact, city) are the constants at the top.
 
-export const LEGAL_ENTITY = "Matryx Social Labs";
+// Who is who: Prism Media Intelligence LLP owns and operates Prism and is the
+// data fiduciary; Matryx Social Labs Private Limited (brand: Matrix Social
+// Labs) builds and runs it as the technology partner, and so is a processor.
+export const LEGAL_ENTITY = "Prism Media Intelligence LLP";
+export const LEGAL_PARTNER = "Matryx Social Labs Private Limited (Matrix Social Labs)";
 export const CONTACT_EMAIL = "hello@readprism.news";
 export const LEGAL_CITY = "Bengaluru, Karnataka";
 export const LEGAL_UPDATED = "2026-09-20";
@@ -18,7 +22,7 @@ export type LegalDoc = { slug: "privacy" | "terms" | "refunds"; title: string; l
 export const PRIVACY: LegalDoc = {
   slug: "privacy",
   title: "Privacy policy",
-  lede: `Prism is run by ${LEGAL_ENTITY}. This page says what we collect, why, where it goes, and how to have it removed. It is written to India's Digital Personal Data Protection Act, 2023.`,
+  lede: `Prism is owned and operated by ${LEGAL_ENTITY} ("Prism", "we"), and built and run with ${LEGAL_PARTNER} as its technology partner. This page says what we collect, why, where it goes, and how to have it removed. It is written to India's Digital Personal Data Protection Act, 2023, under which ${LEGAL_ENTITY} is the data fiduciary.`,
   sections: [
     {
       heading: "What we collect",
@@ -48,6 +52,7 @@ export const PRIVACY: LegalDoc = {
       heading: "Who processes it for us",
       blocks: [
         [
+          `${LEGAL_PARTNER} engineers and operates the service for us, and so has access to production systems on our instructions.`,
           "Vercel hosts the website.",
           "Railway hosts the API and the database.",
           "Resend delivers our email.",
@@ -96,7 +101,7 @@ export const PRIVACY: LegalDoc = {
     },
     {
       heading: "Contact",
-      blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}. The same address reaches our grievance officer.`],
+      blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}. The same address reaches our grievance officer. Matters about the engineering of the service reach ${LEGAL_PARTNER} through us.`],
     },
   ],
 };
@@ -104,7 +109,7 @@ export const PRIVACY: LegalDoc = {
 export const TERMS: LegalDoc = {
   slug: "terms",
   title: "Terms of service",
-  lede: `These are the terms between you and ${LEGAL_ENTITY} for using Prism at readprism.news. They are short on purpose. Using Prism means you accept them.`,
+  lede: `These are the terms between you and ${LEGAL_ENTITY}, which owns and operates Prism at readprism.news (built and run with ${LEGAL_PARTNER}). They are short on purpose. Using Prism means you accept them.`,
   sections: [
     {
       heading: "What Prism is",

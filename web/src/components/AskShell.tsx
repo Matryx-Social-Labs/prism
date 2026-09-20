@@ -21,8 +21,8 @@ export interface Turn {
   streaming: boolean;
 }
 
-/** The answer's anatomy after the prose: table · what the reports don't say · follow-ups. */
-export function AnswerStructure({ s, citations, onFollowUp }: { s: AskStructure; citations: AskCitation[]; onFollowUp?: (q: string) => void }) {
+/** The answer's anatomy after the prose: table · what the reports don't say. (Its follow-ups take the suggestion row.) */
+export function AnswerStructure({ s, citations }: { s: AskStructure; citations: AskCitation[] }) {
   const [left, right] = s.columns.length === 2 ? s.columns : ["", ""];
   return (
     <div className="mt-3 flex flex-col gap-3">
@@ -53,13 +53,6 @@ export function AnswerStructure({ s, citations, onFollowUp }: { s: AskStructure;
           <span className="mr-2 font-mono text-[11px]" style={{ color: "var(--ink)" }}>Not in the reports</span>
           {s.gaps}
         </p>
-      )}
-      {s.followups.length > 0 && onFollowUp && (
-        <div className="flex flex-wrap gap-1.5">
-          {s.followups.map((q) => (
-            <button key={q} type="button" onClick={() => onFollowUp(q)} className="chip chip-q text-[12.5px]">{q}</button>
-          ))}
-        </div>
       )}
     </div>
   );
@@ -141,6 +134,8 @@ export function AskShell({
   className?: string;
   style?: React.CSSProperties;
 }) {
+  const last = turns[turns.length - 1];
+  const chips = turns.length === 0 ? suggestions : last?.role === "a" && !last.streaming ? (last.structure?.followups ?? []) : [];
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     // isComposing: for Devanagari/Tamil/Telugu IMEs, Enter confirms the
     // candidate. Submitting on it sends a half-composed question.
@@ -207,7 +202,7 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
                   )}
                 </p>
                 )}
-                {!t.streaming && t.structure && <AnswerStructure s={t.structure} citations={t.citations} onFollowUp={onFollowUp} />}
+                {!t.streaming && t.structure && <AnswerStructure s={t.structure} citations={t.citations} />}
                 {!t.streaming && t.citations.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-[5px]">
                     {t.citations.map((c) => (
@@ -235,19 +230,25 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5 px-4 pb-2.5 pt-2">
-        {turns.length === 0 && suggestions.map((q) => (
-          <button
-            key={q}
-            type="button"
-            onClick={() => onSubmit(q)}
-            className="min-h-11 border px-3 py-2 text-[12.5px] transition hover:opacity-75"
-            style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-          >
-            {q}
-          </button>
-        ))}
-      </div>
+      {/* One row of questions above the input: the story's suggestions before
+          the first answer, then the last answer's follow-ups (founder: the row
+          changes, rather than the answer growing chips). Nothing while an
+          answer is still streaming. */}
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-4 pb-2.5 pt-2" aria-label={turns.length ? "Follow-up questions" : "Suggested questions"}>
+          {chips.map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => (turns.length && onFollowUp ? onFollowUp(q) : onSubmit(q))}
+              className="min-h-11 border px-3 py-2 text-left text-[12.5px] transition hover:opacity-75"
+              style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-2 border-t px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2.5" style={{ borderColor: "var(--line)" }}>
         <input

@@ -231,7 +231,7 @@ describe("AskPanel — the floating panel", () => {
 });
 
 describe("AskPanel — the answer's anatomy", () => {
-  it("renders the table, the honesty line and follow-ups after the prose, and a follow-up asks again", async () => {
+  it("renders the table and the honesty line after the prose; the follow-ups take the suggestion row and ask again", async () => {
     const s = streamController();
     render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
     await userEvent.type(screen.getByPlaceholderText(/ask anything/i), "how many?{Enter}");
@@ -248,6 +248,10 @@ describe("AskPanel — the answer's anatomy", () => {
     // The row's citation uses the same chip and opens the same report.
     expect(screen.getByRole("link", { name: "[2]" })).toHaveAttribute("href", "https://y");
     await act(async () => s.finish());
+    // The story's suggestions are gone; the answer's follow-ups sit above the input instead.
+    expect(screen.queryByRole("button", { name: "What led to this?" })).toBeNull();
+    const row = screen.getByLabelText("Follow-up questions");
+    expect(row).toContainElement(screen.getByRole("button", { name: "Which villages?" }));
     askQuestion.mockClear();
     askQuestion.mockResolvedValue(undefined);
     await userEvent.click(screen.getByRole("button", { name: "Which villages?" }));
