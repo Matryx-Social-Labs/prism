@@ -15,9 +15,10 @@ import shutil
 from PIL import Image, ImageDraw, ImageFont
 
 BOX = 24
-APEX_Y = 19 - 20 * math.sqrt(3) / 2  # 1.68
-TRI = [(12, APEX_Y), (22, 19), (2, 19)]
-BAND = (2, 20.25, 20, 2.75)
+BASE_Y = 19.5
+APEX_Y = BASE_Y - 20 * math.sqrt(3) / 2  # 2.18
+TRI = [(12, APEX_Y), (22, BASE_Y), (2, BASE_Y)]
+BAND = (2, BASE_Y, 20, 2.75)  # attached to the base: no gap
 SPECTRUM = ["#ef4444", "#f59e0b", "#06b6d4", "#8b5cf6"]
 INK, IVORY, CHARCOAL = "#141414", "#f2f4ee", "#141414"
 OUT = pathlib.Path(__file__).with_name("exports")

@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { PrismMark } from "@/components/PrismMark";
-import { MARK_BAND, MARK_TRIANGLE, SPECTRUM } from "@/lib/mark";
+import { MARK_BAND, MARK_BASE_Y, MARK_TRIANGLE, SPECTRUM } from "@/lib/mark";
 
 /**
  * The mark's geometry, pinned. The old mark stroked the triangle at 1.5 (edges
@@ -18,13 +18,16 @@ describe("PrismMark", () => {
     expect(tri.getAttribute("d")).toBe(MARK_TRIANGLE);
   });
 
-  it("puts the spectrum below the base, exactly as wide as the base, as one continuous gradient", () => {
+  it("stands the prism ON its spectrum: the band's top is the base line, no gap, exactly the base's width", () => {
     const { container } = render(<><PrismMark size={24} /><PrismMark size={24} /></>);
     const rects = [...container.querySelectorAll("rect")];
     expect(rects).toHaveLength(2);
+    // The triangle's base line, read from the path itself.
+    const baseY = Number(/L22 ([\d.]+) L2/.exec(MARK_TRIANGLE)![1]);
+    expect(baseY).toBe(MARK_BASE_Y);
     for (const r of rects) {
       expect([Number(r.getAttribute("x")), Number(r.getAttribute("width"))]).toEqual([2, 20]);
-      expect(Number(r.getAttribute("y"))).toBeGreaterThan(19);
+      expect(Number(r.getAttribute("y"))).toBe(baseY);
       expect(Number(r.getAttribute("y")) + Number(r.getAttribute("height"))).toBeLessThanOrEqual(24);
     }
     // One gradient per instance, four stops in the design's hues.
