@@ -9,6 +9,8 @@ const fetchTrending = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ fetchFeed, fetchTrending, fetchRegions: () => Promise.resolve([{ code: "IN-KL", name: "Kerala", covered: true }]) }));
 vi.mock("@/lib/profile", () => ({ loadProfile }));
+const useScrollRestore = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/useScrollRestore", () => ({ useScrollRestore }));
 // @/lib/scope stays real — the persisted value is the thing under test.
 
 const item = (over: Partial<FeedItem> = {}): FeedItem =>
@@ -197,5 +199,20 @@ describe("the masthead says when the record went quiet", () => {
     fetchFeed.mockResolvedValue([item({ latest_published_at: old, last_updated_at: old })]);
     render(<FrontPage />);
     expect(await screen.findByText(/quiet since/i)).toBeInTheDocument();
+  });
+});
+
+// REGRESSION (founder, 2026-09-20): back from a story landed at the top of the
+// chart. The chart restores its scroll once its list is present, keyed by the
+// slice so one scope's offset never lands on another's.
+describe("FrontPage — coming back", () => {
+  it("restores scroll for the slice on screen, only once the list has loaded", async () => {
+    useScrollRestore.mockClear();
+    loadProfile.mockReturnValue({ state: "IN-KA", interests: [], languages: ["en"] });
+    fetchFeed.mockResolvedValue([item()]);
+    render(<FrontPage />);
+    // Before the list: not ready.
+    expect(useScrollRestore.mock.calls[0][1]).toBe(false);
+    await waitFor(() => expect(useScrollRestore).toHaveBeenLastCalledWith(expect.stringMatching(/^feed:all:today:(all|region):scrollY$/), true));
   });
 });

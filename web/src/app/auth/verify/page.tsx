@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { afterSignIn, takeNext } from "@/lib/next";
 import { Suspense, useEffect, useState } from "react";
 
 import { saveSession, verifyMagicLink } from "@/lib/session";
@@ -24,7 +25,7 @@ function Verify() {
         saveSession(session);
         // New readers finish onboarding (name/profession/languages); returning
         // readers land straight in the app.
-        router.replace(needsProfile ? "/onboarding" : "/feed");
+        router.replace(afterSignIn(needsProfile, takeNext("/feed", params.get("next"))));
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Sign-in failed.");

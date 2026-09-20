@@ -35,7 +35,7 @@ describe("Sign in — sending the link", () => {
   it("asks for a link for the address the reader entered", async () => {
     render(<SignInPage />);
     await submit();
-    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL);
+    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, null);
   });
 
   it("locks the button while the request is in flight", async () => {
@@ -105,5 +105,30 @@ describe("Sign in — the way out", () => {
     params.delete("next");
     render(<SignInPage />);
     expect(screen.getByRole("link", { name: /keep reading/i })).toHaveAttribute("href", "/feed");
+  });
+});
+
+// REGRESSION (founder, 2026-09-20): a reader sent to sign in from /plus came
+// back to the chart, not to the purchase they were making. The destination
+// must ride every exit: the magic-link email (a new tab) and Google's callback
+// (this tab, via what the page remembered).
+describe("Sign in — the way back", () => {
+  it("sends the destination with the link request and remembers it for this tab", async () => {
+    params.set("next", "/plus?from=ask-limit");
+    render(<SignInPage />);
+    await submit();
+    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, "/plus?from=ask-limit");
+    expect(window.sessionStorage.getItem("prism.next.v1")).toBe("/plus?from=ask-limit");
+    params.delete("next");
+    window.sessionStorage.clear();
+  });
+
+  it("never remembers a destination off the site", async () => {
+    params.set("next", "https://evil.example/");
+    render(<SignInPage />);
+    await submit();
+    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, null);
+    expect(window.sessionStorage.getItem("prism.next.v1")).toBeNull();
+    params.delete("next");
   });
 });

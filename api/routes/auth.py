@@ -4,6 +4,7 @@ The email delivery backend is pluggable (common/email.py) and defaults to a
 console sender, so the flow works end-to-end in dev with no provider configured.
 """
 
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -26,6 +27,16 @@ router = APIRouter()
 
 class MagicLinkRequest(BaseModel):
     email: str  # email-only — the profile is collected after verify (see set_profile)
+    # Where the reader was going when a gate sent them to sign in (a same-site
+    # path); the link carries it so the tab the email opens can finish the trip.
+    next: str | None = None
+
+
+def safe_next(value: str | None) -> str | None:
+    """A same-site path or nothing: never an open redirect off readprism.news."""
+    if not value or not value.startswith("/") or value.startswith("//") or len(value) > 500:
+        return None
+    return value
 
 
 class VerifyRequest(BaseModel):
@@ -77,6 +88,9 @@ async def request_link(body: MagicLinkRequest, db: AsyncSession = Depends(get_db
         # for this email (avoids an enumeration / timing side channel).
         return {"ok": True}
     link = f"{settings.prism_web_url}/auth/verify?token={raw}"
+    nxt = safe_next(body.next)
+    if nxt:
+        link += f"&next={quote(nxt, safe='')}"
     text, html = magic_link_email(link=link, ttl_min=settings.prism_magic_token_ttl_min, to=body.email)
     await get_email_sender().send(
         to=body.email, subject="Your Prism sign-in link", body=text, html=html

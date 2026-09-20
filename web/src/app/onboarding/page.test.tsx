@@ -17,7 +17,7 @@ const router = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock("@/lib/session", () => ({ useSession, fetchLanguages, setProfile: vi.fn() }));
 vi.mock("@/lib/api", () => ({ fetchRegions, fetchTaxonomy, fetchProfessions, fetchLenses }));
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("next/navigation", () => ({ useRouter: () => router, useSearchParams: () => new URLSearchParams("") }));
 
 const KEY = "prism.profile.v1";
 const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");

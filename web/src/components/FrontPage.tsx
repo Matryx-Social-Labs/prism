@@ -15,6 +15,7 @@ import { loadProfile, type Profile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { markReturning } from "@/lib/returning";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 
 /**
@@ -79,6 +80,11 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [ready, profile]);
+
+  // Coming back from a story lands where the reader left the chart, not at the
+  // top (founder, 2026-09-20). Keyed by the slice, so Karnataka's offset never
+  // restores onto National's list. Search and Stories already do this.
+  useScrollRestore(`feed:${sector ?? "all"}:${tab}:${scope}:scrollY`, items !== null && items.length > 0);
 
   // The scope is a server-side slice (see /feed `scope`); the page IS the slice.
   const scoped = useMemo(() => items ?? [], [items]);

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, useState } from "react";
+import { rememberNext, safeNext } from "@/lib/next";
+import { type FormEvent, Suspense, useState, useEffect } from "react";
 
 import { Brand } from "@/components/Brand";
 import { requestMagicLink } from "@/lib/session";
@@ -19,8 +20,11 @@ export default function SignInPage() {
 function SignIn() {
   // Where the reader came from, when a gate sent them: the way out goes back
   // there, not to the chart they were not reading.
-  const next = useSearchParams().get("next");
-  const back = next && next.startsWith("/") ? next : "/feed";
+  const next = safeNext(useSearchParams().get("next"));
+  const back = next ?? "/feed";
+  // Remembered for the tab, so Google's callback and a same-tab magic link
+  // both finish the trip the reader was on.
+  useEffect(() => rememberNext(next), [next]);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +35,7 @@ function SignIn() {
     setError(null);
     setBusy(true);
     try {
-      await requestMagicLink(email.trim());
+      await requestMagicLink(email.trim(), next);
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

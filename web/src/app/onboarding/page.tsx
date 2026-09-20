@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { safeNext } from "@/lib/next";
 import { interestsToPicks, picksToInterests, useTaxonomy, type Picks } from "@/components/ProfileEditor";
 import { Field, ProfessionField, SectorsField, StateField, useProfessionGroups } from "@/components/ReservationForm";
 import { loadProfile, saveProfile } from "@/lib/profile";
@@ -12,7 +13,7 @@ import { setProfile, useSession } from "@/lib/session";
 
 const STEPS = ["Where you are", "What you do", "What you follow"] as const;
 
-export default function OnboardingPage() {
+function OnboardingPage() {
   const router = useRouter();
   const taxonomy = useTaxonomy();
   const groups = useProfessionGroups();
@@ -24,6 +25,8 @@ export default function OnboardingPage() {
   const session = useSession();
   const [name, setName] = useState("");
   const [consent, setConsent] = useState(false);
+  // Where the reader was going before sign-in interrupted (a gate, /plus).
+  const next = safeNext(useSearchParams().get("next")) ?? "/feed";
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -68,7 +71,7 @@ export default function OnboardingPage() {
       }
       setSaving(false);
     }
-    router.push("/feed");
+    router.push(next);
   }
 
   return (
@@ -162,10 +165,19 @@ export default function OnboardingPage() {
             : "No account needed. Your profile lives in this browser."}
         </span>
         {/* Nothing blocks reading: the way out is on every step. */}
-        <button onClick={() => router.push("/feed")} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+        <button onClick={() => router.push(next)} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
           Skip for now
         </button>
       </p>
     </div>
+  );
+}
+
+// useSearchParams (the `next` destination) needs a Suspense boundary for static rendering.
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingPage />
+    </Suspense>
   );
 }

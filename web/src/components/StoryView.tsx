@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { track } from "@/lib/analytics";
+import { cameFromInside } from "@/lib/nav";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail, type OutletRef, type TrendingStoryDetail } from "@/lib/api";
 import { headlineByline } from "@/lib/headline";
@@ -311,7 +312,20 @@ export function StoryView({ event }: { event: EventDetail }) {
       {/* Phone back bar: the way back, the mark, Share. The thumb bar below
           carries Share and Ask; the tab bar is hidden on the record. */}
       <div className="glass sticky top-0 z-30 -mx-5 flex h-[52px] items-center justify-between border-b px-3 sm:-mx-8 sm:px-6 lg:hidden" style={{ borderColor: "var(--line)" }}>
-        <Link href="/feed" scroll={false} className="btn btn-ghost btn-sm gap-1.5" aria-label="Back to today">
+        <Link
+          href="/feed"
+          scroll={false}
+          className="btn btn-ghost btn-sm gap-1.5"
+          aria-label="Back to today"
+          onClick={(e) => {
+            // Came here from inside Prism: real back, so the list they left is
+            // the one they return to, at the place they left it.
+            if (cameFromInside()) {
+              e.preventDefault();
+              router.back();
+            }
+          }}
+        >
           <ArrowLeft /> Today
         </Link>
         <Brand size={22} label="Prism, today" />

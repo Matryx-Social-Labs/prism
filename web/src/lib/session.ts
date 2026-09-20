@@ -61,11 +61,11 @@ async function detail(res: Response, fallback: string): Promise<string> {
 /** Email-first: we always send a link (same response for new + returning readers,
  * so an onlooker can't tell whether an email is registered). The profile is
  * collected after verify, so this call needs nothing but an email. */
-export async function requestMagicLink(email: string): Promise<void> {
+export async function requestMagicLink(email: string, next?: string | null): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/auth/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, next: next ?? undefined }),
   });
   if (!res.ok) throw new Error(await detail(res, "Could not send the sign-in link"));
 }
