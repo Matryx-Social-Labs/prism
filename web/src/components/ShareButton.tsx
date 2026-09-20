@@ -6,7 +6,7 @@ import { ArrowUpRight } from "@/components/icons";
 // path); copy-link fallback on desktop. Shares the shareable /trending/<slug> URL.
 import { useState } from "react";
 
-export function ShareButton({ url, title, fill }: { url: string; title: string; fill?: boolean }) {
+export function ShareButton({ url, title, fill, compact }: { url: string; title: string; fill?: boolean; compact?: boolean }) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
@@ -44,6 +44,14 @@ export function ShareButton({ url, title, fill }: { url: string; title: string; 
     }
   }
 
+  if (compact) {
+    // A text link in a meta row (a quote card's foot): the same behaviour, no chrome.
+    return (
+      <button type="button" onClick={share} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }} aria-label="Share this quote">
+        {copied ? "Link copied" : "Share"}
+      </button>
+    );
+  }
   return (
     <button
       type="button"

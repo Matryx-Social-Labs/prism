@@ -8,6 +8,8 @@ import { OutletIcon } from "@/components/Coverage";
 import { fallbackCode } from "@/components/SourceList";
 import { relativeTime } from "@/lib/dateline";
 import { quoteLink } from "@/lib/quoteLink";
+import { quoteId } from "@/lib/quotes";
+import { ShareButton } from "@/components/ShareButton";
 
 /**
  * Who said what, verbatim, grouped by speaker — one card per speaker
@@ -30,22 +32,25 @@ export function Said({
   claims,
   sourceIndex,
   outletOf,
+  eventId,
 }: {
   claims: SpeakerClaims[];
   sourceIndex: Map<string, number>;
   /** article_id → the outlet's icon facts, when the caller has them. */
   outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined;
+  /** When set, each quote carries Share → its own address and quote card. */
+  eventId?: string;
 }) {
   return (
     <div className={`grid gap-3 ${claims.length > 1 ? "md:grid-cols-2" : ""}`}>
-      {claims.map((sp) => (
-        <SpeakerCard key={sp.speaker} sp={sp} sourceIndex={sourceIndex} outletOf={outletOf} />
+      {claims.map((sp, si) => (
+        <SpeakerCard key={sp.speaker} sp={sp} si={si} sourceIndex={sourceIndex} outletOf={outletOf} eventId={eventId} />
       ))}
     </div>
   );
 }
 
-function SpeakerCard({ sp, sourceIndex, outletOf }: { sp: SpeakerClaims; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined }) {
+function SpeakerCard({ sp, si, sourceIndex, outletOf, eventId }: { sp: SpeakerClaims; si: number; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined; eventId?: string }) {
   // Two quotes per speaker, the rest on request: a minister with nine quotes
   // is a column of italics that buries the next speaker.
   const [all, setAll] = useState(false);
@@ -99,6 +104,9 @@ function SpeakerCard({ sp, sourceIndex, outletOf }: { sp: SpeakerClaims; sourceI
                         >
                           Open at the quote ↗
                         </a>
+                      )}
+                      {eventId && (
+                        <span className="inline-flex"><ShareButton url={`/story/${eventId}/quote/${quoteId(si, j)}`} title={`“${c.quote_text}” — ${sp.speaker}`} compact /></span>
                       )}
                       {ask && (
                         <button

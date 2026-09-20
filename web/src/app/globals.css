@@ -391,6 +391,8 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 }
 @media (min-width: 1024px) {
   .clip-bar { left: 50%; right: auto; bottom: 24px; width: min(640px, calc(100vw - 48px)); transform: translateX(-50%); }
+  /* Docked in the record's foot (StoryView #story-foot-slot): in flow, the column's width. */
+  .clip-bar-docked .clip-bar { position: static; left: auto; right: auto; bottom: auto; width: auto; transform: none; }
 }
 /* Entity marks: ink text, a thin accent underline — the record stays a record,
    not a page of blue. Hover/focus lifts to the accent tint. */

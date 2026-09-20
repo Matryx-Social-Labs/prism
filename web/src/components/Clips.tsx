@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ClipOut } from "@/lib/api";
 import { relativeTime } from "@/lib/dateline";
 import { Headphones, Pause, Play, SkipNext } from "@/components/icons";
@@ -174,7 +175,9 @@ export function Clips({ clips }: { clips: ClipOut[] }) {
         ))}
       </ol>
       {current && (playing || active >= 0) && (
-        <NowPlaying clip={current} playing={playing} time={time - shift} onToggle={() => toggle(active)} onNext={next} hasNext={active + 1 < clips.length} />
+        <Docked>
+          <NowPlaying clip={current} playing={playing} time={time - shift} onToggle={() => toggle(active)} onNext={next} hasNext={active + 1 < clips.length} />
+        </Docked>
       )}
     </div>
   );
@@ -262,6 +265,25 @@ function ShowArt({ show, size }: { show: ClipOut["show"]; size: number }) {
 }
 
 /** The bar that rides above the thumb zone while a clip plays: what is on, pause, next. */
+/**
+ * Where the bar lives. On a desk the record's foot has a slot (#story-foot-slot,
+ * StoryView) that rides the viewport with the Ask bar; the player docks there,
+ * above the bar and clear of the Ask drawer, instead of floating over both
+ * (founder, 2026-09-21). On the phone, and anywhere without the slot, it stays
+ * a fixed bar above the thumb zone.
+ */
+function Docked({ children }: { children: React.ReactNode }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const find = () => setSlot(mq.matches ? document.getElementById("story-foot-slot") : null);
+    find();
+    mq.addEventListener("change", find);
+    return () => mq.removeEventListener("change", find);
+  }, []);
+  return slot ? createPortal(<div className="clip-bar-docked">{children}</div>, slot) : <>{children}</>;
+}
+
 function NowPlaying({ clip, playing, time, onToggle, onNext, hasNext }: { clip: ClipOut; playing: boolean; time: number; onToggle: () => void; onNext: () => void; hasNext: boolean }) {
   return (
     <div className="clip-bar glass" role="region" aria-label="Now playing">

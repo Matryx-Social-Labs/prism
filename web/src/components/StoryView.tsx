@@ -579,7 +579,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                   count={quoteCount}
                   hint="Only words found exactly in the article are shown, attributed and linked to the line they came from."
                 />
-                <Said claims={claims} sourceIndex={sourceIndex} outletOf={(id) => event.sources.find((x) => x.article_id === id)} />
+                <Said claims={claims} sourceIndex={sourceIndex} outletOf={(id) => event.sources.find((x) => x.article_id === id)} eventId={event.id} />
               </section>
             )}
 
@@ -680,12 +680,15 @@ export function StoryView({ event }: { event: EventDetail }) {
             <section id="ask" className="scroll-mt-24 pt-6" aria-labelledby="ask-title">
               <Head id="ask-title" title="Ask this story" hint="Answers cite the reports above, or say they can't." />
             </section>
-            {/* Gone while the sheet is open: one input on screen at a time. */}
-            {!askOpen && (
-              <div className="z-20 pb-6 lg:sticky lg:bottom-4">
-                <AskBar suggestions={questions} sourceCount={sourceCount} />
-              </div>
-            )}
+            {/* The foot of the reading column, riding the viewport on a desk:
+                the clip that is playing (Clips portals its bar here, so it
+                never lies over the Ask drawer or under the Ask bar) above the
+                Ask bar. The bar leaves while the sheet is open — one input on
+                screen at a time; the player stays. */}
+            <div className="z-20 flex flex-col gap-2 pb-6 lg:sticky lg:bottom-4">
+              <div id="story-foot-slot" className="hidden lg:block empty:hidden" />
+              {!askOpen && <AskBar suggestions={questions} sourceCount={sourceCount} />}
+            </div>
 
             <p className="flex justify-between gap-4 border-t pt-4 text-[13.5px] font-medium" style={{ borderColor: "var(--line)" }}>
               <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>← Today&rsquo;s record</Link>
