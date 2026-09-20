@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.routes.serialization import build_feed_item
 from api.schemas import FeedItem, FeedResponse
 from common import outlets
+from common.config import get_settings
 from common.db import get_db
 from common.lenses import get_lens
 from common.taxonomy import TAXONOMY
@@ -217,4 +218,37 @@ async def get_feed(
     elif records:
         items.extend(records)
         items.sort(key=lambda i: i.score, reverse=True)
-    return FeedResponse(items=items[:limit], lens=active_lens.slug)
+    page = items[:limit]
+    await attach_clip_shows(db, page)
+    return FeedResponse(items=page, lens=active_lens.slug)
+
+
+async def attach_clip_shows(db: AsyncSession, page: list[FeedItem]) -> None:
+    """"Heard on N shows" on a row: the podcast shows with a clip on the story,
+    best first, at most three. One query for the page; nothing when the clips
+    pipeline is off (see api.routes.events.event_clips)."""
+    if not page or not get_settings().prism_podcasts_enabled:
+        return
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT ec.event_id, e.show_slug
+                FROM event_clips ec
+                JOIN podcast_windows w ON w.id = ec.window_id
+                JOIN podcast_episodes e ON e.id = w.episode_id
+                JOIN podcast_shows s ON s.slug = e.show_slug AND s.enabled
+                WHERE ec.event_id = ANY(CAST(:ids AS uuid[]))
+                ORDER BY ec.event_id, ec.rank
+                """
+            ),
+            {"ids": [i.id for i in page]},
+        )
+    ).all()
+    shows: dict[str, list[str]] = {}
+    for event_id, slug in rows:
+        lst = shows.setdefault(str(event_id), [])
+        if slug not in lst and len(lst) < 3:
+            lst.append(slug)
+    for item in page:
+        item.clip_shows = shows.get(item.id, [])

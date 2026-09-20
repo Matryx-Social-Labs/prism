@@ -22,6 +22,8 @@ from api.schemas import (
     AskRequest,
     BriefResponse,
     ClaimOut,
+    ClipOut,
+    ClipShow,
     EntityOut,
     EventDetail,
     ImpactOut,
@@ -31,6 +33,7 @@ from api.schemas import (
     SpeakerClaims,
 )
 from common import outlets
+from common.config import get_settings
 from common.db import get_db
 from common.lenses import LENSES, PAID_LENS_FIELDS
 from common.locks import single_flight
@@ -112,6 +115,53 @@ def quote_context(clean_text: str | None, quote: str, start: int | None, end: in
     if end + CONTEXT_CHARS < len(clean_text) and " " in after:
         after = after.rsplit(" ", 1)[0]
     return before.strip(), after.strip()
+
+
+async def event_clips(db: AsyncSession, event_id: uuid.UUID) -> list[ClipOut]:
+    """The podcast clips on this story, best first. Off (empty) unless the
+    pipeline is enabled on this service — the gate that says the matches are
+    good enough to show (tools/gold_clips) is a founder decision, not a query."""
+    if not get_settings().prism_podcasts_enabled:
+        return []
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT ec.start_s, ec.end_s, ec.score, w.text, w.words,
+                       e.title AS episode_title, e.episode_url, e.audio_url, e.audio_duration_s, e.published_at,
+                       s.slug, s.name, s.publisher, s.art_url, s.site_url
+                FROM event_clips ec
+                JOIN podcast_windows w ON w.id = ec.window_id
+                JOIN podcast_episodes e ON e.id = w.episode_id
+                JOIN podcast_shows s ON s.slug = e.show_slug
+                WHERE ec.event_id = :id AND s.enabled
+                ORDER BY ec.rank, ec.score DESC
+                """
+            ),
+            {"id": event_id},
+        )
+    ).mappings().all()
+    out: list[ClipOut] = []
+    for r in rows:
+        # A merged clip spans several windows; the row carries the best window's
+        # words, trimmed to the clip — enough for read-along on what plays first.
+        words = [w for w in (r["words"] or []) if isinstance(w, list) and len(w) == 3 and r["start_s"] <= float(w[1]) <= r["end_s"]]
+        out.append(
+            ClipOut(
+                show=ClipShow(slug=r["slug"], name=r["name"], publisher=r["publisher"], art_url=r["art_url"], site_url=r["site_url"]),
+                episode_title=r["episode_title"],
+                episode_url=r["episode_url"],
+                audio_url=r["audio_url"],
+                audio_duration_s=r["audio_duration_s"],
+                published_at=r["published_at"].isoformat(),
+                start_s=float(r["start_s"]),
+                end_s=float(r["end_s"]),
+                text=r["text"],
+                words=words,
+                score=float(r["score"]),
+            )
+        )
+    return out
 
 
 def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
@@ -386,6 +436,7 @@ async def get_event(
             for p in perspectives
         ],
         claims=group_claims(sources),
+        clips=await event_clips(db, event["id"]),
         impacts=[
             ImpactOut(
                 id=str(i["id"]),

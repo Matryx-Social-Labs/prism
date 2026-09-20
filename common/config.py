@@ -135,6 +135,13 @@ class Settings(BaseSettings):
     prism_llm_budget_floor_usd: float = 5.0
     prism_cve_feeds_enabled: bool = False
     prism_ingestion_enabled: bool = True
+    # Podcast clips (podcasts/): poll the shows, transcribe, match to events.
+    # Off by default until the gold_clips gate reads ≥ 0.9; the transcription
+    # line is ≈ $0.06/day on OpenRouter→Groq at the five shows' cadence.
+    prism_podcasts_enabled: bool = False
+    # Window→event cosine floor (mE5, symmetric query: prefix). Calibrated on
+    # gold_clips; the entity check is required on top of it.
+    prism_clip_min_cos: float = 0.84
 
     # Grounded storyline veto master switch. Set PRISM_VETO_ENABLED=false to stop
     # the hourly LLM overlay pass.

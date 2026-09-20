@@ -38,6 +38,7 @@ class FeedItem(BaseModel):
     image_url: str | None
     is_regional: bool  # profile region appears in the event's regions
     coverage: CoverageOut | None = None
+    clip_shows: list[str] = []  # podcast shows with a clip on this story (slugs), ≤ 3
     event_type: str | None
     source_count: int
     cvss_score: float | None
@@ -87,6 +88,33 @@ class SectorOut(BaseModel):
 
 class TaxonomyResponse(BaseModel):
     sectors: list[SectorOut]
+
+
+class ClipShow(BaseModel):
+    slug: str
+    name: str
+    publisher: str
+    art_url: str | None = None
+    site_url: str | None = None
+
+
+class ClipOut(BaseModel):
+    """A stretch of a news podcast that discussed this story: the publisher's own
+    audio (never ours), the transcript of just that stretch, and what the
+    player needs to seek there — including the duration WE transcribed, so it
+    can reconcile a file the host served with different ads stitched in."""
+
+    show: ClipShow
+    episode_title: str
+    episode_url: str | None
+    audio_url: str
+    audio_duration_s: float | None
+    published_at: str
+    start_s: float
+    end_s: float
+    text: str
+    words: list[list] = []  # [word, start_s, end_s]
+    score: float
 
 
 class SourceRef(BaseModel):
@@ -204,6 +232,10 @@ class EventDetail(BaseModel):
     # (measured: 3% of events carry one person under two strings, all
     # punctuation variants); folding across a story is the QID ledger's job.
     claims: list[SpeakerClaims]
+    # READER-TIER too, for the same reason: what the news podcasts said about
+    # this story, in their own words, is evidence. Empty unless the pipeline is
+    # on and the gold_clips gate has been passed.
+    clips: list[ClipOut] = []
 
 
 class BriefResponse(BaseModel):

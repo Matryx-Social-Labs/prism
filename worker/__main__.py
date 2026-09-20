@@ -176,6 +176,11 @@ async def main(stages: list[str]) -> None:
             max_instances=1,
             coalesce=True,
         )
+        # Podcast clips ride the same scheduler, hourly: poll five feeds,
+        # transcribe what is new, rematch. A no-op unless PRISM_PODCASTS_ENABLED.
+        from podcasts.runner import run_podcasts
+
+        scheduler.add_job(run_podcasts, IntervalTrigger(minutes=60), id="podcasts", max_instances=1, coalesce=True)
         scheduler.start()
         # Kick off one ingestion run at startup so a fresh deploy has data.
         tasks.append(asyncio.create_task(_initial_ingest()))
