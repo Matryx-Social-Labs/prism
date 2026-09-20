@@ -44,3 +44,13 @@ def test_two_different_pictures_are_far_apart():
 
 def test_not_an_image_is_no_hash_not_a_crash():
     assert dhash_bytes(b"<html>not a picture</html>") is None
+
+
+def test_only_public_http_urls_are_fetched():
+    """The URL is a publisher's, i.e. an attacker's if the feed is compromised,
+    and the worker fetches it from inside the deployment."""
+    from common.imagehash import public_http_url
+
+    for bad in ["http://127.0.0.1/x.jpg", "http://169.254.169.254/latest/meta-data", "http://10.0.0.5/a.png", "http://[::1]/a.png", "file:///etc/passwd", "ftp://example.com/a.jpg", "http://localhost/a.jpg", ""]:
+        assert public_http_url(bad) is False, bad
+    assert public_http_url("https://ichef.bbci.co.uk/ace/ws/800/a.jpg.webp") is True
