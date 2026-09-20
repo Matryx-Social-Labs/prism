@@ -181,7 +181,9 @@ export function Clips({ clips }: { clips: ClipOut[] }) {
           if (active < 0) play(0);
         }}
       />
-      {current && (playing || active >= 0) && (
+      {/* The bar exists only while sound is playing: paused, stopped or ended,
+          it goes (founder, 2026-09-21); the card's own button resumes. */}
+      {current && playing && (
         <Docked>
           <NowPlaying clip={current} playing={playing} time={time - shift} onToggle={() => toggle(active)} onNext={next} hasNext={active + 1 < clips.length} />
         </Docked>

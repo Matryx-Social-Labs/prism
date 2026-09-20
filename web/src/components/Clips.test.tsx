@@ -123,3 +123,18 @@ describe("HeardOn", () => {
     expect(screen.queryByText(/Heard on/)).toBeNull();
   });
 });
+
+describe("Clips — the now-playing bar", () => {
+  it("exists only while sound plays: gone when paused, gone when the last clip ends", async () => {
+    render(<Clips clips={[clip()]} />);
+    const audio = document.querySelector("audio")!;
+    await userEvent.click(screen.getByRole("button", { name: /Play the clip/ }));
+    fireEvent(audio, new Event("play"));
+    expect(screen.getByRole("region", { name: "Now playing" })).toBeInTheDocument();
+    fireEvent(audio, new Event("pause"));
+    expect(screen.queryByRole("region", { name: "Now playing" })).toBeNull();
+    fireEvent(audio, new Event("play"));
+    fireEvent(audio, new Event("ended"));
+    expect(screen.queryByRole("region", { name: "Now playing" })).toBeNull();
+  });
+});
