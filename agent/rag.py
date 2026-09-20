@@ -90,8 +90,14 @@ async def answer_stream(
     event_id: uuid.UUID,
     session_id: uuid.UUID,
     question: str,
+    plan: str = "free",
 ) -> AsyncIterator[dict]:
-    """Yield SSE-ready events: {type: token|citations|done|error, ...}."""
+    """Yield SSE-ready events: {type: token|citations|done|error, ...}.
+
+    `plan` picks the model: Plus gets prism_model_agent; free and anonymous get
+    prism_model_agent_free, which answers the same grounded prompt at about a
+    sixth of the cost (BUSINESS-MODEL.md §4). Citations and refusals are the
+    same contract on both."""
     # Guardrail: reject explicit/harmful/injection/spam before spending the agent.
     guard = await guard_question(question)
     if not guard.allowed:
@@ -127,7 +133,7 @@ async def answer_stream(
     full_text = ""
     try:
         response = await client.chat.completions.create(
-            model=settings.prism_model_agent,
+            model=settings.prism_model_agent if plan == "plus" else settings.prism_model_agent_free,
             messages=messages,
             stream=True,
             # An answer is a paragraph with citations; the provider's default

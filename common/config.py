@@ -70,7 +70,8 @@ class Settings(BaseSettings):
     # vs 0.96, zero failures vs three, 19.8s vs 40.1s a brief, a quarter of
     # the price. Ask stays on prism_model_agent.
     prism_model_correlate: str = "z-ai/glm-5.3-flash"
-    prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing
+    prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing, Plus
+    prism_model_agent_free: str = "z-ai/glm-5.3-flash"  # Ask for free and anonymous readers: same prompt, ~1/6 the cost
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning
     # Where a request goes when the primary model refuses it on content policy
     # (Gemini PROHIBITED_CONTENT on sexual-violence reporting, 2026-09-18: 13 of
@@ -219,6 +220,13 @@ class Settings(BaseSettings):
     # Google sign-in (Google Identity Services, ID-token mode). The client id is
     # public; the API only uses it to check a token's audience. Empty = off.
     google_client_id: str = ""
+    # Billing (common/billing.py). The paid launch date starts the 90-day offer
+    # clock; empty = not launched, offer prices shown. Razorpay keys are read
+    # only by the webhook route and the (future) checkout; empty = 503 there.
+    prism_paid_launch_date: str = ""
+    razorpay_key_id: str = Field("", repr=False)
+    razorpay_key_secret: str = Field("", repr=False)
+    razorpay_webhook_secret: str = Field("", repr=False)
 
     # Sources
     nvd_api_key: str = Field("", repr=False)

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import (
     admin,
     auth,
+    billing,
     digest,
     events,
     feed,
@@ -46,6 +47,7 @@ app.add_middleware(
 # route set is identical to the pre-split single-file version.
 app.include_router(meta.router)
 app.include_router(auth.router)
+app.include_router(billing.router)
 app.include_router(feed.router)
 app.include_router(search.router)
 app.include_router(digest.router)

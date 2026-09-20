@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,7 @@ from api.schemas import (
     SpeakerClaims,
 )
 from common import outlets
+from common.billing import plan_for
 from common.config import get_settings
 from common.db import get_db
 from common.images import hi_res
@@ -42,6 +43,8 @@ from common.logging import get_logger
 from common.quota import (
     READER_LENS,
     ask_allowance,
+    ask_burst_ok,
+    ask_record_spend,
     grant_samples,
     has_unlocked,
     record_unlock,
@@ -575,6 +578,7 @@ async def get_questions(
 async def ask(
     event_id: uuid.UUID,
     body: AskRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user_id: uuid.UUID | None = Depends(get_current_user_optional),
 ):
@@ -598,8 +602,9 @@ async def ask(
     # was unlimited and unauthenticated. Checked AFTER ensure_session so an
     # anonymous session that has just been adopted counts against the account
     # rather than restarting its allowance.
+    plan = await plan_for(db, user_id)
     allowed, used, cap = await ask_allowance(
-        db, str(user_id) if user_id else None, session_id
+        db, str(user_id) if user_id else None, session_id, plan
     )
     if not allowed:
         raise HTTPException(
@@ -611,12 +616,26 @@ async def ask(
                 # Anonymous readers are told the way forward is signing in, not
                 # that they are blocked: the cap exists to convert, not to wall.
                 "signin_helps": user_id is None,
+                # A free account at its cap is told what Plus gives (BUSINESS-MODEL.md §3).
+                "plus_helps": user_id is not None and plan != "plus",
             },
         )
+    # The Redis-side brakes: a burst from one identity, an anonymous flood from
+    # one address, and the day's spend ceiling. Plan caps above still hold if
+    # Redis is away.
+    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (request.client.host if request.client else None)
+    reason = await ask_burst_ok(str(user_id) if user_id else str(session_id), ip, anonymous=user_id is None)
+    if reason == "burst":
+        raise HTTPException(status_code=429, detail={"error": "too many questions this minute", "retry_after_s": 60})
+    if reason == "ip":
+        raise HTTPException(status_code=429, detail={"error": "question limit reached", "signin_helps": True})
+    if reason == "ceiling" and plan != "plus":
+        raise HTTPException(status_code=503, detail={"error": "Ask is resting for today for free readers; it is back at midnight UTC", "plus_helps": user_id is not None})
+    await ask_record_spend(plan)
 
     async def sse():
         yield f"event: session\ndata: {json.dumps({'session_id': str(session_id)})}\n\n"
-        async for chunk in answer_stream(event_id=event_id, session_id=session_id, question=question):
+        async for chunk in answer_stream(event_id=event_id, session_id=session_id, question=question, plan=plan):
             yield f"event: {chunk['type']}\ndata: {json.dumps(chunk)}\n\n"
 
     return StreamingResponse(

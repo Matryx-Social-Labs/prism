@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
 from common import auth
+from common.billing import plan_for
 from common.config import get_settings
 from common.db import get_db
 from common.email import get_email_sender
@@ -49,6 +50,7 @@ class SessionResponse(BaseModel):
 class MeResponse(BaseModel):
     user_id: str
     email: str
+    plan: str = "free"  # free | plus (common/billing.plan_for)
 
 
 @router.get("/api/v1/professions")
@@ -148,4 +150,4 @@ async def me(user_id: UUID = Depends(get_current_user), db: AsyncSession = Depen
     email = (
         await db.execute(text("SELECT email FROM users WHERE id = :i"), {"i": str(user_id)})
     ).scalar_one()
-    return MeResponse(user_id=str(user_id), email=email)
+    return MeResponse(plan=await plan_for(db, user_id), user_id=str(user_id), email=email)

@@ -4,7 +4,7 @@ Split out of api/main.py so route modules (api/routes/*) share one schema
 source and main.py only wires the app. Pure Pydantic — no DB or app deps.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CoverageOut(BaseModel):
@@ -267,7 +267,7 @@ class DigestResponse(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str
+    question: str = Field(max_length=500)  # bounds the input tokens; a real question fits
     session_id: str | None = None
 
 

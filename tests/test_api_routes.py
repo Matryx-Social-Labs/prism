@@ -17,6 +17,8 @@ EXPECTED = {
     ("POST", "/api/v1/auth/request"),
     ("POST", "/api/v1/auth/verify"),
     ("POST", "/api/v1/auth/google"),
+    ("GET", "/api/v1/billing/plans"),
+    ("POST", "/api/v1/billing/razorpay/webhook"),
     ("POST", "/api/v1/auth/profile"),
     ("GET", "/api/v1/auth/me"),
     ("GET", "/api/v1/feed"),

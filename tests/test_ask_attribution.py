@@ -143,6 +143,10 @@ async def test_the_ASK_ROUTE_actually_passes_the_user_through(monkeypatch):
                 # about ATTRIBUTION rather than about the quota.
                 return 0
 
+            def all(self):
+                # The plan lookup (common/billing.plan_for): no subscription rows → free.
+                return []
+
         class _S:
             async def execute(self, *a, **kw):
                 return _R()

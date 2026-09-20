@@ -155,7 +155,19 @@ async def unlocked_lenses(session: AsyncSession, user_id: UUID, event_id: UUID) 
 # Not an IP cap: carrier-grade NAT in India puts thousands of real readers behind
 # one address, so an IP limit throttles exactly the audience we want.
 ANON_ASK_PER_SESSION = 3
-USER_ASK_PER_DAY = 30
+USER_ASK_PER_DAY = 10  # free account; Plus gets PLUS_ASK_PER_DAY (BUSINESS-MODEL.md §3)
+PLUS_ASK_PER_DAY = 100
+# A per-address ceiling only a script reaches. Carrier-grade NAT can put a
+# building behind one address, so this is deliberately far above what any
+# group of humans asks anonymously in a day — it exists because an anonymous
+# session costs nothing to mint, so the session cap alone is no cap.
+ANON_ASK_PER_IP_PER_DAY = 60
+# Burst: questions per minute for one identity (account, or anonymous session).
+ASK_PER_MINUTE = 6
+# Estimated cost of one answer, by the model the plan gets (common/billing);
+# summed per day in Redis against the global ceiling below.
+ASK_COST_USD = {"free": 0.0005, "plus": 0.003}
+ASK_DAILY_CEILING_USD = 25.0  # at 80% anonymous Ask closes; at 100% free too; Plus continues
 
 
 async def ask_questions_used(
@@ -195,9 +207,65 @@ async def ask_questions_used(
 
 
 async def ask_allowance(
-    session: AsyncSession, user_ref: str | None, session_id: UUID
+    session: AsyncSession, user_ref: str | None, session_id: UUID, plan: str = "free"
 ) -> tuple[bool, int, int]:
-    """(allowed, used, cap) for the next question."""
-    cap = USER_ASK_PER_DAY if user_ref else ANON_ASK_PER_SESSION
+    """(allowed, used, cap) for the next question, by plan."""
+    cap = (PLUS_ASK_PER_DAY if plan == "plus" else USER_ASK_PER_DAY) if user_ref else ANON_ASK_PER_SESSION
     used = await ask_questions_used(session, user_ref, session_id)
     return used < cap, used, cap
+
+
+def _ip_key(ip: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(ip.encode()).hexdigest()[:24]
+
+
+async def ask_burst_ok(identity: str, ip: str | None, anonymous: bool) -> str | None:
+    """The Redis-side checks before a question runs. Returns None when the
+    question may proceed, else a short reason: 'burst' (too many this minute),
+    'ip' (anonymous per-address ceiling), 'ceiling' (the day's spend ceiling).
+    Redis unreachable → allow: the account/session caps above still hold."""
+    from datetime import UTC, datetime
+
+    from common.stream import get_redis
+
+    try:
+        r = get_redis()
+        day = datetime.now(UTC).strftime("%Y%m%d")
+        minute = datetime.now(UTC).strftime("%Y%m%d%H%M")
+        burst_key = f"prism:ask:burst:{identity}:{minute}"
+        n = await r.incr(burst_key)
+        if n == 1:
+            await r.expire(burst_key, 120)
+        if n > ASK_PER_MINUTE:
+            return "burst"
+        if anonymous and ip:
+            ip_key = f"prism:ask:ip:{_ip_key(ip)}:{day}"
+            m = await r.incr(ip_key)
+            if m == 1:
+                await r.expire(ip_key, 60 * 60 * 26)
+            if m > ANON_ASK_PER_IP_PER_DAY:
+                return "ip"
+        spent = float(await r.get(f"prism:ask:spend:{day}") or 0.0)
+        if spent >= ASK_DAILY_CEILING_USD or (anonymous and spent >= 0.8 * ASK_DAILY_CEILING_USD):
+            return "ceiling"
+    except Exception:  # noqa: BLE001 — a limiter that is down must not take Ask down with it
+        return None
+    return None
+
+
+async def ask_record_spend(plan: str) -> None:
+    """Add one answer's estimated cost to today's total (see ASK_COST_USD)."""
+    from datetime import UTC, datetime
+
+    from common.stream import get_redis
+
+    try:
+        r = get_redis()
+        day = datetime.now(UTC).strftime("%Y%m%d")
+        key = f"prism:ask:spend:{day}"
+        await r.incrbyfloat(key, ASK_COST_USD.get(plan, ASK_COST_USD["plus"]))
+        await r.expire(key, 60 * 60 * 26)
+    except Exception:  # noqa: BLE001
+        return None
