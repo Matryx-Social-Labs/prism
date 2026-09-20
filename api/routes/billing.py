@@ -1,11 +1,13 @@
-"""Billing: the plans the pricing page shows, and the provider webhook.
+"""Billing: plans, checkout, verification, cancellation, and the webhook.
 
-The provider is Razorpay Subscriptions (UPI Autopay + cards), not yet wired on
-2026-09-20 — no account. This route is the plug-in point built ahead of it:
-`/billing/plans` already serves the offer, and the webhook verifies Razorpay's
-HMAC and writes `subscriptions` rows, returning 503 until the secret is set.
-Entitlement is read from those rows by common/billing.plan_for; nothing else
-needs to change when the account arrives except the checkout button.
+Razorpay Subscriptions (UPI Autopay + cards). The flow: `/billing/checkout`
+creates the subscription server-side at the price of the day and hands its id
+to Checkout.js; Checkout's success callback comes back to `/billing/verify`
+with Razorpay's signature, which turns the row active at once; the webhook
+then keeps the row true over the months (charged, halted, cancelled). Until
+the keys are set, `plans` says `checkout_ready: false` and the checkout routes
+answer 503, so the pricing page shows no button that cannot work. Entitlement
+is read from `subscriptions` by common/billing.plan_for.
 """
 from __future__ import annotations
 
@@ -13,12 +15,16 @@ import hashlib
 import hmac
 import uuid
 from datetime import UTC, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.billing import prices
+from api.deps import get_current_user
+from common import razorpay
+from common.billing import OFFER, REGULAR, offer_open, prices
 from common.config import get_settings
 from common.db import get_db
 from common.logging import get_logger
@@ -46,7 +52,126 @@ def _launch_date() -> datetime | None:
 
 @router.get("/api/v1/billing/plans")
 async def plans(db: AsyncSession = Depends(get_db)):
-    return await prices(db, _launch_date())
+    out = await prices(db, _launch_date())
+    out["checkout_ready"] = razorpay.configured()
+    out["key_id"] = get_settings().razorpay_key_id or None  # public by design; Checkout.js needs it
+    return out
+
+
+class CheckoutIn(BaseModel):
+    plan: str  # plus_monthly | plus_yearly | founding
+
+
+@router.post("/api/v1/billing/checkout")
+async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db), user_id: UUID = Depends(get_current_user)):
+    """A subscription at TODAY's price for this plan, ready for Checkout.js."""
+    if not razorpay.configured():
+        raise HTTPException(status_code=503, detail="payments not configured")
+    current = await _current(db, user_id)
+    if current and current["status"] in ("active", "past_due"):
+        raise HTTPException(status_code=409, detail={"error": "already subscribed", "plan": current["plan"]})
+    on_offer = await offer_open(db, _launch_date())
+    table = OFFER if on_offer else REGULAR
+    price = table.get(body.plan)
+    if price is None:
+        raise HTTPException(status_code=422, detail=f"plan '{body.plan}' is not on sale")
+    if body.plan == "founding" and (await prices(db, _launch_date()))["founding_left"] <= 0:
+        raise HTTPException(status_code=422, detail="founding memberships are taken")
+    spec = razorpay.PlanSpec(key=body.plan if on_offer else f"{body.plan}_regular", label=price.label, paise=price.paise, period=price.period)
+    try:
+        sub = await razorpay.create_subscription(spec, str(user_id))
+    except Exception:
+        logger.exception("razorpay_create_subscription_failed", user_id=str(user_id), plan=body.plan)
+        raise HTTPException(status_code=502, detail="payment provider unavailable") from None
+    await db.execute(
+        text(
+            """
+            INSERT INTO subscriptions (id, user_id, provider, provider_sub_id, plan, status, price_paise, notes)
+            VALUES (:id, :u, 'razorpay', :sid, :plan, 'created', :price, 'checkout opened')
+            ON CONFLICT (provider, provider_sub_id) DO NOTHING
+            """
+        ),
+        {"id": uuid.uuid4(), "u": str(user_id), "sid": sub["id"], "plan": body.plan, "price": price.paise},
+    )
+    return {"subscription_id": sub["id"], "key_id": get_settings().razorpay_key_id, "plan": body.plan, "label": price.label, "amount_paise": price.paise, "period": price.period}
+
+
+class VerifyIn(BaseModel):
+    razorpay_payment_id: str
+    razorpay_subscription_id: str
+    razorpay_signature: str
+
+
+@router.post("/api/v1/billing/verify")
+async def verify(body: VerifyIn, db: AsyncSession = Depends(get_db), user_id: UUID = Depends(get_current_user)):
+    """Checkout's success callback: the signature proves the payment; the row
+    turns active now rather than whenever the webhook lands."""
+    if not razorpay.verify_checkout_signature(body.razorpay_payment_id, body.razorpay_subscription_id, body.razorpay_signature):
+        raise HTTPException(status_code=400, detail="bad signature")
+    res = await db.execute(
+        text(
+            """
+            UPDATE subscriptions SET status = 'active', notes = 'verified at checkout', updated_at = now()
+            WHERE provider = 'razorpay' AND provider_sub_id = :sid AND user_id = :u
+            RETURNING plan
+            """
+        ),
+        {"sid": body.razorpay_subscription_id, "u": str(user_id)},
+    )
+    row = res.first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="no such subscription for this account")
+    return {"ok": True, "plan": row[0]}
+
+
+@router.post("/api/v1/billing/cancel")
+async def cancel(db: AsyncSession = Depends(get_db), user_id: UUID = Depends(get_current_user)):
+    """One click: stops the next charge; Plus stays on to the end of the paid period."""
+    current = await _current(db, user_id)
+    if not current or current["status"] not in ("active", "past_due"):
+        raise HTTPException(status_code=404, detail="no active subscription")
+    if current["provider"] == "razorpay" and current["provider_sub_id"]:
+        try:
+            await razorpay.cancel_subscription(current["provider_sub_id"])
+        except Exception:
+            logger.exception("razorpay_cancel_failed", sub=current["provider_sub_id"])
+            raise HTTPException(status_code=502, detail="payment provider unavailable") from None
+    await db.execute(
+        text("UPDATE subscriptions SET cancel_at = coalesce(current_period_end, now()), updated_at = now() WHERE id = :id"),
+        {"id": current["id"]},
+    )
+    return {"ok": True, "access_until": current["current_period_end"].isoformat() if current["current_period_end"] else None}
+
+
+@router.get("/api/v1/billing/me")
+async def me(db: AsyncSession = Depends(get_db), user_id: UUID = Depends(get_current_user)):
+    """The account page's plan row."""
+    current = await _current(db, user_id)
+    if not current:
+        return {"plan": "free"}
+    return {
+        "plan": current["plan"],
+        "status": current["status"],
+        "current_period_end": current["current_period_end"].isoformat() if current["current_period_end"] else None,
+        "cancel_at": current["cancel_at"].isoformat() if current["cancel_at"] else None,
+        "price_paise": current["price_paise"],
+    }
+
+
+async def _current(db: AsyncSession, user_id: UUID) -> dict | None:
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT id, provider, provider_sub_id, plan, status, current_period_end, cancel_at, price_paise
+                FROM subscriptions WHERE user_id = :u
+                ORDER BY (status IN ('active','past_due')) DESC, created_at DESC LIMIT 1
+                """
+            ),
+            {"u": str(user_id)},
+        )
+    ).mappings().first()
+    return dict(row) if row else None
 
 
 @router.post("/api/v1/billing/razorpay/webhook")
