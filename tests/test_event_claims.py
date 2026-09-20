@@ -171,6 +171,9 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
         def mappings(self):
             return self
 
+        def scalars(self):  # the placeholder-photo hashes: none in this corpus
+            return self
+
         def first(self):
             if "FROM events WHERE id" in self.sql:
                 return {"id": eid, "title": "t", "headline_by": None, "summary": "s", "sector": None, "subsector": None,

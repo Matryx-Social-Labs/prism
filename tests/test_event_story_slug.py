@@ -25,6 +25,7 @@ def _client(story_row):
     class _R:
         def __init__(self, sql): self.sql = sql
         def mappings(self): return self
+        def scalars(self): return self  # the placeholder-photo hashes: none here
         def first(self):
             if "FROM events WHERE id" in self.sql:
                 return {"id": eid, "title": "t", "headline_by": None, "summary": "s", "sector": None, "subsector": None,
