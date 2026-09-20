@@ -573,12 +573,24 @@ export interface AskCitation {
   url: string | null;
 }
 
+/** Why a question was refused before any retrieval (api/routes/events.py ask). */
+export interface AskLimit {
+  status: number;
+  error?: string;
+  used?: number;
+  limit?: number;
+  signin_helps?: boolean;
+  plus_helps?: boolean;
+  retry_after_s?: number;
+}
+
 export interface AskCallbacks {
   onSession?: (sessionId: string) => void;
   onToken: (text: string) => void;
   onCitations: (citations: AskCitation[]) => void;
   onDone: () => void;
-  onError: (message: string) => void;
+  /** `limit` is set when the server said no (429/503) and says what would help. */
+  onError: (message: string, limit?: AskLimit) => void;
 }
 
 /** POST /ask and consume the SSE stream. */
@@ -600,7 +612,20 @@ export async function askQuestion(
     signal,
   });
   if (!res.ok || !res.body) {
-    callbacks.onError(`Request failed (${res.status})`);
+    // A 429/503 carries a JSON `detail` naming the way forward (sign in, Plus,
+    // wait a minute). Surface it; a bare status code reads as an outage.
+    let detail: Record<string, unknown> | null = null;
+    try {
+      const body = await res.json();
+      detail = body && typeof body.detail === "object" ? (body.detail as Record<string, unknown>) : null;
+    } catch {
+      detail = null;
+    }
+    if (detail && (res.status === 429 || res.status === 503)) {
+      callbacks.onError(String(detail.error ?? "question limit reached"), { status: res.status, ...detail } as AskLimit);
+    } else {
+      callbacks.onError(`Request failed (${res.status})`);
+    }
     return;
   }
 

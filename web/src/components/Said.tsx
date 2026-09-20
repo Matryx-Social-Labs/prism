@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAsk } from "@/components/AskContext";
 import type { SpeakerClaims } from "@/lib/api";
 import { ChevronDown } from "@/components/icons";
 import { OutletIcon } from "@/components/Coverage";
@@ -48,6 +49,7 @@ function SpeakerCard({ sp, sourceIndex, outletOf }: { sp: SpeakerClaims; sourceI
   // Two quotes per speaker, the rest on request: a minister with nine quotes
   // is a column of italics that buries the next speaker.
   const [all, setAll] = useState(false);
+  const ask = useAsk();
   const shown = all ? sp.claims : sp.claims.slice(0, QUOTES_FOLD);
   const outlets = new Set(sp.claims.map((c) => c.source_name)).size;
   return (
@@ -97,6 +99,16 @@ function SpeakerCard({ sp, sourceIndex, outletOf }: { sp: SpeakerClaims; sourceI
                         >
                           Open at the quote ↗
                         </a>
+                      )}
+                      {ask && (
+                        <button
+                          type="button"
+                          onClick={() => ask({ prefill: `About the quote “${c.quote_text.length > 160 ? c.quote_text.slice(0, 160) + "…" : c.quote_text}” by ${sp.speaker}: what else did they say on this story, and does any report contradict it?`, via: "quote" })}
+                          className="font-semibold underline-offset-4 hover:underline"
+                          style={{ color: "var(--ink-2)" }}
+                        >
+                          Ask about this quote
+                        </button>
                       )}
                     </div>
                     {/* The quote in place: the article's own words either side,

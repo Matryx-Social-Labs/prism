@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { track } from "@/lib/analytics";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail, type OutletRef, type TrendingStoryDetail } from "@/lib/api";
 import { headlineByline } from "@/lib/headline";
 import { useStateNames } from "@/lib/useStateName";
@@ -14,6 +14,9 @@ import { ArrowDown, ArrowLeft, ArrowUp, Dash, Lock, Speech } from "@/components/
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
+import { AskBar } from "@/components/AskBar";
+import { AskContext, type AskOpen } from "@/components/AskContext";
+import { SelectionAsk } from "@/components/SelectionAsk";
 import { Brand } from "@/components/Brand";
 import { CoverageBar, CoverageLegend, MonogramStack, OutletIcon, coverageText, languageNames, languagesOf, publishers } from "@/components/Coverage";
 import { EntityText } from "@/components/EntityText";
@@ -88,8 +91,9 @@ export function StoryView({ event }: { event: EventDetail }) {
   >(null);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
-  // Country codes resolve locally; a state code (IN-KA) needs the regions list.
-  const regionLabels = useStateNames(event.regions).map((r) => (r.includes("-") ? r : regionName(r)));
+  // Country codes resolve locally; a state code (IN-KA) needs the regions list,
+  // and until it arrives the code is left out rather than printed raw.
+  const regionLabels = useStateNames(event.regions).filter((r) => !/^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(r)).map((r) => (r.includes("-") ? r : regionName(r)));
   // Did the READER ask for this lens, or did it come back from their profile?
   // The locked-lens guard below has to tell those apart, and `lens` alone can't.
   const readerPicked = useRef(false);
@@ -205,6 +209,12 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Lightweight scroll-spy so the rail nav highlights the section in view.
   const [activeSection, setActiveSection] = useState("lens-brief");
   const [askOpen, setAskOpen] = useState(false);
+  // What opened Ask and with what (AskContext); the nonce makes a repeat new.
+  const [askRequest, setAskRequest] = useState<(AskOpen & { nonce: number }) | null>(null);
+  const openAsk = useCallback((o: AskOpen) => {
+    setAskRequest({ ...o, nonce: Date.now() });
+    setAskOpen(true);
+  }, []);
   const [allSources, setAllSources] = useState(false);
   const [allReports, setAllReports] = useState(false);
 
@@ -297,7 +307,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   );
 
   return (
-    <>
+    <AskContext.Provider value={openAsk}>
       {/* Phone back bar: the way back, the mark, Share. The thumb bar below
           carries Share and Ask; the tab bar is hidden on the record. */}
       <div className="glass sticky top-0 z-30 -mx-5 flex h-[52px] items-center justify-between border-b px-3 sm:-mx-8 sm:px-6 lg:hidden" style={{ borderColor: "var(--line)" }}>
@@ -370,7 +380,7 @@ export function StoryView({ event }: { event: EventDetail }) {
             <div className="mt-5"><ReportImages sources={event.sources} /></div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="hidden lg:inline-flex"><ShareButton url={`/story/${event.id}`} title={event.title} /></span>
-              <button type="button" onClick={() => setAskOpen(true)} className="btn btn-secondary hidden lg:inline-flex">
+              <button type="button" onClick={() => openAsk({ via: "foot" })} className="btn btn-secondary hidden lg:inline-flex">
                 <Speech /> Ask this story
               </button>
               <span className="flex-1" />
@@ -381,7 +391,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           <article className="min-w-0 lg:max-w-[var(--reading)]">
             {/* ── The record — the lens block, the product moment ─────
                 Mechanics unchanged: the locked flip, the gate, the keys. */}
-            <section id="lens-brief" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }}>
+            <section id="lens-brief" data-askable className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }}>
               <Head
                 id="record-title"
                 title="The record"
@@ -547,7 +557,7 @@ export function StoryView({ event }: { event: EventDetail }) {
 
             {/* ── Who said what ─────────────────────────────────── */}
             {claims.length > 0 && (
-              <section id="said" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="said-title">
+              <section id="said" data-askable className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="said-title">
                 <Head
                   id="said-title"
                   title="Who said what"
@@ -648,28 +658,19 @@ export function StoryView({ event }: { event: EventDetail }) {
               </section>
             )}
 
-            {/* ── Ask, subordinate to the evidence ──────────────── */}
-            <section id="ask" className="scroll-mt-24 py-6" aria-labelledby="ask-title">
+            {/* ── Ask: the heading here, the bar below it. The bar is a direct
+                child of the article (not of this section) so `sticky` can hold
+                it at the viewport's foot all the way down the record, and it
+                docks here when the reader arrives — one input, never two. */}
+            <section id="ask" className="scroll-mt-24 pt-6" aria-labelledby="ask-title">
               <Head id="ask-title" title="Ask this story" hint="Answers cite the reports above, or say they can't." />
-              <div className="card">
-                <button
-                  type="button"
-                  onClick={() => setAskOpen(true)}
-                  className="flex h-11 w-full items-center gap-2.5 rounded-full border px-4 text-left text-[15px]"
-                  style={{ borderColor: "var(--line-strong)", color: "var(--ink-3)" }}
-                  aria-label="Ask about this story"
-                >
-                  <Speech /> Ask about this story…
-                </button>
-                {questions.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {questions.slice(0, 3).map((q) => (
-                      <button key={q} type="button" onClick={() => setAskOpen(true)} className="chip h-8 whitespace-normal text-left text-[13px]">{q}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </section>
+            {/* Gone while the sheet is open: one input on screen at a time. */}
+            {!askOpen && (
+              <div className="z-20 pb-6 lg:sticky lg:bottom-4">
+                <AskBar suggestions={questions} sourceCount={sourceCount} />
+              </div>
+            )}
 
             <p className="flex justify-between gap-4 border-t pt-4 text-[13.5px] font-medium" style={{ borderColor: "var(--line)" }}>
               <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>← Today&rsquo;s record</Link>
@@ -706,7 +707,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       >
         <button
           type="button"
-          onClick={() => setAskOpen(true)}
+          onClick={() => openAsk({ via: "thumb" })}
           className="btn btn-primary flex-[1.4]"
         >
           <Speech /> Ask
@@ -725,7 +726,9 @@ export function StoryView({ event }: { event: EventDetail }) {
         open={askOpen}
         onOpenChange={setAskOpen}
         launcher={false}
+        request={askRequest}
       />
-    </>
+      <SelectionAsk />
+    </AskContext.Provider>
   );
 }

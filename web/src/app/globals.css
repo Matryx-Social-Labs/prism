@@ -381,6 +381,13 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 }
 
 /* ── Motion primitives (all gated on prefers-reduced-motion) ───────── */
+/* The Ask sheet arrives from its edge: up on the phone, in from the right on
+   a desk. 220ms, the standard ease; reduced motion places it. */
+@keyframes askUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes askIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.ask-sheet { animation: askUp 220ms cubic-bezier(.2,.7,.2,1) both; }
+@media (min-width: 1024px) { .ask-sheet { animation-name: askIn; } }
+@media (prefers-reduced-motion: reduce) { .ask-sheet { animation: none; } }
 
 /* The re-typeset flip (DESIGN.md signature): a lens-colored scan line sweeps
    the lens block while the content re-inks BEHIND it. The ink is a veil in the

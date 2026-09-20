@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowUp, Close } from "@/components/icons";
-import type { AskCitation } from "@/lib/api";
+import type { AskCitation, AskLimit } from "@/lib/api";
 import type { KeyboardEvent, RefObject } from "react";
 
 // The Ask panel's body, one markup for the ticket's live panel and the
@@ -13,7 +14,48 @@ export interface Turn {
   text: string;
   citations: AskCitation[];
   error?: string;
+  /** The server refused before answering; what would help is in here. */
+  limit?: AskLimit;
   streaming: boolean;
+}
+
+/** The answer's `[n]` markers as mono chips that open the cited report. */
+export function AnswerText({ text, citations }: { text: string; citations: AskCitation[] }) {
+  const parts = text.split(/(\[\d+\])/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const m = /^\[(\d+)\]$/.exec(part);
+        if (!m) return <span key={i}>{part}</span>;
+        const c = citations.find((x) => x.number === Number(m[1]));
+        const chip = "mx-px inline-block rounded-[4px] px-1 align-baseline font-mono text-[11px] leading-[1.6]";
+        return c?.url ? (
+          <a key={i} href={c.url} target="_blank" rel="noopener noreferrer" title={c.source_name} className={`${chip} underline-offset-2 hover:underline`} style={{ background: "var(--sunken)", color: "var(--ink)" }}>{part}</a>
+        ) : (
+          <span key={i} className={chip} style={{ background: "var(--sunken)", color: "var(--ink-2)" }}>{part}</span>
+        );
+      })}
+    </>
+  );
+}
+
+/** What a refused question tells the reader, and the one action that helps. */
+export function LimitNote({ limit, next }: { limit: AskLimit; next: string }) {
+  if (limit.retry_after_s) return <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>One question at a time — try again in a minute.</p>;
+  if (limit.status === 503) return <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>Ask is resting for today for free readers. It is back at midnight UTC.</p>;
+  if (limit.signin_helps) {
+    return (
+      <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+        That was your last free question here.{" "}
+        <Link href={`/signin?next=${encodeURIComponent(next)}`} className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>Sign in for 10 a day →</Link>
+      </p>
+    );
+  }
+  return (
+    <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+      You have asked {limit.used ?? limit.limit} of {limit.limit} questions today.{limit.plus_helps ? " Plus, at 100 a day, opens soon." : ""}
+    </p>
+  );
 }
 
 export function isRefusal(turn: Turn): boolean {
@@ -93,16 +135,19 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
             <div key={i} className="grid grid-cols-[20px_1fr] gap-x-2 pt-1">
               <span className="font-mono text-[11px] leading-[1.9]" style={{ color: "var(--ink-faint)" }}>A</span>
               <div className="min-w-0">
-                {isRefusal(t) && (
+                {(isRefusal(t) || t.limit) && (
                   <span className="mb-1 block font-mono text-[11px]" style={{ color: "var(--ink)" }}>
-                    Not in sources
+                    {t.limit ? "Limit" : "Not in sources"}
                   </span>
                 )}
+                {t.limit ? (
+                  <LimitNote limit={t.limit} next={typeof window === "undefined" ? "/" : window.location.pathname} />
+                ) : (
                 <p
                   className="text-[13.5px] leading-[1.65]"
                   style={{ color: t.error ? "var(--danger)" : isRefusal(t) ? "var(--ink)" : "var(--ink-muted)" }}
                 >
-                  {t.error ?? t.text}
+                  {t.error ?? <AnswerText text={t.text} citations={t.streaming ? [] : t.citations} />}
                   {t.streaming && (
                     <span
                       className="blink-caret ml-0.5 inline-block h-3.5 w-[7px] align-text-bottom"
@@ -110,6 +155,7 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
                     />
                   )}
                 </p>
+                )}
                 {!t.streaming && t.citations.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-[5px]">
                     {t.citations.map((c) => (

@@ -3,13 +3,16 @@
 import { track } from "@/lib/analytics";
 import { Speech } from "@/components/icons";
 import { AskShell, type Turn } from "@/components/AskShell";
+import type { AskOpen } from "@/components/AskContext";
+import { useSession } from "@/lib/session";
 
-// The grounded per-story agent as a floating panel at every width (founder
-// decision, 2026-09-17): a launcher pill bottom-right from 1024px, the
-// ticket's pinned thumb-zone button beneath that; the chat is a 400px panel
-// bottom-right on a desk and a bottom sheet over a scrim on a phone. Answers
-// stream from the story's own sources with numbered citations; a refusal
-// renders as a first-class state.
+// The grounded per-story agent as one sheet at every width: a bottom sheet
+// over a scrim on the phone, a right-side drawer under the top bar on a desk
+// so the record stays readable beside the answer (founder, 2026-09-20; it was
+// a 400px box bottom-right). Opened by the persistent bar, the thumb-zone
+// button, a selection, a quote or an entity (AskContext), which may hand it a
+// question to show or to send. Answers stream from the story's own sources
+// with numbered citations; a refusal and a limit are first-class states.
 
 import { useEffect, useRef, useState } from "react";
 import { askQuestion, type AskCitation } from "@/lib/api";
@@ -21,6 +24,7 @@ export function AskPanel({
   open: openProp,
   onOpenChange,
   launcher = true,
+  request = null,
 }: {
   eventId: string;
   sourceCount: number;
@@ -30,7 +34,10 @@ export function AskPanel({
   onOpenChange?: (v: boolean) => void;
   // The bottom-right launcher pill; off when the page supplies its own.
   launcher?: boolean;
+  // What an entry point opened us with; `nonce` makes the same text twice a new request.
+  request?: (AskOpen & { nonce: number }) | null;
 }) {
+  const session = useSession();
   const [openState, setOpenState] = useState(false);
   const open = openProp !== undefined ? openProp : openState;
   const setOpen = (v: boolean) => (onOpenChange ? onOpenChange(v) : setOpenState(v));
@@ -63,6 +70,28 @@ export function AskPanel({
   // response and setting state on a dead component.
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // An entry point's request: send it, or put it in the input to finish. The
+  // caret goes to the end so a quoted line reads as the start of a question.
+  const viaRef = useRef<AskOpen["via"]>("foot");
+  useEffect(() => {
+    if (!request) return;
+    viaRef.current = request.via;
+    if (request.submit && request.prefill) {
+      void submit(request.prefill);
+      return;
+    }
+    if (request.prefill !== undefined) {
+      setInput(request.prefill);
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus({ preventScroll: true });
+        el.setSelectionRange(el.value.length, el.value.length);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request?.nonce]);
+
   async function submit(question: string) {
     const q = question.trim();
     if (!q || busyRef.current) return;
@@ -70,7 +99,8 @@ export function AskPanel({
     setBusy(true);
     setInput("");
     setOpen(true);
-    track("Ask");
+    track("Ask", { via: viaRef.current });
+    viaRef.current = "foot";
 
     // Capture THIS answer's index at submit time. Targeting `prev.length - 1`
     // meant a second question's turn could receive the first's tokens, and its
@@ -103,9 +133,12 @@ export function AskPanel({
           onToken: (text) => update((t) => ({ ...t, text: t.text + text })),
           onCitations: (citations) => update((t) => ({ ...t, citations })),
           onDone: () => update((t) => ({ ...t, streaming: false })),
-          onError: (message) => update((t) => ({ ...t, error: message, streaming: false })),
+          onError: (message, limit) => update((t) => ({ ...t, error: limit ? undefined : message, limit, streaming: false })),
         },
         controller.signal,
+        // The account's allowance and model, not the anonymous three: without
+        // the token every signed-in reader was capped as a stranger.
+        session?.token,
       );
     } catch {
       if (!controller.signal.aborted) {
@@ -148,7 +181,7 @@ export function AskPanel({
             onClose={() => setOpen(false)}
             inputRef={inputRef}
             scrollRef={scrollRef}
-            className="fixed inset-x-0 bottom-0 z-[46] max-h-[86vh] border-t lg:inset-auto lg:bottom-5 lg:right-5 lg:max-h-[min(640px,calc(100vh-40px))] lg:w-[400px] lg:border"
+            className="ask-sheet fixed inset-x-0 bottom-0 z-[46] max-h-[86vh] border-t lg:inset-auto lg:bottom-0 lg:right-0 lg:top-[var(--topbar)] lg:max-h-none lg:w-[420px] lg:border-l lg:border-t-0"
           />
         </>
       )}

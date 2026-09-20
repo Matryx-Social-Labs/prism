@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import { useAsk } from "@/components/AskContext";
 import type { EntityOut, SpeakerClaims } from "@/lib/api";
 import { entityKind, markEntities, type Segment } from "@/lib/entities";
 
@@ -47,6 +48,7 @@ export function EntityText({
 const norm = (s: string) => s.replace(/\./g, " ").replace(/\s+/g, " ").trim().toLowerCase();
 
 export function EntityMark({ label, entity, claims = [] }: { label: string; entity: EntityOut; claims?: SpeakerClaims[] }) {
+  const ask = useAsk();
   const [open, setOpen] = useState(false);
   const id = useId();
   const wrap = useRef<HTMLSpanElement>(null);
@@ -114,6 +116,16 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
             <span className="text-[13.5px]" style={{ color: "var(--ink-2)" }}>
               Named in the reports{entity.role ? ` · ${entity.role.replace(/_/g, " ")}` : ""}.
             </span>
+          )}
+          {ask && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); ask({ prefill: `What do the reports say about ${entity.name} on this story?`, via: "entity" }); }}
+              className="text-left text-[13.5px] font-semibold"
+              style={{ color: "var(--ink-2)" }}
+            >
+              Ask about {entity.name} on this story
+            </button>
           )}
           <Link href={href} className="text-[13.5px] font-semibold" style={{ color: "var(--accent)" }}>
             All stories about {entity.name} →

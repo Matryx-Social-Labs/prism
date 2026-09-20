@@ -65,8 +65,45 @@ describe("AskPanel — submitting", () => {
     askQuestion.mockResolvedValue(undefined);
     render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
     await userEvent.click(screen.getByRole("button", { name: "What led to this?" }));
-    expect(askQuestion).toHaveBeenCalledWith("e1", "What led to this?", null, expect.anything(), expect.anything());
+    expect(askQuestion).toHaveBeenCalledWith("e1", "What led to this?", null, expect.anything(), expect.anything(), undefined);
   });
+
+  // REGRESSION: the token was never passed, so every signed-in reader was
+  // capped and modelled as an anonymous stranger (3 questions, the free model).
+  it("sends the account's bearer token when the reader is signed in", async () => {
+    window.localStorage.setItem("prism.session.v1", JSON.stringify({ token: "tok-1", userId: "u1", email: "a@b.c" }));
+    askQuestion.mockResolvedValue(undefined);
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
+    await userEvent.click(screen.getByRole("button", { name: "What led to this?" }));
+    expect(askQuestion).toHaveBeenLastCalledWith("e1", "What led to this?", null, expect.anything(), expect.anything(), "tok-1");
+    window.localStorage.removeItem("prism.session.v1");
+  });
+
+  it("renders a refused question as a limit with the way forward, not as an outage", async () => {
+    const s = streamController();
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
+    await userEvent.type(screen.getByPlaceholderText(/ask anything/i), "why?{Enter}");
+    await s.started;
+    act(() => s.cb().onError("question limit reached", { status: 429, used: 3, limit: 3, signin_helps: true }));
+    expect(await screen.findByText("Limit")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Sign in for 10 a day/ })).toHaveAttribute("href", expect.stringContaining("/signin?next="));
+    expect(screen.queryByText(/Request failed/)).toBeNull();
+  });
+
+  it("prints [n] in the answer as a chip that opens the cited report", async () => {
+    const s = streamController();
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
+    await userEvent.type(screen.getByPlaceholderText(/ask anything/i), "why?{Enter}");
+    await s.started;
+    act(() => {
+      s.cb().onToken("Because of the contracts [1].");
+      s.cb().onCitations([{ number: 1, source_name: "The Hindu", url: "https://x" } as never]);
+      s.cb().onDone();
+    });
+    const chips = await screen.findAllByRole("link", { name: "[1]" });
+    expect(chips[0]).toHaveAttribute("href", "https://x");
+  });
+
 
   it("renders streamed tokens and their citations", async () => {
     const s = streamController();
@@ -175,5 +212,20 @@ describe("AskPanel — the floating panel", () => {
   it("prints the source count on the launcher", () => {
     render(<AskPanel {...PROPS} />);
     expect(screen.getByRole("button", { name: /ask this story\s*4 sources/i })).toBeInTheDocument();
+  });
+});
+
+describe("AskPanel — opened by an entry point", () => {
+  it("sends a request marked submit at once", async () => {
+    askQuestion.mockResolvedValue(undefined);
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} request={{ prefill: "Who paid?", submit: true, via: "bar", nonce: 1 }} />);
+    await waitFor(() => expect(askQuestion).toHaveBeenCalledWith("e1", "Who paid?", null, expect.anything(), expect.anything(), undefined));
+  });
+
+  it("puts a prefilled question in the input to finish, and does not send it", async () => {
+    askQuestion.mockResolvedValue(undefined);
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} request={{ prefill: "About this line: “x” — ", via: "selection", nonce: 2 }} />);
+    expect(await screen.findByDisplayValue(/About this line: “x”/)).toBeInTheDocument();
+    expect(askQuestion).not.toHaveBeenCalled();
   });
 });
