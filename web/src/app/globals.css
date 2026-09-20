@@ -545,7 +545,12 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 .stagger > *:nth-child(8) { animation-delay: 390ms; }
 .stagger > *:nth-child(n + 9) { animation-delay: 440ms; }
 
+/* Reveal: a block prints in once, when first seen (components/Reveal.tsx). */
+.reveal { opacity: 0; transform: translateY(8px); transition: opacity 240ms var(--ease), transform 240ms var(--ease); }
+.reveal.is-in { opacity: 1; transform: none; }
+
 @media (prefers-reduced-motion: reduce) {
+  .reveal,
   .js .reveal,
   .stagger > * {
     opacity: 1;

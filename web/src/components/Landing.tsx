@@ -9,6 +9,7 @@ import { LensRegistry } from "@/components/LensRegistry";
 import { PrismFigure } from "@/components/PrismFigure";
 import { Said } from "@/components/Said";
 import { SectionHead } from "@/components/SectionHead";
+import { AVAILABLE, NEXT, StatusColumn, VALIDATION } from "@/components/StatusGrid";
 import { OutletIcon } from "@/components/Coverage";
 import { ArrowRight } from "@/components/icons";
 import { fallbackCode, indexSources } from "@/lib/sources";
@@ -84,41 +85,6 @@ function outletsOf(event: EventDetail | null): OutletRef[] {
   return event.sources
     .filter((s) => s.code && s.origin)
     .map((s) => ({ slug: s.source_slug, publisher: s.publisher ?? s.source_slug, name: s.source_name, code: s.code!, origin: s.origin as Origin, language: s.language ?? null, domain: s.domain ?? null }));
-}
-
-const AVAILABLE = [
-  "One record per story from monitored outlets, across languages",
-  "Verbatim quotes with the source and the article context",
-  "Coverage by outlet origin on every story",
-  "Reader, Markets and Cyber readings of the same facts",
-  "Ask, cited to the story's own reports",
-];
-const VALIDATION = [
-  "Story timelines across days (two-reviewer gate)",
-  "Freshness targets on a clean 72-hour cohort",
-  "Coverage gaps stated against the monitored set",
-];
-const NEXT = [
-  "Follow a story and see only what changed since you last read",
-  "Original-language quotes beside the translation",
-  "A corrections log on every record",
-];
-
-function StatusColumn({ tone, label, items }: { tone: "now" | "val" | "next"; label: string; items: string[] }) {
-  const color = tone === "now" ? "var(--lens-markets)" : tone === "val" ? "var(--status-disputed)" : "var(--ink-3)";
-  return (
-    <div className="card">
-      <h3 className="mb-3 text-[12.5px] font-semibold uppercase tracking-[0.08em]" style={{ color }}>{label}</h3>
-      <ul className="flex flex-col gap-2 text-[14.5px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
-        {items.map((item) => (
-          <li key={item} className="flex gap-2.5">
-            <span aria-hidden className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color, opacity: 0.6 }} />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 export async function Landing() {

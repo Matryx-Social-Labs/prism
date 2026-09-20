@@ -36,7 +36,7 @@ export function Said({
   outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className={`grid gap-3 ${claims.length > 1 ? "md:grid-cols-2" : ""}`}>
       {claims.map((sp) => (
         <SpeakerCard key={sp.speaker} sp={sp} sourceIndex={sourceIndex} outletOf={outletOf} />
       ))}
