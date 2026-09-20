@@ -5,8 +5,12 @@ cannot tell a story from its topic on real transcripts. The judge sees the
 headline, the first lines of the record and the passage, and answers one of
 three words. `event` is the only one that becomes a clip. Verdicts are cached
 per (event, window) in clip_verdicts, so the hourly recompute is free for
-every pair it has seen. The light gate model, reasoning off: ≈ 700 tokens a
-pair, ≈ $0.03 for a first backlog of 400 pairs.
+every pair it has seen. The judge model (the one that scores groundedness),
+reasoning off, ≈ 700 tokens a pair. Measured 2026-09-20 on 23 clips: 0.83
+precision pairwise; a comparative form (one call per window over all its
+candidate stories) was worse at 0.56 — it picked "the best on the menu" even
+for a headline list — so pairwise stays, and podcasts/match.py adds the
+structural rule the misses pointed at (one event per story per window).
 """
 from __future__ import annotations
 
@@ -36,7 +40,10 @@ SYSTEM = (
     "You judge whether a stretch of a news podcast transcript is about a specific news story. "
     "Answer with one word in the JSON field `about`: event, topic or unrelated. `event` only when the "
     "passage itself discusses this very happening — not merely the same people, company or theme, and not "
-    "a host's introduction, segue or list of headlines."
+    "a host's introduction, segue or list of headlines. A passage that only announces that the show will cover "
+    "the subject, or moves from one story to the next, is `topic`. A different announcement, speech or finding "
+    "from the same conference, court, ministry or company is `topic`, not `event`: the headline names one "
+    "happening and the passage must be about that one. If in doubt, `topic`."
 )
 
 
@@ -44,7 +51,7 @@ async def judge_pairs(db: AsyncSession, pairs: list[tuple[uuid.UUID, uuid.UUID]]
     """Verdicts for (event_id, window_id) pairs, from the cache where it has them."""
     if not pairs:
         return {}
-    model = get_settings().prism_model_gate
+    model = get_settings().prism_model_judge
     cached = {
         (r[0], r[1]): r[2]
         for r in (await db.execute(text(
@@ -76,6 +83,7 @@ async def judge_pairs(db: AsyncSession, pairs: list[tuple[uuid.UUID, uuid.UUID]]
                 ],
                 output_model=Verdict,
                 trace_name="clip-judge",
+                temperature=0,  # a verdict, not a draft: the same pair must judge the same way twice
                 max_tokens=40,
                 reasoning=REASONING_OFF,
             )

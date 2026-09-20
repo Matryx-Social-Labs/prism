@@ -62,3 +62,12 @@ def test_title_hits_count_the_headlines_own_words_not_glue():
     clip = "the U.S. House is expected to pass a new law which would put up to 100% tariff sanctions on India"
     assert title_hits(clip, "US House clears Russia sanctions bill authorizing 100% tariffs on India") >= 2
     assert title_hits(clip, "BMC issues notices to 294 establishments without Marathi signboards") == 0
+
+
+def test_a_window_backs_one_event_per_story_the_best_one():
+    from podcasts.match import one_event_per_story
+
+    ev1, ev2, ev3, ep, w = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    hits = [Hit(ev1, w, ep, 1, 0, 40, 0.90, 1, "semicon"), Hit(ev2, w, ep, 1, 0, 40, 0.92, 1, "semicon"), Hit(ev3, w, ep, 1, 0, 40, 0.85, 1, "tata")]
+    kept = one_event_per_story(hits)
+    assert {h.event_id for h in kept} == {ev2, ev3}

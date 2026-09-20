@@ -62,6 +62,20 @@ class Hit:
     end_s: float
     score: float
     entity_hits: int
+    story: str = ""
+
+
+def one_event_per_story(hits: list[Hit]) -> list[Hit]:
+    """A window backs at most one event per story: the best-scoring one. The
+    story layer splits a conference or a saga into several events; a passage
+    about "Semicon" would otherwise be credited to three sub-stories at once
+    (three of the four misses on 2026-09-20). Pure; tested."""
+    best: dict[tuple[uuid.UUID, str], Hit] = {}
+    for h in hits:
+        k = (h.window_id, h.story)
+        if k not in best or h.score > best[k].score:
+            best[k] = h
+    return list(best.values())
 
 
 def entity_hits(window_text: str, names: list[str]) -> int:
@@ -117,7 +131,7 @@ def merge_runs(hits: list[Hit]) -> list[Hit]:
                         grew = True
                     if not grew:
                         break
-                out.append(Hit(best.event_id, best.window_id, best.episode_id, best.seq, run[lo].start_s, run[hi].end_s, best.score, max(x.entity_hits for x in run[lo:hi + 1])))
+                out.append(Hit(best.event_id, best.window_id, best.episode_id, best.seq, run[lo].start_s, run[hi].end_s, best.score, max(x.entity_hits for x in run[lo:hi + 1]), best.story))
             run = [h] if h is not None else []
     return out
 
@@ -185,10 +199,10 @@ async def match_recent(hours: int = 96) -> int:
             for c in cands:
                 n = entity_hits(w["text"], cast.get(c["id"], []))
                 if n or title_hits(w["text"], c["title"]) >= TITLE_WORDS:
-                    hits.append(Hit(c["id"], w["id"], w["episode_id"], w["seq"], float(w["start_s"]), float(w["end_s"]), float(c["cos"]), n))
+                    hits.append(Hit(c["id"], w["id"], w["episode_id"], w["seq"], float(w["start_s"]), float(w["end_s"]), float(c["cos"]), n, story_of.get(str(c["id"]), str(c["id"]))))
         # The judge reads both texts; only `event` verdicts go on. Cached per pair.
         verdicts = await judge_pairs(s, [(h.event_id, h.window_id) for h in hits])
-        hits = [h for h in hits if verdicts.get((h.event_id, h.window_id)) == "event"]
+        hits = one_event_per_story([h for h in hits if verdicts.get((h.event_id, h.window_id)) == "event"])
         clips = merge_runs(hits)
         # Best CLIPS_PER_EVENT per event, one per episode.
         per_event: dict[uuid.UUID, list[Hit]] = {}
