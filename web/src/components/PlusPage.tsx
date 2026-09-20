@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Dash } from "@/components/icons";
 import { Reveal } from "@/components/Reveal";
@@ -44,6 +44,7 @@ function Row({ ok, children, muted = false }: { ok: boolean; children: React.Rea
 
 export function PlusPage() {
   const session = useSession();
+  const router = useRouter();
   const params = useSearchParams();
   const from = params.get("from");
   const [plans, setPlans] = useState<PlansOut | null>(null);
@@ -84,8 +85,9 @@ export function PlusPage() {
     setBusy(plan);
     setNote(null);
     try {
-      await subscribe(plan, session.token, session.email);
+      await subscribe(plan, session.token, session.email, (_kind, detail) => setNote(`${detail}. The sheet is still open — try UPI or another card.`));
       setMyPlan("plus");
+      router.push(`/plus/welcome${from ? `?next=${encodeURIComponent(from.startsWith("/") ? from : "/feed")}` : ""}`);
     } catch (e) {
       const m = e instanceof Error ? e.message : "";
       if (m !== "dismissed") setNote(m || "Payment did not go through.");

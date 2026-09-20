@@ -13,7 +13,7 @@ import { Headphones, Pause, Play, SkipNext } from "@/components/icons";
  * to the clip's start; at the clip's end the queue advances to the next card
  * (another episode if need be) unless the reader chose to keep listening. The
  * transcript is the card's body — the first sentence is the headline — and its
- * words ink as they are spoken. Nothing is ours: the audio, the words and the
+ * words step back as they are spoken (the unsaid stand in ink). Nothing is ours: the audio, the words and the
  * art are the show's, named on the card, with the whole episode one tap away.
  *
  * Hosts stitch ads in per request, so the file the browser loads may not be

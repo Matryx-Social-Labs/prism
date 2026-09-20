@@ -65,7 +65,7 @@ export function UpgradeSheet({
     setBusy(true);
     setNote(null);
     try {
-      await subscribe(monthly.plan, session.token, session.email);
+      await subscribe(monthly.plan, session.token, session.email, (_kind, detail) => setNote(`${detail}. The sheet is still open — try UPI or another card.`));
       setDone(true);
       onSubscribed?.();
     } catch (e) {

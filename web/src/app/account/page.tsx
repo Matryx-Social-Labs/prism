@@ -3,20 +3,22 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-
+import { PlanCard } from "@/components/PlanCard";
+import { SectionHead } from "@/components/SectionHead";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { clearSession, useSession } from "@/lib/session";
 
+// The account: who you are, what you pay for, and the door out — the same
+// hairline sections as every other page (DESIGN.md § Account). The plan is
+// first because it is why most people come here.
 export default function AccountPage() {
   const session = useSession();
   const router = useRouter();
 
-  // Not signed in → send to the sign-in page.
   useEffect(() => {
     if (session === null && typeof window !== "undefined") {
-      // useSession initializes to null then syncs; only redirect once we've had
-      // a tick to read localStorage. A microtask defer avoids a flash-redirect.
       const t = setTimeout(() => {
-        if (!localStorage.getItem("prism.session.v1")) router.replace("/signin");
+        if (!localStorage.getItem("prism.session.v1")) router.replace("/signin?next=/account");
       }, 0);
       return () => clearTimeout(t);
     }
@@ -25,29 +27,48 @@ export default function AccountPage() {
   if (!session) return null;
 
   return (
-    <div className="mx-auto flex min-h-[60dvh] w-full max-w-[440px] flex-col justify-center px-5 py-14">
-      <div className="card p-6">
-        <h1 className="font-record text-[28px] font-medium leading-[1.15]">Account</h1>
-        <dl className="mt-5 border-t pt-4" style={{ borderColor: "var(--line)" }}>
-          <dt className="field-label" style={{ color: "var(--ink-3)" }}>Signed in as</dt>
-          <dd className="mt-1 font-mono text-[14.5px]" style={{ color: "var(--ink)" }}>{session.email}</dd>
-        </dl>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              clearSession();
-              router.replace("/feed");
-            }}
-            className="btn btn-secondary"
-          >
-            Sign out
-          </button>
-          <Link href="/you" className="btn btn-ghost">Your profile</Link>
+    <div className="mx-auto w-full max-w-[var(--reading)] px-5 pb-20 pt-8 sm:px-8">
+      <h1 className="font-record text-[32px] font-medium leading-[1.1] tracking-[-0.015em]">Account</h1>
+      <p className="mt-1.5 font-mono text-[12.5px]" style={{ color: "var(--ink-3)" }}>{session.email}</p>
+
+      <section className="mt-8" aria-labelledby="plan-title">
+        <SectionHead id="plan-title" title="Your plan" />
+        <PlanCard session={session} />
+      </section>
+
+      <section className="mt-8" aria-labelledby="profile-title">
+        <SectionHead id="profile-title" title="Your record" hint="Your state, profession and the subjects you follow shape Today." />
+        <div className="card divide-y p-0" style={{ borderColor: "var(--line)" }}>
+          <Link href="/you" className="flex min-h-[56px] items-center px-4 text-[15px] font-medium" style={{ borderColor: "var(--line)" }}>Profile, state and subjects →</Link>
+          <Link href="/watchlist" className="flex min-h-[56px] items-center px-4 text-[15px] font-medium" style={{ borderColor: "var(--line)" }}>Watchlist →</Link>
+          <div className="flex min-h-[56px] items-center px-4" style={{ borderColor: "var(--line)" }}>
+            <span className="text-[15px]">Theme</span>
+            <span className="ml-auto"><ThemeToggle /></span>
+          </div>
         </div>
-      </div>
-      <Link href="/feed" className="mt-6 self-center text-[14px] font-medium underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>
-        Back to today&rsquo;s record
-      </Link>
+      </section>
+
+      <section className="mt-8" aria-labelledby="signout-title">
+        <SectionHead id="signout-title" title="Sign out" />
+        <div className="card divide-y p-0" style={{ borderColor: "var(--line)" }}>
+          <button
+            onClick={() => { clearSession(); router.replace("/feed"); }}
+            className="flex min-h-[56px] w-full items-center px-4 text-left text-[15px] font-semibold"
+            style={{ color: "var(--danger)" }}
+          >
+            Sign out of Prism
+          </button>
+        </div>
+        <p className="mt-3 text-[13px] leading-[1.5]" style={{ color: "var(--ink-3)" }}>
+          To delete your account and everything we hold, write to us from this address — see the <Link href="/privacy" className="underline underline-offset-[3px]">privacy policy</Link>.
+        </p>
+      </section>
+
+      <p className="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: "var(--ink-3)" }}>
+        <Link href="/privacy" className="underline-offset-[3px] hover:underline">Privacy</Link>
+        <Link href="/terms" className="underline-offset-[3px] hover:underline">Terms</Link>
+        <Link href="/refunds" className="underline-offset-[3px] hover:underline">Refunds</Link>
+      </p>
     </div>
   );
 }

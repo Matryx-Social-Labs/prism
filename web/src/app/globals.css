@@ -274,11 +274,21 @@ button:disabled {
   transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
 }
 .chip:hover { border-color: var(--line-strong); color: var(--ink); }
-/* The photo pile on a story row: the cards behind spread a little on hover. */
-.photo-stack__card { transition: transform var(--t-micro) var(--ease); }
-.group:hover .photo-stack .photo-stack__card:nth-child(1) { transform: rotate(-7deg) translate(-6px, -10px) !important; }
-.group:hover .photo-stack .photo-stack__card:nth-child(2) { transform: rotate(4deg) translate(2px, -6px) !important; }
-@media (prefers-reduced-motion: reduce) { .photo-stack__card { transition: none; } .group:hover .photo-stack .photo-stack__card { transform: none !important; } }
+/* The photo pile on a story row (components/PhotoStack). The cards start
+   stacked under the front one; when the row comes into view they settle into
+   their fan on a spring (one beat, staggered by the inline delay); a hover on a
+   desk spreads the fan a little further. A photograph fades in as it loads. */
+.photo-stack__card { transform: translate(0, 0) rotate(0deg); transition: transform 480ms cubic-bezier(.34,1.4,.64,1); will-change: transform; }
+.photo-stack.is-in .photo-stack__card { transform: translate(var(--fan-x, 0), var(--fan-y, 0)) rotate(var(--fan-r, 0deg)); }
+@media (hover: hover) {
+  .group:hover .photo-stack.is-in .photo-stack__card { transform: translate(calc(var(--fan-x, 0) * 1.9), calc(var(--fan-y, 0) * 2.2)) rotate(calc(var(--fan-r, 0deg) * 1.6)); transition-delay: 0ms !important; }
+}
+.photo-fade { opacity: 0; transition: opacity 320ms var(--ease); }
+.photo-fade.is-ready { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .photo-stack__card { transition: none; }
+  .photo-fade { opacity: 1; transition: none; }
+}
 /* A question as a chip: it wraps, because a question is a sentence. */
 .chip-q { height: auto; min-height: 34px; padding: 6px 14px; white-space: normal; text-align: left; line-height: 1.35; max-width: 100%; }
 .chip[aria-current], .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -367,8 +377,11 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 }
 .clip-play:hover { transform: scale(1.04); }
 .clip-play:active { transform: scale(0.97); }
-.clip-word { color: var(--ink-3); transition: color 120ms linear; }
-.clip-word-said { color: var(--ink); }
+/* Read-along, the way a reader asked for it (2026-09-21): the whole transcript
+   stands in ink and the words already spoken step back — the eye rides the
+   edge between light and dark, left to right. */
+.clip-word { color: inherit; transition: color 160ms linear; }
+.clip-word-said { color: var(--ink-3); }
 .clip-progress { position: relative; height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
 .clip-progress > span { position: absolute; inset: 0 auto 0 0; background: var(--ink); transition: width 200ms linear; }
 .clip-bar {

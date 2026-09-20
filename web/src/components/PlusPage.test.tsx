@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlusPage } from "@/components/PlusPage";
-import { PlanRow } from "@/components/PlanRow";
+import { PlanCard } from "@/components/PlanCard";
 
 const billing = vi.hoisted(() => ({
   fetchPlans: vi.fn(),
@@ -11,7 +11,8 @@ const billing = vi.hoisted(() => ({
   cancelSubscription: vi.fn(),
 }));
 vi.mock("@/lib/billing", async (orig) => ({ ...(await orig<typeof import("@/lib/billing")>()), ...billing }));
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(""), useRouter: () => ({ push: vi.fn() }) }));
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(""), useRouter: () => router }));
 const session = vi.hoisted(() => ({ current: null as null | { token: string; userId: string; email: string } }));
 vi.mock("@/lib/session", async (orig) => ({
   ...(await orig<typeof import("@/lib/session")>()),
@@ -61,14 +62,26 @@ describe("PlusPage", () => {
     expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
   });
 
-  it("a signed-in reader subscribes to the period shown, then is on Plus", async () => {
+  it("a signed-in reader subscribes to the period shown, then lands on the welcome page", async () => {
     session.current = { token: "t", userId: "u1", email: "a@b.c" };
-    billing.subscribe.mockResolvedValue("plus_yearly");
+    billing.subscribe.mockResolvedValue({ plan: "plus_yearly", status: "active", entitled: true });
     render(<PlusPage />);
     await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
-    expect(billing.subscribe).toHaveBeenCalledWith("plus_yearly", "t", "a@b.c");
-    expect(await screen.findByText(/You’re on Plus/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
+    expect(billing.subscribe).toHaveBeenCalledWith("plus_yearly", "t", "a@b.c", expect.any(Function));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/plus/welcome"));
+  });
+
+  it("a declined card does not end the purchase: it is said, and the sheet stays open", async () => {
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.subscribe.mockImplementation(async (_p: string, _t: string, _e: string, onEvent?: (k: string, d: string) => void) => {
+      onEvent?.("payment_failed", "Card declined");
+      await new Promise(() => {}); // the sheet is still open
+      return { plan: "plus_yearly", status: "active", entitled: true };
+    });
+    render(<PlusPage />);
+    await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
+    expect(await screen.findByRole("status")).toHaveTextContent(/Card declined\. The sheet is still open/);
+    expect(screen.getAllByRole("button", { name: "Opening…" })[0]).toBeDisabled();
   });
 
   it("a dismissed sheet says nothing; a failed one says so", async () => {
@@ -92,26 +105,44 @@ describe("PlusPage", () => {
   });
 });
 
-describe("PlanRow", () => {
+describe("PlanCard — every state of a subscription's life", () => {
   const s = { token: "t", userId: "u1", email: "a@b.c" };
 
-  it("a free account sees the way to Plus", async () => {
+  it("free: the way to Plus", async () => {
     billing.fetchMySubscription.mockResolvedValue({ plan: "free" });
-    render(<PlanRow session={s} />);
-    expect(await screen.findByRole("link", { name: "Plus →" })).toHaveAttribute("href", "/plus");
+    render(<PlanCard session={s} />);
+    expect(await screen.findByRole("link", { name: "Get Plus" })).toHaveAttribute("href", "/plus?from=account");
   });
 
-  it("cancelling is one click plus a confirmation, and keeps access to the period's end", async () => {
+  it("active: renews on a date; cancelling is one click plus one confirmation, and keeps access to the period's end", async () => {
     billing.fetchMySubscription.mockResolvedValue({ plan: "plus_monthly", status: "active", current_period_end: "2026-10-20T00:00:00Z", cancel_at: null, price_paise: 14900 });
     billing.cancelSubscription.mockResolvedValue({ access_until: "2026-10-20T00:00:00Z" });
-    render(<PlanRow session={s} />);
+    render(<PlanCard session={s} />);
     expect(await screen.findByText("Plus · monthly")).toBeInTheDocument();
     expect(screen.getByText(/Renews 20 Oct 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Razorpay emails one for every charge to a@b.c/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(billing.cancelSubscription).not.toHaveBeenCalled();
+    expect(screen.getByText(/You keep Plus until 20 Oct 2026/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Yes, cancel" }));
     expect(billing.cancelSubscription).toHaveBeenCalledWith("t");
     expect(await screen.findByText(/Ends 20 Oct 2026 · no further charges/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  it("past due: says the charge failed and until when access lasts, and points at the email", async () => {
+    billing.fetchMySubscription.mockResolvedValue({ plan: "plus_yearly", status: "past_due", current_period_end: "2026-10-01T00:00:00Z", cancel_at: null, price_paise: 119900 });
+    render(<PlanCard session={s} />);
+    expect(await screen.findByText(/The last charge did not go through/)).toBeInTheDocument();
+    expect(screen.getByText(/until 1 Oct 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Check your email")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  it("lapsed: says when it ended and offers Plus again", async () => {
+    billing.fetchMySubscription.mockResolvedValue({ plan: "plus_monthly", status: "cancelled", current_period_end: "2026-09-01T00:00:00Z", cancel_at: "2026-09-01T00:00:00Z", price_paise: 14900 });
+    render(<PlanCard session={s} />);
+    expect(await screen.findByText(/Your Plus ended on 1 Sept 2026/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Get Plus" })).toBeInTheDocument();
   });
 });

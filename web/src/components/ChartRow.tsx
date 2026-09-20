@@ -87,8 +87,11 @@ export function ChartRow({
       <Link
         href={`/story/${item.id}`}
         aria-current={lastOpened ? "true" : undefined}
-        className={`row-card group ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"} ${photo ? (lead ? "flex flex-col gap-4 lg:flex-row-reverse lg:items-start" : "flex items-start gap-3.5") : ""}`}
+        className={`row-card group flex h-full flex-col ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"}`}
       >
+        {/* The words beside the picture (the lead: picture above on the phone,
+            beside on a desk); the foot under both, full width. */}
+        <div className={photo ? (lead ? "flex flex-col gap-4 lg:flex-row-reverse lg:items-start" : "flex items-start gap-3.5") : ""}>
         {thumb}
         <div className="min-w-0 flex-1">
         <div className="meta-line">
@@ -125,7 +128,9 @@ export function ChartRow({
         {/* The foot wraps rather than truncates: the count is the legend for the
             bar and must never be cut to "3 out…"; the lens dot drops to its own
             line on a narrow phone. */}
-        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        </div>
+        </div>
+        <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 pt-3">
           <MonogramStack outlets={outlets} />
           <span className="inline-flex items-center gap-2.5">
             <CoverageBar outlets={outlets} fallbackCount={item.source_count} />
@@ -139,7 +144,6 @@ export function ChartRow({
               <i /> {m.label}
             </span>
           ))}
-        </div>
         </div>
       </Link>
     </li>

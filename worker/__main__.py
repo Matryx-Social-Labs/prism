@@ -188,6 +188,22 @@ async def main(stages: list[str]) -> None:
             run_podcasts, IntervalTrigger(minutes=60), id="podcasts", max_instances=1, coalesce=True,
             next_run_time=datetime.now(UTC) + timedelta(seconds=90),
         )
+        # Subscriptions: ask Razorpay about rows the webhook may have missed
+        # (checkouts still 'created', entitled rows untouched for a day). A
+        # missed webhook must never leave a paying reader on the free plan.
+        from common.db import session_scope as _scope
+        from common.razorpay import reconcile_pending
+
+        async def _reconcile_billing() -> None:
+            async with _scope() as s:
+                n = await reconcile_pending(s)
+            if n:
+                logger.info("billing_reconciled", changed=n)
+
+        scheduler.add_job(
+            _reconcile_billing, IntervalTrigger(minutes=60), id="billing_reconcile", max_instances=1, coalesce=True,
+            next_run_time=datetime.now(UTC) + timedelta(seconds=120),
+        )
         scheduler.start()
         # Kick off one ingestion run at startup so a fresh deploy has data.
         tasks.append(asyncio.create_task(_initial_ingest()))

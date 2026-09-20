@@ -337,8 +337,16 @@ export interface BranchTreeData {
   shape: { developments: number; branches: number; satellites: number; max_depth: number };
 }
 
+export interface StoryOutlet {
+  outlet: OutletRef;
+  reports: number;
+}
+
 export interface TrendingStoryDetail {
   slug: string;
+  /** The story's photographs (up to eight, credited) and who reported it, most reports first. */
+  photos: StoryPhoto[];
+  outlets: StoryOutlet[];
   canonical_slug: string;
   label: string;
   cast: string[];

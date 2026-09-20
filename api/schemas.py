@@ -387,11 +387,22 @@ class RelatedStoryOut(BaseModel):
     causal: bool = False
 
 
+class StoryOutlet(BaseModel):
+    """One outlet's share of a story: who it is and how many of its reports are in it."""
+
+    outlet: OutletRef
+    reports: int
+
+
 class TrendingStoryDetail(BaseModel):
     slug: str
     canonical_slug: str  # if != the requested slug, the client should redirect
     label: str
     cast: list[str] = []
+    # The story's photographs (up to eight, credited, placeholders out) and
+    # who reported it, most reports first — the header's deck and the rail.
+    photos: list[StoryPhoto] = []
+    outlets: list[StoryOutlet] = []
     sector: str | None
     source_count: int
     velocity: int

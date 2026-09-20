@@ -15,6 +15,7 @@ import { loadProfile, type Profile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { markReturning } from "@/lib/returning";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
+import { RowListSkeleton } from "@/components/Skeletons";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 
@@ -174,16 +175,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
                 <p className="mt-1 text-[14px]" style={{ color: "var(--ink-2)" }}>{error}</p>
               </div>
             ) : items === null ? (
-              <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading today's record">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="row-card px-4 py-4" aria-hidden>
-                    <span className="pulse-skel block h-2.5 w-24 rounded" style={{ background: "var(--sunken)" }} />
-                    <span className="pulse-skel mt-3 block h-4 rounded" style={{ background: "var(--sunken)", width: ["82%", "68%", "74%", "57%"][i] }} />
-                    <span className="pulse-skel mt-2 block h-3 w-[90%] rounded" style={{ background: "var(--sunken)" }} />
-                    <span className="pulse-skel mt-4 block h-1.5 w-20 rounded" style={{ background: "var(--sunken)" }} />
-                  </div>
-                ))}
-              </div>
+              <RowListSkeleton n={7} label="Loading today's record" />
             ) : (
               <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} />
             )}

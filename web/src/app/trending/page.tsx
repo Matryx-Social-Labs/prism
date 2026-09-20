@@ -9,6 +9,7 @@ import { SectorStrip } from "@/components/SectorStrip";
 import { StatusPill } from "@/components/StatusPill";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { PhotoStack } from "@/components/PhotoStack";
+import { RowListSkeleton } from "@/components/Skeletons";
 import { arcHref, isStale, spanDays } from "@/lib/arc";
 import { relativeTime } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
@@ -100,15 +101,7 @@ export default function TrendingPage() {
             {error ? (
               <div className="card" role="status"><p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>{error}</p></div>
             ) : stories === null ? (
-              <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading stories">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="row-card px-4 py-4" aria-hidden>
-                    <span className="pulse-skel block h-2.5 w-24 rounded" style={{ background: "var(--sunken)" }} />
-                    <span className="pulse-skel mt-3 block h-4 rounded" style={{ background: "var(--sunken)", width: ["76%", "64%", "70%"][i] }} />
-                    <span className="pulse-skel mt-4 block h-1.5 w-20 rounded" style={{ background: "var(--sunken)" }} />
-                  </div>
-                ))}
-              </div>
+              <RowListSkeleton n={5} label="Loading stories" />
             ) : stories.length === 0 ? (
               <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>No story is developing in {subject} right now.</p></div>
             ) : (
@@ -143,8 +136,12 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
 
   return (
     <li>
-      <Link href={arcHref(story)} className={`row-card group ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"} ${story.photos?.length ? "flex items-start gap-4" : ""}`} style={stale ? { opacity: 0.75 } : undefined}>
-        {story.photos?.length ? <PhotoStack photos={story.photos} size={lead ? "lead" : "row"} /> : null}
+      <Link href={arcHref(story)} className={`row-card group ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"}`} style={stale ? { opacity: 0.75 } : undefined}>
+        {/* The words beside the pile; the foot under both, so the bar, its count
+            and the status pill have the whole card's width on a phone. */}
+        <div className={story.photos?.length ? (lead ? "flex flex-col gap-4 lg:flex-row-reverse lg:items-start" : "flex items-start gap-4") : ""}>
+        {/* The lead's pile sits above the words on a phone, beside them on a desk. */}
+        {lead && story.photos?.length ? <PhotoStack photos={story.photos} size="lead" /> : null}
         <div className="min-w-0 flex-1">
         <div className="meta-line">
           {group && <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{group.name}</span>}
@@ -171,16 +168,19 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
           {memberLabel} across {outlets}.{cast ? ` Named: ${cast}.` : ""}
         </p>
         <RouteGlyph route={verified ? story.route : null} />
-        <div className="mt-3 flex min-w-0 items-center gap-3">
+        </div>
+        {!lead && story.photos?.length ? <PhotoStack photos={story.photos} size="row" /> : null}
+        </div>
+        {/* The foot wraps and sits under the whole card: a pill that cannot
+            shrink beside the pile widened the page on a phone (2026-09-21). */}
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <span className="inline-flex min-w-0 items-center gap-2.5">
             <CoverageBar outlets={[]} fallbackCount={story.source_count} />
-            <span className="truncate font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
+            <span className="whitespace-nowrap font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
               {outlets} · {story.developments} {story.developments === 1 ? "report" : "reports"}
             </span>
           </span>
-          <span className="flex-1" />
-          <StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : "Grouping under review"} />
-        </div>
+          <span className="ml-auto"><StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : "Grouping under review"} /></span>
         </div>
       </Link>
     </li>

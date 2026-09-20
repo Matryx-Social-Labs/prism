@@ -100,7 +100,36 @@ async def trending(
 STORY_PHOTOS = 4
 
 
-async def story_photos(db: AsyncSession, member_ids_per_story: list[list]) -> list[list[dict]]:
+async def story_outlets(db: AsyncSession, member_ids: list) -> list[dict]:
+    """Who reported the story: each registered outlet with its count of reports, most first."""
+    if not member_ids:
+        return []
+    reg = await outlets.registry(db)
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT s.slug, count(*) AS n
+                FROM event_memberships m
+                JOIN articles a ON a.id = m.article_id
+                JOIN raw_items ri ON ri.id = a.raw_item_id
+                JOIN sources s ON s.id = ri.source_id
+                WHERE m.event_id = ANY(CAST(:ids AS uuid[]))
+                GROUP BY s.slug ORDER BY n DESC, s.slug
+                """
+            ),
+            {"ids": [str(e) for e in member_ids]},
+        )
+    ).all()
+    out = []
+    for slug, n in rows:
+        ref = next(iter(outlet_refs([slug], reg)), None)
+        if ref:
+            out.append({"outlet": ref, "reports": int(n)})
+    return out
+
+
+async def story_photos(db: AsyncSession, member_ids_per_story: list[list], limit: int = STORY_PHOTOS) -> list[list[dict]]:
     """Up to STORY_PHOTOS distinct photographs per story, across its developments.
 
     One query for the page: every member report with a real picture (no
@@ -158,7 +187,7 @@ async def story_photos(db: AsyncSession, member_ids_per_story: list[list]) -> li
             pub = reg[r["source_slug"]].publisher if r["source_slug"] in reg else r["source_slug"]
             (rest if pub in first else lead).append(r)
             first.add(pub)
-        chosen = (lead + rest)[:STORY_PHOTOS]
+        chosen = (lead + rest)[:limit]
         out.append(
             [
                 {
@@ -330,7 +359,27 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         if STORY_BOUNDARY_STATUS == "verified":
             branches = await branch_tree_for_members(story["member_event_ids"])
     related = await _related_stories(db, story["id"], story["member_event_ids"] or [], story["cast"] or [])
+    members = story["member_event_ids"] or []
+    photos = (await story_photos(db, [members], limit=8))[0]
+    who = await story_outlets(db, members)
+    # A development's own picture, never a placeholder (the timeline shows it).
+    placeholders = await placeholder_hashes(db)
+    devs = timeline.get("developments", [])
+    if devs and placeholders:
+        bad = set(
+            (
+                await db.execute(
+                    text("SELECT DISTINCT image_url FROM raw_items WHERE image_phash = ANY(CAST(:h AS text[])) AND image_url = ANY(CAST(:u AS text[]))"),
+                    {"h": list(placeholders), "u": [d.get("image_url") for d in devs if d.get("image_url")]},
+                )
+            ).scalars().all()
+        )
+        for d in devs:
+            if d.get("image_url") in bad:
+                d["image_url"] = None
     return {
+        "photos": photos,
+        "outlets": who,
         # Fail closed until the live, two-labeller boundary evaluation passes.
         # The members remain available as related coverage, but clients must not
         # present the generated branch order as verified chronology.

@@ -32,11 +32,11 @@ describe("UpgradeSheet", () => {
 
   it("a signed-in reader pays in place and is told they are on Plus", async () => {
     session.current = { token: "t", userId: "u1", email: "a@b.c" };
-    billing.subscribe.mockResolvedValue("plus_monthly");
+    billing.subscribe.mockResolvedValue({ plan: "plus_monthly", status: "active", entitled: true });
     const onSubscribed = vi.fn();
     render(<UpgradeSheet open onClose={() => {}} reason="ask-rest" onSubscribed={onSubscribed} />);
     await userEvent.click(await screen.findByRole("button", { name: /Get Plus · ₹149 a month/ }));
-    expect(billing.subscribe).toHaveBeenCalledWith("plus_monthly", "t", "a@b.c");
+    expect(billing.subscribe).toHaveBeenCalledWith("plus_monthly", "t", "a@b.c", expect.any(Function));
     expect(await screen.findByRole("status")).toHaveTextContent(/on Plus/);
     expect(onSubscribed).toHaveBeenCalled();
   });

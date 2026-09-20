@@ -71,3 +71,38 @@ def magic_link_email(*, link: str, ttl_min: int, to: str) -> tuple[str, str]:
 </table>
 </body></html>"""
     return text, html
+
+
+def shell(*, title: str, paragraphs: list[str], cta_label: str, cta_href: str, footer: str) -> str:
+    """The sign-in email's frame around any title, paragraphs, one button and a footer line."""
+    bar = "".join(
+        f'<td width="33.33%" height="4" style="background:{c};font-size:0;line-height:0;">&nbsp;</td>'
+        for c in (_AMBER, _CYAN, _VIOLET)
+    )
+    body = "".join(
+        f'<p style="margin:14px 0 0;font-family:{_SANS};font-size:15px;line-height:1.6;color:{_MUTED};">{p}</p>'
+        for p in paragraphs
+    )
+    return f"""\
+<!doctype html><html><body style="margin:0;padding:0;background:{_BG};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{_BG};padding:32px 16px;">
+<tr><td align="center">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:{_CARD};border:1px solid {_LINE};border-radius:16px;overflow:hidden;">
+    <tr><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{bar}</tr></table></tr>
+    <tr><td style="padding:36px 40px 40px;">
+      <div style="font-family:{_SERIF};font-size:22px;font-weight:600;color:{_INK};letter-spacing:-0.01em;">Prism</div>
+      <h1 style="margin:22px 0 0;font-family:{_SERIF};font-size:26px;line-height:1.2;font-weight:600;color:{_INK};">{_html.escape(title)}</h1>
+      {body}
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 8px;">
+        <tr><td style="border-radius:999px;background:{_INK};">
+          <a href="{_html.escape(cta_href, quote=True)}" style="display:inline-block;padding:13px 28px;font-family:{_SANS};font-size:15px;font-weight:600;color:{_CARD};text-decoration:none;border-radius:999px;">{_html.escape(cta_label)}</a>
+        </td></tr>
+      </table>
+      <hr style="border:none;border-top:1px solid {_LINE};margin:28px 0 0;">
+      <p style="margin:18px 0 0;font-family:{_MONO};font-size:11px;line-height:1.6;color:{_FAINT};">{footer}</p>
+      <p style="margin:16px 0 0;font-family:{_SERIF};font-size:13px;color:{_FAINT};">Prism — One story. Every perspective.</p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body></html>"""

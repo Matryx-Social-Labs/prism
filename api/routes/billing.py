@@ -32,19 +32,6 @@ from common.logging import get_logger
 router = APIRouter()
 logger = get_logger(__name__)
 
-# Razorpay subscription status → ours (common/billing.entitled reads ours).
-STATUS = {
-    "authenticated": "active",
-    "active": "active",
-    "pending": "past_due",
-    "halted": "halted",
-    "cancelled": "cancelled",
-    "completed": "expired",
-    "expired": "expired",
-    "paused": "cancelled",
-}
-
-
 def _launch_date() -> datetime | None:
     raw = get_settings().prism_paid_launch_date
     return datetime.fromisoformat(raw).replace(tzinfo=UTC) if raw else None
@@ -108,20 +95,31 @@ async def verify(body: VerifyIn, db: AsyncSession = Depends(get_db), user_id: UU
     turns active now rather than whenever the webhook lands."""
     if not razorpay.verify_checkout_signature(body.razorpay_payment_id, body.razorpay_subscription_id, body.razorpay_signature):
         raise HTTPException(status_code=400, detail="bad signature")
-    res = await db.execute(
-        text(
-            """
-            UPDATE subscriptions SET status = 'active', notes = 'verified at checkout', updated_at = now()
-            WHERE provider = 'razorpay' AND provider_sub_id = :sid AND user_id = :u
-            RETURNING plan
-            """
-        ),
-        {"sid": body.razorpay_subscription_id, "u": str(user_id)},
-    )
-    row = res.first()
-    if row is None:
+    owned = (
+        await db.execute(
+            text("SELECT plan FROM subscriptions WHERE provider = 'razorpay' AND provider_sub_id = :sid AND user_id = :u"),
+            {"sid": body.razorpay_subscription_id, "u": str(user_id)},
+        )
+    ).scalar_one_or_none()
+    if owned is None:
         raise HTTPException(status_code=404, detail="no such subscription for this account")
-    return {"ok": True, "plan": row[0]}
+    # Razorpay's record is the truth: status, the paid period's end, the plan.
+    # If Razorpay cannot be reached this second, the signature alone turns the
+    # row active and the hourly reconcile fills the dates in.
+    try:
+        sub = await razorpay.fetch_subscription(body.razorpay_subscription_id)
+        _, before, after = await razorpay.apply_subscription(db, sub, note="verified at checkout")
+        if before != after:
+            await razorpay.on_transition(db, str(user_id), before, after, sub)
+        status = after
+    except Exception:
+        logger.exception("razorpay_fetch_after_verify_failed", sub=body.razorpay_subscription_id)
+        await db.execute(
+            text("UPDATE subscriptions SET status = 'active', notes = 'verified at checkout (unfetched)', updated_at = now() WHERE provider = 'razorpay' AND provider_sub_id = :sid"),
+            {"sid": body.razorpay_subscription_id},
+        )
+        status = "active"
+    return {"ok": True, "plan": owned, "status": status, "entitled": status in ("active", "past_due")}
 
 
 @router.post("/api/v1/billing/cancel")
@@ -130,17 +128,19 @@ async def cancel(db: AsyncSession = Depends(get_db), user_id: UUID = Depends(get
     current = await _current(db, user_id)
     if not current or current["status"] not in ("active", "past_due"):
         raise HTTPException(status_code=404, detail="no active subscription")
+    access_until = current["current_period_end"]
     if current["provider"] == "razorpay" and current["provider_sub_id"]:
         try:
-            await razorpay.cancel_subscription(current["provider_sub_id"])
+            sub = await razorpay.cancel_subscription(current["provider_sub_id"])
+            access_until = razorpay.period_end(sub) or access_until
         except Exception:
             logger.exception("razorpay_cancel_failed", sub=current["provider_sub_id"])
             raise HTTPException(status_code=502, detail="payment provider unavailable") from None
     await db.execute(
-        text("UPDATE subscriptions SET cancel_at = coalesce(current_period_end, now()), updated_at = now() WHERE id = :id"),
-        {"id": current["id"]},
+        text("UPDATE subscriptions SET cancel_at = :at, notes = 'cancelled by reader', updated_at = now() WHERE id = :id"),
+        {"id": current["id"], "at": access_until or datetime.now(UTC)},
     )
-    return {"ok": True, "access_until": current["current_period_end"].isoformat() if current["current_period_end"] else None}
+    return {"ok": True, "access_until": access_until.isoformat() if access_until else None}
 
 
 @router.get("/api/v1/billing/me")
@@ -187,33 +187,22 @@ async def razorpay_webhook(request: Request, db: AsyncSession = Depends(get_db))
     payload = await request.json()
     event = payload.get("event", "")
     sub = ((payload.get("payload") or {}).get("subscription") or {}).get("entity") or {}
-    if not event.startswith("subscription.") or not sub.get("id"):
-        return {"ok": True, "ignored": event}
-    notes = sub.get("notes") or {}
-    user_id = notes.get("user_id")
-    plan = notes.get("plan") or "plus_monthly"
-    if not user_id:
+    if not sub.get("id"):
+        # payment.* events carry the subscription id on the payment; fetch it.
+        pay = ((payload.get("payload") or {}).get("payment") or {}).get("entity") or {}
+        sid = pay.get("subscription_id") if isinstance(pay, dict) else None
+        if not sid:
+            return {"ok": True, "ignored": event}
+        try:
+            sub = await razorpay.fetch_subscription(sid)
+        except Exception:
+            logger.exception("razorpay_webhook_fetch_failed", event=event, sub=sid)
+            return {"ok": True, "ignored": "fetch failed"}
+    if not (sub.get("notes") or {}).get("user_id"):
         logger.warning("razorpay_webhook_no_user", event=event, sub=sub.get("id"))
         return {"ok": True, "ignored": "no user_id in notes"}
-    period_end = sub.get("current_end")
-    await db.execute(
-        text(
-            """
-            INSERT INTO subscriptions (id, user_id, provider, provider_sub_id, plan, status, current_period_end, price_paise, notes)
-            VALUES (:id, :u, 'razorpay', :sid, :plan, :status, :end, :price, :notes)
-            ON CONFLICT (provider, provider_sub_id) DO UPDATE SET
-              status = EXCLUDED.status, current_period_end = EXCLUDED.current_period_end, plan = EXCLUDED.plan, updated_at = now()
-            """
-        ),
-        {
-            "id": uuid.uuid4(),
-            "u": user_id,
-            "sid": sub["id"],
-            "plan": plan,
-            "status": STATUS.get(sub.get("status", ""), "cancelled"),
-            "end": datetime.fromtimestamp(period_end, tz=UTC) if period_end else None,
-            "price": notes.get("price_paise"),
-            "notes": event,
-        },
-    )
-    return {"ok": True}
+    user_id, before, after = await razorpay.apply_subscription(db, sub, note=event)
+    logger.info("razorpay_webhook", event=event, sub=sub.get("id"), before=before, after=after)
+    if user_id and before != after:
+        await razorpay.on_transition(db, user_id, before, after, sub)
+    return {"ok": True, "status": after}

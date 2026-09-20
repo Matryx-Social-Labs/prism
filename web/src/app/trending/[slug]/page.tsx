@@ -12,7 +12,9 @@ import { SectionHead } from "@/components/SectionHead";
 import { StoryTimeline } from "@/components/StoryTimeline";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill } from "@/components/StatusPill";
-import { CoverageBar } from "@/components/Coverage";
+import { CoverageBar, OutletIcon } from "@/components/Coverage";
+import { PhotoDeck } from "@/components/PhotoDeck";
+import { framesFromStory } from "@/lib/photos";
 import { ArrowLeft } from "@/components/icons";
 import { Brand } from "@/components/Brand";
 import { sectorGroup } from "@/lib/sectors";
@@ -90,10 +92,15 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             <span className="inline-flex items-center gap-2.5">
-              <CoverageBar outlets={[]} fallbackCount={s.source_count} size="lg" />
+              {/* The bar in the outlets' real slot colours, since the story knows who reported it. */}
+              <CoverageBar outlets={(s.outlets ?? []).map((o) => o.outlet)} fallbackCount={s.source_count} size="lg" />
               <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>{s.source_count} outlets · {shape.join(" · ")}</span>
             </span>
           </div>
+          {/* The story's photographs: every development's, credited, one stage. */}
+          {(s.photos ?? []).length > 0 && (
+            <div className="mt-6 lg:max-w-[var(--reading)]"><PhotoDeck frames={framesFromStory(s.photos)} /></div>
+          )}
           <div className="mt-4 hidden lg:flex"><ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} /></div>
         </header>
 
@@ -124,7 +131,22 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
             )}
           </div>
 
-          <aside className="lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start">
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start">
+            {(s.outlets ?? []).length > 0 && (
+              <div className="card">
+                <h2 id="outlets-title" className="card-h">Who reported it · {s.outlets.length}</h2>
+                <ol className="flex flex-col">
+                  {s.outlets.slice(0, 12).map(({ outlet, reports }, i) => (
+                    <li key={outlet.slug} className={`flex items-center gap-2.5 py-2 ${i > 0 ? "border-t" : ""}`} style={{ borderColor: "var(--line)" }}>
+                      <OutletIcon domain={outlet.domain} code={outlet.code} name={outlet.name} size={24} />
+                      <span className="min-w-0 flex-1 truncate text-[14px]">{outlet.name}</span>
+                      <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--ink-3)" }}>{reports} {reports === 1 ? "report" : "reports"}</span>
+                    </li>
+                  ))}
+                </ol>
+                {s.outlets.length > 12 && <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>+{s.outlets.length - 12} more</p>}
+              </div>
+            )}
             <div className="card">
               <h2 id="cast-title" className="card-h">Who is in it · {s.cast.length}</h2>
               <div className="flex flex-wrap gap-1.5">

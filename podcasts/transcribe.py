@@ -3,8 +3,8 @@
 The enclosure is streamed to a temp file, cut into ~20 MB pieces (the
 transcription endpoint caps a file at 25 MB; MP3 frames are self-contained so
 a byte cut costs at most one garbled frame at the seam), sent to OpenRouter's
-/audio/transcriptions (routed to Groq's whisper-large-v3-turbo: $0.04 an
-hour measured 2026-09-20, word timestamps), and discarded. Each piece's
+/audio/transcriptions (routed to Groq's whisper-large-v3: ~$0.11 an hour;
+turbo was $0.04 but dropped phrases, word timestamps), and discarded. Each piece's
 timestamps are offset by the durations whisper reported for the pieces before
 it — so a variable-bitrate file cannot skew them the way a byte→time guess
 would.
@@ -32,7 +32,12 @@ from podcasts.feeds import UA
 logger = get_logger(__name__)
 
 TRANSCRIBE_URL = "https://openrouter.ai/api/v1/audio/transcriptions"
-TRANSCRIBE_MODEL = "openai/whisper-large-v3-turbo"
+# The full large-v3, not turbo: turbo dropped a whole phrase mid-sentence
+# ("…had turned a chapter, [missing] appointment. Separately…") on a
+# Moneycontrol clip and every word after it read ahead of the voice
+# (founder, 2026-09-21). About 2.5× the price ($0.11 an hour on Groq); the
+# read-along is only as good as the alignment.
+TRANSCRIBE_MODEL = os.environ.get("PRISM_MODEL_TRANSCRIBE", "openai/whisper-large-v3")
 PIECE_BYTES = 20 * 1024 * 1024
 MAX_BYTES = 160 * 1024 * 1024  # ~2.5 h at 128 kbps; longer is not a daily news show
 WINDOW_MIN_S = 30.0

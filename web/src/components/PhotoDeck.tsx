@@ -6,7 +6,8 @@ import { ArrowLeft, ArrowRight, ArrowUpRight } from "@/components/icons";
 import { fallbackCode } from "@/lib/sources";
 import type { SourceRef } from "@/lib/api";
 import { relativeTime } from "@/lib/dateline";
-import { NEAR_DUPLICATE_BITS, REPORT_IMAGES, hamming } from "@/lib/images";
+import { REPORT_IMAGES } from "@/lib/images";
+import { framesFromSources, type DeckPhoto } from "@/lib/photos";
 
 // The record's photographs (DESIGN.md § Images): one stage showing one
 // outlet's picture at a time, the others fanned behind it as a stack — the
@@ -16,33 +17,12 @@ import { NEAR_DUPLICATE_BITS, REPORT_IMAGES, hamming } from "@/lib/images";
 // its own; arrows and the keyboard step it; the count is printed as a count.
 // Motion is the browser's own scroll-snap (240ms smooth, instant under
 // reduced motion) — never a crossfade.
-const MAX = 8;
-
-export function uniquePhotos(sources: SourceRef[], limit = MAX): SourceRef[] {
-  const seen = new Set<string>();
-  const hashes: string[] = [];
-  const all = sources.filter((s) => {
-    if (!s.image_url || !s.url || seen.has(s.image_url)) return false;
-    seen.add(s.image_url);
-    if (s.image_phash) {
-      if (hashes.some((h) => hamming(h, s.image_phash!) <= NEAR_DUPLICATE_BITS)) return false;
-      hashes.push(s.image_phash);
-    }
-    return true;
-  });
-  // One per publisher first: BBC's language editions upload the same picture
-  // under new ids, and three in a row read as a repeat before another outlet.
-  const firstOf = new Set<string>();
-  const lead = all.filter((s) => { const k = s.publisher ?? s.source_name; return firstOf.has(k) ? false : (firstOf.add(k), true); });
-  return [...lead, ...all.filter((s) => !lead.includes(s))].slice(0, limit);
-}
-
-export function PhotoDeck({ sources }: { sources: SourceRef[] }) {
-  const photos = REPORT_IMAGES ? uniquePhotos(sources) : [];
+export function PhotoDeck({ sources, frames }: { sources?: SourceRef[]; frames?: DeckPhoto[] }) {
+  const photos: DeckPhoto[] = REPORT_IMAGES ? (frames ?? framesFromSources(sources ?? [])) : [];
   const stage = useRef<HTMLUListElement>(null);
   const [i, setI] = useState(0);
   const [dead, setDead] = useState<Set<string>>(new Set());
-  const live = photos.filter((p) => !dead.has(p.article_id));
+  const live = photos.filter((p) => !dead.has(p.key));
   const n = live.length;
 
   // Which frame is in view, from the browser's own scroll position.
@@ -82,17 +62,17 @@ export function PhotoDeck({ sources }: { sources: SourceRef[] }) {
           tabIndex={n > 1 ? 0 : -1}
         >
           {live.map((s, k) => (
-            <li key={s.article_id} className="relative aspect-[16/10] w-full flex-none snap-center lg:aspect-[2/1]" aria-hidden={k !== i} aria-label={`${k + 1} of ${n}: ${s.source_name}`}>
-              <a href={s.url!} target="_blank" rel="noopener noreferrer" className="block h-full w-full" tabIndex={k === i ? 0 : -1} aria-label={`Open the report at ${s.source_name}: ${s.title}`}>
+            <li key={s.key} className="relative aspect-[16/10] w-full flex-none snap-center lg:aspect-[2/1]" aria-hidden={k !== i} aria-label={`${k + 1} of ${n}: ${s.source_name}`}>
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="block h-full w-full" tabIndex={k === i ? 0 : -1} aria-label={`Open the report at ${s.source_name}${s.title ? `: ${s.title}` : ""}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={s.image_url!}
+                  src={s.image_url}
                   alt={`Photo from ${s.source_name}`}
                   loading={k === 0 ? "eager" : "lazy"}
                   decoding="async"
                   referrerPolicy="no-referrer"
                   className="h-full w-full object-cover"
-                  onError={() => setDead((d) => new Set(d).add(s.article_id))}
+                  onError={() => setDead((d) => new Set(d).add(s.key))}
                 />
               </a>
             </li>
@@ -103,7 +83,7 @@ export function PhotoDeck({ sources }: { sources: SourceRef[] }) {
           <OutletIcon domain={cur.domain} code={cur.code ?? fallbackCode(cur.source_name)} name={cur.source_name} size={20} />
           <span className="truncate">Photo: {cur.source_name}</span>
           {cur.published_at && <span className="shrink-0 font-mono text-[10.5px] font-normal opacity-90">{relativeTime(cur.published_at)}</span>}
-          <a href={cur.url!} target="_blank" rel="noopener noreferrer" className="pointer-events-auto ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px] font-normal underline-offset-2 hover:underline">
+          <a href={cur.url} target="_blank" rel="noopener noreferrer" className="pointer-events-auto ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px] font-normal underline-offset-2 hover:underline">
             Open report <ArrowUpRight size={11} />
           </a>
         </div>
@@ -119,10 +99,10 @@ export function PhotoDeck({ sources }: { sources: SourceRef[] }) {
       {n > 1 && (
         <ol className="mt-2 hidden gap-1.5 lg:flex" aria-label="All photographs">
           {live.map((s, k) => (
-            <li key={s.article_id}>
+            <li key={s.key}>
               <button type="button" onClick={() => go(k)} aria-label={`Photograph ${k + 1}, ${s.source_name}`} aria-current={k === i ? "true" : undefined} className="block h-[42px] w-[60px] overflow-hidden rounded-[6px] border transition-opacity" style={{ borderColor: k === i ? "var(--ink)" : "var(--line)", opacity: k === i ? 1 : 0.7 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.image_url!} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                <img src={s.image_url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
               </button>
             </li>
           ))}

@@ -28,10 +28,29 @@ BASE = "https://api.razorpay.com/v1"
 # count; ten years is "until cancelled").
 TOTAL_COUNT = {
     "plus_monthly": 12,
-    "plus_yearly": 1,
+    # NOT 1: a one-charge subscription is "completed" the moment it is paid and
+    # never "active" (that is how the first real test purchase read as expired,
+    # 2026-09-21). The yearly offer renews at the same price; ten years is
+    # "until cancelled".
+    "plus_yearly": 10,
     "founding": 3,
     "plus_monthly_regular": 120,
     "plus_yearly_regular": 10,
+}
+
+# Razorpay subscription status → ours (common/billing.entitled reads ours).
+# `completed` — every charge in total_count made — is still PAID UP to
+# current_end, so it stays active; entitlement lapses by the date, not the word.
+STATUS = {
+    "created": "created",
+    "authenticated": "active",
+    "active": "active",
+    "pending": "past_due",
+    "halted": "halted",
+    "cancelled": "cancelled",
+    "completed": "active",
+    "expired": "expired",
+    "paused": "cancelled",
 }
 PERIOD = {"month": "monthly", "year": "yearly"}
 
@@ -135,3 +154,127 @@ def verify_checkout_signature(payment_id: str, subscription_id: str, signature: 
         return False
     expected = hmac.new(secret.encode(), f"{payment_id}|{subscription_id}".encode(), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature or "")
+
+
+async def fetch_subscription(sub_id: str, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+    """Razorpay's own record of a subscription — the truth the row is kept to."""
+    own = client is None
+    client = client or _client()
+    try:
+        r = await client.get(f"/subscriptions/{sub_id}")
+        r.raise_for_status()
+        return r.json()
+    finally:
+        if own:
+            await client.aclose()
+
+
+def period_end(sub: dict[str, Any]):
+    """When the paid period ends: `current_end` while it runs, `ended_at`/`end_at` after."""
+    from datetime import UTC, datetime
+
+    for key in ("current_end", "end_at", "ended_at"):
+        v = sub.get(key)
+        if v:
+            return datetime.fromtimestamp(int(v), tz=UTC)
+    return None
+
+
+async def apply_subscription(db, sub: dict[str, Any], *, note: str) -> tuple[str | None, str, str]:
+    """Write Razorpay's subscription onto our row; returns (user_id, before, after).
+
+    One function for the three ways the truth arrives — Checkout's verified
+    callback, the webhook, and the hourly reconcile — so no path can disagree
+    with another. Never demotes an entitled reader on a missing row."""
+    import uuid as _uuid
+
+    from sqlalchemy import text
+
+    notes = sub.get("notes") or {}
+    user_id = notes.get("user_id")
+    if not user_id:
+        return None, "", ""
+    status = STATUS.get(sub.get("status", ""), "cancelled")
+    end = period_end(sub)
+    before = (
+        await db.execute(
+            text("SELECT status FROM subscriptions WHERE provider = 'razorpay' AND provider_sub_id = :sid"),
+            {"sid": sub["id"]},
+        )
+    ).scalar_one_or_none() or ""
+    # A cancel-at-cycle-end shows as still `active` with `end_at` set; keep the access date.
+    cancel_at = None
+    if sub.get("status") == "cancelled" or (sub.get("status") in ("active", "authenticated") and sub.get("end_at") and int(sub.get("remaining_count") or 1) == 0):
+        cancel_at = end
+    await db.execute(
+        text(
+            """
+            INSERT INTO subscriptions (id, user_id, provider, provider_sub_id, plan, status, current_period_end, cancel_at, price_paise, notes)
+            VALUES (:id, :u, 'razorpay', :sid, :plan, :status, :end, :cancel_at, :price, :notes)
+            ON CONFLICT (provider, provider_sub_id) DO UPDATE SET
+              status = EXCLUDED.status, current_period_end = EXCLUDED.current_period_end,
+              cancel_at = COALESCE(EXCLUDED.cancel_at, subscriptions.cancel_at),
+              plan = EXCLUDED.plan, price_paise = COALESCE(EXCLUDED.price_paise, subscriptions.price_paise),
+              notes = EXCLUDED.notes, updated_at = now()
+            """
+        ),
+        {
+            "id": _uuid.uuid4(),
+            "u": user_id,
+            "sid": sub["id"],
+            "plan": notes.get("plan") or "plus_monthly",
+            "status": status,
+            "end": end,
+            "cancel_at": cancel_at,
+            "price": int(notes["price_paise"]) if notes.get("price_paise") else None,
+            "notes": note,
+        },
+    )
+    return user_id, before, status
+
+
+async def reconcile_pending(db) -> int:
+    """Ask Razorpay about every row the webhook may have missed: checkouts
+    still 'created' after two minutes, and entitled rows not touched in a day.
+    Returns how many rows changed status."""
+    from sqlalchemy import text
+
+    if not configured():
+        return 0
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT provider_sub_id FROM subscriptions
+                WHERE provider = 'razorpay' AND provider_sub_id IS NOT NULL
+                  AND ((status = 'created' AND created_at < now() - interval '2 minutes' AND created_at > now() - interval '7 days')
+                       OR (status IN ('active','past_due') AND updated_at < now() - interval '1 day'))
+                LIMIT 200
+                """
+            )
+        )
+    ).scalars().all()
+    changed = 0
+    async with _client() as client:
+        for sid in rows:
+            try:
+                sub = await fetch_subscription(sid, client)
+            except Exception:
+                continue
+            user_id, before, after = await apply_subscription(db, sub, note="reconciled")
+            if user_id and before != after:
+                changed += 1
+                await on_transition(db, user_id, before, after, sub)
+    return changed
+
+
+async def on_transition(db, user_id: str, before: str, after: str, sub: dict[str, Any]) -> None:
+    """The emails a status change owes the reader (common/billing_emails)."""
+    from common.billing_emails import notify_transition
+
+    try:
+        await notify_transition(db, user_id, before, after, sub)
+    except Exception:  # an email must never fail a payment
+        import logging
+
+        logging.getLogger(__name__).exception("billing_email_failed")
