@@ -80,7 +80,9 @@ export function newsArticleLd(event: EventDetail) {
       headline: clip(s.title, 110),
       datePublished: s.published_at ?? undefined,
       inLanguage: s.language ?? undefined,
-      publisher: { "@type": "Organization", name: s.publisher ?? s.source_name },
+      // `source_name` is the outlet's display name ("The Times of India");
+      // `publisher` is the registry key and reads as a slug.
+      publisher: { "@type": "Organization", name: s.source_name, ...(s.domain ? { url: `https://${s.domain}/` } : {}) },
     })),
     author: { "@id": ORG_ID },
     publisher: { "@id": ORG_ID },

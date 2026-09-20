@@ -13,7 +13,7 @@ const event = {
   lens_briefs: {},
   entities: [{ name: "Lalbaug", entity_type: "place", role: "location" }, { name: "Mumbai Police", entity_type: "org", role: "actor" }],
   sources: [
-    { article_id: "a1", source_name: "Amar Ujala", source_slug: "amar-ujala", publisher: "Amar Ujala", language: "hi", url: "https://example.com/a1", title: "Report one", published_at: "2026-09-20T09:00:00Z", stance: null, funding: null },
+    { article_id: "a1", source_name: "Amar Ujala", source_slug: "amar-ujala", publisher: "amarujala", domain: "www.amarujala.com", language: "hi", url: "https://example.com/a1", title: "Report one", published_at: "2026-09-20T09:00:00Z", stance: null, funding: null },
     { article_id: "a2", source_name: "No link", source_slug: "x", url: null, title: "Unlinked", published_at: null, stance: null, funding: null },
   ],
   image_url: "https://publisher.example/photo.jpg",
@@ -25,7 +25,7 @@ describe("structured data", () => {
     expect(ld["@type"]).toBe("NewsArticle");
     expect(ld.url).toMatch(/\/story\/e1$/);
     expect(ld.isBasedOn).toEqual([
-      expect.objectContaining({ url: "https://example.com/a1", headline: "Report one", inLanguage: "hi", publisher: { "@type": "Organization", name: "Amar Ujala" } }),
+      expect.objectContaining({ url: "https://example.com/a1", headline: "Report one", inLanguage: "hi", publisher: { "@type": "Organization", name: "Amar Ujala", url: "https://www.amarujala.com/" } }),
     ]);
     expect(ld.about).toEqual([{ "@type": "Thing", name: "Lalbaug" }, { "@type": "Thing", name: "Mumbai Police" }]);
     expect(ld.isAccessibleForFree).toBe(true);

@@ -12,7 +12,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export async function GET() {
   let items: FeedItem[] = [];
   try {
-    items = await fetchFeed({ sort: "latest", limit: 500 });
+    items = await fetchFeed({ sort: "latest", limit: 100 }); // the API's page cap
   } catch {
     // API down: an empty, valid sitemap rather than a 500.
   }
