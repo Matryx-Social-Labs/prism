@@ -16,6 +16,7 @@ EXPECTED = {
     ("GET", "/api/v1/languages"),
     ("POST", "/api/v1/auth/request"),
     ("POST", "/api/v1/auth/verify"),
+    ("POST", "/api/v1/auth/google"),
     ("POST", "/api/v1/auth/profile"),
     ("GET", "/api/v1/auth/me"),
     ("GET", "/api/v1/feed"),
