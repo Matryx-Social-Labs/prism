@@ -13,6 +13,8 @@ which is the right shape for a backfill and the wrong one for the live path.
   --sync [N]      no batch: call the chat endpoint directly for up to N events
                   (default all), newest first, 8 at a time, persisting as it goes.
                   Full price; the trial batch sat in_progress for 22h with 0/10 done.
+  --rewrite-days N  rewrite the briefs of the last N days even where one exists
+                  (the 2026-09-20 prompt: standalone sentences the page prints as points)
   --model M       the model slug (default: the light extract model)
 
 State is the event row itself: a collected brief lands in projection.lens_briefs,
@@ -36,9 +38,11 @@ from correlation.consumer import extracted_reader_brief
 BATCHES = "https://openrouter.ai/api/beta/batches"
 SYSTEM = (
     "You write for a general reader of Indian news. Given one news report, return JSON with two keys: "
-    '"reader_brief" — three or four plain English sentences on what happened and why it matters, only what the '
-    "report states, no opinion, no lists; and \"watch_points\" — up to three one-line things to watch next that the "
-    "report itself points to, an empty list if none. Respond with the JSON object only."
+    '"reader_brief" — three to five plain English sentences for a general reader, each ONE fact that stands on its '
+    "own (the page prints them as separate points): no 'however', 'meanwhile' or 'this' carrying over from the "
+    "sentence before, no pronoun for something named in an earlier sentence; the first says what happened, the "
+    'last why it matters; only what the report states, no opinion; and "watch_points" — up to three one-line things '
+    "to watch next that the report itself points to, an empty list if none. Respond with the JSON object only."
 )
 MISSING = (
     "SELECT e.id::text AS id, e.title, e.summary, a.clean_text "
@@ -101,7 +105,7 @@ async def run_sync(todo, model: str, headers: dict) -> int:
         nonlocal written, skipped
         # English is asked for again here, and the ceiling raised: a Hindi source
         # had glm answer in Devanagari and run out of tokens at 400.
-        body = {"model": model, "reasoning": {"effort": "minimal"}, **request_for(ev)["body"], "max_tokens": 700}
+        body = {"model": model, "reasoning": {"effort": "minimal"}, **request_for(ev)["body"], "max_tokens": 900}
         body["messages"][-1]["content"] += "\n\nWrite the brief in English."
         async with sem:
             try:
@@ -130,6 +134,7 @@ async def main() -> int:
     ap.add_argument("--collect", default=None)
     ap.add_argument("--sync", nargs="?", const=0, type=int, default=None)
     ap.add_argument("--model", default=None)
+    ap.add_argument("--rewrite-days", type=int, default=None)
     args = ap.parse_args()
     settings = get_settings()
     model = args.model or settings.prism_model_extract_light
@@ -157,8 +162,11 @@ async def main() -> int:
         return 0
 
     limit = args.submit or args.sync or None
+    select = MISSING
+    if args.rewrite_days:
+        select = MISSING.replace("WHERE e.projection->'lens_briefs'->>'reader' IS NULL", f"WHERE e.last_updated_at > now() - interval '{int(args.rewrite_days)} days'")
     async with get_session_factory()() as session:
-        todo = (await session.execute(text(MISSING + " ORDER BY e.last_updated_at DESC" + (f" LIMIT {int(limit)}" if limit else "")))).mappings().all()
+        todo = (await session.execute(text(select + " ORDER BY e.last_updated_at DESC" + (f" LIMIT {int(limit)}" if limit else "")))).mappings().all()
     if args.sync is not None:
         return await run_sync(todo, model, headers)
     print(f"{len(todo)} events without a Reader brief; ~{len(todo) * 1.6 / 1000:.2f}M input + ~{len(todo) * 0.25 / 1000:.2f}M output tokens on {model} at batch price")

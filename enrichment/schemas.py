@@ -51,9 +51,19 @@ class Claim(BaseModel):
     speaker_role: str | None = Field(
         default=None,
         description=(
-            "The speaker's title, office or standing EXACTLY as this article gives it, in English "
-            "(e.g. 'Vice President of the United States', 'MEA spokesperson', 'Kerala Chief Minister', "
-            "'senior police officer'); null if the article does not say who they are"
+            "The speaker's title, office or standing in this article's own words, in English, spelled out and "
+            "placed: the office in full with the state, body or party the article names for it ('former Karnataka "
+            "Chief Minister', not 'Former CM'; 'BJP MLA for Shivamogga', not 'MLA'; 'Vice President of the United "
+            "States'; 'MEA spokesperson'; 'senior police officer'). Never add a place or body the article does not "
+            "name; null if the article does not say who they are"
+        ),
+    )
+    speaker_role_native: str | None = Field(
+        default=None,
+        description=(
+            "Only when the article is not in English: the words the article uses for that title, copied exactly "
+            "in the article's own script and covering every part of speaker_role (place and body included); "
+            "null for an English article"
         ),
     )
     quote_text: str = Field(description="Their words VERBATIM from the article, not paraphrased")
@@ -109,7 +119,12 @@ class SharedExtraction(BaseModel):
     # call already reads the article; this is ~250 more output tokens on it.
     reader_brief: str | None = Field(
         default=None,
-        description="For a general reader, in English: three or four plain sentences on what happened and why it matters, only what the article states, no opinion, no lists",
+        description=(
+            "In English, three to five plain sentences for a general reader, each ONE fact that stands on its own "
+            "(the page prints them as separate points): no 'however', 'meanwhile' or 'this' carrying over from the "
+            "sentence before, no pronoun for something named in an earlier sentence; the first says what happened, "
+            "the last why it matters; only what the article states, no opinion"
+        ),
     )
     watch_points: list[str] = Field(
         default_factory=list,

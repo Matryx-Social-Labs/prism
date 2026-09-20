@@ -110,14 +110,44 @@ def test_a_role_in_the_articles_own_words_survives():
     assert kept[0].speaker_role == "minister"
 
 
-def test_a_composed_or_essay_role_is_dropped_even_if_every_word_appears():
+def test_a_bracketed_role_is_dropped_and_an_essay_is_cut_to_its_title():
     kept, _ = verify_claims([claim(speaker_role="minister (state)")], ARTICLE)
     assert kept[0].speaker_role is None
     long = "the minister who said the state would double its outlay on rural roads before the monsoon"
     kept, _ = verify_claims([claim(speaker_role=long)], ARTICLE)
+    assert kept[0].speaker_role == "minister"
+    # An essay with no clause to cut at is dropped whole.
+    kept, _ = verify_claims([claim(speaker_role="minister of the state's outlay on rural roads before the monsoon season began")], ARTICLE)
     assert kept[0].speaker_role is None
 
 
 def test_a_trailing_acronym_is_the_articles_shorthand_not_a_composition():
     kept, _ = verify_claims([claim(speaker_role="minister (MIN)")], ARTICLE)
     assert kept[0].speaker_role == "minister"
+
+
+def test_an_office_spelled_out_holds_against_an_article_that_abbreviated_it():
+    """The press writes "Karnataka CM"; the role is asked for in full so the
+    card can say whose Chief Minister. Expansion on both sides keeps the
+    verbatim rule honest without rejecting every spelled-out office."""
+    article = "Bengaluru: Karnataka CM Siddaramaiah said the state would double its outlay on rural roads before the monsoon."
+    kept, _ = verify_claims([claim(speaker="Siddaramaiah", speaker_role="Karnataka Chief Minister")], article)
+    assert kept[0].speaker_role == "Karnataka Chief Minister"
+    # …but the state still has to be the article's, not the model's.
+    kept, _ = verify_claims([claim(speaker="Siddaramaiah", speaker_role="Kerala Chief Minister")], article)
+    assert kept[0].speaker_role is None
+
+
+def test_a_paraphrased_tail_is_cut_and_the_true_head_kept():
+    kept, _ = verify_claims([claim(speaker_role="minister belonging to the coalition's rural wing")], ARTICLE)
+    assert kept[0].speaker_role == "minister"
+
+
+def test_a_role_on_a_kannada_report_stands_when_its_own_script_is_in_the_article():
+    article = "ಬೆಂಗಳೂರು: ಗೃಹ ಸಚಿವ ಪ್ರಿಯಾಂಕ್ ಖರ್ಗೆ ಅವರು ಹೇಳಿದರು, ರಾಜ್ಯವು ಗ್ರಾಮೀಣ ರಸ್ತೆಗಳ ವೆಚ್ಚವನ್ನು ದ್ವಿಗುಣಗೊಳಿಸಲಿದೆ ಎಂದು."
+    quote = "ರಾಜ್ಯವು ಗ್ರಾಮೀಣ ರಸ್ತೆಗಳ ವೆಚ್ಚವನ್ನು ದ್ವಿಗುಣಗೊಳಿಸಲಿದೆ"
+    kept, _ = verify_claims([claim(speaker="Priyank Kharge", quote_text=quote, speaker_role="Home Minister", speaker_role_native="ಗೃಹ ಸಚಿವ")], article)
+    assert kept[0].speaker_role == "Home Minister"
+    # A native copy the article does not contain proves nothing.
+    kept, _ = verify_claims([claim(speaker="Priyank Kharge", quote_text=quote, speaker_role="Home Minister", speaker_role_native="ಮುಖ್ಯಮಂತ್ರಿ")], article)
+    assert kept[0].speaker_role is None

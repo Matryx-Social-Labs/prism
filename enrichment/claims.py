@@ -40,6 +40,22 @@ _WORD = re.compile(r"[^\W\d_]+")
 # A role longer than this is a description, not a title.
 MAX_ROLE_CHARS = 60
 _ROLE_GLUE = {"of", "the", "and", "for", "in", "at", "to", "a", "an"}
+# The press abbreviates offices; the role is asked for in full. Both sides are
+# expanded before the word check so "Karnataka Chief Minister" holds against an
+# article that only ever wrote "Karnataka CM".
+_ROLE_ABBR = [
+    (re.compile(r"\bdy\.?\s*cm\b", re.I), " deputy chief minister "),
+    (re.compile(r"\bcm\b", re.I), " chief minister "),
+    (re.compile(r"\bpm\b", re.I), " prime minister "),
+    (re.compile(r"\bcji\b", re.I), " chief justice of india "),
+    (re.compile(r"\bex-", re.I), " former "),
+]
+
+
+def _expand(s: str) -> str:
+    for pat, full in _ROLE_ABBR:
+        s = pat.sub(full, s)
+    return s
 
 
 def flat_ws(s: str) -> str:
@@ -48,15 +64,26 @@ def flat_ws(s: str) -> str:
     return _WS.sub(" ", s or "").strip()
 
 
-def faithful_role(role: str | None, flat_text: str) -> str | None:
+_ROLE_QUALIFIERS = {"former", "ex", "senior", "junior", "acting", "deputy", "outgoing", "then", "interim"}
+_CLAUSE = re.compile(r",|;| who | which | that | from | for | at | in | and |\bbelonging\b", re.I)
+
+
+def faithful_role(role: str | None, flat_text: str, native: str | None = None) -> str | None:
     """The speaker's role only if the article's own words support it.
 
-    Every content word of the role must appear in the article (casefolded),
-    nothing composed with brackets or clauses, and no longer than a title.
-    Asked for "EXACTLY as the article gives it", the model still writes
-    "Agriculture Minister (Andhra Pradesh)" or a 30-word description from what
-    it knows; a null prints no role, which is better than a plausible one. An
-    English role on a Hindi article is unverifiable and so also null.
+    Kept in full when every content word appears in the article (casefolded,
+    CM/PM/CJI expanded on both sides); otherwise cut back to the longest
+    leading run the article does support ("lawyer belonging to the Friends of
+    the Earth organisation" → "lawyer"; "Kerala Chief Minister" on a Karnataka
+    report → nothing, since the first word already fails). Brackets are
+    rejected, clauses are cut at the title's length. Asked for "in the
+    article's own words", the model still writes "Agriculture Minister
+    (Andhra Pradesh)" or a 30-word description from what it knows; a null
+    prints no role, which is better than a plausible one.
+
+    `native` is the same title copied in the article's own script, for a
+    Hindi or Kannada report whose English role no word check can reach: if
+    that copy really is in the article, the English role stands.
     """
     if not role:
         return None
@@ -65,13 +92,28 @@ def faithful_role(role: str | None, flat_text: str) -> str | None:
     r = re.sub(r"\s*\([A-Z]{2,7}\)$", "", _WS.sub(" ", role).strip().strip(" .,"))
     if r[:4].casefold() == "the ":
         r = r[4:]
-    if not r or len(r) > MAX_ROLE_CHARS or any(ch in r for ch in ";()[]"):
+    if not r or any(ch in r for ch in "()[]"):
         return None
-    words = set(_WORD.findall(flat_text.casefold()))
-    for tok in _WORD.findall(r.casefold()):
-        if len(tok) >= 3 and tok not in _ROLE_GLUE and tok not in words:
+    if len(r) > MAX_ROLE_CHARS:
+        r = _CLAUSE.split(r, 1)[0].strip(" .,")
+        if not r or len(r) > MAX_ROLE_CHARS:
             return None
-    return r
+    n = _WS.sub(" ", native or "").strip()
+    if n and n in flat_text:
+        return r
+    words = set(_WORD.findall(_expand(flat_text.casefold())))
+    kept: list[str] = []
+    for tok in r.split(" "):
+        parts = _WORD.findall(_expand(tok.casefold()))
+        if all(len(w) < 3 or w in _ROLE_GLUE or w in words for w in parts):
+            kept.append(tok)
+        else:
+            break
+    while kept and _WORD.findall(kept[-1].casefold()) and all(w in _ROLE_GLUE for w in _WORD.findall(kept[-1].casefold())):
+        kept.pop()
+    out = " ".join(kept).strip(" .,")
+    content = [w for w in _WORD.findall(out.casefold()) if w not in _ROLE_GLUE and w not in _ROLE_QUALIFIERS]
+    return out if content else None
 
 
 def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], dict[str, int]]:
@@ -106,7 +148,8 @@ def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], di
                 "quote_text": quote,
                 "quote_start": at,
                 "quote_end": at + len(quote),
-                "speaker_role": faithful_role(c.speaker_role, flat_text),
+                "speaker_role": faithful_role(c.speaker_role, flat_text, c.speaker_role_native),
+                "speaker_role_native": None,
             })
         )
     if any(rejected.values()):
