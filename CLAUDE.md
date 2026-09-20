@@ -57,6 +57,16 @@ refuses if `main` is not an ancestor of `dev` (someone committed to `main`
 directly), and refuses unless CI is green for that exact `dev` commit, so prod
 ships what CI vouched for rather than what happens to be on disk.
 
+**GitHub enforces the same thing (ruleset on `main`, 2026-09-20):** no deletion, no
+force-push, linear history (a merge commit is refused), and the two CI checks
+(`backend · …`, `web · …`) must be green **on the commit being pushed**. Because
+those checks ran on `dev` for the same SHA, a fast-forward promote is accepted; an
+untested commit, a squash, a rebase or a PR merge is refused with `GH013`. CI does
+NOT re-run the tests on `main`: the `main` workflow only re-reads those checks
+(`vouched`) and deploys the web. Railway deploys the API and worker from `main` on
+its own, so this ruleset is what guarantees prod never receives an untested commit.
+No PR ever targets `main`; feature branches PR into `dev`.
+
 Delete every branch after merge except `main`, `dev` and `stage`. The repo has
 `delete_branch_on_merge` enabled, so this is automatic for PR merges.
 

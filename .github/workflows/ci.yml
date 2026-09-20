@@ -4,16 +4,22 @@ on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main, dev]
+    branches: [dev]  # feature branches land on dev; main is never a PR target
 
 # Cancel in-progress runs on the same branch when a new push lands.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# main is production. It only ever receives a fast-forward of a commit that
+# already passed these jobs on dev, and a ruleset on main refuses any push
+# whose commit does not carry green `backend` and `web` checks. So on main the
+# verify jobs are SKIPPED — re-running them would test the same SHA twice —
+# and the deploy runs after `vouched` re-reads those checks from the API.
 jobs:
   backend:
     name: backend · lint + import + migrate + tests
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -90,6 +96,7 @@ jobs:
 
   web:
     name: web · test + typecheck + build
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -125,12 +132,37 @@ jobs:
           NEXT_PUBLIC_API_URL: 'http://localhost:8000'
         run: npm run build
 
+  vouched:
+    # The commit on main must already carry green backend + web checks — the
+    # ones its run on dev produced. The ruleset on main enforces the same
+    # thing at push time; this makes the deploy depend on it explicitly and
+    # names the failure if someone ever bypasses the ruleset.
+    name: main · this commit passed CI on dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Require green backend + web checks on this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for name in "backend · lint + import + migrate + tests" "web · test + typecheck + build"; do
+            ok=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?per_page=100" \
+                  --jq "[.check_runs[] | select(.name == \"$name\" and .conclusion == \"success\")] | length")
+            if [ "$ok" = "0" ]; then
+              echo "::error::no successful '$name' check on ${{ github.sha }}. Promote from dev after CI is green; never push an untested commit to main."
+              exit 1
+            fi
+            echo "✓ $name"
+          done
+
   deploy-web:
     # Vercel Hobby blocks the GitHub integration on private org repos, so
     # we deploy via the Vercel CLI from CI instead. Runs only on pushes to
-    # main, and only after both verify jobs are green.
+    # main, after `vouched` confirms the commit's dev checks.
     name: Deploy web to Vercel (production)
-    needs: [backend, web]
+    needs: [vouched]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15

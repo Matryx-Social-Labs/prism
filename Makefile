@@ -75,6 +75,9 @@ promote:  ## Ship dev to main (prod) by FAST-FORWARD — main can never lead dev
 	@git merge-base --is-ancestor origin/main origin/dev || { 		echo "  refusing: main is NOT an ancestor of dev, so this would not fast-forward."; 		echo "  Someone committed to main directly. Reconcile before promoting."; exit 1; }
 	@test -n "$$(git rev-list origin/main..origin/dev)" || { echo "  main is already up to date"; exit 0; }
 	@# Prod ships what CI actually vouched for, not what happens to be on disk.
+	@# (GitHub enforces this too: the ruleset on main requires the backend and web
+	@# checks to be green on the pushed commit and refuses non-fast-forwards. This
+	@# local check just fails faster, with a better message.)
 	@gh run list --branch dev --limit 1 --json conclusion,headSha 		--jq 'if .[0].conclusion == "success" and .[0].headSha == "'"$$(git rev-parse origin/dev)"'" 			then "" else "  refusing: dev CI is not green for this exact commit" | halt_error(1) end'
 	@echo "  promoting $$(git rev-list --count origin/main..origin/dev) commit(s) to main"
 	git push origin origin/dev:main
