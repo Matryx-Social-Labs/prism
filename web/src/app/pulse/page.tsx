@@ -38,7 +38,7 @@ export default function PulsePage() {
   return (
     <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
       <Masthead dateline={dateline} />
-      <div className="mx-auto max-w-[880px] lg:pt-6">
+      <div className="mx-auto max-w-[720px] lg:pt-6">
         <SectionHead id="pulse-title" title="Market Pulse" hint="One reading of the day's market-moving stories, written from the record beneath it." right={<Link href="/watchlist" className="btn btn-secondary btn-sm">Watchlist</Link>} />
 
         {loading ? (

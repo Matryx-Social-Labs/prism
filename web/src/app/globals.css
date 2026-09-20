@@ -178,8 +178,8 @@ body {
   --font-ui: var(--font-hind), var(--font-hind-kn), var(--font-hind-ta), var(--font-hind-te),
     system-ui, sans-serif;
   /* The record voice: Newsreader for Latin, the serif siblings per script. */
-  --font-record: var(--font-display), "Tiro Devanagari Hindi", "Noto Serif Kannada", "Noto Serif Tamil",
-    "Noto Serif Telugu", Georgia, serif;
+  --font-record: var(--font-display), var(--font-record-hi), var(--font-record-kn), var(--font-record-ta),
+    var(--font-record-te), Georgia, serif;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
@@ -299,7 +299,7 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
   transition: border-color var(--t-micro) var(--ease), box-shadow var(--t-micro) var(--ease);
 }
 .row-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-1); }
-.row-card.single { border-style: dashed; }
+.row-card.single { border-style: dashed; border-color: var(--line-strong); } /* one source: the dash has to be visible to mean anything */
 /* The coverage bar: the prism's work on one story. Segments in the fixed slot
    order national · intl · regional · wire; the count beside it is the legend. */
 .covbar { display: inline-flex; gap: 2px; height: 6px; flex: none; }

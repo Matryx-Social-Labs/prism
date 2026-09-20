@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, JetBrains_Mono, Newsreader } from "next/font/google";
+import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, JetBrains_Mono, Newsreader, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu, Tiro_Devanagari_Hindi } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SITE_URL } from "@/lib/site";
@@ -19,6 +19,15 @@ const display = Newsreader({
   axes: ["opsz"],
   variable: "--font-display",
 });
+// The record voice per script: Newsreader has no Indic glyphs, so without these
+// a Hindi outlet headline in "What changed" or a Kannada quote fell to the
+// system sans inside a serif row. Not preloaded: each face is unicode-ranged to
+// its script and the browser fetches it only when a glyph needs it.
+// (next/font reads these calls statically, so the options are spelled out.)
+const recordHi = Tiro_Devanagari_Hindi({ subsets: ["devanagari"], weight: "400", style: ["normal", "italic"], variable: "--font-record-hi", preload: false, adjustFontFallback: false });
+const recordKn = Noto_Serif_Kannada({ subsets: ["kannada"], weight: "variable", variable: "--font-record-kn", preload: false, adjustFontFallback: false });
+const recordTa = Noto_Serif_Tamil({ subsets: ["tamil"], weight: "variable", style: ["normal", "italic"], variable: "--font-record-ta", preload: false, adjustFontFallback: false });
+const recordTe = Noto_Serif_Telugu({ subsets: ["telugu"], weight: "variable", variable: "--font-record-te", preload: false, adjustFontFallback: false });
 
 // Reading and UI: Hind (ITF) and its script siblings. One family across Latin,
 // Devanagari, Kannada, Tamil and Telugu, so a Kannada row and an English one sit
@@ -74,7 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body
-        className={`${display.variable} ${ui.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-dvh flex-col antialiased`}
+        className={`${display.variable} ${recordHi.variable} ${recordKn.variable} ${recordTa.variable} ${recordTe.variable} ${ui.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-dvh flex-col antialiased`}
         style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
       >
         <a

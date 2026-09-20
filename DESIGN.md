@@ -139,7 +139,7 @@ A lens hue appears only on: the selected lens tab's text, the flip's scan line, 
 
 ## Typography
 
-**Display: Newsreader** (variable, optical sizes 6–72, weights 400–600, italics). Falls through per script to Tiro Devanagari Hindi, Noto Serif Kannada / Tamil / Telugu / Bengali / Gujarati, then Georgia.
+**Display: Newsreader** (variable, optical sizes 6–72, weights 400–600, italics). Falls through per script to Tiro Devanagari Hindi, Noto Serif Kannada / Tamil / Telugu (loaded through next/font, unicode-ranged, not preloaded: fetched only when a glyph needs them), then Georgia. Bengali and Gujarati are not loaded yet — add their Noto Serif when a source in those scripts is added.
 **Sans: Hind** with Hind Siliguri (Bengali), Vadodara (Gujarati), Mysuru (Kannada), Madurai (Tamil), Guntur (Telugu), then `system-ui`.
 **Mono: JetBrains Mono** 400/500, `font-variant-numeric: tabular-nums` everywhere.
 
