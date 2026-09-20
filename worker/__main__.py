@@ -18,6 +18,7 @@ replicas): give each replica a unique PRISM_CONSUMER_NAME.
 import argparse
 import asyncio
 import os
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -180,7 +181,13 @@ async def main(stages: list[str]) -> None:
         # transcribe what is new, rematch. A no-op unless PRISM_PODCASTS_ENABLED.
         from podcasts.runner import run_podcasts
 
-        scheduler.add_job(run_podcasts, IntervalTrigger(minutes=60), id="podcasts", max_instances=1, coalesce=True)
+        # First run at startup: a deploy restarts the worker and the interval
+        # with it, and on a day of hourly promotes an hour-from-now job never
+        # arrives (2026-09-20: flag on for three hours, zero runs).
+        scheduler.add_job(
+            run_podcasts, IntervalTrigger(minutes=60), id="podcasts", max_instances=1, coalesce=True,
+            next_run_time=datetime.now(UTC) + timedelta(seconds=90),
+        )
         scheduler.start()
         # Kick off one ingestion run at startup so a fresh deploy has data.
         tasks.append(asyncio.create_task(_initial_ingest()))
