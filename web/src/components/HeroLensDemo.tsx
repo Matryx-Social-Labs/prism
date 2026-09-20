@@ -8,7 +8,8 @@
 // instant under reduced motion. Two of the four reads are marked next: they
 // are being built, and the tab says so.
 import Link from "next/link";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { flipDuration } from "@/lib/motion";
 
 interface HeroLens {
   key: string;
@@ -80,6 +81,10 @@ export function HeroLensDemo({
 }) {
   const [active, setActive] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const flipRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (flipped && flipRef.current) flipRef.current.style.setProperty("--flip-ms", `${flipDuration(flipRef.current.offsetHeight)}ms`);
+  }, [flipped, active]);
   const lens = LENSES[active];
   const isLocked = locked.includes(lens.key);
 
@@ -123,7 +128,7 @@ export function HeroLensDemo({
         <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-3)" }}>{GRID} · Illustration</p>
       </div>
 
-      <div key={active} className={`${flipped ? "flip-body" : ""} relative overflow-hidden px-5 pb-5 pt-4`}>
+      <div key={active} ref={flipRef} className={`${flipped ? "flip-body" : ""} relative overflow-hidden px-5 pb-5 pt-4`} style={{ "--flip-veil": "var(--surface)" } as React.CSSProperties}>
         {flipped && <span aria-hidden className="flip-scanline" style={{ background: lens.color }} />}
         {isLocked ? (
           <p className="text-[15.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>

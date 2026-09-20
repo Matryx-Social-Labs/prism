@@ -81,7 +81,7 @@ reading a manual:
 - Three voices: **Newsreader** for the record (headlines, titles, quotes), **Hind** for everything read or tapped in every Indian script, **JetBrains Mono** for provenance only.
 - Soft geometry: 10–20px radii on cards and sheets, pills for actions and chips, 1px lines for structure. No heavy shadows; one soft shadow for floating sheets.
 - Mobile is the product (bottom tabs, thumb-zone actions, 44px targets, safe areas). Desktop is the same components with room for evidence beside the record.
-- Two signature motions: the **lens flip** (scan line + re-ink, 500ms) and the **coverage bar drawing in** (segments grow left→right, 240ms, staggered 30ms). Reduced motion collapses both.
+- Two signature motions: the **lens flip** (scan line + re-ink behind it, 500–1100ms at a constant 0.9px/ms) and the **coverage bar drawing in** (segments grow left→right, 240ms, staggered 30ms). Reduced motion collapses both.
 
 ## Colour
 
@@ -243,7 +243,7 @@ Skeletons are `sunken` bars in the exact geometry of the row (no spinner on the 
 ## Motion
 
 - **micro** 160ms, **standard** 240ms, easing `cubic-bezier(.2,.7,.2,1)`.
-- **The lens flip (kept):** a 2px scan line in the lens hue sweeps the reading column top→bottom over 500ms while the text re-inks beneath it; layout never moves. Reduced motion: instant swap.
+- **The lens flip (kept):** a 2px scan line in the lens hue sweeps the lens block top→bottom while the text re-inks *behind* it (a veil in the ground colour lifts on the same clock, so line and ink never separate); the clock is the block's height at ~0.9px/ms, clamped 500–1100ms (`lib/motion.flipDuration`), so a five-point brief is swept at the same pace as a three-line locked box. Layout never moves. Reduced motion: instant swap.
 - **Coverage bar:** segments scale from 0 on first paint, 240ms, 30ms stagger. Once per page load, never on re-sort.
 - Rows print in with a 40ms stagger (kept). No parallax, no scroll-jacking, no looping animation anywhere.
 

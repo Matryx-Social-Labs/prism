@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail, type OutletRef, type TrendingStoryDetail } from "@/lib/api";
 import { headlineByline } from "@/lib/headline";
 import { useStateNames } from "@/lib/useStateName";
 import { useRouter } from "next/navigation";
 
 import { lensMeta, useLenses } from "@/lib/lenses";
+import { flipDuration } from "@/lib/motion";
 import { ArrowDown, ArrowLeft, ArrowUp, Dash, Lock, Speech } from "@/components/icons";
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
@@ -72,6 +73,11 @@ export function StoryView({ event }: { event: EventDetail }) {
   const [lens, setLens] = useState("reader");
   const [briefs, setBriefs] = useState<Record<string, string>>(event.lens_briefs ?? {});
   const [flipped, setFlipped] = useState(false);
+  // The flip's clock is the new block's height, measured before it paints.
+  const flipRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (flipped && flipRef.current) flipRef.current.style.setProperty("--flip-ms", `${flipDuration(flipRef.current.offsetHeight)}ms`);
+  }, [flipped, lens]);
   const [points, setPoints] = useState<Record<string, string[]>>(event.lens_points ?? {});
   const [briefLoading, setBriefLoading] = useState(false);
   // Which paywall wall this lens hit, if any. Null means the lens is readable.
@@ -383,6 +389,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               />
               <div
                 key={lens}
+                ref={flipRef}
                 className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden`}
               >
                 {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}

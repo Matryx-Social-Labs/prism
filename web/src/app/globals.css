@@ -357,40 +357,57 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 
 /* ── Motion primitives (all gated on prefers-reduced-motion) ───────── */
 
-/* The re-typeset flip (DESIGN.md signature): a lens-colored scan line
-   sweeps the lens block while the content re-inks behind it. */
+/* The re-typeset flip (DESIGN.md signature): a lens-colored scan line sweeps
+   the lens block while the content re-inks BEHIND it. The ink is a veil in the
+   ground colour over the new text that lifts from the top on the same clock as
+   the line, so the two stay locked at any height. --flip-ms is set per flip
+   from the block's height (flipDuration): a five-point brief is swept at the
+   same pace as a three-line locked box, not three times faster. */
+.flip-body {
+  position: relative;
+  --flip-ms: 500ms;
+  --flip-ease: cubic-bezier(0.25, 0.6, 0.2, 1);
+}
+.flip-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--flip-veil, var(--bg));
+  opacity: 0.74;
+  pointer-events: none;
+  animation: flipVeil var(--flip-ms) var(--flip-ease) forwards;
+}
+@keyframes flipVeil {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(100% 0 0 0);
+  }
+}
 .flip-scanline {
   position: absolute;
   left: 0;
   right: 0;
   top: -2px;
   height: 2px;
+  z-index: 2;
   opacity: 0;
   pointer-events: none;
-  animation: flipSweep 500ms ease-out forwards;
+  animation: flipSweep var(--flip-ms) var(--flip-ease) forwards;
 }
 @keyframes flipSweep {
   from {
     top: -2px;
     opacity: 1;
   }
+  85% {
+    opacity: 1;
+  }
   to {
     top: 100%;
-    opacity: 0.85;
-  }
-}
-.flip-body {
-  animation: flipReink 500ms ease-out;
-}
-@keyframes flipReink {
-  0% {
-    opacity: 0.25;
-  }
-  60% {
-    opacity: 0.55;
-  }
-  100% {
-    opacity: 1;
+    opacity: 0;
   }
 }
 
@@ -518,6 +535,7 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
   }
   .flip-scanline,
   .flip-body,
+  .flip-body::after,
   .pulse-skel,
   .blink-caret,
   .prism-glow,
