@@ -14,6 +14,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { StatusPill } from "@/components/StatusPill";
 import { CoverageBar, OutletIcon } from "@/components/Coverage";
 import { PhotoDeck } from "@/components/PhotoDeck";
+import { Rail } from "@/components/Rail";
 import { framesFromStory } from "@/lib/photos";
 import { ArrowLeft } from "@/components/icons";
 import { Brand } from "@/components/Brand";
@@ -131,7 +132,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
             )}
           </div>
 
-          <aside className="flex flex-col gap-4 lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start">
+          <Rail className="flex flex-col gap-4">
             {(s.outlets ?? []).length > 0 && (
               <div className="card">
                 <h2 id="outlets-title" className="card-h">Who reported it · {s.outlets.length}</h2>
@@ -155,7 +156,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
                 ))}
               </div>
             </div>
-          </aside>
+          </Rail>
         </div>
 
         {(s.related?.length ?? 0) > 0 && (

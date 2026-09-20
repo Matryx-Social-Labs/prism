@@ -30,6 +30,7 @@ import { Clips } from "@/components/Clips";
 import { SectionHead as Head } from "@/components/SectionHead";
 import { SourceList, fallbackCode, indexSources } from "@/components/SourceList";
 import { PhotoDeck } from "@/components/PhotoDeck";
+import { Rail } from "@/components/Rail";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
 import { relativeTime } from "@/lib/dateline";
@@ -703,8 +704,9 @@ export function StoryView({ event }: { event: EventDetail }) {
         </div>
 
         {/* ── Beside the record (desktop): the reports, who is named ── */}
-        <aside className="hidden xl:flex xl:flex-col xl:gap-4 xl:sticky xl:top-[calc(var(--topbar)+24px)] xl:self-start" aria-label="Evidence">
-          <div className="card max-h-[calc(100dvh-140px)] overflow-y-auto">
+        <Rail className="hidden xl:flex xl:flex-col xl:gap-4" label="Evidence">
+          {/* The whole list, no inner scroll: the rail itself scrolls with the page (Rail). */}
+          <div className="card">
             <h3 className="card-h">Reports · {sourceCount}</h3>
             <SourceList sources={event.sources} sourceIndex={sourceIndex} compact />
           </div>
@@ -718,7 +720,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               </div>
             </div>
           )}
-        </aside>
+        </Rail>
       </div>
 
       {/* ── Thumb zone (phone): Share and Ask, above the safe area ── */}

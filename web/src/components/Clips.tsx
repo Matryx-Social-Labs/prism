@@ -157,23 +157,30 @@ export function Clips({ clips }: { clips: ClipOut[] }) {
         onTimeUpdate={onTime}
         onLoadedMetadata={onLoadedMetadata}
       />
-      <ol className="flex flex-col gap-3" aria-label="Podcast clips">
+      {/* The clips as a rail of compact cards; one transcript window under
+          them for the clip that is playing (or the first, until one is). */}
+      <ol className="hide-scroll -mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-1 sm:-mx-8 sm:px-8 lg:mx-0 lg:px-0" aria-label="Podcast clips">
         {clips.map((c, i) => (
           <ClipCard
             key={`${c.audio_url}-${c.start_s}`}
             clip={c}
-            active={active === i}
+            active={active === i || (active < 0 && i === 0)}
             playing={active === i && playing}
-            time={active === i ? time - shift : null}
-            freeRun={active === i && freeRun}
+            progress={active === i ? Math.min(1, Math.max(0, (time - shift - c.start_s) / Math.max(1, c.end_s - c.start_s))) : 0}
             onToggle={() => toggle(i)}
-            onKeepListening={() => {
-              setFreeRun(true);
-              if (active !== i) play(i);
-            }}
           />
         ))}
       </ol>
+      <Transcript
+        clip={current ?? clips[0]}
+        time={current ? time - shift : null}
+        playing={playing}
+        freeRun={freeRun && active >= 0}
+        onKeepListening={() => {
+          setFreeRun(true);
+          if (active < 0) play(0);
+        }}
+      />
       {current && (playing || active >= 0) && (
         <Docked>
           <NowPlaying clip={current} playing={playing} time={time - shift} onToggle={() => toggle(active)} onNext={next} hasNext={active + 1 < clips.length} />
@@ -183,69 +190,88 @@ export function Clips({ clips }: { clips: ClipOut[] }) {
   );
 }
 
-function ClipCard({
-  clip,
-  active,
-  playing,
-  time,
-  freeRun,
-  onToggle,
-  onKeepListening,
-}: {
-  clip: ClipOut;
-  active: boolean;
-  playing: boolean;
-  time: number | null; // in the transcript's clock
-  freeRun: boolean;
-  onToggle: () => void;
-  onKeepListening: () => void;
-}) {
-  const words = clip.words?.length ? clip.words : null;
-  const progress = time == null ? 0 : Math.min(1, Math.max(0, (time - clip.start_s) / Math.max(1, clip.end_s - clip.start_s)));
+function ClipCard({ clip, active, playing, progress, onToggle }: { clip: ClipOut; active: boolean; playing: boolean; progress: number; onToggle: () => void }) {
   const label = `${playing ? "Pause" : "Play"} the clip from ${clip.show.name}`;
+  const secs = Math.max(0, Math.round(clip.end_s - clip.start_s));
   return (
-    <li className="clip card p-4" data-active={active || undefined}>
-      <div className="flex items-start gap-3">
-        <button type="button" onClick={onToggle} aria-label={label} aria-pressed={playing} className="clip-play">
-          {playing ? <Pause size={18} /> : <Play size={18} />}
-        </button>
+    <li className="clip card flex w-[260px] flex-none snap-start flex-col gap-3 p-3.5 sm:w-[280px]" data-active={active || undefined}>
+      <div className="flex items-center gap-2.5">
+        <ShowArt show={clip.show} size={40} />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
-            <ShowArt show={clip.show} size={24} />
-            <span className="font-semibold" style={{ color: "var(--ink-2)" }}>{clip.show.name}</span>
-            <span>· {clip.show.publisher}</span>
-            <time dateTime={clip.published_at} className="font-mono text-[11px]">{relativeTime(clip.published_at)}</time>
-            <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.04em]">Transcript {mmss(clip.start_s)}–{mmss(clip.end_s)}</span>
-          </div>
-          <p className="mt-2.5 text-[16px] leading-[1.6]" style={{ color: active ? "var(--ink)" : "var(--ink-2)" }}>
-            {words
-              ? words.map(([w, s], i) => (
-                  <span key={i} className={time != null && time >= s ? "clip-word-said" : "clip-word"}>
-                    {w}{i < words.length - 1 ? " " : ""}
-                  </span>
-                ))
-              : clip.text}
-          </p>
-          <div className="clip-progress mt-3" aria-hidden>
-            <span style={{ width: `${progress * 100}%` }} />
-          </div>
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
-            <span className="truncate">From <i className="not-italic font-medium" style={{ color: "var(--ink-2)" }}>{clip.episode_title}</i></span>
-            {clip.episode_url && (
-              <a href={clip.episode_url} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>
-                Full episode ↗
-              </a>
-            )}
-            {!freeRun && (
-              <button type="button" onClick={onKeepListening} className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
-                Keep listening
-              </button>
-            )}
-            {freeRun && <span className="whitespace-nowrap">Playing on</span>}
-          </div>
+          <p className="truncate text-[13.5px] font-semibold">{clip.show.name}</p>
+          <p className="truncate text-[12px]" style={{ color: "var(--ink-3)" }}>{clip.show.publisher} · {relativeTime(clip.published_at)}</p>
         </div>
+        <button type="button" onClick={onToggle} aria-label={label} aria-pressed={playing} className="clip-play">
+          {playing ? <Pause size={16} /> : <Play size={16} />}
+        </button>
+      </div>
+      <p className="line-clamp-2 text-[14px] leading-[1.45]" style={{ color: "var(--ink-2)" }}>{clip.episode_title}</p>
+      <div className="mt-auto flex items-center gap-3">
+        <div className="clip-progress flex-1" aria-hidden><span style={{ width: `${progress * 100}%` }} /></div>
+        <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--ink-3)" }}>{mmss(secs)}</span>
       </div>
     </li>
+  );
+}
+
+/** How long the reader's own scroll keeps the window from following the voice. */
+const HANDS_OFF_MS = 4000;
+
+/**
+ * The transcript window: the words of the clip in view, a few lines tall,
+ * scrolling on its own to keep the word being spoken in the middle — the
+ * whole transcript stands in ink and the words already said step back. A
+ * reader who scrolls it takes the wheel for a few seconds. Never the whole
+ * transcript spilled down the page (founder, 2026-09-21; Particle does this
+ * well).
+ */
+function Transcript({ clip, time, playing, freeRun, onKeepListening }: { clip: ClipOut; time: number | null; playing: boolean; freeRun: boolean; onKeepListening: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const handsOff = useRef(0);
+  const words = clip.words?.length ? clip.words : null;
+  const said = time == null || !words ? -1 : words.reduce((k, [, s], i) => (time >= s ? i : k), -1);
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el || said < 0 || Date.now() < handsOff.current) return;
+    const w = el.querySelector<HTMLElement>(`[data-i="${said}"]`);
+    if (!w) return;
+    const target = w.offsetTop - el.clientHeight / 2 + w.offsetHeight / 2;
+    if (Math.abs(el.scrollTop - target) > 8) el.scrollTo({ top: target, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [said]);
+
+  return (
+    <div className="card mt-3 p-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2.5 text-[12.5px]" style={{ borderColor: "var(--line)", color: "var(--ink-3)" }}>
+        <span className="font-semibold" style={{ color: "var(--ink-2)" }}>{clip.show.name}</span>
+        <span className="font-mono text-[11px] uppercase tracking-[0.04em]">Transcript {mmss(clip.start_s)}–{mmss(clip.end_s)}</span>
+        <span className="ml-auto flex items-center gap-3">
+          {clip.episode_url && (
+            <a href={clip.episode_url} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>Full episode ↗</a>
+          )}
+          {playing && !freeRun && (
+            <button type="button" onClick={onKeepListening} className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>Keep listening</button>
+          )}
+          {freeRun && <span className="whitespace-nowrap">Playing on</span>}
+        </span>
+      </div>
+      <div
+        ref={box}
+        onWheel={() => { handsOff.current = Date.now() + HANDS_OFF_MS; }}
+        onTouchMove={() => { handsOff.current = Date.now() + HANDS_OFF_MS; }}
+        className="clip-window max-h-[168px] overflow-y-auto px-4 py-3 text-[16px] leading-[1.7]"
+        style={{ color: time != null ? "var(--ink)" : "var(--ink-2)" }}
+        aria-live="off"
+      >
+        {words
+          ? words.map(([w], i) => (
+              <span key={i} data-i={i} className={i <= said ? "clip-word-said" : "clip-word"}>
+                {w}{i < words.length - 1 ? " " : ""}
+              </span>
+            ))
+          : clip.text}
+      </div>
+    </div>
   );
 }
 

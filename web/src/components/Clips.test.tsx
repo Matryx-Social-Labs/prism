@@ -101,9 +101,9 @@ describe("Clips — one player, the publisher's file", () => {
     expect(screen.getByText("Monday").className).toBe("clip-word");
   });
 
-  it("names the show, the publisher and the whole episode on every card", () => {
+  it("names the show, the publisher and the whole episode — on the card and again on the transcript window", () => {
     render(<Clips clips={[clip()]} />);
-    expect(screen.getByText("The Morning Brief")).toBeInTheDocument();
+    expect(screen.getAllByText("The Morning Brief").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/The Economic Times/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Full episode/ })).toHaveAttribute("href", "https://et.example/ep");
     expect(screen.getByText(/Transcript 2:00–3:00/)).toBeInTheDocument();
