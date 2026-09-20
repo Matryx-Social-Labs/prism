@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AskDemo } from "@/components/AskDemo";
 import { BranchTree } from "@/components/BranchTree";
 import { ChartRow } from "@/components/ChartRow";
-import { CoverageBar, CoverageLegend, MonogramStack, coverageText, publishers, type Origin } from "@/components/Coverage";
+import { CoverageBar, CoverageLegend, MonogramStack } from "@/components/Coverage";
+import { coverageText, publishers, type Origin } from "@/lib/coverage";
 import { HeroLensDemo } from "@/components/HeroLensDemo";
 import { LensRegistry } from "@/components/LensRegistry";
 import { PrismFigure } from "@/components/PrismFigure";
@@ -10,7 +11,7 @@ import { Said } from "@/components/Said";
 import { SectionHead } from "@/components/SectionHead";
 import { OutletIcon } from "@/components/Coverage";
 import { ArrowRight } from "@/components/icons";
-import { fallbackCode, indexSources } from "@/components/SourceList";
+import { fallbackCode, indexSources } from "@/lib/sources";
 import {
   fetchEvent,
   fetchFeed,

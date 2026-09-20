@@ -1,6 +1,9 @@
 "use client";
 
 import type { SourceRef } from "@/lib/api";
+import { fallbackCode, indexSources } from "@/lib/sources";
+
+export { fallbackCode, indexSources };
 import { ORIGIN_LABEL, OutletIcon, type Origin } from "@/components/Coverage";
 import { relativeTime } from "@/lib/dateline";
 
@@ -17,12 +20,6 @@ const FUNDING_LABEL: Record<string, string> = {
   state: "State-affiliated",
   public: "Public broadcaster",
 };
-
-export function fallbackCode(name: string | null | undefined): string {
-  const words = (name ?? "").replace("—", " ").split(/\s+/).filter((w) => w && !/^(the|of|news|&|and)$/i.test(w));
-  if (words.length === 0) return "?";
-  return (words.length === 1 ? words[0].slice(0, 2) : words.slice(0, 3).map((w) => w[0]).join("")).toUpperCase();
-}
 
 /**
  * One report as the reader sees it (DESIGN.md § Report card): the outlet's
@@ -130,9 +127,4 @@ export function ReportImages({ sources, limit = 8 }: { sources: SourceRef[]; lim
       ))}
     </ul>
   );
-}
-
-/** One index for [n], shared by the quotes and the report cards. */
-export function indexSources(sources: SourceRef[]): Map<string, number> {
-  return new Map(sources.map((s, i) => [s.article_id, i + 1]));
 }
