@@ -296,6 +296,22 @@ WhatsApp Business API, ₹0.8–1 per message — paid tier only).
 | 7–9 | Kannada + Telugu (parallel translator), then Tamil · state pages · Apple sign-in if the app is in motion | per-language judge |
 | ongoing | labels → story layer re-score (§4); clip labels → precision | F1 > 0.47 both folds; clips ≥ 0.9 |
 
+**Status, 2026-09-20 (end of day).** Shipped to prod: Google sign-in (client id
+set on Railway, Vercel and pinned in ci.yml); Ask limits + model tiering with
+the account's token actually sent; billing plumbing (plans, entitlement,
+Razorpay webhook plug-in, `tools/grant_plan.py`); `/privacy`, `/terms`,
+`/refunds` (owner Prism Media Intelligence LLP, partner Matryx Social Labs Pvt
+Ltd) linked from footer, account page, sign-in and the consent line; cookieless
+analytics behind `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` (needs the account); Ask
+redesign §2.1 (persistent bar, selection/quote/entity entry points, right
+drawer) and §2.2 (table · "Not in the reports" · follow-ups in the suggestion
+row); the mark as a continuous spectrum with PNG exports. Not yet: story-wide
+retrieval for Plus (§2.3), the 50-question groundedness run + your 20-question
+analyst set, the Plausible account, Vercel Pro, Razorpay, the pricing page,
+Hindi. Open facts to confirm in `web/src/lib/legal.ts`: the contact mailbox
+`hello@readprism.news` (needs an inbound route), the court city (Bengaluru),
+the 30-day rights-response window.
+
 Decisions needed from you now: (1) ₹149 for 90 days or first 1,000 — agree the
 end condition; (2) Razorpay account + GSTIN + Vercel Pro; (3) Google Cloud OAuth
 client (or let me create it under a Prism project you own); (4) push the two
