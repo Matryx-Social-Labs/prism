@@ -99,6 +99,14 @@ export function LimitNote({ limit, next }: { limit: AskLimit; next: string }) {
   );
 }
 
+/** The analyst's three, always available before the first question: each is
+ * answered as a table (agent/structure.py kinds) rather than prose. */
+export const DIG_DEEPER: { label: string; question: string }[] = [
+  { label: "Timeline", question: "Give me a timeline of what changed in this story, with dates." },
+  { label: "Every quote", question: "Give me every direct quote in the reports, with who said it." },
+  { label: "How outlets differ", question: "Which outlets reported this, and what did only one of them report?" },
+];
+
 export function isRefusal(turn: Turn): boolean {
   return !turn.streaming && turn.citations.length === 0 && /don'?t cover|do not say|not in sources|refus/i.test(turn.text);
 }
@@ -230,6 +238,14 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
         )}
       </div>
 
+      {turns.length === 0 && onFollowUp && (
+        <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2" aria-label="Dig deeper">
+          <span className="mr-1 font-mono text-[11px] uppercase tracking-[0.03em]" style={{ color: "var(--ink-faint)" }}>Dig deeper</span>
+          {DIG_DEEPER.map((d) => (
+            <button key={d.label} type="button" onClick={() => onFollowUp(d.question)} className="chip h-8 px-3 text-[12.5px]">{d.label}</button>
+          ))}
+        </div>
+      )}
       {/* One row of questions above the input: the story's suggestions before
           the first answer, then the last answer's follow-ups (founder: the row
           changes, rather than the answer growing chips). Nothing while an

@@ -259,6 +259,18 @@ describe("AskPanel — the answer's anatomy", () => {
   });
 });
 
+describe("AskPanel — dig deeper", () => {
+  it("offers the analyst's three before the first question, each sent as a question", async () => {
+    askQuestion.mockResolvedValue(undefined);
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
+    const row = screen.getByLabelText("Dig deeper");
+    expect(row).toHaveTextContent("Timeline");
+    await userEvent.click(screen.getByRole("button", { name: "How outlets differ" }));
+    expect(askQuestion).toHaveBeenCalledWith("e1", expect.stringMatching(/Which outlets reported this/), null, expect.anything(), expect.anything(), undefined);
+    expect(screen.queryByLabelText("Dig deeper")).toBeNull();
+  });
+});
+
 describe("AskPanel — opened by an entry point", () => {
   it("sends a request marked submit at once", async () => {
     askQuestion.mockResolvedValue(undefined);
