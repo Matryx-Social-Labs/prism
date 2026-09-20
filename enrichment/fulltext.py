@@ -12,6 +12,7 @@ import re
 import httpx
 import trafilatura
 
+from common.imagehash import refuse_non_public
 from common.logging import get_logger
 
 logger = get_logger(__name__)
@@ -71,10 +72,14 @@ async def retrieve_fulltext(url: str | None, body: str | None) -> tuple[str, str
 
     if url:
         try:
+            # The URL is the feed's. A compromised feed must not be able to
+            # make the worker fetch an internal address; the hook checks the
+            # first request and every redirect hop (common/imagehash.py).
             async with httpx.AsyncClient(
                 timeout=30,
                 follow_redirects=True,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; prism-prototype/0.1)"},
+                event_hooks={"request": [refuse_non_public]},
             ) as client:
                 response = await client.get(url)
                 response.raise_for_status()

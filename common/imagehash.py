@@ -52,6 +52,14 @@ def public_http_url(url: str) -> bool:
     return True
 
 
+async def refuse_non_public(request: httpx.Request) -> None:
+    """httpx request hook: runs for the first request AND every redirect hop,
+    so a client built with `event_hooks={"request": [refuse_non_public]}` can
+    follow redirects and still never reach a private address."""
+    if not public_http_url(str(request.url)):
+        raise httpx.RequestError(f"refused non-public target {request.url.host}", request=request)
+
+
 def dhash_bytes(data: bytes) -> str | None:
     """64-bit difference hash as 16 hex chars, or None if the bytes are not an image."""
     try:
