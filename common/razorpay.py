@@ -133,12 +133,18 @@ async def create_subscription(spec: PlanSpec, user_id: str, client: httpx.AsyncC
             await client.aclose()
 
 
+class NothingToCancel(Exception):
+    """Razorpay refused the cancel because the subscription has already run its course."""
+
+
 async def cancel_subscription(sub_id: str, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
     """Stop at the end of the paid period; access continues until then."""
     own = client is None
     client = client or _client()
     try:
         r = await client.post(f"/subscriptions/{sub_id}/cancel", json={"cancel_at_cycle_end": 1})
+        if r.status_code == 400 and "not cancellable" in r.text:
+            raise NothingToCancel(r.text[:200])
         r.raise_for_status()
         return r.json()
     finally:
@@ -202,9 +208,11 @@ async def apply_subscription(db, sub: dict[str, Any], *, note: str) -> tuple[str
             {"sid": sub["id"]},
         )
     ).scalar_one_or_none() or ""
-    # A cancel-at-cycle-end shows as still `active` with `end_at` set; keep the access date.
+    # When no further charge will come — cancelled, or every charge made
+    # (`completed`) — the end date is recorded as cancel_at: the plan card then
+    # says "Ends <date> · no further charges" and offers nothing to cancel.
     cancel_at = None
-    if sub.get("status") == "cancelled" or (sub.get("status") in ("active", "authenticated") and sub.get("end_at") and int(sub.get("remaining_count") or 1) == 0):
+    if sub.get("status") in ("cancelled", "completed") or (sub.get("status") in ("active", "authenticated") and sub.get("end_at") and int(sub.get("remaining_count") or 1) == 0):
         cancel_at = end
     await db.execute(
         text(

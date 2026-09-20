@@ -133,6 +133,11 @@ async def cancel(db: AsyncSession = Depends(get_db), user_id: UUID = Depends(get
         try:
             sub = await razorpay.cancel_subscription(current["provider_sub_id"])
             access_until = razorpay.period_end(sub) or access_until
+        except razorpay.NothingToCancel:
+            # Razorpay: "not cancellable in completed status" — every charge is
+            # already made and none will follow. There is nothing to stop; the
+            # reader keeps what they paid for and the row records that.
+            pass
         except Exception:
             logger.exception("razorpay_cancel_failed", sub=current["provider_sub_id"])
             raise HTTPException(status_code=502, detail="payment provider unavailable") from None
@@ -202,7 +207,10 @@ async def razorpay_webhook(request: Request, db: AsyncSession = Depends(get_db))
         logger.warning("razorpay_webhook_no_user", event=event, sub=sub.get("id"))
         return {"ok": True, "ignored": "no user_id in notes"}
     user_id, before, after = await razorpay.apply_subscription(db, sub, note=event)
-    logger.info("razorpay_webhook", event=event, sub=sub.get("id"), before=before, after=after)
+    # `event` is structlog's positional name; a kwarg of that name raised a
+    # TypeError and 500'd every delivery (2026-09-20) — Razorpay retries, then
+    # gives up on a webhook that keeps failing.
+    logger.info("razorpay_webhook", kind=event, sub=sub.get("id"), before=before, after=after)
     if user_id and before != after:
         await razorpay.on_transition(db, user_id, before, after, sub)
     return {"ok": True, "status": after}

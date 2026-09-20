@@ -44,6 +44,8 @@ def _mock(plans: list[dict], calls: list[tuple[str, str, dict | None]]):
         if req.method == "POST" and req.url.path == "/v1/subscriptions":
             return httpx.Response(200, json={"id": "sub_1", "status": "created", **body})
         if req.method == "POST" and req.url.path.endswith("/cancel"):
+            if SUB_STATE.get("status") == "completed":
+                return httpx.Response(400, json={"error": {"code": "BAD_REQUEST_ERROR", "description": "Subscription is not cancellable in completed status.", "field": "status"}})
             return httpx.Response(200, json={"id": req.url.path.split("/")[-2], "status": "cancelled", "current_end": SUB_STATE.get("current_end"), "notes": {"user_id": SUB_STATE.get("user_id", ""), "plan": "plus_monthly"}})
         return httpx.Response(404, json={"error": "unexpected"})
 
@@ -187,7 +189,17 @@ async def test_checkout_then_verify_turns_plus_on_and_cancel_keeps_it_to_period_
             # A second checkout while subscribed is refused.
             r = await c.post("/api/v1/billing/checkout", json={"plan": "plus_yearly"}, headers=auth)
             assert r.status_code == 409
-            # Cancel: the provider is told to stop at cycle end; access continues.
+            # A completed (paid-up, one-charge) subscription already records its end.
+            r = await c.get("/api/v1/billing/me", headers=auth)
+            assert r.json()["status"] == "active" and r.json()["cancel_at"] is not None
+            # Cancel on it: Razorpay says there is nothing to cancel; that is not an error for the reader.
+            r = await c.post("/api/v1/billing/cancel", headers=auth)
+            assert r.status_code == 200, r.text
+            assert r.json()["access_until"].startswith("2100-01-01")
+            # A renewing subscription: the provider is told to stop at cycle end; access continues.
+            SUB_STATE.update({"status": "active", "remaining_count": 9})
+            async with session_scope() as s:
+                await s.execute(text("UPDATE subscriptions SET cancel_at = NULL WHERE provider_sub_id = 'sub_1'"))
             r = await c.post("/api/v1/billing/cancel", headers=auth)
             assert r.status_code == 200
             assert any(p.endswith("/sub_1/cancel") and b == {"cancel_at_cycle_end": 1} for _, p, b in calls)
