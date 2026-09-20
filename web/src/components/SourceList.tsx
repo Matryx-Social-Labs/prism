@@ -1,11 +1,16 @@
 "use client";
 
+import { useRef } from "react";
 import type { SourceRef } from "@/lib/api";
 import { fallbackCode, indexSources } from "@/lib/sources";
 
 export { fallbackCode, indexSources };
 import { ORIGIN_LABEL, OutletIcon, type Origin } from "@/components/Coverage";
 import { relativeTime } from "@/lib/dateline";
+import { ArrowLeft, ArrowRight } from "@/components/icons";
+
+/** One photo tile: wide enough for "Photo: The Times of India" and a time on one line. */
+const TILE_W = 232;
 
 /**
  * Publisher images are shown ONLY as link previews to the report they came
@@ -100,31 +105,60 @@ export function SourceList({
 
 /**
  * "From the reports": the outlets' own photographs as a rail of credited link
- * previews — a horizontal scroll on the phone, a strip on desktop. Each tile
- * opens the report it came from and names the outlet on the tile itself, so
- * the photo is never separated from its source. Off when REPORT_IMAGES is off.
+ * previews — one horizontal strip at every width (a grid of eight tall tiles
+ * pushed the record off the first screen, 2026-09-20). Snap-scrolls on touch;
+ * on desktop a label names the rail and prev/next step it one tile, because a
+ * hidden scrollbar gives a mouse no hint. Each tile opens the report it came
+ * from and names the outlet on the tile itself, so the photo is never
+ * separated from its source. Off when REPORT_IMAGES is off.
  */
 export function ReportImages({ sources, limit = 8 }: { sources: SourceRef[]; limit?: number }) {
+  const rail = useRef<HTMLUListElement>(null);
   if (!REPORT_IMAGES) return null;
   const seen = new Set<string>();
-  const withImage = sources.filter((s) => s.image_url && s.url && !seen.has(s.image_url) && seen.add(s.image_url)).slice(0, limit);
+  const all = sources.filter((s) => s.image_url && s.url && !seen.has(s.image_url) && seen.add(s.image_url));
+  // One photo per publisher first, then the rest: BBC's Tamil, Telugu and
+  // Bengali editions each upload the same picture under a new id, and three
+  // of them in a row read as a repeat before any other outlet gets a tile.
+  const firstOf = new Set<string>();
+  const lead = all.filter((s) => { const k = s.publisher ?? s.source_name; return firstOf.has(k) ? false : (firstOf.add(k), true); });
+  const withImage = [...lead, ...all.filter((s) => !lead.includes(s))].slice(0, limit);
   if (withImage.length === 0) return null;
+  const step = (dir: 1 | -1) => rail.current?.scrollBy({ left: dir * (TILE_W + 10), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   return (
-    <ul className="hide-scroll -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 sm:-mx-8 sm:px-8 lg:mx-0 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(196px,1fr))] lg:overflow-visible lg:px-0" aria-label="Images from the reports">
-      {withImage.map((s) => (
-        <li key={s.article_id} className="w-[220px] flex-none snap-start lg:w-auto">
-          <a href={s.url!} target="_blank" rel="noopener noreferrer" className="group relative block aspect-[4/3] overflow-hidden rounded-[var(--r-md)] border" style={{ borderColor: "var(--line)", background: "var(--sunken)" }} aria-label={`${s.source_name}: ${s.title}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={s.image_url!} alt={`Photo from ${s.source_name}`} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" onError={(e) => { ((e.currentTarget as HTMLImageElement).closest("li") as HTMLElement).style.display = "none"; }} />
-            {/* The credit, on the image itself. The tile is the link; no badge. */}
-            <span className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 px-2.5 pb-2 pt-8 text-[12px] font-semibold text-white" style={{ background: "linear-gradient(to top, rgba(0,0,0,.78) 0%, rgba(0,0,0,.5) 55%, rgba(0,0,0,0) 100%)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
-              <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} />
-              <span className="truncate">Photo: {s.source_name}</span>
-              {s.published_at && <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10.5px] font-normal opacity-90">{relativeTime(s.published_at)}</span>}
-            </span>
-          </a>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
+          From the reports · {withImage.length} {withImage.length === 1 ? "photo" : "photos"}
+        </p>
+        {withImage.length > 2 && (
+          <span className="hidden items-center gap-1 lg:inline-flex">
+            <button type="button" className="icon-btn h-7 w-7" aria-label="Previous photos" onClick={() => step(-1)}><ArrowLeft size={14} /></button>
+            <button type="button" className="icon-btn h-7 w-7" aria-label="Next photos" onClick={() => step(1)}><ArrowRight size={14} /></button>
+          </span>
+        )}
+      </div>
+      <ul
+        ref={rail}
+        className="hide-scroll -mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scroll-pl-5 sm:-mx-8 sm:px-8 sm:scroll-pl-8 lg:mx-0 lg:px-0 lg:scroll-pl-0"
+        aria-label="Images from the reports"
+      >
+        {withImage.map((s) => (
+          <li key={s.article_id} className="flex-none snap-start" style={{ width: TILE_W }}>
+            <a href={s.url!} target="_blank" rel="noopener noreferrer" className="group relative block aspect-[4/3] overflow-hidden rounded-[var(--r-md)] border" style={{ borderColor: "var(--line)", background: "var(--sunken)" }} aria-label={`${s.source_name}: ${s.title}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={s.image_url!} alt={`Photo from ${s.source_name}`} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" onError={(e) => { ((e.currentTarget as HTMLImageElement).closest("li") as HTMLElement).style.display = "none"; }} />
+              {/* The credit, on the image itself. The tile is the link; no badge. */}
+              <span className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 px-2.5 pb-2 pt-8 text-[12px] font-semibold text-white" style={{ background: "linear-gradient(to top, rgba(0,0,0,.78) 0%, rgba(0,0,0,.5) 55%, rgba(0,0,0,0) 100%)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+                <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} />
+                <span className="truncate">Photo: {s.source_name}</span>
+                {s.published_at && <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10.5px] font-normal opacity-90">{relativeTime(s.published_at)}</span>}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
+

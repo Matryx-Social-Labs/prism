@@ -345,7 +345,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                 <span key={cve} style={{ color: "var(--ink)" }}>{cve}</span>
               ))}
             </div>
-            <h1 className="font-record mt-3 max-w-[22ch] text-[30px] font-medium leading-[1.12] text-balance sm:text-[38px]" style={{ letterSpacing: "-0.015em" }}>
+            <h1 className="font-record mt-3 max-w-[28ch] text-[30px] font-medium leading-[1.12] text-balance sm:text-[38px]" style={{ letterSpacing: "-0.015em" }}>
               {event.title}
             </h1>
             <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{headlineByline(event)}</p>

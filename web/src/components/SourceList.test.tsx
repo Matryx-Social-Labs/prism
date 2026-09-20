@@ -39,3 +39,14 @@ describe("ReportCard", () => {
     expect(screen.getByAltText("Photo from The Hindu")).toBeInTheDocument();
   });
 });
+
+describe("ReportImages — one photo per publisher first", () => {
+  it("leads with each publisher's first photo before a second from the same one", async () => {
+    const { ReportImages } = await import("@/components/SourceList");
+    const { render, screen, within } = await import("@testing-library/react");
+    const src = (id: string, publisher: string, name: string) => ({ article_id: id, source_name: name, source_slug: id, url: `https://x.example/${id}`, title: `T ${id}`, published_at: null, stance: null, funding: null, publisher, image_url: `https://img.example/${id}.jpg` }) as never;
+    render(<ReportImages sources={[src("bbc-ta", "bbc", "BBC Tamil"), src("bbc-te", "bbc", "BBC Telugu"), src("hindu", "thehindu", "The Hindu"), src("bbc-bn", "bbc", "BBC Bengali")]} />);
+    const tiles = within(screen.getByRole("list", { name: "Images from the reports" })).getAllByRole("link");
+    expect(tiles.map((a) => a.getAttribute("aria-label")?.split(":")[0])).toEqual(["BBC Tamil", "The Hindu", "BBC Telugu", "BBC Bengali"]);
+  });
+});
