@@ -1,16 +1,15 @@
+import { MARK_BAND, MARK_BOX, MARK_TRIANGLE, bandSegments } from "@/lib/mark";
 import { OG_COLORS, OG_DISPLAY, OG_MONO, displayStack } from "@/lib/ogFonts";
 
 /** The mark as PrismMark draws it, for Satori: a solid triangle on the spectrum bar. */
 export function PrismMarkSvg({ size, ink }: { size: number; ink: string }) {
+  // Same geometry as components/PrismMark (lib/mark.ts); inline for next/og.
   return (
-    <svg width={size} height={Math.round((size * 22) / 24)} viewBox="0 0 24 22" fill="none">
-      <path d="M12 1 L23 21 L1 21 Z" fill={ink} stroke={ink} strokeWidth={1.5} strokeLinejoin="round" />
-      <rect x="1" y="19" width="22" height="3" fill="url(#sp)" />
-      <defs>
-        <linearGradient id="sp" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#ef4444" /><stop offset="35%" stopColor="#f59e0b" /><stop offset="70%" stopColor="#06b6d4" /><stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-      </defs>
+    <svg width={size} height={size} viewBox={`0 0 ${MARK_BOX} ${MARK_BOX}`} fill="none">
+      <path d={MARK_TRIANGLE} fill={ink} />
+      {bandSegments().map((s) => (
+        <rect key={s.color} x={s.x} y={MARK_BAND.y} width={s.width} height={MARK_BAND.height} fill={s.color} />
+      ))}
     </svg>
   );
 }
