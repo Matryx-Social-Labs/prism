@@ -138,7 +138,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   return (
     <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
       <Masthead dateline={dateline} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-10 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_300px]">
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-10 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)]">
         <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
 
         <div className="min-w-0">

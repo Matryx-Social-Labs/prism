@@ -97,7 +97,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
           <div className="mt-4 hidden lg:flex"><ShareButton url={`/trending/${s.canonical_slug}`} title={s.label} /></div>
         </header>
 
-        <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-12">
+        <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_var(--evidence)] lg:gap-12">
           <div className="min-w-0">
             {verified && tree ? (
               <section aria-labelledby="route-title" className="card p-5">

@@ -72,6 +72,7 @@
   --shell: 1360px;
   --reading: 640px;
   --rail: 220px;
+  --evidence: 300px; /* the right rail: reports, named, plan */
   --topbar: 60px;
   --tabbar: 56px;
   --r-xs: 4px;
@@ -343,6 +344,11 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 .meta-line { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.03em; color: var(--ink-3); text-transform: uppercase; }
 .meta-line .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line-strong); display: inline-block; }
 .glass { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+/* A wide desk (≥1536px): the shell grows and the rails with it — width buys
+   simultaneity (two columns of stories, wider evidence), never longer lines;
+   the reading measure stays 640 (DESIGN.md § Layout). */
+@media (min-width: 1536px) { :root { --shell: 1600px; --rail: 240px; --evidence: 360px; } }
+@media (min-width: 1920px) { :root { --shell: 1760px; --evidence: 400px; } }
 
 /* ── Podcast clip (DESIGN.md § Podcast clip) ─────────────────────────
    The transcript is the card; the one control is the play disc; the words

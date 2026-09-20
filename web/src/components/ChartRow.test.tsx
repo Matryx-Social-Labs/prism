@@ -129,10 +129,20 @@ describe("ChartRow — a lens dot says a professional reading exists", () => {
   });
 });
 
-describe("ChartRow — no publisher photograph, on any row", () => {
-  it("ignores image_url even on the lead", () => {
-    const { container } = row(item({ image_url: "https://x/y.jpg" }), { lead: true });
-    expect(container.querySelector("img")).toBeNull();
+describe("ChartRow — the photograph, credited (founder, 2026-09-20)", () => {
+  it("shows the report's image as a credited thumbnail: the outlet's icon on it, the alt says whose it is", () => {
+    const outlet = { slug: "thehindu", publisher: "thehindu", name: "The Hindu", code: "TH", origin: "national", language: "en", domain: "thehindu.com" };
+    const { container } = row(item({ image_url: "https://x/y.jpg", image_outlet: outlet }), { lead: true });
+    const img = container.querySelector("figure img")!;
+    expect(img).toHaveAttribute("src", "https://x/y.jpg");
+    expect(img).toHaveAttribute("alt", "Photo: The Hindu");
+    expect(img).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(container.querySelector("figure [title='Photo: The Hindu']")).toBeInTheDocument();
+  });
+
+  it("a row without a picture keeps its shape: no figure, no empty box", () => {
+    const { container } = row(item({ image_url: null }));
+    expect(container.querySelector("figure")).toBeNull();
   });
 
   it("prints what changed on every row, larger on the lead", () => {

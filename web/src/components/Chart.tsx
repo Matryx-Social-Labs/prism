@@ -51,7 +51,7 @@ export function Chart({
   return (
     <div>
       <ol
-        className="chart-print flex flex-col gap-3"
+        className="chart-print grid grid-cols-1 gap-3 2xl:grid-cols-2"
         onClickCapture={(e) => {
           const a = (e.target as HTMLElement).closest("a[href^='/story/']");
           const id = a?.getAttribute("href")?.split("/story/")[1];

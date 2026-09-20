@@ -29,6 +29,8 @@ export interface FeedItem {
   subsector: string | null;
   regions: string[];
   image_url: string | null;
+  /** Whose photograph `image_url` is — the outlet is credited on the thumbnail. */
+  image_outlet?: OutletRef | null;
   is_regional: boolean;
   /** Podcast shows with a clip on this story (slugs), at most three. */
   clip_shows?: string[];

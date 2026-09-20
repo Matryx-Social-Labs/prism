@@ -37,6 +37,9 @@ class _Rows:
     def mappings(self):
         return self
 
+    def scalars(self):
+        return self
+
     def all(self):
         return self._rows
 
@@ -66,6 +69,8 @@ class _FakeSession:
 
     async def execute(self, _stmt, params=None):
         if "FROM sources" in str(_stmt):  # the outlet registry: no outlets in this corpus
+            return _Rows([])
+        if "GROUP BY image_phash" in str(_stmt):  # placeholder photographs: none in this corpus
             return _Rows([])
         self.params = params or {}
         self.queries.append(self.params)

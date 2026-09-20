@@ -1,3 +1,4 @@
+import { sentences } from "@/lib/sentences";
 import Link from "next/link";
 import { AskDemo } from "@/components/AskDemo";
 import { ChartRow } from "@/components/ChartRow";
@@ -72,9 +73,6 @@ async function pickExample(): Promise<Example | null> {
   }
 }
 
-function sentences(text: string): string[] {
-  return (text.match(/[^.!?]+[.!?]+["’”]?|[^.!?]+$/g) ?? [text]).map((s) => s.trim()).filter(Boolean);
-}
 
 function Step({ id, n, title, rule, children, example }: { id: string; n: string; title: string; rule: string; children: React.ReactNode; example: React.ReactNode }) {
   return (

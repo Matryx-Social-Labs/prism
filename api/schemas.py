@@ -36,6 +36,8 @@ class FeedItem(BaseModel):
     subsector: str | None
     regions: list[str]
     image_url: str | None
+    # The outlet whose photograph `image_url` is, for the credit on the thumbnail.
+    image_outlet: OutletRef | None = None
     is_regional: bool  # profile region appears in the event's regions
     coverage: CoverageOut | None = None
     clip_shows: list[str] = []  # podcast shows with a clip on this story (slugs), ≤ 3

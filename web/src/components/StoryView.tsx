@@ -28,7 +28,8 @@ import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { Said } from "@/components/Said";
 import { Clips } from "@/components/Clips";
 import { SectionHead as Head } from "@/components/SectionHead";
-import { ReportImages, SourceList, fallbackCode, indexSources } from "@/components/SourceList";
+import { SourceList, fallbackCode, indexSources } from "@/components/SourceList";
+import { PhotoDeck } from "@/components/PhotoDeck";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
 import { relativeTime } from "@/lib/dateline";
@@ -332,7 +333,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         <span className="w-[76px]" aria-hidden />
       </div>
 
-      <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+40px)] pt-4 sm:px-8 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10 xl:grid-cols-[var(--rail)_minmax(0,1fr)_300px] lg:pb-20 lg:pt-6 xl:px-10">
+      <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+40px)] pt-4 sm:px-8 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)] lg:pb-20 lg:pt-6 xl:px-10">
         {/* ── On this story (desktop rail) ─────────────────────── */}
         <aside className="hidden lg:block lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start" aria-label="On this story">
           <p className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>On this story</p>
@@ -391,12 +392,12 @@ export function StoryView({ event }: { event: EventDetail }) {
               </span>
               {single && <StatusPill status="provisional" label="One source so far" />}
             </div>
-            <div className="mt-5"><ReportImages sources={event.sources} /></div>
+            <div className="mt-6"><PhotoDeck sources={event.sources} /></div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
+              {/* No Ask button here: on a desk the bar rides the foot of the
+                  viewport the whole way down (AskBar); on the phone it is in
+                  the thumb zone. One affordance, always in reach. */}
               <span className="hidden lg:inline-flex"><ShareButton url={`/story/${event.id}`} title={event.title} /></span>
-              <button type="button" onClick={() => openAsk({ via: "foot" })} className="btn btn-secondary hidden lg:inline-flex">
-                <Speech /> Ask this story
-              </button>
               <span className="flex-1" />
               {lensControl}
             </div>

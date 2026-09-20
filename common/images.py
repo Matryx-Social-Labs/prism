@@ -33,3 +33,42 @@ def hi_res(url: str | None) -> str | None:
             return _ASSETTYPE_W.sub(lambda mm: f"{mm.group(1)}{TARGET_W}", url, count=1)
         return url
     return url
+
+
+# ── Placeholders: the outlet's logo or a stock district photo, not this story ──
+# The Hindu's og-image.png appeared on 363 reports in a fortnight, TOI's generic
+# msid on 87, Prajavani's district stock shots on 13–28 each (prod, 2026-09-21).
+# A photograph OF a story is not shared by a dozen unrelated ones, so a hash
+# seen on PLACEHOLDER_REPEATS reports within PLACEHOLDER_WINDOW is treated as
+# furniture and never shown as the story's picture.
+PLACEHOLDER_REPEATS = 4
+PLACEHOLDER_WINDOW = "14 days"
+_PLACEHOLDER_TTL_S = 300.0
+_placeholders: tuple[float, frozenset[str]] = (0.0, frozenset())
+
+
+async def placeholder_hashes(session) -> frozenset[str]:
+    """The current set of placeholder image hashes, refreshed every five minutes."""
+    global _placeholders
+    import time
+
+    from sqlalchemy import text
+
+    now = time.monotonic()
+    stamp, cached = _placeholders
+    if cached and now - stamp < _PLACEHOLDER_TTL_S:
+        return cached
+    rows = (
+        await session.execute(
+            text(
+                f"""
+                SELECT image_phash FROM raw_items
+                WHERE image_phash IS NOT NULL AND created_at > now() - interval '{PLACEHOLDER_WINDOW}'
+                GROUP BY image_phash HAVING count(*) >= :n
+                """
+            ),
+            {"n": PLACEHOLDER_REPEATS},
+        )
+    ).scalars().all()
+    _placeholders = (now, frozenset(rows))
+    return _placeholders[1]

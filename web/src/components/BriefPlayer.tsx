@@ -12,15 +12,7 @@ import { markBlocks } from "@/lib/entities";
 // highlighted (real read-along), which also sidesteps Chrome's ~15s cutoff on
 // long single utterances.
 
-// Native sentence segmentation; regex fallback for engines without Intl.Segmenter.
-function sentences(text: string): string[] {
-  try {
-    const seg = new Intl.Segmenter("en", { granularity: "sentence" });
-    return [...seg.segment(text)].map((s) => s.segment.trim()).filter(Boolean);
-  } catch {
-    return (text.match(/[^.!?]+[.!?]*/g) ?? [text]).map((s) => s.trim()).filter(Boolean);
-  }
-}
+import { sentences } from "@/lib/sentences";
 
 function pickVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
   const voices = synth.getVoices();

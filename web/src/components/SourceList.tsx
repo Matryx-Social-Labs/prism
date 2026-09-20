@@ -11,15 +11,7 @@ import { ArrowLeft, ArrowRight } from "@/components/icons";
 
 /** One photo tile: wide enough for "Photo: The Times of India" and a time on one line. */
 const TILE_W = 232;
-/** dHash bits apart at which two photos are the same photo (crops and re-encodes land ≤ 6). */
-const NEAR_DUPLICATE_BITS = 8;
-
-export function hamming(a: string, b: string): number {
-  let x = BigInt(`0x${a}`) ^ BigInt(`0x${b}`);
-  let n = 0;
-  while (x) { n += Number(x & 1n); x >>= 1n; }
-  return n;
-}
+export { hamming } from "@/lib/images";
 
 /**
  * Publisher images are shown ONLY as link previews to the report they came
@@ -28,7 +20,8 @@ export function hamming(a: string, b: string): number {
  * as Prism's own image. A kill switch, because the right to even this much is
  * not settled in India (DESIGN.md § Images; legal note 2026-09-18).
  */
-export const REPORT_IMAGES = process.env.NEXT_PUBLIC_REPORT_IMAGES !== "0";
+import { NEAR_DUPLICATE_BITS, REPORT_IMAGES, hamming } from "@/lib/images";
+export { REPORT_IMAGES } from "@/lib/images";
 
 const FUNDING_LABEL: Record<string, string> = {
   state: "State-affiliated",

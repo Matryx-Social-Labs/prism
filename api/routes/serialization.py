@@ -44,6 +44,14 @@ def outlet_refs(slugs: list[str], registry: dict[str, Outlet] | None) -> list[Ou
     ]
 
 
+def _get(row: Any, key: str) -> Any:
+    """A column that only some queries select (the CVE-record and older paths do not)."""
+    try:
+        return row[key]
+    except (KeyError, IndexError):
+        return None
+
+
 def build_feed_item(
     row: Any,
     active_lens: Lens,
@@ -76,6 +84,7 @@ def build_feed_item(
         subsector=row["subsector"],
         regions=row["regions"] or [],
         image_url=row["image_url"],
+        image_outlet=next(iter(outlet_refs([row["image_source_slug"]], registry)), None) if _get(row, "image_source_slug") else None,
         is_regional=bool(region and region in (row["regions"] or [])),
         coverage=projection.get("coverage"),
         event_type=projection.get("event_type"),
