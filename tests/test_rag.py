@@ -173,7 +173,7 @@ async def test_an_empty_grounding_set_refuses_instead_of_guessing(monkeypatch):
     memory is precisely the behaviour this agent exists not to have."""
     import agent.rag as rag
 
-    async def _nothing(_e, _q):
+    async def _nothing(_e, _q, **_kw):
         return [], {}, "A title"
 
     def _llm():
