@@ -4,9 +4,13 @@ stopped publishing to RSS — Hindi news audio lives on YouTube and app-only
 players — so v1 is English, and a Hindi source is an open search, not a gap
 this list can close.
 
-`dai` marks a host that stitches ads in per request (Spreaker served 2.57 MB
-and 2.12 MB of one episode to two user agents): the player must reconcile its
-file against the one we transcribed before it seeks.
+`dai` marks a host that stitches ads in per request. Measured on one Indian
+Express episode (2026-09-20): two clients got files 57 s apart in length, but
+the content was shifted by only 28.6 s — ads pre-roll AND mid-roll — so no
+duration arithmetic recovers the offset and a clip would start in the wrong
+place for most readers. Such a show is registered but disabled: nothing is
+transcribed, nothing is shown, until the host serves one file to everyone.
+The other four hosts served byte-identical files across clients.
 """
 from dataclasses import dataclass
 
@@ -20,6 +24,10 @@ class ShowSpec:
     site_url: str
     language: str = "en"
     dai: bool = False
+
+    @property
+    def enabled(self) -> bool:
+        return not self.dai
 
 
 SHOWS: list[ShowSpec] = [

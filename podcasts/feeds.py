@@ -45,16 +45,16 @@ async def upsert_show(spec: ShowSpec, art_url: str | None) -> None:
         await s.execute(
             text(
                 """
-                INSERT INTO podcast_shows (slug, name, publisher, feed_url, site_url, art_url, language, last_polled_at)
-                VALUES (:slug, :name, :publisher, :feed_url, :site_url, :art_url, :language, now())
+                INSERT INTO podcast_shows (slug, name, publisher, feed_url, site_url, art_url, language, enabled, last_polled_at)
+                VALUES (:slug, :name, :publisher, :feed_url, :site_url, :art_url, :language, :enabled, now())
                 ON CONFLICT (slug) DO UPDATE SET
                   name = EXCLUDED.name, publisher = EXCLUDED.publisher, feed_url = EXCLUDED.feed_url,
                   site_url = EXCLUDED.site_url, art_url = COALESCE(EXCLUDED.art_url, podcast_shows.art_url),
-                  last_polled_at = now()
+                  enabled = EXCLUDED.enabled, last_polled_at = now()
                 """
             ),
             {"slug": spec.slug, "name": spec.name, "publisher": spec.publisher, "feed_url": spec.feed_url,
-             "site_url": spec.site_url, "art_url": art_url, "language": spec.language},
+             "site_url": spec.site_url, "art_url": art_url, "language": spec.language, "enabled": spec.enabled},
         )
 
 
@@ -77,7 +77,8 @@ async def poll_show(spec: ShowSpec, http: httpx.AsyncClient) -> int:
             guid = e.get("id") or e.get("guid") or audio
             if not (audio and pub and guid):
                 continue
-            status = "pending" if now - pub <= TRANSCRIBE_WITHIN else "skipped"
+            # A disabled show (dynamic ad insertion) is catalogued, never paid for.
+            status = "pending" if spec.enabled and now - pub <= TRANSCRIBE_WITHIN else "skipped"
             res = await s.execute(
                 text(
                     """
