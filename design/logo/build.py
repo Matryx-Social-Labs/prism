@@ -35,11 +35,17 @@ def mark(px: int, ink: str, bg: str | None, pad_ratio: float = 0.0) -> Image.Ima
     tri = [(off + x * scale, off + y * scale) for x, y in TRI]
     d.polygon(tri, fill=ink)
     bx, by, bw, bh = BAND
-    seg = bw / len(SPECTRUM)
-    for i, c in enumerate(SPECTRUM):
-        x0 = off + (bx + i * seg) * scale
-        x1 = off + (bx + (i + 1) * seg) * scale
-        d.rectangle([x0, off + by * scale, x1, off + (by + bh) * scale], fill=c)
+    x0, x1 = off + bx * scale, off + (bx + bw) * scale
+    y0, y1 = off + by * scale, off + (by + bh) * scale
+    # A continuous spectrum: interpolate between the four stops column by column.
+    stops = [tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in SPECTRUM]
+    n = int(x1 - x0)
+    for k in range(n):
+        t = k / max(n - 1, 1) * (len(stops) - 1)
+        i = min(int(t), len(stops) - 2)
+        f = t - i
+        col = tuple(round(stops[i][ch] * (1 - f) + stops[i + 1][ch] * f) for ch in range(3))
+        d.line([(x0 + k, y0), (x0 + k, y1)], fill=col)
     return im.resize((px, px), Image.Resampling.LANCZOS)
 
 

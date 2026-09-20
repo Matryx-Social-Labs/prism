@@ -18,20 +18,21 @@ describe("PrismMark", () => {
     expect(tri.getAttribute("d")).toBe(MARK_TRIANGLE);
   });
 
-  it("puts the spectrum below the base, exactly as wide as the base, in four crisp segments", () => {
-    const { container } = render(<PrismMark size={24} />);
+  it("puts the spectrum below the base, exactly as wide as the base, as one continuous gradient", () => {
+    const { container } = render(<><PrismMark size={24} /><PrismMark size={24} /></>);
     const rects = [...container.querySelectorAll("rect")];
-    expect(rects).toHaveLength(SPECTRUM.length);
-    expect(rects.map((r) => r.getAttribute("fill"))).toEqual([...SPECTRUM]);
-    const xs = rects.map((r) => Number(r.getAttribute("x")));
-    const ws = rects.map((r) => Number(r.getAttribute("width")));
-    // Base runs x 2…22; the band covers exactly that, contiguous, no overhang.
-    expect(xs[0]).toBe(2);
-    expect(xs[xs.length - 1] + ws[ws.length - 1]).toBe(22);
-    for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeCloseTo(xs[i - 1] + ws[i - 1], 6);
-    // Below the base (y 19), never over it.
-    expect(MARK_BAND.y).toBeGreaterThan(19);
-    expect(MARK_BAND.y + MARK_BAND.height).toBeLessThanOrEqual(24);
+    expect(rects).toHaveLength(2);
+    for (const r of rects) {
+      expect([Number(r.getAttribute("x")), Number(r.getAttribute("width"))]).toEqual([2, 20]);
+      expect(Number(r.getAttribute("y"))).toBeGreaterThan(19);
+      expect(Number(r.getAttribute("y")) + Number(r.getAttribute("height"))).toBeLessThanOrEqual(24);
+    }
+    // One gradient per instance, four stops in the design's hues.
+    const ids = [...container.querySelectorAll("linearGradient")].map((g) => g.id);
+    expect(new Set(ids).size).toBe(2);
+    expect(rects.map((r) => r.getAttribute("fill"))).toEqual(ids.map((id) => `url(#${id})`));
+    const stops = [...container.querySelectorAll("linearGradient")][0].querySelectorAll("stop");
+    expect([...stops].map((s) => s.getAttribute("stop-color"))).toEqual([...SPECTRUM]);
   });
 
   it("is square at every size the design uses", () => {

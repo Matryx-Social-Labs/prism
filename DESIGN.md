@@ -85,7 +85,7 @@ reading a manual:
 
 ## The mark
 
-A 24×24 box: an equilateral prism, fill only (no stroke — a stroke put every edge on a fraction and clipped the base), base 20 wide at y 19, apex at 1.68; the spectrum a band below the base, exactly the base's width, 1.25 below it, in the coverage bar's four hues as four crisp segments (a gradient is mud at 21px). Geometry lives once in `web/src/lib/mark.ts`; the favicon, the share card and the PNG exports (`design/logo/build.py` → `design/logo/exports/`, shareable set at `/brand/*.png`) draw the same numbers. The triangle takes `currentColor`; the band is the only spectrum in the system. Fixed 2026-09-20 after the founder zoomed in on the old base.
+A 24×24 box: an equilateral prism, fill only (no stroke — a stroke put every edge on a fraction and clipped the base), base 20 wide at y 19, apex at 1.68; the spectrum a band below the base, exactly the base's width, 1.25 below it, as one continuous spectrum with stops at the coverage bar's four hues (red → amber → cyan → violet). Geometry lives once in `web/src/lib/mark.ts`; the favicon, the share card and the PNG exports (`design/logo/build.py` → `design/logo/exports/`, shareable set at `/brand/*.png`) draw the same numbers. The triangle takes `currentColor`; the band is the only spectrum in the system. Fixed 2026-09-20 after the founder zoomed in on the old base.
 
 ## Colour
 
