@@ -19,6 +19,7 @@ import { framesFromStory } from "@/lib/photos";
 import { ArrowLeft } from "@/components/icons";
 import { Brand } from "@/components/Brand";
 import { sectorGroup } from "@/lib/sectors";
+import { jsonLd, storyLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,8 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
   const group = sectorGroup(s.sector);
   return (
     <>
+      {/* The arc as an article whose parts are its developments (lib/seo). */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(storyLd(s)) }} />
       <div className="glass sticky top-0 z-30 flex h-[52px] items-center justify-between border-b px-3 sm:px-6 lg:hidden" style={{ borderColor: "var(--line)" }}>
         <Link href="/trending" className="btn btn-ghost btn-sm gap-1.5" aria-label="Back to stories"><ArrowLeft /> Stories</Link>
         <Brand size={22} label="Prism, stories" />

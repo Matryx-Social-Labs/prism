@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import Script from "next/script";
 import { PLAUSIBLE_DOMAIN } from "@/lib/analytics";
@@ -6,6 +6,7 @@ import { NavMemory } from "@/components/NavMemory";
 import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, JetBrains_Mono, Newsreader, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu, Tiro_Devanagari_Hindi } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
+import { jsonLd, siteGraph } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -54,12 +55,18 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  applicationName: "Prism",
   title: {
     default: "Prism: Follow the story, not the headlines.",
     template: "%s | Prism",
   },
   description:
     "One live story record from monitored outlets, with every development, verified quote and source open to inspection.",
+  // Let search show the full snippet and the share card at full size; a news
+  // result cut to 160 characters or a thumbnail loses the record's point.
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large", "max-video-preview": -1 } },
+  category: "news",
+  publisher: "Prism Media Intelligence LLP",
   openGraph: {
     type: "website",
     siteName: "Prism",
@@ -74,6 +81,15 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F0F12" },
+  ],
+};
+
 // Runs before first paint: sets the saved theme, and marks the document as
 // JS-capable (the `js` class gates anything that must never hide content from
 // a crawler or a reader whose JS failed).
@@ -84,6 +100,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {/* Who publishes this and how to search it — the same on every page (lib/seo). */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(siteGraph()) }} />
       </head>
       <body
         className={`${display.variable} ${recordHi.variable} ${recordKn.variable} ${recordTa.variable} ${recordTe.variable} ${ui.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-dvh flex-col antialiased`}

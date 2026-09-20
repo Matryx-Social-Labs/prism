@@ -3,6 +3,47 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.83.0] - 2026-09-21
+
+### Added
+- **The subscription's whole life on the account page.** Cancelling a monthly
+  plan opens one sheet: the truth first (you keep Plus until the date), an
+  optional reason, ONE offer matched to it — a pause of 1–3 months (Razorpay
+  pauses at once, the worker resumes it on the day) or the yearly saving
+  starting the day the month ends (a new subscription with `start_at`; the
+  monthly is stopped at cycle end once it is authorised) — and "Cancel anyway"
+  beside it at equal weight. The Refund policy's seven days on yearly/founding
+  is one click on the plan card (Razorpay refunds the latest invoice's payment
+  in full, normal speed; the plan ends at once). **Payments** lists every paid
+  Razorpay invoice with its hosted link. `GET/POST /billing/{pause,resume,
+  refund,history}`; `subscriptions` gains `current_period_start`, `refund_id`,
+  `paused_until`, `starts_at`.
+- **Search and answer-engine visibility.** `/feed`, `/sector/<slug>` and
+  `/trending` are server-rendered (the rows are in the HTML a crawler receives;
+  they were a skeleton), each with one `h1`, a canonical and an `ItemList`;
+  `NewsArticle` JSON-LD on records now carries `isBasedOn` (the reports),
+  `about` (entities) and the publisher by `@id`; story arcs carry `hasPart`;
+  every page carries the `NewsMediaOrganization` + `WebSite` graph; a Google
+  News sitemap (`/news-sitemap.xml`), `/llms.txt`, a web manifest, theme
+  colours, `max-snippet`/`max-image-preview` directives; `/search` is
+  `noindex`; the sitemap lists subjects and stories; the worker pings IndexNow
+  hourly with what changed. `docs/SEO.md` records it and the owner's checklist.
+
+### Changed
+- **Every email in the record's voices.** The shell wore the retired world
+  (Fraunces, IBM Plex Mono, warm ivory, the three-lens bar — a gradient by
+  another name). Now: masthead with the mark, a mono meta line, the title in
+  Newsreader, Hind body, facts on hairlines with mono labels, one accent
+  button, a mono footer. New moments: cancel confirmed at once, paused, back
+  on, yearly scheduled, ended (never "you keep Plus until" a date that has
+  passed), refunded; nothing is sent on top of a refund.
+- The Razorpay checkout prefills the account's email and locks it: Razorpay
+  builds its customer, and addresses every invoice, from what is typed there.
+- The Refund policy describes the button, the window and Razorpay's 5–7
+  working days to the original method; `LEGAL_UPDATED` 2026-09-21.
+- Unknown `/sector/<slug>` addresses 404 instead of rendering the whole chart
+  under the root title.
+
 ## [0.0.82.1] - 2026-09-18
 
 ### Changed

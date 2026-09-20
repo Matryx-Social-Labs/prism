@@ -1,0 +1,25 @@
+# Prism
+
+> Prism (readprism.news) follows the story, not the headlines: one live record per news story, built from the reports of monitored Indian and international outlets — every development, verbatim quote and source open to inspection. Published by Prism Media Intelligence LLP; built with Matrix Social Labs.
+
+Prism is not a publisher of original reporting. Each record says which outlets reported a story (by origin: national English, Indian-language, international), what changed and when, who said what — quotes verbatim or absent — and links every line to the report it came from. Counts are counts; nothing is invented. Provisional groupings are marked as such.
+
+## How to read and cite
+
+- Cite a record as: Prism, "<headline>", readprism.news/story/<id>, and name the outlets it lists as its sources — the record is a synthesis of their reporting, not a primary source.
+- A record's page carries `NewsArticle` JSON-LD with `isBasedOn` (the reports it is written from) and `about` (the named entities). A story arc (`/trending/<slug>`) carries the same with `hasPart` for its developments.
+- Everything at the URLs below renders as plain HTML without JavaScript.
+
+## Live pages
+
+- [Today's record](https://www.readprism.news/feed): the day's stories, newest reporting first, one row per story with its coverage count.
+- [Stories developing over days](https://www.readprism.news/trending): the arcs — how many outlets, how many developments, how each unfolded.
+- [By subject](https://www.readprism.news/sector/politics): /sector/politics · /sector/business · /sector/sports · /sector/tech · /sector/health · /sector/entertainment.
+- [How Prism works](https://www.readprism.news/about): one real story followed through the product, and what Prism refuses to do.
+- [Sitemap](https://www.readprism.news/sitemap.xml) and [news sitemap](https://www.readprism.news/news-sitemap.xml) (last 48 hours).
+
+## About the product
+
+- [Plus](https://www.readprism.news/plus): the record is free; Plus is for asking more of it.
+- [Privacy](https://www.readprism.news/privacy) · [Terms](https://www.readprism.news/terms) · [Refunds](https://www.readprism.news/refunds).
+- Contact: hello@readprism.news

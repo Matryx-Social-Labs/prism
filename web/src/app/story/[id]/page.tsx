@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchEvent, type EventDetail } from "@/lib/api";
 import { StoryView } from "@/components/StoryView";
-import { SITE_URL } from "@/lib/site";
+import { eventDescription, jsonLd, newsArticleLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +16,12 @@ async function load(id: string): Promise<EventDetail | null> {
   }
 }
 
-function metaDescription(event: EventDetail): string {
-  const text = event.summary ?? event.lens_briefs?.reader ?? event.title;
-  return text.length > 200 ? `${text.slice(0, 197).trimEnd()}…` : text;
-}
-
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const event = await load(id);
   if (!event) return { title: "Story not found" };
 
-  const description = metaDescription(event);
+  const description = eventDescription(event);
   const url = `/story/${id}`;
   // The share card is always Prism's own (opengraph-image.tsx): a publisher's
   // photograph is never presented as our card (legal review, 2026-09-18).
@@ -58,32 +53,13 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   const event = await load(id);
   if (!event) notFound();
 
-  // NewsArticle structured data — lets search + social render this as a news
-  // result with headline and dates instead of a bare link. No image: the
-  // publisher's photograph is not ours to declare.
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    headline: event.title,
-    description: metaDescription(event),
-    datePublished: event.occurred_at ?? event.last_updated_at,
-    dateModified: event.last_updated_at,
-    url: `${SITE_URL}/story/${id}`,
-    articleSection: event.sector ?? undefined,
-    author: { "@type": "Organization", name: "Prism" },
-    publisher: { "@type": "Organization", name: "Prism" },
-  };
-
+  // NewsArticle structured data (lib/seo): headline, dates, the reports it is
+  // based on and the entities it is about — so search and answer engines see
+  // a grounded record, not a bare link. No image: the publisher's photograph
+  // is not ours to declare.
   return (
     <>
-      {/* Escape `<`: JSON.stringify handles quotes and backslashes but not the
-          closing-tag sequence, so a headline containing `</script>` would break
-          out of this element. Titles come from scraped publisher copy and LLM
-          extraction, so they are not trusted input. */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(newsArticleLd(event)) }} />
       <StoryView event={event} />
     </>
   );

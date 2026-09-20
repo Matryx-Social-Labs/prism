@@ -201,9 +201,21 @@ async def main(stages: list[str]) -> None:
             if n or resumed:
                 logger.info("billing_reconciled", changed=n, resumed=resumed)
 
+        # IndexNow: the records and stories that moved in the last hour go to
+        # Bing/Yandex/Naver at once (common/indexnow); Google reads the sitemaps.
+        async def _indexnow() -> None:
+            from common.indexnow import ping_changed
+
+            async with _scope() as s:
+                await ping_changed(s)
+
         scheduler.add_job(
             _reconcile_billing, IntervalTrigger(minutes=60), id="billing_reconcile", max_instances=1, coalesce=True,
             next_run_time=datetime.now(UTC) + timedelta(seconds=120),
+        )
+        scheduler.add_job(
+            _indexnow, IntervalTrigger(minutes=60), id="indexnow", max_instances=1, coalesce=True,
+            next_run_time=datetime.now(UTC) + timedelta(seconds=300),
         )
         scheduler.start()
         # Kick off one ingestion run at startup so a fresh deploy has data.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chart } from "@/components/Chart";
 import { CoverageBar, CoverageLegend } from "@/components/Coverage";
 import { Masthead } from "@/components/Masthead";
@@ -16,6 +16,7 @@ import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { markReturning } from "@/lib/returning";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
 import { RowListSkeleton } from "@/components/Skeletons";
+import { FEED_WINDOW } from "@/lib/feedWindow";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 
@@ -28,17 +29,24 @@ import { useStateName } from "@/lib/useStateName";
  * A subject chip re-sorts the list in place; the URL follows (/sector/<slug>).
  * Desktop uses its width for simultaneity: the subject rail on the left, the
  * developing stories and the legend on the right — never longer lines.
+ *
+ * `initial` is the ALL list the server already fetched, so the rows are in the
+ * HTML a crawler receives (Google renders JS late; GPTBot, ClaudeBot and
+ * PerplexityBot never do — the day's record was invisible to all of them,
+ * 2026-09-21). The first client fetch is skipped when the reader's slice IS
+ * that default; a state, a language or FOR YOU re-fetches as before.
  */
 type Tab = "today" | "foryou";
-const WINDOW = 60;
+const WINDOW = FEED_WINDOW;
 
-export function FrontPage({ sector = null }: { sector?: string | null }) {
+export function FrontPage({ sector = null, initial = null }: { sector?: string | null; initial?: FeedItem[] | null }) {
   const group = sectorGroup(sector);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
   const [scope, setScope] = useState<Scope>("all");
   const [tab, setTab] = useState<Tab>("today");
-  const [items, setItems] = useState<FeedItem[] | null>(null);
+  const [items, setItems] = useState<FeedItem[] | null>(initial);
+  const seeded = useRef(initial !== null);
   const [developing, setDeveloping] = useState<TrendingStory[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +63,11 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
 
   useEffect(() => {
     if (!ready) return;
+    if (seeded.current) {
+      seeded.current = false;
+      const isDefault = !(tab === "foryou" && hasInterests) && !profile?.state && scope === "all" && !profile?.languages?.length;
+      if (isDefault) return;
+    }
     setError(null);
     let cancelled = false;
     fetchFeed({
@@ -154,6 +167,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
           )}
           <SectionHead
             id="chart-title"
+            as="h1"
             title={group ? group.name : tab === "foryou" ? "For you" : "Today"}
             hint={subline ?? undefined}
             right={

@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "How Prism works",
   description: "One story from today's record, followed through Prism step by step: the reports, the record, who covered it, who said what, the brief, the lens, the question box.",
+  alternates: { canonical: "/about" },
 };
 
 export default async function AboutPage() {

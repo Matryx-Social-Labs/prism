@@ -315,6 +315,15 @@ Hindi. Open facts to confirm in `web/src/lib/legal.ts`: the contact mailbox
 `hello@readprism.news` (needs an inbound route), the court city (Bengaluru),
 the 30-day rights-response window.
 
+**Status, 2026-09-21.** The subscription's whole life is on the account page
+(cancel sheet with one offer — pause or the yearly switch — and "Cancel anyway"
+beside it; the 7-day refund as one click; Payments with Razorpay's invoices;
+every email in the record's voices), and search/answer-engine visibility is set
+up (`docs/SEO.md`): the day's record, the sector pages and Stories are in the
+HTML a crawler receives, NewsArticle/ItemList/Organization JSON-LD, sitemap +
+news sitemap, `llms.txt`, a manifest, hourly IndexNow pings. Manual steps that
+need the founder's accounts are listed in `docs/SEO.md` § Owner's checklist.
+
 Decisions needed from you now: (1) ₹149 for 90 days or first 1,000 — agree the
 end condition; (2) Razorpay account + GSTIN + Vercel Pro; (3) Google Cloud OAuth
 client (or let me create it under a Prism project you own); (4) push the two
