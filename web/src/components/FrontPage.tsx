@@ -59,7 +59,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
       sector: group ? sectorParam(group) : undefined,
       interests: tab === "foryou" && hasInterests ? profile?.interests : undefined,
       state: profile?.state ?? undefined,
-      scope: profile?.state ? scope : "all",
+      scope: scope === "region" && !profile?.state ? "all" : scope,
       languages: profile?.languages,
       sort: "latest",
       limit: WINDOW,
@@ -113,12 +113,20 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   const primaryLang = profile?.languages?.[0] ?? "en";
   const emptyLabel = group
     ? `No ${group.name} records today`
-    : scope === "national" && profile?.state
+    : scope === "national"
       ? "No India-wide records yet today"
-      : scope === "region" && profile?.state
-        ? `Nothing from ${stateName ?? "your state"} yet today`
-        : "Nothing on today's record yet";
-  const scopes: [Scope, string][] = [["all", "All"], ["region", stateName ?? "Your state"], ["national", "National"]];
+      : scope === "world"
+        ? "No world records yet today"
+        : scope === "region" && profile?.state
+          ? `Nothing from ${stateName ?? "your state"} yet today`
+          : "Nothing on today's record yet";
+  // The state pill needs a state; All, National and World do not.
+  const scopes: [Scope, string][] = [
+    ["all", "All"],
+    ...(profile?.state ? ([["region", stateName ?? "Your state"]] as [Scope, string][]) : []),
+    ["national", "National"],
+    ["world", "World"],
+  ];
   const pick = (s: Scope) => { setScope(s); saveScope(s); };
 
   return (
@@ -128,8 +136,8 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
         <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
 
         <div className="min-w-0">
-          {profile?.state && (
-            <div className="flex gap-2 pt-2 lg:pt-0" role="group" aria-label="Scope">
+          {(
+            <div className="flex flex-wrap gap-2 pt-2 lg:pt-0" role="group" aria-label="Scope">
               {scopes.map(([s, l]) => (
                 <button key={s} onClick={() => pick(s)} aria-pressed={scope === s} className="chip h-8 px-3 text-[13px]">
                   {l}

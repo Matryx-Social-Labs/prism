@@ -18,7 +18,7 @@
 // nobody can see. The sibling keys (`prism.profile.v1`, `prism.session.v1`)
 // stayed put through the rename out to Parse for the same reason.
 
-export type Scope = "all" | "region" | "national";
+export type Scope = "all" | "region" | "national" | "world";
 
 // v2: the member formerly called "world" is now "national". The old name was
 // the inverse of what it meant — "world" was the tier that EXCLUDES everything
@@ -51,8 +51,8 @@ export function loadScope(hasState = true): Scope | null {
   if (typeof window === "undefined") return null; // SSR: caller keeps its default
   try {
     const v = window.localStorage.getItem(KEY);
-    if (v !== "all" && v !== "region" && v !== "national") return null;
-    if (!hasState && v !== "all") return null;
+    if (v !== "all" && v !== "region" && v !== "national" && v !== "world") return null;
+    if (!hasState && v !== "all" && v !== "world") return null;
     return v;
   } catch {
     return null; // storage blocked (in-app webviews) — scope just won't persist

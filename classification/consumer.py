@@ -71,9 +71,14 @@ async def handle_raw_item(payload: dict) -> None:
             classification = await _run_classifier(title, body, source_country, meta)
 
     # Stamp the state (ISO 3166-2) from a state-edition feed onto the regions, so
-    # the feed can tier local(state) -> national. Deterministic from the feed, no LLM.
+    # the feed can tier local(state) -> national. Deterministic from the feed, no
+    # LLM — but only where the feed's state can be the story's: not when the
+    # classifier already placed the event in a state, and not when the article
+    # is about another country. Prajavani's whole-site feed is IN-KA and printed
+    # the US Senate's Russia-sanctions bill; the stamp put it under Karnataka
+    # (founder, 2026-09-20).
     if classification is not None and feed_spec is not None and feed_spec.state:
-        if feed_spec.state not in classification.regions:
+        if feed_spec.state not in classification.regions and feed_state_applies(classification.regions):
             classification.regions = [*classification.regions, feed_spec.state]
 
     async with session_scope() as session:
@@ -157,6 +162,14 @@ async def _run_classifier(
     if not result.regions and source_country:
         result.regions = [source_country]
     return result
+
+
+def feed_state_applies(regions: list[str]) -> bool:
+    """A feed's state stamp holds only when nothing says otherwise: the
+    classifier named no state of its own, and no foreign country is involved."""
+    if any(r.startswith("IN-") for r in regions):
+        return False
+    return all(r == "IN" for r in regions)
 
 
 def _classify_cve_feed(source_slug: str, title: str, body: str | None) -> ClassificationResult:

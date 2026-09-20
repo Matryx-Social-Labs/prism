@@ -110,11 +110,22 @@ describe("FrontPage — scope", () => {
   });
 
   // REGRESSION (ISSUE-001): a saved region scope can outlive the state it named.
-  it("offers no scope control at all to a reader with no state", async () => {
+  it("offers no state pill to a reader with no state, and forgets a saved state scope", async () => {
     localStorage.setItem("parse.scope.v2", "region");
     render(<FrontPage />);
     await screen.findByText("A story on the chart");
-    expect(screen.queryByRole("button", { name: /Your state|National/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Your state/ })).toBeNull();
+    // National and World are absolute slices; everyone gets them.
+    expect(screen.getByRole("button", { name: "National" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "World" })).toBeInTheDocument();
+    expect(lastQuery().scope).toBe("all");
+  });
+
+  it("World is what does not involve India, for any reader", async () => {
+    render(<FrontPage />);
+    await screen.findByText("A story on the chart");
+    await userEvent.click(screen.getByRole("button", { name: "World" }));
+    await waitFor(() => expect(lastQuery().scope).toBe("world"));
   });
 
   it("persists the pick so it survives a reload and carries to Trending", async () => {

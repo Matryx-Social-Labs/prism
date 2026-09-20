@@ -230,8 +230,8 @@ export interface FeedQuery {
   interests?: string[];
   region?: string | null;
   state?: string | null;
-  /** all = everything newest first · region = the reader's state · national = India-wide, no state. */
-  scope?: "all" | "region" | "national";
+  /** all = everything newest first · region = the reader's state · national = India-wide, no state · world = not India. */
+  scope?: "all" | "region" | "national" | "world";
   languages?: string[];
   sort?: "latest" | "top";
   limit?: number;

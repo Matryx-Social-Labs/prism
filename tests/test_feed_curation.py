@@ -85,6 +85,8 @@ class _FakeSession:
                 rows = [r for r in rows if state_only in (r.get("regions") or [])]
             if self.params.get("national"):
                 rows = [r for r in rows if "IN" in (r.get("regions") or []) and not any(x.startswith("IN-") for x in r["regions"])]
+            if self.params.get("world"):
+                rows = [r for r in rows if not any(x == "IN" or x.startswith("IN-") for x in (r.get("regions") or []))]
         return _Rows(rows)
 
 
@@ -279,6 +281,9 @@ async def test_the_scope_is_a_server_slice_not_a_filter_over_the_state_first_pag
     assert {t["title"] for t in national} == {"India 0", "India 1", "India 2"}, "national is India-wide, no state — not 'not my state'"
     # All is newest-first, not state-first: India-wide and foreign lead because they are newer.
     assert [t["title"] for t in everything][:5] == ["India 0", "India 1", "India 2", "Kerala", "Washington"] and len(everything) == 30
+    with _corpus(rows):
+        world = await _feed(state="IN-KA", scope="world", limit=30)
+    assert [t["title"] for t in world] == ["Washington"], "world is what does not involve India"
     # Without a scope the old state-first tiering still stands for other callers.
     with _corpus(rows):
         legacy = await _feed(state="IN-KA", limit=45)

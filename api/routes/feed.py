@@ -32,9 +32,9 @@ async def get_feed(
     interests: str | None = None,
     region: str | None = None,
     state: str | None = None,  # ISO 3166-2 (e.g. IN-KA) — surfaces the reader's state first
-    # Which slice of the country the page is: `region` = events placed in the
-    # reader's state; `national` = India-wide events carrying no state at all;
-    # `all` = everything, newest first. Filtered HERE, not on the client: the
+    # Which slice the page is: `region` = events placed in the reader's state;
+    # `national` = India-wide events carrying no state at all; `world` = events
+    # that do not involve India at all; `all` = everything, newest first. Filtered HERE, not on the client: the
     # page used to be sorted state-first and then filtered in the browser, so a
     # reader in a state with more than a page of news (Karnataka: 35% of two
     # days' events) saw "National" empty and "All" identical to "Your state".
@@ -121,6 +121,7 @@ async def get_feed(
                           'IN' = ANY(e.regions)
                           AND NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r LIKE 'IN-%')
                       ))
+                      AND (NOT :world OR NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r = 'IN' OR r LIKE 'IN-%'))
                 ) windowed
                 WHERE rn <= 120
                 """
@@ -130,6 +131,7 @@ async def get_feed(
                 "cve_only": CVE_ONLY_JSON,
                 "state_only": state if scope == "region" and state else None,
                 "national": scope == "national",
+                "world": scope == "world",
             },
         )
     ).mappings().all()
