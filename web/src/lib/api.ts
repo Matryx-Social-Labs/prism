@@ -568,6 +568,8 @@ export async function fetchBrief(
 
 export interface AskCitation {
   number: number;
+  /** Every chunk number the answer used from this article; `number` is the first. */
+  numbers?: number[];
   article_id: string;
   source_name: string;
   url: string | null;
@@ -584,9 +586,21 @@ export interface AskLimit {
   retry_after_s?: number;
 }
 
+/** The shape after the prose (agent/structure.py): one table at most, the
+ * honesty line, follow-ups the sources can answer. Row cells are text; `n`
+ * is the row's citation marks, rendered with the prose's chip. */
+export interface AskStructure {
+  kind: "timeline" | "who_said" | "compare" | "numbers" | null;
+  columns: string[];
+  rows: { a: string; b: string; n: string }[];
+  gaps: string | null;
+  followups: string[];
+}
+
 export interface AskCallbacks {
   onSession?: (sessionId: string) => void;
   onToken: (text: string) => void;
+  onStructure?: (structure: AskStructure) => void;
   onCitations: (citations: AskCitation[]) => void;
   onDone: () => void;
   /** `limit` is set when the server said no (429/503) and says what would help. */
@@ -652,6 +666,7 @@ export async function askQuestion(
         const payload = JSON.parse(dataLine.slice(6));
         if (payload.session_id) callbacks.onSession?.(payload.session_id);
         else if (payload.type === "token") callbacks.onToken(payload.text);
+        else if (payload.type === "structure") callbacks.onStructure?.(payload as AskStructure);
         else if (payload.type === "citations") callbacks.onCitations(payload.citations ?? []);
         else if (payload.type === "done") callbacks.onDone();
         else if (payload.type === "error") callbacks.onError(payload.message);

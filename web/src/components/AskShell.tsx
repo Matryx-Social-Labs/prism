@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUp, Close } from "@/components/icons";
-import type { AskCitation, AskLimit } from "@/lib/api";
+import type { AskCitation, AskLimit, AskStructure } from "@/lib/api";
 import type { KeyboardEvent, RefObject } from "react";
 
 // The Ask panel's body, one markup for the ticket's live panel and the
@@ -16,18 +16,66 @@ export interface Turn {
   error?: string;
   /** The server refused before answering; what would help is in here. */
   limit?: AskLimit;
+  /** After the prose: a table, the honesty line, follow-ups. */
+  structure?: AskStructure;
   streaming: boolean;
+}
+
+/** The answer's anatomy after the prose: table · what the reports don't say · follow-ups. */
+export function AnswerStructure({ s, citations, onFollowUp }: { s: AskStructure; citations: AskCitation[]; onFollowUp?: (q: string) => void }) {
+  const [left, right] = s.columns.length === 2 ? s.columns : ["", ""];
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      {s.rows.length > 0 && (
+        <table className="w-full border-collapse text-[13px] leading-[1.5]" aria-label={s.kind ?? "table"}>
+          {(left || right) && (
+            <thead>
+              <tr className="text-left text-[11.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
+                <th scope="col" className="border-b py-1.5 pr-3 font-semibold" style={{ borderColor: "var(--line-strong)" }}>{left}</th>
+                <th scope="col" className="border-b py-1.5 font-semibold" style={{ borderColor: "var(--line-strong)" }}>{right}</th>
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {s.rows.map((r, i) => (
+              <tr key={i} className="align-top">
+                <td className={`border-b py-2 pr-3 ${s.kind === "who_said" ? "font-semibold" : ""} ${s.kind === "timeline" || s.kind === "numbers" ? "whitespace-nowrap font-mono text-[12px]" : ""}`} style={{ borderColor: "var(--line)", color: "var(--ink)" }}>{r.a}</td>
+                <td className={`border-b py-2 ${s.kind === "who_said" ? "font-record italic" : ""}`} style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
+                  {s.kind === "who_said" ? <>“{r.b}”</> : r.b} {r.n && <AnswerText text={r.n} citations={citations} />}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {s.gaps && (
+        <p className="text-[13px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
+          <span className="mr-2 font-mono text-[11px]" style={{ color: "var(--ink)" }}>Not in the reports</span>
+          {s.gaps}
+        </p>
+      )}
+      {s.followups.length > 0 && onFollowUp && (
+        <div className="flex flex-wrap gap-1.5">
+          {s.followups.map((q) => (
+            <button key={q} type="button" onClick={() => onFollowUp(q)} className="chip chip-q text-[12.5px]">{q}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** The answer's `[n]` markers as mono chips that open the cited report. */
 export function AnswerText({ text, citations }: { text: string; citations: AskCitation[] }) {
-  const parts = text.split(/(\[\d+\])/g);
+  // The prompt asks for plain text; a model that bolds anyway must not show asterisks.
+  const parts = text.replace(/\*\*/g, "").split(/(\[\d+\])/g);
   return (
     <>
       {parts.map((part, i) => {
         const m = /^\[(\d+)\]$/.exec(part);
         if (!m) return <span key={i}>{part}</span>;
-        const c = citations.find((x) => x.number === Number(m[1]));
+        const n = Number(m[1]);
+        const c = citations.find((x) => x.number === n || x.numbers?.includes(n));
         const chip = "mx-px inline-block rounded-[4px] px-1 align-baseline font-mono text-[11px] leading-[1.6]";
         return c?.url ? (
           <a key={i} href={c.url} target="_blank" rel="noopener noreferrer" title={c.source_name} className={`${chip} underline-offset-2 hover:underline`} style={{ background: "var(--sunken)", color: "var(--ink)" }}>{part}</a>
@@ -69,6 +117,7 @@ export function AskShell({
   input,
   onInput,
   onSubmit,
+  onFollowUp,
   suggestions,
   onClose,
   inputRef,
@@ -82,6 +131,8 @@ export function AskShell({
   input: string;
   onInput: (v: string) => void;
   onSubmit: (q: string) => void;
+  /** A follow-up chip under an answer; absent on the landing's scripted panel. */
+  onFollowUp?: (q: string) => void;
   suggestions: string[];
   /** Absent on the landing's embedded panel, which has nothing to close. */
   onClose?: () => void;
@@ -156,6 +207,7 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
                   )}
                 </p>
                 )}
+                {!t.streaming && t.structure && <AnswerStructure s={t.structure} citations={t.citations} onFollowUp={onFollowUp} />}
                 {!t.streaming && t.citations.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-[5px]">
                     {t.citations.map((c) => (
@@ -184,7 +236,7 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
       </div>
 
       <div className="flex flex-wrap gap-1.5 px-4 pb-2.5 pt-2">
-        {suggestions.map((q) => (
+        {turns.length === 0 && suggestions.map((q) => (
           <button
             key={q}
             type="button"

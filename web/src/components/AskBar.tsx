@@ -25,7 +25,7 @@ export function AskBar({ suggestions, sourceCount }: { suggestions: string[]; so
       {focused && !q && suggestions.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-2 pb-2 pt-1.5">
           {suggestions.slice(0, 3).map((s) => (
-            <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => send(s, "chip")} className="chip h-8 whitespace-normal text-left text-[13px]">
+            <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => send(s, "chip")} className="chip chip-q text-[13px]">
               {s}
             </button>
           ))}

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import text
 
+from agent.structure import TailSplitter
 from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_query
@@ -131,6 +132,9 @@ async def answer_stream(
     settings = get_settings()
     client = get_llm()
     full_text = ""
+    # The prose streams; the JSON tail after `===` is held back and delivered
+    # whole (agent/structure.py). `full_text` is the prose only.
+    splitter = TailSplitter()
     try:
         response = await client.chat.completions.create(
             model=settings.prism_model_agent if plan == "plus" else settings.prism_model_agent_free,
@@ -149,20 +153,34 @@ async def answer_stream(
         async for part in response:
             delta = part.choices[0].delta.content if part.choices else None
             if delta:
-                full_text += delta
-                yield {"type": "token", "text": delta}
+                for out in splitter.feed(delta):
+                    full_text += out
+                    yield {"type": "token", "text": out}
+        rest = splitter.flush()
+        if rest:
+            full_text += rest
+            yield {"type": "token", "text": rest}
     except Exception:
         logger.exception("agent_completion_failed", event_id=str(event_id))
         yield {"type": "error", "message": "The agent is unavailable right now. Please retry."}
         return
 
-    cited = _extract_citations(full_text, chunks)
+    structure = splitter.structure()
+    # A table row's citations count as much as the prose's: the reader sees them.
+    marks = full_text + "".join(r.n for r in (structure.rows if structure else []))
+    cited = _extract_citations(marks, chunks)
     await _persist_turn(session_id, question, full_text, [c.article_id for c in cited])
+    if structure:
+        yield {"type": "structure", **structure.model_dump()}
+    # One entry per ARTICLE (the source list), carrying every chunk number the
+    # answer used for it, so a [3] that is the same report as [1] still opens it.
+    numbers = _numbers_by_article(marks, chunks)
     yield {
         "type": "citations",
         "citations": [
             {
                 "number": c.number,
+                "numbers": numbers.get(c.article_id, [c.number]),
                 "article_id": str(c.article_id),
                 "source_name": c.source_name,
                 "url": c.url,
@@ -171,6 +189,16 @@ async def answer_stream(
         ],
     }
     yield {"type": "done"}
+
+
+def _numbers_by_article(answer: str, chunks: list[GroundingChunk]) -> dict[uuid.UUID, list[int]]:
+    """Every referenced chunk number, grouped under its article."""
+    referenced = {int(n) for n in re.findall(r"\[(\d{1,2})\]", answer)}
+    out: dict[uuid.UUID, list[int]] = {}
+    for c in chunks:
+        if c.number in referenced:
+            out.setdefault(c.article_id, []).append(c.number)
+    return out
 
 
 def _extract_citations(answer: str, chunks: list[GroundingChunk]) -> list[GroundingChunk]:

@@ -131,6 +131,7 @@ export function AskPanel({
             sessionRef.current = sid;
           },
           onToken: (text) => update((t) => ({ ...t, text: t.text + text })),
+          onStructure: (structure) => update((t) => ({ ...t, structure })),
           onCitations: (citations) => update((t) => ({ ...t, citations })),
           onDone: () => update((t) => ({ ...t, streaming: false })),
           onError: (message, limit) => update((t) => ({ ...t, error: limit ? undefined : message, limit, streaming: false })),
@@ -177,6 +178,7 @@ export function AskPanel({
             input={input}
             onInput={setInput}
             onSubmit={submit}
+            onFollowUp={(q) => { viaRef.current = "chip"; void submit(q); }}
             suggestions={suggestedQuestions}
             onClose={() => setOpen(false)}
             inputRef={inputRef}

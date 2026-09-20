@@ -273,6 +273,8 @@ button:disabled {
   transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
 }
 .chip:hover { border-color: var(--line-strong); color: var(--ink); }
+/* A question as a chip: it wraps, because a question is a sentence. */
+.chip-q { height: auto; min-height: 34px; padding: 6px 14px; white-space: normal; text-align: left; line-height: 1.35; max-width: 100%; }
 .chip[aria-current], .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 @media (min-width: 1024px) {
   /* the same control as the desktop left rail: no pill, accent for the active row */

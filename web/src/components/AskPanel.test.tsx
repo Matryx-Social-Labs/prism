@@ -13,13 +13,14 @@ const PROPS = { eventId: "e1", sourceCount: 4, suggestedQuestions: ["What led to
 function streamController() {
   let cb: AskCallbacks;
   let release: () => void;
+  let finish: () => void = () => {};
   const started = new Promise<void>((r) => (release = r));
   askQuestion.mockImplementation(async (_id, _q, _s, callbacks: AskCallbacks) => {
     cb = callbacks;
     release();
-    await new Promise(() => {}); // never resolves — stream stays open
+    await new Promise<void>((r) => (finish = r)); // stream stays open until finish()
   });
-  return { started, cb: () => cb };
+  return { started, cb: () => cb, finish: () => finish() };
 }
 
 beforeEach(() => askQuestion.mockReset());
@@ -102,6 +103,20 @@ describe("AskPanel — submitting", () => {
     });
     const chips = await screen.findAllByRole("link", { name: "[1]" });
     expect(chips[0]).toHaveAttribute("href", "https://x");
+  });
+
+  it("a second chunk number of the same report opens that report, and stray bold is not shown", async () => {
+    const s = streamController();
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
+    await userEvent.type(screen.getByPlaceholderText(/ask anything/i), "why?{Enter}");
+    await s.started;
+    act(() => {
+      s.cb().onToken("**Ninety-eight** [1], later [3].");
+      s.cb().onCitations([{ number: 1, numbers: [1, 3], source_name: "The Hindu", url: "https://x" } as never]);
+      s.cb().onDone();
+    });
+    expect(await screen.findByRole("link", { name: "[3]" })).toHaveAttribute("href", "https://x");
+    expect(screen.queryByText(/\*\*/)).toBeNull();
   });
 
 
@@ -212,6 +227,31 @@ describe("AskPanel — the floating panel", () => {
   it("prints the source count on the launcher", () => {
     render(<AskPanel {...PROPS} />);
     expect(screen.getByRole("button", { name: /ask this story\s*4 sources/i })).toBeInTheDocument();
+  });
+});
+
+describe("AskPanel — the answer's anatomy", () => {
+  it("renders the table, the honesty line and follow-ups after the prose, and a follow-up asks again", async () => {
+    const s = streamController();
+    render(<AskPanel {...PROPS} open onOpenChange={() => {}} launcher={false} />);
+    await userEvent.type(screen.getByPlaceholderText(/ask anything/i), "how many?{Enter}");
+    await s.started;
+    act(() => {
+      s.cb().onToken("Ninety-eight villages [1].");
+      s.cb().onStructure!({ kind: "numbers", columns: ["Figure", "What"], rows: [{ a: "98", b: "villages", n: "[2]" }], gaps: "No report gives the area.", followups: ["Which villages?"] });
+      s.cb().onCitations([{ number: 1, source_name: "The Hindu", url: "https://x" }, { number: 2, source_name: "TOI", url: "https://y" }] as never);
+      s.cb().onDone();
+    });
+    expect(await screen.findByRole("table", { name: "numbers" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Figure" })).toBeInTheDocument();
+    expect(screen.getByText("No report gives the area.")).toBeInTheDocument();
+    // The row's citation uses the same chip and opens the same report.
+    expect(screen.getByRole("link", { name: "[2]" })).toHaveAttribute("href", "https://y");
+    await act(async () => s.finish());
+    askQuestion.mockClear();
+    askQuestion.mockResolvedValue(undefined);
+    await userEvent.click(screen.getByRole("button", { name: "Which villages?" }));
+    expect(askQuestion).toHaveBeenCalledWith("e1", "Which villages?", null, expect.anything(), expect.anything(), undefined);
   });
 });
 
