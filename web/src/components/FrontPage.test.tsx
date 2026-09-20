@@ -7,7 +7,7 @@ import type { FeedItem } from "@/lib/api";
 const fetchFeed = vi.hoisted(() => vi.fn());
 const fetchTrending = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ fetchFeed, fetchTrending }));
+vi.mock("@/lib/api", () => ({ fetchFeed, fetchTrending, fetchRegions: () => Promise.resolve([{ code: "IN-KL", name: "Kerala", covered: true }]) }));
 vi.mock("@/lib/profile", () => ({ loadProfile }));
 // @/lib/scope stays real — the persisted value is the thing under test.
 
@@ -106,7 +106,7 @@ describe("FrontPage — scope", () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<FrontPage />);
     expect(await screen.findByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Your state" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /Your state|Kerala/ })).toHaveAttribute("aria-pressed", "false");
   });
 
   // REGRESSION (ISSUE-001): a saved region scope can outlive the state it named.
@@ -114,7 +114,7 @@ describe("FrontPage — scope", () => {
     localStorage.setItem("parse.scope.v2", "region");
     render(<FrontPage />);
     await screen.findByText("A story on the chart");
-    expect(screen.queryByRole("button", { name: "Your state" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Your state|National/ })).toBeNull();
   });
 
   it("persists the pick so it survives a reload and carries to Trending", async () => {
@@ -124,17 +124,25 @@ describe("FrontPage — scope", () => {
     expect(localStorage.getItem("parse.scope.v2")).toBe("national");
   });
 
-  it("filters the rows the API already tagged, so ALL is the same for every reader", async () => {
+  // REGRESSION: the three pills filtered ONE state-first page in the browser. A
+  // Karnataka reader (more than a page of Karnataka news) saw "National" empty
+  // and "All" identical to "Your state". Each pill is now its own server slice.
+  it("asks the API for each slice instead of filtering one page", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
-    fetchFeed.mockResolvedValue([item({ id: "r", title: "Regional", is_regional: true }), item({ id: "n", title: "National story", is_regional: false })]);
     render(<FrontPage />);
-    await screen.findByText("Regional");
-    await userEvent.click(screen.getByRole("button", { name: "Your state" }));
-    expect(screen.queryByText("National story")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "All" }));
-    expect(screen.getByText("National story")).toBeInTheDocument();
-    // The API was asked once; scope never refetches.
-    expect(fetchFeed).toHaveBeenCalledTimes(1);
+    await screen.findByText("A story on the chart");
+    expect(lastQuery().scope).toBe("all");
+    await userEvent.click(screen.getByRole("button", { name: /Your state|Kerala/ }));
+    await waitFor(() => expect(lastQuery().scope).toBe("region"));
+    await userEvent.click(screen.getByRole("button", { name: "National" }));
+    await waitFor(() => expect(lastQuery().scope).toBe("national"));
+    expect(fetchFeed).toHaveBeenCalledTimes(3);
+  });
+
+  it("names the reader's state on the pill once the regions have loaded", async () => {
+    loadProfile.mockReturnValue({ state: "IN-KL" });
+    render(<FrontPage />);
+    expect(await screen.findByRole("button", { name: "Kerala" })).toBeInTheDocument();
   });
 });
 

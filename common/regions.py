@@ -36,3 +36,8 @@ def is_valid_state(code: str) -> bool:
 
 def states_payload() -> list[dict]:
     return [{"code": c, "name": n, "covered": c in COVERED} for c, n in IN_STATES]
+
+
+def is_state_code(code: str) -> bool:
+    """True for a real ISO 3166-2:IN code we know (IN-KA), false for IN-BLR and friends."""
+    return code in _VALID

@@ -15,6 +15,7 @@ import { loadProfile, type Profile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { markReturning } from "@/lib/returning";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
+import { useStateName } from "@/lib/useStateName";
 
 /**
  * Today: the day's records, the same list for everyone (D2). FOR YOU appears
@@ -48,6 +49,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   }, []);
 
   const hasInterests = Boolean(profile?.interests?.length);
+  const stateName = useStateName(profile?.state ?? null);
 
   useEffect(() => {
     if (!ready) return;
@@ -57,6 +59,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
       sector: group ? sectorParam(group) : undefined,
       interests: tab === "foryou" && hasInterests ? profile?.interests : undefined,
       state: profile?.state ?? undefined,
+      scope: profile?.state ? scope : "all",
       languages: profile?.languages,
       sort: "latest",
       limit: WINDOW,
@@ -64,7 +67,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
       .then((list) => { if (!cancelled) setItems(list); })
       .catch(() => { if (!cancelled) setError("The Prism API is unreachable right now."); });
     return () => { cancelled = true; };
-  }, [ready, tab, hasInterests, profile, group]);
+  }, [ready, tab, hasInterests, profile, group, scope]);
 
   // The right rail: stories developing over days — a different cut from the
   // list, not the same rows twice. Best effort; the list never waits for it.
@@ -77,10 +80,8 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
     return () => { cancelled = true; };
   }, [ready, profile]);
 
-  const scoped = useMemo(() => {
-    if (!items || scope === "all" || !profile?.state) return items ?? [];
-    return items.filter((i) => (scope === "region" ? i.is_regional : !i.is_regional));
-  }, [items, scope, profile]);
+  // The scope is a server-side slice (see /feed `scope`); the page IS the slice.
+  const scoped = useMemo(() => items ?? [], [items]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: scoped.length };
@@ -110,8 +111,14 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
   }, [items, scoped]);
 
   const primaryLang = profile?.languages?.[0] ?? "en";
-  const emptyLabel = group ? `No ${group.name} records today` : "Nothing on today's record yet";
-  const scopes: [Scope, string][] = [["all", "All"], ["region", "Your state"], ["national", "National"]];
+  const emptyLabel = group
+    ? `No ${group.name} records today`
+    : scope === "national" && profile?.state
+      ? "No India-wide records yet today"
+      : scope === "region" && profile?.state
+        ? `Nothing from ${stateName ?? "your state"} yet today`
+        : "Nothing on today's record yet";
+  const scopes: [Scope, string][] = [["all", "All"], ["region", stateName ?? "Your state"], ["national", "National"]];
   const pick = (s: Scope) => { setScope(s); saveScope(s); };
 
   return (
@@ -164,7 +171,7 @@ export function FrontPage({ sector = null }: { sector?: string | null }) {
                 ))}
               </div>
             ) : (
-              <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} yesterdayHref="/feed/yesterday" />
+              <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} />
             )}
           </section>
         </div>

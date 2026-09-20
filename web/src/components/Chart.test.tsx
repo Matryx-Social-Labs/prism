@@ -71,16 +71,14 @@ describe("Chart — the list", () => {
     expect(within(rows[1]).getByText("Thin")).toBeInTheDocument();
   });
 
-  it("names the subject when there is nothing, and offers yesterday", () => {
-    render(<Chart items={[]} emptyLabel="No Sports stories on today's chart" yesterdayHref="/feed/yesterday" />);
+  it("names the subject when there is nothing, and offers no dead link", () => {
+    // REGRESSION: the empty state and the foot linked /feed/yesterday, a route
+    // the redesign never carried over — a 404 on the one path a reader took
+    // when the chart was empty.
+    render(<Chart items={[]} emptyLabel="No Sports stories on today's chart" />);
     expect(screen.getByText(/No Sports stories on today's chart/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /yesterday/i })).toHaveAttribute("href", "/feed/yesterday");
+    expect(screen.queryByRole("link", { name: /yesterday/i })).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
-  });
-
-  it("has a foot — yesterday's chart — not an infinite scroll", () => {
-    render(<Chart items={[item()]} emptyLabel="none" yesterdayHref="/feed/yesterday" />);
-    expect(screen.getByRole("link", { name: /yesterday/i })).toHaveAttribute("href", "/feed/yesterday");
   });
 });
 

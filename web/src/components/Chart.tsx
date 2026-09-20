@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { FeedItem } from "@/lib/api";
 import { chartOrder } from "@/lib/chart";
@@ -23,15 +22,13 @@ export function Chart({
   primaryLang = "en",
   pageCode = null,
   emptyLabel,
-  yesterdayHref,
 }: {
   items: FeedItem[];
   primaryLang?: string;
   /** The sector code the page is filtered to; rows omit it. */
   pageCode?: string | null;
-  /** What to say when the chart has no rows — names the subject, offers yesterday. */
+  /** What to say when the chart has no rows — names the subject. */
   emptyLabel: string;
-  yesterdayHref?: string;
 }) {
   const ordered = chartOrder(items);
   const [lastOpened, setLastOpened] = useState<string | null>(null);
@@ -47,11 +44,6 @@ export function Chart({
     return (
       <div className="card py-8 text-center">
         <p className="text-[15px]" style={{ color: "var(--ink-2)" }}>{emptyLabel}</p>
-        {yesterdayHref && (
-          <Link href={yesterdayHref} className="btn btn-secondary btn-sm mt-4">
-            Yesterday&rsquo;s record
-          </Link>
-        )}
       </div>
     );
   }
@@ -77,13 +69,6 @@ export function Chart({
           />
         ))}
       </ol>
-      {yesterdayHref && (
-        <div className="flex justify-center py-6">
-          <Link href={yesterdayHref} className="btn btn-secondary">
-            Yesterday&rsquo;s record
-          </Link>
-        </div>
-      )}
     </div>
   );
 }

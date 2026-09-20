@@ -65,6 +65,8 @@ class _FakeSession:
         self.queries: list[dict] = []
 
     async def execute(self, _stmt, params=None):
+        if "FROM sources" in str(_stmt):  # the outlet registry: no outlets in this corpus
+            return _Rows([])
         self.params = params or {}
         self.queries.append(self.params)
         wanted = self.params.get("sectors")
@@ -77,6 +79,12 @@ class _FakeSession:
             )[: self.params["cap"]]
         else:  # the news window
             rows = [r for r in rows if not _is_record(r)]
+            # The scope predicates, as the SQL has them: bound by the route, or absent.
+            state_only = self.params.get("state_only")
+            if state_only:
+                rows = [r for r in rows if state_only in (r.get("regions") or [])]
+            if self.params.get("national"):
+                rows = [r for r in rows if "IN" in (r.get("regions") or []) and not any(x.startswith("IN-") for x in r["regions"])]
         return _Rows(rows)
 
 
@@ -252,3 +260,26 @@ async def test_an_unknown_name_in_the_list_is_dropped_not_fatal():
     with _corpus(rows):
         titles = {i["title"] for i in await _feed(sector="business,nonsense", limit=30)}
     assert titles == {"Tata results"}
+
+
+async def test_the_scope_is_a_server_slice_not_a_filter_over_the_state_first_page():
+    """REGRESSION: the page was sorted state-first and the three pills filtered it
+    in the browser. A Karnataka reader (35% of two days' events) got a page that
+    was all Karnataka, so "National" was empty and "All" was "Your state" again."""
+    # The India-wide and foreign rows are the NEWEST, so an unfiltered page would
+    # lead with them and a state-first page would bury them: each slice differs.
+    rows = [dict(_row(f"India {i}", "politics", age_min=i), regions=["IN"]) for i in range(3)]
+    rows += [dict(_row("Kerala", "politics", age_min=3), regions=["IN", "IN-KL"]), dict(_row("Washington", "politics", age_min=4), regions=["US"])]
+    rows += [dict(_row(f"KA {i}", "politics", age_min=10 + i), regions=["IN", "IN-KA"]) for i in range(40)]
+    with _corpus(rows):
+        region = await _feed(state="IN-KA", scope="region", limit=30)
+        national = await _feed(state="IN-KA", scope="national", limit=30)
+        everything = await _feed(state="IN-KA", scope="all", limit=30)
+    assert all(t["title"].startswith("KA") for t in region) and len(region) == 30
+    assert {t["title"] for t in national} == {"India 0", "India 1", "India 2"}, "national is India-wide, no state — not 'not my state'"
+    # All is newest-first, not state-first: India-wide and foreign lead because they are newer.
+    assert [t["title"] for t in everything][:5] == ["India 0", "India 1", "India 2", "Kerala", "Washington"] and len(everything) == 30
+    # Without a scope the old state-first tiering still stands for other callers.
+    with _corpus(rows):
+        legacy = await _feed(state="IN-KA", limit=45)
+    assert all(t["title"].startswith("KA") for t in legacy[:40])

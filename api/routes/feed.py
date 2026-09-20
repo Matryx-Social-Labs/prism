@@ -31,6 +31,13 @@ async def get_feed(
     interests: str | None = None,
     region: str | None = None,
     state: str | None = None,  # ISO 3166-2 (e.g. IN-KA) — surfaces the reader's state first
+    # Which slice of the country the page is: `region` = events placed in the
+    # reader's state; `national` = India-wide events carrying no state at all;
+    # `all` = everything, newest first. Filtered HERE, not on the client: the
+    # page used to be sorted state-first and then filtered in the browser, so a
+    # reader in a state with more than a page of news (Karnataka: 35% of two
+    # days' events) saw "National" empty and "All" identical to "Your state".
+    scope: str | None = None,
     languages: str | None = None,  # comma-sep, preference order; ranks + localises (never filters)
     sort: str = "latest",
     limit: int = 30,
@@ -108,11 +115,21 @@ async def get_feed(
                           COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
                           AND (e.projection->'source_slugs') <@ CAST(:cve_only AS jsonb)
                       )
+                      AND (CAST(:state_only AS text) IS NULL OR :state_only = ANY(e.regions))
+                      AND (NOT :national OR (
+                          'IN' = ANY(e.regions)
+                          AND NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r LIKE 'IN-%')
+                      ))
                 ) windowed
                 WHERE rn <= 120
                 """
             ),
-            {"sectors": sectors or None, "cve_only": CVE_ONLY_JSON},
+            {
+                "sectors": sectors or None,
+                "cve_only": CVE_ONLY_JSON,
+                "state_only": state if scope == "region" and state else None,
+                "national": scope == "national",
+            },
         )
     ).mappings().all()
 
@@ -171,7 +188,7 @@ async def get_feed(
     # since records carry no regions they all sank into the national band and got
     # cut by the page slice, making include_cve_records a no-op for any reader
     # with a state (i.e. every onboarded one).
-    if state:
+    if state and scope is None:
         items.sort(key=lambda i: not i.is_regional)
 
     # Records are machine-written and re-stamped on every scan, so they are

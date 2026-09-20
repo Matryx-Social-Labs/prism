@@ -200,6 +200,8 @@ export interface FeedQuery {
   interests?: string[];
   region?: string | null;
   state?: string | null;
+  /** all = everything newest first · region = the reader's state · national = India-wide, no state. */
+  scope?: "all" | "region" | "national";
   languages?: string[];
   sort?: "latest" | "top";
   limit?: number;
@@ -224,6 +226,7 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   if (query.interests?.length) params.set("interests", query.interests.join(","));
   if (query.region) params.set("region", query.region);
   if (query.state) params.set("state", query.state);
+  if (query.scope) params.set("scope", query.scope);
   if (query.languages?.length) params.set("languages", query.languages.join(","));
   if (query.sort) params.set("sort", query.sort);
   if (query.limit) params.set("limit", String(query.limit));
