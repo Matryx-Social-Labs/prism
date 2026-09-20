@@ -97,6 +97,25 @@ async def verify(body: VerifyRequest, db: AsyncSession = Depends(get_db)):
     )
 
 
+class GoogleSignIn(BaseModel):
+    credential: str
+
+
+@router.post("/api/v1/auth/google", response_model=SessionResponse)
+async def google_sign_in(body: GoogleSignIn, db: AsyncSession = Depends(get_db)):
+    """A Google ID token from the button or One Tap → the same session a
+    consumed magic link gets. The verified email is the identity, so an address
+    that signed in by link before lands in its existing account."""
+    try:
+        email = await auth.verify_google_id_token(body.credential)
+    except auth.GoogleTokenInvalid as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    user_id = await auth.user_for_verified_email(db, email)
+    token = await auth.create_session(db, user_id)
+    needs_profile = not await auth.profile_complete(db, user_id)
+    return SessionResponse(token=token, user_id=str(user_id), email=email, needs_profile=needs_profile)
+
+
 @router.post("/api/v1/auth/profile", response_model=MeResponse)
 async def set_profile(
     body: ProfileRequest,

@@ -216,6 +216,9 @@ class Settings(BaseSettings):
     prism_session_ttl_days: int = 30  # bearer session lifetime
     prism_magic_request_cooldown_s: int = 30  # per-email rate limit on link requests
     prism_free_markets_samples: int = 3  # sample grant on signup (D13 Markets-only)
+    # Google sign-in (Google Identity Services, ID-token mode). The client id is
+    # public; the API only uses it to check a token's audience. Empty = off.
+    google_client_id: str = ""
 
     # Sources
     nvd_api_key: str = Field("", repr=False)

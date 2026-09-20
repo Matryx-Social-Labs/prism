@@ -6,6 +6,7 @@ import { type FormEvent, Suspense, useState } from "react";
 
 import { Brand } from "@/components/Brand";
 import { requestMagicLink } from "@/lib/session";
+import { GoogleSignIn } from "@/components/GoogleSignIn";
 
 export default function SignInPage() {
   return (
@@ -83,6 +84,13 @@ function SignIn() {
             <button type="submit" disabled={busy || !email.trim()} className="btn btn-primary btn-lg mt-1">
               {busy ? "Sending…" : "Email me a sign-in link"}
             </button>
+            {/* One tap on Android and desktop; hidden until the client id is configured. */}
+            <div className="mt-2 flex items-center gap-3" aria-hidden>
+              <span className="h-px flex-1" style={{ background: "var(--line)" }} />
+              <span className="text-[12.5px]" style={{ color: "var(--ink-3)" }}>or</span>
+              <span className="h-px flex-1" style={{ background: "var(--line)" }} />
+            </div>
+            <GoogleSignIn />
           </form>
         )}
       </div>

@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 import SignInPage from "@/app/signin/page";
 
 const requestMagicLink = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/session", () => ({ requestMagicLink }));
+vi.mock("@/lib/session", () => ({ requestMagicLink, saveSession: vi.fn(), signInWithGoogle: vi.fn() }));
 const params = vi.hoisted(() => new URLSearchParams());
-vi.mock("next/navigation", () => ({ useSearchParams: () => params }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => params, useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 
 const EMAIL = "reader@example.com";
 

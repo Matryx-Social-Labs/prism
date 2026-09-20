@@ -80,9 +80,16 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
     ).scalar_one_or_none()
     if email is None:
         return None
-    # Create the account only now, on a verified email (no unverified/junk rows).
-    # The profile (name/profession/languages) is filled in the next step; a
-    # returned id means this is a brand-new account.
+    return await user_for_verified_email(session, email)
+
+
+async def user_for_verified_email(session: AsyncSession, email: str) -> UUID:
+    """The account for an email some identity provider has VERIFIED — a consumed
+    magic link, or a Google ID token with email_verified. Creates it on first
+    sign-in (no unverified/junk rows) and grants the free Markets samples once;
+    a Google sign-in on an address that already has a magic-link account lands
+    in the same account, since the verified email is the identity."""
+    email = email.strip().lower()
     user_id = (
         await session.execute(
             text(
@@ -99,6 +106,38 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
     else:  # new user — grant the free Markets samples once
         await grant_samples(session, user_id, get_settings().prism_free_markets_samples)
     return user_id
+
+
+GOOGLE_TOKENINFO = "https://oauth2.googleapis.com/tokeninfo"
+GOOGLE_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
+
+
+class GoogleTokenInvalid(ValueError):
+    pass
+
+
+async def verify_google_id_token(credential: str) -> str:
+    """Google Identity Services hands the browser a signed ID token; the browser
+    hands it to us. Google's tokeninfo endpoint checks the signature and expiry
+    (no JWKS/crypto dependency here — sign-ins are rare); we check it was minted
+    for OUR client id, by Google, for a verified email. Returns the email."""
+    import httpx
+
+    client_id = get_settings().google_client_id
+    if not client_id:
+        raise GoogleTokenInvalid("google sign-in is not configured")
+    async with httpx.AsyncClient(timeout=8.0) as http:
+        r = await http.get(GOOGLE_TOKENINFO, params={"id_token": credential})
+    if r.status_code != 200:
+        raise GoogleTokenInvalid("token rejected by google")
+    claims = r.json()
+    if claims.get("aud") != client_id:
+        raise GoogleTokenInvalid("token was not issued for this app")
+    if claims.get("iss") not in GOOGLE_ISSUERS:
+        raise GoogleTokenInvalid("unexpected issuer")
+    if str(claims.get("email_verified")).lower() != "true" or not claims.get("email"):
+        raise GoogleTokenInvalid("email not verified")
+    return str(claims["email"])
 
 
 async def profile_complete(session: AsyncSession, user_id: UUID) -> bool:
