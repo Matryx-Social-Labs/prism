@@ -75,7 +75,7 @@ async def test_the_stream_emits_one_structure_event_and_counts_its_citations(mon
 
     text = 'Prose cites [1].\n===\n{"kind":"numbers","columns":["Figure","What"],"rows":[{"a":"98","b":"villages","n":"[2]"}],"gaps":null,"followups":["Which villages?"]}'
     monkeypatch.setattr(rag, "guard_question", _allow())
-    monkeypatch.setattr(rag, "retrieve_grounding", lambda _e, _q: _grounded([chunk(1, a1), chunk(2, a2)]))
+    monkeypatch.setattr(rag, "retrieve_grounding", lambda _e, _q, **_kw: _grounded([chunk(1, a1), chunk(2, a2)]))
     monkeypatch.setattr(rag, "get_llm", lambda: _Streaming(text))
     monkeypatch.setattr(rag, "fetch_prompt", lambda _n: _Prompt())
     monkeypatch.setattr(rag, "_persist_turn", _record)
@@ -104,7 +104,7 @@ async def test_a_second_chunk_of_the_same_article_still_opens_that_article(monke
         return None
 
     monkeypatch.setattr(rag, "guard_question", _allow())
-    monkeypatch.setattr(rag, "retrieve_grounding", lambda _e, _q: _grounded([chunk(1, a1), chunk(2, uuid.uuid4()), chunk(3, a1)]))
+    monkeypatch.setattr(rag, "retrieve_grounding", lambda _e, _q, **_kw: _grounded([chunk(1, a1), chunk(2, uuid.uuid4()), chunk(3, a1)]))
     monkeypatch.setattr(rag, "get_llm", lambda: _Streaming("First [1], and later [3]."))
     monkeypatch.setattr(rag, "fetch_prompt", lambda _n: _Prompt())
     monkeypatch.setattr(rag, "_persist_turn", _noop)

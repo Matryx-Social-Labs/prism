@@ -213,7 +213,7 @@ async def test_a_model_failure_records_no_turn(monkeypatch):
 
     monkeypatch.setattr(rag, "guard_question", _allow())
     monkeypatch.setattr(rag, "retrieve_grounding",
-                        lambda _e, _q: _grounded([chunk(1)]))
+                        lambda _e, _q, **_kw: _grounded([chunk(1)]))
     monkeypatch.setattr(rag, "get_llm", lambda: _Boom())
     monkeypatch.setattr(rag, "fetch_prompt", lambda _n: _Prompt())
     monkeypatch.setattr(rag, "_persist_turn", _record)
@@ -240,7 +240,7 @@ async def test_only_cited_articles_are_persisted(monkeypatch):
 
     monkeypatch.setattr(rag, "guard_question", _allow())
     monkeypatch.setattr(rag, "retrieve_grounding",
-                        lambda _e, _q: _grounded([chunk(1, a1), chunk(2, a2)]))
+                        lambda _e, _q, **_kw: _grounded([chunk(1, a1), chunk(2, a2)]))
     monkeypatch.setattr(rag, "get_llm", lambda: _Streaming("Only [1] and the invented [8]."))
     monkeypatch.setattr(rag, "fetch_prompt", lambda _n: _Prompt())
     monkeypatch.setattr(rag, "_persist_turn", _record)

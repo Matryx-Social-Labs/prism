@@ -27,6 +27,10 @@ from common.observability import fetch_prompt
 logger = get_logger(__name__)
 
 TOP_K = 8
+# Plus reads the whole story: every development's reports, not this event's
+# alone (PLAN-LAUNCH.md §2.3) — "every quote by X across this story", "what
+# changed over the week". Twice the chunks, because the set is many times wider.
+TOP_K_STORY = 16
 
 
 @dataclass
@@ -38,16 +42,32 @@ class GroundingChunk:
     text: str
 
 
-async def retrieve_grounding(event_id: uuid.UUID, question: str) -> tuple[list[GroundingChunk], dict, str]:
-    """Top-K chunks from the event's member articles + structured projection."""
+async def retrieve_grounding(event_id: uuid.UUID, question: str, *, story_wide: bool = False) -> tuple[list[GroundingChunk], dict, str]:
+    """Top-K chunks from the event's member articles + structured projection.
+
+    `story_wide` widens the article set to every event in this event's story
+    (the current partition run). An event with no story membership reads as
+    itself, so a Plus reader never gets LESS than a free one."""
     query_vec = await embed_query(question)
     vector_literal = "[" + ",".join(f"{v:.6f}" for v in query_vec) + "]"
+    scope = (
+        """em.event_id IN (
+            SELECT :eid
+            UNION
+            SELECT es2.event_id FROM event_story es1
+            JOIN event_story es2 ON es2.run_id = es1.run_id AND es2.story_label = es1.story_label
+            JOIN partition_runs pr ON pr.id = es1.run_id AND pr.status = 'current'
+            WHERE es1.event_id = :eid
+        )"""
+        if story_wide
+        else "em.event_id = :eid"
+    )
 
     async with session_scope() as session:
         rows = (
             await session.execute(
                 text(
-                    """
+                    f"""
                     SELECT ac.article_id, ac.text, s.name AS source_name, ri.url,
                            (ac.embedding <=> CAST(:vec AS vector)) AS dist
                     FROM article_chunks ac
@@ -55,12 +75,12 @@ async def retrieve_grounding(event_id: uuid.UUID, question: str) -> tuple[list[G
                     JOIN articles a ON a.id = ac.article_id
                     JOIN raw_items ri ON ri.id = a.raw_item_id
                     JOIN sources s ON s.id = ri.source_id
-                    WHERE em.event_id = :eid AND ac.embedding IS NOT NULL
+                    WHERE {scope} AND ac.embedding IS NOT NULL
                     ORDER BY dist ASC
                     LIMIT :k
                     """
                 ),
-                {"vec": vector_literal, "eid": str(event_id), "k": TOP_K},
+                {"vec": vector_literal, "eid": str(event_id), "k": TOP_K_STORY if story_wide else TOP_K},
             )
         ).mappings().all()
 
@@ -108,7 +128,7 @@ async def answer_stream(
         yield {"type": "done"}
         return
 
-    chunks, projection, title = await retrieve_grounding(event_id, question)
+    chunks, projection, title = await retrieve_grounding(event_id, question, story_wide=plan == "plus")
 
     if not chunks:
         refusal = "This story has no retrievable sources yet, so I can't answer grounded questions about it."
