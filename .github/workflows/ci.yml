@@ -20,7 +20,7 @@ jobs:
   backend:
     name: backend · lint + import + migrate + tests
     if: github.ref != 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19; we upgrade on purpose, not by label drift
     timeout-minutes: 10
 
     # Real Postgres (pgvector) + Redis so `alembic upgrade head` runs and the
@@ -97,7 +97,7 @@ jobs:
   web:
     name: web · test + typecheck + build
     if: github.ref != 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19; we upgrade on purpose, not by label drift
     timeout-minutes: 10
     defaults:
       run:
@@ -139,7 +139,7 @@ jobs:
     # names the failure if someone ever bypasses the ruleset.
     name: main · this commit passed CI on dev
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19; we upgrade on purpose, not by label drift
     timeout-minutes: 3
     steps:
       - name: Require green backend + web checks on this exact commit
@@ -164,7 +164,7 @@ jobs:
     name: Deploy web to Vercel (production)
     needs: [vouched]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19; we upgrade on purpose, not by label drift
     timeout-minutes: 15
     concurrency:
       # Serialize production deploys so two pushes in quick succession

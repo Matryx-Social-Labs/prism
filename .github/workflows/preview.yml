@@ -24,7 +24,7 @@ concurrency:
 jobs:
   preview:
     name: Deploy web to Vercel (preview)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19; we upgrade on purpose, not by label drift
     timeout-minutes: 15
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
