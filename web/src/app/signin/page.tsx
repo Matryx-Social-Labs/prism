@@ -91,6 +91,10 @@ function SignIn() {
               <span className="h-px flex-1" style={{ background: "var(--line)" }} />
             </div>
             <GoogleSignIn />
+            <p className="mt-4 text-[12.5px] leading-[1.5]" style={{ color: "var(--ink-3)" }}>
+              By signing in you agree to the <Link href="/terms" className="underline underline-offset-[3px]">Terms</Link> and the{" "}
+              <Link href="/privacy" className="underline underline-offset-[3px]">privacy policy</Link>.
+            </p>
           </form>
         )}
       </div>

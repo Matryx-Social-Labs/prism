@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { interestsToPicks, picksToInterests, useTaxonomy, type Picks } from "@/components/ProfileEditor";
@@ -131,7 +133,10 @@ export default function OnboardingPage() {
             {session && (
               <label className="mt-5 flex items-start gap-2.5 text-[13.5px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]" />
-                <span>I agree to the Terms and to Prism creating an account for me and processing my email per the privacy policy.</span>
+                <span>
+                  I agree to the <Link href="/terms" className="underline underline-offset-[3px]">Terms</Link> and to Prism creating an account for me and processing my email per the{" "}
+                  <Link href="/privacy" className="underline underline-offset-[3px]">privacy policy</Link>.
+                </span>
               </label>
             )}
           </section>

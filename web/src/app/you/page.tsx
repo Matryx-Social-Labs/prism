@@ -137,6 +137,12 @@ export default function YouPage() {
               <Link href="/signin" className="flex min-h-[56px] items-center px-4 text-[15px] font-semibold" style={{ borderColor: "var(--line)" }}>Sign in</Link>
             )}
           </div>
+          {/* The footer is desktop-only; on the phone this is where the policies live. */}
+          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: "var(--ink-3)" }}>
+            <Link href="/privacy" className="underline-offset-[3px] hover:underline">Privacy</Link>
+            <Link href="/terms" className="underline-offset-[3px] hover:underline">Terms</Link>
+            <Link href="/refunds" className="underline-offset-[3px] hover:underline">Refunds</Link>
+          </p>
         </section>
       </div>
     </div>

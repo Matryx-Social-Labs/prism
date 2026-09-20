@@ -106,6 +106,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="flex items-center gap-4">
               <Link href="/about" className="hover:underline underline-offset-[3px]">About</Link>
               <Link href="/about#status" className="hover:underline underline-offset-[3px]">What&rsquo;s live</Link>
+              <Link href="/privacy" className="hover:underline underline-offset-[3px]">Privacy</Link>
+              <Link href="/terms" className="hover:underline underline-offset-[3px]">Terms</Link>
+              <Link href="/refunds" className="hover:underline underline-offset-[3px]">Refunds</Link>
             </span>
           </div>
         </footer>
