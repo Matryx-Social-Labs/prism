@@ -146,10 +146,14 @@ _MANDATORY_REASONING_MODELS = frozenset({
 })
 
 
-def _reasoning_payload(model: str, reasoning: dict[str, Any]) -> dict[str, Any]:
+def reasoning_payload(model: str, reasoning: dict[str, Any]) -> dict[str, Any]:
+    """The `reasoning` body for this model: "off" becomes "minimal" where off is refused."""
     if reasoning == REASONING_OFF and model in _MANDATORY_REASONING_MODELS:
         return {"effort": "minimal"}
     return reasoning
+
+
+_reasoning_payload = reasoning_payload
 
 
 async def structured_chat[T: BaseModel](

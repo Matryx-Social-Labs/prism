@@ -18,7 +18,7 @@ from agent.structure import TailSplitter
 from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_query
-from common.llm import get_llm
+from common.llm import REASONING_OFF, get_llm, reasoning_payload
 from common.logging import get_logger
 from common.models import AgentMessage, AgentSession
 from common.moderation import REFUSAL, guard_question
@@ -156,13 +156,19 @@ async def answer_stream(
     # whole (agent/structure.py). `full_text` is the prose only.
     splitter = TailSplitter()
     try:
+        model = settings.prism_model_agent if plan == "plus" else settings.prism_model_agent_free
         response = await client.chat.completions.create(
-            model=settings.prism_model_agent if plan == "plus" else settings.prism_model_agent_free,
+            model=model,
             messages=messages,
             stream=True,
             # An answer is a paragraph with citations; the provider's default
             # ceiling was reserved against the balance on every question.
             max_tokens=3000,
+            # Thinking shares max_tokens. glm-5.3-flash spent 2,224 of the 3,000
+            # thinking on "who is involved and what did they say?" and 7 of 50
+            # eval answers came back EMPTY (tools/eval_ask.py, 2026-09-20).
+            # Off where allowed, minimal where mandatory.
+            extra_body={"reasoning": reasoning_payload(model, REASONING_OFF)},
             name="agent-qa",
             metadata={
                 "stage": "agent",

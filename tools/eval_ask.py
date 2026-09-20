@@ -76,8 +76,11 @@ async def _events(n: int) -> list[tuple[uuid.UUID, str]]:
 
 async def _ask(event_id: uuid.UUID, question: str, plan: str) -> tuple[str, str, dict | None]:
     """The answer as the reader gets it, plus the excerpts the model was shown."""
-    chunks, _, _ = await rag.retrieve_grounding(event_id, question, story_wide=plan == "plus")
+    chunks, projection, _ = await rag.retrieve_grounding(event_id, question, story_wide=plan == "plus")
+    # The agent is also shown the event's structured projection; the judge must
+    # see it too, or a fact taken from there reads as invented.
     sources = "\n\n".join(f"[{c.number}] ({c.source_name}) {c.text}" for c in chunks)
+    sources += "\n\nStructured event data (also given to the agent):\n" + json.dumps(projection, default=str)[:3000]
     prose, structure = "", None
     async for ev in rag.answer_stream(event_id=event_id, session_id=uuid.uuid4(), question=question, plan=plan):
         if ev["type"] == "token":
