@@ -305,9 +305,12 @@ Ltd) linked from footer, account page, sign-in and the consent line; cookieless
 analytics behind `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` (needs the account); Ask
 redesign §2.1 (persistent bar, selection/quote/entity entry points, right
 drawer) and §2.2 (table · "Not in the reports" · follow-ups in the suggestion
-row); the mark as a continuous spectrum with PNG exports. Not yet: story-wide
-retrieval for Plus (§2.3), the 50-question groundedness run + your 20-question
-analyst set, the Plausible account, Vercel Pro, Razorpay, the pricing page,
+row); the mark as a continuous spectrum with PNG exports. Story-wide retrieval for Plus shipped (§2.3). **§2 gate met:** `tools/eval_ask.py`, 50
+questions on 25 live events, free tier: grounded **0.993**, citation quality 0.994, 0
+wrong refusals, 36 tables, 30 "not in the reports" lines
+(`docs/evals/ask-groundedness-2026-09-20-free.jsonl`). The first run scored 0.858 —
+every miss an EMPTY answer, glm-5.3-flash thinking the 3,000-token budget away;
+reasoning is now off for Ask. Not yet: your 20-question analyst set, the Plausible account, Vercel Pro, Razorpay, the pricing page,
 Hindi. Open facts to confirm in `web/src/lib/legal.ts`: the contact mailbox
 `hello@readprism.news` (needs an inbound route), the court city (Bengaluru),
 the 30-day rights-response window.
