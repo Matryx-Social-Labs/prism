@@ -678,3 +678,8 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 .rg .rg-sat { stroke-dasharray: 2 2; }
 .rg circle { fill: var(--bg); stroke: var(--ink-muted); stroke-width: 1.5; }
 .rg circle.rg-here { fill: var(--ink); stroke: var(--ink); }
+
+/* No page scrolls sideways on a phone: the viewport is the page. A component
+   that wants full bleed sits outside the padded shell or uses the scroll-rail
+   pattern (.hide-scroll with matching negative margins INSIDE the shell). */
+html, body { overflow-x: clip; }

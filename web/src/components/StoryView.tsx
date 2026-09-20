@@ -312,7 +312,10 @@ export function StoryView({ event }: { event: EventDetail }) {
     <AskContext.Provider value={openAsk}>
       {/* Phone back bar: the way back, the mark, Share. The thumb bar below
           carries Share and Ask; the tab bar is hidden on the record. */}
-      <div className="glass sticky top-0 z-30 -mx-5 flex h-[52px] items-center justify-between border-b px-3 sm:-mx-8 sm:px-6 lg:hidden" style={{ borderColor: "var(--line)" }}>
+      {/* Full-bleed by being OUTSIDE the padded shell, not by negative margins:
+          -mx-5 here pushed the bar 20px past the viewport and gave the whole
+          record page a sideways scroll on every phone (2026-09-21). */}
+      <div className="glass sticky top-0 z-30 flex h-[52px] items-center justify-between border-b px-3 sm:px-6 lg:hidden" style={{ borderColor: "var(--line)" }}>
         <Link
           href="/feed"
           scroll={false}
