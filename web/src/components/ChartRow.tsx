@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { FeedItem } from "@/lib/api";
 import { CoverageBar, MonogramStack, coverageText, languagesOf } from "@/components/Coverage";
 import { relativeTime } from "@/lib/dateline";
+import { HeardOn } from "@/components/Clips";
 import { langNative } from "@/lib/languages";
 import { regionLabel } from "@/lib/regions";
 import { sectorGroup } from "@/lib/sectors";
@@ -109,6 +110,7 @@ export function ChartRow({
               {coverageText(outlets, item.source_count)}
             </span>
           </span>
+          <HeardOn shows={item.clip_shows} />
           {markers.map((m) => (
             <span key={m.key} className={`lensdot ${m.className} ml-auto`}>
               <i /> {m.label}

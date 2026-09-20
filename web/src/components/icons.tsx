@@ -73,3 +73,15 @@ export const Speech = ({ size = 16, className }: P) => (
 export const Close = ({ size = 14, className }: P) => (
   <svg {...base(size)} className={className}><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
+export const Play = ({ size = 16, className }: P) => (
+  <svg {...base(size)} className={className} fill="currentColor" stroke="none"><path d="M7 4.5v15l12-7.5z" /></svg>
+);
+export const Pause = ({ size = 16, className }: P) => (
+  <svg {...base(size)} className={className} fill="currentColor" stroke="none"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
+);
+export const SkipNext = ({ size = 16, className }: P) => (
+  <svg {...base(size)} className={className} fill="currentColor" stroke="none"><path d="M5 5v14l9-7zM16 5h3v14h-3z" /></svg>
+);
+export const Headphones = ({ size = 16, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><path d="M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1z" /></svg>
+);

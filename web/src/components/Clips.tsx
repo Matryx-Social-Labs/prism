@@ -1,0 +1,289 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ClipOut } from "@/lib/api";
+import { relativeTime } from "@/lib/dateline";
+import { Headphones, Pause, Play, SkipNext } from "@/components/icons";
+
+/**
+ * "Heard on": the stretches of news podcasts that discussed this story, in the
+ * hosts' own words (DESIGN.md § Podcast clip).
+ *
+ * One <audio> for the section. Play on a card seeks the publisher's own file
+ * to the clip's start; at the clip's end the queue advances to the next card
+ * (another episode if need be) unless the reader chose to keep listening. The
+ * transcript is the card's body — the first sentence is the headline — and its
+ * words ink as they are spoken. Nothing is ours: the audio, the words and the
+ * art are the show's, named on the card, with the whole episode one tap away.
+ *
+ * Hosts stitch ads in per request, so the file the browser loads may not be
+ * the file we transcribed. `shift` is the difference in duration between the
+ * two; a pre-roll ad is the common case and shifts every offset by the same
+ * amount, so the seek and the read-along both add it.
+ */
+export const PODCAST_CLIPS = process.env.NEXT_PUBLIC_PODCAST_CLIPS !== "0";
+const ADVANCE_PAUSE_MS = 400;
+const SHIFT_TOLERANCE_S = 1.5;
+
+export function clipShift(loadedDuration: number, transcribedDuration: number | null | undefined): number {
+  if (!transcribedDuration || !Number.isFinite(loadedDuration) || loadedDuration <= 0) return 0;
+  const d = loadedDuration - transcribedDuration;
+  return Math.abs(d) < SHIFT_TOLERANCE_S ? 0 : d;
+}
+
+function mmss(s: number): string {
+  const t = Math.max(0, Math.round(s));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+}
+
+export function Clips({ clips }: { clips: ClipOut[] }) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [active, setActive] = useState<number>(-1);
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(0); // in the loaded file's clock
+  const [shift, setShift] = useState(0);
+  const [freeRun, setFreeRun] = useState(false); // "keep listening": past end_s
+  const advancing = useRef<number | null>(null);
+  const pendingSeek = useRef<number | null>(null);
+
+  const current = active >= 0 ? clips[active] : null;
+
+  const seekTo = useCallback((el: HTMLAudioElement, clip: ClipOut) => {
+    const sh = clipShift(el.duration, clip.audio_duration_s);
+    setShift(sh);
+    el.currentTime = Math.max(0, clip.start_s + sh);
+  }, []);
+
+  const play = useCallback(
+    (i: number) => {
+      const el = audio.current;
+      const clip = clips[i];
+      if (!el || !clip) return;
+      if (advancing.current) window.clearTimeout(advancing.current);
+      setFreeRun(false);
+      setActive(i);
+      const sameFile = el.currentSrc === clip.audio_url || el.src === clip.audio_url;
+      if (sameFile && el.readyState >= 1) {
+        seekTo(el, clip);
+        void el.play();
+      } else {
+        pendingSeek.current = i;
+        el.src = clip.audio_url;
+        el.load();
+        // Seek once metadata is in (see onLoadedMetadata), then play.
+      }
+    },
+    [clips, seekTo],
+  );
+
+  const pause = useCallback(() => audio.current?.pause(), []);
+  const toggle = useCallback((i: number) => (active === i && playing ? pause() : play(i)), [active, playing, pause, play]);
+  const next = useCallback(() => {
+    if (active + 1 < clips.length) play(active + 1);
+    else pause();
+  }, [active, clips.length, play, pause]);
+
+  // Media Session: the lock screen names the show and the publisher, not us.
+  useEffect(() => {
+    if (!current || typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: current.episode_title,
+        artist: `${current.show.name} · ${current.show.publisher}`,
+        artwork: current.show.art_url ? [{ src: current.show.art_url, sizes: "512x512" }] : [],
+      });
+      navigator.mediaSession.setActionHandler("play", () => void audio.current?.play());
+      navigator.mediaSession.setActionHandler("pause", () => audio.current?.pause());
+      navigator.mediaSession.setActionHandler("nexttrack", next);
+    } catch {
+      /* not every browser accepts every handler */
+    }
+  }, [current, next]);
+
+  // ← → move between clips while one is active; space is the focused button's own.
+  useEffect(() => {
+    if (active < 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        next();
+      } else if (e.key === "ArrowLeft" && active > 0) {
+        e.preventDefault();
+        play(active - 1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, next, play]);
+
+  const onTime = () => {
+    const el = audio.current;
+    if (!el || !current) return;
+    setTime(el.currentTime);
+    if (!freeRun && el.currentTime >= current.end_s + shift && !advancing.current) {
+      el.pause();
+      advancing.current = window.setTimeout(() => {
+        advancing.current = null;
+        if (active + 1 < clips.length) play(active + 1);
+        else setPlaying(false);
+      }, ADVANCE_PAUSE_MS);
+    }
+  };
+
+  const onLoadedMetadata = () => {
+    const el = audio.current;
+    const i = pendingSeek.current;
+    if (!el || i == null) return;
+    pendingSeek.current = null;
+    const clip = clips[i];
+    if (!clip) return;
+    seekTo(el, clip);
+    void el.play();
+  };
+
+  if (!PODCAST_CLIPS || clips.length === 0) return null;
+
+  return (
+    <div>
+      <audio
+        ref={audio}
+        preload="none"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onTimeUpdate={onTime}
+        onLoadedMetadata={onLoadedMetadata}
+      />
+      <ol className="flex flex-col gap-3" aria-label="Podcast clips">
+        {clips.map((c, i) => (
+          <ClipCard
+            key={`${c.audio_url}-${c.start_s}`}
+            clip={c}
+            active={active === i}
+            playing={active === i && playing}
+            time={active === i ? time - shift : null}
+            freeRun={active === i && freeRun}
+            onToggle={() => toggle(i)}
+            onKeepListening={() => {
+              setFreeRun(true);
+              if (active !== i) play(i);
+            }}
+          />
+        ))}
+      </ol>
+      {current && (playing || active >= 0) && (
+        <NowPlaying clip={current} playing={playing} time={time - shift} onToggle={() => toggle(active)} onNext={next} hasNext={active + 1 < clips.length} />
+      )}
+    </div>
+  );
+}
+
+function ClipCard({
+  clip,
+  active,
+  playing,
+  time,
+  freeRun,
+  onToggle,
+  onKeepListening,
+}: {
+  clip: ClipOut;
+  active: boolean;
+  playing: boolean;
+  time: number | null; // in the transcript's clock
+  freeRun: boolean;
+  onToggle: () => void;
+  onKeepListening: () => void;
+}) {
+  const words = clip.words?.length ? clip.words : null;
+  const progress = time == null ? 0 : Math.min(1, Math.max(0, (time - clip.start_s) / Math.max(1, clip.end_s - clip.start_s)));
+  const label = `${playing ? "Pause" : "Play"} the clip from ${clip.show.name}`;
+  return (
+    <li className="clip card p-4" data-active={active || undefined}>
+      <div className="flex items-start gap-3">
+        <button type="button" onClick={onToggle} aria-label={label} aria-pressed={playing} className="clip-play">
+          {playing ? <Pause size={18} /> : <Play size={18} />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+            <ShowArt show={clip.show} size={24} />
+            <span className="font-semibold" style={{ color: "var(--ink-2)" }}>{clip.show.name}</span>
+            <span>· {clip.show.publisher}</span>
+            <time dateTime={clip.published_at} className="font-mono text-[11px]">{relativeTime(clip.published_at)}</time>
+            <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.04em]">Transcript {mmss(clip.start_s)}–{mmss(clip.end_s)}</span>
+          </div>
+          <p className="mt-2.5 text-[16px] leading-[1.6]" style={{ color: active ? "var(--ink)" : "var(--ink-2)" }}>
+            {words
+              ? words.map(([w, s], i) => (
+                  <span key={i} className={time != null && time >= s ? "clip-word-said" : "clip-word"}>
+                    {w}{i < words.length - 1 ? " " : ""}
+                  </span>
+                ))
+              : clip.text}
+          </p>
+          <div className="clip-progress mt-3" aria-hidden>
+            <span style={{ width: `${progress * 100}%` }} />
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+            <span className="truncate">From <i className="not-italic font-medium" style={{ color: "var(--ink-2)" }}>{clip.episode_title}</i></span>
+            {clip.episode_url && (
+              <a href={clip.episode_url} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>
+                Full episode ↗
+              </a>
+            )}
+            {!freeRun && (
+              <button type="button" onClick={onKeepListening} className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+                Keep listening
+              </button>
+            )}
+            {freeRun && <span className="whitespace-nowrap">Playing on</span>}
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function ShowArt({ show, size }: { show: ClipOut["show"]; size: number }) {
+  const [broken, setBroken] = useState(false);
+  if (!show.art_url || broken) {
+    return (
+      <span className="monogram inline-flex items-center justify-center" style={{ width: size, height: size }} aria-hidden>
+        <Headphones size={Math.round(size * 0.55)} />
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={show.art_url} alt="" width={size} height={size} loading="lazy" referrerPolicy="no-referrer" className="rounded-[6px] object-cover" style={{ width: size, height: size }} onError={() => setBroken(true)} />
+  );
+}
+
+/** The bar that rides above the thumb zone while a clip plays: what is on, pause, next. */
+function NowPlaying({ clip, playing, time, onToggle, onNext, hasNext }: { clip: ClipOut; playing: boolean; time: number; onToggle: () => void; onNext: () => void; hasNext: boolean }) {
+  return (
+    <div className="clip-bar glass" role="region" aria-label="Now playing">
+      <ShowArt show={clip.show} size={32} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-semibold">{clip.show.name} <span className="font-normal" style={{ color: "var(--ink-3)" }}>· {clip.show.publisher}</span></p>
+        <p className="truncate font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{mmss(Math.max(clip.start_s, time))} of {mmss(clip.end_s)} · {clip.episode_title}</p>
+      </div>
+      <button type="button" onClick={onToggle} className="icon-btn" aria-label={playing ? "Pause" : "Play"}>{playing ? <Pause size={16} /> : <Play size={16} />}</button>
+      {hasNext && <button type="button" onClick={onNext} className="icon-btn" aria-label="Next clip"><SkipNext size={16} /></button>}
+    </div>
+  );
+}
+
+/** "Heard on N shows" for a feed row: shows with a clip on the story. */
+export function HeardOn({ shows }: { shows?: string[] }) {
+  const n = shows?.length ?? 0;
+  const label = useMemo(() => (n === 1 ? "Heard on 1 show" : `Heard on ${n} shows`), [n]);
+  if (!PODCAST_CLIPS || n === 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
+      <Headphones size={13} /> {label}
+    </span>
+  );
+}

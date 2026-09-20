@@ -21,6 +21,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { StoryRoute } from "@/components/StoryRoute";
 import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { Said } from "@/components/Said";
+import { Clips } from "@/components/Clips";
 import { SectionHead as Head } from "@/components/SectionHead";
 import { ReportImages, SourceList, fallbackCode, indexSources } from "@/components/SourceList";
 import { BriefPlayer } from "@/components/BriefPlayer";
@@ -186,12 +187,14 @@ export function StoryView({ event }: { event: EventDetail }) {
   // "On this story", in the order the sections appear. A nav that lists
   // sections in another order than they appear is a small lie the reader
   // notices on the second tap.
+  const clips = event.clips ?? [];
   const navItems: { id: string; label: string; count?: number }[] = [
     { id: "lens-brief", label: "The record" },
     ...(reports.length > 1 ? [{ id: "changed", label: "What changed", count: reports.length }] : []),
     // Only when there is something to jump to: 55% of stories have no attributed
     // quote, and a permanent "0" would advertise absence on every other page.
     ...(quoteCount > 0 ? [{ id: "said", label: "Who said what", count: quoteCount }] : []),
+    ...(clips.length > 0 ? [{ id: "heard", label: "Heard on", count: clips.length }] : []),
     ...(event.story_slug ? [{ id: "route", label: boundaryVerified ? "How it unfolded" : "Related reporting" }] : []),
     ...(event.impacts.length > 0 ? [{ id: "so-what", label: "Why it matters", count: event.impacts.length }] : []),
     { id: "sources", label: "Coverage", count: outletCount },
@@ -550,6 +553,19 @@ export function StoryView({ event }: { event: EventDetail }) {
                   hint="Only words found exactly in the article are shown, attributed and linked to the line they came from."
                 />
                 <Said claims={claims} sourceIndex={sourceIndex} outletOf={(id) => event.sources.find((x) => x.article_id === id)} />
+              </section>
+            )}
+
+            {/* ── Heard on: what the news podcasts said, in their words ── */}
+            {clips.length > 0 && (
+              <section id="heard" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="heard-title">
+                <Head
+                  id="heard-title"
+                  title="Heard on"
+                  count={clips.length}
+                  hint="News podcasts that discussed this story, in the hosts' own words. Plays the publisher's audio from the clip; the transcript is of that stretch only."
+                />
+                <Clips clips={clips} />
               </section>
             )}
 

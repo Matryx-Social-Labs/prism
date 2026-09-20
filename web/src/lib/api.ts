@@ -30,6 +30,8 @@ export interface FeedItem {
   regions: string[];
   image_url: string | null;
   is_regional: boolean;
+  /** Podcast shows with a clip on this story (slugs), at most three. */
+  clip_shows?: string[];
   coverage: CoverageOut | null;
   event_type: string | null;
   source_count: number;
@@ -192,6 +194,34 @@ export interface EventDetail {
   sources: SourceRef[];
   perspectives: PerspectiveOut[];
   impacts: ImpactOut[];
+  // Reader-tier evidence: what the news podcasts said about this story. Optional
+  // for the same two-pipeline reason as claims; empty until the gate is passed.
+  clips?: ClipOut[];
+}
+
+export interface ClipShow {
+  slug: string;
+  name: string;
+  publisher: string;
+  art_url: string | null;
+  site_url: string | null;
+}
+
+/** A stretch of a podcast episode about this story; the audio is the publisher's own file. */
+export interface ClipOut {
+  show: ClipShow;
+  episode_title: string;
+  episode_url: string | null;
+  audio_url: string;
+  /** The duration WE transcribed; the player reconciles the file it loads against it. */
+  audio_duration_s: number | null;
+  published_at: string;
+  start_s: number;
+  end_s: number;
+  text: string;
+  /** [word, start_s, end_s] for read-along. */
+  words: [string, number, number][];
+  score: number;
 }
 
 export interface FeedQuery {
