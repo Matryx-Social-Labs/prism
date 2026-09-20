@@ -114,7 +114,10 @@ async def verify(body: VerifyRequest, db: AsyncSession = Depends(get_db)):
 
 
 class GoogleSignIn(BaseModel):
-    credential: str
+    # One of the two: an ID token from Google's own button / One Tap, or an
+    # access token from our button's OAuth token flow (common/auth.py).
+    credential: str | None = None
+    access_token: str | None = None
 
 
 @router.post("/api/v1/auth/google", response_model=SessionResponse)
@@ -123,7 +126,12 @@ async def google_sign_in(body: GoogleSignIn, db: AsyncSession = Depends(get_db))
     consumed magic link gets. The verified email is the identity, so an address
     that signed in by link before lands in its existing account."""
     try:
-        email = await auth.verify_google_id_token(body.credential)
+        if body.access_token:
+            email = await auth.verify_google_access_token(body.access_token)
+        elif body.credential:
+            email = await auth.verify_google_id_token(body.credential)
+        else:
+            raise HTTPException(status_code=422, detail="credential or access_token required")
     except auth.GoogleTokenInvalid as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
     user_id = await auth.user_for_verified_email(db, email)

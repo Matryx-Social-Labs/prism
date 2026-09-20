@@ -140,6 +140,32 @@ async def verify_google_id_token(credential: str) -> str:
     return str(claims["email"])
 
 
+async def verify_google_access_token(access_token: str) -> str:
+    """The OAuth token flow: our OWN button (Google's rendered button refuses
+    clicks when it is not visibly its own, so it cannot wear our style) asks
+    Google for an access token with the openid+email scopes; we ask tokeninfo
+    whose it is. `aud` must be our client id — an access token minted for some
+    other app must never sign a reader in here (token substitution). Returns
+    the email."""
+    import httpx
+
+    client_id = get_settings().google_client_id
+    if not client_id:
+        raise GoogleTokenInvalid("google sign-in is not configured")
+    async with httpx.AsyncClient(timeout=8.0) as http:
+        r = await http.get(GOOGLE_TOKENINFO, params={"access_token": access_token})
+    if r.status_code != 200:
+        raise GoogleTokenInvalid("token rejected by google")
+    info = r.json()
+    if info.get("aud") != client_id and info.get("azp") != client_id:
+        raise GoogleTokenInvalid("token was not issued for this app")
+    if str(info.get("email_verified")).lower() != "true" or not info.get("email"):
+        raise GoogleTokenInvalid("email not verified")
+    if int(info.get("expires_in") or 0) <= 0:
+        raise GoogleTokenInvalid("token expired")
+    return str(info["email"])
+
+
 async def profile_complete(session: AsyncSession, user_id: UUID) -> bool:
     """A profile is complete once the reader has picked a profession (the gate the
     onboarding step fills). Drives the `needs_profile` flag returned on verify."""

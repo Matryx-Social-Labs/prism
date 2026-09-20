@@ -6,20 +6,28 @@ import { afterSignIn, takeNext } from "@/lib/next";
 import { saveSession, signInWithGoogle } from "@/lib/session";
 
 /**
- * Sign in with Google (Google Identity Services, ID-token mode). Renders
- * nothing until NEXT_PUBLIC_GOOGLE_CLIENT_ID is set, so the sign-in page is
- * complete without it. The credential goes to /api/v1/auth/google, which
- * verifies it and returns the same session a magic link does; the verified
- * email is the identity, so an existing link account is the same account.
+ * Continue with Google — OUR button, Google's OAuth token flow.
+ *
+ * Google's rendered "Sign in with Google" button cannot wear our style, and
+ * it refuses the click when it is not visibly its own (it checks its own
+ * visibility, so an overlay at opacity 0 is a dead button — that is what
+ * broke sign-in on 2026-09-20). The token client has no button: our pill
+ * calls `requestAccessToken()`, Google's account chooser opens, and the access
+ * token goes to /api/v1/auth/google, which asks Google whose it is and checks
+ * it was minted for our client id. Same session, same account, as a magic link.
+ * Renders nothing until NEXT_PUBLIC_GOOGLE_CLIENT_ID is set.
  */
 declare global {
   interface Window {
     google?: {
       accounts: {
-        id: {
-          initialize: (o: { client_id: string; callback: (r: { credential: string }) => void; ux_mode?: string; auto_select?: boolean; itp_support?: boolean }) => void;
-          renderButton: (el: HTMLElement, o: Record<string, string | number>) => void;
-          prompt: () => void;
+        oauth2: {
+          initTokenClient: (o: {
+            client_id: string;
+            scope: string;
+            callback: (r: { access_token?: string; error?: string; error_description?: string }) => void;
+            error_callback?: (e: { type: string; message?: string }) => void;
+          }) => { requestAccessToken: (o?: { prompt?: string }) => void };
         };
       };
     };
@@ -27,14 +35,27 @@ declare global {
 }
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+const SCOPE = "openid email profile";
+const GSI = "https://accounts.google.com/gsi/client";
 
-// Google's rendered button (an iframe) cannot be restyled, and the ID-token
-// flow only works from Google's own button. So the reader sees OUR pill —
-// the secondary button beside the primary "Email me a sign-in link" — and
-// Google's real button sits over it at opacity 0, scaled to the pill's
-// height, taking the click. Google's terms allow a custom look as long as
-// the button says what it does and carries the G.
-const GIS_HEIGHT = 40; // size: "large"
+function loadGsi(): Promise<void> {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${GSI}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Google could not be reached")), { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = GSI;
+    s.async = true;
+    s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Google could not be reached"));
+    document.head.appendChild(s);
+  });
+}
 
 function GoogleG() {
   return (
@@ -47,65 +68,54 @@ function GoogleG() {
   );
 }
 
-export function GoogleSignIn({ oneTap = false }: { oneTap?: boolean }) {
+export function GoogleSignIn() {
   const router = useRouter();
-  const slot = useRef<HTMLDivElement>(null);
-  const pill = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const alive = useRef(true);
   useEffect(() => {
-    if (!CLIENT_ID || !slot.current) return;
-    let cancelled = false;
-    const boot = () => {
-      if (cancelled || !window.google || !slot.current) return;
-      window.google.accounts.id.initialize({
+    // Warm the script so the first tap opens Google at once.
+    loadGsi().catch(() => {});
+    return () => { alive.current = false; };
+  }, []);
+
+  async function start() {
+    setError(null);
+    setBusy(true);
+    try {
+      await loadGsi();
+      const client = window.google!.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
-        itp_support: true,
-        callback: ({ credential }) => {
-          signInWithGoogle(credential)
+        scope: SCOPE,
+        callback: (r) => {
+          if (!r.access_token) {
+            if (alive.current) { setBusy(false); if (r.error && r.error !== "access_denied") setError(r.error_description || "Google sign-in failed"); }
+            return;
+          }
+          signInWithGoogle(r.access_token)
             .then(({ session, needsProfile }) => {
               saveSession(session);
               router.replace(afterSignIn(needsProfile, takeNext("/feed", new URLSearchParams(window.location.search).get("next"))));
             })
-            .catch((e: Error) => setError(e.message));
+            .catch((e: Error) => { if (alive.current) { setError(e.message); setBusy(false); } });
         },
+        // The reader closed the popup, or the browser blocked it.
+        error_callback: (e) => { if (alive.current) { setBusy(false); if (e.type !== "popup_closed") setError(e.message || "Google sign-in could not open"); } },
       });
-      // Google's button is 40px tall; the pill is 48. Scale the invisible
-      // button up to cover the pill, and size it to the pill's width.
-      const width = pill.current?.clientWidth ?? 320;
-      const scale = 48 / GIS_HEIGHT;
-      window.google.accounts.id.renderButton(slot.current, {
-        type: "standard", theme: "outline", size: "large", shape: "pill", text: "continue_with", logo_alignment: "left",
-        // Google draws its button ~26px narrower than asked; ask for the difference.
-        width: Math.min(400, Math.max(200, Math.round(width / scale) + 28)),
-      });
-      if (oneTap) window.google.accounts.id.prompt();
-    };
-    if (window.google) boot();
-    else {
-      const s = document.createElement("script");
-      s.src = "https://accounts.google.com/gsi/client";
-      s.async = true;
-      s.defer = true;
-      s.onload = boot;
-      document.head.appendChild(s);
+      client.requestAccessToken();
+    } catch (e) {
+      setBusy(false);
+      setError(e instanceof Error ? e.message : "Google sign-in failed");
     }
-    return () => { cancelled = true; };
-  }, [router, oneTap]);
+  }
 
   if (!CLIENT_ID) return null;
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative">
-        <div ref={pill} className="btn btn-secondary btn-lg w-full" aria-hidden>
-          <GoogleG />
-          Continue with Google
-        </div>
-        {/* Google's real button: over the pill, unseen, scaled to its height. */}
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full" style={{ opacity: 0, transform: `scale(${48 / GIS_HEIGHT})` }}>
-          <div ref={slot} aria-label="Continue with Google" />
-        </div>
-      </div>
+      <button type="button" onClick={start} disabled={busy} className="btn btn-secondary btn-lg w-full">
+        <GoogleG />
+        {busy ? "Opening Google…" : "Continue with Google"}
+      </button>
       {error && <p className="text-[13px]" style={{ color: "var(--danger)" }}>{error}</p>}
     </div>
   );

@@ -118,12 +118,12 @@ export async function verifyMagicLink(token: string): Promise<VerifyResult> {
   };
 }
 
-/** A Google ID token (from the button or One Tap) → the same session a magic link gives. */
-export async function signInWithGoogle(credential: string): Promise<VerifyResult> {
+/** A Google OAuth access token (from our button's token flow) → the same session a magic link gives. */
+export async function signInWithGoogle(accessToken: string): Promise<VerifyResult> {
   const res = await fetch(`${API_URL}/api/v1/auth/google`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ credential }),
+    body: JSON.stringify({ access_token: accessToken }),
   });
   if (!res.ok) throw new Error(await detail(res, "Google sign-in failed"));
   const d = (await res.json()) as { token: string; user_id: string; email: string; needs_profile: boolean };

@@ -46,6 +46,49 @@ async def test_a_good_token_yields_the_email(monkeypatch):
     assert await auth.verify_google_id_token("x") == "Reader@Example.com"
 
 
+# ── The token flow (our own button) ─────────────────────────────────────────
+# tokeninfo answers an access token with aud/azp, email, email_verified and
+# expires_in; the same three refusals apply, plus an expired token.
+
+async def test_an_access_token_for_another_app_is_refused(monkeypatch):
+    _tokeninfo(monkeypatch, aud="someone-else", azp="someone-else", email="a@b.c", email_verified="true", expires_in="3000")
+    with pytest.raises(auth.GoogleTokenInvalid):
+        await auth.verify_google_access_token("ya29.x")
+
+
+async def test_an_expired_or_unverified_access_token_is_refused(monkeypatch):
+    _tokeninfo(monkeypatch, aud="prism-web.apps.googleusercontent.com", email="a@b.c", email_verified="true", expires_in="0")
+    with pytest.raises(auth.GoogleTokenInvalid):
+        await auth.verify_google_access_token("ya29.x")
+    _tokeninfo(monkeypatch, aud="prism-web.apps.googleusercontent.com", email="a@b.c", email_verified="false", expires_in="3000")
+    with pytest.raises(auth.GoogleTokenInvalid):
+        await auth.verify_google_access_token("ya29.x")
+
+
+async def test_a_good_access_token_yields_the_email(monkeypatch):
+    _tokeninfo(monkeypatch, aud="prism-web.apps.googleusercontent.com", email="Reader@Example.com", email_verified="true", expires_in="3000")
+    assert await auth.verify_google_access_token("ya29.x") == "Reader@Example.com"
+
+
+async def test_the_route_takes_an_access_token_too(monkeypatch):
+    if not await _db():
+        pytest.skip("no local database")
+    _tokeninfo(monkeypatch, aud="prism-web.apps.googleusercontent.com", email="google-token@t.test", email_verified="true", expires_in="3000")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.post("/api/v1/auth/google", json={"access_token": "ya29.x"})
+        assert r.status_code == 200, r.text
+        assert r.json()["email"] == "google-token@t.test"
+        r = await c.post("/api/v1/auth/google", json={})
+        assert r.status_code == 422
+    from sqlalchemy import text
+
+    from common.db import session_scope
+    async with session_scope() as s:
+        await s.execute(text("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = 'google-token@t.test')"))
+        await s.execute(text("DELETE FROM usage_quota WHERE user_id IN (SELECT id FROM users WHERE email = 'google-token@t.test')"))
+        await s.execute(text("DELETE FROM users WHERE email = 'google-token@t.test'"))
+
+
 async def test_the_route_returns_the_same_session_shape_as_magic_link(monkeypatch):
     if not await _db():
         pytest.skip("no local database")
