@@ -80,14 +80,22 @@ export function AnswerText({ text, citations }: { text: string; citations: AskCi
   );
 }
 
+export type UpgradeAsk = { reason: "ask-limit" | "ask-rest"; used?: number; limit?: number };
+
 /** What a refused question tells the reader, and the one action that helps. */
-export function LimitNote({ limit, next }: { limit: AskLimit; next: string }) {
+export function LimitNote({ limit, next, onUpgrade }: { limit: AskLimit; next: string; onUpgrade?: (o: UpgradeAsk) => void }) {
+  const plusLink = (label: string, o: UpgradeAsk) =>
+    onUpgrade ? (
+      <button type="button" onClick={() => onUpgrade(o)} className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>{label}</button>
+    ) : (
+      <Link href="/plus" className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>{label}</Link>
+    );
   if (limit.retry_after_s) return <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>One question at a time — try again in a minute.</p>;
   if (limit.status === 503) {
     return (
       <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
         Ask is resting for today for free readers. It is back at midnight UTC.{" "}
-        {limit.plus_helps && <Link href="/plus" className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>Plus stays on →</Link>}
+        {limit.plus_helps && plusLink("Plus stays on →", { reason: "ask-rest" })}
       </p>
     );
   }
@@ -102,12 +110,7 @@ export function LimitNote({ limit, next }: { limit: AskLimit; next: string }) {
   return (
     <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
       You have asked {limit.used ?? limit.limit} of {limit.limit} questions today.
-      {limit.plus_helps && (
-        <>
-          {" "}
-          <Link href="/plus" className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>Plus is 100 a day →</Link>
-        </>
-      )}
+      {limit.plus_helps && <> {plusLink("Plus is 100 a day →", { reason: "ask-limit", used: limit.used, limit: limit.limit })}</>}
     </p>
   );
 }
@@ -132,6 +135,7 @@ export function AskShell({
   onInput,
   onSubmit,
   onFollowUp,
+  onUpgrade,
   suggestions,
   onClose,
   inputRef,
@@ -147,6 +151,8 @@ export function AskShell({
   onSubmit: (q: string) => void;
   /** A follow-up chip under an answer; absent on the landing's scripted panel. */
   onFollowUp?: (q: string) => void;
+  /** Opens the upgrade sheet from a limit; absent where there is no account to upgrade. */
+  onUpgrade?: (o: UpgradeAsk) => void;
   suggestions: string[];
   /** Absent on the landing's embedded panel, which has nothing to close. */
   onClose?: () => void;
@@ -208,7 +214,7 @@ style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ..
                   </span>
                 )}
                 {t.limit ? (
-                  <LimitNote limit={t.limit} next={typeof window === "undefined" ? "/" : window.location.pathname} />
+                  <LimitNote limit={t.limit} next={typeof window === "undefined" ? "/" : window.location.pathname} onUpgrade={onUpgrade} />
                 ) : (
                 <p
                   className="text-[13.5px] leading-[1.65]"

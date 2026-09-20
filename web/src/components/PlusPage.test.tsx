@@ -11,6 +11,7 @@ const billing = vi.hoisted(() => ({
   cancelSubscription: vi.fn(),
 }));
 vi.mock("@/lib/billing", async (orig) => ({ ...(await orig<typeof import("@/lib/billing")>()), ...billing }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(""), useRouter: () => ({ push: vi.fn() }) }));
 const session = vi.hoisted(() => ({ current: null as null | { token: string; userId: string; email: string } }));
 vi.mock("@/lib/session", async (orig) => ({
   ...(await orig<typeof import("@/lib/session")>()),
@@ -38,45 +39,56 @@ beforeEach(() => {
 });
 
 describe("PlusPage", () => {
-  it("prints the plans at the API's prices and sends a stranger to sign in first", async () => {
+  it("prints the API's prices, yearly by default with the saving computed from them, and sends a stranger to sign in first", async () => {
     render(<PlusPage />);
-    expect(await screen.findByText("Plus · monthly")).toBeInTheDocument();
-    expect(screen.getByText(/₹149/)).toBeInTheDocument();
-    expect(screen.getByText(/₹1,199/)).toBeInTheDocument();
-    expect(screen.getByText("500 of 500 seats left")).toBeInTheDocument();
-    const links = screen.getAllByRole("link", { name: "Sign in to subscribe" });
-    expect(links[0]).toHaveAttribute("href", "/signin?next=/plus");
-    expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+    const plus = await screen.findByRole("article", { name: "Plus" });
+    expect(plus).toHaveTextContent("₹1,199");
+    expect(plus).toHaveTextContent("≈ ₹100 a month");
+    // 12 × 149 − 1,199 = 589: arithmetic on the API's figures, not a typed number.
+    expect(screen.getByRole("tab", { name: /Yearly/ })).toHaveTextContent("save ₹589");
+    expect(screen.getByRole("article", { name: "Founding member" })).toHaveTextContent("500 of 500 seats");
+    expect(screen.getAllByRole("link", { name: "Sign in to continue" })[0]).toHaveAttribute("href", "/signin?next=/plus");
+    expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
+    await userEvent.click(screen.getByRole("tab", { name: "Monthly" }));
+    expect(screen.getByRole("article", { name: "Plus" })).toHaveTextContent("₹149");
   });
 
-  it("shows no button that cannot work: before the keys exist the rows say 'Opens soon'", async () => {
+  it("shows no button that cannot work: before the keys exist the cards say 'Opens soon'", async () => {
     billing.fetchPlans.mockResolvedValue({ ...PLANS, checkout_ready: false, key_id: null });
     session.current = { token: "t", userId: "u1", email: "a@b.c" };
     render(<PlusPage />);
-    expect((await screen.findAllByText("Opens soon")).length).toBe(3);
-    expect(screen.queryByRole("button", { name: /Subscribe/ })).toBeNull();
+    expect((await screen.findAllByText("Opens soon")).length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
   });
 
-  it("a signed-in reader subscribes through the server-made subscription, then is on Plus", async () => {
+  it("a signed-in reader subscribes to the period shown, then is on Plus", async () => {
     session.current = { token: "t", userId: "u1", email: "a@b.c" };
-    billing.subscribe.mockResolvedValue("plus_monthly");
+    billing.subscribe.mockResolvedValue("plus_yearly");
     render(<PlusPage />);
-    await userEvent.click((await screen.findAllByRole("button", { name: "Subscribe" }))[0]);
-    expect(billing.subscribe).toHaveBeenCalledWith("plus_monthly", "t", "a@b.c");
+    await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
+    expect(billing.subscribe).toHaveBeenCalledWith("plus_yearly", "t", "a@b.c");
     expect(await screen.findByText(/You’re on Plus/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
   });
 
   it("a dismissed sheet says nothing; a failed one says so", async () => {
     session.current = { token: "t", userId: "u1", email: "a@b.c" };
     billing.subscribe.mockRejectedValueOnce(new Error("dismissed"));
     render(<PlusPage />);
-    await userEvent.click((await screen.findAllByRole("button", { name: "Subscribe" }))[0]);
+    await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
     await waitFor(() => expect(billing.subscribe).toHaveBeenCalled());
     expect(screen.queryByRole("status")).toBeNull();
     billing.subscribe.mockRejectedValueOnce(new Error("payment failed"));
-    await userEvent.click((await screen.findAllByRole("button", { name: "Subscribe" }))[0]);
+    await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
     expect(await screen.findByRole("status")).toHaveTextContent("payment failed");
+  });
+
+  it("answers the questions people ask before paying, and names who charges them", async () => {
+    render(<PlusPage />);
+    await screen.findByRole("article", { name: "Plus" });
+    expect(screen.getByText("Who charges me, and how?")).toBeInTheDocument();
+    expect(screen.getByText(/collected by Matryx Social Labs Private Limited on behalf of Prism Media Intelligence LLP/)).toBeInTheDocument();
+    expect(screen.getByRole("table")).toHaveTextContent("Questions a day");
   });
 });
 

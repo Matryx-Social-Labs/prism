@@ -138,6 +138,30 @@ export async function fetchMe(session: Session): Promise<{ user_id: string; emai
   return res.json();
 }
 
+/** The session's plan, "free" until known; anonymous is "free". Cached per
+ * token for the tab so the header does not ask on every route. */
+const planCache = new Map<string, "free" | "plus">();
+export function usePlan(session: Session | null): "free" | "plus" {
+  const [plan, setPlan] = useState<"free" | "plus">(session ? planCache.get(session.token) ?? "free" : "free");
+  useEffect(() => {
+    if (!session) return setPlan("free");
+    const cached = planCache.get(session.token);
+    if (cached) return setPlan(cached);
+    let live = true;
+    fetchMe(session)
+      .then((m) => {
+        const p = m.plan === "plus" ? "plus" : "free";
+        planCache.set(session.token, p);
+        if (live) setPlan(p);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [session]);
+  return plan;
+}
+
 /** Complete onboarding for the signed-in reader (name, profession, location,
  * languages ordered by preference, consent). Requires a verified session. */
 export async function setProfile(

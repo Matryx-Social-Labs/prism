@@ -2,7 +2,8 @@
 
 import { track } from "@/lib/analytics";
 import { Speech } from "@/components/icons";
-import { AskShell, type Turn } from "@/components/AskShell";
+import { AskShell, type Turn, type UpgradeAsk } from "@/components/AskShell";
+import { UpgradeSheet } from "@/components/UpgradeSheet";
 import type { AskOpen } from "@/components/AskContext";
 import { useSession } from "@/lib/session";
 
@@ -39,6 +40,7 @@ export function AskPanel({
 }) {
   const session = useSession();
   const [openState, setOpenState] = useState(false);
+  const [upgrade, setUpgrade] = useState<UpgradeAsk | null>(null);
   const open = openProp !== undefined ? openProp : openState;
   const setOpen = (v: boolean) => (onOpenChange ? onOpenChange(v) : setOpenState(v));
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -179,6 +181,7 @@ export function AskPanel({
             onInput={setInput}
             onSubmit={submit}
             onFollowUp={(q) => { viaRef.current = "chip"; void submit(q); }}
+            onUpgrade={setUpgrade}
             suggestions={suggestedQuestions}
             onClose={() => setOpen(false)}
             inputRef={inputRef}
@@ -187,6 +190,7 @@ export function AskPanel({
           />
         </>
       )}
+      <UpgradeSheet open={upgrade !== null} onClose={() => setUpgrade(null)} reason={upgrade?.reason} used={upgrade?.used} limit={upgrade?.limit} />
     </>
   );
 }

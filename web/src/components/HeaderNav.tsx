@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SearchIcon } from "@/components/icons";
-import { useSession } from "@/lib/session";
+import { usePlan, useSession } from "@/lib/session";
 
 // Destinations, in the reader's words. /trending stays the URL; "Stories" is
 // what a reader calls the developing arcs (DESIGN.md decisions, 2026-09-18).
@@ -20,6 +20,7 @@ export function HeaderNav() {
   const pathname = usePathname();
   const router = useRouter();
   const session = useSession();
+  const plan = usePlan(session);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // `/` focuses the search field from anywhere the field is on screen, the way
@@ -91,6 +92,9 @@ export function HeaderNav() {
       </form>
 
       <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
+        {plan !== "plus" && !landing && (
+          <Link href="/plus?from=header" className="btn btn-ghost hidden sm:inline-flex" style={{ color: "var(--ink-2)" }}>Plus</Link>
+        )}
         <ThemeToggle />
         {session ? (
           <Link

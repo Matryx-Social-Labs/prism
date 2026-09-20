@@ -390,6 +390,11 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 .ask-sheet { animation: askUp 220ms cubic-bezier(.2,.7,.2,1) both; }
 @media (min-width: 1024px) { .ask-sheet { animation-name: askIn; } }
 @media (prefers-reduced-motion: reduce) { .ask-sheet { animation: none; } }
+/* The upgrade sheet: up on the phone; on a desk it is centred, so it settles rather than slides. */
+@keyframes sheetPop { from { opacity: 0; transform: translate(-50%, calc(-50% + 12px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+.upgrade-sheet { animation: askUp 220ms cubic-bezier(.2,.7,.2,1) both; }
+@media (min-width: 1024px) { .upgrade-sheet { animation-name: sheetPop; } }
+@media (prefers-reduced-motion: reduce) { .upgrade-sheet { animation: none; } }
 
 /* The re-typeset flip (DESIGN.md signature): a lens-colored scan line sweeps
    the lens block while the content re-inks BEHIND it. The ink is a veil in the
