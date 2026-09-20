@@ -92,11 +92,53 @@ def report() -> int:
     return 0
 
 
+async def live() -> int:
+    """Precision among labelled pairs the CURRENT event_clips still contains:
+    how the matcher's filters (not just the threshold) fare on the gold."""
+    gold = _load()
+    if not gold:
+        print("no labels yet")
+        return 1
+    # A merged clip is keyed by its best window, which moves as the filters
+    # change; a gold pair survives if the event still has a clip from the same
+    # episode overlapping the labelled window's stretch.
+    async with get_session_factory()() as s:
+        clips = (await s.execute(text(
+            "SELECT ec.event_id, w.episode_id, ec.start_s, ec.end_s FROM event_clips ec JOIN podcast_windows w ON w.id = ec.window_id"
+        ))).all()
+        wins = {str(r[0]): (str(r[1]), float(r[2]), float(r[3])) for r in (await s.execute(text(
+            "SELECT id, episode_id, start_s, end_s FROM podcast_windows WHERE id = ANY(CAST(:ids AS uuid[]))"
+        ), {"ids": [g["window_id"] for g in gold]})).all()}
+        n_events = (await s.execute(text("SELECT count(DISTINCT event_id) FROM event_clips"))).scalar()
+        n_clips = len(clips)
+    by_event: dict[str, list] = {}
+    for ev, ep, a, b in clips:
+        by_event.setdefault(str(ev), []).append((str(ep), float(a), float(b)))
+
+    def alive(g: dict) -> bool:
+        w = wins.get(g["window_id"])
+        if not w:
+            return False
+        return any(ep == w[0] and a < w[2] and b > w[1] for ep, a, b in by_event.get(g["event_id"], []))
+
+    survivors = [g for g in gold if alive(g)]
+    dropped = [g for g in gold if not alive(g)]
+    y = sum(g["label"] == "y" for g in survivors)
+    print(f"live: {n_clips} clips on {n_events} events · gold survivors {len(survivors)}/{len(gold)} · precision(y) {y / len(survivors) if survivors else 0:.3f} · y lost {sum(g['label'] == 'y' for g in dropped)}")
+    for g in survivors:
+        if g["label"] != "y":
+            print(f"   still in ({g['label']}): {g['score']:.3f} {g['title'][:70]}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sample", type=int, default=0)
     ap.add_argument("--report", action="store_true")
+    ap.add_argument("--live", action="store_true", help="precision among gold pairs the current event_clips keeps")
     args = ap.parse_args()
+    if args.live:
+        return asyncio.run(live())
     if args.sample:
         n = asyncio.run(sample(args.sample))
         print(f"labelled {n}")

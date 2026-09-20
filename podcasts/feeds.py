@@ -18,6 +18,8 @@ logger = get_logger(__name__)
 UA = "Mozilla/5.0 (compatible; Prism/1.0; +https://readprism.news)"
 # Older than this is catalogued, never transcribed: a clip is about today's story.
 TRANSCRIBE_WITHIN = timedelta(hours=72)
+# Older than this is not even catalogued: a feed carries years of back issues.
+CATALOGUE_WITHIN = timedelta(days=30)
 
 
 def _duration_s(raw: str | None) -> int | None:
@@ -75,7 +77,7 @@ async def poll_show(spec: ShowSpec, http: httpx.AsyncClient) -> int:
                 audio = enc.get("href") or enc.get("url")
             pub = _published(e)
             guid = e.get("id") or e.get("guid") or audio
-            if not (audio and pub and guid):
+            if not (audio and pub and guid) or now - pub > CATALOGUE_WITHIN:
                 continue
             # A disabled show (dynamic ad insertion) is catalogued, never paid for.
             status = "pending" if spec.enabled and now - pub <= TRANSCRIBE_WITHIN else "skipped"

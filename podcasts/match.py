@@ -2,8 +2,10 @@
 
 Two signals, both required: the window's embedding is near the event's (one
 index scan on events.embedding, the vectors the events already carry) AND the
-window names at least one of the event's cast — the entity check that keeps
-"same topic" (another day's iPhone story) from passing as "same story". Then
+window names one of the event's cast that is rare enough to place a story, or
+two of the headline's own words — the check that keeps "same topic" (another
+day's iPhone story) from passing as "same story". A window near more than a
+few events at once is a topic passage and is dropped whole. Then
 consecutive matched windows of one episode merge into one clip of at most
 CLIP_MAX_S, and each event keeps its best CLIPS_PER_EVENT, one per episode.
 
@@ -22,12 +24,29 @@ from sqlalchemy import text
 from common.config import get_settings
 from common.db import session_scope
 from common.logging import get_logger
+from podcasts.judge import judge_pairs
 
 logger = get_logger(__name__)
 
 CLIP_MAX_S = 90.0
 CLIPS_PER_EVENT = 4
 CANDIDATES = 8
+# The window's top band: candidates within this much of its best cosine. A
+# story passage has one or two stories in its band (a story is several events
+# here); a topic passage ("now let's begin with the top story…", "we continue
+# to track Semicon") has a flat profile across many. More than MAGNET_STORIES
+# distinct stories in the band → the window is a magnet, dropped whole.
+# Measured 2026-09-20: at a 0.84 floor every window's eight nearest events
+# cleared it, so a cap on EVENTS fired on the true matches too.
+TOP_BAND = 0.03
+MAGNET_STORIES = 6  # loose: the judge decides; this only spares it the show's segues
+# An entity named in more than this share of the month's events (India, US,
+# Modi, BJP, Apple) says nothing about WHICH story; only rarer names count.
+COMMON_ENTITY_DF = 0.01
+# Alternatively the window carries this many of the headline's own content words.
+TITLE_WORDS = 2
+_STOP = {"the", "and", "for", "with", "from", "that", "this", "over", "after", "into", "amid", "says", "said", "will", "have", "has",
+         "india", "indian", "government", "govt", "news", "live", "updates", "update", "brief", "evening", "morning", "today"}
 # A window can only be about a story reported around when the episode aired.
 BEFORE = timedelta(hours=72)
 AFTER = timedelta(hours=72)
@@ -58,6 +77,16 @@ def entity_hits(window_text: str, names: list[str]) -> int:
         if re.search(pat, window_text if len(name) < 4 else low):
             n += 1
     return n
+
+
+def title_words(title: str) -> set[str]:
+    """The headline's content words: lower-case, ≥ 4 letters, no stopwords."""
+    return {w for w in re.findall(r"[a-z][a-z0-9']{3,}", title.casefold()) if w not in _STOP}
+
+
+def title_hits(window_text: str, title: str) -> int:
+    low = window_text.casefold()
+    return sum(1 for w in title_words(title) if re.search(r"(?<!\w)" + re.escape(w) + r"(?!\w)", low))
 
 
 def merge_runs(hits: list[Hit]) -> list[Hit]:
@@ -100,6 +129,18 @@ async def match_recent(hours: int = 96) -> int:
     min_cos = get_settings().prism_clip_min_cos
     since = datetime.now(UTC) - timedelta(hours=hours)
     async with session_scope() as s:
+        # Which names are too common to place a story: df over the month's events.
+        total = (await s.execute(text("SELECT count(*) FROM events WHERE last_updated_at > now() - interval '30 days'"))).scalar() or 1
+        common = {
+            r[0] for r in (await s.execute(text(
+                """
+                SELECT en.name FROM event_entities ee JOIN entities en ON en.id = ee.entity_id
+                JOIN events e ON e.id = ee.event_id
+                WHERE e.last_updated_at > now() - interval '30 days'
+                GROUP BY en.name HAVING count(DISTINCT ee.event_id) > :floor
+                """
+            ), {"floor": total * COMMON_ENTITY_DF})).all()
+        }
         wins = (await s.execute(text(
             """
             SELECT w.id, w.episode_id, w.seq, w.start_s, w.end_s, w.text, w.embedding::text AS vec, e.published_at
@@ -112,7 +153,7 @@ async def match_recent(hours: int = 96) -> int:
         for w in wins:
             cands = (await s.execute(text(
                 """
-                SELECT e.id, 1 - (e.embedding <=> CAST(:vec AS vector)) AS cos
+                SELECT e.id, e.title, 1 - (e.embedding <=> CAST(:vec AS vector)) AS cos
                 FROM events e
                 WHERE e.embedding IS NOT NULL
                   AND e.last_updated_at > :lo AND e.first_seen_at < :hi
@@ -123,16 +164,31 @@ async def match_recent(hours: int = 96) -> int:
             cands = [c for c in cands if float(c["cos"]) >= min_cos]
             if not cands:
                 continue
+            best = max(float(c["cos"]) for c in cands)
+            cands = [c for c in cands if float(c["cos"]) >= best - TOP_BAND]
+            stories = (await s.execute(text(
+                "SELECT slug, member_event_ids FROM stories WHERE merged_into IS NULL AND member_event_ids ?| CAST(:ids AS text[])"
+            ), {"ids": [str(c["id"]) for c in cands]})).all()
+            story_of = {}
+            for slug, members in stories:
+                for m in members or []:
+                    story_of.setdefault(str(m), slug)
+            if len({story_of.get(str(c["id"]), str(c["id"])) for c in cands}) > MAGNET_STORIES:
+                continue
             names = (await s.execute(text(
                 "SELECT ee.event_id, en.name FROM event_entities ee JOIN entities en ON en.id = ee.entity_id WHERE ee.event_id = ANY(:ids)"
             ), {"ids": [c["id"] for c in cands]})).all()
             cast: dict[uuid.UUID, list[str]] = {}
             for eid, name in names:
-                cast.setdefault(eid, []).append(name)
+                if name not in common:
+                    cast.setdefault(eid, []).append(name)
             for c in cands:
                 n = entity_hits(w["text"], cast.get(c["id"], []))
-                if n:
+                if n or title_hits(w["text"], c["title"]) >= TITLE_WORDS:
                     hits.append(Hit(c["id"], w["id"], w["episode_id"], w["seq"], float(w["start_s"]), float(w["end_s"]), float(c["cos"]), n))
+        # The judge reads both texts; only `event` verdicts go on. Cached per pair.
+        verdicts = await judge_pairs(s, [(h.event_id, h.window_id) for h in hits])
+        hits = [h for h in hits if verdicts.get((h.event_id, h.window_id)) == "event"]
         clips = merge_runs(hits)
         # Best CLIPS_PER_EVENT per event, one per episode.
         per_event: dict[uuid.UUID, list[Hit]] = {}
@@ -155,5 +211,5 @@ async def match_recent(hours: int = 96) -> int:
                     "start_s = EXCLUDED.start_s, end_s = EXCLUDED.end_s, score = EXCLUDED.score, entity_hits = EXCLUDED.entity_hits, rank = EXCLUDED.rank"
                 ), {"e": eid, "w": h.window_id, "s": h.start_s, "t": h.end_s, "sc": round(h.score, 4), "n": h.entity_hits, "r": rank})
                 written += 1
-    logger.info("podcast_matched", windows=len(wins), hits=len(hits), clips=written, events=len(touched), min_cos=min_cos)
+    logger.info("podcast_matched", windows=len(wins), judged_event=len(hits), clips=written, events=len(touched), min_cos=min_cos)
     return written
