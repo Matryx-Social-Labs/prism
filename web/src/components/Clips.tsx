@@ -236,7 +236,11 @@ function Transcript({ clip, time, playing, freeRun, onKeepListening }: { clip: C
     if (!el || said < 0 || Date.now() < handsOff.current) return;
     const w = el.querySelector<HTMLElement>(`[data-i="${said}"]`);
     if (!w) return;
-    const target = w.offsetTop - el.clientHeight / 2 + w.offsetHeight / 2;
+    // Measured against the window itself, not offsetTop (whose parent is the
+    // card, so it overshot to the end on a phone, 2026-09-21).
+    const wr = w.getBoundingClientRect();
+    const br = el.getBoundingClientRect();
+    const target = el.scrollTop + (wr.top - br.top) - el.clientHeight / 2 + wr.height / 2;
     if (Math.abs(el.scrollTop - target) > 8) el.scrollTo({ top: target, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [said]);
 
@@ -259,7 +263,7 @@ function Transcript({ clip, time, playing, freeRun, onKeepListening }: { clip: C
         ref={box}
         onWheel={() => { handsOff.current = Date.now() + HANDS_OFF_MS; }}
         onTouchMove={() => { handsOff.current = Date.now() + HANDS_OFF_MS; }}
-        className="clip-window max-h-[168px] overflow-y-auto px-4 py-3 text-[16px] leading-[1.7]"
+        className="clip-window relative max-h-[168px] overflow-y-auto px-4 py-3 text-[16px] leading-[1.7]"
         style={{ color: time != null ? "var(--ink)" : "var(--ink-2)" }}
         aria-live="off"
       >
