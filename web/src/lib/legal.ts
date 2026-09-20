@@ -146,6 +146,7 @@ export const TERMS: LegalDoc = {
       heading: "Paid plans",
       blocks: [
         "The price you see when you subscribe includes GST. A plan renews at the end of each period until you cancel; cancelling takes one click on your account page and access continues to the end of the period you paid for. Refunds follow the Refund policy. If a price changes, we tell you before the renewal it applies to.",
+        `Payments are processed by Razorpay and collected by ${LEGAL_PARTNER} on behalf of ${LEGAL_ENTITY} until the LLP's own merchant account is live; that is the name you may see on your statement.`,
       ],
     },
     {
@@ -180,7 +181,7 @@ export const TERMS: LegalDoc = {
 export const REFUNDS: LegalDoc = {
   slug: "refunds",
   title: "Refund policy",
-  lede: "Paid plans are not yet on sale. This policy applies from the day they are.",
+  lede: `Paid plans are not yet on sale. This policy applies from the day they are. Payments are processed by Razorpay and collected by ${LEGAL_PARTNER} on behalf of ${LEGAL_ENTITY}.`,
   sections: [
     {
       heading: "Monthly plans",

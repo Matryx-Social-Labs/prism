@@ -83,7 +83,14 @@ export function AnswerText({ text, citations }: { text: string; citations: AskCi
 /** What a refused question tells the reader, and the one action that helps. */
 export function LimitNote({ limit, next }: { limit: AskLimit; next: string }) {
   if (limit.retry_after_s) return <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>One question at a time — try again in a minute.</p>;
-  if (limit.status === 503) return <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>Ask is resting for today for free readers. It is back at midnight UTC.</p>;
+  if (limit.status === 503) {
+    return (
+      <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+        Ask is resting for today for free readers. It is back at midnight UTC.{" "}
+        {limit.plus_helps && <Link href="/plus" className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>Plus stays on →</Link>}
+      </p>
+    );
+  }
   if (limit.signin_helps) {
     return (
       <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
@@ -94,7 +101,13 @@ export function LimitNote({ limit, next }: { limit: AskLimit; next: string }) {
   }
   return (
     <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
-      You have asked {limit.used ?? limit.limit} of {limit.limit} questions today.{limit.plus_helps ? " Plus, at 100 a day, opens soon." : ""}
+      You have asked {limit.used ?? limit.limit} of {limit.limit} questions today.
+      {limit.plus_helps && (
+        <>
+          {" "}
+          <Link href="/plus" className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>Plus is 100 a day →</Link>
+        </>
+      )}
     </p>
   );
 }

@@ -131,6 +131,13 @@ export async function signInWithGoogle(credential: string): Promise<VerifyResult
   return { session: { token: d.token, userId: d.user_id, email: d.email }, needsProfile: d.needs_profile };
 }
 
+/** Who the session belongs to and the plan it is on (`plan`: free | plus). */
+export async function fetchMe(session: Session): Promise<{ user_id: string; email: string; plan: "free" | "plus" | string }> {
+  const res = await fetch(`${API_URL}/api/v1/auth/me`, { headers: { Authorization: `Bearer ${session.token}` }, cache: "no-store" });
+  if (!res.ok) throw new Error(`me ${res.status}`);
+  return res.json();
+}
+
 /** Complete onboarding for the signed-in reader (name, profession, location,
  * languages ordered by preference, consent). Requires a verified session. */
 export async function setProfile(

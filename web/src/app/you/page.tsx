@@ -12,6 +12,7 @@ import type { ProfessionOption } from "@/lib/api";
 import { relativeTime } from "@/lib/dateline";
 import { loadProfile, saveProfile } from "@/lib/profile";
 import { clearSession, useSession } from "@/lib/session";
+import { PlanRow } from "@/components/PlanRow";
 import { getWatchlist, watchlistEvents, type WatchEvent, type WatchItem } from "@/lib/watchlist";
 
 /**
@@ -129,6 +130,7 @@ export default function YouPage() {
               <span className="text-[15px]">Theme</span>
               <span className="ml-auto"><ThemeToggle /></span>
             </div>
+            {session && <PlanRow session={session} />}
             {session ? (
               <button onClick={signOut} className="flex min-h-[56px] w-full items-center px-4 text-left text-[15px] font-semibold" style={{ color: "var(--danger)", borderColor: "var(--line)" }}>
                 Sign out
