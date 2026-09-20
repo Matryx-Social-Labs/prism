@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { Payments } from "@/components/Payments";
 import { PlanCard } from "@/components/PlanCard";
 import { SectionHead } from "@/components/SectionHead";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { clearSession, useSession } from "@/lib/session";
 
-// The account: who you are, what you pay for, and the door out — the same
-// hairline sections as every other page (DESIGN.md § Account). The plan is
-// first because it is why most people come here.
+// The account: who you are, what you pay for, what you have paid, and the
+// door out — the same hairline sections as every other page (DESIGN.md
+// § Account). The plan is first because it is why most people come here;
+// Payments appears only once there is a charge to show.
 export default function AccountPage() {
   const session = useSession();
   const router = useRouter();
@@ -35,6 +37,7 @@ export default function AccountPage() {
         <SectionHead id="plan-title" title="Your plan" />
         <PlanCard session={session} />
       </section>
+      <Payments session={session} />
 
       <section className="mt-8" aria-labelledby="profile-title">
         <SectionHead id="profile-title" title="Your record" hint="Your state, profession and the subjects you follow shape Today." />

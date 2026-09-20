@@ -18,6 +18,9 @@ from typing import Any
 import httpx
 
 from common.config import get_settings
+from common.logging import get_logger
+
+logger = get_logger(__name__)
 
 BASE = "https://api.razorpay.com/v1"
 
@@ -50,9 +53,27 @@ STATUS = {
     "cancelled": "cancelled",
     "completed": "active",
     "expired": "expired",
-    "paused": "cancelled",
+    # A pause is a pause: paid time is kept, nothing is charged, the worker
+    # resumes it on the date the reader chose (resume_due).
+    "paused": "paused",
 }
 PERIOD = {"month": "monthly", "year": "yearly"}
+
+# The Refund policy (web/src/lib/legal.ts REFUNDS): yearly and founding
+# charges are refunded in full within seven days of any charge; monthly is not.
+REFUND_DAYS = 7
+REFUNDABLE_PLANS = frozenset({"plus_yearly", "founding"})
+
+
+def refundable_until(plan: str, status: str, current_period_start, refund_id: str | None):
+    """The moment the reader's right to a full refund lapses, or None if there
+    is none to offer: monthly plans, anything not active, an already refunded
+    row, or a row whose period start Razorpay has not told us yet."""
+    from datetime import timedelta
+
+    if plan not in REFUNDABLE_PLANS or status != "active" or refund_id or not current_period_start:
+        return None
+    return current_period_start + timedelta(days=REFUND_DAYS)
 
 
 @dataclass(frozen=True)
@@ -109,8 +130,16 @@ async def ensure_plan(spec: PlanSpec, client: httpx.AsyncClient | None = None) -
             await client.aclose()
 
 
-async def create_subscription(spec: PlanSpec, user_id: str, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
-    """A subscription awaiting its first payment; the id goes to Checkout."""
+async def create_subscription(
+    spec: PlanSpec, user_id: str, client: httpx.AsyncClient | None = None, *, start_at: int | None = None, replaces: str | None = None
+) -> dict[str, Any]:
+    """A subscription awaiting its first payment; the id goes to Checkout.
+
+    `start_at` (unix) defers the first charge — the reader authorises the
+    mandate now and pays on that date; used when a yearly plan is taken from
+    the cancel sheet so it begins the day the paid month ends. `replaces` names
+    the subscription to stop at cycle end once this one is authorised; verify
+    reads it back from the notes."""
     own = client is None
     client = client or _client()
     try:
@@ -121,9 +150,10 @@ async def create_subscription(spec: PlanSpec, user_id: str, client: httpx.AsyncC
                 "plan_id": plan_id,
                 "total_count": TOTAL_COUNT[spec.key],
                 "customer_notify": 1,
+                **({"start_at": start_at} if start_at else {}),
                 # Read back by the webhook (api/routes/billing.py): whose
                 # subscription, which plan, at what price.
-                "notes": {"user_id": user_id, "plan": spec.key.removesuffix("_regular"), "price_paise": str(spec.paise)},
+                "notes": {"user_id": user_id, "plan": spec.key.removesuffix("_regular"), "price_paise": str(spec.paise), **({"replaces": replaces} if replaces else {})},
             },
         )
         r.raise_for_status()
@@ -137,12 +167,13 @@ class NothingToCancel(Exception):
     """Razorpay refused the cancel because the subscription has already run its course."""
 
 
-async def cancel_subscription(sub_id: str, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
-    """Stop at the end of the paid period; access continues until then."""
+async def cancel_subscription(sub_id: str, client: httpx.AsyncClient | None = None, *, at_cycle_end: bool = True) -> dict[str, Any]:
+    """Stop at the end of the paid period (access continues until then), or —
+    after a refund — at once."""
     own = client is None
     client = client or _client()
     try:
-        r = await client.post(f"/subscriptions/{sub_id}/cancel", json={"cancel_at_cycle_end": 1})
+        r = await client.post(f"/subscriptions/{sub_id}/cancel", json={"cancel_at_cycle_end": 1 if at_cycle_end else 0})
         if r.status_code == 400 and "not cancellable" in r.text:
             raise NothingToCancel(r.text[:200])
         r.raise_for_status()
@@ -175,6 +206,88 @@ async def fetch_subscription(sub_id: str, client: httpx.AsyncClient | None = Non
             await client.aclose()
 
 
+class PauseUnavailable(Exception):
+    """Razorpay refused the pause: the feature is not enabled on the account
+    (Razorpay support turns it on) or the subscription is not in a state that
+    can be paused. The sheet then offers the rest and says so."""
+
+
+async def pause_subscription(sub_id: str, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+    """Pause at once. Charges stop; the paid period is still the reader's
+    (entitlement is by date, common/billing.entitled). Only `active` pauses."""
+    own = client is None
+    client = client or _client()
+    try:
+        r = await client.post(f"/subscriptions/{sub_id}/pause", json={"pause_at": "now"})
+        if r.status_code == 400:
+            raise PauseUnavailable(r.text[:200])
+        r.raise_for_status()
+        return r.json()
+    finally:
+        if own:
+            await client.aclose()
+
+
+async def resume_subscription(sub_id: str, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+    """Resume a paused subscription now; Razorpay charges on its next cycle."""
+    own = client is None
+    client = client or _client()
+    try:
+        r = await client.post(f"/subscriptions/{sub_id}/resume", json={"resume_at": "now"})
+        r.raise_for_status()
+        return r.json()
+    finally:
+        if own:
+            await client.aclose()
+
+
+async def list_invoices(sub_id: str, client: httpx.AsyncClient | None = None) -> list[dict[str, Any]]:
+    """Every invoice of a subscription, newest first — one per charge, each
+    carrying the `payment_id` a refund is made against and the `short_url` of
+    Razorpay's hosted invoice (view, download as PDF)."""
+    own = client is None
+    client = client or _client()
+    try:
+        r = await client.get("/invoices", params={"subscription_id": sub_id, "count": 100})
+        r.raise_for_status()
+        items = list(r.json().get("items", []))
+        items.sort(key=lambda i: int(i.get("paid_at") or i.get("issued_at") or i.get("created_at") or 0), reverse=True)
+        return items
+    finally:
+        if own:
+            await client.aclose()
+
+
+async def latest_paid_invoice(sub_id: str, client: httpx.AsyncClient | None = None) -> dict[str, Any] | None:
+    """The most recent paid invoice of a subscription."""
+    paid = [i for i in await list_invoices(sub_id, client) if i.get("status") == "paid" and i.get("payment_id")]
+    return paid[0] if paid else None
+
+
+async def refund_payment(payment_id: str, amount_paise: int, *, notes: dict[str, str], client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+    """Refund a charge in full to the instrument it was paid with. Normal
+    speed: Razorpay credits the card, account or UPI app in 5–7 working days
+    (instant refunds cost a fee per refund; the policy promises days, not
+    minutes). Returns Razorpay's refund object (`id` rfnd_…, `status`)."""
+    own = client is None
+    client = client or _client()
+    try:
+        r = await client.post(f"/payments/{payment_id}/refund", json={"amount": amount_paise, "speed": "normal", "notes": notes})
+        r.raise_for_status()
+        return r.json()
+    finally:
+        if own:
+            await client.aclose()
+
+
+def period_start(sub: dict[str, Any]):
+    """When the current paid period began — the refund window counts from here."""
+    from datetime import UTC, datetime
+
+    v = sub.get("current_start")
+    return datetime.fromtimestamp(int(v), tz=UTC) if v else None
+
+
 def period_end(sub: dict[str, Any]):
     """When the paid period ends: `current_end` while it runs, `ended_at`/`end_at` after."""
     from datetime import UTC, datetime
@@ -202,6 +315,17 @@ async def apply_subscription(db, sub: dict[str, Any], *, note: str) -> tuple[str
         return None, "", ""
     status = STATUS.get(sub.get("status", ""), "cancelled")
     end = period_end(sub)
+    # Authorised for a future start (`start_at`, the cancel sheet's yearly):
+    # no paid period yet, so no end to be entitled by — the plan it replaces
+    # carries the reader to that day. `end_at` (ten years out) is not a period.
+    start_at = int(sub.get("start_at") or 0)
+    starts_at = None
+    if not sub.get("current_start") and start_at and sub.get("status") in ("created", "authenticated"):
+        from datetime import UTC as _UTC
+        from datetime import datetime as _dt
+
+        starts_at = _dt.fromtimestamp(start_at, tz=_UTC)
+        end = None
     before = (
         await db.execute(
             text("SELECT status FROM subscriptions WHERE provider = 'razorpay' AND provider_sub_id = :sid"),
@@ -217,10 +341,13 @@ async def apply_subscription(db, sub: dict[str, Any], *, note: str) -> tuple[str
     await db.execute(
         text(
             """
-            INSERT INTO subscriptions (id, user_id, provider, provider_sub_id, plan, status, current_period_end, cancel_at, price_paise, notes)
-            VALUES (:id, :u, 'razorpay', :sid, :plan, :status, :end, :cancel_at, :price, :notes)
+            INSERT INTO subscriptions (id, user_id, provider, provider_sub_id, plan, status, current_period_start, current_period_end, cancel_at, price_paise, notes, starts_at)
+            VALUES (:id, :u, 'razorpay', :sid, :plan, :status, :start, :end, :cancel_at, :price, :notes, :starts_at)
             ON CONFLICT (provider, provider_sub_id) DO UPDATE SET
               status = EXCLUDED.status, current_period_end = EXCLUDED.current_period_end,
+              current_period_start = COALESCE(EXCLUDED.current_period_start, subscriptions.current_period_start),
+              starts_at = EXCLUDED.starts_at,
+              paused_until = CASE WHEN EXCLUDED.status = 'paused' THEN subscriptions.paused_until ELSE NULL END,
               cancel_at = COALESCE(EXCLUDED.cancel_at, subscriptions.cancel_at),
               plan = EXCLUDED.plan, price_paise = COALESCE(EXCLUDED.price_paise, subscriptions.price_paise),
               notes = EXCLUDED.notes, updated_at = now()
@@ -232,8 +359,10 @@ async def apply_subscription(db, sub: dict[str, Any], *, note: str) -> tuple[str
             "sid": sub["id"],
             "plan": notes.get("plan") or "plus_monthly",
             "status": status,
+            "start": period_start(sub),
             "end": end,
             "cancel_at": cancel_at,
+            "starts_at": starts_at,
             "price": int(notes["price_paise"]) if notes.get("price_paise") else None,
             "notes": note,
         },
@@ -274,6 +403,29 @@ async def reconcile_pending(db) -> int:
                 changed += 1
                 await on_transition(db, user_id, before, after, sub)
     return changed
+
+
+async def resume_due(db) -> int:
+    """Paused subscriptions whose chosen date has come: resume them at
+    Razorpay and apply what it says. Runs with the hourly reconcile."""
+    from sqlalchemy import text
+
+    rows = (
+        await db.execute(
+            text("SELECT provider_sub_id, user_id FROM subscriptions WHERE provider = 'razorpay' AND status = 'paused' AND paused_until IS NOT NULL AND paused_until <= now()")
+        )
+    ).all()
+    n = 0
+    for sid, user_id in rows:
+        try:
+            sub = await resume_subscription(sid)
+            _, before, after = await apply_subscription(db, sub, note="resumed on schedule")
+            if before != after:
+                await on_transition(db, str(user_id), before, after, sub)
+            n += 1
+        except Exception:
+            logger.exception("razorpay_resume_failed", sub=sid)
+    return n
 
 
 async def on_transition(db, user_id: str, before: str, after: str, sub: dict[str, Any]) -> None:

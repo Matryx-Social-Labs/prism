@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import uuid
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -36,13 +37,28 @@ def _mock(plans: list[dict], calls: list[tuple[str, str, dict | None]]):
         calls.append((req.method, req.url.path, body))
         if req.method == "GET" and req.url.path.startswith("/v1/subscriptions/"):
             sid = req.url.path.split("/")[-1]
-            return httpx.Response(200, json={"id": sid, "notes": {"user_id": SUB_STATE.get("user_id", ""), "plan": "plus_monthly", "price_paise": "14900"}, **SUB_STATE})
+            state = SUB_STATE.get("subs", {}).get(sid, SUB_STATE)
+            notes = {"user_id": SUB_STATE.get("user_id", ""), "plan": state.get("plan", "plus_monthly"), "price_paise": state.get("price_paise", "14900"), **state.get("notes", {})}
+            return httpx.Response(200, json={"id": sid, **{k: v for k, v in state.items() if k not in ("subs", "invoices")}, "notes": notes})
         if req.method == "GET" and req.url.path == "/v1/plans":
             return httpx.Response(200, json={"items": plans})
         if req.method == "POST" and req.url.path == "/v1/plans":
             return httpx.Response(200, json={"id": "plan_new", **body})
         if req.method == "POST" and req.url.path == "/v1/subscriptions":
-            return httpx.Response(200, json={"id": "sub_1", "status": "created", **body})
+            return httpx.Response(200, json={"id": SUB_STATE.get("next_id", "sub_1"), "status": "created", **body})
+        if req.method == "POST" and req.url.path.endswith("/pause"):
+            if SUB_STATE.get("pause_unavailable"):
+                return httpx.Response(400, json={"error": {"code": "BAD_REQUEST_ERROR", "description": "Pause is not enabled for this account."}})
+            SUB_STATE["status"] = "paused"
+            return httpx.Response(200, json={"id": req.url.path.split("/")[-2], **{k: v for k, v in SUB_STATE.items() if k not in ("subs", "invoices")}, "notes": {"user_id": SUB_STATE.get("user_id", ""), "plan": SUB_STATE.get("plan", "plus_monthly")}})
+        if req.method == "POST" and req.url.path.endswith("/resume"):
+            SUB_STATE["status"] = "active"
+            return httpx.Response(200, json={"id": req.url.path.split("/")[-2], **{k: v for k, v in SUB_STATE.items() if k not in ("subs", "invoices")}, "notes": {"user_id": SUB_STATE.get("user_id", ""), "plan": SUB_STATE.get("plan", "plus_monthly")}})
+        if req.method == "GET" and req.url.path == "/v1/invoices":
+            inv = SUB_STATE.get("invoices", [])
+            return httpx.Response(200, json={"count": len(inv), "items": inv})
+        if req.method == "POST" and req.url.path.startswith("/v1/payments/") and req.url.path.endswith("/refund"):
+            return httpx.Response(200, json={"id": "rfnd_1", "payment_id": req.url.path.split("/")[-2], "amount": body["amount"], "speed_processed": body.get("speed"), "status": "pending"})
         if req.method == "POST" and req.url.path.endswith("/cancel"):
             if SUB_STATE.get("status") == "completed":
                 return httpx.Response(400, json={"error": {"code": "BAD_REQUEST_ERROR", "description": "Subscription is not cancellable in completed status.", "field": "status"}})
@@ -249,3 +265,280 @@ def test_the_status_map_keeps_a_paid_up_completed_subscription_active():
     assert razorpay.STATUS["pending"] == "past_due"
     assert razorpay.STATUS["expired"] == "expired"
     assert razorpay.TOTAL_COUNT["plus_yearly"] > 1, "a one-charge subscription completes on payment and never reads as active"
+
+
+def test_the_refund_window_is_seven_days_on_yearly_and_founding_and_nothing_else():
+    from datetime import UTC, datetime, timedelta
+
+    start = datetime(2026, 9, 21, tzinfo=UTC)
+    assert razorpay.refundable_until("plus_yearly", "active", start, None) == start + timedelta(days=7)
+    assert razorpay.refundable_until("founding", "active", start, None) == start + timedelta(days=7)
+    assert razorpay.refundable_until("plus_monthly", "active", start, None) is None, "monthly is never refunded"
+    assert razorpay.refundable_until("plus_yearly", "past_due", start, None) is None
+    assert razorpay.refundable_until("plus_yearly", "active", None, None) is None, "no start known: nothing offered"
+    assert razorpay.refundable_until("plus_yearly", "active", start, "rfnd_1") is None, "offered once"
+
+
+async def test_refund_inside_the_window_goes_back_in_full_and_ends_plus_at_once(monkeypatch):
+    """The Refund policy as one click: the latest paid invoice's payment is
+    refunded for what was paid, the row records the refund BEFORE the cancel is
+    asked (so a racing webhook sends nothing on top), the subscription is
+    cancelled now rather than at cycle end, and the reader is free again.
+    Outside the window, or twice, the route refuses."""
+    import time
+    from datetime import UTC, datetime, timedelta
+
+    from api.routes import billing as billing_routes
+
+    if not await _db():
+        pytest.skip("no local database")
+    monkeypatch.setattr(get_settings(), "razorpay_key_id", "rzp_test_x")
+    monkeypatch.setattr(get_settings(), "razorpay_key_secret", "s3cret")
+    calls: list = []
+    monkeypatch.setattr(razorpay, "_client", lambda: _mock([], calls))
+    mails: list = []
+
+    async def _no_mail(db, user_id, before, after, sub):
+        mails.append(("transition", before, after))
+
+    async def _refund_mail(db, user_id, **kw):
+        mails.append(("refund", kw["amount_paise"], kw["refund_id"]))
+
+    monkeypatch.setattr(razorpay, "on_transition", _no_mail)
+    monkeypatch.setattr(billing_routes, "notify_refund", _refund_mail)
+    uid, token, email = await _account()
+    auth = {"Authorization": f"Bearer {token}"}
+    now = int(time.time())
+    SUB_STATE.clear()
+    SUB_STATE.update({
+        "status": "created", "paid_count": 0, "current_end": None, "user_id": str(uid), "plan": "plus_yearly", "price_paise": "149900",
+        "invoices": [{"id": "inv_1", "status": "paid", "payment_id": "pay_9", "amount": 149900, "amount_paid": 149900, "paid_at": now - 86400}],
+    })
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.post("/api/v1/billing/checkout", json={"plan": "plus_yearly"}, headers=auth)
+            assert r.status_code == 200, r.text
+            SUB_STATE.update({"status": "active", "paid_count": 1, "current_start": now - 86400, "current_end": now + 364 * 86400, "remaining_count": 9})
+            sig = hmac.new(b"s3cret", b"pay_9|sub_1", hashlib.sha256).hexdigest()
+            r = await c.post("/api/v1/billing/verify", json={"razorpay_payment_id": "pay_9", "razorpay_subscription_id": "sub_1", "razorpay_signature": sig}, headers=auth)
+            assert r.status_code == 200, r.text
+            me = (await c.get("/api/v1/billing/me", headers=auth)).json()
+            assert me["refundable_until"] is not None and me["refund_id"] is None
+            until = datetime.fromisoformat(me["refundable_until"])
+            assert timedelta(days=5) < until - datetime.now(UTC) < timedelta(days=7)
+            # The click.
+            r = await c.post("/api/v1/billing/refund", headers=auth)
+            assert r.status_code == 200, r.text
+            assert r.json()["refund_id"] == "rfnd_1" and r.json()["amount_paise"] == 149900
+            refund = next((p, b) for m, p, b in calls if m == "POST" and p.endswith("/refund"))
+            assert refund == ("/v1/payments/pay_9/refund", {"amount": 149900, "speed": "normal", "notes": {"user_id": str(uid), "reason": "7-day refund policy", "subscription_id": "sub_1"}})
+            assert any(p.endswith("/sub_1/cancel") and b == {"cancel_at_cycle_end": 0} for _, p, b in calls), "ended now, not at cycle end"
+            assert calls.index(next(x for x in calls if x[1].endswith("/refund"))) < calls.index(next(x for x in calls if x[1].endswith("/cancel"))), "refund before cancel"
+            assert ("refund", 149900, "rfnd_1") in mails
+            assert (await c.get("/api/v1/auth/me", headers=auth)).json()["plan"] == "free"
+            me = (await c.get("/api/v1/billing/me", headers=auth)).json()
+            assert me["status"] == "cancelled" and me["refund_id"] == "rfnd_1" and me["refundable_until"] is None
+            # Twice: refused.
+            assert (await c.post("/api/v1/billing/refund", headers=auth)).status_code == 409
+            # The webhook that follows the cancel changes nothing and owes no second email.
+            async with session_scope() as s:
+                await razorpay.apply_subscription(s, {**SUB_STATE, "id": "sub_1", "status": "cancelled", "notes": {"user_id": str(uid), "plan": "plus_yearly"}}, note="subscription.cancelled")
+                row = (await s.execute(text("SELECT refund_id, status FROM subscriptions WHERE provider_sub_id = 'sub_1'"))).one()
+            assert row == ("rfnd_1", "cancelled")
+    finally:
+        await _cleanup(email)
+
+
+async def test_refund_is_refused_once_the_window_has_closed(monkeypatch):
+    if not await _db():
+        pytest.skip("no local database")
+    monkeypatch.setattr(get_settings(), "razorpay_key_id", "rzp_test_x")
+    monkeypatch.setattr(get_settings(), "razorpay_key_secret", "s3cret")
+    calls: list = []
+    monkeypatch.setattr(razorpay, "_client", lambda: _mock([], calls))
+    uid, token, email = await _account()
+    auth = {"Authorization": f"Bearer {token}"}
+    try:
+        async with session_scope() as s:
+            await s.execute(
+                text(
+                    "INSERT INTO subscriptions (id, user_id, provider, provider_sub_id, plan, status, current_period_start, current_period_end, price_paise) "
+                    "VALUES (gen_random_uuid(), :u, 'razorpay', 'sub_old', 'plus_yearly', 'active', now() - interval '8 days', now() + interval '357 days', 149900)"
+                ),
+                {"u": str(uid)},
+            )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            me = (await c.get("/api/v1/billing/me", headers=auth)).json()
+            assert me["refundable_until"] is not None and datetime_past(me["refundable_until"])
+            assert (await c.post("/api/v1/billing/refund", headers=auth)).status_code == 409
+            assert not any(p.endswith("/refund") for _, p, _ in calls), "Razorpay is never asked outside the window"
+    finally:
+        await _cleanup(email)
+
+
+def datetime_past(iso: str) -> bool:
+    from datetime import UTC, datetime
+
+    return datetime.fromisoformat(iso) < datetime.now(UTC)
+
+
+async def test_pause_keeps_the_paid_month_stops_charges_and_comes_back_on_its_own(monkeypatch):
+    """The cancel sheet's first offer. Razorpay is paused at once; the reader
+    stays Plus to the end of the paid month (entitlement is by date); the row
+    remembers when to resume; the worker resumes it on that day, and a reader
+    can resume sooner by hand. Cancel and pause are refused on the wrong states."""
+    import time
+
+    from api.routes import billing as billing_routes
+
+    if not await _db():
+        pytest.skip("no local database")
+    monkeypatch.setattr(get_settings(), "razorpay_key_id", "rzp_test_x")
+    monkeypatch.setattr(get_settings(), "razorpay_key_secret", "s3cret")
+    calls: list = []
+    monkeypatch.setattr(razorpay, "_client", lambda: _mock([], calls))
+    mails: list = []
+
+    async def _transition(db, user_id, before, after, sub):
+        mails.append((before, after))
+
+    async def _paused(db, user_id, **kw):
+        mails.append(("paused", kw["resumes"]))
+
+    monkeypatch.setattr(razorpay, "on_transition", _transition)
+    monkeypatch.setattr(billing_routes, "notify_paused", _paused)
+    uid, token, email = await _account()
+    auth = {"Authorization": f"Bearer {token}"}
+    now = int(time.time())
+    end = now + 20 * 86400
+    SUB_STATE.clear()
+    SUB_STATE.update({"status": "created", "paid_count": 0, "current_end": None, "user_id": str(uid)})
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            assert (await c.post("/api/v1/billing/checkout", json={"plan": "plus_monthly"}, headers=auth)).status_code == 200
+            SUB_STATE.update({"status": "active", "paid_count": 1, "current_start": now - 10 * 86400, "current_end": end, "remaining_count": 11})
+            sig = hmac.new(b"s3cret", b"pay_1|sub_1", hashlib.sha256).hexdigest()
+            assert (await c.post("/api/v1/billing/verify", json={"razorpay_payment_id": "pay_1", "razorpay_subscription_id": "sub_1", "razorpay_signature": sig}, headers=auth)).status_code == 200
+            assert (await c.post("/api/v1/billing/pause", json={"months": 5}, headers=auth)).status_code == 422
+            r = await c.post("/api/v1/billing/pause", json={"months": 2}, headers=auth)
+            assert r.status_code == 200, r.text
+            assert any(p.endswith("/sub_1/pause") and b == {"pause_at": "now"} for _, p, b in calls)
+            paused_until = datetime.fromisoformat(r.json()["paused_until"])
+            assert abs((paused_until - datetime.fromtimestamp(end, tz=UTC)).days - 60) <= 1, "the pause starts when the paid month ends"
+            assert ("paused", paused_until) in mails
+            me = (await c.get("/api/v1/billing/me", headers=auth)).json()
+            assert me["status"] == "paused" and me["paused_until"] == r.json()["paused_until"]
+            assert (await c.get("/api/v1/auth/me", headers=auth)).json()["plan"] == "plus", "paid time is kept"
+            assert (await c.post("/api/v1/billing/pause", json={"months": 1}, headers=auth)).status_code == 409, "nothing to pause twice"
+            # The worker, before the day: nothing. On the day: resumed, and the row is active again.
+            async with session_scope() as s:
+                assert await razorpay.resume_due(s) == 0
+                await s.execute(text("UPDATE subscriptions SET paused_until = now() - interval '1 hour' WHERE provider_sub_id = 'sub_1'"))
+            async with session_scope() as s:
+                assert await razorpay.resume_due(s) == 1
+            assert any(p.endswith("/sub_1/resume") and b == {"resume_at": "now"} for _, p, b in calls)
+            me = (await c.get("/api/v1/billing/me", headers=auth)).json()
+            assert me["status"] == "active" and me["paused_until"] is None
+            assert ("paused", "active") in mails, "the back-on email is owed"
+            # Resume by hand from a fresh pause.
+            assert (await c.post("/api/v1/billing/pause", json={"months": 1}, headers=auth)).status_code == 200
+            assert (await c.post("/api/v1/billing/resume", headers=auth)).status_code == 200
+            assert (await c.get("/api/v1/billing/me", headers=auth)).json()["status"] == "active"
+            # Razorpay without the feature: a plain 409, never a 500.
+            SUB_STATE["pause_unavailable"] = True
+            r = await c.post("/api/v1/billing/pause", json={"months": 1}, headers=auth)
+            assert r.status_code == 409 and "not available" in r.json()["detail"]
+    finally:
+        await _cleanup(email)
+
+
+async def test_the_yearly_from_the_cancel_sheet_starts_when_the_month_ends_and_stops_the_monthly(monkeypatch):
+    """Nothing is charged twice for the same days: the yearly is created with
+    start_at = the monthly's period end, and once authorised the monthly is
+    told to stop at cycle end. The plan row reads: ends <date> · then yearly."""
+    import time
+
+    if not await _db():
+        pytest.skip("no local database")
+    monkeypatch.setattr(get_settings(), "razorpay_key_id", "rzp_test_x")
+    monkeypatch.setattr(get_settings(), "razorpay_key_secret", "s3cret")
+    calls: list = []
+    monkeypatch.setattr(razorpay, "_client", lambda: _mock([], calls))
+    mails: list = []
+
+    async def _transition(db, user_id, before, after, sub):
+        mails.append((before, after, sub.get("id")))
+
+    monkeypatch.setattr(razorpay, "on_transition", _transition)
+    uid, token, email = await _account()
+    auth = {"Authorization": f"Bearer {token}"}
+    now = int(time.time())
+    end = now + 12 * 86400
+    SUB_STATE.clear()
+    SUB_STATE.update({"status": "created", "paid_count": 0, "current_end": None, "user_id": str(uid)})
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            assert (await c.post("/api/v1/billing/checkout", json={"plan": "plus_monthly"}, headers=auth)).status_code == 200
+            SUB_STATE.update({"status": "active", "paid_count": 1, "current_start": now - 18 * 86400, "current_end": end, "remaining_count": 11})
+            sig = hmac.new(b"s3cret", b"pay_1|sub_1", hashlib.sha256).hexdigest()
+            assert (await c.post("/api/v1/billing/verify", json={"razorpay_payment_id": "pay_1", "razorpay_subscription_id": "sub_1", "razorpay_signature": sig}, headers=auth)).status_code == 200
+            # A plain second checkout is still refused …
+            assert (await c.post("/api/v1/billing/checkout", json={"plan": "plus_yearly"}, headers=auth)).status_code == 409
+            # … the scheduled one is made for the day the month ends.
+            SUB_STATE["next_id"] = "sub_2"
+            r = await c.post("/api/v1/billing/checkout", json={"plan": "plus_yearly", "start_after_current": True}, headers=auth)
+            assert r.status_code == 200, r.text
+            made = next(b for m, p, b in calls if m == "POST" and p == "/v1/subscriptions" and b.get("start_at"))
+            assert made["start_at"] == end and made["notes"]["replaces"] == "sub_1"
+            assert r.json()["starts_at"].startswith(datetime.fromtimestamp(end, tz=UTC).date().isoformat())
+            # Razorpay: authorised, not started.
+            SUB_STATE["subs"] = {"sub_2": {"status": "authenticated", "start_at": end, "charge_at": end, "end_at": end + 10 * 365 * 86400, "plan": "plus_yearly", "price_paise": "149900", "notes": {"replaces": "sub_1"}}}
+            sig2 = hmac.new(b"s3cret", b"pay_2|sub_2", hashlib.sha256).hexdigest()
+            r = await c.post("/api/v1/billing/verify", json={"razorpay_payment_id": "pay_2", "razorpay_subscription_id": "sub_2", "razorpay_signature": sig2}, headers=auth)
+            assert r.status_code == 200, r.text
+            assert any(p.endswith("/sub_1/cancel") and b == {"cancel_at_cycle_end": 1} for _, p, b in calls), "the monthly stops at cycle end"
+            me = (await c.get("/api/v1/billing/me", headers=auth)).json()
+            assert me["plan"] == "plus_monthly" and me["status"] == "active" and me["cancel_at"] is not None, "the monthly still speaks for the reader"
+            assert me["next"] == {"plan": "plus_yearly", "starts_at": datetime.fromtimestamp(end, tz=UTC).isoformat(), "price_paise": 149900}
+            assert ("created", "active", "sub_2") in mails
+            assert (await c.get("/api/v1/auth/me", headers=auth)).json()["plan"] == "plus"
+            assert (await c.post("/api/v1/billing/checkout", json={"plan": "plus_yearly", "start_after_current": True}, headers=auth)).status_code == 409, "one scheduled plan at a time"
+    finally:
+        await _cleanup(email)
+
+
+async def test_history_lists_every_paid_invoice_with_razorpays_link_and_marks_the_refunded_one(monkeypatch):
+    if not await _db():
+        pytest.skip("no local database")
+    monkeypatch.setattr(get_settings(), "razorpay_key_id", "rzp_test_x")
+    monkeypatch.setattr(get_settings(), "razorpay_key_secret", "s3cret")
+    calls: list = []
+    monkeypatch.setattr(razorpay, "_client", lambda: _mock([], calls))
+    uid, token, email = await _account()
+    auth = {"Authorization": f"Bearer {token}"}
+    SUB_STATE.clear()
+    SUB_STATE.update({
+        "invoices": [
+            {"id": "inv_old", "status": "paid", "payment_id": "pay_a", "amount": 14900, "amount_paid": 14900, "paid_at": 1_700_000_000, "short_url": "https://rzp.io/i/old"},
+            {"id": "inv_new", "status": "paid", "payment_id": "pay_b", "amount": 149900, "amount_paid": 149900, "paid_at": 1_760_000_000, "short_url": "https://rzp.io/i/new"},
+            {"id": "inv_draft", "status": "issued", "payment_id": None, "amount": 149900, "issued_at": 1_770_000_000},
+        ]
+    })
+    try:
+        async with session_scope() as s:
+            await s.execute(
+                text(
+                    "INSERT INTO subscriptions (id, user_id, provider, provider_sub_id, plan, status, price_paise, refund_id) "
+                    "VALUES (gen_random_uuid(), :u, 'razorpay', 'sub_h', 'plus_yearly', 'cancelled', 149900, 'rfnd_9')"
+                ),
+                {"u": str(uid)},
+            )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            r = await c.get("/api/v1/billing/history", headers=auth)
+            assert r.status_code == 200, r.text
+            rows = r.json()["payments"]
+            assert [x["invoice_id"] for x in rows] == ["inv_new", "inv_old"], "paid only, newest first"
+            assert rows[0] == {"paid_at": "2025-10-09T08:53:20+00:00", "plan": "plus_yearly", "amount_paise": 149900, "status": "refunded", "invoice_url": "https://rzp.io/i/new", "invoice_id": "inv_new", "payment_id": "pay_b"}
+            assert rows[1]["status"] == "paid" and rows[1]["invoice_url"] == "https://rzp.io/i/old"
+    finally:
+        await _cleanup(email)

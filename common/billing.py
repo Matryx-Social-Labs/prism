@@ -56,6 +56,9 @@ def entitled(status: str, current_period_end: datetime | None, now: datetime | N
     now = now or datetime.now(UTC)
     if status == "active":
         return current_period_end is None or current_period_end + GRACE > now
+    if status == "paused":
+        # Paid time is kept; nothing after it until the worker resumes the plan.
+        return current_period_end is not None and current_period_end > now
     if status == "past_due":
         return current_period_end is not None and current_period_end + GRACE > now
     return False

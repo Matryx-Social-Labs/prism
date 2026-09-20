@@ -12,7 +12,7 @@ export const LEGAL_ENTITY = "Prism Media Intelligence LLP";
 export const LEGAL_PARTNER = "Matryx Social Labs Private Limited (Matrix Social Labs)";
 export const CONTACT_EMAIL = "hello@readprism.news";
 export const LEGAL_CITY = "Bengaluru, Karnataka";
-export const LEGAL_UPDATED = "2026-09-20";
+export const LEGAL_UPDATED = "2026-09-21";
 
 /** A paragraph, or a bullet list. */
 export type Block = string | string[];
@@ -231,31 +231,45 @@ export const REFUNDS: LegalDoc = {
   kind: "Policy",
   inShort: [
     "Monthly: not refunded; cancelling stops the next charge.",
-    "Yearly and founding: refunded in full within 7 days of any charge.",
+    "Yearly and founding: refunded in full within 7 days of any charge — one click on your account page.",
+    "Refunds go back the way you paid, through Razorpay, in 5–7 working days.",
     "Mistakes and duplicates: refunded whenever you tell us.",
   ],
   lede: `Paid plans are not yet on sale. This policy applies from the day they are. Payments are processed by Razorpay and collected by ${LEGAL_PARTNER} on behalf of ${LEGAL_ENTITY}.`,
   sections: [
     {
       heading: "Monthly plans",
+      short: "A paid month is kept; cancel any time and you are not charged again.",
       blocks: [
         "A paid month is not refunded. Cancel at any time from your account page; you keep access until the end of the month you paid for and are not charged again.",
       ],
     },
     {
       heading: "Annual and founding plans",
+      short: "Seven days from any yearly charge to take it all back, no questions asked.",
       blocks: [
-        "Ask within 7 days of an annual charge and we refund it in full, no questions asked. This applies to the first charge and to each renewal. After 7 days the remainder of the year is not refunded, but cancelling stops the next renewal.",
+        "For seven days after an annual or founding charge — the first one and every renewal — your account page shows a Refund button beside your plan. One click refunds that charge in full and ends Plus at once; we do not ask why. The window and the day it closes are printed on the plan card.",
+        "After seven days the remainder of the year is not refunded, but cancelling stops the next renewal and you keep Plus to the end of the year you paid for.",
+      ],
+    },
+    {
+      heading: "How a refund reaches you",
+      short: "Razorpay returns it to the card, account or UPI app you paid with; banks take 5–7 working days.",
+      blocks: [
+        "Every refund is made through Razorpay against the original payment, so it goes back to the same card, bank account or UPI app. Razorpay hands it to your bank the same day; most banks show it within 5–7 working days, and a few take up to 10. You get an email from us with the refund reference the moment it is made, and Razorpay's own confirmation follows.",
+        "We cannot send a refund to a different account, and we cannot make it arrive faster than your bank does.",
       ],
     },
     {
       heading: "Mistaken and duplicate charges",
-      blocks: ["A charge made in error, a duplicate, or a charge after you cancelled is refunded in full whenever you tell us."],
+      short: "Told us? Refunded, whenever it happened.",
+      blocks: ["A charge made in error, a duplicate, or a charge after you cancelled is refunded in full whenever you tell us, with no time limit."],
     },
     {
       heading: "How to ask",
+      short: `Inside the window: the button on your account page. Anything else: ${CONTACT_EMAIL}.`,
       blocks: [
-        `Write to ${CONTACT_EMAIL} from the email on the account, with the payment reference from your invoice. We issue the refund within 5 working days to the method you paid with; your bank or UPI app may take a few more days to show it.`,
+        `Inside the seven-day window, use the Refund button on your account page — it is the fastest route and needs nothing from you. For anything else, write to ${CONTACT_EMAIL} from the email on the account with the payment reference from your Razorpay receipt. We make the refund through Razorpay within 5 working days of your message, and it then reaches you as described above.`,
       ],
     },
   ],

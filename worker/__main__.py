@@ -192,13 +192,14 @@ async def main(stages: list[str]) -> None:
         # (checkouts still 'created', entitled rows untouched for a day). A
         # missed webhook must never leave a paying reader on the free plan.
         from common.db import session_scope as _scope
-        from common.razorpay import reconcile_pending
+        from common.razorpay import reconcile_pending, resume_due
 
         async def _reconcile_billing() -> None:
             async with _scope() as s:
                 n = await reconcile_pending(s)
-            if n:
-                logger.info("billing_reconciled", changed=n)
+                resumed = await resume_due(s)
+            if n or resumed:
+                logger.info("billing_reconciled", changed=n, resumed=resumed)
 
         scheduler.add_job(
             _reconcile_billing, IntervalTrigger(minutes=60), id="billing_reconcile", max_instances=1, coalesce=True,

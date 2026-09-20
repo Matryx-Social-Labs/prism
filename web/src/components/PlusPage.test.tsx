@@ -114,7 +114,7 @@ describe("PlanCard — every state of a subscription's life", () => {
     expect(await screen.findByRole("link", { name: "Get Plus" })).toHaveAttribute("href", "/plus?from=account");
   });
 
-  it("active: renews on a date; cancelling is one click plus one confirmation, and keeps access to the period's end", async () => {
+  it("active: renews on a date; cancelling a monthly is one click to the sheet and one more out, and keeps access to the period's end", async () => {
     billing.fetchMySubscription.mockResolvedValue({ plan: "plus_monthly", status: "active", current_period_end: "2026-10-20T00:00:00Z", cancel_at: null, price_paise: 14900 });
     billing.cancelSubscription.mockResolvedValue({ access_until: "2026-10-20T00:00:00Z" });
     render(<PlanCard session={s} />);
@@ -123,9 +123,10 @@ describe("PlanCard — every state of a subscription's life", () => {
     expect(screen.getByText(/Razorpay emails one for every charge to a@b.c/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(billing.cancelSubscription).not.toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: "Before you go" })).toBeInTheDocument();
     expect(screen.getByText(/You keep Plus until 20 Oct 2026/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Yes, cancel" }));
-    expect(billing.cancelSubscription).toHaveBeenCalledWith("t");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel anyway" }));
+    expect(billing.cancelSubscription).toHaveBeenCalledWith("t", { reason: undefined, comment: undefined });
     expect(await screen.findByText(/Ends 20 Oct 2026 · no further charges/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   });

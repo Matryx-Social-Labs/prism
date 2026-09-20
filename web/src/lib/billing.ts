@@ -26,7 +26,25 @@ export interface MySubscription {
   current_period_end?: string | null;
   cancel_at?: string | null;
   price_paise?: number | null;
+  /** While set and in the future, the Refund policy's 7 days are open on this charge. */
+  refundable_until?: string | null;
+  /** Razorpay's rfnd_… once the reader took the refund; the row is then cancelled. */
+  refund_id?: string | null;
+  /** Paused: the day the worker resumes it (paid time runs to current_period_end first). */
+  paused_until?: string | null;
+  /** A plan authorised to begin later — the yearly taken from the cancel sheet. */
+  next?: { plan: string; starts_at: string | null; price_paise: number | null } | null;
 }
+export interface Payment {
+  paid_at: string | null;
+  plan: string;
+  amount_paise: number;
+  status: "paid" | "refunded";
+  invoice_url: string | null;
+  invoice_id: string | null;
+  payment_id: string | null;
+}
+export type CancelReason = "not-using" | "too-expensive" | "missing-something" | "other";
 
 export const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
@@ -42,9 +60,41 @@ export async function fetchMySubscription(token: string): Promise<MySubscription
   return r.json();
 }
 
-export async function cancelSubscription(token: string): Promise<{ access_until: string | null }> {
-  const r = await fetch(`${API_URL}/api/v1/billing/cancel`, { method: "POST", headers: authHeaders(token) });
+export async function cancelSubscription(token: string, why?: { reason?: CancelReason; comment?: string }): Promise<{ access_until: string | null }> {
+  const r = await fetch(`${API_URL}/api/v1/billing/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(why ?? {}),
+  });
   if (!r.ok) throw new Error(`cancel ${r.status}`);
+  return r.json();
+}
+
+export async function pauseSubscription(token: string, months: 1 | 2 | 3): Promise<{ paused_until: string; paid_until: string | null }> {
+  const r = await fetch(`${API_URL}/api/v1/billing/pause`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ months }),
+  });
+  if (!r.ok) throw new Error(r.status === 409 ? "unavailable" : `pause ${r.status}`);
+  return r.json();
+}
+
+export async function resumeSubscription(token: string): Promise<{ status: string }> {
+  const r = await fetch(`${API_URL}/api/v1/billing/resume`, { method: "POST", headers: authHeaders(token) });
+  if (!r.ok) throw new Error(`resume ${r.status}`);
+  return r.json();
+}
+
+export async function fetchPayments(token: string): Promise<Payment[]> {
+  const r = await fetch(`${API_URL}/api/v1/billing/history`, { headers: authHeaders(token), cache: "no-store" });
+  if (!r.ok) throw new Error(`history ${r.status}`);
+  return ((await r.json()) as { payments: Payment[] }).payments;
+}
+
+export async function refundSubscription(token: string): Promise<{ refund_id: string; amount_paise: number; ended_at: string }> {
+  const r = await fetch(`${API_URL}/api/v1/billing/refund`, { method: "POST", headers: authHeaders(token) });
+  if (!r.ok) throw new Error(`refund ${r.status}`);
   return r.json();
 }
 
@@ -80,12 +130,18 @@ export interface Subscribed {
  * (The first real test purchase was lost exactly there: a declined card
  * ended our promise, the UPI payment that followed succeeded unheard.)
  */
-export async function subscribe(plan: string, token: string, email: string | undefined, onEvent?: (kind: "payment_failed", detail: string) => void): Promise<Subscribed> {
+export async function subscribe(
+  plan: string,
+  token: string,
+  email: string | undefined,
+  onEvent?: (kind: "payment_failed", detail: string) => void,
+  opts: { startAfterCurrent?: boolean } = {},
+): Promise<Subscribed> {
   track("Subscribe", { plan, stage: "checkout" });
   const r = await fetch(`${API_URL}/api/v1/billing/checkout`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({ plan, start_after_current: !!opts.startAfterCurrent }),
   });
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
@@ -101,7 +157,11 @@ export async function subscribe(plan: string, token: string, email: string | und
       subscription_id: order.subscription_id,
       name: "Prism",
       description: order.label,
+      // The account's email, and not editable: Razorpay builds its customer —
+      // and addresses every invoice — from what is typed here, so an address
+      // changed in the sheet sent the receipts elsewhere (founder, 2026-09-21).
       prefill: email ? { email } : undefined,
+      readonly: email ? { email: true } : undefined,
       theme: { color: ink },
       handler: (r: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => { done = true; resolve(r); },
       modal: { ondismiss: () => { if (!done) reject(new Error("dismissed")); } },
