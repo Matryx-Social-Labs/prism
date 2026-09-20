@@ -53,3 +53,12 @@ def test_a_run_longer_than_the_cap_keeps_the_best_window_and_its_neighbours():
     (clip,) = merge_runs(hits)
     assert clip.seq == 5 and clip.start_s <= 200 <= clip.end_s
     assert clip.end_s - clip.start_s <= CLIP_MAX_S
+
+
+def test_title_hits_count_the_headlines_own_words_not_glue():
+    from podcasts.match import title_hits, title_words
+
+    assert title_words("US House clears Russia sanctions bill authorizing 100% tariffs on India") == {"house", "clears", "russia", "sanctions", "bill", "authorizing", "tariffs"}
+    clip = "the U.S. House is expected to pass a new law which would put up to 100% tariff sanctions on India"
+    assert title_hits(clip, "US House clears Russia sanctions bill authorizing 100% tariffs on India") >= 2
+    assert title_hits(clip, "BMC issues notices to 294 establishments without Marathi signboards") == 0
