@@ -77,6 +77,7 @@ class RawItem(TimestampMixin, Base):
     # Comparison key only; `url` remains the exact publisher observation.
     url_canonical: Mapped[str | None] = mapped_column(Text)
     url_canonical_version: Mapped[int | None] = mapped_column(Integer)
+    image_phash: Mapped[str | None] = mapped_column(Text)  # 64-bit dHash of image_url, hex; common/imagehash.py
     title: Mapped[str] = mapped_column(Text, nullable=False)
     body: Mapped[str | None] = mapped_column(Text)
     language: Mapped[str | None] = mapped_column(Text)

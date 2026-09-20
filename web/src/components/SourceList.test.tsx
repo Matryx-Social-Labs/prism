@@ -50,3 +50,15 @@ describe("ReportImages — one photo per publisher first", () => {
     expect(tiles.map((a) => a.getAttribute("aria-label")?.split(":")[0])).toEqual(["BBC Tamil", "The Hindu", "BBC Telugu", "BBC Bengali"]);
   });
 });
+
+describe("ReportImages — the same picture under two urls is one tile", () => {
+  it("drops a photo whose perceptual hash is within a few bits of one already shown", async () => {
+    const { ReportImages, hamming } = await import("@/components/SourceList");
+    const { render, screen, within } = await import("@testing-library/react");
+    expect(hamming("ffffffffffffffff", "fffffffffffffff0")).toBe(4);
+    const src = (id: string, name: string, phash: string | null) => ({ article_id: id, source_name: name, source_slug: id, url: `https://x.example/${id}`, title: `T ${id}`, published_at: null, stance: null, funding: null, publisher: name, image_url: `https://img.example/${id}.jpg`, image_phash: phash }) as never;
+    render(<ReportImages sources={[src("ta", "BBC Tamil", "3c3c1e1e0f0f8787"), src("bn", "BBC Bengali", "3c3c1e1e0f0f8783"), src("hindu", "The Hindu", "0000ffff0000ffff"), src("none", "Mint", null)]} />);
+    const tiles = within(screen.getByRole("list", { name: "Images from the reports" })).getAllByRole("link");
+    expect(tiles.map((a) => a.getAttribute("aria-label")?.split(":")[0])).toEqual(["BBC Tamil", "The Hindu", "Mint"]);
+  });
+});

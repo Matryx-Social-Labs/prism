@@ -134,6 +134,7 @@ class SourceRef(BaseModel):
     # The report's own lead image, as the outlet published it. Shown only as a
     # credited link preview to that article (DESIGN.md § Images), never as ours.
     image_url: str | None = None
+    image_phash: str | None = None  # 64-bit dHash of the photo, hex; the rail drops near-identical ones
 
 
 class PerspectiveOut(BaseModel):

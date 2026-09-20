@@ -66,6 +66,8 @@ export interface SourceRef {
   domain?: string | null;
   /** The report's own lead image; shown only as a credited link preview to that article. */
   image_url?: string | null;
+  /** 64-bit perceptual hash of the photo (hex); two uploads of one picture sit a few bits apart. */
+  image_phash?: string | null;
   url: string | null;
   title: string;
   published_at: string | null;

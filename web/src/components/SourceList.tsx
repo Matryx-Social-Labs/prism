@@ -11,6 +11,15 @@ import { ArrowLeft, ArrowRight } from "@/components/icons";
 
 /** One photo tile: wide enough for "Photo: The Times of India" and a time on one line. */
 const TILE_W = 232;
+/** dHash bits apart at which two photos are the same photo (crops and re-encodes land ≤ 6). */
+const NEAR_DUPLICATE_BITS = 8;
+
+export function hamming(a: string, b: string): number {
+  let x = BigInt(`0x${a}`) ^ BigInt(`0x${b}`);
+  let n = 0;
+  while (x) { n += Number(x & 1n); x >>= 1n; }
+  return n;
+}
 
 /**
  * Publisher images are shown ONLY as link previews to the report they came
@@ -116,7 +125,18 @@ export function ReportImages({ sources, limit = 8 }: { sources: SourceRef[]; lim
   const rail = useRef<HTMLUListElement>(null);
   if (!REPORT_IMAGES) return null;
   const seen = new Set<string>();
-  const all = sources.filter((s) => s.image_url && s.url && !seen.has(s.image_url) && seen.add(s.image_url));
+  const hashes: string[] = [];
+  // Same URL, or the same picture under another URL (BBC uploads one photo per
+  // language edition): a perceptual hash within a few bits is the same photo.
+  const all = sources.filter((s) => {
+    if (!s.image_url || !s.url || seen.has(s.image_url)) return false;
+    seen.add(s.image_url);
+    if (s.image_phash) {
+      if (hashes.some((h) => hamming(h, s.image_phash!) <= NEAR_DUPLICATE_BITS)) return false;
+      hashes.push(s.image_phash);
+    }
+    return true;
+  });
   // One photo per publisher first, then the rest: BBC's Tamil, Telugu and
   // Bengali editions each upload the same picture under a new id, and three
   // of them in a row read as a repeat before any other outlet gets a tile.

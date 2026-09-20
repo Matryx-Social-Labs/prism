@@ -17,6 +17,8 @@ from common import stream
 from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_texts
+from common.imagehash import fetch_dhash
+from common.images import hi_res
 from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
 from common.models import Article, ArticleChunk, Enrichment, FieldProvenance, RawItem, Source
@@ -58,6 +60,7 @@ async def handle_classified_item(payload: dict) -> None:
         published_at = item.published_at
         sector = (item.classification or {}).get("sector")
         has_image = item.image_url is not None
+        image_url = item.image_url
 
     meta = {"stage": "enrichment", "source_slug": source_slug, "raw_item_id": str(raw_item_id)}
     settings = get_settings()
@@ -145,11 +148,18 @@ async def handle_classified_item(payload: dict) -> None:
     article_id = uuid.uuid4()
     enrichment_id = uuid.uuid4()
     shared = extraction.shared
+    # The photo's fingerprint, once, so the rail can drop a second upload of
+    # the same picture. Fetched small and discarded; never stored or served.
+    image_for_hash = og_image if (og_image and not has_image) else image_url
+    image_phash = await fetch_dhash(hi_res(image_for_hash)) if image_for_hash else None
     async with session_scope() as session:
-        if og_image and not has_image:
+        if (og_image and not has_image) or image_phash:
             item = await session.get(RawItem, raw_item_id)
             if item is not None:
-                item.image_url = og_image
+                if og_image and not has_image:
+                    item.image_url = og_image
+                if image_phash:
+                    item.image_phash = image_phash
         session.add(
             Article(
                 id=article_id,
