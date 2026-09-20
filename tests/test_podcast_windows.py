@@ -71,3 +71,23 @@ def test_a_window_backs_one_event_per_story_the_best_one():
     hits = [Hit(ev1, w, ep, 1, 0, 40, 0.90, 1, "semicon"), Hit(ev2, w, ep, 1, 0, 40, 0.92, 1, "semicon"), Hit(ev3, w, ep, 1, 0, 40, 0.85, 1, "tata")]
     kept = one_event_per_story(hits)
     assert {h.event_id for h in kept} == {ev2, ev3}
+
+
+def test_a_shows_opening_rundown_is_not_a_clip():
+    from podcasts.match import is_headline_list
+
+    rundown = "Semicon 2026, global chipmakers, all-in on India. 18% GST on UPI MDR. Rento Mojo gets its IPO mojo. Spotify, Apple or wherever you get your podcasts. Now let's begin with the top story of the hour where a bitter boardroom battle has broken out at the Tata Group."
+    assert is_headline_list(rundown) is True
+    rundown2 = "Apple's iPhone 18 Pro and iPhone 18 Pro Max demand spikes in India. UPI MDR – Government's eagle eye on merchants. Can MDR revive fintech funding? NXP Fujifilm Applied Materials chart India growth plans. your go-to show for the sharpest startup and tech updates."
+    assert is_headline_list(rundown2) is True
+    prose = "Now UPI users may not have to pay MDR directly but the government is keeping a close eye on whether the cost gets passed on to them indirectly. The government plans to closely monitor payment gateways and other platforms. This is according to a top official."
+    assert is_headline_list(prose) is False
+
+
+def test_a_preview_story_is_recognised_by_its_headline():
+    from podcasts.match import is_preview
+
+    assert is_preview("PM to inaugurate three-day Semicon India 2026 on Thursday")
+    assert is_preview("Russia sanctions bill advances in US House, set for final vote")
+    assert not is_preview("SEMICON India 2026: PM Modi hails India's semiconductor journey")
+    assert not is_preview("Government plans to monitor merchants to prevent UPI fee burden on consumers")

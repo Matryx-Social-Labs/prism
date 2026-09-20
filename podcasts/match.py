@@ -24,7 +24,7 @@ from sqlalchemy import text
 from common.config import get_settings
 from common.db import session_scope
 from common.logging import get_logger
-from podcasts.judge import judge_pairs
+from podcasts.judge import judge_pairs, tiebreak
 
 logger = get_logger(__name__)
 
@@ -91,6 +91,37 @@ def entity_hits(window_text: str, names: list[str]) -> int:
         if re.search(pat, window_text if len(name) < 4 else low):
             n += 1
     return n
+
+
+_SENT = re.compile(r"(?<=[.!?])\s+")
+_PREVIEW = re.compile(
+    r"\b(to (inaugurate|launch|open|begin|start|hold|host|meet|visit|address|unveil|announce|table|present|kick off)"
+    r"|set to|set for|ahead of|likely to|expected to|due to (open|begin|start)"
+    r"|will (inaugurate|launch|open|begin|start|hold|host|meet|visit|address|unveil|announce))\b"
+    r"|\bon (monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|\btomorrow\b|\bnext week\b",
+    re.I,
+)
+PREVIEW_GRACE = timedelta(hours=24)
+
+
+def is_headline_list(text: str) -> bool:
+    """A show's opening rundown — "Semicon 2026, global chipmakers, all-in on
+    India. 18% GST on UPI MDR. Rento Mojo gets its IPO mojo." — reads as a list
+    of headlines. Half or more of the sentences at nine words or fewer, and at
+    least three of them: not a clip about anything. Pure; tested."""
+    sents = [x for x in _SENT.split(text.strip()) if x.strip()]
+    if len(sents) < 3:
+        return False
+    short = sum(1 for x in sents if len(x.split()) <= 9)
+    return short >= 3 and short / len(sents) >= 0.5
+
+
+def is_preview(title: str) -> bool:
+    """A story that announces something to come: "PM to inaugurate Semicon on
+    Thursday", "bill set for final vote". Matched to an episode only while the
+    thing is still ahead (PREVIEW_GRACE after the story appeared); a passage
+    about what then happened belongs to the story of the happening."""
+    return bool(_PREVIEW.search(title))
 
 
 def title_words(title: str) -> set[str]:
@@ -165,9 +196,11 @@ async def match_recent(hours: int = 96) -> int:
         ), {"since": since})).mappings().all()
         hits: list[Hit] = []
         for w in wins:
+            if is_headline_list(w["text"]):
+                continue
             cands = (await s.execute(text(
                 """
-                SELECT e.id, e.title, 1 - (e.embedding <=> CAST(:vec AS vector)) AS cos
+                SELECT e.id, e.title, e.first_seen_at, 1 - (e.embedding <=> CAST(:vec AS vector)) AS cos
                 FROM events e
                 WHERE e.embedding IS NOT NULL
                   AND e.last_updated_at > :lo AND e.first_seen_at < :hi
@@ -175,7 +208,11 @@ async def match_recent(hours: int = 96) -> int:
                 LIMIT :k
                 """
             ), {"vec": w["vec"], "lo": w["published_at"] - BEFORE, "hi": w["published_at"] + AFTER, "k": CANDIDATES})).mappings().all()
-            cands = [c for c in cands if float(c["cos"]) >= min_cos]
+            cands = [
+                c for c in cands
+                if float(c["cos"]) >= min_cos
+                and not (is_preview(c["title"]) and w["published_at"] - c["first_seen_at"] > PREVIEW_GRACE)
+            ]
             if not cands:
                 continue
             best = max(float(c["cos"]) for c in cands)
@@ -203,6 +240,22 @@ async def match_recent(hours: int = 96) -> int:
         # The judge reads both texts; only `event` verdicts go on. Cached per pair.
         verdicts = await judge_pairs(s, [(h.event_id, h.window_id) for h in hits])
         hits = one_event_per_story([h for h in hits if verdicts.get((h.event_id, h.window_id)) == "event"])
+        # A window still approved for several DIFFERENT stories is asked once
+        # more, comparatively, which of them it is about (podcasts/judge.tiebreak).
+        by_window: dict[uuid.UUID, list[Hit]] = {}
+        for h in hits:
+            by_window.setdefault(h.window_id, []).append(h)
+        kept: list[Hit] = []
+        for w_id, hs in by_window.items():
+            if len({h.story for h in hs}) < 2:
+                kept.extend(hs)
+                continue
+            # Only pairs the judge has not already settled in a tie-break.
+            chosen = await tiebreak(s, w_id, [h.event_id for h in sorted(hs, key=lambda x: -x.score)])
+            if not chosen:  # undecided: the best-scoring one alone
+                chosen = {max(hs, key=lambda x: x.score).event_id}
+            kept.extend(h for h in hs if h.event_id in chosen)
+        hits = kept
         clips = merge_runs(hits)
         # Best CLIPS_PER_EVENT per event, one per episode.
         per_event: dict[uuid.UUID, list[Hit]] = {}
