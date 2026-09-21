@@ -48,7 +48,11 @@ ACCOUNTS: list[AccountSpec] = [
     AccountSpec("IndianCERT", "CERT-In"),
     # ── Markets lens ──
     AccountSpec("RBI", "Reserve Bank of India"),
-    AccountSpec("SEBI_India", "SEBI"),
+    # @SEBI_India is the investor-awareness account; the regulator itself posts
+    # as @SEBI_updates (SEBI press release, 2025-04-04). The first poll on
+    # 2026-09-21 could not resolve SEBI_India — it is an awareness handle X does
+    # not return for the lookup — and the allowlist was wrong, not X.
+    AccountSpec("SEBI_updates", "SEBI"),
     AccountSpec("NSEIndia", "National Stock Exchange"),
     AccountSpec("BSEIndia", "BSE"),
 ]
