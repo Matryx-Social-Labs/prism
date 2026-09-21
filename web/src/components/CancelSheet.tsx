@@ -137,7 +137,7 @@ export function CancelSheet({
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <p className="meta-line"><span>Plus · monthly</span>{until && <><span className="dot" /><span>renews {until}</span></>}</p>
-            <h2 id="cancel-title" className="font-record mt-2 text-[26px] font-medium leading-[1.15] tracking-[-0.01em] text-balance">{done ? "Done" : "Before you go"}</h2>
+            <h2 id="cancel-title" className="font-record mt-2 text-[26px] font-bold leading-[1.15] tracking-[-0.01em] text-balance">{done ? "Done" : "Before you go"}</h2>
           </div>
           <button ref={closeRef} type="button" onClick={onClose} aria-label="Close" className="grid h-10 w-10 flex-none place-items-center rounded-full border" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
             <Close />

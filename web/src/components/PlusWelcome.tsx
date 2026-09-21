@@ -33,7 +33,7 @@ export function PlusWelcome() {
   return (
     <div className="mx-auto w-full max-w-[var(--reading)] px-5 pb-24 pt-12 sm:px-8 lg:pt-20">
       <p className="meta-line"><span>Prism Plus</span>{sub?.price_paise ? <><span className="dot" /><span>{label} · {rupees(sub.price_paise)}</span></> : null}</p>
-      <h1 className="font-record mt-3 text-[36px] font-medium leading-[1.08] tracking-[-0.015em] text-balance sm:text-[44px]">You&rsquo;re on Plus.</h1>
+      <h1 className="font-record mt-3 text-[36px] font-bold leading-[1.08] tracking-[-0.015em] text-balance sm:text-[44px]">You&rsquo;re on Plus.</h1>
       <p className="mt-4 text-[17px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
         Thank you. Everything below is on from this moment, on every story.
       </p>

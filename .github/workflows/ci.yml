@@ -66,6 +66,8 @@ jobs:
 
       - name: Lint (ruff)
         run: uv run ruff check .
+      - name: Design tokens → globals.css is current
+        run: uv run python design/gen_css.py --check
 
       - name: Import check (catches wiring errors without infra)
         run: |

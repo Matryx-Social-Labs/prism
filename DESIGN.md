@@ -1,26 +1,26 @@
 ---
 name: Prism
 description: "Follow the story, not the headlines."
-world: "Spectrum (v3, 2026-09-18) — replaces The Reservation Chart"
+world: "Spectrum (v4 editorial, 2026-09-21 — tokens 4.0.0; v3 2026-09-18 replaced The Reservation Chart)"
 tokens: design/tokens.json
 board: design/board (uv run python design/board/build.py)
 colors:
   # Light (default). Full scale, dark values and roles live in design/tokens.json.
-  bg: "#FAFAF7"
-  surface: "#FFFFFF"
-  sunken: "#F1F1EC"
-  ink: "#15151A"
-  ink-2: "#4B4D57"
-  ink-3: "#6C6F7A"
-  line: "#E6E6E1"
-  line-strong: "#CFCFC8"
-  accent: "#5B3FE6"
-  accent-fill: "#6B4EF6"
-  accent-soft: "#EEEAFE"
+  bg: "#F6F3EC"
+  surface: "#FCFBF7"
+  sunken: "#ECE9E0"
+  ink: "#171A18"
+  ink-2: "#4E5550"
+  ink-3: "#6C746F"
+  line: "#DCD8CE"
+  line-strong: "#BDB8AD"
+  accent: "#006B62"
+  accent-fill: "#006B62"
+  accent-soft: "#DCEDE9"
   coverage-national: "#DC9412"
   coverage-regional: "#E4573D"
   coverage-intl: "#0E9FB8"
-  coverage-wire: "#8A6CF2"
+  coverage-wire: "#68736D"
   lens-markets: "#0F9D6A"
   lens-cyber: "#2563EB"
   lens-health: "#DB2777"
@@ -28,19 +28,32 @@ colors:
   danger: "#D93A2B"
   up: "#0F9D6A"
   down: "#D93A2B"
-  bg-dark: "#0F0F12"
-  surface-dark: "#16161B"
-  ink-dark: "#F1F1EE"
-  accent-dark: "#A08BF6"
+  bg-dark: "#111512"
+  surface-dark: "#181D19"
+  ink-dark: "#F1EFE8"
+  accent-dark: "#63C8B8"
 typography:
-  display: { fontFamily: "Newsreader, Tiro Devanagari Hindi, Noto Serif Kannada, Noto Serif Tamil, Noto Serif Telugu, serif", fontWeight: 500 }
-  sans: { fontFamily: "Hind, Hind Siliguri, Hind Vadodara, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif", fontWeight: 400 }
+  display: { fontFamily: "Libre Baskerville, Tiro Devanagari Hindi, Noto Serif Kannada, Noto Serif Tamil, Noto Serif Telugu, serif", fontWeight: 700 }
+  sans: { fontFamily: "IBM Plex Sans, Hind, Hind Siliguri, Hind Vadodara, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif", fontWeight: 400 }
   mono: { fontFamily: "JetBrains Mono, ui-monospace, Menlo, monospace", fontWeight: 400 }
-rounded: { xs: "4px", sm: "6px", md: "10px", lg: "14px", xl: "20px", pill: "9999px" }
+rounded: { xs: "2px", sm: "3px", md: "4px", lg: "6px", xl: "8px", pill: "9999px" }
 spacing: { 1: "4px", 2: "8px", 3: "12px", 4: "16px", 5: "20px", 6: "24px", 7: "32px", 8: "40px", 9: "48px", 10: "64px" }
 ---
 
 # Design System: Prism — Spectrum
+
+> **2026-09-21 — tokens 4.0.0, the editorial redesign (Lovable, applied verbatim).**
+> The front matter above and `design/tokens.json` are the truth; the prose below
+> still names the v3 values where it quotes a hex or a face. What changed: accent
+> is deep teal `#006B62` / `#63C8B8` (was violet), the wire slot is grey, the
+> display face is Libre Baskerville 400/700 (headings set bold; there is no 500),
+> the reading face is IBM Plex Sans for Latin with Hind's siblings for Indic
+> glyphs, radii are 2–8px, rows are hairline-separated on a desk and cards on a
+> phone, the page ground is faintly ruled, and a spectrum line sits under the
+> header. Open against the named rules: light `ink-3` on `bg` is 4.34:1 and dark
+> white on `accent-fill` is 4.02:1 (The Floors say 4.5); the header line is a
+> second gradient (The One Gradient Rule); the sign-in and landing eyebrows are
+> set in mono (The Three Jobs Rule). Founder to rule on each.
 
 > The world changed on 2026-09-18. "The Reservation Chart" (Teko / Hind / Martian
 > Mono, monochrome stationery, hairlines-not-cards, 0-radius) is retired. The

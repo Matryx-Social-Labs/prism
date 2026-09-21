@@ -124,7 +124,7 @@ export function HeroLensDemo({
 
       <div className="px-5 pt-5">
         {/* A paragraph, not a heading: the demo sits inside the landing and must not break the page's outline. */}
-        <p className="font-record text-[22px] font-medium leading-[1.25] text-balance sm:text-[24px]">{HEADLINE}</p>
+        <p className="font-record text-[22px] font-bold leading-[1.25] text-balance sm:text-[24px]">{HEADLINE}</p>
         <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-3)" }}>{GRID} · Illustration</p>
       </div>
 

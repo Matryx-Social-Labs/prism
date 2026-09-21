@@ -137,7 +137,7 @@ function WatchlistInner() {
                         <span>{relativeTime(ev.last_updated_at)}</span>
                         {ev.catalyst && (<><span className="dot" /><span>{ev.catalyst.replaceAll("_", " ")}</span></>)}
                       </div>
-                      <h2 className="font-record mt-1.5 text-[19px] font-medium leading-[1.3] group-hover:underline underline-offset-4 decoration-1" style={{ color: "var(--ink)" }}>{ev.title}</h2>
+                      <h2 className="font-record mt-1.5 text-[19px] font-bold leading-[1.3] group-hover:underline underline-offset-4 decoration-1" style={{ color: "var(--ink)" }}>{ev.title}</h2>
                       {ev.tickers.length > 0 && (
                         <div className="mt-2.5 flex flex-wrap gap-1.5">
                           {ev.tickers.slice(0, 4).map((t) => (

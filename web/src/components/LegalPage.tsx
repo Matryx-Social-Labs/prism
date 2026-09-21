@@ -92,7 +92,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
           const id = anchor(s.heading);
           return (
             <section key={id} id={id} className="scroll-mt-24 mt-8 border-t pt-5" style={{ borderColor: "var(--line)" }} aria-labelledby={`${id}-title`}>
-              <h2 id={`${id}-title`} className="font-record text-[24px] font-medium leading-[1.2] tracking-[-0.01em]">{s.heading}</h2>
+              <h2 id={`${id}-title`} className="font-record text-[24px] font-bold leading-[1.2] tracking-[-0.01em]">{s.heading}</h2>
               {s.short && (
                 <p className="mt-1.5 text-[15px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
                   <span className="mr-2 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>In short</span>

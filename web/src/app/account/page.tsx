@@ -30,7 +30,7 @@ export default function AccountPage() {
 
   return (
     <div className="mx-auto w-full max-w-[var(--reading)] px-5 pb-20 pt-8 sm:px-8">
-      <h1 className="font-record text-[32px] font-medium leading-[1.1] tracking-[-0.015em]">Account</h1>
+      <h1 className="font-record text-[32px] font-bold leading-[1.1] tracking-[-0.015em]">Account</h1>
       <p className="mt-1.5 font-mono text-[12.5px]" style={{ color: "var(--ink-3)" }}>{session.email}</p>
 
       <section className="mt-8" aria-labelledby="plan-title">

@@ -44,7 +44,7 @@ export function HeaderNav() {
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <nav className="grid min-w-0 grid-cols-[minmax(0,auto)_minmax(240px,1fr)_auto] items-center gap-5" aria-label="Primary">
+    <nav className="flex min-w-0 items-center justify-end gap-2 lg:grid lg:grid-cols-[minmax(0,auto)_minmax(240px,1fr)_auto] lg:gap-5" aria-label="Primary">
       <div className="hidden items-center gap-0.5 lg:flex">
         {NAV.map((n) => {
           const on = active(n.href);

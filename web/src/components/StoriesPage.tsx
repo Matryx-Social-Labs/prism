@@ -114,7 +114,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
             ) : stories.length === 0 ? (
               <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>No story is developing in {subject} right now.</p></div>
             ) : (
-              <ol className="chart-print flex flex-col border-t" style={{ borderColor: "var(--line)" }}>
+              <ol className="chart-print flex flex-col gap-3 lg:gap-0 lg:border-t" style={{ borderColor: "var(--line)" }}>
                 {stories.map((s, i) => <ArcRow key={s.slug} story={s} lead={i === 0} />)}
               </ol>
             )}

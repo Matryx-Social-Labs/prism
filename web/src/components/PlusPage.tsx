@@ -152,7 +152,7 @@ export function PlusPage() {
             <span className="absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.03em]" style={{ background: "var(--ink)", color: "var(--bg)" }}>Recommended</span>
             <h2 className="text-[15px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-2)" }}>Plus</h2>
             <p className="mt-3 flex items-baseline gap-1.5">
-              <span className="font-record text-[40px] font-medium leading-none tracking-[-0.02em]">{plus ? rupees(plus.amount_paise) : <span className="pulse-skel inline-block h-9 w-24 rounded" style={{ background: "var(--sunken)" }} />}</span>
+              <span className="font-record text-[40px] font-bold leading-none tracking-[-0.02em]">{plus ? rupees(plus.amount_paise) : <span className="pulse-skel inline-block h-9 w-24 rounded" style={{ background: "var(--sunken)" }} />}</span>
               <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>{period === "year" ? "/ year" : "/ month"}</span>
             </p>
             <p className="mt-1 h-5 font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
@@ -173,7 +173,7 @@ export function PlusPage() {
           <article className="card flex flex-col p-6" aria-label="Free">
             <h2 className="text-[15px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-2)" }}>Free</h2>
             <p className="mt-3 flex items-baseline gap-1.5">
-              <span className="font-record text-[40px] font-medium leading-none tracking-[-0.02em]">₹0</span>
+              <span className="font-record text-[40px] font-bold leading-none tracking-[-0.02em]">₹0</span>
               <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>forever</span>
             </p>
             <p className="mt-1 h-5 font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>No card, no trial clock</p>
@@ -199,7 +199,7 @@ export function PlusPage() {
             <article className="card flex flex-col p-6" aria-label="Founding member">
               <h2 className="text-[15px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-2)" }}>Founding member</h2>
               <p className="mt-3 flex items-baseline gap-1.5">
-                <span className="font-record text-[40px] font-medium leading-none tracking-[-0.02em]">{rupees(founding.amount_paise)}</span>
+                <span className="font-record text-[40px] font-bold leading-none tracking-[-0.02em]">{rupees(founding.amount_paise)}</span>
                 <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>/ year</span>
               </p>
               <p className="mt-1 h-5 font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>{plans!.founding_left} of {FOUNDING_SEATS} seats · price locked 3 years</p>
@@ -228,7 +228,7 @@ export function PlusPage() {
 
       {/* ── Side by side ──────────────────────────────────────────── */}
       <section className="mx-auto mt-16 max-w-[760px]" aria-labelledby="compare-title">
-        <h2 id="compare-title" className="font-record text-[26px] font-medium leading-[1.2] tracking-[-0.01em]">Side by side</h2>
+        <h2 id="compare-title" className="font-record text-[26px] font-bold leading-[1.2] tracking-[-0.01em]">Side by side</h2>
         <table className="mt-4 w-full border-collapse text-[14.5px] leading-[1.5]">
           <thead>
             <tr className="text-left text-[11.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
@@ -258,7 +258,7 @@ export function PlusPage() {
 
       {/* ── Before you pay ─────────────────────────────────────────── */}
       <section className="mx-auto mt-16 max-w-[760px]" aria-labelledby="faq-title">
-        <h2 id="faq-title" className="font-record text-[26px] font-medium leading-[1.2] tracking-[-0.01em]">Before you pay</h2>
+        <h2 id="faq-title" className="font-record text-[26px] font-bold leading-[1.2] tracking-[-0.01em]">Before you pay</h2>
         <div className="mt-2 border-t" style={{ borderColor: "var(--line)" }}>
           {FAQ.map((f) => (
             <details key={f.q} className="group border-b" style={{ borderColor: "var(--line)" }}>
@@ -275,7 +275,7 @@ export function PlusPage() {
       {/* ── One more time, and the small print ─────────────────────── */}
       {!onPlus && (
         <section className="mx-auto mt-16 max-w-[640px] text-center">
-          <p className="font-record text-[24px] font-medium leading-[1.25]">A hundred questions a day, from the whole story.</p>
+          <p className="font-record text-[24px] font-bold leading-[1.25]">A hundred questions a day, from the whole story.</p>
           <div className="mt-5 flex justify-center"><Action plan={period === "year" ? "plus_yearly" : "plus_monthly"} primary label={plus ? `Get Plus · ${rupees(plus.amount_paise)} ${period === "year" ? "a year" : "a month"}` : "Get Plus"} /></div>
         </section>
       )}

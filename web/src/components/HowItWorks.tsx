@@ -79,7 +79,7 @@ function Step({ id, n, title, rule, children, example }: { id: string; n: string
     <section id={id} className="scroll-mt-24 grid gap-6 border-t py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-12 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby={`${id}-title`}>
       <div>
         <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP {n}</p>
-        <h2 id={`${id}-title`} className="font-record mt-2 text-[28px] font-medium leading-[1.15] tracking-[-0.015em] lg:text-[34px]">{title}</h2>
+        <h2 id={`${id}-title`} className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">{title}</h2>
         <div className="mt-3 flex max-w-[46ch] flex-col gap-3 text-[16px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>{children}</div>
         <p className="mt-4 inline-flex items-center gap-2 rounded-[var(--r-sm)] border px-2.5 py-1.5 font-mono text-[11px] tracking-[0.04em]" style={{ borderColor: "var(--line-strong)", color: "var(--ink-2)" }}>
           <span style={{ color: "var(--accent)" }}>RULE</span> {rule}
@@ -110,7 +110,7 @@ export async function HowItWorks() {
       {/* ── The walk-through's opening: what it is, on which story ── */}
       <section className={`${SHELL} grid gap-8 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:py-16`}>
         <div>
-          <h1 className="font-record max-w-[16ch] text-[38px] font-medium leading-[1.06] tracking-[-0.02em] text-balance sm:text-[48px] lg:text-[56px]">How Prism works</h1>
+          <h1 className="font-record max-w-[16ch] text-[38px] font-bold leading-[1.06] tracking-[-0.02em] text-balance sm:text-[48px] lg:text-[56px]">How Prism works</h1>
           <p className="mt-5 max-w-[46ch] text-[17px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
             Prism reads the day&rsquo;s reports from the outlets it monitors and keeps one record per story: what each outlet reported, who said what in their exact words, and a brief written only from those reports. Below, one story from today&rsquo;s record goes through it, step by step.
           </p>
@@ -124,14 +124,14 @@ export async function HowItWorks() {
           {ex ? (
             <div className="card">
               <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Today&rsquo;s example · live</p>
-              <Link href={`/story/${event!.id}`} className="font-record mt-2 block text-[22px] font-medium leading-[1.25] text-balance underline-offset-4 hover:underline">{event!.title}</Link>
+              <Link href={`/story/${event!.id}`} className="font-record mt-2 block text-[22px] font-bold leading-[1.25] text-balance underline-offset-4 hover:underline">{event!.title}</Link>
               <p className="mt-2 font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>
                 {coverageText(outlets, event!.sources.length)} · {event!.sources.length} {event!.sources.length === 1 ? "report" : "reports"}{langs.length ? ` · ${languageNames(langs)}` : ""} · updated {relativeTime(event!.last_updated_at)}
               </p>
             </div>
           ) : (
             <div className="card" role="status">
-              <p className="font-record text-[20px] font-medium leading-[1.25]">The live record is unavailable right now.</p>
+              <p className="font-record text-[20px] font-bold leading-[1.25]">The live record is unavailable right now.</p>
               <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-2)" }}>The steps below still explain how it works; the examples return when the monitored feed reconnects.</p>
             </div>
           )}
@@ -213,12 +213,12 @@ export async function HowItWorks() {
 
           <section id="refuses" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="refuses-title">
             <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 08</p>
-            <h2 id="refuses-title" className="font-record mt-2 text-[28px] font-medium leading-[1.15] tracking-[-0.015em] lg:text-[34px]">What Prism refuses to do.</h2>
+            <h2 id="refuses-title" className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">What Prism refuses to do.</h2>
             <ul className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
               {REFUSALS.map(([head, body], i) => (
                 <li key={head} className="border-t pt-4" style={{ borderColor: "var(--line)" }}>
                   <Reveal delay={i * 40}>
-                    <p className="font-record text-[20px] font-medium leading-[1.25]">{head}</p>
+                    <p className="font-record text-[20px] font-bold leading-[1.25]">{head}</p>
                     <p className="mt-1.5 text-[15px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>{body}</p>
                   </Reveal>
                 </li>
@@ -227,7 +227,7 @@ export async function HowItWorks() {
           </section>
 
           <section className="border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="status-title">
-            <h2 id="status-title" className="font-record text-[28px] font-medium leading-[1.15] tracking-[-0.015em] lg:text-[34px]">Where Prism stands today.</h2>
+            <h2 id="status-title" className="font-record text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">Where Prism stands today.</h2>
             <div className="mt-6 grid gap-3 md:grid-cols-3">
               <StatusColumn tone="now" label="Available now" items={AVAILABLE} />
               <StatusColumn tone="val" label="In validation" items={VALIDATION} />
@@ -237,7 +237,7 @@ export async function HowItWorks() {
           </section>
 
           <section className="border-t py-12 text-center" style={{ borderColor: "var(--line)" }}>
-            <h2 className="font-record text-[30px] font-medium leading-[1.1] tracking-[-0.015em]">Now read one for yourself.</h2>
+            <h2 className="font-record text-[30px] font-bold leading-[1.1] tracking-[-0.015em]">Now read one for yourself.</h2>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
               {event ? <Link href={`/story/${event.id}`} className="btn btn-primary btn-lg">Open the example story <ArrowRight /></Link> : <Link href="/feed" className="btn btn-primary btn-lg">Open today&rsquo;s record <ArrowRight /></Link>}
               <Link href="/onboarding" className="btn btn-ghost btn-lg">Set up my feed</Link>

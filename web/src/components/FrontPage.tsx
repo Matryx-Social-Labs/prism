@@ -200,11 +200,11 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
           {developing.length > 0 && (
             <div className="card">
               <h3 className="card-h">Developing over days</h3>
-              <ol className="flex flex-col divide-y" style={{ borderColor: "var(--line)" }}>
+              <ol className="flex flex-col">
                 {developing.map((s) => (
-                  <li key={s.slug}>
+                  <li key={s.slug} className="border-t py-3 first:border-t-0 first:pt-0 last:pb-0" style={{ borderColor: "var(--line)" }}>
                     <Link href={`/trending/${s.slug}`} className="group block">
-                      <p className="font-record text-[15.5px] font-medium leading-[1.35] group-hover:underline underline-offset-4">
+                      <p className="font-record text-[15.5px] font-bold leading-[1.35] group-hover:underline underline-offset-4">
                         {s.hero_title ?? s.label}
                       </p>
                       <p className="mt-1.5 flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>

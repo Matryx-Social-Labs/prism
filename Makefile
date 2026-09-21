@@ -46,6 +46,7 @@ web:  ## Web tests + typecheck + build
 # every real diff in whitespace and make review impossible. Land it as its own
 # commit at a clean boundary (after Phase 0), then add fmt-check to this target.
 check: lint  ## THE GATE — everything CI runs, plus a typecheck CI never did
+	uv run python design/gen_css.py --check
 	uv run python -c "import api.main, worker.__main__, ingestion.runner, \
 classification.consumer, enrichment.consumer, correlation.consumer, \
 agent.rag, personalization.ranking, common.lenses"

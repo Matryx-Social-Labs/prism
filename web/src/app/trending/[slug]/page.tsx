@@ -90,7 +90,7 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
             {s.velocity > 0 && <span style={{ color: "var(--accent)", fontWeight: 600 }}>moving now</span>}
             {days != null && days > 0 && <span>{days} {days === 1 ? "day" : "days"}</span>}
           </div>
-          <h1 className="font-record mt-3 max-w-[28ch] text-[30px] font-medium leading-[1.12] text-balance sm:text-[38px]" style={{ letterSpacing: "-0.015em" }}>{s.label}</h1>
+          <h1 className="font-record mt-3 max-w-[28ch] text-[30px] font-bold leading-[1.12] text-balance sm:text-[38px]" style={{ letterSpacing: "-0.015em" }}>{s.label}</h1>
           <p className="mt-2 text-[15px]" style={{ color: "var(--ink-2)" }}>
             {verified ? "A story headline written from its developments." : "Related reporting, grouped by subject and cast while the story boundary is under human review. No chronology is implied."}
           </p>

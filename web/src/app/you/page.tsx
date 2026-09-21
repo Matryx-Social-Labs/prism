@@ -107,7 +107,7 @@ export default function YouPage() {
                   {recent.slice(0, 3).map((e) => (
                     <li key={e.id} style={{ borderColor: "var(--line)" }}>
                       <Link href={`/story/${e.id}`} className="block py-3">
-                        <p className="font-record text-[16px] font-medium leading-[1.35]">{e.title}</p>
+                        <p className="font-record text-[16px] font-bold leading-[1.35]">{e.title}</p>
                         <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{relativeTime(e.last_updated_at)}</p>
                       </Link>
                     </li>

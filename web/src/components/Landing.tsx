@@ -133,7 +133,7 @@ export async function Landing() {
               </ol>
             ) : (
               <div className="card" role="status">
-                <p className="font-record text-[22px] font-medium leading-[1.25]">The live record is unavailable right now.</p>
+                <p className="font-record text-[22px] font-bold leading-[1.25]">The live record is unavailable right now.</p>
                 <p className="mt-2 text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>Prism will show current reporting here when the monitored feed reconnects.</p>
                 <Link href="/feed" className="btn btn-secondary btn-sm mt-4">Try today&rsquo;s record</Link>
               </div>
@@ -150,11 +150,11 @@ export async function Landing() {
       {/* ── What you get on every story: three real components ────── */}
       <section id="proof" className={`${SHELL} scroll-mt-20 border-t py-12 lg:py-16`} style={{ borderColor: "var(--line)" }} aria-labelledby="proof-title">
         <p className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--accent)" }}>What you get on every story</p>
-        <h2 id="proof-title" className="font-record text-[30px] font-medium leading-[1.15] tracking-[-0.015em] lg:text-[38px]">The record, not a verdict.</h2>
+        <h2 id="proof-title" className="font-record text-[30px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[38px]">The record, not a verdict.</h2>
         <p className="mt-2 max-w-[56ch] text-[16.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>Three things a headline can&rsquo;t give you, built from the reports themselves{proof ? `, shown here on a story from today's record` : ""}.</p>
         <div className="mt-7 grid gap-4 lg:grid-cols-3">
           <div className="card flex flex-col gap-3 p-5">
-            <h3 className="font-record text-[22px] font-medium leading-[1.2]">What changed</h3>
+            <h3 className="font-record text-[22px] font-bold leading-[1.2]">What changed</h3>
             <p className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>Every report on the story, newest first, with the outlet and the time it published, so a new report never erases what came before it.</p>
             <div className="mt-auto border-t pt-4" style={{ borderColor: "var(--line)" }}>
               {reports.length > 0 ? (
@@ -168,7 +168,7 @@ export async function Landing() {
                         <span className="font-semibold" style={{ color: "var(--ink-2)" }}>{s.source_name}</span>
                         {s.published_at && <span className="font-mono text-[11px]">{relativeTime(s.published_at)}</span>}
                       </p>
-                      <p className="font-record mt-0.5 text-[15px] font-medium leading-[1.35] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">{s.title}</p>
+                      <p className="font-record mt-0.5 text-[15px] font-bold leading-[1.35] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">{s.title}</p>
                     </li>
                   ))}
                 </ol>
@@ -179,7 +179,7 @@ export async function Landing() {
           </div>
 
           <div className="card flex flex-col gap-3 p-5" aria-labelledby="evidence-title">
-            <h3 id="evidence-title" className="font-record text-[22px] font-medium leading-[1.2]">Exact words. Exact source.</h3>
+            <h3 id="evidence-title" className="font-record text-[22px] font-bold leading-[1.2]">Exact words. Exact source.</h3>
             <p className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>A quote appears only when the same words are in the article, attributed to the speaker and linked to the line they came from. No paraphrase, no invented positions.</p>
             <div className="mt-auto border-t pt-4 [&_.card]:border-0 [&_.card]:p-0" style={{ borderColor: "var(--line)" }}>
               {said && quote ? (
@@ -194,7 +194,7 @@ export async function Landing() {
           </div>
 
           <div className="card flex flex-col gap-3 p-5">
-            <h3 className="font-record text-[22px] font-medium leading-[1.2]">Who covered it</h3>
+            <h3 className="font-record text-[22px] font-bold leading-[1.2]">Who covered it</h3>
             <p className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>See at a glance whether a story is carried by English national outlets, Indian-language outlets, the international press, or just one of them.</p>
             <div className="mt-auto border-t pt-4" style={{ borderColor: "var(--line)" }}>
               {proofOutlets.length > 0 ? (
@@ -232,7 +232,7 @@ export async function Landing() {
         <section className={`${SHELL} border-t py-12`} style={{ borderColor: "var(--line)" }} aria-labelledby="developments-title">
           <SectionHead id="developments-title" title="See what changed" hint="Verified developments stay in order, so a new report does not erase what happened before it." />
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(480px,1.2fr)] lg:gap-14">
-            <Link href={`/story/${evidence.route.event.id}`} className="font-record block text-[22px] font-medium leading-[1.3] text-balance underline-offset-4 hover:underline">
+            <Link href={`/story/${evidence.route.event.id}`} className="font-record block text-[22px] font-bold leading-[1.3] text-balance underline-offset-4 hover:underline">
               {evidence.route.event.title}
             </Link>
             <div className="min-w-0">
@@ -247,7 +247,7 @@ export async function Landing() {
         <div className="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-start lg:gap-14">
           <div>
             <p className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--accent)" }}>The signature</p>
-            <h2 id="lens-title" className="font-record text-[30px] font-medium leading-[1.15] tracking-[-0.015em] lg:text-[38px]">The same facts, read for your work.</h2>
+            <h2 id="lens-title" className="font-record text-[30px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[38px]">The same facts, read for your work.</h2>
             <p className="mt-2 max-w-[44ch] text-[16.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>Flip a story into the reading your work needs. The record underneath never changes; only the reading does, and every lens shows what it adds before you sign in.</p>
             <div className="mt-6"><LensRegistry /></div>
           </div>
@@ -264,7 +264,7 @@ export async function Landing() {
       {/* ── Honest about what's live ──────────────────────────────── */}
       <section id="status" className={`${SHELL} scroll-mt-20 border-t py-12 lg:py-16`} style={{ borderColor: "var(--line)" }} aria-labelledby="status-title">
         <p className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--accent)" }}>Where Prism stands today</p>
-        <h2 id="status-title" className="font-record text-[30px] font-medium leading-[1.15] tracking-[-0.015em] lg:text-[38px]">Honest about what&rsquo;s live.</h2>
+        <h2 id="status-title" className="font-record text-[30px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[38px]">Honest about what&rsquo;s live.</h2>
         <div className="mt-7 grid gap-3 md:grid-cols-3">
           <StatusColumn tone="now" label="Available now" items={AVAILABLE} />
           <StatusColumn tone="val" label="In validation" items={VALIDATION} />
@@ -277,7 +277,7 @@ export async function Landing() {
 
       {/* ── One final call ────────────────────────────────────────── */}
       <section className={`${SHELL} border-t py-14 text-center`} style={{ borderColor: "var(--line)" }}>
-        <h2 className="font-record text-[32px] font-medium leading-[1.1] tracking-[-0.015em]">Open today&rsquo;s record.</h2>
+        <h2 className="font-record text-[32px] font-bold leading-[1.1] tracking-[-0.015em]">Open today&rsquo;s record.</h2>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
           <Link href="/feed" className="btn btn-primary btn-lg">Read today <ArrowRight /></Link>
           <Link href="/onboarding" className="btn btn-ghost btn-lg">Set up my feed</Link>

@@ -38,7 +38,7 @@ function Verify() {
   if (error) {
     return (
       <div className="card p-6 text-center">
-        <p className="font-record text-[22px] font-medium">Couldn&apos;t sign you in</p>
+        <p className="font-record text-[22px] font-bold">Couldn&apos;t sign you in</p>
         <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-2)" }}>
           {error}
         </p>

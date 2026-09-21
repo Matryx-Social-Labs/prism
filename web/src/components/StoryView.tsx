@@ -564,9 +564,9 @@ export function StoryView({ event }: { event: EventDetail }) {
                         {sourceIndex.get(s.article_id) != null && <span className="font-mono text-[11px]">[{sourceIndex.get(s.article_id)}]</span>}
                       </p>
                       {s.url ? (
-                        <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-record mt-0.5 block text-[17px] font-medium leading-[1.35] underline-offset-4 hover:underline">{s.title}</a>
+                        <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-record mt-0.5 block text-[17px] font-bold leading-[1.35] underline-offset-4 hover:underline">{s.title}</a>
                       ) : (
-                        <p className="font-record mt-0.5 text-[17px] font-medium leading-[1.35]">{s.title}</p>
+                        <p className="font-record mt-0.5 text-[17px] font-bold leading-[1.35]">{s.title}</p>
                       )}
                     </li>
                   ))}

@@ -55,6 +55,7 @@ def block(t: dict, mode: str) -> str:
             f"  --shell: {t['layout']['shell']}px;",
             f"  --reading: {t['layout']['reading']}px;",
             f"  --rail: {t['layout']['rail']}px;",
+            f"  --evidence: {t['layout']['evidence']}px;",
             f"  --topbar: {t['layout']['topbar']}px;",
             f"  --tabbar: {t['layout']['tabbar']}px;",
         ]

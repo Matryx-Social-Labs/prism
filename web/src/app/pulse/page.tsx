@@ -49,7 +49,7 @@ export default function PulsePage() {
           <div>
             <article className="card p-5 sm:p-6" style={{ borderTop: "3px solid var(--lens-markets)" }}>
               <p className="lensdot l-markets"><i /> Markets read <span className="font-mono text-[11px] font-normal" style={{ color: "var(--ink-3)" }}>· written from {digest.event_ids.length} {digest.event_ids.length === 1 ? "story" : "stories"}{stamp ? ` · ${stamp}` : ""}</span></p>
-              <h1 className="font-record mt-3 text-[26px] font-medium leading-[1.2] text-balance sm:text-[30px]" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>
+              <h1 className="font-record mt-3 text-[26px] font-bold leading-[1.2] text-balance sm:text-[30px]" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>
                 {digest.headline}
               </h1>
               <div className="mt-4 flex max-w-[64ch] flex-col gap-4">
