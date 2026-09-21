@@ -154,6 +154,23 @@ _SCRIPT_RANGES = (
 )
 
 
+def is_latin_text(text: str) -> bool:
+    """True when the words are written in Latin letters — an English headline,
+    even one quoting an Indic word. Unlike detect_script (which names the
+    Indic block that leads, for the embedding and cross-script guards, and does
+    not count Latin at all), this weighs Latin letters against every other
+    script's, so "Court reads ‘न्याय’ into the order" is Latin and a Hindi title
+    carrying "UPSC" is not."""
+    latin = other = 0
+    for ch in text:
+        cp = ord(ch)
+        if (0x41 <= cp <= 0x5A) or (0x61 <= cp <= 0x7A) or (0x00C0 <= cp <= 0x024F):
+            latin += 1
+        elif any(lo <= cp <= hi for _, lo, hi in _SCRIPT_RANGES):
+            other += 1
+    return latin > other
+
+
 def detect_script(text: str) -> str:
     """The dominant script of `text` — 'latin' when no Indic block leads.
 

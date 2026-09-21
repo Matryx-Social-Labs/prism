@@ -33,7 +33,7 @@ from common.models import (
 )
 from common.observability import fetch_prompt, observe
 from common.stream import get_redis
-from common.text import entity_slug
+from common.text import entity_slug, is_latin_text
 from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
@@ -42,15 +42,25 @@ from correlation.threads import link_event_threads
 logger = get_logger(__name__)
 
 
+def english_headline(shared: dict) -> str | None:
+    """The extractor's headline, only if it is the English one the prompt asks
+    for. The model sometimes echoes a Hindi or Urdu source title into the field
+    (23 of ~6,750 events in a fortnight, 2026-09-21); a headline in another
+    script is not Prism's and never becomes the record's title or the
+    cross-language tier's query."""
+    headline = (shared.get("headline") or "").strip()
+    return headline if headline and is_latin_text(headline) else None
+
+
 @observe(name="correlation-stage")
 def canonical_title(shared: dict, raw_title: str) -> tuple[str, str | None]:
     """The event's title and whose words it is (founder decision 1b, 2026-09-17).
 
-    Prism's headline when the extractor wrote one, marked 'prism'; otherwise the
-    first report's own headline, unmarked. The outlet's words are never lost:
-    they stay on the raw item and print under Sources.
+    Prism's headline when the extractor wrote one in English, marked 'prism';
+    otherwise the first report's own headline, unmarked. The outlet's words are
+    never lost: they stay on the raw item and print under Sources.
     """
-    headline = (shared.get("headline") or "").strip()
+    headline = english_headline(shared)
     return (headline, "prism") if headline else (raw_title, None)
 
 
@@ -118,7 +128,7 @@ async def handle_enriched_item(payload: dict) -> None:
             embedding=embedding,
             entity_slugs=entity_slugs or None,
             cve_record=cve_record,
-            english_title=(shared.get("headline") or "").strip() or None,
+            english_title=english_headline(shared),
         )
 
         if match is not None:

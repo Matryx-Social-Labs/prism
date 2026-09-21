@@ -1,4 +1,5 @@
-"""Write Prism's headline for every event that still carries an outlet's words.
+"""Write Prism's headline for every event that still carries an outlet's words —
+or a "Prism" headline the extractor echoed from a Hindi/Urdu/Telugu source.
 
 Founder decision 1(b), 2026-09-17: the canonical title is a Prism-written
 headline from the reports, labelled as ours. New events get one from the
@@ -28,6 +29,7 @@ from sqlalchemy import text
 from common.config import get_settings
 from common.db import get_session_factory
 from common.llm import structured_chat
+from common.text import is_latin_text
 
 MAX_WORDS = 12
 # One event's prompt is ~350 input tokens and the answer ~25; the estimate uses
@@ -41,7 +43,14 @@ class Headline(BaseModel):
 
 def acceptable(h: str) -> bool:
     h = h.strip()
-    return 0 < len(h.split()) <= MAX_WORDS and not re.search(r'["“”]', h) and not h.endswith(".")
+    return 0 < len(h.split()) <= MAX_WORDS and not re.search(r'["“”]', h) and not h.endswith(".") and is_latin_text(h)
+
+
+def needs_headline(title: str, headline_by: str | None) -> bool:
+    """An outlet's words, or a 'Prism' headline that is not in English (the
+    extractor echoed the source title; correlation now refuses those, this
+    pass repairs the ones already written)."""
+    return headline_by is None or not is_latin_text(title or "")
 
 
 async def write_one(session, ev, sources: list[str]) -> str | None:
@@ -62,10 +71,14 @@ async def main() -> int:
 
     async with get_session_factory()() as session:
         todo = (await session.execute(text(
-            "SELECT e.id, e.title, e.summary FROM events e WHERE e.headline_by IS NULL "
+            "SELECT e.id, e.title, e.summary, e.headline_by FROM events e "
+            "WHERE (e.headline_by IS NULL OR e.title ~ '[^\\x00-\\x7F]') "
             "AND EXISTS (SELECT 1 FROM event_memberships m WHERE m.event_id = e.id) ORDER BY e.last_updated_at DESC"
             + (f" LIMIT {int(args.limit)}" if args.limit else "")
         ))).mappings().all()
+        # The SQL only narrows (non-ASCII titles include English ones with a
+        # curly quote or a rupee sign); the script test decides.
+        todo = [ev for ev in todo if needs_headline(ev["title"], ev["headline_by"])]
         print(f"{len(todo)} events carry an outlet's headline; ~{len(todo) * TOKENS_IN / 1e6:.2f}M input + ~{len(todo) * TOKENS_OUT / 1e6:.3f}M output tokens on {get_settings().prism_model_extract_light}")
         if not args.apply:
             print("dry run — pass --apply to write (try --limit 20 first)")
