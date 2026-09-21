@@ -31,6 +31,7 @@ from api.schemas import (
     QuestionsResponse,
     SourceRef,
     SpeakerClaims,
+    XPostOut,
 )
 from common import outlets
 from common.billing import plan_for
@@ -119,6 +120,40 @@ def quote_context(clean_text: str | None, quote: str, start: int | None, end: in
     if end + CONTEXT_CHARS < len(clean_text) and " " in after:
         after = after.rsplit(" ", 1)[0]
     return before.strip(), after.strip()
+
+
+async def event_x_posts(db: AsyncSession, event_id: uuid.UUID) -> list[XPostOut]:
+    """The official accounts' posts on this story, best first. Off (empty)
+    unless PRISM_X_ENABLED on this service: the worker can run in shadow while
+    the API serves nothing, until tools/gold_xposts says the matches are good."""
+    if not get_settings().prism_x_enabled:
+        return []
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT p.post_id, p.text, p.created_at, ep.method, ep.score,
+                       a.handle, a.name, a.tier, a.profile_image_url
+                FROM event_x_posts ep
+                JOIN x_posts p ON p.post_id = ep.post_id
+                JOIN x_accounts a ON a.handle = p.handle
+                WHERE ep.event_id = :id AND a.enabled AND p.deleted_at IS NULL
+                ORDER BY ep.rank, ep.score DESC
+                """
+            ),
+            {"id": event_id},
+        )
+    ).mappings().all()
+    return [
+        XPostOut(
+            post_id=r["post_id"], handle=r["handle"], name=r["name"], tier=r["tier"],
+            profile_image_url=r["profile_image_url"],
+            url=f"https://x.com/{r['handle']}/status/{r['post_id']}",
+            text=r["text"], created_at=r["created_at"].isoformat(),
+            method=r["method"], score=float(r["score"]),
+        )
+        for r in rows
+    ]
 
 
 async def event_clips(db: AsyncSession, event_id: uuid.UUID) -> list[ClipOut]:
@@ -443,6 +478,7 @@ async def get_event(
         ],
         claims=group_claims(sources),
         clips=await event_clips(db, event["id"]),
+        x_posts=await event_x_posts(db, event["id"]),
         impacts=[
             ImpactOut(
                 id=str(i["id"]),

@@ -10,6 +10,8 @@
       "enrichment/**",
       "correlation/**",
       "personalization/**",
+      "podcasts/**",
+      "xposts/**",
       "agent/**",
       "api/**",
       "worker/**",

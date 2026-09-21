@@ -201,6 +201,25 @@ export interface EventDetail {
   // Reader-tier evidence: what the news podcasts said about this story. Optional
   // for the same two-pipeline reason as claims; empty until the gate is passed.
   clips?: ClipOut[];
+  // Reader-tier signal: what the official accounts said on X, as written. Never
+  // in `sources`, never counted. Empty until PRISM_X_ENABLED on the API.
+  x_posts?: XPostOut[];
+}
+
+/** A post from an official account on X about this story, as written. */
+export interface XPostOut {
+  post_id: string;
+  handle: string;
+  name: string;
+  tier: string;
+  profile_image_url: string | null;
+  /** The permalink on X. */
+  url: string;
+  text: string;
+  created_at: string;
+  /** url: the post links a report we hold · judge: a model read both. */
+  method: string;
+  score: number;
 }
 
 export interface ClipShow {

@@ -188,6 +188,16 @@ async def main(stages: list[str]) -> None:
             run_podcasts, IntervalTrigger(minutes=60), id="podcasts", max_instances=1, coalesce=True,
             next_run_time=datetime.now(UTC) + timedelta(seconds=90),
         )
+        # X posts from the official accounts, every PRISM_X_POLL_MINUTES: poll
+        # by since_id, rematch the 72 h hold, re-check what is shown. A no-op
+        # unless PRISM_X_ENABLED and X_BEARER_TOKEN.
+        from xposts.runner import run_xposts
+
+        scheduler.add_job(
+            run_xposts, IntervalTrigger(minutes=int(os.environ.get("PRISM_X_POLL_MINUTES", "10"))),
+            id="xposts", max_instances=1, coalesce=True,
+            next_run_time=datetime.now(UTC) + timedelta(seconds=120),
+        )
         # Subscriptions: ask Razorpay about rows the webhook may have missed
         # (checkouts still 'created', entitled rows untouched for a day). A
         # missed webhook must never leave a paying reader on the free plan.

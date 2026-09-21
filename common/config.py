@@ -143,6 +143,16 @@ class Settings(BaseSettings):
     # Window→event cosine floor (mE5, symmetric query: prefix) for the CANDIDATE
     # stage; the judge (podcasts/judge.py) makes the call. Loose on purpose.
     prism_clip_min_cos: float = 0.84
+    # X posts (xposts/): poll the allowlisted official accounts, attach posts to
+    # events. Off by default until the gold_xposts gate reads ≥ 0.9. Read on the
+    # worker (poll + match) AND the API (serve): worker on, API off = shadow.
+    # X bills $0.005 a post read on pay-per-use (2026-09); ~25 official
+    # accounts ≈ $2/day. Prepaid credits with auto-recharge off are the hard cap.
+    prism_x_enabled: bool = False
+    # Post→event cosine floor for the CANDIDATE stage. The podcast floor was
+    # tuned on 100–150-word windows; a post is 30–60 words — re-measure with
+    # tools/gold_xposts before trusting it.
+    prism_x_min_cos: float = 0.84
 
     # Grounded storyline veto master switch. Set PRISM_VETO_ENABLED=false to stop
     # the hourly LLM overlay pass.
@@ -230,6 +240,7 @@ class Settings(BaseSettings):
 
     # Sources
     nvd_api_key: str = Field("", repr=False)
+    x_bearer_token: str = Field("", repr=False)  # X API app-only bearer (console.x.com), pay-per-use
 
     @property
     def cors_origin_list(self) -> list[str]:

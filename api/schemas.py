@@ -119,6 +119,24 @@ class ClipOut(BaseModel):
     score: float
 
 
+class XPostOut(BaseModel):
+    """A post from an official account on X about this story, as written. The
+    X display rules and the product's verbatim rule agree: the text is never
+    altered, the author links to the profile, the time links to the post.
+    Signal, never coverage: it is not in `sources` and counts toward nothing."""
+
+    post_id: str
+    handle: str
+    name: str
+    tier: str
+    profile_image_url: str | None
+    url: str  # the permalink
+    text: str
+    created_at: str
+    method: str  # url: the post links a report we hold | judge: a model read both
+    score: float
+
+
 class SourceRef(BaseModel):
     article_id: str
     source_name: str
@@ -239,6 +257,10 @@ class EventDetail(BaseModel):
     # this story, in their own words, is evidence. Empty unless the pipeline is
     # on and the gold_clips gate has been passed.
     clips: list[ClipOut] = []
+    # READER-TIER, same footing as clips: what the official accounts said on X,
+    # as written. Empty unless PRISM_X_ENABLED on this service and the
+    # gold_xposts gate has been passed.
+    x_posts: list[XPostOut] = []
 
 
 class BriefResponse(BaseModel):

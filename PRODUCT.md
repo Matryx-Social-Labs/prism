@@ -55,6 +55,12 @@ reader — is the memorable thing and the brand.
   English and Indian-language coverage. Display is English-first. Production
   ingestion is active at a 120-minute Railway override as of 2026-09-17; `dev`
   targets five-minute conditional polling, pending deploy and canary validation.
+- **Signal, not coverage:** posts from an allowlist of official accounts on X
+  (the ministries, regulators, exchanges and the press office — never outlets,
+  never the firehose) are attached to the story they are about and shown as
+  written, in their own record section. They are not sources: they count toward
+  nothing, never create a story, and reach no feed row or share card. A post
+  gone on X is gone here. Off until the gold gate (tools/gold_xposts) reads ≥ 0.9.
 - **Corpus shape today:** ~1,357 stories in the live window — politics 40%,
   business+finance 18%, sports 9%, health/science/tech/cyber the rest. 22% carry no
   sector. 3% carry a validated ticker. 45% carry at least one verbatim claim.
