@@ -8,7 +8,8 @@ reproducibility. Article text is chunked + embedded for the agent.
 """
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy import text as sa_text
@@ -200,7 +201,7 @@ async def handle_classified_item(payload: dict) -> None:
                 article_id=article_id,
                 event_type=shared.event_type,
                 summary=shared.headline_summary,
-                occurred_at=_parse_date(shared.occurred_at),
+                occurred_at=occurred_on(shared.occurred_at, published_at),
                 sentiment=shared.sentiment,
                 shared_fields=shared.model_dump(),
                 lens_fields=lens_fields or None,
@@ -248,6 +249,33 @@ def _parse_date(value: str | None) -> date | None:
         return date.fromisoformat(value[:10])
     except ValueError:
         return None
+
+
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def occurred_on(value: str | None, published_at) -> date | None:
+    """The day the event happened, or None — never a day after the report.
+
+    Asked for "the ISO date the event occurred", the extractor answers with
+    the date the article is ABOUT when that is a date: "SBI ATM rules change
+    from October 1" came back as occurred_at 2026-10-01 on a report filed on
+    16 September, and 202 of 13,870 events (2026-09-21) sat in the future —
+    on the feed's dateline, in the story timeline's order, in JSON-LD's
+    datePublished, and under the labellers' eyes. What happened on the 16th
+    was the announcement; when the extractor names a later day, the honest
+    value is "not stated", and every reader of the column falls back to when
+    the story was first seen. The report's day is read on the Indian clock —
+    the day the article's own words mean — so no slack is needed and
+    "launching tomorrow" does not slip through."""
+    d = _parse_date(value)
+    if d is None or published_at is None:
+        return d
+    if isinstance(published_at, datetime):
+        pub = (published_at if published_at.tzinfo else published_at.replace(tzinfo=UTC)).astimezone(IST).date()
+    else:
+        pub = published_at
+    return None if d > pub else d
 
 
 async def _extraction_for_same_url(url: str | None) -> tuple[str, dict, str] | None:
