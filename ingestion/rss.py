@@ -13,6 +13,8 @@ import asyncio
 import calendar
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
 
 import feedparser
 import httpx
@@ -55,6 +57,20 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("livemint", "https://www.livemint.com/rss/news", sector="business"),
     FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss", sector="business"),
     FeedSpec("espncricinfo", "https://www.espncricinfo.com/rss/content/story/feeds/0.xml", sector="sports", subsector="cricket"),
+    # ── Origin feeds: the institution's own release, not an outlet's report of it.
+    # Measured 2026-09-21 with this User-Agent: RBI answers 200, entries are dated
+    # and carry the full release in the summary. Deterministic finance sector.
+    FeedSpec("rbi", "https://www.rbi.org.in/pressreleases_rss.xml", sector="finance"),
+    # PIB: the edge 403s any User-Agent that carries a URL (ours does; `Foo/1.0
+    # (+example.com)` passes, `Foo/1.0 (+https://example.com)` does not), the
+    # Lang=1 URL redirects to Hindi unless `reg=3` is added, and entries carry no
+    # date and no body. Off until a per-feed UA and a fulltext path are measured.
+    FeedSpec("pib", "https://www.pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3&reg=3", enabled=False),
+    # SEBI: the feed answers 200 but the release pages 403 this User-Agent, the
+    # summaries are 50–200 chars, and the feed is mostly enforcement orders and
+    # recovery certificates rather than press releases. Off until a press-release
+    # -only feed is found.
+    FeedSpec("sebi", "https://www.sebi.gov.in/sebirss.xml", sector="finance", enabled=False),
     # ── India national — other languages (multilingual embedding clusters these
     # with the English coverage of the same story) ──
     FeedSpec("aajtak", "https://www.aajtak.in/rssfeeds/?id=home"),
@@ -99,6 +115,7 @@ USER_AGENT = "Prism/1.0 (+https://www.readprism.news)"
 
 SPEC_BY_SLUG: dict[str, FeedSpec] = {spec.slug: spec for spec in FEEDS}
 RSS_CONCURRENCY = 8
+IST = ZoneInfo("Asia/Kolkata")
 
 
 def _conditional_headers(watermark: dict) -> dict[str, str]:
@@ -231,7 +248,18 @@ def _entry_image(entry) -> str | None:
 def _entry_datetime(entry) -> datetime | None:
     parsed = entry.get("published_parsed") or entry.get("updated_parsed")
     if not parsed:
-        return None
+        # feedparser refuses an RFC 822 date with no zone (RBI: "Mon, 21 Sep
+        # 2026 14:30:00"). Every such feed in this registry is Indian and prints
+        # its wall clock, so a bare date is read as IST.
+        # ponytail: one zone for all bare dates; a FeedSpec.tz if a non-IN feed ever drops its zone
+        raw = entry.get("published") or entry.get("updated")
+        try:
+            naive = parsedate_to_datetime(raw) if raw else None
+        except (TypeError, ValueError):
+            naive = None
+        if naive is None:
+            return None
+        return (naive if naive.tzinfo else naive.replace(tzinfo=IST)).astimezone(UTC)
     # feedparser's struct_time is UTC. `time.mktime` interprets it in the machine's
     # local timezone, so a worker region change silently shifts every publication
     # time; timegm is the UTC inverse the feed value requires.

@@ -61,9 +61,28 @@ def test_a_feed_blocked_at_the_egress_is_not_fetched_every_cycle():
 def test_every_other_feed_stays_on():
     """A disable flag is a trapdoor — one stray default and ingestion goes quiet."""
     on = [f.slug for f in FEEDS if f.enabled]
-    assert len(on) == len(FEEDS) - 1
-    for core in ("thehindu", "timesofindia", "ndtv", "thehackernews"):
+    # Every feed that is off is off for a measured reason written beside it.
+    assert {f.slug for f in FEEDS if not f.enabled} == {"bleepingcomputer", "pib", "sebi"}
+    for core in ("thehindu", "timesofindia", "ndtv", "thehackernews", "rbi"):
         assert core in on
+
+
+def test_a_bare_rfc822_date_is_read_as_ist():
+    """RBI prints its wall clock with no zone; feedparser leaves published_parsed
+    empty and every RBI release would have carried no date at all."""
+    from datetime import UTC, datetime
+
+    from ingestion.rss import _entry_datetime
+
+    when = _entry_datetime({"published": "Mon, 21 Sep 2026 14:30:00"})
+    assert when == datetime(2026, 9, 21, 9, 0, tzinfo=UTC)
+    # A zoned date still goes through feedparser's struct_time, untouched.
+    import time
+
+    zoned = _entry_datetime({"published_parsed": time.gmtime(1_790_000_000)})
+    assert zoned == datetime.fromtimestamp(1_790_000_000, tz=UTC)
+    assert _entry_datetime({"published": "not a date"}) is None
+    assert _entry_datetime({}) is None
 
 
 def test_the_crawler_identifies_itself_and_is_reachable():

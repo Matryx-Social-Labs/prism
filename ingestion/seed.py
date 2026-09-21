@@ -22,6 +22,12 @@ SOURCES = [
     {"slug": "livemint", "name": "Mint", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "hindu_businessline", "name": "The Hindu BusinessLine", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "espncricinfo", "name": "ESPNcricinfo", "source_type": "rss", "country": "IN", "language": "en"},
+    # ── Origin feeds (the institution's own release). source_type stays "rss" so
+    # a release counts as one publisher toward story support: the government's
+    # statement IS a perspective. funding=state prints the State-affiliated label.
+    {"slug": "rbi", "name": "Reserve Bank of India", "source_type": "rss", "country": "IN", "language": "en", "reliability": {"funding": "state"}},
+    {"slug": "pib", "name": "Press Information Bureau", "source_type": "rss", "country": "IN", "language": "en", "reliability": {"funding": "state"}},
+    {"slug": "sebi", "name": "SEBI", "source_type": "rss", "country": "IN", "language": "en", "reliability": {"funding": "state"}},
     # ── India national — other languages (multilingual clustering) ──
     {"slug": "aajtak", "name": "Aaj Tak", "source_type": "rss", "country": "IN", "language": "hi"},
     {"slug": "amarujala", "name": "Amar Ujala", "source_type": "rss", "country": "IN", "language": "hi"},
