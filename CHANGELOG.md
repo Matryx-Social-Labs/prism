@@ -3,6 +3,32 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.84.0] - 2026-09-21
+
+### Added
+- **X as a signal tier.** Posts from an allowlist of official accounts (the
+  ministries, regulators, exchanges and the press office — never outlets,
+  never the firehose) are polled by since_id every ten minutes, attached to
+  the event they are about (a post that links a report we hold resolves
+  exactly; otherwise kNN + cast/title evidence + a cached pairwise judge, one
+  event per story, rematched over a 72 h hold so a post that precedes the
+  outlets attaches when the story arrives) and shown as written in a new
+  record section **On X** after Heard on — avatar, name and @handle to the
+  profile, the time to the post, the X mark, *View on X*, and one mono line
+  *First on X* when the earliest post strictly precedes the earliest report.
+  Signal, never coverage: `event_x_posts` is a side table, so nothing in
+  corroboration, trending or the feed sees it. Attached posts are re-checked
+  weekly and a post gone on X is gone here. Off until `PRISM_X_ENABLED` and
+  `X_BEARER_TOKEN` are set on the worker (shadow) and, after
+  `tools/gold_xposts` reads ≥ 0.9, on the API. X bills $0.005 a post read;
+  the allowlist is ≈ $2/day. `xposts/`, migration `f1c4a7d92e35`.
+- **Origin feeds.** The Reserve Bank of India's press-release RSS is a source
+  (deterministic finance sector; its zone-less pubDate is read as IST). PIB
+  and SEBI are registered but off, with the measured reasons beside them.
+
+### Changed
+- Railway now redeploys on `podcasts/**` and `xposts/**` changes.
+
 ## [0.0.83.0] - 2026-09-21
 
 ### Added
