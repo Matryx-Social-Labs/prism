@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
  */
 export function Masthead({ dateline, right }: { dateline: string | null; right?: React.ReactNode }) {
   return (
-    <header className="glass sticky top-0 z-30 -mx-5 flex h-[52px] items-center justify-between gap-3 border-b px-5 sm:-mx-8 sm:px-8 lg:hidden" style={{ borderColor: "var(--line)" }}>
+    <header className="mobile-masthead glass sticky top-0 z-30 -mx-5 grid h-[52px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b px-5 sm:-mx-8 sm:px-8 lg:hidden" style={{ borderColor: "var(--line)" }}>
       <Brand size={24} label="Prism, today" />
       {dateline && (
         <span className="min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-3)" }}>

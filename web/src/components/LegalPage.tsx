@@ -49,7 +49,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
   );
 
   return (
-    <div className="mx-auto max-w-[var(--shell)] px-5 pb-20 pt-6 sm:px-8 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10 lg:pt-8 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)] xl:px-10">
+    <div className="mx-auto max-w-[var(--shell)] px-5 pb-20 pt-6 sm:px-8 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-8 lg:pt-10 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)] xl:gap-x-10 xl:px-10">
       {/* ── On this page (desk) ─────────────────────────────────────── */}
       <aside className="hidden lg:block lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start" aria-label="On this page">
         <p className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>On this page</p>
@@ -76,7 +76,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
             <span className="dot" />
             <span>Last changed <time dateTime={LEGAL_UPDATED}>{LEGAL_UPDATED}</time></span>
           </p>
-          <h1 className="font-record mt-2 text-[34px] font-medium leading-[1.1] tracking-[-0.015em] text-balance sm:text-[40px]">{doc.title}</h1>
+          <h1 className="font-record mt-2 text-[34px] font-bold leading-[1.2] text-balance sm:text-[40px]">{doc.title}</h1>
           <p className="mt-4 text-[16.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>{doc.lede}</p>
         </header>
 

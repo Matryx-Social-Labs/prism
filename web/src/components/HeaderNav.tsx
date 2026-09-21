@@ -44,15 +44,15 @@ export function HeaderNav() {
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <nav className="flex min-w-0 flex-1 items-center gap-2" aria-label="Primary">
-      <div className="hidden items-center gap-1 lg:flex">
+    <nav className="grid min-w-0 grid-cols-[minmax(0,auto)_minmax(240px,1fr)_auto] items-center gap-5" aria-label="Primary">
+      <div className="hidden items-center gap-0.5 lg:flex">
         {NAV.map((n) => {
           const on = active(n.href);
           return (
             <Link
               key={n.href}
               href={n.href}
-              className="rounded-full px-3 py-2 text-[15px] font-medium transition-colors"
+              className="nav-link px-3 py-2 text-[14px] font-medium transition-colors"
               style={{
                 color: on ? "var(--accent)" : "var(--ink-2)",
                 background: on ? "var(--accent-soft)" : "transparent",
@@ -70,7 +70,7 @@ export function HeaderNav() {
           results; this only carries the query there. */}
       <form
         role="search"
-        className="ml-auto hidden h-[38px] min-w-[260px] items-center gap-2 rounded-full border px-3 text-[14px] lg:flex"
+        className="search-entry mx-auto hidden h-[38px] w-full max-w-[440px] min-w-0 items-center gap-2 border px-3 text-[14px] lg:flex"
         style={{ borderColor: "var(--line-strong)", background: "var(--surface)", color: "var(--ink-3)" }}
         onSubmit={(e) => {
           e.preventDefault();
@@ -91,7 +91,7 @@ export function HeaderNav() {
         <kbd className="rounded border px-1.5 font-mono text-[11px]" style={{ borderColor: "var(--line)", color: "var(--ink-3)" }}>/</kbd>
       </form>
 
-      <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
+      <div className="flex shrink-0 items-center gap-1.5">
         {plan !== "plus" && !landing && (
           <Link href="/plus?from=header" className="btn btn-ghost hidden sm:inline-flex" style={{ color: "var(--ink-2)" }}>Plus</Link>
         )}

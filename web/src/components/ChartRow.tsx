@@ -87,7 +87,7 @@ export function ChartRow({
       <Link
         href={`/story/${item.id}`}
         aria-current={lastOpened ? "true" : undefined}
-        className={`row-card group flex h-full flex-col ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"}`}
+        className={`story-row row-card group flex h-full flex-col ${single ? "single" : ""} ${lead ? "story-row-lead px-[18px] py-5" : "px-4 py-3.5"}`}
       >
         {/* The words beside the picture (the lead: picture above on the phone,
             beside on a desk); the foot under both, full width. */}
@@ -112,8 +112,8 @@ export function ChartRow({
           )}
         </div>
         <h2
-          className={`font-record font-medium text-balance ${lead ? "mt-2 text-[26px] leading-[1.18] sm:text-[30px]" : "mt-1.5 text-[19px] leading-[1.3]"} group-hover:underline group-focus-visible:underline underline-offset-4 decoration-1`}
-          style={{ color: "var(--ink)", letterSpacing: "-0.005em" }}
+          className={`font-record font-bold text-balance ${lead ? "mt-2 text-[26px] leading-[1.22] sm:text-[30px]" : "mt-1.5 text-[18px] leading-[1.4]"} group-hover:underline group-focus-visible:underline underline-offset-4 decoration-1`}
+          style={{ color: "var(--ink)" }}
         >
           {item.title}
         </h2>

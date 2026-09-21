@@ -152,7 +152,7 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
   return (
     <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
       <Masthead dateline={dateline} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-10 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)]">
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-7 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)] xl:gap-10">
         <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
 
         <div className="min-w-0">
@@ -182,7 +182,7 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
               ) : undefined
             }
           />
-          <section aria-labelledby="chart-title">
+          <section aria-labelledby="chart-title" className="border-t" style={{ borderColor: "var(--line)" }}>
             {error ? (
               <div className="card" role="status">
                 <p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>Today&rsquo;s record could not load.</p>
@@ -200,7 +200,7 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
           {developing.length > 0 && (
             <div className="card">
               <h3 className="card-h">Developing over days</h3>
-              <ol className="flex flex-col gap-3.5">
+              <ol className="flex flex-col divide-y" style={{ borderColor: "var(--line)" }}>
                 {developing.map((s) => (
                   <li key={s.slug}>
                     <Link href={`/trending/${s.slug}`} className="group block">

@@ -99,10 +99,10 @@ function OnboardingPage() {
         ))}
       </nav>
 
-      <div className="card p-5 sm:p-6">
+      <div className="border-y py-6 sm:border sm:p-8" style={{ borderColor: "var(--line-strong)", background: "var(--surface)" }}>
         {step === 0 && (
           <section>
-            <h1 className="font-record text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">Which state are you in?</h1>
+            <h1 className="font-record text-[30px] font-bold leading-[1.25] text-balance sm:text-[34px]">Which state are you in?</h1>
             <p className="mt-2 max-w-[52ch] text-[15px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>You can change any of this later, under You.</p>
             <div className="mt-4">
               <StateField value={state} onChange={setState} />
@@ -112,7 +112,7 @@ function OnboardingPage() {
 
         {step === 1 && (
           <section>
-            <h1 className="font-record text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">What do you do?</h1>
+            <h1 className="font-record text-[30px] font-bold leading-[1.25] text-balance sm:text-[34px]">What do you do?</h1>
             <div className="mt-4">
               {session && (
                 <Field label="Your name" hint="For the account you are signed in to.">
@@ -129,7 +129,7 @@ function OnboardingPage() {
 
         {step === 2 && (
           <section>
-            <h1 className="font-record text-[30px] font-medium leading-[1.15] text-balance sm:text-[34px]">What do you follow?</h1>
+            <h1 className="font-record text-[30px] font-bold leading-[1.25] text-balance sm:text-[34px]">What do you follow?</h1>
             <div className="mt-4">
               <SectorsField taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
             </div>

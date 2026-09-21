@@ -100,26 +100,25 @@ export async function Landing() {
   return (
     <div className="pb-24 lg:pb-20">
       {/* ── The promise, the prism, the live record ─────────────── */}
-      <section className="relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute inset-x-[-20%] top-[-40%] h-[70%]" style={{ background: "radial-gradient(60% 60% at 30% 40%, var(--accent-soft) 0%, transparent 70%)", opacity: 0.9 }} />
-        <div className={`${SHELL} relative grid gap-10 py-10 md:py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center lg:gap-14 lg:py-16`}>
+      <section className="relative overflow-hidden border-b" style={{ borderColor: "var(--line)" }}>
+        <div className={`${SHELL} relative grid gap-10 py-10 md:py-14 lg:min-h-[calc(100dvh-var(--topbar)-72px)] lg:grid-cols-[minmax(0,.86fr)_minmax(560px,1.14fr)] lg:items-center lg:gap-16 lg:py-16`}>
           <div>
-            <p className="mb-3 text-[12.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--accent)" }}>News for India · every source open</p>
-            <h1 className="font-record max-w-[14ch] text-[40px] font-medium leading-[1.05] tracking-[-0.02em] text-balance sm:text-[52px] lg:text-[60px]">
+            <p className="mb-4 font-mono text-[11px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--accent)" }}>The live record · India</p>
+            <h1 className="font-record max-w-[12ch] text-[40px] font-bold leading-[1.12] text-balance sm:text-[50px] lg:text-[56px]">
               Follow the story, not the headlines.
             </h1>
             <p className="mt-5 max-w-[44ch] text-[17px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
               Prism turns the day&rsquo;s reports from monitored outlets into one live record per story: what changed, who said what, exactly, and which outlets covered it. Then read the same facts through the lens of your work.
             </p>
-            <div className="mt-6 flex flex-wrap items-center gap-2.5">
+            <div className="mt-7 flex flex-wrap items-center gap-2.5">
               <Link href="/feed" className="btn btn-primary btn-lg">{CTA} <ArrowRight /></Link>
               <a href="#proof" className="btn btn-ghost btn-lg">How it works</a>
             </div>
             {evidence && evidence.outlets > 0 && (
-              <div className="mt-6 grid grid-cols-3 gap-3">
+              <div className="mt-8 grid grid-cols-3 border-y" style={{ borderColor: "var(--line)" }}>
                 {[[String(evidence.outlets), "outlets in today's record"], [String(evidence.languages), evidence.languages === 1 ? "language read" : "languages read"], ["1", "record per story"]].map(([n, l]) => (
-                  <div key={l} className="card px-3.5 py-3">
-                    <b className="font-record block text-[28px] font-medium leading-none tracking-[-0.02em]">{n}</b>
+                  <div key={l} className="border-r px-3.5 py-4 last:border-r-0" style={{ borderColor: "var(--line)" }}>
+                    <b className="font-record block text-[28px] font-bold leading-none">{n}</b>
                     <span className="mt-1 block text-[12.5px]" style={{ color: "var(--ink-3)" }}>{l}</span>
                   </div>
                 ))}
@@ -127,7 +126,7 @@ export async function Landing() {
             )}
           </div>
           <div>
-            <PrismFigure className="mx-auto mb-5 block w-full max-w-[520px]" />
+            <PrismFigure className="mx-auto mb-6 block w-full max-w-[460px]" />
             {leadRow ? (
               <ol className="flex flex-col gap-3" aria-label={`Open live record: ${leadRow.title}`}>
                 <ChartRow item={{ ...leadRow, outlets: leadRow.outlets?.length ? leadRow.outlets : outletsOf(lead) }} lead />

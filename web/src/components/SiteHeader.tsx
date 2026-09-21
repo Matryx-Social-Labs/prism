@@ -19,10 +19,10 @@ export function SiteHeader() {
   const isApp = APP_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return (
     <header
-      className={`${isApp ? "hidden lg:block" : ""} glass sticky top-0 z-40 border-b`}
+      className={`${isApp ? "hidden lg:block" : ""} site-header glass sticky top-0 z-40 border-b`}
       style={{ borderColor: "var(--line)", height: "var(--topbar)" }}
     >
-      <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-6 px-5 sm:px-8 xl:px-10">
+      <div className="mx-auto grid h-full max-w-[var(--shell)] grid-cols-[auto_minmax(0,1fr)] items-center gap-8 px-5 sm:px-8 xl:px-10">
         <Brand />
         <HeaderNav />
       </div>

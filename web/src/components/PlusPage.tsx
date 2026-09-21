@@ -123,7 +123,7 @@ export function PlusPage() {
             </>
           )}
         </p>
-        <h1 className="font-record mt-3 text-[36px] font-medium leading-[1.08] tracking-[-0.015em] text-balance sm:text-[44px]">Ask more of every story.</h1>
+        <h1 className="font-record mt-3 text-[36px] font-bold leading-[1.18] text-balance sm:text-[44px]">Ask more of every story.</h1>
         <p className="mt-4 text-[17px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
           The record stays free for everyone. Plus is for the reader who needs answers from the whole story — a hundred times a day, on the stronger model.
         </p>
@@ -148,7 +148,7 @@ export function PlusPage() {
       <section aria-label="Plans" className="mt-10 grid gap-4 lg:mt-12 lg:grid-cols-3 lg:items-start">
         {/* Plus first on the phone, centre on a desk. */}
         <Reveal className="order-1 lg:order-2">
-          <article className="card relative flex flex-col p-6" style={{ borderColor: "var(--ink)", boxShadow: "var(--shadow-2)" }} aria-label="Plus">
+          <article className="card relative flex flex-col p-6" style={{ borderColor: "var(--accent)", borderTopWidth: 3 }} aria-label="Plus">
             <span className="absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.03em]" style={{ background: "var(--ink)", color: "var(--bg)" }}>Recommended</span>
             <h2 className="text-[15px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-2)" }}>Plus</h2>
             <p className="mt-3 flex items-baseline gap-1.5">

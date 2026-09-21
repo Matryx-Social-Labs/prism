@@ -114,7 +114,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
             ) : stories.length === 0 ? (
               <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>No story is developing in {subject} right now.</p></div>
             ) : (
-              <ol className="chart-print flex flex-col gap-3">
+              <ol className="chart-print flex flex-col border-t" style={{ borderColor: "var(--line)" }}>
                 {stories.map((s, i) => <ArcRow key={s.slug} story={s} lead={i === 0} />)}
               </ol>
             )}
@@ -145,7 +145,7 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
 
   return (
     <li>
-      <Link href={arcHref(story)} className={`row-card group ${single ? "single" : ""} ${lead ? "px-[18px] py-5" : "px-4 py-3.5"}`} style={stale ? { opacity: 0.75 } : undefined}>
+      <Link href={arcHref(story)} className={`story-row row-card group ${single ? "single" : ""} ${lead ? "story-row-lead px-[18px] py-5" : "px-4 py-3.5"}`} style={stale ? { opacity: 0.75 } : undefined}>
         {/* The words beside the pile; the foot under both, so the bar, its count
             and the status pill have the whole card's width on a phone. */}
         <div className={story.photos?.length ? (lead ? "flex flex-col gap-4 lg:flex-row-reverse lg:items-start" : "flex items-start gap-4") : ""}>
@@ -168,8 +168,8 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
           )}
         </div>
         <h2
-          className={`font-record font-medium text-balance ${lead ? "mt-2 text-[26px] leading-[1.18] sm:text-[30px]" : "mt-1.5 text-[19px] leading-[1.3]"} group-hover:underline group-focus-visible:underline underline-offset-4 decoration-1`}
-          style={{ color: "var(--ink)", letterSpacing: "-0.005em" }}
+          className={`font-record font-bold text-balance ${lead ? "mt-2 text-[26px] leading-[1.22] sm:text-[30px]" : "mt-1.5 text-[18px] leading-[1.4]"} group-hover:underline group-focus-visible:underline underline-offset-4 decoration-1`}
+          style={{ color: "var(--ink)" }}
         >
           {story.label ?? story.hero_title}
         </h2>

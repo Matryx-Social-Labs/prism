@@ -3,7 +3,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { PLAUSIBLE_DOMAIN } from "@/lib/analytics";
 import { NavMemory } from "@/components/NavMemory";
-import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, JetBrains_Mono, Newsreader, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu, Tiro_Devanagari_Hindi } from "next/font/google";
+import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, IBM_Plex_Sans, JetBrains_Mono, Libre_Baskerville, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu, Tiro_Devanagari_Hindi } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { jsonLd, siteGraph } from "@/lib/seo";
@@ -13,14 +13,12 @@ import "./globals.css";
 // THREE VOICES (DESIGN.md § Typography — the Spectrum world, 2026-09-18). The
 // rule is the commitment — a record voice, a reading voice, a provenance voice.
 //
-// The record: Newsreader (Production Type), drawn for on-screen news reading with
-// real optical sizes, so a 60px promise and a 19px row headline come from one
-// voice. Headlines, story titles, section titles, quotes. Never a button or label.
-const display = Newsreader({
+// The record: Libre Baskerville gives headlines, story titles, section titles
+// and quotes a durable editorial voice. Never a button or label.
+const display = Libre_Baskerville({
   subsets: ["latin"],
-  weight: "variable", // the whole wght axis; opsz rides along so 60px and 19px set from one face
+  weight: ["400", "700"],
   style: ["normal", "italic"],
-  axes: ["opsz"],
   variable: "--font-display",
 });
 // The record voice per script: Newsreader has no Indic glyphs, so without these
@@ -33,10 +31,10 @@ const recordKn = Noto_Serif_Kannada({ subsets: ["kannada"], weight: "variable", 
 const recordTa = Noto_Serif_Tamil({ subsets: ["tamil"], weight: "variable", style: ["normal", "italic"], variable: "--font-record-ta", preload: false, adjustFontFallback: false });
 const recordTe = Noto_Serif_Telugu({ subsets: ["telugu"], weight: "variable", variable: "--font-record-te", preload: false, adjustFontFallback: false });
 
-// Reading and UI: Hind (ITF) and its script siblings. One family across Latin,
-// Devanagari, Kannada, Tamil and Telugu, so a Kannada row and an English one sit
-// on the same baseline without a fallback seam — the browser falls through per glyph.
-const ui = Hind({ subsets: ["latin", "devanagari"], weight: ["400", "500", "600", "700"], variable: "--font-hind" });
+// Reading and UI: IBM Plex Sans for Latin, with Hind and its script siblings for
+// Devanagari, Kannada, Tamil and Telugu. The browser falls through per glyph.
+const ui = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-ui-latin" });
+const uiDevanagari = Hind({ subsets: ["devanagari"], weight: ["400", "500", "600", "700"], variable: "--font-hind" });
 // next/font has no metrics table for the Indic siblings, so it cannot size a
 // fallback face to them and logs "Failed to find font override values" on
 // every build. Off explicitly: these families only ever set a line or two of
@@ -104,7 +102,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(siteGraph()) }} />
       </head>
       <body
-        className={`${display.variable} ${recordHi.variable} ${recordKn.variable} ${recordTa.variable} ${recordTe.variable} ${ui.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-dvh flex-col antialiased`}
+        className={`${display.variable} ${recordHi.variable} ${recordKn.variable} ${recordTa.variable} ${recordTe.variable} ${ui.variable} ${uiDevanagari.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-dvh flex-col antialiased`}
         style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
       >
         <a
@@ -121,7 +119,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomTabBar />
         {/* Footer is desktop-only — on mobile the bottom tab bar is the chrome,
             and the marketing footer would just hide behind it. */}
-        <footer className="mt-auto hidden border-t lg:block" style={{ borderColor: "var(--line)" }}>
+        <footer className="site-footer mt-auto hidden border-t lg:block" style={{ borderColor: "var(--line)" }}>
           <div
             className="mx-auto flex max-w-[var(--shell)] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-[13px] sm:px-8 xl:px-10"
             style={{ color: "var(--ink-3)" }}

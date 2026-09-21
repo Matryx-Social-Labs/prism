@@ -44,7 +44,7 @@ export function XPosts({ posts, sources }: { posts: XPostOut[]; sources: SourceR
   if (posts.length === 0) return null;
   const first = firstOnX(posts, sources);
   return (
-    <div>
+    <div className="border-l-2 pl-4 sm:pl-5" style={{ borderColor: "var(--line-strong)" }}>
       {first && (
         <p className="mb-3 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
           First on X · @{first.handle} · {relativeTime(first.created_at)}
@@ -54,7 +54,7 @@ export function XPosts({ posts, sources }: { posts: XPostOut[]; sources: SourceR
         {posts.map((p) => {
           const profile = `https://x.com/${p.handle}`;
           return (
-            <li key={p.post_id} className="py-4" data-testid="x-post">
+            <li key={p.post_id} className="py-5" data-testid="x-post">
               <div className="flex items-center gap-2">
                 <a href={profile} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0" aria-label={`${p.name} on X`}>
                   <Avatar post={p} />
@@ -69,7 +69,7 @@ export function XPosts({ posts, sources }: { posts: XPostOut[]; sources: SourceR
                   <XIcon size={14} />
                 </span>
               </div>
-              <p className="mt-2 whitespace-pre-wrap text-[15px] leading-[1.55]" style={{ color: "var(--ink)", textWrap: "pretty" }}>
+              <p className="mt-2 whitespace-pre-wrap text-[15.5px] leading-[1.65]" style={{ color: "var(--ink)", textWrap: "pretty" }}>
                 {p.text}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
