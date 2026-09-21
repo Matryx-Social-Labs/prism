@@ -7,6 +7,7 @@ import { Check, Dash } from "@/components/icons";
 import { Reveal } from "@/components/Reveal";
 import { track } from "@/lib/analytics";
 import { fetchPlans, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
+import { billingDay } from "@/lib/dateline";
 import { fetchMe, useSession } from "@/lib/session";
 
 // The pricing page (DESIGN.md § Plus). The shape every subscription page a
@@ -78,7 +79,7 @@ export function PlusPage() {
 
   const onPlus = myPlan === "plus";
   const ready = !!plans?.checkout_ready;
-  const offerEnds = plans?.offer_ends ? new Date(plans.offer_ends).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const offerEnds = plans?.offer_ends ? billingDay(plans.offer_ends, { long: true }) : null;
 
   async function buy(plan: string) {
     if (!session) return;

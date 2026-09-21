@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Close } from "@/components/icons";
 import { track } from "@/lib/analytics";
 import { cancelSubscription, fetchPlans, pauseSubscription, rupees, subscribe, type CancelReason, type MySubscription, type PlanOut } from "@/lib/billing";
+import { billingDay } from "@/lib/dateline";
 import type { Session } from "@/lib/session";
 
 /**
@@ -23,7 +24,7 @@ const REASONS: [CancelReason, string][] = [
   ["missing-something", "Missing something"],
   ["other", "Something else"],
 ];
-const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null);
+const when = (iso?: string | null) => (iso ? billingDay(iso) : null);
 
 export function CancelSheet({
   open,

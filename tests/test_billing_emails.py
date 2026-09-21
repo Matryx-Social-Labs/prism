@@ -79,6 +79,25 @@ async def test_each_transition_sends_its_email_and_others_send_nothing(monkeypat
     assert "ended on 1 January 2000" in ended and "No further charges" in ended
 
 
+async def test_billing_dates_are_the_indian_calendar_day_razorpay_bills_on(monkeypatch):
+    """The founder paid from Berlin at 20:50 on 20 Sept; Razorpay charged at 00:20
+    IST on the 21st and ends the cycle at 00:00 IST on 21 Sept 2027. The UTC date
+    of that instant is the 20th; the receipt says the 21st; so do we."""
+    if not await _db():
+        pytest.skip("no local database")
+    sender = _Sender()
+    monkeypatch.setattr(be, "get_email_sender", lambda: sender)
+    uid, _ = await _user()
+    try:
+        async with session_scope() as s:
+            await be.notify_transition(s, uid, "created", "active", {"id": "sub_tz", "status": "active", "current_start": 1789930228, "current_end": 1821465000, "notes": {"plan": "plus_yearly", "price_paise": "119900"}})
+    finally:
+        await _drop(uid)
+    body = sender.sent[0][2]
+    assert "Next charge: 21 September 2027 IST" in body
+    assert "20 September 2027" not in body
+
+
 async def test_a_scheduled_cancel_is_confirmed_at_once_and_its_end_is_reported_as_ended(monkeypatch):
     """The reader clicks Cancel: one email now with the date. When Razorpay
     later reports the cancellation at cycle end, the reader is told it ENDED —

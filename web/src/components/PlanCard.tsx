@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CancelSheet } from "@/components/CancelSheet";
 import { cancelSubscription, fetchMySubscription, refundSubscription, resumeSubscription, rupees, type MySubscription } from "@/lib/billing";
+import { billingDay } from "@/lib/dateline";
 import type { Session } from "@/lib/session";
 
 // The subscription as the reader sees it, every state of its life
@@ -16,7 +17,8 @@ import type { Session } from "@/lib/session";
 // same card offers the refund the same way. Razorpay emails the receipts;
 // the Payments list below the card links every invoice.
 export const PLAN_LABEL: Record<string, string> = { plus_monthly: "Plus · monthly", plus_yearly: "Plus · yearly", founding: "Founding member" };
-const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null);
+// Billing dates on the Indian calendar, IST-tagged abroad (lib/dateline.billingDay).
+const when = (iso?: string | null) => (iso ? billingDay(iso) : null);
 
 export function planState(sub: MySubscription | null) {
   if (!sub || !sub.status || sub.plan === "free") return "free" as const;

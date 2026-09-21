@@ -7,6 +7,7 @@ import { Check } from "@/components/icons";
 import { PLAN_LABEL } from "@/components/PlanCard";
 import { track } from "@/lib/analytics";
 import { fetchMySubscription, rupees, type MySubscription } from "@/lib/billing";
+import { billingDay } from "@/lib/dateline";
 import { safeNext } from "@/lib/next";
 import { useSession } from "@/lib/session";
 
@@ -27,7 +28,7 @@ export function PlusWelcome() {
     fetchMySubscription(session.token).then(setSub).catch(() => setSub(null));
   }, [session]);
   const label = PLAN_LABEL[sub?.plan ?? ""] ?? "Plus";
-  const renews = sub?.current_period_end ? new Date(sub.current_period_end).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const renews = sub?.current_period_end ? billingDay(sub.current_period_end, { long: true }) : null;
 
   return (
     <div className="mx-auto w-full max-w-[var(--reading)] px-5 pb-24 pt-12 sm:px-8 lg:pt-20">

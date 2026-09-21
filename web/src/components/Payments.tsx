@@ -5,6 +5,7 @@ import { ArrowUpRight } from "@/components/icons";
 import { SectionHead } from "@/components/SectionHead";
 import { PLAN_LABEL } from "@/components/PlanCard";
 import { fetchPayments, rupees, type Payment } from "@/lib/billing";
+import { billingDay } from "@/lib/dateline";
 import type { Session } from "@/lib/session";
 
 /**
@@ -15,7 +16,7 @@ import type { Session } from "@/lib/session";
  * receipt in the reader's inbox. Renders nothing for a reader who has never
  * paid; the section only exists when there is something in it.
  */
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—");
+const when = (iso: string | null) => (iso ? billingDay(iso) : "—");
 
 export function Payments({ session }: { session: Session }) {
   const [rows, setRows] = useState<Payment[] | null | undefined>(undefined);

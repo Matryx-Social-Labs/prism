@@ -59,6 +59,40 @@ export function istStamp(iso: string): string {
   return `${two(day)} ${MONTHS[month].toUpperCase()} ${year} ${istTime(iso)} IST`;
 }
 
+const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** The device's zone; "Asia/Kolkata" for a reader in India. */
+export function viewerZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** "IST" when the device is not on Indian time, so a billing date reads as
+ *  the calendar it was drawn on; empty at home. */
+export function istTag(zone: string = viewerZone()): string {
+  return zone === "Asia/Kolkata" || zone === "Asia/Calcutta" ? "" : "IST";
+}
+
+/**
+ * 21 Sept 2027 — a billing date on the Indian calendar.
+ *
+ * Razorpay charges, invoices and retries on IST: a cycle ends at 00:00 IST, so
+ * the receipt in a reader's inbox says the 21st even when their evening in
+ * Berlin was still the 20th. Every date about money is printed on that same
+ * calendar — the card, the sheet, the payments list, the emails — and carries
+ * the IST tag when the device is elsewhere, so the app never disagrees with
+ * the receipt (founder in Germany, 2026-09-21: the card said the 20th).
+ */
+export function billingDay(iso: string, opts: { long?: boolean; tag?: boolean } = {}): string {
+  const { day, month, year } = ist(new Date(iso));
+  const date = `${day} ${(opts.long ? LONG_MONTHS : MONTHS)[month]} ${year}`;
+  const tag = opts.tag === false ? "" : istTag();
+  return tag ? `${date} ${tag}` : date;
+}
+
 /** SAT 25 JUL 2026 */
 export function istDate(d: Date): string {
   const { weekday, day, month, year } = ist(d);

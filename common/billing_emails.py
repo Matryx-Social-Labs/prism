@@ -20,6 +20,7 @@ from __future__ import annotations
 import html as _html
 from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
@@ -29,9 +30,19 @@ from common.email_templates import PROMISE, shell
 
 PLAN_LABEL = {"plus_monthly": "Plus · monthly", "plus_yearly": "Plus · yearly", "founding": "Founding member"}
 
+# Razorpay charges, invoices and retries on IST — a cycle ends at 00:00 IST —
+# so every date about money is the Indian calendar day, tagged IST, the same
+# words the receipt uses (a reader in Berlin who paid at 20:50 on the 20th was
+# charged on the 21st and is billed again on the 21st; the UTC date said the
+# 20th, 2026-09-21). The date in the meta line is today's, untagged.
+IST = ZoneInfo("Asia/Kolkata")
 
-def _day(d: datetime | None) -> str | None:
-    return d.astimezone(UTC).strftime("%-d %B %Y") if d else None
+
+def _day(d: datetime | None, *, tag: bool = True) -> str | None:
+    if not d:
+        return None
+    s = d.astimezone(IST).strftime("%-d %B %Y")
+    return f"{s} IST" if tag else s
 
 
 def _ts(ts: Any) -> datetime | None:
@@ -84,7 +95,7 @@ async def notify_transition(db, user_id: str, before: str, after: str, sub: dict
     plan = PLAN_LABEL.get(plan_key, "Plus")
     price = rupees(int(notes["price_paise"])) if notes.get("price_paise") else None
     end = _ts(sub.get("current_end")) or _ts(sub.get("end_at")) or _ts(sub.get("ended_at"))
-    today = _day(datetime.now(UTC))
+    today = _day(datetime.now(UTC), tag=False)
     meta = " · ".join(x for x in (plan, price, today) if x)
 
     if after == "active" and before == "paused":
@@ -199,7 +210,7 @@ async def notify_cancel_scheduled(db, user_id: str, *, plan_key: str, price_pais
         db,
         user_id,
         subject="Your Prism Plus is set to end",
-        meta=" · ".join(x for x in (plan, rupees(price_paise), _day(datetime.now(UTC))) if x),
+        meta=" · ".join(x for x in (plan, rupees(price_paise), _day(datetime.now(UTC), tag=False)) if x),
         lines=[
             f"Done — your {plan} will not renew, and nothing more will be charged.",
             f"You keep Plus until {until}." if until else "You keep Plus to the end of the period you paid for.",
@@ -219,7 +230,7 @@ async def notify_paused(db, user_id: str, *, plan_key: str, price_paise: int | N
         db,
         user_id,
         subject="Prism Plus is paused",
-        meta=" · ".join(x for x in (plan, rupees(price_paise), _day(datetime.now(UTC))) if x),
+        meta=" · ".join(x for x in (plan, rupees(price_paise), _day(datetime.now(UTC), tag=False)) if x),
         lines=[
             f"Your {plan} is paused. You keep Plus to the end of the month you paid for; after that nothing is charged until {_day(resumes)}, when it comes back on its own.",
             "Want it back sooner? Resume from your account any time.",
@@ -239,7 +250,7 @@ async def notify_refund(db, user_id: str, *, plan_key: str, amount_paise: int, r
         db,
         user_id,
         subject=f"Refunded: {amount} for Prism Plus",
-        meta=" · ".join(x for x in (plan, amount, _day(datetime.now(UTC))) if x),
+        meta=" · ".join(x for x in (plan, amount, _day(datetime.now(UTC), tag=False)) if x),
         lines=[
             f"Your {plan} charge of {amount} has been refunded in full, and Plus ended today.",
             "Razorpay returns it to the card, bank account or UPI app you paid with. Most banks show it within 5–7 working days; a few take up to 10.",

@@ -1,3 +1,9 @@
+// The product's clock is IST (news datelines and billing dates alike), so the
+// suite runs on it too: a date rendered from an instant is then the same on a
+// laptop in Berlin, on CI in UTC, and in Bengaluru, and lib/dateline.istTag is
+// silent as it is for a reader at home. Set before anything touches Date.
+process.env.TZ = "Asia/Kolkata";
+
 import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";

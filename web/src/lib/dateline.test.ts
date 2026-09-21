@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FeedItem } from "@/lib/api";
-import { istDate, istStamp, istTime, newsTime, origins, shortDate } from "@/lib/dateline";
+import { billingDay, istDate, istStamp, istTag, istTime, newsTime, origins, shortDate } from "@/lib/dateline";
 
 function item(id: string, sector: string, over: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -94,5 +94,23 @@ describe("the month words are ours, not ICU's", () => {
     expect(shortDate("2026-09-17T06:00:00Z")).toBe("17 Sept");
     expect(istDate(new Date("2026-09-17T06:00:00Z"))).toBe("THU 17 SEPT 2026");
     expect(istStamp("2026-09-05T20:55:00Z")).toBe("06 SEPT 2026 02:25 IST");
+  });
+});
+
+describe("billingDay — the Indian calendar day Razorpay bills on", () => {
+  // The founder's real cycle end: 2027-09-20T18:30Z is 00:00 IST on the 21st.
+  // Razorpay's receipt says the 21st; a browser in Berlin said the 20th.
+  it("prints the IST date of the instant, short or long", () => {
+    expect(billingDay("2027-09-20T18:30:00Z")).toBe("21 Sept 2027");
+    expect(billingDay("2027-09-20T18:30:00Z", { long: true })).toBe("21 September 2027");
+    expect(billingDay("2027-09-20T18:29:59Z")).toBe("20 Sept 2027");
+  });
+  it("tags the date IST only when the device is elsewhere", () => {
+    expect(istTag("Asia/Kolkata")).toBe("");
+    expect(istTag("Asia/Calcutta")).toBe("");
+    expect(istTag("Europe/Berlin")).toBe("IST");
+    expect(istTag("UTC")).toBe("IST");
+    // The suite runs on IST (vitest.setup), so the rendered date is untagged here.
+    expect(billingDay("2027-09-20T18:30:00Z")).not.toContain("IST");
   });
 });
