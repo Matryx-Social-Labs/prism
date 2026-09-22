@@ -31,8 +31,11 @@ PROMPTS = [
 
 
 def main() -> None:
+    import sys
+
     langfuse = get_client()
-    for name in PROMPTS:
+    names = sys.argv[1:] or PROMPTS  # `sync_prompts.py agent-qa` publishes one, not a new version of all
+    for name in names:
         path = FALLBACK_DIR / f"{name}.json"
         messages = json.loads(path.read_text())
         langfuse.create_prompt(

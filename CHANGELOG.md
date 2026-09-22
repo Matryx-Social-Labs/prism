@@ -5,7 +5,15 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
 ## [0.0.86.0] - 2026-09-22
 
-### Security (docs/AUDIT-2026-09.md C2, H1, H3, H4, H5, H6, H7)
+### Security (docs/AUDIT-2026-09.md C1, C2, H1, H3, H4, H5, H6, H7)
+- **What the Ask agent reads from an article is data, not a rule.** The
+  numbered sources and the projection were spliced into the SYSTEM turn of
+  `agent-qa`; they now ride in the reader's turn between `<sources>` and
+  `<structured>` tags, a sixth rule says text inside them is never an
+  instruction, and an article's own closing tag is neutralised so it cannot
+  end the block. Probed with a crude override on both Ask models before and
+  after (n=4): neither obeyed it either time — this is depth, not a fix for a
+  demonstrated takeover. `evals/sync_prompts.py agent-qa` publishes one prompt.
 - **The admin token is checked in one place, in constant time, and the
   placeholder refuses to serve.** `require_admin` (`api/deps.py`) replaces
   three inline `!=` compares on `/admin/*` and the gold-set export;
