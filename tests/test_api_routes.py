@@ -29,6 +29,7 @@ EXPECTED = {
     ("GET", "/api/v1/billing/me"),
     ("POST", "/api/v1/auth/profile"),
     ("GET", "/api/v1/auth/me"),
+    ("DELETE", "/api/v1/auth/session"),
     ("GET", "/api/v1/feed"),
     ("GET", "/api/v1/search"),
     ("GET", "/api/v1/digest/markets"),

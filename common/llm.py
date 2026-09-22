@@ -35,8 +35,16 @@ QUOTA_STATUS = frozenset({401, 402, 403, 429})
 _COOLDOWN_SECONDS = 120
 # Per-request ceiling; see get_llm for why an explicit one matters.
 LLM_TIMEOUT_SECONDS = 90.0
+# The whole structured_chat call — SDK retries, our parse retries, the fallback
+# swap — bounded as one. Before this, 2 SDK retries × 3 attempts × a fallback
+# could hold an enrichment slot for 13 minutes while the docstring promised 90 s.
+LLM_DEADLINE_SECONDS = 2 * LLM_TIMEOUT_SECONDS
 _WEEKLY_COOLDOWN_SECONDS = 900  # weekly-limit 429s: don't poke every 2 minutes
 _cooldown_until = 0.0
+# A 429 is one model's limit, not the account's: it pauses that model alone, so
+# the judge model's weekly cap no longer stalls the gate, the extractor and the
+# reader's Ask stream. 401/402/403 stay global — those are the account.
+_model_cooldown_until: dict[str, float] = {}
 
 
 class LlmQuotaError(ConnectionError):
@@ -93,24 +101,38 @@ async def respect_cooldown() -> None:
         await asyncio.sleep(wait)
 
 
-def start_cooldown(status: int, message: str = "") -> None:
-    """Pause every model call when a provider rejects for a billing/quota
-    reason. Shared by the chat client and the decisions client: the credits
-    are one account, so a 402 on either is a 402 on both."""
+def start_cooldown(status: int, message: str = "", model: str | None = None) -> None:
+    """Pause model calls when a provider rejects for a billing/quota reason.
+    Shared by the chat client and the decisions client: the credits are one
+    account, so a 402 on either is a 402 on both. A 429 with a model named
+    pauses that model only."""
     global _cooldown_until
     if status not in QUOTA_STATUS:
         return
     pause = _WEEKLY_COOLDOWN_SECONDS if "weekly" in message.lower() else _COOLDOWN_SECONDS
-    _cooldown_until = time.monotonic() + pause
-    logger.warning("llm_quota_cooldown", status=status, pause_s=pause)
+    if status == 429 and model:
+        _model_cooldown_until[model] = time.monotonic() + pause
+    else:
+        _cooldown_until = time.monotonic() + pause
+    logger.warning("llm_quota_cooldown", status=status, pause_s=pause, model=model)
+
+
+def model_cooldown_remaining(model: str) -> float:
+    return max(0.0, _model_cooldown_until.get(model, 0.0) - time.monotonic())
+
+
+async def _respect_model_cooldown(model: str) -> None:
+    wait = model_cooldown_remaining(model)
+    if wait > 0:
+        await asyncio.sleep(wait)
 
 
 _respect_cooldown = respect_cooldown  # patched by tests/test_reasoning_control.py and test_schema_echo.py
 
 
-def _maybe_start_cooldown(error: Exception) -> None:
+def _maybe_start_cooldown(error: Exception, model: str | None = None) -> None:
     if isinstance(error, APIStatusError):
-        start_cooldown(error.status_code, str(error))
+        start_cooldown(error.status_code, str(error), model)
 
 
 def get_llm() -> AsyncOpenAI:
@@ -138,7 +160,7 @@ def get_llm() -> AsyncOpenAI:
         # the stream and is redelivered, so the work is retried rather than lost.
         _client = AsyncOpenAI(
             base_url=base_url, api_key=api_key, default_headers=headers,
-            timeout=LLM_TIMEOUT_SECONDS, max_retries=2,
+            timeout=LLM_TIMEOUT_SECONDS, max_retries=1,
         )
     return _client
 
@@ -169,7 +191,7 @@ def reasoning_payload(model: str, reasoning: dict[str, Any]) -> dict[str, Any]:
 _reasoning_payload = reasoning_payload
 
 
-async def structured_chat[T: BaseModel](
+async def _structured_chat[T: BaseModel](
     *,
     model: str,
     messages: list[dict[str, str]],
@@ -236,6 +258,7 @@ async def structured_chat[T: BaseModel](
     last_err: Exception | None = None
     for attempt in range(max_retries):
         await _respect_cooldown()
+        await _respect_model_cooldown(kwargs["model"])
         try:
             response = await client.chat.completions.create(**kwargs)
         except APIStatusError as e:
@@ -247,12 +270,12 @@ async def structured_chat[T: BaseModel](
                 kwargs["extra_body"] = {"reasoning": {"effort": "minimal"}}
                 response = await client.chat.completions.create(**kwargs)
             else:
-                _maybe_start_cooldown(e)
+                _maybe_start_cooldown(e, kwargs["model"])
                 if e.status_code in QUOTA_STATUS:
                     raise LlmQuotaError(f"llm quota exhausted ({e.status_code})") from e
                 raise
         except Exception as e:
-            _maybe_start_cooldown(e)
+            _maybe_start_cooldown(e, kwargs["model"])
             raise
         choices = response.choices or []
         if not choices:
@@ -355,6 +378,19 @@ async def structured_chat[T: BaseModel](
     if isinstance(last_err, LlmEmptyResponse):
         raise last_err
     raise ValueError(f"structured_chat failed after {max_retries} attempts: {last_err}")
+
+
+async def structured_chat[T: BaseModel](**kwargs: Any) -> T:
+    """`_structured_chat` under one deadline for the whole call. A TimeoutError
+    is transient to the stream consumers (the message is redelivered), so a
+    hung provider costs LLM_DEADLINE_SECONDS of one slot, never more."""
+    try:
+        async with asyncio.timeout(LLM_DEADLINE_SECONDS):
+            return await _structured_chat(**kwargs)
+    except TimeoutError:
+        logger.warning("llm_deadline_exceeded", trace=kwargs.get("trace_name"), model=kwargs.get("model"),
+                       deadline_s=LLM_DEADLINE_SECONDS)
+        raise
 
 
 def _swap_to_fallback(kwargs: dict[str, Any], reasoning: dict[str, Any] | None, trace_name: str) -> bool:
@@ -466,6 +502,7 @@ async def plain_chat(
     if langfuse_prompt is not None:
         kwargs["langfuse_prompt"] = langfuse_prompt
     await _respect_cooldown()
+    await _respect_model_cooldown(model)
     try:
         response = await client.chat.completions.create(**kwargs)
     except Exception as e:

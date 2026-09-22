@@ -10,6 +10,7 @@ import httpx
 from sqlalchemy import text
 
 from common.db import session_scope
+from common.imagehash import refuse_non_public
 from common.logging import get_logger
 from podcasts.shows import SHOWS, ShowSpec
 
@@ -96,9 +97,16 @@ async def poll_show(spec: ShowSpec, http: httpx.AsyncClient) -> int:
     return new
 
 
+def podcast_client(timeout: httpx.Timeout | float = 30) -> httpx.AsyncClient:
+    """Feed and enclosure URLs are the publisher's; the hook refuses a private
+    address on the first request and on every redirect hop (enrichment/fulltext
+    does the same for article URLs)."""
+    return httpx.AsyncClient(timeout=timeout, follow_redirects=True, event_hooks={"request": [refuse_non_public]})
+
+
 async def poll_all() -> dict[str, int]:
     out: dict[str, int] = {}
-    async with httpx.AsyncClient(timeout=30) as http:
+    async with podcast_client() as http:
         for spec in SHOWS:
             try:
                 out[spec.slug] = await poll_show(spec, http)

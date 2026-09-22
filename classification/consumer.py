@@ -23,7 +23,6 @@ from classification.decide import (
     to_results,
 )
 from classification.schemas import ClassificationResult, GateResult
-from classification.shadow_gate import shadow_score
 from common import stream
 from common.config import get_settings
 from common.db import session_scope
@@ -148,8 +147,6 @@ async def _gate_and_classify(
         return decided[0], decided[1]
 
     gate = await _run_gate(title, body, meta)
-    if settings.prism_gate_mode == "shadow":
-        await _log_shadow_gate(title, body, gate, meta.get("source_slug", ""), meta.get("raw_item_id", ""))
     classification = await _run_classifier(title, body, source_country, meta) if gate.is_relevant else None
     if decided is not None:
         _log_decision_shadow(
@@ -187,28 +184,6 @@ def _log_decision_shadow(
         lenses_agree=(sorted(j.role_interests) == sorted(l.role_interests)) if (j and l) else None,
         language_agree=(j.language == l.language) if (j and l) else None,
     )
-
-
-async def _log_shadow_gate(
-    title: str, body: str | None, gate: GateResult, source_slug: str, raw_item_id: str
-) -> None:
-    """Shadow mode: log the embedding relevance score next to the LLM decision so
-    the score band can be calibrated before embeddings ever filter. Behavior-neutral.
-
-    The broad `except` is deliberate: shadow scoring is observability-only and must
-    never break ingestion. It logs the failure with context rather than swallowing.
-    """
-    try:
-        score = await shadow_score(title, body)
-        logger.info(
-            "shadow_gate",
-            score=round(score, 4),
-            llm_relevant=gate.is_relevant,
-            source_slug=source_slug,
-            raw_item_id=raw_item_id,
-        )
-    except Exception as exc:  # noqa: BLE001 — shadow path must not break the pipeline
-        logger.warning("shadow_gate_failed", error=str(exc), raw_item_id=raw_item_id)
 
 
 async def _run_gate(title: str, body: str | None, meta: dict) -> GateResult:

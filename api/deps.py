@@ -1,12 +1,34 @@
 """Shared FastAPI dependencies for the serving layer."""
 
+import hmac
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import auth
+from common.config import Settings, get_settings
 from common.db import get_db
+
+ADMIN_TOKEN_PLACEHOLDER = "change-me"
+
+
+def assert_admin_token_configured(settings: Settings) -> None:
+    """Refuse to serve outside a laptop with the placeholder admin token.
+
+    The default exists so `make up` works with no secrets; a deploy that forgot
+    PRISM_ADMIN_TOKEN would otherwise accept the string from .env.example on
+    /admin/pipeline/run and the gold-set export."""
+    local = "localhost" in settings.prism_web_url or "127.0.0.1" in settings.prism_web_url
+    if settings.prism_admin_token == ADMIN_TOKEN_PLACEHOLDER and not local:
+        raise RuntimeError("PRISM_ADMIN_TOKEN is the placeholder; set it before serving")
+
+
+async def require_admin(x_admin_token: str = Header(default="")) -> None:
+    """The operator's token, compared in constant time. One dependency for the
+    three admin surfaces, so the header name and the 403 live in one place."""
+    if not hmac.compare_digest(x_admin_token.encode(), get_settings().prism_admin_token.encode()):
+        raise HTTPException(status_code=403, detail="admin token required")
 
 
 async def get_current_user(

@@ -40,8 +40,18 @@ export function saveSession(s: Session): void {
 }
 
 export function clearSession(): void {
+  const token = loadSession()?.token;
   window.localStorage.removeItem(KEY);
   window.dispatchEvent(new Event(EVENT));
+  // Revoke server-side too: the row is gone, so the token is dead now rather
+  // than at its 30-day expiry. Fire-and-forget — the local sign-out is the UX.
+  if (token) {
+    void fetch(`${API_URL}/api/v1/auth/session`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
+    }).catch(() => undefined);
+  }
 }
 
 /** Authorization header for gated calls (pro lenses, watchlist, personalized brief). */

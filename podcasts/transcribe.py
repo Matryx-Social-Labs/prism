@@ -27,7 +27,7 @@ from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_texts
 from common.logging import get_logger
-from podcasts.feeds import UA
+from podcasts.feeds import UA, podcast_client
 
 logger = get_logger(__name__)
 
@@ -145,7 +145,7 @@ async def transcribe_episode(episode_id: uuid.UUID) -> int:
     language = (show or {}).get("language") or None
     path = None
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=30.0)) as http:
+        async with podcast_client(httpx.Timeout(300.0, connect=30.0)) as http:
             path, size = await _download(ep["audio_url"], http)
             segments, words, duration, cost = await transcribe_file(path, language, http)
         wins = windows_from_segments(segments, words)

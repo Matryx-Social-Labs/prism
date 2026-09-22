@@ -90,7 +90,6 @@ class _Calls:
 
 async def _run(mode: str, monkeypatch, **calls_kw) -> tuple[_Calls, GateResult, ClassificationResult | None]:
     monkeypatch.setattr(get_settings(), "prism_decisions_mode", mode)
-    monkeypatch.setattr(get_settings(), "prism_gate_mode", "off")
     calls = _Calls(monkeypatch, **calls_kw)
     gate, cls = await consumer._gate_and_classify("t", "b", "IN", {"stage": "classification"})
     return calls, gate, cls

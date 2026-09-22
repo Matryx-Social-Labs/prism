@@ -75,37 +75,33 @@ async def link_event_threads(event_id: uuid.UUID) -> None:
     )
 
     judged = {j.index: j for j in result.judgements}
-    async with session_scope() as session:
-        for i, candidate in enumerate(candidates):
-            j = judged.get(i)
-            if j is None or not j.related:
-                relation, from_id, to_id = "none", event_id, candidate["id"]
-                confidence, rationale = (j.confidence if j else None), (j.rationale if j else None)
+    rows: list[dict] = []
+    for i, candidate in enumerate(candidates):
+        j = judged.get(i)
+        if j is None or not j.related:
+            relation, from_id, to_id = "none", event_id, candidate["id"]
+            confidence, rationale = (j.confidence if j else None), (j.rationale if j else None)
+        else:
+            confidence, rationale = j.confidence, j.rationale
+            if j.direction == "candidate_causes_event":
+                relation, from_id, to_id = "leads_to", candidate["id"], event_id
+            elif j.direction == "event_causes_candidate":
+                relation, from_id, to_id = "leads_to", event_id, candidate["id"]
             else:
-                confidence, rationale = j.confidence, j.rationale
-                if j.direction == "candidate_causes_event":
-                    relation, from_id, to_id = "leads_to", candidate["id"], event_id
-                elif j.direction == "event_causes_candidate":
-                    relation, from_id, to_id = "leads_to", event_id, candidate["id"]
-                else:
-                    relation, from_id, to_id = "related", event_id, candidate["id"]
-            await session.execute(
-                text(
-                    """
-                    INSERT INTO event_links (id, from_event_id, to_event_id, relation, confidence, rationale)
-                    VALUES (:id, :f, :t, :rel, :conf, :rat)
-                    ON CONFLICT ON CONSTRAINT uq_event_links_pair DO NOTHING
-                    """
-                ),
-                {
-                    "id": str(uuid.uuid4()),
-                    "f": str(from_id),
-                    "t": str(to_id),
-                    "rel": relation,
-                    "conf": confidence,
-                    "rat": rationale,
-                },
-            )
+                relation, from_id, to_id = "related", event_id, candidate["id"]
+        rows.append({"id": str(uuid.uuid4()), "f": str(from_id), "t": str(to_id),
+                     "rel": relation, "conf": confidence, "rat": rationale})
+    async with session_scope() as session:
+        await session.execute(
+            text(
+                """
+                INSERT INTO event_links (id, from_event_id, to_event_id, relation, confidence, rationale)
+                VALUES (:id, :f, :t, :rel, :conf, :rat)
+                ON CONFLICT ON CONSTRAINT uq_event_links_pair DO NOTHING
+                """
+            ),
+            rows,  # executemany — one round trip for up to MAX_LINK_CANDIDATES verdicts, not one each
+        )
     linked = sum(1 for j in result.judgements if j.related)
     if linked:
         logger.info("thread_links_created", event_id=str(event_id), linked=linked)

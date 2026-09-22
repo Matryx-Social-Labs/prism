@@ -17,6 +17,12 @@ from common.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Fail-open is the right call for one blip and the wrong call for an hour. The
+# counter turns the hour into an ERROR line (Railway alerts on level) without
+# blocking readers; it resets on the first success.
+GUARD_FAILURE_ALERT_AFTER = 5
+_consecutive_failures = 0
+
 REFUSAL = (
     "I can only answer good-faith questions about this news story from its sources — "
     "I can't help with that request."
@@ -48,6 +54,7 @@ class GuardResult(BaseModel):
 async def guard_question(question: str) -> GuardResult:
     """Classify a question; allow on any error so the agent (grounded in sources)
     stays the backstop rather than a guard outage blocking legitimate users."""
+    global _consecutive_failures
     if not get_settings().prism_ask_guard_enabled:
         return GuardResult(allowed=True, category="ok")
     try:
@@ -59,9 +66,13 @@ async def guard_question(question: str) -> GuardResult:
             max_tokens=400,
             reasoning=REASONING_OFF,
         )
+        _consecutive_failures = 0
         if not result.allowed:
             logger.info("ask_guard_blocked", category=result.category)
         return result
     except Exception as exc:  # noqa: BLE001 — fail open; agent's source-grounding is the backstop
-        logger.warning("ask_guard_failed", error=str(exc))
+        _consecutive_failures += 1
+        log = logger.error if _consecutive_failures >= GUARD_FAILURE_ALERT_AFTER else logger.warning
+        log("ask_guard_failed", error_type=type(exc).__name__, error=str(exc)[:200],
+            consecutive=_consecutive_failures)
         return GuardResult(allowed=True, category="error")

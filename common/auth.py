@@ -211,6 +211,13 @@ async def create_session(session: AsyncSession, user_id: UUID) -> str:
     return raw
 
 
+async def revoke_session(session: AsyncSession, bearer: str) -> bool:
+    """Sign out: the row for this bearer is gone, so the token is dead at once
+    rather than at its 30-day expiry. True if there was a session to revoke."""
+    result = await session.execute(text("DELETE FROM sessions WHERE token_hash = :h"), {"h": _hash(bearer)})
+    return result.rowcount > 0
+
+
 async def resolve_session(session: AsyncSession, bearer: str) -> UUID | None:
     """Return the user id for a valid, unexpired bearer token, else None."""
     return (

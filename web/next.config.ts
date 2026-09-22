@@ -14,6 +14,23 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Every page. No framing (the account page's cancel and refund are one
+        // click each — an overlay on a framed page would be a clickjack), no MIME
+        // sniffing, a year of HSTS, and the browser features the site never uses
+        // switched off. A Content-Security-Policy is deliberately absent: Google
+        // sign-in, Razorpay checkout, Plausible and the inline JSON-LD each need
+        // an allowance, and a wrong one breaks sign-in silently — it lands
+        // report-only first, once there is somewhere for the reports to go.
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(self)" },
+        ],
+      },
+      {
         // Defence in depth for the labelling surface. The credential is already
         // kept out of the URL and sent in a header, so there is nothing in the
         // address bar worth leaking — but a labelling link gets pasted into chat
