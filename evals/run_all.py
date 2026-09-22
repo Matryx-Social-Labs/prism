@@ -1,6 +1,10 @@
 """Upload gold datasets to Langfuse and run experiments against the pipeline.
 
-Usage:  uv run python evals/run_all.py [relevance|classification|groundedness]
+Usage:  uv run python evals/run_all.py [--backend llm|decide] [relevance|classification|groundedness]
+
+--backend decide runs the relevance and classification sets through the one
+typed Jev call (classification/decide.py) instead of the LLM pair, as its own
+experiment run, so the two backends sit side by side in Langfuse.
 
 Requires LANGFUSE_* and OLLAMA_API_KEY in the environment (.env is read by
 common.config; export them for the Langfuse SDK too). Results appear in the
@@ -14,14 +18,17 @@ from pathlib import Path
 from langfuse import Evaluation, get_client
 from pydantic import BaseModel, Field
 
+from classification.decide import QUESTIONS, state_for, to_results
 from classification.schemas import ClassificationResult, GateResult
 from common.config import get_settings
+from common.decisions import decide
 from common.llm import structured_chat
 from common.observability import fetch_prompt
 from common.taxonomy import prompt_menu, valid_subsector
 from correlation.schemas import ThreadLinkResult
 
 DATASET_DIR = Path(__file__).parent / "datasets"
+BACKEND = "llm"  # or "decide" — set from argv in __main__
 
 get_settings()  # bridges .env Langfuse keys into process env for the SDK
 langfuse = get_client()
@@ -42,7 +49,15 @@ def upload(name: str, filename: str) -> None:
 # ── Relevance gate ───────────────────────────────────────────────────
 
 
+async def _decide_item(item, trace_name: str):
+    d = await decide(state_for(item.input["title"], item.input["body"]), QUESTIONS, trace_name=trace_name)
+    return to_results(d, source_country=None)
+
+
 async def relevance_task(*, item, **kwargs):
+    if BACKEND == "decide":
+        gate, _ = await _decide_item(item, "eval-relevance-decide")
+        return gate.model_dump()
     prompt = fetch_prompt("relevance-gate")
     messages = prompt.compile(title=item.input["title"], body=item.input["body"])
     result = await structured_chat(
@@ -63,6 +78,9 @@ def relevance_evaluator(*, input, output, expected_output, **kwargs):
 
 
 async def classification_task(*, item, **kwargs):
+    if BACKEND == "decide":
+        _, cls = await _decide_item(item, "eval-classifier-decide")
+        return cls.model_dump() if cls else None
     prompt = fetch_prompt("classifier")
     messages = prompt.compile(
         title=item.input["title"], body=item.input["body"], taxonomy=prompt_menu()
@@ -221,7 +239,7 @@ def run_relevance():
     upload("prism-relevance", "relevance.jsonl")
     dataset = langfuse.get_dataset("prism-relevance")
     result = dataset.run_experiment(
-        name="relevance-gate",
+        name=f"relevance-gate-{BACKEND}" if BACKEND != "llm" else "relevance-gate",
         description="Binary relevance gate accuracy",
         task=relevance_task,
         evaluators=[relevance_evaluator],
@@ -233,7 +251,7 @@ def run_classification():
     upload("prism-classification", "classification.jsonl")
     dataset = langfuse.get_dataset("prism-classification")
     result = dataset.run_experiment(
-        name="classifier",
+        name=f"classifier-{BACKEND}" if BACKEND != "llm" else "classifier",
         description="Sector / role-interest / routing accuracy",
         task=classification_task,
         evaluators=[sector_evaluator, subsector_evaluator, role_evaluator],
@@ -287,7 +305,12 @@ RUNS = {
 
 
 if __name__ == "__main__":
-    targets = sys.argv[1:] or list(RUNS)
+    args = sys.argv[1:]
+    if "--backend" in args:
+        i = args.index("--backend")
+        BACKEND = args[i + 1]
+        del args[i : i + 2]
+    targets = args or list(RUNS)
     for target in targets:
         print(f"\n=== {target} ===")
         RUNS[target]()
