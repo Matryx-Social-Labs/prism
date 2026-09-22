@@ -161,6 +161,10 @@ class Event(TimestampMixin, Base):
     summary: Mapped[str | None] = mapped_column(Text)
     sector: Mapped[str | None] = mapped_column(Text)
     subsector: Mapped[str | None] = mapped_column(Text)
+    # The subject tree path (common/subjects.py), e.g. "civic.crime.violent".
+    # `sector`/`subsector` above are derived from it (migration b4d18e7c3f20).
+    subject_path: Mapped[str | None] = mapped_column(Text)
+    subject_confidence: Mapped[float | None] = mapped_column(Float)
     regions: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     image_url: Mapped[str | None] = mapped_column(Text)
     occurred_at: Mapped[date | None] = mapped_column(Date)
