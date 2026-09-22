@@ -22,6 +22,15 @@ logger = get_logger(__name__)
 RAW_ITEMS = "raw.items"
 CLASSIFIED_ITEMS = "classified.items"
 ENRICHED_ITEMS = "enriched.items"
+
+# Every stream and the group that consumes it. `backlog()` reports on these and
+# tools/redrive_dead re-drives their dead letters; one list so a new stage
+# cannot be reported on and forgotten by the other.
+TOPIC_GROUPS: tuple[tuple[str, str], ...] = (
+    (RAW_ITEMS, "classification"),
+    (CLASSIFIED_ITEMS, "enrichment"),
+    (ENRICHED_ITEMS, "correlation"),
+)
 ADMIN_TRIGGERS = "admin.triggers"  # api -> worker: run ingestion now
 
 _redis: aioredis.Redis | None = None
@@ -68,11 +77,7 @@ async def backlog() -> dict[str, dict[str, int]]:
     """
     r = get_redis()
     out: dict[str, dict[str, int]] = {}
-    for topic, group in (
-        (RAW_ITEMS, "classification"),
-        (CLASSIFIED_ITEMS, "enrichment"),
-        (ENRICHED_ITEMS, "correlation"),
-    ):
+    for topic, group in TOPIC_GROUPS:
         report = {
             "waiting": -1,
             "pending": -1,

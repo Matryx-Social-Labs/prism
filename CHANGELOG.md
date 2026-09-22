@@ -17,6 +17,20 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   a client drops a cookie as cheaply as it mints a session id, so it would
   have dressed up the same gap.
 
+### Fixed (H9, H10)
+- **Every way an item falls out of the pipeline now has a way back.**
+  `requeue_stalled` covered two gaps and missed the third: an article whose
+  enrichment committed but whose publish to `enriched.items` failed is done as
+  far as classification and enrichment are concerned, and only the missing
+  membership knows otherwise. It is re-driven now — and recovery is its own
+  scheduled job rather than a step inside `run_all`, which meant the cost
+  brake (or a budget floor) switched off the one thing that rescues stranded
+  items exactly when there are most of them.
+- **The dead letters have a reader.** `<topic>.dead` has been written since the
+  streams existed and never read; `tools/redrive_dead.py` lists them by error,
+  shows one in full, and re-drives the original payload to its live topic —
+  dry-run by default, deleting the dead entry only once the publish returned.
+
 ### Added
 - **An actor has a page.** `/entity/<slug>` lists every record naming one
   person, organisation or place, with the actor's own schema (`Person`,
@@ -122,7 +136,6 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   stream redelivers, and the guard used to return on seeing the membership —
   leaving the projection stale and the analysis never marked. It now skips
   the match and still rebuilds, briefs and marks.
-
 
 ## [0.0.85.0] - 2026-09-22
 
@@ -1018,8 +1031,6 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 - Feed and Trending no longer fire a throwaway un-personalised request on every
   mount before the profile loads: 6 requests down to 3, and 2 down to 1.
 - The scope sheet is one component instead of two copies that had drifted apart.
-
-
 
 ### Fixed
 - **The lens flip works again.** Tapping Cyber or Markets on a story did nothing
