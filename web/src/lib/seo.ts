@@ -23,7 +23,7 @@ export const ORGANIZATION = {
   // What we do and refuse to do, in the vocabulary engines read: no invented
   // numbers, quotes verbatim or absent — the /about page says it at length.
   publishingPrinciples: `${SITE_URL}/about`,
-  correctionsPolicy: `${SITE_URL}/about#status`,
+  correctionsPolicy: `${SITE_URL}/about#accountability`,
   contactPoint: { "@type": "ContactPoint", email: CONTACT_EMAIL, contactType: "editorial" },
 };
 

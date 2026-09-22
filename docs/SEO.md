@@ -47,16 +47,13 @@ nothing here changes them.
 3. **Bing Webmaster Tools** — import from Search Console (one click). IndexNow
    submissions show up under "IndexNow" there; the first acceptance can take a
    day while the key is verified.
-4. **Plausible** — set `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` (Vercel + ci.yml pin) and
-   add the sentence to `/privacy`; search-console data does not need it.
-5. **The mailbox** `hello@readprism.news` is named in `llms.txt`, the policies
-   and the refund flow — it needs an inbound route (Resend inbound, or a
-   forward at the registrar).
-6. **Google-Extended / CCBot** — the file allows them today (training crawlers).
-   If you want Prism read for answers but not trained on, add a `Disallow: /`
-   rule for `Google-Extended`, `CCBot`, `Applebot-Extended` in `app/robots.ts`
-   (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `OAI-SearchBot` stay allowed — those
-   are the citing crawlers). It is a policy call, not a technical one.
+4. ~~**Plausible**~~ — no account; deliberately skipped 2026-09-22. It measures ranking rather than affecting it; Search Console's Performance report is the baseline until there is traffic worth a second tool.
+5. ~~**The mailbox** `hello@readprism.news`~~ — DONE 2026-09-22: a forwarding alias at the registrar. It is named in `llms.txt`, the policies, the refund flow and the organisation schema, and now reaches a person.
+6. ~~**Google-Extended / CCBot**~~ — DECIDED and SHIPPED in 0.0.86.0: the
+   training-only crawlers (`Google-Extended`, `CCBot`, `Applebot-Extended`,
+   `Bytespider`, `meta-externalagent`) are disallowed; the citing crawlers
+   (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `OAI-SearchBot`) stay allowed. The
+   trade-off is written beside the rule in `app/robots.ts`.
 
 ## Rank sooner — the order that matters (2026-09-22)
 
@@ -70,8 +67,8 @@ these are what turn it into traffic, and each unlocks the next.
 | 1 | **Google Search Console**: Domain property for `readprism.news` (DNS TXT at the registrar), then submit `sitemap.xml`, `news-sitemap.xml`, `records-sitemap.xml` | Every later diagnostic (indexed? Discover? Publisher Center check?) reads from here | 15 min + DNS |
 | 2 | **Bing Webmaster Tools** → "Import from Search Console" | Bing's index (Copilot and ChatGPT search read it) and the IndexNow dashboard that shows the worker's hourly pings landing | 5 min |
 | 3 | ~~Google Publisher Center~~ — **not a step any more** (checked 2026-09-22): the manual news setup is gone and inclusion is automatic. Instead, make `/about#status` say plainly how a record is written and corrected — the bylines read "Headline by Prism", and editorial accountability is what a policy review looks for | Google News / Top Stories eligibility, which is now earned by content + the shipped signals, not by registration | 20 min on /about |
-| 4 | **`hello@readprism.news` inbound** (Resend inbound or a registrar forward) | Publisher Center may write to it; takedowns and corrections reach a person | 10 min |
-| 5 | **Plausible**: `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` on Vercel + `ci.yml`, one sentence on `/privacy` | Knowing whether 1–4 moved organic sessions | 10 min |
+| 4 | ~~`hello@readprism.news` inbound~~ — **DONE** 2026-09-22 (registrar forwarding alias) | Corrections and takedowns reach a person | — |
+| 5 | ~~Plausible~~ — **skipped** 2026-09-22, no account. Search Console's own Performance report is the baseline until there is traffic worth a second tool | — | — |
 
 What I need from you to take the code side further: read access to the Search
 Console property once it exists (impressions/clicks by page are the baseline
