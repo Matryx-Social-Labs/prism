@@ -185,6 +185,29 @@ class EntityOut(BaseModel):
     slug: str | None = None
 
 
+class SubjectNode(BaseModel):
+    path: str
+    slug: str
+    label: str
+    depth: int
+    # Served stories under this node in the live window; None when not counted.
+    # A node below the floor is still returned — with the number that says so.
+    story_count: int | None = None
+
+
+class SubjectTree(BaseModel):
+    roots: list[SubjectNode]
+    nodes: list[SubjectNode]
+
+
+class SubjectPage(BaseModel):
+    node: SubjectNode
+    ancestors: list[SubjectNode]
+    children: list[SubjectNode]
+    story_count: int
+    stories: list[FeedItem]
+
+
 class EntityRef(BaseModel):
     """An actor as its own page addresses it. `schema_type` is the schema.org
     type the extractor's loose vocabulary maps to (api/routes/entity.py)."""

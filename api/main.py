@@ -20,6 +20,7 @@ from api.routes import (
     label,
     meta,
     search,
+    subject,
     trending,
     watchlist,
 )
@@ -58,6 +59,7 @@ app.include_router(search.router)
 app.include_router(digest.router)
 app.include_router(events.router)
 app.include_router(entity.router)
+app.include_router(subject.router)
 app.include_router(trending.router)
 app.include_router(watchlist.router)
 app.include_router(label.router)

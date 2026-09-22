@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { fetchFeed, fetchTrending } from "@/lib/api";
+import { fetchFeed, fetchSubjects, fetchTrending } from "@/lib/api";
 import { SECTOR_GROUPS } from "@/lib/sectors";
 import { SITE_URL } from "@/lib/site";
 
@@ -10,6 +10,13 @@ export const revalidate = 3600;
 // the news sitemap (news-sitemap.xml) carries the last two days for Google
 // News. Static pages always render even if the API is down.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  let subjectNodes: { path: string; depth: number }[] = [];
+  try {
+    const tree = await fetchSubjects();
+    subjectNodes = (tree?.nodes ?? []).filter((n) => (n.story_count ?? 0) > 0);
+  } catch {
+    // API down → the rest of the sitemap still serves.
+  }
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/feed`, changeFrequency: "hourly", priority: 0.9 },
@@ -21,6 +28,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/refunds`, changeFrequency: "yearly", priority: 0.2 },
     ...SECTOR_GROUPS.map((g) => ({ url: `${SITE_URL}/sector/${g.slug}`, changeFrequency: "hourly" as const, priority: 0.7 })),
+    // Every node of the subject tree that has stories under it. A node with
+    // none is left out rather than offered to a crawler as an empty room.
+    ...subjectNodes.map((n) => ({
+      url: `${SITE_URL}/subject/${n.path.split(".").join("/")}`,
+      changeFrequency: "hourly" as const,
+      priority: n.depth === 1 ? 0.7 : 0.6,
+    })),
   ];
 
   let stories: MetadataRoute.Sitemap = [];

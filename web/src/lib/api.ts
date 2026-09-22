@@ -405,6 +405,40 @@ export async function fetchTrendingStory(slug: string): Promise<TrendingStoryDet
   return (await res.json()) as TrendingStoryDetail;
 }
 
+export interface SubjectNode {
+  path: string;
+  slug: string;
+  label: string;
+  depth: number;
+  story_count: number | null;
+}
+
+export interface SubjectPage {
+  node: SubjectNode;
+  ancestors: SubjectNode[];
+  children: SubjectNode[];
+  story_count: number;
+  stories: FeedItem[];
+}
+
+export async function fetchSubject(path: string): Promise<SubjectPage | null> {
+  const clean = path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+  const res = await fetch(`${API_URL}/api/v1/subject/${clean}`, { next: { revalidate: 120 } });
+  if (!res.ok) return null;
+  return (await res.json()) as SubjectPage;
+}
+
+export interface SubjectTree {
+  roots: SubjectNode[];
+  nodes: SubjectNode[];
+}
+
+export async function fetchSubjects(): Promise<SubjectTree | null> {
+  const res = await fetch(`${API_URL}/api/v1/subjects`, { next: { revalidate: 900 } });
+  if (!res.ok) return null;
+  return (await res.json()) as SubjectTree;
+}
+
 export interface EntityRef {
   slug: string;
   name: string;

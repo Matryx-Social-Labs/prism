@@ -34,6 +34,32 @@ export const SECTOR_GROUPS: SectorGroup[] = [
   { slug: "entertainment", code: "ENT", name: "Entertainment", sectors: ["entertainment"] },
 ];
 
+/**
+ * What the nav actually shows: the six sector groups above, plus the two roots
+ * of the subject tree that the old ten sectors had no room for.
+ *
+ * Civic & Safety is a third of the corpus (crime, accidents, community life)
+ * and used to be `other`, which D3 never shows as a heading — so a third of
+ * the product was unreachable from the nav. Education was landing in three
+ * different wrong places. Both are measured above the floor a section needs.
+ *
+ * The six keep their `/sector/<slug>` addresses, which are indexed; the two
+ * new ones live at `/subject/<path>` because that is what they are. One nav,
+ * two URL shapes, and no redirect of a page Google already holds.
+ */
+export interface NavItem {
+  key: string;
+  code: string;
+  name: string;
+  href: string;
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  ...SECTOR_GROUPS.map((g) => ({ key: g.slug, code: g.code, name: g.name, href: `/sector/${g.slug}` })),
+  { key: "education", code: "EDU", name: "Education", href: "/subject/education" },
+  { key: "civic", code: "CIV", name: "Civic & Safety", href: "/subject/civic" },
+];
+
 const BY_SLUG = new Map(SECTOR_GROUPS.map((g) => [g.slug, g]));
 const BY_PIPELINE = new Map(SECTOR_GROUPS.flatMap((g) => g.sectors.map((s) => [s, g] as const)));
 
