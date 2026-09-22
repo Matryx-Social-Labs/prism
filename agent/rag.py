@@ -26,6 +26,13 @@ from common.observability import fetch_prompt
 
 logger = get_logger(__name__)
 
+_DATA_TAGS = re.compile(r"</?\s*(sources|structured)\s*>", re.IGNORECASE)
+
+
+def _neutralise_tags(text: str) -> str:
+    """An article cannot close the data block it is quoted inside."""
+    return _DATA_TAGS.sub(lambda m: m.group(0).replace("<", "‹").replace(">", "›"), text)
+
 TOP_K = 8
 # Plus reads the whole story: every development's reports, not this event's
 # alone (PLAN-LAUNCH.md §2.3) — "every quote by X across this story", "what
@@ -138,13 +145,19 @@ async def answer_stream(
         yield {"type": "done"}
         return
 
+    # The sources and the projection ride in the reader's turn between
+    # <sources>/<structured> tags, framed by the system rules as data that is
+    # never an instruction (audit C1: they were spliced into the system role,
+    # where a hostile article read as one of the rules). An article that
+    # contains the closing tag itself would end the data block early, so the
+    # tags are neutralised in the text before it goes in.
     sources_block = "\n\n".join(
-        f"[{c.number}] ({c.source_name}) {c.text}" for c in chunks
+        f"[{c.number}] ({c.source_name}) {_neutralise_tags(c.text)}" for c in chunks
     )
     prompt = fetch_prompt("agent-qa")
     messages = prompt.compile(
-        event_title=title,
-        structured=json.dumps(projection, default=str)[:3000],
+        event_title=_neutralise_tags(title),
+        structured=_neutralise_tags(json.dumps(projection, default=str)[:3000]),
         sources=sources_block,
         question=question,
     )
