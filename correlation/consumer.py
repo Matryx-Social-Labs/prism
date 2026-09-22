@@ -96,85 +96,18 @@ async def handle_enriched_item(payload: dict) -> None:
         if enrichment is None or article is None:
             logger.warning("enrichment_or_article_missing", enrichment_id=str(enrichment_id), article_id=str(article_id))
             return
-        already = await session.execute(
-            select(EventMembership.id).where(EventMembership.article_id == article_id)
-        )
-        if already.scalar_one_or_none() is not None:
-            return  # replay
-
-        raw_item = await session.get(RawItem, article.raw_item_id)
         shared = enrichment.shared_fields or {}
-        lens = (enrichment.lens_fields or {}).get("cyber") or {}
-        cve_ids = lens.get("cve_ids") or []
-        title = raw_item.title if raw_item else "(untitled)"
-        url = (raw_item.url_canonical or raw_item.url) if raw_item else None
-        published_at = raw_item.published_at if raw_item else None
-        classification = (raw_item.classification or {}) if raw_item else {}
-        cve_record = (enrichment.model or "").startswith("deterministic:")
-
-        embedding = await _first_chunk_embedding(session, article_id)
-        # The outlet is not an actor in its own coverage: left in, `prajavani` was
-        # the most-shared "entity" across a 139-article over-merge, i.e. the thing
-        # doing the merging.
-        entity_names = [e["name"] for e in (shared.get("entities") or []) if e.get("name")]
-        entity_slugs = [entity_slug(n) for n in await drop_source_names(session, entity_names)]
-
-        match = await find_event(
-            session,
-            cve_ids=cve_ids,
-            url=url,
-            title=title,
-            published_at=published_at,
-            embedding=embedding,
-            entity_slugs=entity_slugs or None,
-            cve_record=cve_record,
-            english_title=english_headline(shared),
-        )
-
-        if match is not None:
-            event = await session.get(Event, match.event_id)
-            is_new_event = False
+        # A replayed message (the stream redelivers after any failure past the
+        # first commit below) resumes at the projection rebuild instead of
+        # returning: the article is attached, but the projection, the brief and
+        # the analysis mark may not have happened (audit C4).
+        attached = (
+            await session.execute(select(EventMembership.event_id).where(EventMembership.article_id == article_id))
+        ).scalar_one_or_none()
+        if attached is not None:
+            event_id, is_new_event = attached, False
         else:
-            canon, by = canonical_title(shared, title)
-            event = Event(
-                id=uuid.uuid4(),
-                title=canon,
-                headline_by=by,
-                summary=enrichment.summary,
-                sector=classification.get("sector", "other"),
-                subsector=classification.get("subsector"),
-                regions=shared.get("regions") or classification.get("regions") or [],
-                occurred_at=enrichment.occurred_at,
-                embedding=embedding,
-            )
-            session.add(event)
-            is_new_event = True
-
-        # State codes (ISO 3166-2, e.g. IN-KA) from a state-edition feed must
-        # survive into the event's regions — even when a new event's shared
-        # extraction returned only country-level regions, or an existing event
-        # was matched — so the feed can tier local(state) -> national.
-        state_codes = [r for r in (classification.get("regions") or []) if "-" in r]
-        if state_codes:
-            merged = list(event.regions or [])
-            merged += [c for c in state_codes if c not in merged]
-            if merged != list(event.regions or []):
-                event.regions = merged
-
-        if event.image_url is None and raw_item is not None and raw_item.image_url:
-            event.image_url = raw_item.image_url
-        session.add(
-            EventMembership(
-                event_id=event.id,
-                article_id=article_id,
-                match_type=match.match_type if match else "new_event",
-                match_score=match.match_score if match else None,
-                is_survivor=is_new_event,
-            )
-        )
-
-        await _upsert_entities(session, event.id, shared.get("entities") or [], article_id)
-        event_id = event.id
+            event_id, is_new_event = await _attach(session, article, enrichment, shared, article_id, cve_ids_of(enrichment))
 
     # Real-time path: rebuild the served projection (fast, DB-only) and publish so
     # the feed reflects the new coverage immediately — before any LLM runs.
@@ -190,6 +123,96 @@ async def handle_enriched_item(payload: dict) -> None:
     # to the debounced sweeper: a burst of coverage for one story then costs a
     # single analysis pass, off the ingest hot path.
     await mark_event_dirty(event_id)
+
+
+def cve_ids_of(enrichment: Enrichment) -> list[str]:
+    lens = (enrichment.lens_fields or {}).get("cyber") or {}
+    return lens.get("cve_ids") or []
+
+
+async def _attach(session, article: Article, enrichment: Enrichment, shared: dict, article_id: uuid.UUID,
+                  cve_ids: list[str]) -> tuple[uuid.UUID, bool]:
+    """Match the article to an event or seed one, and write the membership.
+    Returns (event_id, is_new_event).
+
+    Under one advisory lock for the whole match-or-create: two consumers (a
+    second replica, or XAUTOCLAIM handing a slow message on) would otherwise
+    both miss the match and seed two events for one story. The lock serialises
+    exactly what the "correlation runs at concurrency 1" deployment rule
+    serialised, but on the database, where a rule cannot be forgotten; the
+    unique constraint on article_id (migration a7c3e91d4b28) makes the bad
+    state unrepresentable even so (audit C3)."""
+    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('correlation.match_or_create'))"))
+    raw_item = await session.get(RawItem, article.raw_item_id)
+    title = raw_item.title if raw_item else "(untitled)"
+    url = (raw_item.url_canonical or raw_item.url) if raw_item else None
+    published_at = raw_item.published_at if raw_item else None
+    classification = (raw_item.classification or {}) if raw_item else {}
+    cve_record = (enrichment.model or "").startswith("deterministic:")
+
+    embedding = await _first_chunk_embedding(session, article_id)
+    # The outlet is not an actor in its own coverage: left in, `prajavani` was
+    # the most-shared "entity" across a 139-article over-merge, i.e. the thing
+    # doing the merging.
+    entity_names = [e["name"] for e in (shared.get("entities") or []) if e.get("name")]
+    entity_slugs = [entity_slug(n) for n in await drop_source_names(session, entity_names)]
+
+    match = await find_event(
+        session,
+        cve_ids=cve_ids,
+        url=url,
+        title=title,
+        published_at=published_at,
+        embedding=embedding,
+        entity_slugs=entity_slugs or None,
+        cve_record=cve_record,
+        english_title=english_headline(shared),
+    )
+
+    if match is not None:
+        event = await session.get(Event, match.event_id)
+        is_new_event = False
+    else:
+        canon, by = canonical_title(shared, title)
+        event = Event(
+            id=uuid.uuid4(),
+            title=canon,
+            headline_by=by,
+            summary=enrichment.summary,
+            sector=classification.get("sector", "other"),
+            subsector=classification.get("subsector"),
+            regions=shared.get("regions") or classification.get("regions") or [],
+            occurred_at=enrichment.occurred_at,
+            embedding=embedding,
+        )
+        session.add(event)
+        is_new_event = True
+
+    # State codes (ISO 3166-2, e.g. IN-KA) from a state-edition feed must
+    # survive into the event's regions — even when a new event's shared
+    # extraction returned only country-level regions, or an existing event
+    # was matched — so the feed can tier local(state) -> national.
+    state_codes = [r for r in (classification.get("regions") or []) if "-" in r]
+    if state_codes:
+        merged = list(event.regions or [])
+        merged += [c for c in state_codes if c not in merged]
+        if merged != list(event.regions or []):
+            event.regions = merged
+
+    if event.image_url is None and raw_item is not None and raw_item.image_url:
+        event.image_url = raw_item.image_url
+    session.add(
+        EventMembership(
+            event_id=event.id,
+            article_id=article_id,
+            match_type=match.match_type if match else "new_event",
+            match_score=match.match_score if match else None,
+            is_survivor=is_new_event,
+        )
+    )
+
+    await _upsert_entities(session, event.id, shared.get("entities") or [], article_id)
+    return event.id, is_new_event
 
 
 # ── Deferred analysis: real-time attach above, debounced LLM analysis here ──
