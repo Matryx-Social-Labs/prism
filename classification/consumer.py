@@ -24,7 +24,7 @@ from classification.decide import (
     to_results,
 )
 from classification.schemas import ClassificationResult, GateResult
-from common import stream
+from common import stream, subjects
 from common.config import get_settings
 from common.db import session_scope
 from common.decisions import decide
@@ -68,6 +68,10 @@ async def handle_raw_item(payload: dict) -> None:
         classification = ClassificationResult(
             sector=feed_spec.sector,
             subsector=feed_spec.subsector,
+            # A single-topic feed knows its subject by construction; the tree
+            # learns it from the same declaration rather than from a model.
+            subject_path=subjects.path_for_legacy(feed_spec.sector, feed_spec.subsector),
+            subject_confidence=1.0,
             regions=[source_country] if source_country else [],
             language="en",
             role_interests=["markets"] if feed_spec.sector in ("finance", "business") else [],
@@ -182,8 +186,18 @@ async def _deepen_subject(
     except Exception as exc:  # noqa: BLE001 — the parent stands
         logger.warning("subject_leaf_failed", error_type=type(exc).__name__, error=str(exc)[:160], path=path)
         return classification
-    deeper, confidence = subject.deepen(path, answers)
-    return classification.model_copy(update={"subject_path": deeper, "subject_confidence": round(confidence, 3)})
+    deeper, confidence = subject.deepen(path, classification.subject_confidence or 0.0, answers)
+    # sector/subsector are derived from the path, so they follow it down: a
+    # story that deepens from `tech.security` to `.vulnerabilities` was keeping
+    # the parent's `cybersecurity/None` and losing the subsector it had just
+    # earned.
+    legacy_sector, legacy_sub = subjects.legacy_for(deeper)
+    return classification.model_copy(update={
+        "subject_path": deeper,
+        "subject_confidence": round(confidence, 3),
+        "sector": legacy_sector,
+        "subsector": legacy_sub,
+    })
 
 
 def _log_decision_shadow(
@@ -268,6 +282,12 @@ def _classify_cve_feed(source_slug: str, title: str, body: str | None) -> Classi
     return ClassificationResult(
         sector="cybersecurity",
         subsector="vulnerabilities",
+        # The deterministic paths need a place on the tree too, or the flagship
+        # content for `tech.security.vulnerabilities` would be the one thing
+        # never on it — a CVE record is that node by construction, no model
+        # needed (review, 2026-09-22).
+        subject_path="tech.security.vulnerabilities",
+        subject_confidence=1.0,
         regions=[],
         language="en",
         role_interests=["cyber"],

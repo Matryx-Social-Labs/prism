@@ -71,7 +71,7 @@ async def place(rows: list[dict]) -> list[dict]:
             if path and needs_third_level(path):
                 try:
                     deeper = await decide(state, level_three_question(path), trace_name="backfill-subject-leaf")
-                    path, confidence = deepen(path, deeper)
+                    path, confidence = deepen(path, confidence, deeper)
                     cost += deeper.usage.cost
                 except Exception:  # noqa: BLE001 — the parent is a valid place
                     pass

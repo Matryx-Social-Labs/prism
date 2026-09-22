@@ -29,6 +29,7 @@ import json
 
 from classification import subject
 from classification.schemas import ClassificationResult, GateResult
+from common import subjects
 from common.decisions import Choice, ChoiceAnswer, Decisions, Noul, NoulAnswer, Question
 from common.regions import IN_STATES, is_state_code
 from common.taxonomy import TAXONOMY, display_name, valid_subsector
@@ -189,15 +190,28 @@ def to_results(d: Decisions, *, source_country: str | None) -> tuple[GateResult,
         return gate, None
     path, path_confidence = subject.path_from(d)
     sector = _choice(d, "sector")
-    sub_key = _choice(d, "subsector").choice
-    subsector = sub_key.split("/", 1)[1] if sub_key.startswith(f"{sector.choice}/") else None
+    # The old columns are DERIVED from the path when there is one, not elicited
+    # separately. Two independent judgements in the same call can disagree, and
+    # for the two new roots there is no old sector to elicit at all — `civic`
+    # and `education` have no entry in the flat taxonomy, so the old question
+    # could only guess. One placement, one answer, and the migration's promise
+    # that `sector` still means something is actually kept. The separate
+    # question stays as the fallback for a story the tree could not place.
+    if path is not None:
+        legacy_sector, legacy_sub = subjects.legacy_for(path)
+    else:
+        sub_key = _choice(d, "subsector").choice
+        legacy_sector = sector.choice
+        legacy_sub = valid_subsector(
+            sector.choice, sub_key.split("/", 1)[1] if sub_key.startswith(f"{sector.choice}/") else None
+        )
     country = _choice(d, "country").choice
     state = _choice(d, "indian_state").choice
     country_code = country if country != "other" else source_country
     regions = [c for c in (country_code, state) if c and (c == country_code or is_state_code(c))]
     return gate, ClassificationResult(
-        sector=sector.choice,
-        subsector=valid_subsector(sector.choice, subsector),
+        sector=legacy_sector,
+        subsector=legacy_sub,
         regions=regions,
         language=_choice(d, "language").choice,
         role_interests=[lens for lens, floor in LENS_MIN.items() if _noul(d, lens) >= floor],

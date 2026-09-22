@@ -93,11 +93,71 @@ def test_only_the_two_deep_branches_ask_a_third_question():
 
 def test_the_third_call_deepens_only_when_it_is_sure():
     sure = Decisions(answers={"leaf": ChoiceAnswer(choice="violent", confidence=0.99, probabilities={})})
-    assert subj.deepen("civic.crime", sure)[0] == "civic.crime.violent"
+    assert subj.deepen("civic.crime", 0.95, sure)[0] == "civic.crime.violent"
     unsure = Decisions(answers={"leaf": ChoiceAnswer(choice="violent", confidence=0.2, probabilities={})})
-    assert subj.deepen("civic.crime", unsure)[0] == "civic.crime"
+    assert subj.deepen("civic.crime", 0.95, unsure)[0] == "civic.crime"
     stay = Decisions(answers={"leaf": ChoiceAnswer(choice=subj.STAY, confidence=0.99, probabilities={})})
-    assert subj.deepen("civic.crime", stay)[0] == "civic.crime"
+    assert subj.deepen("civic.crime", 0.95, stay)[0] == "civic.crime"
+
+
+def test_deepening_never_discards_the_confidence_already_earned():
+    """A story placed on `civic.crime` at 0.95 whose leaf answer came back at
+    0.3 keeps the path — and must keep the 0.95, not be recorded as 0.3 sure of
+    a placement that never happened."""
+    weak = Decisions(answers={"leaf": ChoiceAnswer(choice="violent", confidence=0.3, probabilities={})})
+    assert subj.deepen("civic.crime", 0.95, weak) == ("civic.crime", 0.95)
+    off_menu = Decisions(answers={"leaf": ChoiceAnswer(choice="nope", confidence=0.99, probabilities={})})
+    assert subj.deepen("civic.crime", 0.95, off_menu) == ("civic.crime", 0.95)
+    # Descending is only as sure as its least sure step, like path_from.
+    shaky_root = Decisions(answers={"leaf": ChoiceAnswer(choice="violent", confidence=0.99, probabilities={})})
+    assert subj.deepen("civic.crime", 0.6, shaky_root) == ("civic.crime.violent", 0.6)
+
+
+def test_the_old_columns_are_derived_from_the_path_not_elicited_beside_it():
+    """Two independent judgements in one call can disagree, and the new roots
+    have no old sector to elicit — `civic` is `other` by construction."""
+    _, cls = to_results(_full(), source_country="IN")
+    assert cls.subject_path == "civic.accidents"
+    assert (cls.sector, cls.subsector) == subjects.legacy_for("civic.accidents")
+    assert cls.sector == "other", "the old taxonomy has no civic; the bridge says so"
+    # A story the tree could not place still gets the separately-asked sector.
+    unplaced = _full(subject=ChoiceAnswer(choice="nonsense", confidence=0.9, probabilities={}))
+    _, cls2 = to_results(unplaced, source_country="IN")
+    assert cls2.subject_path is None
+    assert (cls2.sector, cls2.subsector) == ("politics", "courts_law")
+
+
+async def test_deepening_takes_the_old_columns_down_with_it():
+    """A story that deepens from `tech.security` to `.vulnerabilities` must not
+    keep the parent's `cybersecurity/None` and lose the subsector it earned."""
+    from classification import consumer
+    from classification.schemas import ClassificationResult
+
+    parent = ClassificationResult(sector="cybersecurity", subsector=None,
+                                  subject_path="tech.security", subject_confidence=0.9)
+
+    async def fake_decide(state, questions, **kw):
+        return Decisions(answers={"leaf": ChoiceAnswer(choice="vulnerabilities", confidence=0.99, probabilities={})})
+
+    import pytest as _pytest
+
+    monkey = _pytest.MonkeyPatch()
+    monkey.setattr(consumer, "decide", fake_decide)
+    try:
+        out = await consumer._deepen_subject(parent, "t", "b", {})
+    finally:
+        monkey.undo()
+    assert out.subject_path == "tech.security.vulnerabilities"
+    assert (out.sector, out.subsector) == ("cybersecurity", "vulnerabilities")
+    assert out.subject_confidence == pytest.approx(0.9), "least sure step"
+
+
+def test_the_deterministic_feeds_are_placed_without_a_model():
+    from classification.consumer import _classify_cve_feed
+
+    cve = _classify_cve_feed("cisa_kev", "t", None)
+    assert cve.subject_path == "tech.security.vulnerabilities"
+    assert cve.subject_confidence == 1.0
 
 
 def test_every_menu_is_short_enough_to_be_read_carefully():
@@ -130,12 +190,13 @@ def _full(**over) -> Decisions:
     return Decisions(answers={**base, **over})
 
 
-def test_the_classification_carries_the_path_and_keeps_the_old_columns():
+def test_the_classification_carries_the_path_and_the_old_columns_follow_it():
     _, cls = to_results(_full(), source_country="IN")
     assert cls.subject_path == "civic.accidents"
     assert cls.subject_confidence == pytest.approx(0.92)
-    # The old columns still answer, for every reader that has not moved.
-    assert cls.sector == "politics" and cls.subsector == "courts_law"
+    # The old columns still answer — derived from the path, so they cannot
+    # disagree with it (see the derivation test below).
+    assert (cls.sector, cls.subsector) == ("other", None)
 
 
 # ── the node pages ──────────────────────────────────────────────────────────
@@ -176,14 +237,24 @@ async def test_a_node_counts_exactly_what_it_lists():
     from common.models import Event
 
     old = datetime.now(UTC) - timedelta(days=200)
+    ids = [_uuid.uuid4() for _ in range(3)]
     async with session_scope() as s:
-        for i in range(3):
-            s.add(Event(id=_uuid.uuid4(), title=f"old crime {i}", sector="other",
+        for i, eid in enumerate(ids):
+            s.add(Event(id=eid, title=f"old crime {i}", sector="other",
                         subject_path="civic.crime.violent", last_updated_at=old,
                         projection={"source_slugs": ["the_hindu"]}))
-    body = (await _get("/api/v1/subject/civic/crime?limit=60")).json()
-    assert body["story_count"] >= 3
-    assert body["story_count"] == len(body["stories"]) or len(body["stories"]) == 60
+    try:
+        body = (await _get("/api/v1/subject/civic/crime?limit=60")).json()
+        assert body["story_count"] >= 3
+        assert body["story_count"] == len(body["stories"]) or len(body["stories"]) == 60
+    finally:
+        # The local database is shared with every other DB test and with the
+        # dev loop; rows left behind here pushed another test's events out of
+        # the feed's window once already.
+        from sqlalchemy import text as _t
+
+        async with session_scope() as s:
+            await s.execute(_t("DELETE FROM events WHERE id = ANY(:ids)"), {"ids": ids})
 
 
 async def test_a_node_holds_everything_under_it():

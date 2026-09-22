@@ -224,6 +224,21 @@ def legacy_for(path: str) -> tuple[str, str | None]:
     return "other", None
 
 
+def path_for_legacy(sector: str, subsector: str | None) -> str | None:
+    """The tree node an old (sector, subsector) pair names, if one does.
+
+    The reverse of `legacy_for`, for the deterministic classifications that
+    never see a model: a CVE feed and a single-topic feed both declare their
+    subject, and the tree should learn it from the declaration rather than
+    leave the one thing we are certain about unplaced."""
+    for s in SUBJECTS:
+        if s.legacy == (sector, subsector):
+            return s.path
+    if subsector is not None:  # fall back to the sector's own node
+        return path_for_legacy(sector, None)
+    return None
+
+
 def choices(parent: str | None) -> dict[str, str]:
     """The classifier's menu at one level: {slug: criterion} for the children of
     `parent`, keyed on the LAST segment so the model chooses among siblings and
@@ -251,6 +266,20 @@ def demo() -> None:
     }
     assert legacy_for("civic.crime.violent") == ("other", None), "inherited from civic"
     assert legacy_for("sports.cricket") == ("sports", "cricket")
+    assert path_for_legacy("sports", "cricket") == "sports.cricket"
+    assert path_for_legacy("cybersecurity", "vulnerabilities") == "tech.security.vulnerabilities"
+    assert path_for_legacy("sports", "kabaddi") == "sports", "an unknown subsector falls back to its sector"
+    assert path_for_legacy("nonexistent", None) is None
+    # `general` must never collide with a real node's slug at any level, or a
+    # confident pick of that node would read as "stay at the parent".
+    for node in SUBJECTS:
+        assert node.path.rsplit(".", 1)[-1] != "general", node.path
+    # The prefix queries depend on the trailing dot: a sibling whose slug is a
+    # string-prefix of another must not leak into its descendants.
+    for node in SUBJECTS:
+        for other in SUBJECTS:
+            if other.path != node.path and other.path.startswith(node.path):
+                assert other.path[len(node.path)] == ".", f"{other.path} shadows {node.path}"
     assert set(choices(None)) == set(ROOTS)
     assert "cricket" in choices("sports")
     print(f"ok: {len(SUBJECTS)} nodes, {len(ROOTS)} roots, max depth {max(depth(s.path) for s in SUBJECTS)}")
