@@ -101,13 +101,22 @@ def path_from(answers: Decisions) -> tuple[str | None, float]:
     return candidate, min(confidence, child.confidence)
 
 
-def deepen(path: str, answers: Decisions) -> tuple[str, float]:
-    """Apply the second call's answer, if it earned one."""
+def deepen(path: str, earned: float, answers: Decisions) -> tuple[str, float]:
+    """Apply the second call's answer, if it earned one.
+
+    `earned` is the confidence the path already has from the first call, and it
+    is carried through every outcome: a path is only as sure as its least sure
+    step (the same rule `path_from` follows). Returning the leaf's own
+    confidence alone was a bug — a story placed on `civic.crime` at 0.95 whose
+    leaf answer came back at 0.3 kept the path and was then recorded as 0.3
+    sure of it, which is a claim about a placement that never happened."""
     leaf = answers.answers.get("leaf")
     if leaf is None or leaf.choice == STAY or leaf.confidence < DESCEND_MIN_CONFIDENCE:
-        return path, leaf.confidence if leaf else 1.0
+        return path, earned
     candidate = f"{path}.{leaf.choice}"
-    return (candidate, leaf.confidence) if subjects.is_valid(candidate) else (path, leaf.confidence)
+    if not subjects.is_valid(candidate):
+        return path, earned
+    return candidate, min(earned, leaf.confidence)
 
 
 def demo() -> None:
