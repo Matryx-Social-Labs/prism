@@ -3,6 +3,48 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.89.0] - 2026-09-22
+
+### Added
+- **The subject tree.** A story now carries a path — `civic.crime.violent`,
+  `sports.cricket`, `education.exams` — instead of one of ten flat sectors.
+  59 nodes, eight roots, three deep where the corpus earned it
+  (`common/subjects.py`); `events.subject_path` with a prefix index, so every
+  story under a branch is one `LIKE` (migration `b4d18e7c3f20`).
+  `sector`/`subsector` stay and are derived from the path, so every reader,
+  URL and API response keeps working.
+- **Two roots the corpus demanded.** `civic & safety` for crime, accidents,
+  community life and weather: 22 % of production sat in `other`, which D3
+  never shows as a heading, so a fifth of the product was unreachable.
+  Clustered, it is not miscellaneous — ~53 % crime, ~23 % accidents, ~20 %
+  festivals and community honours. `education` for exams, admissions and
+  institutions, which had been landing in `business/corporate` (an IIM
+  admission), `other` (an IB schools conference) and `health` (a NEET answer
+  key). Measured on 250 live events: civic 32 %, education 6 %, and every node
+  clears the ~30-stories-a-month floor below which a section is a promise the
+  product cannot keep.
+- **The spine is authored, the depth is derived.** Levels 1–2 are editorial
+  judgement — they are the navigation and no clustering can tell you how a
+  reader thinks about a beat. Level 3 exists only where 30 days of production
+  put it there. Both halves earned their keep: clustering found the festivals
+  beat that hand-authoring missed, and hand-authoring rejected what clustering
+  proposed — `Asian Games 2026` as the largest sports "category" (a tournament,
+  empty by March) and a politics tree split by state (geography is a facet).
+
+### Changed
+- Classification places a story with one `choice` per level, the parent fixed:
+  eight siblings, then six, then four. The root and every level-2 menu ride in
+  the call that already gates and classifies, because Jev answers every
+  question in one parallel pass — so depth costs input tokens and no extra
+  round trip. Only `tech.security` and `civic.crime` go three deep, and only a
+  story that landed there is asked again. Measured $0.00009 an item; the whole
+  archive re-places for about $1.30.
+- **A parent is a valid resting place** (founder, 2026-09-22). Every child menu
+  carries `general`, and a placement below `DESCEND_MIN_CONFIDENCE` stops at
+  the parent: `civic.crime` is true about a story we could not split, where a
+  guessed leaf would not be. An answer off the menu gives no path at all — an
+  unplaced story is visible and fixable; one filed under the wrong root is not.
+
 ## [0.0.88.0] - 2026-09-22
 
 ### Added

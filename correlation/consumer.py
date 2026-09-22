@@ -181,6 +181,8 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
             summary=enrichment.summary,
             sector=classification.get("sector", "other"),
             subsector=classification.get("subsector"),
+            subject_path=classification.get("subject_path"),
+            subject_confidence=classification.get("subject_confidence"),
             regions=shared.get("regions") or classification.get("regions") or [],
             occurred_at=enrichment.occurred_at,
             embedding=embedding,

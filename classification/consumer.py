@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import update
 
+from classification import subject
 from classification.decide import (
     QUESTIONS,
     QUESTIONS_VERSION,
@@ -139,7 +140,9 @@ async def _gate_and_classify(
             )
             # Mapped inside the guard: an answer that does not fit our records is
             # a Jev failure like any other, not a lost article.
-            decided = (*to_results(answers, source_country=source_country), decided_confidence(answers))
+            gate_result, classification_result = to_results(answers, source_country=source_country)
+            classification_result = await _deepen_subject(classification_result, title, body, meta)
+            decided = (gate_result, classification_result, decided_confidence(answers))
         except Exception as exc:  # noqa: BLE001 — shadow must not break the stage; live falls back to the pair
             logger.warning("decision_failed", error_type=type(exc).__name__, error=str(exc)[:200], mode=mode,
                            raw_item_id=meta.get("raw_item_id"))
@@ -154,6 +157,33 @@ async def _gate_and_classify(
             llm_gate=gate, llm_classification=classification, meta=meta,
         )
     return gate, classification
+
+
+async def _deepen_subject(
+    classification: ClassificationResult | None, title: str, body: str | None, meta: dict
+) -> ClassificationResult | None:
+    """A second call for the two branches that go three deep.
+
+    Only `tech.security` and `civic.crime` have grandchildren, and only a story
+    that landed on one needs asking — about one item in eight. A failure here
+    leaves the story on its parent, which is a valid place to be: `civic.crime`
+    is true about a story we could not split into violence or theft, where a
+    guessed leaf would not be."""
+    if classification is None or not classification.subject_path:
+        return classification
+    path = classification.subject_path
+    if not subject.needs_third_level(path):
+        return classification
+    try:
+        answers = await decide(
+            state_for(title, body), subject.level_three_question(path),
+            trace_name="subject-leaf", metadata=meta,
+        )
+    except Exception as exc:  # noqa: BLE001 — the parent stands
+        logger.warning("subject_leaf_failed", error_type=type(exc).__name__, error=str(exc)[:160], path=path)
+        return classification
+    deeper, confidence = subject.deepen(path, answers)
+    return classification.model_copy(update={"subject_path": deeper, "subject_confidence": round(confidence, 3)})
 
 
 def _log_decision_shadow(

@@ -40,6 +40,11 @@ class ClassificationResult(BaseModel):
     role_interests: list[str] = Field(default_factory=list)
     route: Literal["standard", "fast_lane"] = "standard"
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Where the story sits on the subject tree (common/subjects.py), e.g.
+    # "civic.crime.violent". `sector`/`subsector` above are derived from it and
+    # stay for every reader that has not moved to paths.
+    subject_path: str | None = None
+    subject_confidence: float | None = None
 
     @field_validator("regions", mode="after")
     @classmethod

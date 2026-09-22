@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 
+from classification import subject
 from classification.schemas import ClassificationResult, GateResult
 from common.decisions import Choice, ChoiceAnswer, Decisions, Noul, NoulAnswer, Question
 from common.regions import IN_STATES, is_state_code
@@ -147,6 +148,11 @@ QUESTIONS: dict[str, Question] = {
     ),
 }
 
+# The subject tree's questions ride in the SAME call: Jev answers every question
+# in one parallel pass, so a root choice plus one menu per root costs a little
+# input and no extra round trip (classification/subject.py).
+QUESTIONS.update({"subject": subject.root_question(), **subject.level_two_questions()})
+
 QUESTIONS_VERSION = hashlib.sha256(
     json.dumps({k: q.model_dump() for k, q in QUESTIONS.items()}, sort_keys=True).encode()
 ).hexdigest()[:12]
@@ -181,6 +187,7 @@ def to_results(d: Decisions, *, source_country: str | None) -> tuple[GateResult,
     )
     if not gate.is_relevant:
         return gate, None
+    path, path_confidence = subject.path_from(d)
     sector = _choice(d, "sector")
     sub_key = _choice(d, "subsector").choice
     subsector = sub_key.split("/", 1)[1] if sub_key.startswith(f"{sector.choice}/") else None
@@ -196,6 +203,8 @@ def to_results(d: Decisions, *, source_country: str | None) -> tuple[GateResult,
         role_interests=[lens for lens, floor in LENS_MIN.items() if _noul(d, lens) >= floor],
         route="fast_lane" if _noul(d, "fast_lane") >= FAST_LANE_MIN else "standard",
         confidence=sector.confidence,
+        subject_path=path,
+        subject_confidence=round(path_confidence, 3),
     )
 
 
