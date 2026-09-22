@@ -7,7 +7,7 @@ from common.config import get_settings
 from common.db import session_scope
 from common.logging import get_logger
 from common.models import RawItem
-from common.schemas import ClassifiedItemMessage, RawItemMessage
+from common.schemas import ClassifiedItemMessage, EnrichedItemMessage, RawItemMessage
 from ingestion import cisa_kev, nvd, rss
 from ingestion.seed import seed_sources
 
@@ -56,7 +56,6 @@ async def run_all() -> dict[str, int]:
             logger.exception("collector_failed", collector=name)
             results[name] = -1
 
-    results["requeued"] = await requeue_stalled()
     logger.info("ingestion_run_complete", **{f"n_{k}": v for k, v in results.items()})
     return results
 
@@ -64,10 +63,16 @@ async def run_all() -> dict[str, int]:
 async def requeue_stalled(limit: int = 500) -> int:
     """Republish items that stalled mid-pipeline (e.g. LLM outage).
 
-    Safe because every stage handler is idempotent: already-processed items
-    are skipped on replay. Covers two gaps: raw items still 'pending' after
-    a failed classification, and 'relevant' items that never got an article
-    (failed enrichment).
+    Safe because every stage handler is idempotent: already-processed items are
+    skipped on replay. Covers the three ways an item can fall out of the
+    pipeline without any row saying so: a raw item still 'pending' after a
+    failed classification, a 'relevant' item that never got an article (failed
+    enrichment), and an enriched article that never reached an event (the
+    publish to enriched.items failed, or the message dead-lettered).
+
+    Scheduled on its own, not inside run_all: recovery that only runs while
+    ingestion is enabled is off exactly when a cost brake or an outage has
+    stopped the pipeline mid-flight (audit H9).
     """
     requeued = 0
     async with session_scope() as session:
@@ -101,6 +106,28 @@ async def requeue_stalled(limit: int = 500) -> int:
             )
         ).scalars().all()
 
+        # The third gap (audit H9): the article and its enrichment committed,
+        # then the publish to enriched.items failed or the message dead-lettered.
+        # Nothing downstream ever sees the article, and no other query notices:
+        # to classification it is done, to enrichment it is done, and only the
+        # absence of a membership says otherwise.
+        uncorrelated = (
+            await session.execute(
+                text(
+                    """
+                    SELECT a.raw_item_id, a.id AS article_id, en.id AS enrichment_id
+                    FROM articles a
+                    JOIN enrichments en ON en.article_id = a.id
+                    LEFT JOIN event_memberships m ON m.article_id = a.id
+                    WHERE m.id IS NULL AND en.created_at < now() - interval '20 minutes'
+                    ORDER BY en.created_at
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": limit},
+            )
+        ).mappings().all()
+
     for raw_id in pending:
         await stream.publish(stream.RAW_ITEMS, RawItemMessage(raw_item_id=str(raw_id)).model_dump())
         requeued += 1
@@ -109,4 +136,21 @@ async def requeue_stalled(limit: int = 500) -> int:
             stream.CLASSIFIED_ITEMS, ClassifiedItemMessage(raw_item_id=str(raw_id)).model_dump()
         )
         requeued += 1
+    for row in uncorrelated:
+        await stream.publish(
+            stream.ENRICHED_ITEMS,
+            EnrichedItemMessage(
+                raw_item_id=str(row["raw_item_id"]),
+                article_id=str(row["article_id"]),
+                enrichment_id=str(row["enrichment_id"]),
+            ).model_dump(),
+        )
+        requeued += 1
+    if requeued:
+        logger.info(
+            "requeued_stalled",
+            pending=len(pending),
+            unenriched=len(unenriched),
+            uncorrelated=len(uncorrelated),
+        )
     return requeued

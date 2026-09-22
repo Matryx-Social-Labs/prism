@@ -28,12 +28,13 @@ from common import stream
 from common.logging import get_logger, setup_logging
 from correlation.consumer import handle_enriched_item, run_due_analyses
 from enrichment.consumer import handle_classified_item
-from ingestion.runner import run_all
+from ingestion.runner import requeue_stalled, run_all
 
 setup_logging()
 logger = get_logger("worker")
 
 INGEST_INTERVAL_MINUTES = int(os.environ.get("PRISM_INGEST_INTERVAL_MINUTES", "5"))
+REQUEUE_INTERVAL_MINUTES = int(os.environ.get("PRISM_REQUEUE_INTERVAL_MINUTES", "10"))
 CONSUMER_NAME = os.environ.get("PRISM_CONSUMER_NAME", "worker-1")
 
 ALL_STAGES = ["ingestion", "classification", "enrichment", "correlation"]
@@ -174,6 +175,17 @@ async def main(stages: list[str]) -> None:
             run_all,
             IntervalTrigger(minutes=INGEST_INTERVAL_MINUTES),
             id="ingestion",
+            max_instances=1,
+            coalesce=True,
+        )
+        # Recovery is its own job, NOT part of run_all: it used to ride inside
+        # the collector pass, so turning ingestion off (the cost brake, or a
+        # budget floor) also turned off the only thing that re-drives items
+        # stranded mid-pipeline — exactly when there are most of them (audit H9).
+        scheduler.add_job(
+            requeue_stalled,
+            IntervalTrigger(minutes=REQUEUE_INTERVAL_MINUTES),
+            id="requeue",
             max_instances=1,
             coalesce=True,
         )
