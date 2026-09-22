@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SECTOR_GROUPS } from "@/lib/sectors";
+import { NAV_ITEMS } from "@/lib/sectors";
 
 /**
  * The subject nav, on every list surface. Six subjects and All; pill chips in
@@ -73,7 +73,7 @@ export function SectorStrip({
       }
     >
       {item(null, "ALL", allLabel, allHref)}
-      {SECTOR_GROUPS.map((g) => item(g.slug, g.code, g.name, `/sector/${g.slug}`))}
+      {NAV_ITEMS.map((n) => item(n.key, n.code, n.name, n.href))}
     </nav>
   );
 

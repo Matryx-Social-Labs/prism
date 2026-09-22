@@ -136,3 +136,77 @@ def test_the_classification_carries_the_path_and_keeps_the_old_columns():
     assert cls.subject_confidence == pytest.approx(0.92)
     # The old columns still answer, for every reader that has not moved.
     assert cls.sector == "politics" and cls.subsector == "courts_law"
+
+
+# ── the node pages ──────────────────────────────────────────────────────────
+
+
+async def _db_reachable() -> bool:
+    from sqlalchemy import text as _text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from common.db import session_scope
+
+    try:
+        async with session_scope() as s:
+            await s.execute(_text("SELECT 1"))
+        return True
+    except (SQLAlchemyError, OSError):
+        return False
+
+
+async def _get(path: str):
+    from httpx import ASGITransport, AsyncClient
+
+    from api.main import app
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        return await client.get(path)
+
+
+async def test_a_node_counts_exactly_what_it_lists():
+    """The page said "0 stories" above two stories, because the count carried a
+    30-day window the list did not. The two must describe the same set."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    import uuid as _uuid
+    from datetime import UTC, datetime, timedelta
+
+    from common.db import session_scope
+    from common.models import Event
+
+    old = datetime.now(UTC) - timedelta(days=200)
+    async with session_scope() as s:
+        for i in range(3):
+            s.add(Event(id=_uuid.uuid4(), title=f"old crime {i}", sector="other",
+                        subject_path="civic.crime.violent", last_updated_at=old,
+                        projection={"source_slugs": ["the_hindu"]}))
+    body = (await _get("/api/v1/subject/civic/crime?limit=60")).json()
+    assert body["story_count"] >= 3
+    assert body["story_count"] == len(body["stories"]) or len(body["stories"]) == 60
+
+
+async def test_a_node_holds_everything_under_it():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    body = (await _get("/api/v1/subject/civic")).json()
+    assert body["node"]["path"] == "civic"
+    assert [a["path"] for a in body["ancestors"]] == []
+    assert {c["slug"] for c in body["children"]} >= {"crime", "accidents", "community"}
+    deep = (await _get("/api/v1/subject/civic/crime/violent")).json()
+    assert [a["path"] for a in deep["ancestors"]] == ["civic", "civic.crime"]
+
+
+async def test_an_unknown_path_is_404():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    assert (await _get("/api/v1/subject/not/a/subject")).status_code == 404
+
+
+async def test_the_tree_endpoint_rolls_counts_up_to_every_ancestor():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tree = (await _get("/api/v1/subjects")).json()
+    assert [r["slug"] for r in tree["roots"]] == list(subjects.ROOTS)
+    by_path = {n["path"]: n for n in tree["nodes"]}
+    assert by_path["civic"]["story_count"] >= by_path["civic.crime"]["story_count"]

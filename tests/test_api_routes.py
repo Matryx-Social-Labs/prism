@@ -14,6 +14,8 @@ EXPECTED = {
     ("GET", "/api/v1/sitemap/records"),
     ("GET", "/api/v1/sitemap/entities"),
     ("GET", "/api/v1/entity/{slug}"),
+    ("GET", "/api/v1/subjects"),
+    ("GET", "/api/v1/subject/{path}"),
     ("GET", "/api/v1/regions"),
     ("GET", "/api/v1/professions"),
     ("GET", "/api/v1/languages"),
