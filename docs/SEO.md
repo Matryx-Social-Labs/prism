@@ -48,6 +48,27 @@ nothing here changes them.
    (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `OAI-SearchBot` stay allowed — those
    are the citing crawlers). It is a policy call, not a technical one.
 
+## Rank sooner — the order that matters (2026-09-22)
+
+Status on 2026-09-22: none of the owner-side items below is done. The code side
+(this file, plus 0.0.86.0: the record's own image in the schema, the records
+sitemap, `<time>` dates, breadcrumbs, ISR, the robots split) ships regardless;
+these are what turn it into traffic, and each unlocks the next.
+
+| # | Do | Unlocks | Time |
+|---|---|---|---|
+| 1 | **Google Search Console**: Domain property for `readprism.news` (DNS TXT at the registrar), then submit `sitemap.xml`, `news-sitemap.xml`, `records-sitemap.xml` | Every later diagnostic (indexed? Discover? Publisher Center check?) reads from here | 15 min + DNS |
+| 2 | **Bing Webmaster Tools** → "Import from Search Console" | Bing's index (Copilot and ChatGPT search read it) and the IndexNow dashboard that shows the worker's hourly pings landing | 5 min |
+| 3 | **Google Publisher Center**: register Prism as a publication, link the Search Console property, point at `news-sitemap.xml`. It asks for an About page, contact details and the legal entity — all live (`/about`, `hello@`, the LLP) — and reads bylines; ours are "Headline by Prism", so `/about#status` must say plainly how a record is written and corrected | Google News tab and Top Stories eligibility — the single biggest lever for a news site | 30 min + review days |
+| 4 | **`hello@readprism.news` inbound** (Resend inbound or a registrar forward) | Publisher Center may write to it; takedowns and corrections reach a person | 10 min |
+| 5 | **Plausible**: `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` on Vercel + `ci.yml`, one sentence on `/privacy` | Knowing whether 1–4 moved organic sessions | 10 min |
+
+What I need from you to take the code side further: read access to the Search
+Console property once it exists (impressions/clicks by page are the baseline
+the ledger needs), and a yes/no on entity hub pages (`/entity/<slug>`, audit
+H29) — the cast chips currently link to `/search`, which is `noindex`, so no
+topical authority accrues anywhere.
+
 ## How to check it is working
 
 ```
