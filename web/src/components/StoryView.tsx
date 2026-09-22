@@ -300,7 +300,13 @@ export function StoryView({ event }: { event: EventDetail }) {
     </div>
   );
 
-  const namedIn = [...new Set([...regionLabels, ...event.entities.map((en) => en.name)])];
+  // Region labels are places on the chart, not actors with a page; only the
+  // cast links out (audit H29 — these chips used to point at /search, which is
+  // noindex). The slug is the server's: identity is folded there, not here.
+  const namedIn: { label: string; href: string | null }[] = [
+    ...regionLabels.map((label) => ({ label, href: null })),
+    ...event.entities.map((en) => ({ label: en.name, href: en.slug ? `/entity/${en.slug}` : null })),
+  ].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
   const coverageLine = (
     <>
       {coverageEntries.length > 0 && (
@@ -671,7 +677,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                   {namedIn.length > 0 && (
                     <p>
                       <span className="text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Named</span>{" "}
-                      {namedIn.join(" · ")}
+                      {namedIn.map((n) => n.label).join(" · ")}
                     </p>
                   )}
                 </div>
@@ -732,9 +738,13 @@ export function StoryView({ event }: { event: EventDetail }) {
             <div className="card">
               <h3 className="card-h">Named in the reports</h3>
               <div className="flex flex-wrap gap-1.5">
-                {namedIn.slice(0, 12).map((n) => (
-                  <Link key={n} href={`/search?q=${encodeURIComponent(n)}`} className="chip h-[30px] px-2.5 text-[13px]">{n}</Link>
-                ))}
+                {namedIn.slice(0, 12).map((n) =>
+                  n.href ? (
+                    <Link key={n.label} href={n.href} className="chip h-[30px] px-2.5 text-[13px]">{n.label}</Link>
+                  ) : (
+                    <span key={n.label} className="chip h-[30px] px-2.5 text-[13px]">{n.label}</span>
+                  ),
+                )}
               </div>
             </div>
           )}

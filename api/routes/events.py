@@ -352,7 +352,7 @@ async def get_event(
         await db.execute(
             text(
                 """
-                SELECT en.name, en.entity_type, ee.role
+                SELECT en.name, en.entity_type, en.slug, ee.role
                 FROM event_entities ee
                 JOIN entities en ON en.id = ee.entity_id
                 WHERE ee.event_id = :eid
@@ -443,7 +443,7 @@ async def get_event(
         available_lenses=available_lenses(projection, event["sector"]),
         coverage=projection.get("coverage"),
         entities=[
-            EntityOut(name=e["name"], entity_type=e["entity_type"], role=e["role"]) for e in entities
+            EntityOut(name=e["name"], entity_type=e["entity_type"], role=e["role"], slug=e["slug"]) for e in entities
         ],
         story_slug=story["slug"] if story else None,
         sources=[

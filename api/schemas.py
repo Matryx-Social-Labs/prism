@@ -179,6 +179,31 @@ class EntityOut(BaseModel):
     name: str
     entity_type: str
     role: str
+    # The actor's own address. The server owns identity — `common.text.slugify`
+    # is Unicode-aware precisely so an Indic name does not fold to nothing — so
+    # the slug travels with the name instead of being re-derived in the browser.
+    slug: str | None = None
+
+
+class EntityRef(BaseModel):
+    """An actor as its own page addresses it. `schema_type` is the schema.org
+    type the extractor's loose vocabulary maps to (api/routes/entity.py)."""
+
+    slug: str
+    name: str
+    entity_type: str
+    schema_type: str
+    qid: str | None = None
+    aliases: list[str] = []
+
+
+class EntityPage(BaseModel):
+    entity: EntityRef
+    record_count: int
+    # Below the floor the page renders but asks not to be indexed: a stub is a
+    # liability to the crawl budget, not an asset.
+    indexable: bool
+    records: list[FeedItem]
 
 
 class ClaimOut(BaseModel):
@@ -416,11 +441,17 @@ class StoryOutlet(BaseModel):
     reports: int
 
 
+class CastRef(BaseModel):
+    name: str
+    slug: str | None = None  # the actor's page, where an entity row matches the name
+
+
 class TrendingStoryDetail(BaseModel):
     slug: str
     canonical_slug: str  # if != the requested slug, the client should redirect
     label: str
     cast: list[str] = []
+    cast_refs: list[CastRef] = []
     # The story's photographs (up to eight, credited, placeholders out) and
     # who reported it, most reports first — the header's deck and the rail.
     photos: list[StoryPhoto] = []

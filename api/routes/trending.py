@@ -207,6 +207,20 @@ async def story_photos(db: AsyncSession, member_ids_per_story: list[list], limit
 RELATED_MIN_WEIGHT = 0.5
 
 
+async def _cast_refs(db: AsyncSession, names: list[str]) -> list[dict]:
+    """[{name, slug}] for the cast, slug omitted where no entity row matches."""
+    if not names:
+        return []
+    rows = (
+        await db.execute(
+            text("SELECT name, slug FROM entities WHERE name = ANY(CAST(:names AS text[]))"),
+            {"names": names},
+        )
+    ).all()
+    by_name = {r[0]: r[1] for r in rows}
+    return [{"name": n, "slug": by_name.get(n)} for n in names]
+
+
 async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: list[str]) -> list[dict]:
     """Different stories that touch this one, two ways the record can say so:
     a causal note in event_links crossing the story boundary, or protagonists
@@ -389,6 +403,10 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         "canonical_slug": story["slug"],  # if != the requested slug, the client should redirect
         "label": story["label"],
         "cast": story["cast"] or [],
+        # The same names with the address of each actor's page, where one exists.
+        # Resolved here because identity is the server's (common.text.slugify is
+        # Unicode-aware so an Indic name does not fold to nothing in a browser).
+        "cast_refs": await _cast_refs(db, story["cast"] or []),
         "sector": story["sector"],
         "source_count": story["source_count"],
         "velocity": story["velocity"],

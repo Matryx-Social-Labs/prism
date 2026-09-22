@@ -2,7 +2,7 @@
 // page says the same thing about who Prism is. Nothing here invents a fact:
 // every field is read from the API payload the page already renders, and a
 // publisher's photograph is never declared as ours (DESIGN.md § Images).
-import type { EventDetail, FeedItem, TrendingStory, TrendingStoryDetail } from "@/lib/api";
+import type { EntityRef, EventDetail, FeedItem, TrendingStory, TrendingStoryDetail } from "@/lib/api";
 import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site";
 
@@ -61,7 +61,14 @@ export function eventDescription(event: EventDetail): string {
 export function newsArticleLd(event: EventDetail) {
   const url = `${SITE_URL}/story/${event.id}`;
   const sources = (event.sources ?? []).filter((s) => s.url);
-  const about = (event.entities ?? []).slice(0, 12).map((e) => ({ "@type": "Thing", name: e.name }));
+  // `about` names the actors AND addresses them: an engine that follows the id
+  // lands on the hub page that carries the same @id, so record and hub read as
+  // one graph instead of two mentions of a string.
+  const about = (event.entities ?? []).slice(0, 12).map((e) =>
+    e.slug
+      ? { "@type": "Thing", name: e.name, "@id": `${SITE_URL}/entity/${e.slug}#entity`, url: `${SITE_URL}/entity/${e.slug}` }
+      : { "@type": "Thing", name: e.name },
+  );
   return {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
@@ -90,6 +97,27 @@ export function newsArticleLd(event: EventDetail) {
     })),
     author: { "@id": ORG_ID },
     publisher: { "@id": ORG_ID },
+  };
+}
+
+/**
+ * An actor as itself, with the records naming it as its `subjectOf`. The type
+ * is the server's mapping of the extractor's loose vocabulary (Person,
+ * Organization, Place…), defaulting to Thing rather than asserting something
+ * false about a person. `sameAs` carries the Wikidata item where one is known —
+ * the one fact that lets an engine merge this page with the entity it knows.
+ */
+export function entityLd(entity: EntityRef, url: string, recordCount: number) {
+  return {
+    "@context": "https://schema.org",
+    "@type": entity.schema_type,
+    "@id": `${url}#entity`,
+    name: entity.name,
+    url,
+    ...(entity.aliases.length ? { alternateName: entity.aliases.slice(0, 8) } : {}),
+    ...(entity.qid ? { sameAs: [`https://www.wikidata.org/wiki/${entity.qid}`] } : {}),
+    description: `${recordCount} Prism ${recordCount === 1 ? "record names" : "records name"} ${entity.name}.`,
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
   };
 }
 

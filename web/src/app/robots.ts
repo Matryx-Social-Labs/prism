@@ -22,7 +22,7 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "*", allow: "/", disallow: PRIVATE },
       ...TRAINING_CRAWLERS.map((userAgent) => ({ userAgent, disallow: "/" })),
     ],
-    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/news-sitemap.xml`, `${SITE_URL}/records-sitemap.xml`],
+    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/news-sitemap.xml`, `${SITE_URL}/records-sitemap.xml`, `${SITE_URL}/entities-sitemap.xml`],
     host: SITE_URL,
   };
 }

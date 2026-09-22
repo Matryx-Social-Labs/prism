@@ -87,6 +87,8 @@ export interface EntityOut {
   name: string;
   entity_type: string;
   role: string;
+  /** The actor's page, where the server has one. Identity is the server's. */
+  slug?: string | null;
 }
 
 export interface PerspectiveOut {
@@ -369,6 +371,7 @@ export interface TrendingStoryDetail {
   canonical_slug: string;
   label: string;
   cast: string[];
+  cast_refs?: { name: string; slug: string | null }[];
   sector: string | null;
   source_count: number;
   velocity: number;
@@ -400,6 +403,32 @@ export async function fetchTrendingStory(slug: string): Promise<TrendingStoryDet
   });
   if (!res.ok) return null;
   return (await res.json()) as TrendingStoryDetail;
+}
+
+export interface EntityRef {
+  slug: string;
+  name: string;
+  entity_type: string;
+  /** The schema.org type the extractor's loose vocabulary maps to; "Thing" when unrecognised. */
+  schema_type: string;
+  qid: string | null;
+  aliases: string[];
+}
+
+export interface EntityPage {
+  entity: EntityRef;
+  record_count: number;
+  /** False for a stub: the page renders, but asks not to be indexed. */
+  indexable: boolean;
+  records: FeedItem[];
+}
+
+export async function fetchEntity(slug: string): Promise<EntityPage | null> {
+  const res = await fetch(`${API_URL}/api/v1/entity/${encodeURIComponent(slug)}`, {
+    next: { revalidate: 300 },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as EntityPage;
 }
 
 export interface MarketDigest {
