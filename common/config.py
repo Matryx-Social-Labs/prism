@@ -185,6 +185,22 @@ class Settings(BaseSettings):
     # (logistic head on logged (embedding, llm_label) pairs, or a stronger
     # embedder) — not by flipping this flag.
     prism_gate_mode: str = "shadow"  # shadow | (enforce: not implemented — see above) | off
+    # Typed decisions on TypeSafe Jev through OpenRouter's Decisions API
+    # (common/decisions.py). `off`: the LLM gate and classifier as before.
+    # `shadow`: Jev answers beside them and the pair is logged (`decision_shadow`),
+    # behaviour unchanged. `live`: Jev replaces both calls; an item whose sector
+    # or gate answer lands under prism_decisions_min_confidence falls back to the
+    # LLM pair for that item. Pinned to a version: `jev-latest` retunes without
+    # notice. Smoke-tested 2026-09-22 on en/kn/hi: 320-600 ms, ~$0.00005 an item
+    # for gate + classifier in one call, against ~$0.0008 for the two LLM calls.
+    prism_model_decide: str = "typesafe/jev-1.13"
+    prism_decisions_mode: str = "off"  # off | shadow | live
+    prism_decisions_min_confidence: float = 0.0  # set from the shadow run's agreement table
+    # The clip and X-post judges (common/pair_judge.py): `llm` is the judge model
+    # writing one word; `decide` is one Jev choice over the same story and text.
+    # Verdicts are cached with the model that gave them, so a flip re-judges
+    # nothing already settled.
+    prism_judge_backend: str = "llm"  # llm | decide
 
     # Langfuse (self-hosted). The SDK also reads LANGFUSE_* env vars directly;
     # these mirror them so app code can check whether tracing is configured.

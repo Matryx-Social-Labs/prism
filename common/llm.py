@@ -31,7 +31,7 @@ _client: AsyncOpenAI | None = None
 #   402     — OpenRouter "insufficient credits" (manual top-up; treat as a pause,
 #             not a per-message traceback storm)
 #   429     — rate/weekly limit
-_QUOTA_STATUS = {401, 402, 403, 429}
+QUOTA_STATUS = frozenset({401, 402, 403, 429})
 _COOLDOWN_SECONDS = 120
 # Per-request ceiling; see get_llm for why an explicit one matters.
 LLM_TIMEOUT_SECONDS = 90.0
@@ -86,18 +86,31 @@ def _blocked_error(obj: Any) -> dict | None:
     return err if blocked else None
 
 
-async def _respect_cooldown() -> None:
+async def respect_cooldown() -> None:
+    """Wait out a quota pause before any model call — the chat client's and the decisions client's."""
     wait = _cooldown_until - time.monotonic()
     if wait > 0:
         await asyncio.sleep(wait)
 
 
-def _maybe_start_cooldown(error: Exception) -> None:
+def start_cooldown(status: int, message: str = "") -> None:
+    """Pause every model call when a provider rejects for a billing/quota
+    reason. Shared by the chat client and the decisions client: the credits
+    are one account, so a 402 on either is a 402 on both."""
     global _cooldown_until
-    if isinstance(error, APIStatusError) and error.status_code in _QUOTA_STATUS:
-        pause = _WEEKLY_COOLDOWN_SECONDS if "weekly" in str(error).lower() else _COOLDOWN_SECONDS
-        _cooldown_until = time.monotonic() + pause
-        logger.warning("llm_quota_cooldown", status=error.status_code, pause_s=pause)
+    if status not in QUOTA_STATUS:
+        return
+    pause = _WEEKLY_COOLDOWN_SECONDS if "weekly" in message.lower() else _COOLDOWN_SECONDS
+    _cooldown_until = time.monotonic() + pause
+    logger.warning("llm_quota_cooldown", status=status, pause_s=pause)
+
+
+_respect_cooldown = respect_cooldown  # patched by tests/test_reasoning_control.py and test_schema_echo.py
+
+
+def _maybe_start_cooldown(error: Exception) -> None:
+    if isinstance(error, APIStatusError):
+        start_cooldown(error.status_code, str(error))
 
 
 def get_llm() -> AsyncOpenAI:
@@ -235,7 +248,7 @@ async def structured_chat[T: BaseModel](
                 response = await client.chat.completions.create(**kwargs)
             else:
                 _maybe_start_cooldown(e)
-                if e.status_code in _QUOTA_STATUS:
+                if e.status_code in QUOTA_STATUS:
                     raise LlmQuotaError(f"llm quota exhausted ({e.status_code})") from e
                 raise
         except Exception as e:

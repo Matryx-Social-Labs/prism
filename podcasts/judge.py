@@ -15,7 +15,6 @@ structural rule the misses pointed at (one event per story per window).
 from __future__ import annotations
 
 import uuid
-from typing import Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -24,16 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.config import get_settings
 from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
+from common.pair_judge import RIGHT_TEXT_CHARS, PairJudge
+from common.pair_judge import judge_pairs as _judge_pairs
 
 logger = get_logger(__name__)
-
-
-class Verdict(BaseModel):
-    about: Literal["event", "topic", "unrelated"] = Field(
-        description="event: the passage discusses this specific news event (the same happening, decision or announcement); "
-        "topic: the same subject or people but a different happening, or a passing mention, or a show's intro/segue; "
-        "unrelated: neither"
-    )
 
 
 SYSTEM = (
@@ -49,62 +42,38 @@ SYSTEM = (
 )
 
 
+async def _fetch_windows(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    rows = (await db.execute(text(
+        "SELECT w.id, w.text, to_char(e.published_at, 'DD Mon HH24:MI') FROM podcast_windows w "
+        "JOIN podcast_episodes e ON e.id = w.episode_id WHERE w.id = ANY(CAST(:ids AS uuid[]))"
+    ), {"ids": ids})).all()
+    return {r[0]: f"PASSAGE (episode aired {r[2]}):\n{r[1][:RIGHT_TEXT_CHARS]}" for r in rows}
+
+
+CRITERIA = {
+    "event": "the passage itself discusses this very happening — the same decision, announcement, finding or "
+             "result the story's headline names",
+    "topic": "the same people, company, conference, court, ministry or theme but a different happening; a host's "
+             "introduction, segue or list of headlines; a passage that only announces the show will cover the "
+             "subject; a preview of something to come when the story is what then happened, or the reverse",
+    "unrelated": "neither this story nor its subject",
+}
+
+CLIP_JUDGE = PairJudge(
+    system=SYSTEM,
+    criteria=CRITERIA,
+    cache_table="clip_verdicts",
+    right_column="window_id",
+    right_sql_type="uuid",
+    fetch_right=_fetch_windows,
+    trace_name="clip-judge",
+    log_event="clip_judged",
+)
+
+
 async def judge_pairs(db: AsyncSession, pairs: list[tuple[uuid.UUID, uuid.UUID]]) -> dict[tuple[uuid.UUID, uuid.UUID], str]:
     """Verdicts for (event_id, window_id) pairs, from the cache where it has them."""
-    if not pairs:
-        return {}
-    model = get_settings().prism_model_judge
-    cached = {
-        (r[0], r[1]): r[2]
-        for r in (await db.execute(text(
-            "SELECT event_id, window_id, verdict FROM clip_verdicts WHERE (event_id, window_id) IN "
-            "(SELECT unnest(CAST(:e AS uuid[])), unnest(CAST(:w AS uuid[])))"
-        ), {"e": [p[0] for p in pairs], "w": [p[1] for p in pairs]})).all()
-    }
-    todo = [p for p in pairs if p not in cached]
-    if todo:
-        events = {r[0]: r for r in (await db.execute(text(
-            "SELECT id, title, projection->'lens_briefs'->>'reader' AS brief, to_char(first_seen_at, 'DD Mon HH24:MI') AS seen "
-            "FROM events WHERE id = ANY(CAST(:ids AS uuid[]))"
-        ), {"ids": list({p[0] for p in todo})})).all()}
-        windows = {r[0]: (r[1], r[2]) for r in (await db.execute(text(
-            "SELECT w.id, w.text, to_char(e.published_at, 'DD Mon HH24:MI') FROM podcast_windows w JOIN podcast_episodes e ON e.id = w.episode_id "
-            "WHERE w.id = ANY(CAST(:ids AS uuid[]))"
-        ), {"ids": list({p[1] for p in todo})})).all()}
-    judged = 0
-    for ev_id, w_id in todo:
-        ev = events.get(ev_id)
-        win = windows.get(w_id)
-        if not ev or not win:
-            continue
-        passage, aired = win
-        brief = ". ".join((ev[2] or "").split(". ")[:2])
-        try:
-            out = await structured_chat(
-                model=model,
-                messages=[
-                    {"role": "system", "content": SYSTEM},
-                    {"role": "user", "content": f"STORY headline: {ev[1]}\nSTORY first reported: {ev[3]}\nSTORY record: {brief[:600]}\n\nPASSAGE (episode aired {aired}):\n{passage[:1600]}"},
-                ],
-                output_model=Verdict,
-                trace_name="clip-judge",
-                temperature=0,  # a verdict, not a draft: the same pair must judge the same way twice
-                max_tokens=40,
-                reasoning=REASONING_OFF,
-            )
-            verdict = out.about
-        except Exception as exc:  # noqa: BLE001 — an unjudged pair is simply not a clip this run
-            logger.warning("clip_judge_failed", event=str(ev_id), window=str(w_id), error=str(exc)[:160])
-            continue
-        await db.execute(text(
-            "INSERT INTO clip_verdicts (event_id, window_id, verdict, model) VALUES (:e, :w, :v, :m) "
-            "ON CONFLICT (event_id, window_id) DO UPDATE SET verdict = EXCLUDED.verdict, model = EXCLUDED.model"
-        ), {"e": ev_id, "w": w_id, "v": verdict, "m": model})
-        cached[(ev_id, w_id)] = verdict
-        judged += 1
-    if judged:
-        logger.info("clip_judged", pairs=judged, model=model)
-    return cached
+    return await _judge_pairs(db, CLIP_JUDGE, pairs)
 
 
 class Pick(BaseModel):

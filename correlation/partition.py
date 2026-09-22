@@ -33,6 +33,7 @@ from sqlalchemy import text
 
 from common.config import get_settings
 from common.db import session_scope
+from common.decisions import Noul, NoulAnswer, decide
 from common.llm import structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
@@ -728,6 +729,36 @@ class _StoryVeto(BaseModel):
     reason: str
 
 
+# The same verdict as one Jev noul (prism_judge_backend=decide): the story-veto
+# prompt's SAME STORY clause as a positive statement about the candidate.
+VETO_QUESTION = Noul(
+    instructions=(
+        "The CANDIDATE is part of the SAME STORY as the STORY LEAD: the core event or its continuation; a direct "
+        "consequence of it (police action at it, transit closures it caused, arrests, court cases about its "
+        "participants); a reaction to it by leaders, parties, lawyers or institutions; or the same movement or "
+        "cause spreading to another city or state"
+    )
+)
+
+
+def veto_model() -> str:
+    s = get_settings()
+    return s.prism_model_decide if s.prism_judge_backend == "decide" else s.prism_model_gate
+
+
+async def _veto_on_jev(grounding: str, candidate: str, story_root: str) -> _StoryVeto:
+    d = await decide(
+        {"story": grounding, "candidate": candidate},
+        {"same_story": VETO_QUESTION},
+        trace_name="story-veto",
+        metadata={"stage": "partition", "story_root": story_root},
+    )
+    answer = d.answers["same_story"]
+    assert isinstance(answer, NoulAnswer)
+    p = answer.noul
+    return _StoryVeto(same_story=p >= 0.5, confidence=max(p, 1.0 - p), reason=f"jev same_story={p:.2f}")
+
+
 async def _recurring_cast(session, ids: list[str], limit: int = 8) -> list[str]:
     rows = (
         await session.execute(
@@ -777,6 +808,8 @@ async def llm_prune_story(session, root: Node, members: list[Node], model: str) 
         candidate = f"{c.get('title')}\n{(c.get('summary') or '')[:320]}"
         async with sem:
             try:
+                if get_settings().prism_judge_backend == "decide":
+                    return m, await _veto_on_jev(grounding, candidate, root.id)
                 r = await structured_chat(
                     model=model,
                     messages=prompt.compile(grounding=grounding, candidate=candidate),
@@ -906,7 +939,7 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION_V2, llm_veto: 
         labels = leiden_partition(nodes, edges, resolution)
         edge_w = _edge_weight_map(edges)
         by_story = _group_by_story(labels, nodes)
-        veto_log = await _apply_veto(session, by_story, get_settings().prism_model_gate) if llm_veto else []
+        veto_log = await _apply_veto(session, by_story, veto_model()) if llm_veto else []
         stories = await _finalize_stories(session, by_story, edge_w)
     return {"nodes": nodes, "edges": edges, "stories": stories, "veto_log": veto_log}
 
@@ -916,9 +949,8 @@ async def compute_partition(resolution: float = LEIDEN_RESOLUTION_V2, llm_veto: 
 # config version, so a prompt/model/resolution/window/stoplist change re-vets while
 # unchanged stories reuse. codex #5/#6/#9: never keys on the ephemeral Leiden label.
 def veto_config_version() -> str:
-    s = get_settings()
     raw = (
-        f"gate={s.prism_model_gate}|res={LEIDEN_RESOLUTION_V2}|win={STORY_WINDOW_DAYS}"
+        f"gate={veto_model()}|res={LEIDEN_RESOLUTION_V2}|win={STORY_WINDOW_DAYS}"
         # The content gate changes which events are in a story, so tuning it must
         # re-vet. story_signature already covers a membership change for stories
         # that exist; this covers the config itself so a revert to the old value
@@ -1117,7 +1149,7 @@ async def persist_veto_overlay() -> str | None:
         logger.info("veto_disabled", reason="prism_veto_enabled=false")
         return None
     version = veto_config_version()
-    model = get_settings().prism_model_gate
+    model = veto_model()
     # Phase 1 (no lock): read the current base, run the veto, finalize. Verdicts persist.
     async with session_scope() as session:
         base = (

@@ -3,6 +3,52 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.85.0] - 2026-09-22
+
+### Added
+- **Typed decisions on Jev.** The relevance gate and the classifier can be one
+  call to TypeSafe's Jev (`typesafe/jev-1.13`, OpenRouter's alpha Decisions
+  API, the same key): ten typed questions — event, not-news, sector, sub-domain,
+  Indian state, country, language, cyber, markets, fast lane — answered in one
+  ~0.4 s pass with a probability each, folded into the same `GateResult` and
+  `ClassificationResult` the LLM pair writes. `common/decisions.py` is the
+  client (quota, retry and dead-letter semantics as `common/llm.py`, cost on
+  every trace); `classification/decide.py` builds the questions from the
+  taxonomy and the state table and holds the crossing points, each measured.
+  Off by default: `PRISM_DECISIONS_MODE=shadow` runs Jev beside the pair and
+  logs `decision_shadow` with both verdicts per field; `live` lets it answer,
+  with `PRISM_DECISIONS_MIN_CONFIDENCE` sending the least-sure items back to
+  the pair. Measured 2026-09-22 (`tools/bakeoff_decide`, 450 prod items the
+  pair had labelled, 150 each en/kn/hi): gate agreement 77/89/85 %, sector
+  90/90/83 % — Kannada holds — and where they disagreed on `business` and
+  `markets` the LLM was the one wrong (a school shooting and a co-op's ₹51-lakh
+  profit tagged market-moving). Gold sets: relevance 27/27, sector 31/32,
+  sub-domain 12/13. Cost ≈ $0.00013 an item against ≈ $0.0008 for the two
+  LLM calls. `evals/run_all.py --backend decide` runs the gold sets on it.
+- **The pair judges on Jev.** `PRISM_JUDGE_BACKEND=decide` puts the clip
+  judge, the X-post judge and the story veto on one Jev choice or noul each.
+  Clip judge on the 42 gold pairs still in prod: event-precision 1.00, recall
+  0.75, 3-way accuracy 0.88 (the LLM's cached verdicts: 1.00 / 0.56 / 0.71).
+  Story veto on the 1,147 ratified pairs: keep-recall 0.88, separation 0.89;
+  head to head on 162 the LLM keeps more (0.98 / 0.79) and Jev separates
+  more (0.86 / 0.87) — a trade the founder chooses, so the default stays
+  `llm`. Verdict caches carry the model, so a flip re-judges nothing settled.
+
+### Changed
+- **One pair judge.** `podcasts/judge.py` and `xposts/judge.py` were the same
+  function twice; `common/pair_judge.py` is the one copy, and it judges pairs
+  concurrently (four at a time, as the veto always did) and writes verdicts in
+  one batched round trip where the copies asked one pair at a time and wrote
+  one row at a time. Its failure path also logs now: the copies wrote
+  `event=` into structlog's own message key, so a failed verdict raised
+  `TypeError` inside the handler and took the run with it.
+- **The classification write is one conditional UPDATE** (`... WHERE relevance
+  = 'pending'`), not a re-SELECT and an ORM flush: a replayed message or a
+  second worker that held the same item across the model call can no longer
+  flip a settled row, and the stage does one round trip less per item. The
+  feed-state stamp and the body cap are named helpers; results are copied,
+  not mutated.
+
 ## [0.0.84.0] - 2026-09-21
 
 ### Added
