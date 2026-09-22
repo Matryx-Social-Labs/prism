@@ -31,9 +31,19 @@ nothing here changes them.
    property via DNS TXT is best). Submit `sitemap.xml` and `news-sitemap.xml`.
    Once verified, if you want the meta-tag route instead, add
    `verification.google` to `metadata` in `app/layout.tsx`.
-2. **Google Publisher Center** — register Prism as a publication so the news
-   sitemap is read as news. Requirements: an About page (`/about`), contact
-   details, the legal entity, and consistent bylines ("Headline by Prism").
+2. **Google Publisher Center — SKIP IT (checked 2026-09-22).** The manual
+   Google News setup it used to hold is gone: publication pages are
+   auto-generated (March 2025) and there is no news-sitemap field, no
+   categories and no publish step to find. Google's own documentation now
+   says publishers "are automatically considered for Top stories or the News
+   tab of Search. They just need to produce high-quality content and comply
+   with Google News content policies." What remains in Publisher Center is
+   Showcase, a paid licensing programme, and editing an auto-generated page
+   if one appears. Nothing there gates ranking. Google News inclusion is
+   earned by the content plus the signals already shipped (NewsArticle with
+   an image, dates, canonical, `news-sitemap.xml`, which Google reads whether
+   or not it is registered anywhere) — and watched in Search Console under
+   Performance → Search type → News.
 3. **Bing Webmaster Tools** — import from Search Console (one click). IndexNow
    submissions show up under "IndexNow" there; the first acceptance can take a
    day while the key is verified.
@@ -59,7 +69,7 @@ these are what turn it into traffic, and each unlocks the next.
 |---|---|---|---|
 | 1 | **Google Search Console**: Domain property for `readprism.news` (DNS TXT at the registrar), then submit `sitemap.xml`, `news-sitemap.xml`, `records-sitemap.xml` | Every later diagnostic (indexed? Discover? Publisher Center check?) reads from here | 15 min + DNS |
 | 2 | **Bing Webmaster Tools** → "Import from Search Console" | Bing's index (Copilot and ChatGPT search read it) and the IndexNow dashboard that shows the worker's hourly pings landing | 5 min |
-| 3 | **Google Publisher Center**: register Prism as a publication, link the Search Console property, point at `news-sitemap.xml`. It asks for an About page, contact details and the legal entity — all live (`/about`, `hello@`, the LLP) — and reads bylines; ours are "Headline by Prism", so `/about#status` must say plainly how a record is written and corrected | Google News tab and Top Stories eligibility — the single biggest lever for a news site | 30 min + review days |
+| 3 | ~~Google Publisher Center~~ — **not a step any more** (checked 2026-09-22): the manual news setup is gone and inclusion is automatic. Instead, make `/about#status` say plainly how a record is written and corrected — the bylines read "Headline by Prism", and editorial accountability is what a policy review looks for | Google News / Top Stories eligibility, which is now earned by content + the shipped signals, not by registration | 20 min on /about |
 | 4 | **`hello@readprism.news` inbound** (Resend inbound or a registrar forward) | Publisher Center may write to it; takedowns and corrections reach a person | 10 min |
 | 5 | **Plausible**: `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` on Vercel + `ci.yml`, one sentence on `/privacy` | Knowing whether 1–4 moved organic sessions | 10 min |
 
