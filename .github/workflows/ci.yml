@@ -232,7 +232,7 @@ jobs:
           for f in .vercel/.env.production.local web/.vercel/.env.production.local; do
             [ -f "$f" ] || continue
             grep -vE '^(NEXT_PUBLIC_API_URL|NEXT_PUBLIC_SITE_URL|NEXT_PUBLIC_GOOGLE_CLIENT_ID)=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-            echo 'NEXT_PUBLIC_API_URL="https://prism-production-6747.up.railway.app"' >> "$f"
+            echo 'NEXT_PUBLIC_API_URL="https://api.readprism.news"' >> "$f"
             # Google sign-in: the OAuth client id is public (it ships in the page); the API checks the token's audience against the same value.
             echo 'NEXT_PUBLIC_GOOGLE_CLIENT_ID="740109723206-hjhee8qvdt8ieloktujsjn025uh449rq.apps.googleusercontent.com"' >> "$f"
             echo 'NEXT_PUBLIC_SITE_URL="https://www.readprism.news"' >> "$f"
