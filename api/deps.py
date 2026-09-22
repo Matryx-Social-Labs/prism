@@ -1,6 +1,7 @@
 """Shared FastAPI dependencies for the serving layer."""
 
 import hmac
+from typing import Any
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException
@@ -22,6 +23,29 @@ def assert_admin_token_configured(settings: Settings) -> None:
     local = "localhost" in settings.prism_web_url or "127.0.0.1" in settings.prism_web_url
     if settings.prism_admin_token == ADMIN_TOKEN_PLACEHOLDER and not local:
         raise RuntimeError("PRISM_ADMIN_TOKEN is the placeholder; set it before serving")
+
+
+def client_ip(request: Any) -> str | None:
+    """The caller's address, as far as a trusted proxy vouches for it.
+
+    `X-Forwarded-For` reads client, proxy1, proxy2…: everything to the LEFT of
+    the hops our own proxies appended is whatever the caller chose to send. The
+    anonymous Ask cap is keyed on this, so taking the first entry (as this did)
+    meant one script with a rotating header had an unlimited number of
+    identities and could exhaust the day's spend ceiling for every reader
+    (audit H2).
+    """
+    hops = get_settings().prism_trusted_proxy_hops
+    socket_ip = request.client.host if request.client else None
+    if hops <= 0:
+        return socket_ip
+    chain = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
+    if not chain:
+        return socket_ip
+    # The proxy nearest us appended the last entry; step back over the hops we
+    # trust. A chain shorter than that is a direct or misconfigured call — take
+    # its leftmost entry rather than inventing one.
+    return chain[-hops] if len(chain) >= hops else chain[0]
 
 
 async def require_admin(x_admin_token: str = Header(default="")) -> None:

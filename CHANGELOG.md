@@ -5,6 +5,18 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
 ## [0.0.87.0] - 2026-09-22
 
+### Security (H2)
+- **The client address is the hop a trusted proxy vouched for.**
+  `X-Forwarded-For` reads client, proxy1, proxy2…, and everything left of our
+  own proxies' entries is whatever the caller chose to send — so reading the
+  first entry gave one script with a rotating header an unlimited supply of
+  identities, and the anonymous Ask cap (60 a day an address) was the brake it
+  bypassed on its way to the day's shared spend ceiling. The address is now
+  read `PRISM_TRUSTED_PROXY_HOPS` entries from the right (Railway = 1; 0
+  trusts the socket). A signed anonymous cookie was considered and not added:
+  a client drops a cookie as cheaply as it mints a session id, so it would
+  have dressed up the same gap.
+
 ### Added
 - **An actor has a page.** `/entity/<slug>` lists every record naming one
   person, organisation or place, with the actor's own schema (`Person`,

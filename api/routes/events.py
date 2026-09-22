@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.questions import suggested_questions
 from agent.rag import answer_stream, ensure_session
-from api.deps import get_current_user_optional
+from api.deps import client_ip, get_current_user_optional
 from api.schemas import (
     AskRequest,
     BriefResponse,
@@ -660,7 +660,7 @@ async def ask(
     # The Redis-side brakes: a burst from one identity, an anonymous flood from
     # one address, and the day's spend ceiling. Plan caps above still hold if
     # Redis is away.
-    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (request.client.host if request.client else None)
+    ip = client_ip(request)
     reason = await ask_burst_ok(str(user_id) if user_id else str(session_id), ip, anonymous=user_id is None)
     if reason == "burst":
         raise HTTPException(status_code=429, detail={"error": "too many questions this minute", "retry_after_s": 60})
