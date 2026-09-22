@@ -21,7 +21,11 @@ import { Brand } from "@/components/Brand";
 import { sectorGroup } from "@/lib/sectors";
 import { jsonLd, storyLd } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+// Rendered once a minute, not per request: nothing server-rendered here varies
+// by reader (the lens unlock is client-side), so a crawler hitting thousands of
+// records and a reader opening one share the cached shell (audit: force-dynamic
+// dated from the scaffold and cost a Railway round trip per view).
+export const revalidate = 60;
 
 async function load(slug: string): Promise<TrendingStoryDetail | null> {
   try {
