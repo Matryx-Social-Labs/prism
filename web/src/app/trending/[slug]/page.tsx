@@ -158,9 +158,13 @@ export default async function TrendingStoryPage({ params }: { params: Promise<{ 
             <div className="card">
               <h2 id="cast-title" className="card-h">Who is in it · {s.cast.length}</h2>
               <div className="flex flex-wrap gap-1.5">
-                {s.cast.slice(0, 12).map((c) => (
-                  <Link key={c} href={`/search?q=${encodeURIComponent(c)}`} className="chip h-[30px] px-2.5 text-[13px]">{c}</Link>
-                ))}
+                {(s.cast_refs?.length ? s.cast_refs : s.cast.map((name) => ({ name, slug: null }))).slice(0, 12).map((c) =>
+                  c.slug ? (
+                    <Link key={c.name} href={`/entity/${c.slug}`} className="chip h-[30px] px-2.5 text-[13px]">{c.name}</Link>
+                  ) : (
+                    <span key={c.name} className="chip h-[30px] px-2.5 text-[13px]">{c.name}</span>
+                  ),
+                )}
               </div>
             </div>
           </Rail>

@@ -3,6 +3,28 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.87.0] - 2026-09-22
+
+### Added
+- **An actor has a page.** `/entity/<slug>` lists every record naming one
+  person, organisation or place, with the actor's own schema (`Person`,
+  `Organization`, `Place`… — the extractor's loose vocabulary mapped, and
+  `Thing` rather than a false claim when it is one of production's typos),
+  `sameAs` the Wikidata item where one is known, and an `ItemList` of the
+  records. The cast chips on a record and on an arc pointed at `/search`,
+  which is `noindex`: the most-linked anchors on the site led somewhere no
+  engine keeps, so no topical authority accrued anywhere (audit H29).
+  A record's `about` now addresses each actor by the hub's own `@id`, so
+  record and hub read as one graph instead of two mentions of a string.
+  Every actor a chip names has a page — a link that 404s is worse than a thin
+  one — but only an actor in three or more records asks to be indexed
+  (`INDEXABLE_MIN_RECORDS`); prod has 55,214 entities and 5,995 above the
+  floor. `GET /api/v1/entity/{slug}`, `GET /api/v1/sitemap/entities`,
+  `entities-sitemap.xml`, and the slug now travels with every entity the API
+  returns — identity is folded server-side, where `common.text.slugify` is
+  Unicode-aware, never re-derived in a browser where an Indic name would fold
+  to nothing.
+
 ## [0.0.86.0] - 2026-09-22
 
 ### Security (docs/AUDIT-2026-09.md C1, C2, H1, H3, H4, H5, H6, H7)

@@ -14,6 +14,7 @@ from api.routes import (
     auth,
     billing,
     digest,
+    entity,
     events,
     feed,
     label,
@@ -56,6 +57,7 @@ app.include_router(feed.router)
 app.include_router(search.router)
 app.include_router(digest.router)
 app.include_router(events.router)
+app.include_router(entity.router)
 app.include_router(trending.router)
 app.include_router(watchlist.router)
 app.include_router(label.router)

@@ -76,7 +76,7 @@ describe("robots", () => {
     expect(rule.userAgent).toBe("*");
     expect(rule.allow).toBe("/");
     for (const p of ["/account", "/search", "/label/", "/you", "/plus/welcome"]) expect(rule.disallow).toContain(p);
-    expect(r.sitemap).toEqual([expect.stringMatching(/\/sitemap\.xml$/), expect.stringMatching(/\/news-sitemap\.xml$/), expect.stringMatching(/\/records-sitemap\.xml$/)]);
+    expect(r.sitemap).toEqual([expect.stringMatching(/\/sitemap\.xml$/), expect.stringMatching(/\/news-sitemap\.xml$/), expect.stringMatching(/\/records-sitemap\.xml$/), expect.stringMatching(/\/entities-sitemap\.xml$/)]);
     const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
     const blocked = rules.filter((x) => x.disallow === "/").map((x) => x.userAgent);
     expect(blocked).toEqual(expect.arrayContaining(["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent"]));
