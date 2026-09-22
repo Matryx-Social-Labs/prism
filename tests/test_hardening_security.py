@@ -159,3 +159,45 @@ def test_sdk_retries_are_one_so_the_deadline_holds():
     from common.llm import get_llm
 
     assert get_llm().max_retries == 1
+
+
+# ── H2: the client address is what a trusted proxy vouches for ───────────────
+
+
+class _Req:
+    def __init__(self, xff: str | None, socket: str | None = "10.0.0.1"):
+        self.headers = {"x-forwarded-for": xff} if xff else {}
+        self.client = type("C", (), {"host": socket})() if socket else None
+
+
+def test_the_client_ip_is_the_hop_our_proxy_vouched_for(monkeypatch):
+    from api.deps import client_ip
+
+    monkeypatch.setattr(get_settings(), "prism_trusted_proxy_hops", 1)
+    # A caller that starts the chain themselves: the spoofed entry is on the
+    # left, Railway's observation on the right. The cap must key on the right.
+    assert client_ip(_Req("1.2.3.4, 203.0.113.9")) == "203.0.113.9"
+    assert client_ip(_Req("203.0.113.9")) == "203.0.113.9"
+    assert client_ip(_Req(None)) == "10.0.0.1"
+    assert client_ip(_Req("", socket=None)) is None
+
+
+def test_more_proxies_step_back_further_and_zero_trusts_the_socket(monkeypatch):
+    from api.deps import client_ip
+
+    monkeypatch.setattr(get_settings(), "prism_trusted_proxy_hops", 2)
+    assert client_ip(_Req("1.2.3.4, 203.0.113.9, 198.51.100.7")) == "203.0.113.9"
+    # Chain shorter than the trusted depth: a direct or misconfigured call.
+    assert client_ip(_Req("203.0.113.9")) == "203.0.113.9"
+    monkeypatch.setattr(get_settings(), "prism_trusted_proxy_hops", 0)
+    assert client_ip(_Req("1.2.3.4, 203.0.113.9")) == "10.0.0.1"
+
+
+def test_a_rotating_forwarded_header_no_longer_mints_identities(monkeypatch):
+    """The anonymous Ask cap is keyed on this: one spoofing script used to get
+    an unlimited number of addresses and could exhaust the day's ceiling."""
+    from api.deps import client_ip
+
+    monkeypatch.setattr(get_settings(), "prism_trusted_proxy_hops", 1)
+    seen = {client_ip(_Req(f"{i}.{i}.{i}.{i}, 203.0.113.9")) for i in range(1, 50)}
+    assert seen == {"203.0.113.9"}

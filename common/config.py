@@ -219,6 +219,12 @@ class Settings(BaseSettings):
     # API
     cors_origins: str = "http://localhost:3000"
     prism_admin_token: str = Field("change-me", repr=False)
+    # How many proxies sit in front of the API. `X-Forwarded-For` is a list the
+    # CLIENT can start: only the hops a trusted proxy appended are evidence, so
+    # the client address is read this many entries from the RIGHT. Railway puts
+    # exactly one proxy in front of the container; a second CDN in front of that
+    # makes it 2. Zero means "not behind a proxy": trust the socket only.
+    prism_trusted_proxy_hops: int = 1
 
     # Auth (magic-link, bearer). Web URL is where the verify link points.
     prism_web_url: str = "http://localhost:3000"
