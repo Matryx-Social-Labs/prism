@@ -211,7 +211,7 @@ async def _post(body: dict[str, Any]) -> httpx.Response:
             if response.status_code < 400:
                 return response
             if response.status_code in QUOTA_STATUS:
-                start_cooldown(response.status_code, response.text)
+                start_cooldown(response.status_code, response.text, get_settings().prism_model_decide)
                 raise LlmQuotaError(f"decisions {response.status_code}: {response.text[:200]}")
             if response.status_code < 500:
                 raise ValueError(f"decisions {response.status_code}: {response.text[:300]}")

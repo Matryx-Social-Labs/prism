@@ -16,6 +16,10 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 async def try_consume_sample(session: AsyncSession, user_id: UUID) -> bool:
     """Atomically consume one sample.
@@ -250,7 +254,8 @@ async def ask_burst_ok(identity: str, ip: str | None, anonymous: bool) -> str | 
         spent = float(await r.get(f"prism:ask:spend:{day}") or 0.0)
         if spent >= ASK_DAILY_CEILING_USD or (anonymous and spent >= 0.8 * ASK_DAILY_CEILING_USD):
             return "ceiling"
-    except Exception:  # noqa: BLE001 — a limiter that is down must not take Ask down with it
+    except Exception as exc:  # noqa: BLE001 — a limiter that is down must not take Ask down with it
+        logger.warning("ask_throttle_check_failed", error_type=type(exc).__name__, error=str(exc)[:200])
         return None
     return None
 
@@ -267,5 +272,6 @@ async def ask_record_spend(plan: str) -> None:
         key = f"prism:ask:spend:{day}"
         await r.incrbyfloat(key, ASK_COST_USD.get(plan, ASK_COST_USD["plus"]))
         await r.expire(key, 60 * 60 * 26)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — spend goes unrecorded, not Ask undelivered; but say so
+        logger.warning("ask_spend_record_failed", error_type=type(exc).__name__, error=str(exc)[:200])
         return None

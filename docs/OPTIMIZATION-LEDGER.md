@@ -24,9 +24,13 @@ wall time from the worker's point of view; agreement figures name the sample.
 | 6 | `podcasts/judge.py` + `xposts/judge.py` → `common/pair_judge.py` | two ~90 %-identical functions (107 + 93 lines); pairs judged **one at a time**, one INSERT per pair, DB session held across the loop; a failed verdict raised `TypeError` in the except (structlog `event=` collision) and killed the run | one function (143 lines incl. both backends); 4 pairs in flight (`JUDGE_CONCURRENCY`), verdicts in one `executemany`; a failed pair logs and is skipped | `tests/test_pair_judge.py` asserts peak in-flight > 1 and exactly one INSERT batch; mutation-verified | 2026-09-22 |
 | 7 | Classification write → one conditional `UPDATE … WHERE relevance='pending'` | second `session_scope`: SELECT the row again, mutate, ORM flush (2 round trips); a second worker holding the same item across the model call could overwrite a settled row | 1 round trip; rowcount decides publish; the settled row wins | `tests/test_classification_consumer.py::test_an_item_settled_by_another_worker_mid_call_is_not_overwritten` | 2026-09-22 |
 
+| 8 | `structured_chat` under one deadline; SDK retries 2 → 1 (`common/llm.py`) | worst case per hung call: 3 SDK attempts × 3 parse retries × fallback × 90 s ≈ 13.5 min holding an enrichment slot | ≤ 180 s, then redelivery | `tests/test_hardening_security.py::test_a_hung_provider_costs_one_deadline_not_nine_attempts` | 2026-09-22 |
+| 9 | Per-model 429 cooldown (`common/llm.py`) | any model's 429 paused every stage incl. the user-facing Ask stream for 120–900 s | only that model pauses; 401/402/403 stay global | `…::test_a_429_pauses_only_the_model_that_hit_it` | 2026-09-22 |
+| 10 | Thread-link verdict writes → `executemany` (`correlation/threads.py`) | up to 15 sequential INSERTs per event (~600 linked events/day ≈ 9k round trips) | 1 round trip per event | code; DB round trips counted | 2026-09-22 |
+| 11 | Embedding shadow gate removed | one fastembed call per gated news item (~2,500/day) logging a score nobody consumed | 0 | code; the 2026-07-20 calibration verdict recorded in CHANGELOG 0.0.86.0 | 2026-09-22 |
+
 ## Pending (measured at the time each lands)
 
-Retries ×9 → 3 in `common/llm.py`; per-model 429 cooldown; batched INSERT in
-`correlation/threads.py`; Source cache per item; DF-CTE precompute in
+Source cache per item; DF-CTE precompute in
 `_story_component`; duplicate-URL re-embed; thread-link and ask-guard hybrids
 on Jev; web bundle and Lighthouse; SEO levers. See `.claude/plans/product-hardening.plan.md`.

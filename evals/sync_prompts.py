@@ -19,7 +19,6 @@ PROMPTS = [
     "relevance-gate",
     "classifier",
     "extract-shared",
-    "perspective-impact",
     "event-analysis",
     "thread-link",
     "story-veto",

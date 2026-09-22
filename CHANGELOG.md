@@ -3,6 +3,47 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.86.0] - 2026-09-22
+
+### Security (docs/AUDIT-2026-09.md C2, H1, H3, H4, H5, H6, H7)
+- **The admin token is checked in one place, in constant time, and the
+  placeholder refuses to serve.** `require_admin` (`api/deps.py`) replaces
+  three inline `!=` compares on `/admin/*` and the gold-set export;
+  `assert_admin_token_configured` stops the API at start-up when
+  `PRISM_ADMIN_TOKEN` is still `change-me` anywhere but a laptop.
+- **Podcast fetches refuse private addresses.** Episode enclosure URLs are the
+  publisher's; `podcast_client` carries the same `refuse_non_public` hook as
+  the article fetch, on the first request and every redirect hop.
+- **CORS previews are this project's.** `https://.*\.vercel\.app` matched every
+  tenant on a shared suffix; the regex is now `prism-*-matrixsociallabs-projects`.
+- **Security headers on every page**: no framing (the account page's cancel and
+  refund are one click each), no MIME sniffing, a year of HSTS, unused browser
+  features off. A CSP is deliberately not yet set — see `next.config.ts`.
+- **Sign out revokes the session.** `DELETE /api/v1/auth/session` deletes the
+  row for the bearer presented; the web's `clearSession` calls it, so the
+  token is dead now rather than at its 30-day expiry.
+- **A limiter or guard that is down says so.** `ask_burst_ok` and
+  `ask_record_spend` log the failure they used to swallow; the Ask guard
+  escalates to ERROR after five consecutive failures (still fail-open).
+
+### Changed (H16, H17, H18, H19, H23)
+- **One deadline per model call.** `structured_chat` runs under
+  `LLM_DEADLINE_SECONDS` (180 s) and the SDK retries once, not twice: the
+  worst case for a hung provider was 2 × 3 × a fallback × 90 s ≈ 13 minutes
+  holding an enrichment slot; it is now 180 s, then the message is redelivered.
+- **A 429 pauses one model.** The cooldown is per model for rate limits and
+  global only for 401/402/403 (the account); the judge model's weekly cap no
+  longer stalls the gate, the extractor and the reader's Ask stream.
+- **Thread-link verdicts are one round trip** (`executemany`), not one INSERT
+  per candidate.
+- **The embedding shadow gate is gone.** `classification/shadow_gate.py`,
+  `PRISM_GATE_MODE` and the log line: every gated item paid one embedding to
+  log a score whose calibration (2026-07-20, n=500 balanced: AUC 0.67, 0.72
+  contrastive; at ≤3 % content loss it gated ~5 % of junk) had already ruled
+  out enforcing it. The verdict lives here now.
+- The `perspective-impact` prompt (merged into event-analysis long ago) is
+  deleted from the fallbacks and from the Langfuse sync list.
+
 ## [0.0.85.0] - 2026-09-22
 
 ### Added

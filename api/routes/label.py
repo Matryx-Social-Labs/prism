@@ -43,7 +43,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.config import get_settings
+from api.deps import require_admin
 from common.db import get_db
 
 router = APIRouter()
@@ -323,10 +323,9 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     return {"ok": True}
 
 
-@router.get("/api/v1/label/{key}/export")
+@router.get("/api/v1/label/{key}/export", dependencies=[Depends(require_admin)])
 async def export(
     key: str,
-    x_admin_token: str = Header(default=""),
     db: AsyncSession = Depends(get_db),
 ):
     """Every response in the batch, for compiling a gold set offline. ADMIN ONLY.
@@ -346,8 +345,6 @@ async def export(
     belongs in the tool that builds the gold set, where it can be written down and
     argued with, not buried in a serializer.
     """
-    if x_admin_token != get_settings().prism_admin_token:
-        raise HTTPException(status_code=403, detail="invalid admin token")
     b = await _batch(db, key)
     rows = (
         await db.execute(

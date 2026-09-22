@@ -7,7 +7,7 @@ console sender, so the flow works end-to-end in dev with no provider configured.
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -165,6 +165,16 @@ async def set_profile(
         await db.execute(text("SELECT email FROM users WHERE id = :i"), {"i": str(user_id)})
     ).scalar_one()
     return MeResponse(user_id=str(user_id), email=email)
+
+
+@router.delete("/api/v1/auth/session", status_code=204)
+async def sign_out(authorization: str = Header(default=""), db: AsyncSession = Depends(get_db)) -> Response:
+    """Revoke the bearer session presented. 204 either way: whether the token was
+    live is not something an unauthenticated caller gets to learn."""
+    token = authorization.removeprefix("Bearer ").strip()
+    if token:
+        await auth.revoke_session(db, token)
+    return Response(status_code=204)
 
 
 @router.get("/api/v1/auth/me", response_model=MeResponse)

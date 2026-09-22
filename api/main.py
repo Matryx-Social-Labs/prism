@@ -8,6 +8,7 @@ middleware, and routers. Response models live in api/schemas.py.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.deps import assert_admin_token_configured
 from api.routes import (
     admin,
     auth,
@@ -34,10 +35,13 @@ app = FastAPI(
 )
 
 settings = get_settings()
+assert_admin_token_configured(settings)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # This project's Vercel previews only. `.*\.vercel\.app` matched every
+    # tenant's deployment — vercel.app is a shared suffix anyone can publish under.
+    allow_origin_regex=r"https://prism-[a-z0-9-]+-matrixsociallabs-projects\.vercel\.app",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
