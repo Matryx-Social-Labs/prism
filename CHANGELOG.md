@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.88.0] - 2026-09-22
+
+### Added
+- **Who writes this, and how to correct it.** `/about#accountability` says in
+  four lines what a reader and a news policy review both need: every headline
+  and brief is written by software from the reports under it and is bylined
+  "Headline by Prism", the reporting belongs to the outlets, a quote is the
+  article's words or it is absent, and a correction is dated rather than
+  silent — with the address that reaches a person. The organisation schema has
+  claimed `/about#status` as its `correctionsPolicy` since the schema existed
+  and that anchor did not exist: the section it names is this one now, and a
+  test fails if the anchor the schema points at is not on the page.
+
+### Changed
+- `docs/SEO.md` records what the owner has done (Search Console, Bing, the
+  `hello@` alias) and what was decided against (Plausible, for now).
+
 ## [0.0.87.0] - 2026-09-22
 
 ### Security (H2)

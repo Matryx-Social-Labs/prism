@@ -87,4 +87,17 @@ describe("/about — how Prism works, on one live story", () => {
     }
     expect(document.body.textContent).not.toMatch(/[—–]/);
   });
+
+  it("carries the accountability anchor the organisation schema points at", async () => {
+    // `correctionsPolicy` and `publishingPrinciples` address this page; the
+    // anchor they name used to resolve to the page and to nothing on it.
+    fetchFeed.mockResolvedValue([]);
+    render(await AboutPage());
+    const { ORGANIZATION } = await import("@/lib/seo");
+    const anchor = ORGANIZATION.correctionsPolicy.split("#")[1];
+    expect(anchor).toBeTruthy();
+    expect(document.getElementById(anchor)).not.toBeNull();
+    expect(screen.getByText(/written by machine, and says so/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /hello@readprism\.news/i })).toBeInTheDocument();
+  });
 });

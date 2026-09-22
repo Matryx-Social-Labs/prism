@@ -1,3 +1,4 @@
+import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
 import { sentences } from "@/lib/sentences";
 import Link from "next/link";
 import { AskDemo } from "@/components/AskDemo";
@@ -46,6 +47,17 @@ const REFUSALS: [string, string][] = [
   ["No left, right or centre.", "Coverage is described by where an outlet comes from, a fact of the source, not by a rating nobody has made for Indian outlets."],
   ["No photos of its own.", "A picture is only ever the outlet's, shown as a credited link preview of that outlet's report, never as Prism's."],
   ["No silent edits.", "Every record shows when it was last updated; a new report never erases what came before it."],
+];
+
+// Editorial accountability, in the vocabulary a reader and a policy review
+// both read: who writes a record, what a machine does and does not decide, and
+// where a mistake goes. Bylines read "Headline by Prism" — this is the page
+// that says what that means.
+const ACCOUNTABILITY: [string, string][] = [
+  ["A record is written by machine, and says so.", "Every headline, brief and summary on Prism is written by software from the reports listed under it, never by a journalist and never presented as one. That is why a record is bylined \u201CHeadline by Prism\u201D and names the reports it was written from."],
+  ["The reporting is the outlets\u2019.", "Prism does not report. It reads what registered outlets published, keeps each report as it was, and links to it. The journalism belongs to the outlet that did it. What Prism adds is the grouping, the counts and the reading."],
+  ["A quote is the article\u2019s words or it is not there.", "Quotes are checked against the article they came from before they appear. When a check fails the quote is dropped rather than paraphrased."],
+  ["A correction does not overwrite the past.", "A record carries the time it was last updated, and a later report is added to it rather than replacing what came before. Where a record is wrong it is fixed, and it stays dated."],
 ];
 
 type Example = { row: FeedItem; event: EventDetail; outlets: OutletRef[] };
@@ -226,7 +238,33 @@ export async function HowItWorks() {
             </ul>
           </section>
 
-          <section className="border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="status-title">
+          {/* The address `correctionsPolicy` and `publishingPrinciples` point at
+              (lib/seo.ts). It carried no `id`, so the schema's /about#status
+              resolved to the page and to no anchor on it — and a machine-written
+              byline is exactly what a news policy review reads a page like this
+              to understand. */}
+          <section id="accountability" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="accountability-title">
+            <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 09</p>
+            <h2 id="accountability-title" className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">Who writes this, and how to correct it.</h2>
+            <div className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
+              {ACCOUNTABILITY.map(([head, body], i) => (
+                <div key={head} className="border-t pt-4" style={{ borderColor: "var(--line)" }}>
+                  <Reveal delay={i * 40}>
+                    <p className="font-record text-[20px] font-bold leading-[1.25]">{head}</p>
+                    <p className="mt-1.5 text-[15px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>{body}</p>
+                  </Reveal>
+                </div>
+              ))}
+            </div>
+            <p className="mt-5 max-w-[64ch] text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
+              Something wrong in a record is a correction we want: a quote that is not in the article, a
+              headline that misreads it, an outlet credited for a photograph that is not theirs. Write to{" "}
+              <a className="underline underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>{" "}
+              with the record\u2019s link. {LEGAL_ENTITY} publishes Prism and is answerable for it.
+            </p>
+          </section>
+
+          <section id="status" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="status-title">
             <h2 id="status-title" className="font-record text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">Where Prism stands today.</h2>
             <div className="mt-6 grid gap-3 md:grid-cols-3">
               <StatusColumn tone="now" label="Available now" items={AVAILABLE} />
