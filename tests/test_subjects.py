@@ -210,3 +210,14 @@ async def test_the_tree_endpoint_rolls_counts_up_to_every_ancestor():
     assert [r["slug"] for r in tree["roots"]] == list(subjects.ROOTS)
     by_path = {n["path"]: n for n in tree["nodes"]}
     assert by_path["civic"]["story_count"] >= by_path["civic.crime"]["story_count"]
+
+
+async def test_the_public_subject_routes_are_cacheable_at_the_edge():
+    """Both are identical for every reader and each runs a real aggregate; the
+    origin should not recompute them per reader (security review, 2026-09-22)."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tree = await _get("/api/v1/subjects")
+    assert "s-maxage" in tree.headers.get("cache-control", "")
+    node = await _get("/api/v1/subject/civic")
+    assert "s-maxage" in node.headers.get("cache-control", "")

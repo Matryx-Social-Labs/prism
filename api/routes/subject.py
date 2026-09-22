@@ -8,7 +8,7 @@ property and the unsplit ones together. That prefix query is the whole reason
 the path is a dotted string with a `text_pattern_ops` index.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,12 @@ from common.lenses import get_lens
 router = APIRouter()
 
 MAX_STORIES = 60
+# Both routes are public, identical for every reader, and each runs a real
+# aggregate: the tree a GROUP BY over events, a node a prefix scan plus its own
+# COUNT(*). Nothing here is personalised, so the answer is cacheable at the edge
+# and the origin should not recompute it per reader (security review, 2026-09-22).
+TREE_CACHE = "public, s-maxage=900, stale-while-revalidate=3600"
+NODE_CACHE = "public, s-maxage=120, stale-while-revalidate=600"
 
 
 def _node(path: str, count: int | None = None) -> SubjectNode:
@@ -33,13 +39,14 @@ def _node(path: str, count: int | None = None) -> SubjectNode:
 
 
 @router.get("/api/v1/subjects", response_model=SubjectTree)
-async def get_subjects(db: AsyncSession = Depends(get_db)) -> SubjectTree:
+async def get_subjects(response: Response, db: AsyncSession = Depends(get_db)) -> SubjectTree:
     """Every node, with how many served stories sit under it in the live window.
 
     The count is LIVENESS — stories in the last 30 days — which is what the nav
     needs to avoid offering a reader a room nobody has been in this month. A
     node's own page counts its whole archive instead; the two numbers answer
     different questions and are deliberately not the same."""
+    response.headers["Cache-Control"] = TREE_CACHE
     rows = (
         await db.execute(
             text(
@@ -69,6 +76,7 @@ async def get_subjects(db: AsyncSession = Depends(get_db)) -> SubjectTree:
 @router.get("/api/v1/subject/{path:path}", response_model=SubjectPage)
 async def get_subject(
     path: str,
+    response: Response,
     limit: int = Query(default=30, ge=1, le=MAX_STORIES),
     lens: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -77,6 +85,7 @@ async def get_subject(
     path = path.strip("/").replace("/", ".")
     if not subjects.is_valid(path):
         raise HTTPException(status_code=404, detail="no such subject")
+    response.headers["Cache-Control"] = NODE_CACHE
 
     rows = (
         await db.execute(
