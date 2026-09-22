@@ -11,6 +11,7 @@ EXPECTED = {
     ("GET", "/healthz"),
     ("GET", "/api/v1/lenses"),
     ("GET", "/api/v1/taxonomy"),
+    ("GET", "/api/v1/sitemap/records"),
     ("GET", "/api/v1/regions"),
     ("GET", "/api/v1/professions"),
     ("GET", "/api/v1/languages"),

@@ -3,7 +3,7 @@
 // every field is read from the API payload the page already renders, and a
 // publisher's photograph is never declared as ours (DESIGN.md § Images).
 import type { EventDetail, FeedItem, TrendingStory, TrendingStoryDetail } from "@/lib/api";
-import { LEGAL_ENTITY } from "@/lib/legal";
+import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site";
 
 export const ORG_ID = `${SITE_URL}/#organization`;
@@ -24,6 +24,7 @@ export const ORGANIZATION = {
   // numbers, quotes verbatim or absent — the /about page says it at length.
   publishingPrinciples: `${SITE_URL}/about`,
   correctionsPolicy: `${SITE_URL}/about#status`,
+  contactPoint: { "@type": "ContactPoint", email: CONTACT_EMAIL, contactType: "editorial" },
 };
 
 export const WEBSITE = {
@@ -53,7 +54,9 @@ export function eventDescription(event: EventDetail): string {
 /**
  * A record as a NewsArticle. `isBasedOn` lists the reports it is written from
  * — the grounding an answer engine can follow — and `about` the named
- * entities. No image: the publisher's photograph is not ours to declare.
+ * entities. The image is the record's OWN card (opengraph-image.tsx), never
+ * the publisher's photograph: Top Stories and Discover weigh `image`, and
+ * without one the record was not eligible (audit H28).
  */
 export function newsArticleLd(event: EventDetail) {
   const url = `${SITE_URL}/story/${event.id}`;
@@ -71,6 +74,7 @@ export function newsArticleLd(event: EventDetail) {
     dateModified: event.last_updated_at,
     inLanguage: "en-IN",
     isAccessibleForFree: true,
+    image: [{ "@type": "ImageObject", url: `${url}/opengraph-image`, width: 1200, height: 630 }],
     articleSection: event.sector ?? undefined,
     keywords: [...new Set([event.sector, ...(event.entities ?? []).map((e) => e.name)].filter(Boolean))].slice(0, 20).join(", ") || undefined,
     about: about.length ? about : undefined,
@@ -86,6 +90,15 @@ export function newsArticleLd(event: EventDetail) {
     })),
     author: { "@id": ORG_ID },
     publisher: { "@id": ORG_ID },
+  };
+}
+
+/** Home → subject → record, so an engine can place a record in the hierarchy. */
+export function breadcrumbLd(trail: { name: string; url: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((t, i) => ({ "@type": "ListItem", position: i + 1, name: t.name, item: t.url })),
   };
 }
 

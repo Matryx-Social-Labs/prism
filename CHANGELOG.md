@@ -62,6 +62,22 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 - The `perspective-impact` prompt (merged into event-analysis long ago) is
   deleted from the fallbacks and from the Langfuse sync list.
 
+### SEO / GEO (H28, H30, H31, Q5)
+- **Records carry an image again — their own.** `NewsArticle` names the
+  record's OG card (`/story/<id>/opengraph-image`, 1200×630), never the
+  publisher's photograph; Top Stories and Discover do not consider a record
+  without one.
+- **The archive is in a sitemap.** `records-sitemap.xml` lists every served
+  record from `GET /api/v1/sitemap/records` (one file to 50,000 URLs); the
+  general sitemap stopped at the freshest hundred, so most of the corpus was
+  invisible to crawlers within days.
+- Visible dates are `<time datetime>`; `BreadcrumbList` (Prism → subject →
+  record) on every record; `ContactPoint` on the organisation; a canonical on
+  `/`; record and arc pages render once a minute (ISR) instead of per request.
+- **Training crawlers are refused** (`Google-Extended`, `CCBot`,
+  `Applebot-Extended`, `Bytespider`, `meta-externalagent`); the citing
+  crawlers stay allowed. Founder decision; the trade-off is in `robots.ts`.
+
 ### Correlation (C3, C4)
 - **One event per article is a constraint** (migration `a7c3e91d4b28`), and
   match-or-create runs under an advisory lock, so two consumers serialise on

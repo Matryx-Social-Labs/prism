@@ -20,7 +20,7 @@ const event = {
 } as unknown as EventDetail;
 
 describe("structured data", () => {
-  it("a record is a NewsArticle grounded in the reports it is based on, with no publisher photograph", () => {
+  it("a record is a NewsArticle grounded in the reports it is based on, pictured by its own card", () => {
     const ld = newsArticleLd(event) as Record<string, unknown>;
     expect(ld["@type"]).toBe("NewsArticle");
     expect(ld.url).toMatch(/\/story\/e1$/);
@@ -29,7 +29,9 @@ describe("structured data", () => {
     ]);
     expect(ld.about).toEqual([{ "@type": "Thing", name: "Lalbaug" }, { "@type": "Thing", name: "Mumbai Police" }]);
     expect(ld.isAccessibleForFree).toBe(true);
-    expect(ld).not.toHaveProperty("image");
+    // The image is Prism's own OG card, never the publisher's photograph — and
+    // without one Top Stories and Discover do not consider the record.
+    expect(ld.image).toEqual([expect.objectContaining({ url: expect.stringMatching(/\/story\/.+\/opengraph-image$/), width: 1200, height: 630 })]);
     expect(ld.publisher).toEqual({ "@id": expect.stringMatching(/#organization$/) });
   });
 
@@ -68,12 +70,16 @@ describe("structured data", () => {
 });
 
 describe("robots", () => {
-  it("keeps the record open to every crawler and closes the account, search and the labelling tool", () => {
+  it("keeps the record open to search and citing crawlers, closed to training crawlers, and closes the account, search and the labelling tool", () => {
     const r = robots();
     const rule = Array.isArray(r.rules) ? r.rules[0] : r.rules;
     expect(rule.userAgent).toBe("*");
     expect(rule.allow).toBe("/");
     for (const p of ["/account", "/search", "/label/", "/you", "/plus/welcome"]) expect(rule.disallow).toContain(p);
-    expect(r.sitemap).toEqual([expect.stringMatching(/\/sitemap\.xml$/), expect.stringMatching(/\/news-sitemap\.xml$/)]);
+    expect(r.sitemap).toEqual([expect.stringMatching(/\/sitemap\.xml$/), expect.stringMatching(/\/news-sitemap\.xml$/), expect.stringMatching(/\/records-sitemap\.xml$/)]);
+    const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
+    const blocked = rules.filter((x) => x.disallow === "/").map((x) => x.userAgent);
+    expect(blocked).toEqual(expect.arrayContaining(["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent"]));
+    expect(blocked).not.toEqual(expect.arrayContaining(["GPTBot", "ClaudeBot", "PerplexityBot", "OAI-SearchBot", "Googlebot"]));
   });
 });

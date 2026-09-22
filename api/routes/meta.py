@@ -73,6 +73,26 @@ async def get_regions():
     return {"country": "IN", "states": states_payload()}
 
 
+@router.get("/api/v1/sitemap/records")
+async def sitemap_records(db: AsyncSession = Depends(get_db)):
+    """Every served record's id and last change, newest first, for the records
+    sitemap — the feed pages at 100 and the archive was invisible to crawlers
+    past the freshest hundred (audit H30). Capped at the sitemap protocol's
+    50,000 URLs per file; page this endpoint when the corpus passes it."""
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT id, last_updated_at FROM events
+                WHERE COALESCE(jsonb_array_length(projection->'source_slugs'), 0) > 0
+                ORDER BY last_updated_at DESC LIMIT 50000
+                """
+            )
+        )
+    ).all()
+    return {"records": [{"id": str(r[0]), "last_updated_at": r[1].isoformat() if r[1] else None} for r in rows]}
+
+
 @router.get("/api/v1/taxonomy", response_model=TaxonomyResponse)
 async def get_taxonomy():
     return TaxonomyResponse(

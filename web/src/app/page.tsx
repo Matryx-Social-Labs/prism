@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Landing } from "@/components/Landing";
@@ -9,6 +10,10 @@ import { RETURNING_COOKIE } from "@/lib/returning";
 // once and the product is what the domain opens to after that. The redirect is
 // server-side: no flash of marketing for a returning reader, and a crawler
 // (no cookie) always gets the landing.
+// The one address a first crawl lands on had no canonical while every other
+// route did (audit); the landing is `/`, the chart is `/feed`.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
 export default async function Page() {
   if ((await cookies()).has(RETURNING_COOKIE)) redirect("/feed");
   return Landing();

@@ -370,7 +370,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               {routeStory && event.story_slug && (
                 <StatusPill status={boundaryVerified ? "verified" : "provisional"} title={boundaryVerified ? "Story boundary verified; developments below are in sequence." : "Grouping provisional; related reporting is shown without implying chronology."} />
               )}
-              <span>Updated {relativeTime(event.last_updated_at)}</span>
+              <span>Updated <time dateTime={event.last_updated_at}>{relativeTime(event.last_updated_at)}</time></span>
               {group && (
                 <>
                   <span className="dot" />
@@ -560,7 +560,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                       <p className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
                         <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} />
                         <span className="font-semibold" style={{ color: "var(--ink-2)" }}>{s.source_name}</span>
-                        <span className="font-mono text-[11px]">{s.published_at ? relativeTime(s.published_at) : "time unknown"}</span>
+                        <span className="font-mono text-[11px]">{s.published_at ? <time dateTime={s.published_at}>{relativeTime(s.published_at)}</time> : "time unknown"}</span>
                         {sourceIndex.get(s.article_id) != null && <span className="font-mono text-[11px]">[{sourceIndex.get(s.article_id)}]</span>}
                       </p>
                       {s.url ? (

@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchEvent, type EventDetail } from "@/lib/api";
 import { StoryView } from "@/components/StoryView";
-import { eventDescription, jsonLd, newsArticleLd } from "@/lib/seo";
+import { sectorGroup } from "@/lib/sectors";
+import { breadcrumbLd, eventDescription, jsonLd, newsArticleLd } from "@/lib/seo";
+import { SITE_URL } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
+// Rendered once a minute, not per request: nothing server-rendered here varies
+// by reader (the lens unlock is client-side), so a crawler hitting thousands of
+// records and a reader opening one share the cached shell (audit: force-dynamic
+// dated from the scaffold and cost a Railway round trip per view).
+export const revalidate = 60;
 
 // Next memoizes native fetch per request, so generateMetadata and the page
 // share one call to fetchEvent.
@@ -55,11 +61,17 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
 
   // NewsArticle structured data (lib/seo): headline, dates, the reports it is
   // based on and the entities it is about — so search and answer engines see
-  // a grounded record, not a bare link. No image: the publisher's photograph
-  // is not ours to declare.
+  // a grounded record, not a bare link. The image is the record's own card.
+  const group = sectorGroup(event.sector);
+  const trail = [
+    { name: "Prism", url: `${SITE_URL}/` },
+    ...(group ? [{ name: group.name, url: `${SITE_URL}/sector/${group.slug}` }] : []),
+    { name: event.title, url: `${SITE_URL}/story/${event.id}` },
+  ];
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(newsArticleLd(event)) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbLd(trail)) }} />
       <StoryView event={event} />
     </>
   );
