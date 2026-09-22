@@ -62,6 +62,18 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 - The `perspective-impact` prompt (merged into event-analysis long ago) is
   deleted from the fallbacks and from the Langfuse sync list.
 
+### Correlation (C3, C4)
+- **One event per article is a constraint** (migration `a7c3e91d4b28`), and
+  match-or-create runs under an advisory lock, so two consumers serialise on
+  the database rather than on the deployment rule "correlation must stay at
+  concurrency 1" that lived in two comments. Prod had 0 of 20,127 memberships
+  in two events; the rule had held by luck of topology.
+- **A replayed message resumes.** After a failure past the first commit the
+  stream redelivers, and the guard used to return on seeing the membership —
+  leaving the projection stale and the analysis never marked. It now skips
+  the match and still rebuilds, briefs and marks.
+
+
 ## [0.0.85.0] - 2026-09-22
 
 ### Added
