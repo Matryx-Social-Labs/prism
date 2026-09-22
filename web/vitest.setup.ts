@@ -54,7 +54,7 @@ class MockIntersectionObserver implements IntersectionObserver {
   readonly root = null;
   readonly rootMargin = "";
   readonly thresholds: ReadonlyArray<number> = [];
-  constructor(_cb: IntersectionObserverCallback) {}
+  constructor() {}
   observe() {}
   unobserve() {}
   disconnect() {}

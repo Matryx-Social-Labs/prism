@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { PrismMark } from "@/components/PrismMark";
-import { MARK_BAND, MARK_BASE_Y, MARK_TRIANGLE, SPECTRUM } from "@/lib/mark";
+import { MARK_BASE_Y, MARK_TRIANGLE, SPECTRUM } from "@/lib/mark";
 
 /**
  * The mark's geometry, pinned. The old mark stroked the triangle at 1.5 (edges
