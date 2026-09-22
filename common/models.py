@@ -184,6 +184,9 @@ class EventMembership(TimestampMixin, Base):
     # _match_by_url and _match_by_entities ask exactly that, per ingested article.
     __table_args__ = (
         UniqueConstraint("event_id", "article_id", name="uq_event_memberships_event_article"),
+        # One event per article — the invariant the consumer's "concurrency 1"
+        # comment stood in for (migration a7c3e91d4b28).
+        UniqueConstraint("article_id", name="uq_event_memberships_article"),
         Index("ix_event_memberships_article", "article_id"),
     )
 

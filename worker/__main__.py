@@ -302,8 +302,10 @@ async def main(stages: list[str]) -> None:
             )
         )
     if "correlation" in stages:
-        # concurrency must stay 1: parallel articles for the same real event
-        # would race match-or-create and split the cluster.
+        # Kept at 1 for throughput reasons only: match-or-create now takes an
+        # advisory lock on the database (correlation/consumer._attach) and an
+        # article can belong to one event by constraint, so a second replica or
+        # a higher concurrency is safe, just serialised at the lock.
         tasks.append(
             asyncio.create_task(
                 stream.consume(
