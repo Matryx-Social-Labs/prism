@@ -4,7 +4,12 @@ Prism's serving layer is a FastAPI app under `api/` mounted at `/api/v1`. Every
 endpoint is read-only except auth, watchlist, and the admin pipeline trigger.
 Responses are JSON unless noted (the Ask endpoint streams Server-Sent Events).
 
-- **Base URL (prod):** `https://prism-production-6747.up.railway.app`
+- **Base URL (prod):** `https://api.readprism.news` (Railway custom domain on
+  the `api` service, port 8080; `prism-production-6747.up.railway.app` still
+  answers and stays as the fallback. The API had to leave `railway.app` before
+  a session cookie could work at all: that domain is on the Public Suffix List,
+  so anything the API set was a third-party cookie to the web app and blocked
+  by default in Safari and Firefox.)
 - **Base URL (local):** `http://localhost:8000`
 - **Auth:** most endpoints are public. Watchlist and `/auth/me` require a
   `Authorization: Bearer <session-token>` header (from `/auth/verify`). The admin

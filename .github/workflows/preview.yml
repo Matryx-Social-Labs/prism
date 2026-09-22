@@ -76,7 +76,7 @@ jobs:
                    .vercel/.env.production.local web/.vercel/.env.production.local; do
             [ -f "$f" ] || continue
             grep -vE '^(NEXT_PUBLIC_API_URL|NEXT_PUBLIC_SITE_URL)=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-            echo 'NEXT_PUBLIC_API_URL="https://prism-production-6747.up.railway.app"' >> "$f"
+            echo 'NEXT_PUBLIC_API_URL="https://api.readprism.news"' >> "$f"
             echo 'NEXT_PUBLIC_SITE_URL="https://www.readprism.news"' >> "$f"
             echo "patched $f"
           done
