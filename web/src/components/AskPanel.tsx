@@ -16,7 +16,7 @@ import { useSession } from "@/lib/session";
 // with numbered citations; a refusal and a limit are first-class states.
 
 import { useEffect, useRef, useState } from "react";
-import { askQuestion, type AskCitation } from "@/lib/api";
+import { askQuestion } from "@/lib/api";
 
 export function AskPanel({
   eventId,

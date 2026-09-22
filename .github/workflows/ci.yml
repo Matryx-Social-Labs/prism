@@ -122,6 +122,9 @@ jobs:
       - name: Test (vitest)
         run: npm test
 
+      - name: Lint (eslint — rules-of-hooks and exhaustive-deps were never enforced before 0.0.86)
+        run: npm run lint
+
       - name: Typecheck (tsc --noEmit)
         # The job has been NAMED "test + typecheck + build" while never running
         # a typecheck — typing was only whatever `next build` happened to catch.

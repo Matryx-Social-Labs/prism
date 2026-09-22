@@ -102,7 +102,6 @@ function SearchInner() {
   }, [results, group]);
 
   const count = searched && !loading && !failed ? `${shown.length} ${shown.length === 1 ? "result" : "results"}` : null;
-  const sources = shown.reduce((n, i) => n + (i.source_count || 0), 0);
   const outlets = new Set(shown.flatMap((i) => (i.outlets ?? []).map((o) => o.publisher)));
   const dateline = count ? `${count}${outlets.size ? ` · ${outlets.size} ${outlets.size === 1 ? "outlet" : "outlets"}` : ""}` : null;
 

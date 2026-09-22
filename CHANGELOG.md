@@ -26,6 +26,16 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   `ask_record_spend` log the failure they used to swallow; the Ask guard
   escalates to ERROR after five consecutive failures (still fail-open).
 
+### Web (C6, H8)
+- `next` 15.5.20 → 15.5.25 (`npm audit fix`: the critical `next` advisory
+  bundle, `sharp`/libvips, `nanoid`, `fflate`). What remains is `postcss`
+  vendored inside Next 15 — build-time only — and waits for Next 16.
+- **ESLint exists now.** `eslint` + `eslint-config-next` (flat config,
+  `npm run lint`, in CI and `make check`): `rules-of-hooks` and
+  `exhaustive-deps` had never run here, so every `eslint-disable` comment in
+  the tree was silencing a rule that did not exist. Zero problems at the
+  first run once six unused bindings were removed.
+
 ### Changed (H16, H17, H18, H19, H23)
 - **One deadline per model call.** `structured_chat` runs under
   `LLM_DEADLINE_SECONDS` (180 s) and the SDK retries once, not twice: the

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { BranchTree } from "@/components/BranchTree";
@@ -24,12 +24,6 @@ function tree(nodes: BranchNode[], shape?: Partial<BranchTreeData["shape"]>): Br
     },
   };
 }
-
-const rowText = () =>
-  screen
-    .getByLabelText("Storyline structure")
-    .innerText?.split("\n")
-    .filter(Boolean) ?? [];
 
 describe("BranchTree — TRUNK is the flat timeline", () => {
   // The design's central call: a reader who doesn't care about structure must
