@@ -17,6 +17,7 @@
  * counts, and which proposer suggested a row.
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -190,7 +191,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   const [primed, setPrimed] = useState<boolean | null>(null);
   const [task, setTask] = useState<LabelTask | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "result" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "result" | "requalify" | "error">("loading");
   // Practice only: the answer to the question just answered, shown until "Next".
   const [feedback, setFeedback] = useState<LabelFeedback | null>(null);
   // Practice or test: the score, once every question in the round is answered.
@@ -272,8 +273,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         setTask(t.task);
         setState("ready");
       }
-    } catch {
-      setState("error");
+    } catch (e) {
+      // 403 on a work batch: this account no longer holds the kind (live
+      // checks withdrew it) or was paused — a reason to go back, not a glitch.
+      setState(e instanceof Error && e.message === "403" ? "requalify" : "error");
     }
   }, [batchKey, token]);
 
@@ -302,6 +305,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         // A practice answer is marked straight away and waits for "Next";
         // everything else moves on.
         if (res?.feedback) setFeedback(res.feedback);
+        else if (res?.requalify) setState("requalify");
         else await load();
       } catch {
         setState("error");
@@ -453,6 +457,13 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       )}
       {state === "closed" && <Note>This batch is closed. Thank you.</Note>}
       {state === "result" && result && <RoundResult result={result} />}
+      {state === "requalify" && (
+        <Note>
+          You can&apos;t label this batch right now. Either your recent answers on the check questions hidden in the
+          work fell below 80% — take this task&apos;s test again — or your labelling was paused.{" "}
+          <Link className="underline" href="/label">Open your workspace</Link>
+        </Note>
+      )}
       {state === "ready" && task && feedback && (
         <PracticeFeedback task={task} feedback={feedback} onNext={() => void load()} />
       )}

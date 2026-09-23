@@ -7,6 +7,7 @@
     uv run python -m tools.label_qualify --load KEY k.json        # write edited explanations back
     uv run python -m tools.label_qualify --check KEY              # fairness + completeness report
     uv run python -m tools.label_qualify --publish KEY            # open it — refuses if --check fails
+    uv run python -m tools.label_qualify --seed-checks WORK --from ROUND [--every 10] [--apply]
 
 WHERE THE ANSWERS COME FROM. Only from answers the founders already agreed on:
 tools/gold_claims (founder-ratified 2026-09-14), items marked `agree` or
@@ -34,6 +35,15 @@ words before the quote; a founder reads and edits them (--dump / --load) before
 nothing is served until a founder publishes it.
 
 A POOL A CONSTANT STRATEGY CAN PASS IS REFUSED (common/label_scoring).
+
+HIDDEN CHECKS (--seed-checks, phase 5). Copies a round's items — with their
+answers — into a WORK batch, one in every N tasks, indistinguishable from the
+rest. api/routes/labeller.recheck watches each account's accuracy on them and
+withdraws the kind below LIVE_MIN. Refuses a work batch that already has
+answers: it renumbers positions, and nobody may have answered against the old
+order. A labeller who missed an item on their test saw its explanation, so a
+copied item can occasionally be one they know; that is at most one or two
+items per person and the window is twenty.
 
 Reads production read-only unless --apply / --load / --publish.
 """
@@ -266,6 +276,49 @@ async def check(c: asyncpg.Connection, key: str) -> bool:
     return ok
 
 
+async def seed_checks(c: asyncpg.Connection, work_key: str, round_key: str, every: int, apply: bool) -> None:
+    work = await c.fetchrow("SELECT id, kind, purpose FROM label_batches WHERE key = $1", work_key)
+    src = await c.fetchrow("SELECT id, kind, purpose FROM label_batches WHERE key = $1", round_key)
+    if work is None or src is None:
+        raise SystemExit("no such batch")
+    if work["purpose"] != "work" or src["purpose"] == "work" or work["kind"] != src["kind"]:
+        raise SystemExit("seed a WORK batch from a practice or test round of the SAME kind")
+    if await c.fetchval("SELECT count(*) FROM label_responses r JOIN label_tasks t ON t.id = r.task_id "
+                        "WHERE t.batch_id = $1", work["id"]):
+        raise SystemExit("refusing: this batch already has answers, and seeding renumbers its positions")
+    tasks = await c.fetch("SELECT id FROM label_tasks WHERE batch_id = $1 ORDER BY position", work["id"])
+    checks = await c.fetch("SELECT seed_event_id, candidates, sector, payload, languages, expected, explanation "
+                           "FROM label_tasks WHERE batch_id = $1 AND expected IS NOT NULL ORDER BY random()", src["id"])
+    plan: list[tuple[str, object]] = []
+    queue = list(checks)
+    for i, t in enumerate(tasks):
+        plan.append(("task", t["id"]))
+        if (i + 1) % (every - 1) == 0 and queue:
+            plan.append(("check", queue.pop()))
+    n_checks = sum(1 for kind, _ in plan if kind == "check")
+    print(f"  {len(tasks)} tasks + {n_checks} hidden checks (one in every {every})")
+    if not apply:
+        return
+    async with c.transaction():
+        # Two steps, so no renumbered task collides with one not yet moved.
+        await c.execute("UPDATE label_tasks SET position = position + 1000000 WHERE batch_id = $1", work["id"])
+        for pos, (kind, item) in enumerate(plan):
+            if kind == "task":
+                await c.execute("UPDATE label_tasks SET position = $2 WHERE id = $1", item, pos)
+            else:
+                await c.execute(
+                    "INSERT INTO label_tasks (id, batch_id, position, seed_event_id, candidates, sector, payload, "
+                    "languages, expected, explanation) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8, $9::jsonb, $10)",
+                    uuid.uuid4(), work["id"], pos, item["seed_event_id"],
+                    item["candidates"] if isinstance(item["candidates"], str) else json.dumps(item["candidates"]),
+                    item["sector"],
+                    None if item["payload"] is None else (item["payload"] if isinstance(item["payload"], str) else json.dumps(item["payload"])),
+                    item["languages"],
+                    item["expected"] if isinstance(item["expected"], str) else json.dumps(item["expected"]),
+                    item["explanation"])
+    print("  written")
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--claims", action="store_true", help="build the claim-attribution practice round and test")
@@ -275,6 +328,9 @@ async def main() -> int:
     ap.add_argument("--load", nargs=2, metavar=("KEY", "FILE"))
     ap.add_argument("--check", metavar="KEY")
     ap.add_argument("--publish", metavar="KEY")
+    ap.add_argument("--seed-checks", metavar="WORK_KEY")
+    ap.add_argument("--from", dest="source", metavar="ROUND_KEY")
+    ap.add_argument("--every", type=int, default=10, help="one hidden check in every N tasks")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     a = ap.parse_args()
@@ -325,6 +381,12 @@ async def main() -> int:
             print(f"  {len(edits)} explanations written to {key}")
         elif a.check:
             return 0 if await check(c, a.check) else 1
+        elif a.seed_checks:
+            if not a.source or a.every < 2:
+                raise SystemExit("--seed-checks needs --from ROUND_KEY and --every >= 2")
+            if not a.apply:
+                await c.execute("SET default_transaction_read_only = on")
+            await seed_checks(c, a.seed_checks, a.source, a.every, a.apply)
         elif a.publish:
             if not await check(c, a.publish):
                 return 1

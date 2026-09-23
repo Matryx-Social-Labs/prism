@@ -951,7 +951,7 @@ export async function postLabelAnswer(
     skipped?: boolean;
     ms_spent: number;
   }
-): Promise<{ feedback?: LabelFeedback }> {
+): Promise<{ feedback?: LabelFeedback; requalify?: boolean }> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/answer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

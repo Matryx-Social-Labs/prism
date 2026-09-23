@@ -44,7 +44,15 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import require_admin
-from api.routes.labeller import ELIGIBLE, _ids, feedback, finish_attempt, languages_for_invite
+from api.routes.labeller import (
+    ELIGIBLE,
+    _ids,
+    feedback,
+    finish_attempt,
+    is_qualified,
+    languages_for_invite,
+    recheck,
+)
 from common.db import get_db
 
 router = APIRouter()
@@ -107,6 +115,15 @@ async def _invite(db: AsyncSession, batch_id, token: str) -> dict:
         {"i": row["id"]},
     )
     return dict(row)
+
+
+async def _still_qualified(db: AsyncSession, b: dict, inv: dict) -> None:
+    """An account's credential for a WORK batch keeps working only while the
+    account holds that kind's qualification — withdrawn on live checks, it must
+    stop at once, not at the next visit to the dashboard. Anonymous invites (a
+    founder's link) and practice/test rounds are not gated here."""
+    if b["purpose"] == "work" and inv["user_id"] and not await is_qualified(db, inv["user_id"], b["kind"]):
+        raise HTTPException(status_code=403, detail="take this task's test again from your workspace")
 
 
 async def _batch(db: AsyncSession, key: str) -> dict:
@@ -214,6 +231,7 @@ async def next_task(
         return {"task": None, "closed": True}
     inv = await _invite(db, b["id"], token)
     langs = await languages_for_invite(db, inv["user_id"])
+    await _still_qualified(db, b, inv)
     row = (
         await db.execute(
             text(
@@ -328,6 +346,7 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=409, detail="batch is closed")
     inv = await _invite(db, b["id"], body.token)
     langs = await languages_for_invite(db, inv["user_id"])  # 403 once the labeller is paused
+    await _still_qualified(db, b, inv)
     if inv["finished_at"] is not None:
         # A scored attempt cannot be edited after it was scored.
         raise HTTPException(status_code=409, detail="this round is finished")
@@ -364,6 +383,10 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
             "u": body.unsure, "sk": body.skipped, "ms": body.ms_spent,
         },
     )
+    if b["purpose"] == "work" and owned["expected"] is not None and inv["user_id"]:
+        # A hidden check item. The labeller is not told which it was; they are
+        # told only if their recent checks have cost them the kind.
+        return {"ok": True, "requalify": await recheck(db, inv["user_id"], b["kind"])}
     if b["purpose"] == "practice":
         # Practice teaches as it goes. A TEST never answers here: its results
         # come once, at the end (finish_attempt), when nothing can be changed.

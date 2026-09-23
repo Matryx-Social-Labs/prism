@@ -697,3 +697,28 @@ describe("a quote-rendering task (phase 4)", () => {
     expect(postLabelAnswer.mock.calls[0][1].selected).toEqual(["task-r1"]);
   });
 });
+
+describe("live checks (phase 5)", () => {
+  const CLAIM = {
+    article_id: "a1", title: "t", source: "s", speaker: "The minister", quote_text: "double its outlay",
+    context_before: "the minister said ", context_after: ".", target: null, stance: "neutral",
+  };
+
+  it("sends a labeller back to their workspace when checks withdraw the kind mid-batch", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: { id: "c1", position: 0, kind: "claim_attribution" as const, claim: CLAIM }, closed: false });
+    postLabelAnswer.mockResolvedValue({ ok: true, requalify: true });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Yes —/ }));
+    expect(await screen.findByText(/take this task's test again/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open your workspace" })).toHaveAttribute("href", "/label");
+  });
+
+  it("explains a 403 rather than calling it an error", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockRejectedValue(new Error("403"));
+    render(<LabelPage params={params} />);
+    expect(await screen.findByText(/You can't label this batch right now/)).toBeInTheDocument();
+    expect(screen.queryByText(/Something went wrong/)).not.toBeInTheDocument();
+  });
+});
