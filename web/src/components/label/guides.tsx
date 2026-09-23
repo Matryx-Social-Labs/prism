@@ -212,6 +212,7 @@ export function EventPrimer({ onStart, action = "Start" }: { onStart: () => void
 export function Primer({ kind, onStart, action, children }: { kind: string; onStart: () => void; action?: string; children?: React.ReactNode }) {
   const claim = kind === "claim_attribution";
   if (kind === "event_identity") return <EventPrimer onStart={onStart} action={action} />;
+  if (kind === "quote_rendering") return <RenderingPrimer onStart={onStart} action={action} />;
   if (kind === "topic_relation") {
     return (
       <div className="mx-auto max-w-[640px] pt-2">
@@ -394,5 +395,74 @@ export function ClaimGuide({ open = false }: { open?: boolean }) {
         </p>
       </div>
     </details>
+  );
+}
+
+
+/** The quote-rendering task: same statement in two languages, or was it
+ *  spoken in the language printed? The examples are INVENTED, for the reason
+ *  the story guide gives — a real pair from the batch would hand out its answer.
+ *
+ *  The case to teach is the one the shadow run showed is hard: the model
+ *  flagged half of Telugu quotes as translations. Sometimes that is right (a
+ *  Telugu outlet quoting the Prime Minister's Hindi speech), sometimes wrong
+ *  (a Telugu minister speaking to Telugu reporters). Only the occasion decides. */
+export function RenderingPrimer({ onStart, action = "I have read this — start" }: { onStart: () => void; action?: string }) {
+  return (
+    <div className="mx-auto max-w-[640px] pt-2">
+      <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>READ THIS FIRST · ABOUT TWO MINUTES</p>
+      <h1 className="mt-2 text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+        Same statement, or a translation?
+      </h1>
+      <p className="mt-4 text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+        Prism checks that every quote is copied exactly from its article. What it cannot check is whether the article
+        printed the words the person <strong>spoke</strong>, or its own translation of them. You answer one of two questions:
+        whether two quotes in two languages are the same statement, or whether a quote was spoken in the language it is
+        printed in.
+      </p>
+      <div className="mt-7 border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO</p>
+        <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
+          <li>Say <strong>same</strong> when both quotes report the same thing said, even though a translation never reads word for word.</li>
+          <li>Say <strong>translated</strong> when a person is quoted in a language they were not speaking: a prime minister&apos;s Hindi speech printed in Kannada, a foreign leader printed in Tamil.</li>
+          <li>Say <strong>spoken so</strong> when the occasion fits: a state minister talking to reporters in the state&apos;s language.</li>
+          <li>Answer <strong>Not sure</strong> when the article does not tell you where or to whom it was said. It is a real answer.</li>
+        </ul>
+      </div>
+      <div className="mt-6 border-l-2 pl-4" style={{ borderColor: "var(--danger, #b91c1c)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO NOT</p>
+        <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+          <li>Do not say <strong>same</strong> because two quotes are on the same subject. Two things one person said about one policy are two statements.</li>
+          <li>Do not guess the language from the outlet alone. A Telugu paper quoting a Telugu minister prints the minister&apos;s own words; the same paper quoting the Prime Minister translates them.</li>
+          <li>Do not judge whether the statement is true, fair or well said.</li>
+        </ul>
+      </div>
+      <p className="mt-7 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>WORKED EXAMPLES · INVENTED</p>
+      <div className="mt-3 space-y-4">
+        {[
+          ["SAME — an English report and a Kannada report of a foreign leader’s speech",
+           "Both carry the one thing she said. Neither is in the language she spoke; both are translations of it — and they are still the same statement."],
+          ["TRANSLATED — a national leader’s Hindi speech, quoted in a Telugu paper",
+           "The speech was given in Hindi. The Telugu words are the paper’s own translation."],
+          ["SPOKEN SO — a Kannada minister, quoted in Kannada after a Bengaluru press meet",
+           "The occasion is a Kannada press meet; the quote is the minister’s own words."],
+          ["NOT SURE — a bilingual politician, quoted in English, with no hint of the occasion",
+           "Nothing in the article says which language was used. Guessing is worse than saying so."],
+        ].map(([head, body]) => (
+          <div key={head}>
+            <p className="text-[14px] font-medium" style={{ color: "var(--ink)" }}>{head}</p>
+            <p className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{body}</p>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onStart}
+        className="mt-8 h-11 rounded-full px-6 text-[14.5px] font-medium"
+        style={{ background: "var(--ink)", color: "var(--bg)" }}
+      >
+        {action}
+      </button>
+    </div>
   );
 }

@@ -33,6 +33,7 @@ import {
 } from "@/lib/api";
 import { ClaimGuide, Guide, Primer, TopicGuide } from "@/components/label/guides";
 import { PracticeFeedback, RoundResult } from "@/components/label/rounds";
+import { QuoteRenderingTask } from "@/components/label/QuoteRenderingTask";
 
 const WHO_KEY = "prism.labeller";
 // Per batch, because one person may be invited to several and each carries its own
@@ -293,7 +294,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           // A claim answer has no candidate ids. "The article does attribute this
           // quote to this speaker" is carried as a single sentinel selection, so
           // the same responses table and the same agreement maths serve both kinds.
-          selected: skipped ? [] : task.claim ? (agreed ? [task.id] : []) : [...picked],
+          selected: skipped ? [] : task.claim || task.rendering ? (agreed ? [task.id] : []) : [...picked],
           unsure,
           skipped,
           ms_spent: Date.now() - startedAt.current,
@@ -476,7 +477,14 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       )}
 
       {state === "ready" && task && primed !== false && !feedback && (
-        task.claim ? (
+        task.rendering ? (
+          <QuoteRenderingTask
+            rendering={task.rendering}
+            position={task.position}
+            saving={saving}
+            onAnswer={(verdict) => void submit(verdict === "unsure", verdict === "skip", verdict === "yes")}
+          />
+        ) : task.claim ? (
           <ClaimTask
             claim={task.claim}
             position={task.position}

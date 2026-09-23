@@ -2,6 +2,7 @@
 
     uv run python -m tools.label_qualify --claims                 # dry run: what the pools would hold
     uv run python -m tools.label_qualify --claims --apply         # write them, CLOSED (unpublished)
+    uv run python -m tools.label_qualify --from-batch KEY [--apply]   # pools from a founder-labelled batch
     uv run python -m tools.label_qualify --dump KEY > k.json      # every item + its explanation, to edit
     uv run python -m tools.label_qualify --load KEY k.json        # write edited explanations back
     uv run python -m tools.label_qualify --check KEY              # fairness + completeness report
@@ -20,6 +21,12 @@ asked about ANOTHER person named in the same article. The article credits the
 words to the real speaker, so "did this other person say it?" is no — by
 construction, not by opinion. The other person must share no name token with
 the speaker, or "Shivakumar" vs "D.K. Shivakumar" would become a wrong "no".
+
+FROM A LABELLED BATCH (--from-batch). A kind with no adjudicated gold — the
+quote-rendering task, the cross-language task — gets its test from the batch
+its first labellers answered: only tasks where at least two people answered
+definitely and all agreed. One person's opinion is never a test answer. Those
+items carry no explanation; a founder writes them before --publish.
 
 EXPLANATIONS ARE DRAFTS. Each item gets one written from the article's own
 words before the quote; a founder reads and edits them (--dump / --load) before
@@ -184,21 +191,52 @@ async def claim_items(c: asyncpg.Connection) -> list[dict]:
     return items
 
 
-async def write_round(c: asyncpg.Connection, purpose: str, name: str, items: list[dict]) -> str:
+MIN_AGREEING = 2
+
+
+async def batch_items(c: asyncpg.Connection, key: str) -> tuple[str, list[dict]]:
+    """(kind, items) from a labelled payload batch: tasks where at least
+    MIN_AGREEING people answered definitely and every definite answer agrees."""
+    b = await c.fetchrow("SELECT id, kind FROM label_batches WHERE key = $1", key)
+    if b is None:
+        raise SystemExit(f"no batch with key {key}")
+    rows = await c.fetch(
+        """
+        SELECT t.id, t.payload, t.languages, r.selected, r.unsure, r.skipped
+        FROM label_tasks t JOIN label_responses r ON r.task_id = t.id
+        WHERE t.batch_id = $1 AND t.payload IS NOT NULL
+        """, b["id"])
+    by: dict[str, dict] = {}
+    for r in rows:
+        t = by.setdefault(str(r["id"]), {"payload": r["payload"], "languages": r["languages"], "votes": []})
+        sel = r["selected"] if isinstance(r["selected"], list) else json.loads(r["selected"] or "[]")
+        if not r["unsure"] and not r["skipped"]:
+            t["votes"].append(bool(sel))
+    items = []
+    for tid, t in by.items():
+        votes = t["votes"]
+        if len(votes) >= MIN_AGREEING and len(set(votes)) == 1:
+            payload = t["payload"] if isinstance(t["payload"], dict) else json.loads(t["payload"])
+            lang = (t["languages"] or [payload.get("language") or "en"])
+            items.append({"payload": payload, "yes": votes[0], "gold": tid, "explanation": "", "languages": list(lang)})
+    return b["kind"], items
+
+
+async def write_round(c: asyncpg.Connection, purpose: str, name: str, items: list[dict], kind: str = KIND) -> str:
     key = secrets.token_urlsafe(9)
     bid = uuid.uuid4()
     async with c.transaction():
         await c.execute(
             "INSERT INTO label_batches (id, key, name, kind, purpose, open, self_join, notes) "
             "VALUES ($1, $2, $3, $4, $5, false, false, $6)",
-            bid, key, name, KIND, purpose,
+            bid, key, name, kind, purpose,
             "DRAFT explanations — a founder reviews them (--dump / --load) before --publish.")
         for pos, it in enumerate(items):
             tid = uuid.uuid4()
             await c.execute(
                 "INSERT INTO label_tasks (id, batch_id, position, candidates, payload, languages, expected, explanation) "
                 "VALUES ($1, $2, $3, '[]'::jsonb, $4::jsonb, $5::text[], $6::jsonb, $7)",
-                tid, bid, pos, json.dumps(it["payload"]), [it["payload"]["language"]],
+                tid, bid, pos, json.dumps(it["payload"]), it.get("languages") or [it["payload"]["language"]],
                 json.dumps({"selected": [str(tid)] if it["yes"] else []}), it["explanation"])
     return key
 
@@ -231,6 +269,7 @@ async def check(c: asyncpg.Connection, key: str) -> bool:
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--claims", action="store_true", help="build the claim-attribution practice round and test")
+    ap.add_argument("--from-batch", metavar="KEY", help="build a kind's practice round and test from a labelled batch")
     ap.add_argument("--apply", action="store_true", help="with --claims: write the batches (closed)")
     ap.add_argument("--dump", metavar="KEY")
     ap.add_argument("--load", nargs=2, metavar=("KEY", "FILE"))
@@ -241,10 +280,10 @@ async def main() -> int:
     a = ap.parse_args()
     c = await asyncpg.connect(a.db or _prod_url(), timeout=60)
     try:
-        if a.claims:
+        if a.claims or a.from_batch:
             if not a.apply:
                 await c.execute("SET default_transaction_read_only = on")
-            items = await claim_items(c)
+            kind, items = (KIND, await claim_items(c)) if a.claims else await batch_items(c, a.from_batch)
             rng = random.Random(a.seed)
             yes = [it for it in items if it["yes"]]
             no = [it for it in items if not it["yes"]]
@@ -253,7 +292,7 @@ async def main() -> int:
             practice = balance(yes[:], no[:], PRACTICE_SIZE, rng)
             used = {it["gold"] for it in practice}
             pool = balance([i for i in yes if i["gold"] not in used], [i for i in no if i["gold"] not in used], POOL_SIZE, rng)
-            print(f"  supply: {len(yes)} yes, {len(no)} no (built by swapping in another person from the article)")
+            print(f"  {kind}: {len(yes)} yes, {len(no)} no available")
             for label, rnd in (("practice", practice), ("test pool", pool)):
                 n_yes = sum(it["yes"] for it in rnd)
                 print(f"  {label}: {len(rnd)} items, {n_yes} yes / {len(rnd) - n_yes} no; constant strategies: "
@@ -263,8 +302,8 @@ async def main() -> int:
             for it in pool[:3]:
                 print(f"    e.g. {'YES' if it['yes'] else 'NO '}  {it['payload']['speaker']}: {it['explanation'][:110]}")
             if a.apply:
-                pk = await write_round(c, "practice", "Practice — who said this?", practice)
-                qk = await write_round(c, "qualify", "Test — who said this?", pool)
+                pk = await write_round(c, "practice", f"Practice — {kind}", practice, kind)
+                qk = await write_round(c, "qualify", f"Test — {kind}", pool, kind)
                 print(f"  written CLOSED: practice {pk}, test {qk}. Review with --dump, then --check and --publish.")
         elif a.dump:
             rows = await c.fetch(

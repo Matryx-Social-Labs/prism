@@ -661,3 +661,39 @@ describe("practice rounds and tests (labeller workspace, phase 3)", () => {
     expect(screen.getByText("Somebody else is named before the quote.")).toBeInTheDocument();
   });
 });
+
+describe("a quote-rendering task (phase 4)", () => {
+  const A = { speaker: "Donald Trump", quote: "ಯುದ್ಧ ತಡೆದಿದ್ದೇನೆ", language: "Kannada", code: "kn", outlet: "TV9 Kannada" };
+  const B = { speaker: "Donald Trump", quote: "I stopped a war", language: "English", code: "en", outlet: "Mint" };
+  const spoken = { id: "task-r1", position: 0, kind: "quote_rendering" as const,
+    rendering: { kind: "quote_rendering" as const, question: "spoken" as const, speaker: "Donald Trump", story: "Trump at the UN", a: A, b: null } };
+
+  it("asks whether it was spoken in the language printed, and shapes the quote in its own script", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: spoken, closed: false });
+    render(<LabelPage params={params} />);
+    expect(await screen.findByRole("heading", { name: "Did Donald Trump say this in Kannada?" })).toBeInTheDocument();
+    expect(screen.getByText(/ಯುದ್ಧ ತಡೆದಿದ್ದೇನೆ/).closest("blockquote")).toHaveAttribute("lang", "kn");
+    expect(screen.getByRole("button", { name: "I can't read Kannada" })).toBeInTheDocument();
+  });
+
+  it("files 'translated' as a definite no and 'spoken so' as a yes", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: spoken, closed: false });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: "No — the outlet translated it" }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
+    expect(postLabelAnswer.mock.calls[0][1]).toMatchObject({ selected: [], unsure: false, skipped: false });
+  });
+
+  it("shows both quotes when asking whether they are the same statement", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: { ...spoken, rendering: { ...spoken.rendering, question: "same" as const, b: B } }, closed: false });
+    render(<LabelPage params={params} />);
+    expect(await screen.findByRole("heading", { name: "Is this the same statement by Donald Trump?" })).toBeInTheDocument();
+    expect(screen.getByText(/I stopped a war/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Yes — the same statement" }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
+    expect(postLabelAnswer.mock.calls[0][1].selected).toEqual(["task-r1"]);
+  });
+});

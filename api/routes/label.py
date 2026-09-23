@@ -245,9 +245,16 @@ async def next_task(
         payload = row["payload"]
         if isinstance(payload, str):
             payload = json.loads(payload)
+        # A payload task names its own shape. Claims were the only one until the
+        # quote-rendering task (labeller workspace, phase 4) — "same statement
+        # in two languages?" and "spoken in the language printed?" — which the
+        # page renders from `rendering` instead of `claim`.
+        if payload.get("kind") == "quote_rendering":
+            shaped = {"kind": "quote_rendering", "rendering": payload}
+        else:
+            shaped = {"kind": "claim_attribution", "claim": payload}
         return {
-            "task": {"id": str(row["id"]), "position": row["position"],
-                     "kind": "claim_attribution", "claim": payload},
+            "task": {"id": str(row["id"]), "position": row["position"], **shaped},
             "closed": False,
         }
 

@@ -37,6 +37,12 @@ describe("learning a task before labelling it", () => {
     expect(router.push).toHaveBeenCalledWith("/label");
   });
 
+  it("teaches the quote-rendering task, the hard case included", async () => {
+    await renderKind("quote_rendering");
+    expect(screen.getByRole("heading", { name: "Same statement, or a translation?" })).toBeInTheDocument();
+    expect(screen.getByText(/the same paper quoting the Prime Minister translates them/)).toBeInTheDocument();
+  });
+
   it("is a 404 for a kind that has no guide", async () => {
     await expect(renderKind("nonsense")).rejects.toThrow("NEXT_NOT_FOUND");
     expect(notFound).toHaveBeenCalled();

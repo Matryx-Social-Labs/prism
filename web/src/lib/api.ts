@@ -833,15 +833,37 @@ export interface LabelClaim {
   article_text?: string;
 }
 
+/** One quote as a quote_rendering task shows it. */
+export interface LabelRenderedQuote {
+  speaker: string;
+  quote: string;
+  /** The language's English name ("Kannada"), and its code for the lang attribute. */
+  language: string;
+  code: string;
+  outlet: string;
+}
+
+/** "Same statement in two languages?" or "spoken in the language printed?"
+ *  (tools/gold_renderings --push; labeller workspace phase 4). */
+export interface LabelRendering {
+  kind: "quote_rendering";
+  question: "same" | "spoken";
+  speaker: string;
+  story: string;
+  a: LabelRenderedQuote;
+  b: LabelRenderedQuote | null;
+}
+
 export interface LabelTask {
   id: string;
   position: number;
   sector?: string | null;
   /** Absent on story tasks, which predate the second kind. */
-  kind?: "claim_attribution";
+  kind?: "claim_attribution" | "quote_rendering";
   seed?: LabelEvent;
   candidates?: LabelEvent[];
   claim?: LabelClaim;
+  rendering?: LabelRendering;
 }
 
 export interface LabelBatch {
