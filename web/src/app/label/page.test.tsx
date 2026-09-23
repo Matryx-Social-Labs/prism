@@ -79,6 +79,29 @@ describe("the labeller workspace", () => {
     expect(row.getByRole("link", { name: "How this task works" })).toHaveAttribute("href", "/label/learn/event_identity");
   });
 
+  it("counts what is waiting for an approved labeller, and links to it", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchLabellerMe.mockResolvedValue(me("active", ["en", "kn"]));
+    fetchLabellerBatches.mockResolvedValue({
+      status: "active",
+      ready: [{ key: "k1", name: "Cross-language", kind: "event_identity", notes: "", eligible: 40, answered: 12, labellers: 3 }],
+      done: [],
+      kinds: [{ kind: "claim_attribution", qualified: false, best_score: null, attempts: 0, can_practise: true, can_test: true, retake_at: null, has_work: true }],
+    });
+    render(<LabellerWorkspace />);
+    expect(await screen.findByRole("link", { name: "28 tasks ready in your languages" })).toHaveAttribute("href", "#ready");
+    expect(screen.getByRole("link", { name: "1 test you can take" })).toHaveAttribute("href", "#learn");
+  });
+
+  it("says nothing is waiting rather than showing zeros", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchLabellerMe.mockResolvedValue(me("active", ["en"]));
+    fetchLabellerBatches.mockResolvedValue({ status: "active", ready: [], done: [], kinds: [] });
+    render(<LabellerWorkspace />);
+    expect(await screen.findByText(/Nothing right now/)).toBeInTheDocument();
+    expect(screen.queryByText(/^0 /)).not.toBeInTheDocument();
+  });
+
   it("starting a batch stores the credential where the task page reads it, then opens it", async () => {
     useSession.mockReturnValue(SESSION);
     fetchLabellerMe.mockResolvedValue(me("active", ["en"]));
