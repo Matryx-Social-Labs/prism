@@ -149,6 +149,12 @@ class Settings(BaseSettings):
     # X bills $0.005 a post read on pay-per-use (2026-09); ~25 official
     # accounts ≈ $2/day. Prepaid credits with auto-recharge off are the hard cap.
     prism_x_enabled: bool = False
+    # Which quotes on a speaker card are one statement printed in two languages,
+    # and which are an outlet's translation (enrichment/renderings.py). Read on the
+    # worker (judge the cards, write claim_verdicts) AND the API (apply them):
+    # worker on, API off = shadow, the X pattern. Off on the API until
+    # tools/gold_renderings reads >= 0.95 on labels. ~$0.0001 a card on Jev.
+    prism_quote_verdicts: bool = False
     # Post→event cosine floor for the CANDIDATE stage. The podcast floor was
     # tuned on 100–150-word windows; a post is 30–60 words — re-measure with
     # tools/gold_xposts before trusting it.

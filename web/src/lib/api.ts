@@ -119,6 +119,12 @@ export interface ClaimOut {
    *  verbatim check, because that check asks whether the words are in THIS
    *  ARTICLE. Printing the language is what keeps the card honest. */
   lang?: string | null;
+  /** Quotes sharing an utterance are ONE statement printed in two languages;
+   *  at most one of them is the words as spoken. Null when alone or unjudged. */
+  utterance?: string | null;
+  /** The outlet's translation: a confident NO to "spoken in the language
+   *  printed?". False means not SHOWN to be one — never "the original". */
+  translated?: boolean;
 }
 
 export interface SpeakerClaims {

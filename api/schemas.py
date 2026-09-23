@@ -261,6 +261,16 @@ class ClaimOut(BaseModel):
     # sentence from reading as Giorgia Meloni's exact words. Null for a row
     # whose source never carried one.
     lang: str | None = None
+    # Two quotes with the same `utterance` are ONE statement printed in two
+    # languages (enrichment/renderings.py) — at most one of them can be the words
+    # as spoken, which is arithmetic and not a model's opinion. Null when the
+    # quote is alone or its card has not been judged.
+    utterance: str | None = None
+    # A confident NO to "were these words spoken in the language printed?": the
+    # outlet's translation, labelled as one. One-sided by founder decision
+    # D-quote-4 — a model may downgrade a claim, never assert which language was
+    # spoken — so false means "not shown to be a translation", never "original".
+    translated: bool = False
 
 
 class SpeakerClaims(BaseModel):

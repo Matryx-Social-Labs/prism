@@ -50,6 +50,8 @@ def test_only_verified_fields_leave_the_server():
         # `lang` is verified in the same sense the rest are: it is the article's
         # own language from raw_items, not something the extractor asserted.
         "lang",
+        # Present but inert unless PRISM_QUOTE_VERDICTS and a judged card.
+        "utterance", "translated",
     }
     assert cl.quote_start == 40
     assert cl.published_at == T0.isoformat()
@@ -216,7 +218,8 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
                             "quote_end": None, "context_before": "", "context_after": "",
                             "article_id": str(aid), "source_name": "Mint",
                             "url": "https://m.example/x?utm_source=rss",
-                            "published_at": T0.isoformat(), "lang": "en"}],
+                            "published_at": T0.isoformat(), "lang": "en",
+                            "utterance": None, "translated": False}],
                 "languages": ["en"],
             }], "the route did not pass claims through, or leaked an unverified field"
             assert body["sources"] and body["sources"][0]["article_id"] == str(aid), (
@@ -347,3 +350,60 @@ def test_a_speaker_quoted_identically_by_two_outlets_still_orders_deterministica
         _src("a3", [_c("X", "a third")], published_at=T0, name="TV9", lang="kn"),
     ])
     assert out[0].languages == ["hi", "kn"]
+
+
+# ── Verdicts: one statement printed twice, and an outlet's translation ───────
+#
+# enrichment/renderings.py judges each speaker card; these pin what the route
+# does with the answer. Keyed by the quote's identity (article + words), never
+# its position, and inert for any quote the verdicts do not mention.
+
+from enrichment.renderings import claim_key  # noqa: E402
+
+
+def _meloni():
+    return [
+        _src("kn1", [_c("Giorgia Meloni", "ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು")], published_at=T1, name="Prajavani", lang="kn"),
+        _src("en1", [_c("Giorgia Meloni", "You must go to school with your face uncovered"),
+                     _c("Giorgia Meloni", "A measure will soon be presented to Cabinet")],
+             published_at=T0, name="Mint", lang="en"),
+    ]
+
+
+def test_a_confident_same_statement_verdict_groups_the_two_renderings():
+    kn = claim_key("kn1", "ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು")
+    en = claim_key("en1", "You must go to school with your face uncovered")
+    card = {"spoken": {}, "same": [[en, kn, 0.95]]}
+    out = group_claims(_meloni(), {"giorgia meloni": card})[0]
+    by_text = {c.quote_text: c for c in out.claims}
+    assert by_text["ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು"].utterance is not None
+    assert by_text["ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು"].utterance == by_text["You must go to school with your face uncovered"].utterance
+    assert by_text["A measure will soon be presented to Cabinet"].utterance is None
+
+
+def test_only_a_confident_no_marks_a_translation():
+    """D-quote-4: a model may downgrade a claim, never assert one. Unsure (0.5)
+    must leave the quote as a verbatim quote."""
+    kn = claim_key("kn1", "ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು")
+    en = claim_key("en1", "You must go to school with your face uncovered")
+    card = {"spoken": {kn: 0.03, en: 0.5}, "same": []}
+    out = group_claims(_meloni(), {"giorgia meloni": card})[0]
+    translated = {c.quote_text for c in out.claims if c.translated}
+    assert translated == {"ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು"}
+
+
+def test_no_verdicts_is_exactly_todays_card():
+    plain = group_claims(_meloni())
+    judged_elsewhere = group_claims(_meloni(), {"someone else": {"spoken": {}, "same": []}})
+    assert [c.model_dump() for c in plain[0].claims] == [c.model_dump() for c in judged_elsewhere[0].claims]
+    assert not any(c.translated or c.utterance for c in plain[0].claims)
+
+
+def test_a_verdict_about_a_quote_no_longer_on_the_card_changes_nothing():
+    """The report it named left the event (a re-cluster, a dedupe): a stale
+    verdict must not group or label anything that remains."""
+    gone = claim_key("gone", "words from a report that moved away")
+    en = claim_key("en1", "You must go to school with your face uncovered")
+    card = {"spoken": {gone: 0.01}, "same": [[en, gone, 0.99]]}
+    out = group_claims(_meloni(), {"giorgia meloni": card})[0]
+    assert not any(c.translated or c.utterance for c in out.claims)

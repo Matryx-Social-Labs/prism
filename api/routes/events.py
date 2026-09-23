@@ -7,8 +7,6 @@ Redis lock so it holds across API replicas.
 
 import json
 import uuid
-from collections.abc import Mapping
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -54,55 +52,20 @@ from common.quota import (
     try_consume_sample,
     unlocked_lenses,
 )
-from common.urls import canonicalize_url
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
-from enrichment.claims import flat_ws
+
+# Shared with the worker's rendering sweep (enrichment/renderings.py), which must
+# see a speaker card exactly as this route builds it.
+from enrichment.claims import dedupe_sources, flat_ws
+from enrichment.claims import speaker_key as _speaker_key
+from enrichment.renderings import apply as apply_renderings
+from enrichment.renderings import claim_key
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-def _speaker_key(name: str) -> str:
-    """Fold punctuation and case ONLY: "D.K. Shivakumar" == "D K Shivakumar".
-
-    Measured on the live window: 3% of events carry one person under two speaker
-    strings, and every real duplicate was a punctuation or case variant. A surname
-    key would also have merged Chinna Reddy with Komatireddy Rajagopal Reddy, who
-    are different people, so tokens are kept: "Jaishankar" and "S Jaishankar" stay
-    two rows. That fold is the QID ledger's job (plan step 5), not this one's.
-    """
-    return " ".join(name.replace(".", " ").split()).casefold()
-
-
 CONTEXT_CHARS = 220
-
-
-def dedupe_sources(sources: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    """Keep one reader-facing row per publisher document.
-
-    A feed's external id is not always stable. BBC, for example, has emitted
-    one article URL with ``#0``, ``#2`` and ``#5`` ids as the item moved in its
-    feed. Those observations remain in the database for provenance, but they
-    are one document, not three sources and not three copies of every quote.
-
-    Rows arrive newest-first, so the first row is the latest observation. The
-    runtime canonicalizer is a fallback for rows created before the canonical
-    URL column was backfilled.
-    """
-    seen: set[tuple[str, str]] = set()
-    unique: list[Mapping[str, Any]] = []
-    for src in sources:
-        canonical = src.get("url_canonical") or canonicalize_url(src.get("url"))
-        key = (
-            ("url", canonical)
-            if canonical
-            else ("article", str(src["article_id"]))
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(src)
-    return unique
 
 
 def quote_context(clean_text: str | None, quote: str, start: int | None, end: int | None) -> tuple[str, str]:
@@ -120,6 +83,21 @@ def quote_context(clean_text: str | None, quote: str, start: int | None, end: in
     if end + CONTEXT_CHARS < len(clean_text) and " " in after:
         after = after.rsplit(" ", 1)[0]
     return before.strip(), after.strip()
+
+
+async def event_claim_verdicts(db: AsyncSession, event_id: uuid.UUID) -> dict[str, dict]:
+    """Speaker key -> the card's verdicts (enrichment/renderings.py). Empty unless
+    PRISM_QUOTE_VERDICTS on this service: the worker judges in shadow while the
+    API serves nothing, until tools/gold_renderings says the verdicts are good."""
+    if not get_settings().prism_quote_verdicts:
+        return {}
+    rows = (
+        await db.execute(
+            text("SELECT speaker_key, verdicts FROM claim_verdicts WHERE event_id = :e"),
+            {"e": str(event_id)},
+        )
+    ).all()
+    return {r.speaker_key: r.verdicts for r in rows if isinstance(r.verdicts, dict)}
 
 
 async def event_x_posts(db: AsyncSession, event_id: uuid.UUID) -> list[XPostOut]:
@@ -240,7 +218,19 @@ def interleave_languages(claims: list[ClaimOut]) -> tuple[list[ClaimOut], list[s
     return out, [lang for lang in order if lang]
 
 
-def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
+def _with_verdicts(claims: list[ClaimOut], card: dict) -> list[ClaimOut]:
+    """Mark which quotes are one statement printed twice and which are an
+    outlet's translation. A quote the verdicts do not mention is returned
+    unchanged — an unjudged card is exactly today's card."""
+    keys = [claim_key(c.article_id, c.quote_text) for c in claims]
+    utterance, translated = apply_renderings(keys, [card])
+    return [
+        c.model_copy(update={"utterance": utterance.get(key), "translated": key in translated})
+        for c, key in zip(claims, keys, strict=True)
+    ]
+
+
+def group_claims(sources: list[dict], verdicts: dict[str, dict] | None = None) -> list[SpeakerClaims]:
     """Speaker-grouped, most-quoted first; newest article first, article order within it.
 
     `sources` is the event's article rows, already newest-first, each carrying
@@ -305,6 +295,8 @@ def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
         ordered, languages = interleave_languages(
             [cl for _, cl in sorted(by[k], key=lambda x: x[0])]
         )
+        if verdicts and k in verdicts:
+            ordered = _with_verdicts(ordered, verdicts[k])
         out.append(
             SpeakerClaims(
                 speaker=label[k],
@@ -521,7 +513,7 @@ async def get_event(
             )
             for p in perspectives
         ],
-        claims=group_claims(sources),
+        claims=group_claims(sources, await event_claim_verdicts(db, event["id"])),
         clips=await event_clips(db, event["id"]),
         x_posts=await event_x_posts(db, event["id"]),
         impacts=[

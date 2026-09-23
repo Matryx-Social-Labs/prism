@@ -57,3 +57,36 @@ export function orderForReader(
   }
   return out;
 }
+
+export interface QuoteUnit {
+  /** The rendering the reader meets first, with its position in the API's array. */
+  lead: { claim: ClaimOut; index: number };
+  /** The same statement as other outlets printed it, in other languages. */
+  also: { claim: ClaimOut; index: number }[];
+}
+
+/**
+ * One unit per STATEMENT, not per quote: renderings that share an utterance
+ * collapse under the first one this reader meets. A card whose verdicts are
+ * off or absent has no utterances, so every quote is its own unit and the
+ * card is exactly what it was.
+ *
+ * The fold counts units. Otherwise a statement printed in English and Kannada
+ * spends both of the card's two places on one thing the speaker said.
+ */
+export function unitsForReader(claims: ClaimOut[], prefer: readonly string[]): QuoteUnit[] {
+  const units: QuoteUnit[] = [];
+  const byUtterance = new Map<string, QuoteUnit>();
+  for (const item of orderForReader(claims, prefer)) {
+    const u = item.claim.utterance;
+    const existing = u ? byUtterance.get(u) : undefined;
+    if (existing) {
+      existing.also.push(item);
+      continue;
+    }
+    const unit: QuoteUnit = { lead: item, also: [] };
+    units.push(unit);
+    if (u) byUtterance.set(u, unit);
+  }
+  return units;
+}
