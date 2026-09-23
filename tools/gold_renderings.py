@@ -118,6 +118,12 @@ async def judge(limit: int, apply: bool) -> None:
 
 
 async def export(path: Path, seed: int) -> None:
+    """Sample from the verdicts first, then fetch only the sampled quotes.
+
+    The first version fetched every judged event's articles one query at a
+    time to label ~240 rows — 5,500 round trips over the prod proxy, 15+
+    minutes. A verdict key already names its article, so the sample can be
+    drawn from the verdicts alone and its quotes read in one query."""
     engine = _engine(read_only=True)
     try:
         async with engine.connect() as conn:
@@ -127,34 +133,37 @@ async def export(path: Path, seed: int) -> None:
                 FROM claim_verdicts cv JOIN events e ON e.id = cv.event_id
                 """
             ))).all()
-            quotes = await _quotes(conn, {str(r.event_id) for r in rows})
+
+            same_yes, same_no, spoken_no, spoken_yes = [], [], [], []
+            for r in rows:
+                v = r.verdicts if isinstance(r.verdicts, dict) else json.loads(r.verdicts)
+                for a, b, p in v.get("same") or []:
+                    (same_yes if p >= renderings.SAME_MIN else same_no).append(("same", p, r, a, b))
+                for k, p in (v.get("spoken") or {}).items():
+                    (spoken_no if p < renderings.SPOKEN_MAX else spoken_yes).append(("spoken", p, r, k, None))
+
+            rng = random.Random(seed)
+            picked = []
+            for pool in (same_yes, same_no, spoken_no, spoken_yes):
+                rng.shuffle(pool)
+                picked += pool[:SAMPLE_PER_SIDE]
+            rng.shuffle(picked)  # the labeller must not read the model's answer from row order
+
+            wanted = {k.split(":", 1)[0] for _, _, _, a, b in picked for k in (a, b) if k}
+            quotes = await _quotes(conn, wanted)
     finally:
         await engine.dispose()
 
-    same_yes, same_no, spoken_no, spoken_yes = [], [], [], []
-    for r in rows:
-        v = r.verdicts if isinstance(r.verdicts, dict) else json.loads(r.verdicts)
-        for a, b, p in v.get("same") or []:
-            if a in quotes and b in quotes:
-                (same_yes if p >= renderings.SAME_MIN else same_no).append(("same", p, r, a, b))
-        for k, p in (v.get("spoken") or {}).items():
-            if k in quotes:
-                (spoken_no if p < renderings.SPOKEN_MAX else spoken_yes).append(("spoken", p, r, k, None))
-
-    rng = random.Random(seed)
-    picked = []
-    for pool in (same_yes, same_no, spoken_no, spoken_yes):
-        rng.shuffle(pool)
-        picked += pool[:SAMPLE_PER_SIDE]
-    rng.shuffle(picked)  # the labeller must not read the model's answer from row order
-
+    written = 0
     with path.open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["id", "kind", "question", "speaker", "story",
                     "a_language", "a_outlet", "a_quote", "b_language", "b_outlet", "b_quote",
                     "model_p", "label"])
         for kind, p, r, a, b in picked:
-            qa, qb = quotes[a], quotes.get(b) if b else None
+            qa, qb = quotes.get(a), quotes.get(b) if b else None
+            if qa is None or (b and qb is None):
+                continue  # the report left the event since it was judged
             question = ("Same statement? y/n" if kind == "same"
                         else f"Spoken in {qa['language']} by the speaker (not translated by {qa['outlet']})? y/n")
             w.writerow([cell(v) for v in (
@@ -162,29 +171,37 @@ async def export(path: Path, seed: int) -> None:
                 qa["language"], qa["outlet"], qa["quote"],
                 qb["language"] if qb else "", qb["outlet"] if qb else "", qb["quote"] if qb else "",
                 p, "")])
-    print(f"wrote {len(picked)} rows to {path}: "
+            written += 1
+    print(f"wrote {written} rows to {path}: "
           f"same {min(len(same_yes), SAMPLE_PER_SIDE)}+{min(len(same_no), SAMPLE_PER_SIDE)}, "
           f"spoken {min(len(spoken_no), SAMPLE_PER_SIDE)}+{min(len(spoken_yes), SAMPLE_PER_SIDE)}")
     print("fill the `label` column with y or n; leave `model_p` alone; do not re-sort before scoring")
 
 
-async def _quotes(conn, event_ids: set[str]) -> dict[str, dict]:
-    """claim key -> the quote as a labeller needs to read it."""
+async def _quotes(conn, article_ids: set[str]) -> dict[str, dict]:
+    """claim key -> the quote as a labeller needs to read it, for these articles only."""
     from common.languages import display_name
 
     out: dict[str, dict] = {}
-    for eid in event_ids:
-        for src in (await conn.execute(renderings.CARD_SOURCES, {"eid": eid})).mappings().all():
-            claims = src["claims"]
-            claims = json.loads(claims) if isinstance(claims, str) else claims
-            for c in claims if isinstance(claims, list) else []:
-                if not isinstance(c, dict) or not isinstance(c.get("quote_text"), str):
-                    continue
-                q = c["quote_text"].strip()
-                out[renderings.claim_key(str(src["article_id"]), q)] = {
-                    "speaker": c.get("speaker") or "", "quote": q,
-                    "language": display_name(src["lang"]) or "unknown", "outlet": src["source_name"],
-                }
+    for src in (await conn.execute(text(
+        """
+        SELECT a.id AS article_id, s.name AS source_name, ri.language AS lang,
+               en.shared_fields -> 'claims' AS claims
+        FROM articles a JOIN raw_items ri ON ri.id = a.raw_item_id
+        JOIN sources s ON s.id = ri.source_id JOIN enrichments en ON en.article_id = a.id
+        WHERE a.id = ANY(CAST(:ids AS uuid[]))
+        """
+    ), {"ids": sorted(article_ids)})).mappings().all():
+        claims = src["claims"]
+        claims = json.loads(claims) if isinstance(claims, str) else claims
+        for c in claims if isinstance(claims, list) else []:
+            if not isinstance(c, dict) or not isinstance(c.get("quote_text"), str):
+                continue
+            q = c["quote_text"].strip()
+            out[renderings.claim_key(str(src["article_id"]), q)] = {
+                "speaker": c.get("speaker") or "", "quote": q,
+                "language": display_name(src["lang"]) or "unknown", "outlet": src["source_name"],
+            }
     return out
 
 
