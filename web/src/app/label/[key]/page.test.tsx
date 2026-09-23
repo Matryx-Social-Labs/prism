@@ -622,6 +622,11 @@ describe("the primer is read before the first judgement", () => {
     expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
     expect(screen.queryByText("Seed headline")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /I have read this/ })).not.toBeInTheDocument();
+    // A second try that works shows the guide, still before the task.
+    fetchLabelGuide.mockResolvedValue(guideFor("story_boundary"));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("heading", { name: "Question for story_boundary" })).toBeInTheDocument();
+    expect(screen.queryByText("Seed headline")).not.toBeInTheDocument();
   });
 
   it("does not show again once acknowledged", async () => {

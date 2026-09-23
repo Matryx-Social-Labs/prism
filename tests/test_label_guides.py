@@ -121,6 +121,7 @@ async def test_only_someone_who_has_applied_is_sent_a_guide():
                 got[status] = r.status_code
                 if r.status_code == 200:
                     assert r.json()["question"] == "Is this the same happening?"
+                    assert r.headers["cache-control"] == "private, no-store"
                 else:
                     assert "same incident" not in r.text
             assert got == {None: 403, "applied": 200, "active": 200, "paused": 200, "removed": 403}
@@ -157,6 +158,7 @@ async def test_a_batch_invite_is_sent_its_own_kinds_guide_and_nothing_else_is():
             # A founder's link (an anonymous invite) reads its batch's guide.
             r = await get(claim_key, claim_anon)
             assert r.status_code == 200 and r.json()["kind"] == "claim_attribution"
+            assert r.headers["cache-control"] == "private, no-store"
             # No credential, a credential for ANOTHER batch, or a paused account's: nothing.
             assert (await get(claim_key, None)).status_code == 403
             assert (await get(claim_key, event_anon)).status_code == 403

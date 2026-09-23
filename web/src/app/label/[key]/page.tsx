@@ -199,6 +199,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   // never from the site's JavaScript (common/label_guides.py).
   const [guide, setGuide] = useState<LabelGuide | null>(null);
   const [guideFailed, setGuideFailed] = useState(false);
+  const [guideTry, setGuideTry] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "result" | "requalify" | "error">("loading");
   // Practice only: the answer to the question just answered, shown until "Next".
@@ -255,13 +256,14 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   useEffect(() => {
     if (!batchKey || !token) return;
     let live = true;
+    setGuideFailed(false);
     fetchLabelGuide(batchKey, token)
       .then((g) => live && setGuide(g))
       .catch(() => live && setGuideFailed(true));
     return () => {
       live = false;
     };
-  }, [batchKey, token]);
+  }, [batchKey, token, guideTry]);
 
   const load = useCallback(async () => {
     if (!batchKey || !token) return;
@@ -498,8 +500,16 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         </Note>
       )}
 
+      {state === "ready" && task && primed === false && !guide && !guideFailed && (
+        <Note>Loading the guide for this task.</Note>
+      )}
       {state === "ready" && task && primed === false && !guide && guideFailed && (
-        <Note>The guide for this task could not be loaded. Reload the page to read it before you start.</Note>
+        <div>
+          <Note>The guide for this task could not be loaded. Read it before you start.</Note>
+          <button type="button" className="btn btn-secondary mt-4" onClick={() => setGuideTry((n) => n + 1)}>
+            Try again
+          </button>
+        </div>
       )}
       {state === "ready" && task && primed === false && guide && (
         <GuidePrimer

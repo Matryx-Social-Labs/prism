@@ -34,7 +34,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -105,7 +105,7 @@ READS_GUIDES = ("applied", "active", "paused")
 
 
 @router.get("/api/v1/labeller/guides/{kind}")
-async def read_guide(kind: str, user_id: uuid.UUID = Depends(get_current_user),
+async def read_guide(kind: str, response: Response, user_id: uuid.UUID = Depends(get_current_user),
                      db: AsyncSession = Depends(get_db)):
     """A task's guide — what it asks, DO / DO NOT, worked examples. Served only
     here and to a batch's own invites (api/routes/label.py), never in the site's
@@ -116,6 +116,8 @@ async def read_guide(kind: str, user_id: uuid.UUID = Depends(get_current_user),
     row = await labeller_row(db, user_id)
     if row is None or row["status"] not in READS_GUIDES:
         raise HTTPException(status_code=403, detail="apply at /label to read the guides")
+    # Never a shared cache's to keep: the next person through it may be anyone.
+    response.headers["Cache-Control"] = "private, no-store"
     return g
 
 
