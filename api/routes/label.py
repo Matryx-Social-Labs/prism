@@ -267,10 +267,15 @@ async def next_task(
         # quote-rendering task (labeller workspace, phase 4) — "same statement
         # in two languages?" and "spoken in the language printed?" — which the
         # page renders from `rendering` instead of `claim`.
-        if payload.get("kind") == "quote_rendering":
+        kind = payload.get("kind") or "claim_attribution"
+        if kind == "quote_rendering":
             shaped = {"kind": "quote_rendering", "rendering": payload}
-        else:
+        elif kind == "claim_attribution":
             shaped = {"kind": "claim_attribution", "claim": payload}
+        else:
+            # Served in the wrong shape, an unknown kind would ask a labeller a
+            # question nobody wrote. Loud beats plausible.
+            raise HTTPException(status_code=500, detail=f"unknown task kind {kind!r}")
         return {
             "task": {"id": str(row["id"]), "position": row["position"], **shaped},
             "closed": False,
@@ -350,6 +355,19 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     if inv["finished_at"] is not None:
         # A scored attempt cannot be edited after it was scored.
         raise HTTPException(status_code=409, detail="this round is finished")
+    if b["purpose"] == "work" and inv["user_id"]:
+        # An account's work answer is FINAL, for every task alike. Rewriting was
+        # how a labeller who could spot a hidden check (by its reply, or by its
+        # position) erased it: answer, then resend as "unsure", which the live
+        # checks do not score (security review, 2026-09-23). Refusing ALL
+        # rewrites, not just checks', keeps the refusal from pointing at them.
+        # A founder's anonymous link still may change its mind, as before.
+        already = (await db.execute(
+            text("SELECT 1 FROM label_responses WHERE task_id = :t AND invite_id = :i"),
+            {"t": body.task_id, "i": inv["id"]},
+        )).first()
+        if already:
+            raise HTTPException(status_code=409, detail="this answer is already in")
     owned = (
         await db.execute(
             text(f"SELECT t.expected, t.explanation FROM label_tasks t WHERE t.id = :t AND t.batch_id = :b "

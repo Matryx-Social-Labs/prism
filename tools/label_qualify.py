@@ -289,12 +289,19 @@ async def seed_checks(c: asyncpg.Connection, work_key: str, round_key: str, ever
     tasks = await c.fetch("SELECT id FROM label_tasks WHERE batch_id = $1 ORDER BY position", work["id"])
     checks = await c.fetch("SELECT seed_event_id, candidates, sector, payload, languages, expected, explanation "
                            "FROM label_tasks WHERE batch_id = $1 AND expected IS NOT NULL ORDER BY random()", src["id"])
+    # One check per block of `every - 1` tasks, at a RANDOM place inside the
+    # block. A fixed period (every tenth) made the checks countable — "the next
+    # one is a check" needs no oracle, only arithmetic (security review,
+    # 2026-09-23). SystemRandom: the placement must not be reproducible from a seed.
+    rng = random.SystemRandom()
     plan: list[tuple[str, object]] = []
     queue = list(checks)
-    for i, t in enumerate(tasks):
-        plan.append(("task", t["id"]))
-        if (i + 1) % (every - 1) == 0 and queue:
-            plan.append(("check", queue.pop()))
+    block = every - 1
+    for start in range(0, len(tasks), block):
+        chunk = [("task", t["id"]) for t in tasks[start:start + block]]
+        if len(chunk) == block and queue:
+            chunk.insert(rng.randint(0, block), ("check", queue.pop()))
+        plan += chunk
     n_checks = sum(1 for kind, _ in plan if kind == "check")
     print(f"  {len(tasks)} tasks + {n_checks} hidden checks (one in every {every})")
     if not apply:

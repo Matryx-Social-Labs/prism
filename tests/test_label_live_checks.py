@@ -170,7 +170,10 @@ async def test_seeding_checks_interleaves_them_and_refuses_a_batch_already_answe
         rows = await c.fetch("SELECT position, expected IS NOT NULL AS chk FROM label_tasks t JOIN label_batches b ON b.id = t.batch_id "
                              "WHERE b.key = $1 ORDER BY position", work_key)
         assert [r["position"] for r in rows] == list(range(len(rows))), "positions stay contiguous"
-        assert [r["position"] for r in rows if r["chk"]] == [9, 19], "one check after every nine tasks"
+        checks = [r["position"] for r in rows if r["chk"]]
+        # One per block of ten, somewhere in it — not always the tenth, which made
+        # them countable (security review 2026-09-23). Blocks: positions 0-9, 10-19.
+        assert len(checks) == 2 and checks[0] // 10 == 0 and checks[1] // 10 == 1
         bid = await c.fetchval("SELECT id FROM label_batches WHERE key = $1", work_key)
         tid = await c.fetchval("SELECT id FROM label_tasks WHERE batch_id = $1 ORDER BY position LIMIT 1", bid)
         iid = uuid.uuid4()
@@ -197,5 +200,62 @@ async def test_the_reply_to_a_check_is_the_reply_to_any_task():
                 task = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()["task"]
                 shapes.add(tuple(sorted((await _answer(c, key, tok, task["id"], [])).json())))
             assert shapes == {("ok", "requalify")}
+    finally:
+        await _cleanup(uid)
+
+
+async def test_check_placement_is_not_a_fixed_period():
+    """Seed the same batch shape repeatedly: a fixed period would put every check
+    at the same offset every time. Five blocks at random offsets agree by chance
+    with probability 1e-5 per pair."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    import asyncpg
+
+    from tools.label_qualify import seed_checks
+    from tools.scratch import _local_url
+
+    round_key = f"r{uuid.uuid4().hex[:12]}"
+    rid = uuid.uuid4()
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO label_batches (id, key, name, kind, purpose, open) VALUES (:i, :k, 'r', :kind, 'qualify', false)"),
+                        {"i": rid, "k": round_key, "kind": KIND})
+        for pos in range(10):
+            await s.execute(text("INSERT INTO label_tasks (id, batch_id, position, candidates, payload, expected) "
+                                 "VALUES (:i, :b, :p, '[]'::jsonb, CAST(:pl AS jsonb), '{\"selected\": []}'::jsonb)"),
+                            {"i": uuid.uuid4(), "b": rid, "p": pos, "pl": json.dumps({"kind": KIND, "quote_text": f"c{pos}"})})
+    layouts = []
+    c = await asyncpg.connect(_local_url(), timeout=30)
+    try:
+        for _ in range(3):
+            work_key, _ = await _work_with_checks(0, 45)
+            await c.execute("UPDATE label_batches SET listed = false WHERE key = $1", work_key)
+            await seed_checks(c, work_key, round_key, every=10, apply=True)
+            layouts.append(tuple(r["position"] for r in await c.fetch(
+                "SELECT t.position FROM label_tasks t JOIN label_batches b ON b.id = t.batch_id "
+                "WHERE b.key = $1 AND t.expected IS NOT NULL ORDER BY t.position", work_key)))
+    finally:
+        await c.close()
+    assert len(set(layouts)) > 1, f"three seedings placed the checks identically: {layouts}"
+
+
+async def test_an_accounts_work_answer_is_final_check_or_not():
+    """Security review 2026-09-23: rewriting an answer let a labeller who spotted
+    a check resend it as "unsure", which the checks do not score. Every rewrite
+    is refused the same way, so the refusal points at nothing."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, answers = await _work_with_checks(1, 1)
+    uid, h = await _qualified_labeller()
+    try:
+        async with _client() as c:
+            tok = (await c.post(f"/api/v1/labeller/batches/{key}/start", headers=h)).json()["token"]
+            codes = []
+            for _ in range(2):
+                task = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()["task"]
+                assert (await _answer(c, key, tok, task["id"], [])).status_code == 200
+                again = await _answer(c, key, tok, task["id"], [], unsure=True)
+                codes.append((again.status_code, again.json()))
+            assert codes[0] == codes[1] and codes[0][0] == 409
     finally:
         await _cleanup(uid)

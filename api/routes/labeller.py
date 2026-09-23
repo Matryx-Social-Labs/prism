@@ -563,6 +563,11 @@ async def live_accuracy(db: AsyncSession, user_id: Any, kind: str) -> tuple[int,
 async def recheck(db: AsyncSession, user_id: Any, kind: str) -> bool:
     """Withdraw a kind whose live accuracy fell below LIVE_MIN. Returns True when
     it did. The retake clock restarts, so the way back is the test, tomorrow."""
+    # One recheck at a time per (account, kind): two check answers landing
+    # together could each read a window missing the other and neither withdraw
+    # (security review, 2026-09-23).
+    await db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+                     {"k": f"label-recheck:{user_id}:{kind}"})
     right, n = await live_accuracy(db, user_id, kind)
     if n < CHECK_MIN or right / n >= LIVE_MIN:
         return False

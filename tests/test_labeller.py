@@ -272,3 +272,20 @@ async def test_a_quote_rendering_task_is_served_in_its_own_shape():
         task = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()["task"]
     assert task["kind"] == "quote_rendering" and task["rendering"]["question"] == "spoken"
     assert "claim" not in task
+
+
+
+async def test_an_unknown_task_kind_fails_loudly_rather_than_posing_as_a_claim():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key = f"k{uuid.uuid4().hex[:12]}"
+    bid = uuid.uuid4()
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO label_batches (id, key, name, kind, open) VALUES (:i, :k, 'x', 'mystery', true)"),
+                        {"i": bid, "k": key})
+        await s.execute(text("INSERT INTO label_tasks (id, batch_id, position, candidates, payload) "
+                             "VALUES (:i, :b, 0, '[]'::jsonb, '{\"kind\": \"mystery\"}'::jsonb)"), {"i": uuid.uuid4(), "b": bid})
+    async with _client() as c:
+        tok = (await c.post(f"/api/v1/label/{key}/join", json={"name": "f"})).json()["token"]
+        r = await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})
+    assert r.status_code == 500 and "unknown task kind" in r.text

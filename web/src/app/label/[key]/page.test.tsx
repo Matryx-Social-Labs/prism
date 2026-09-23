@@ -722,3 +722,16 @@ describe("live checks (phase 5)", () => {
     expect(screen.queryByText(/Something went wrong/)).not.toBeInTheDocument();
   });
 });
+
+describe("answering after the kind was withdrawn (phase 5 review)", () => {
+  it("explains a 403 on the answer itself, not only on loading", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    const CLAIM = { article_id: "a", title: "t", source: "s", speaker: "The minister", quote_text: "q words here",
+      context_before: "the minister said ", context_after: ".", target: null, stance: "neutral" };
+    fetchLabelTask.mockResolvedValue({ task: { id: "c1", position: 0, kind: "claim_attribution" as const, claim: CLAIM }, closed: false });
+    postLabelAnswer.mockRejectedValue(new Error("403"));
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Yes —/ }));
+    expect(await screen.findByText(/You can't label this batch right now/)).toBeInTheDocument();
+  });
+});
