@@ -249,8 +249,13 @@ async def test_the_command_line_runs_the_same_operations(monkeypatch):
         assert await label_admin.main() == 0
         assert await _status(who) == "active"
         assert [a["actor"] for a in await _audit(f"cli-{tag}@example.test")] == [f"cli-founder-{tag}"]
-        # A refused change exits non-zero and leaves nothing behind.
-        monkeypatch.setattr(sys, "argv", ["label_admin", "--db", url, "--pause", f"nobody-{tag}@example.test"])
+        # A typo in the second email must not undo the first. It used to: one
+        # transaction for the whole run, so "--remove bad-actor typo" printed
+        # bad-actor as removed and then rolled it back (review, 2026-09-23).
+        monkeypatch.setattr(sys, "argv", ["label_admin", "--db", url, "--by", f"cli-founder-{tag}",
+                                          "--pause", f"cli-{tag}@example.test", f"nobody-{tag}@example.test"])
         assert await label_admin.main() == 1
+        assert await _status(who) == "paused"
+        assert [a["action"] for a in await _audit(f"cli-{tag}@example.test")] == ["labeller.status"] * 2
     finally:
         await _cleanup([who], [], tag)

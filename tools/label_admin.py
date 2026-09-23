@@ -76,26 +76,39 @@ async def _read(conn, a: argparse.Namespace) -> bool:
     return True
 
 
-async def _write(conn, a: argparse.Namespace) -> bool:
+def _changes(a: argparse.Namespace) -> list:
+    """Every change asked for, each as (what, run(conn) -> the line to print)."""
+    out = []
     for flag, status in (("approve", "active"), ("pause", "paused"), ("remove", "removed")):
         for email in getattr(a, flag) or []:
-            was = await label_ops.set_status(conn, email, status, a.by)
-            print(f"  {email:34} {was} -> {status}")
+            async def run(conn, email=email, status=status):
+                return f"{email:34} {await label_ops.set_status(conn, email, status, a.by)} -> {status}"
+            out.append((email, run))
     if a.add:
-        await label_ops.add(conn, a.add[0], [x.strip() for x in a.add[1].split(",") if x.strip()], a.by)
-        print(f"  {a.add[0]} is an active labeller reading {a.add[1]}")
+        email, langs = a.add[0], [x.strip() for x in a.add[1].split(",") if x.strip()]
+        async def add(conn):
+            await label_ops.add(conn, email, langs, a.by)
+            return f"{email} is an active labeller reading {','.join(langs)}"
+        out.append((email, add))
     if a.list or a.unlist:
-        name = await label_ops.set_listed(conn, a.list or a.unlist, bool(a.list), a.by)
-        print(f"  {name!r} is {'listed on' if a.list else 'removed from'} the labeller dashboard")
+        key, on = a.list or a.unlist, bool(a.list)
+        async def listed(conn):
+            name = await label_ops.set_listed(conn, key, on, a.by)
+            return f"{name!r} is {'listed on' if on else 'removed from'} the labeller dashboard"
+        out.append((key, listed))
     if a.languages:
-        tally = await label_ops.gate_languages(conn, a.languages, a.by)
-        print(f"  {sum(tally.values())} tasks gated: " + ", ".join(f"{k} {v}" for k, v in tally.items()))
+        async def gate(conn):
+            tally = await label_ops.gate_languages(conn, a.languages, a.by)
+            return f"{sum(tally.values())} tasks gated: " + ", ".join(f"{k} {v}" for k, v in tally.items())
+        out.append((a.languages, gate))
     for flag, granted in (("qualify", True), ("revoke", False)):
         if getattr(a, flag):
             email, kind = getattr(a, flag)
-            await label_ops.qualify(conn, email, kind, granted, a.by)
-            print(f"  {email} {'qualified for' if granted else 'no longer qualified for'} {kind} by {a.by}")
-    return any(getattr(a, f) for f in ("approve", "pause", "remove", "add", "list", "unlist", "languages", "qualify", "revoke"))
+            async def grant(conn, email=email, kind=kind, granted=granted):
+                await label_ops.qualify(conn, email, kind, granted, a.by)
+                return f"{email} {'qualified for' if granted else 'no longer qualified for'} {kind} by {a.by}"
+            out.append((email, grant))
+    return out
 
 
 async def main() -> int:
@@ -116,16 +129,29 @@ async def main() -> int:
     url = (a.db or _prod_url()).replace("postgresql://", "postgresql+asyncpg://", 1)
     engine = create_async_engine(url, connect_args={"timeout": 60})
     try:
-        # One transaction per run: a change and its audit row commit together,
-        # and a refused change leaves nothing behind.
-        async with engine.begin() as conn:
-            if await _read(conn, a) or await _write(conn, a):
+        async with engine.connect() as conn:
+            if await _read(conn, a):
                 return 0
-        ap.print_help()
-        return 2
-    except (LookupError, ValueError) as e:
-        print(f"  refused: {e}", file=sys.stderr)
-        return 1
+        changes = _changes(a)
+        if not changes:
+            ap.print_help()
+            return 2
+        # ONE TRANSACTION PER CHANGE, and a line printed only once it has
+        # committed. A run of several emails used to share one transaction: a
+        # typo in the second rolled back the first after it had printed as
+        # done — "--remove bad-actor typo" left bad-actor active while the
+        # screen said removed (review, 2026-09-23). Each change and its audit
+        # row still commit together.
+        failed = False
+        for what, run in changes:
+            try:
+                async with engine.begin() as conn:
+                    line = await run(conn)
+                print(f"  {line}")
+            except (LookupError, ValueError) as e:
+                failed = True
+                print(f"  {what:34} REFUSED: {e}", file=sys.stderr)
+        return 1 if failed else 0
     finally:
         await engine.dispose()
 
