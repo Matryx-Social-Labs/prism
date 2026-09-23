@@ -38,7 +38,7 @@ import secrets
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -176,6 +176,7 @@ async def join(key: str, body: Join, db: AsyncSession = Depends(get_db)):
 @router.get("/api/v1/label/{key}/guide")
 async def batch_guide(
     key: str,
+    response: Response,
     token: str = Header("", alias="X-Label-Token"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -190,6 +191,9 @@ async def batch_guide(
     g = label_guides.guide(b["kind"])
     if g is None:
         raise HTTPException(status_code=404, detail="this task has no guide")
+    # The credential is a custom header, which a shared cache does not treat as
+    # private the way it treats Authorization: say so.
+    response.headers["Cache-Control"] = "private, no-store"
     return g
 
 
