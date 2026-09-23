@@ -90,6 +90,9 @@ export async function startBatch(s: Session, key: string): Promise<string> {
   return `/label/${encodeURIComponent(key)}`;
 }
 
+/** The kinds with a guide on /label/learn/<kind>. */
+export const LEARNABLE: readonly string[] = ["event_identity", "story_boundary", "claim_attribution", "topic_relation"];
+
 /** What each kind of task asks, in the reader's words. */
 export const KIND_QUESTION: Record<string, string> = {
   story_boundary: "Is this the same story?",

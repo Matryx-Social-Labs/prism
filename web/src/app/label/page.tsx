@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   KIND_QUESTION,
+  LEARNABLE,
   applyAsLabeller,
   fetchLabellerBatches,
   fetchLabellerMe,
@@ -148,6 +149,20 @@ export default function LabellerWorkspace() {
           )}
         </>
       )}
+
+      {/* Readable by anyone, approved or not: the guide is the first thing a
+          labeller should meet, and waiting for approval is a good time to. */}
+      <Section title="Learn the tasks">
+        <ul>
+          {LEARNABLE.map((kind) => (
+            <li key={kind} className="border-t py-3" style={{ borderColor: "var(--line)" }}>
+              <Link href={`/label/learn/${kind}`} className="text-[15px] font-semibold underline-offset-4 hover:underline">
+                {KIND_QUESTION[kind]}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Section>
     </Shell>
   );
 }
@@ -225,6 +240,11 @@ function BatchRow({ batch, onStart }: { batch: LabellerBatch; onStart?: (key: st
         <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
           {batch.answered} of {batch.eligible} done · {batch.labellers} {batch.labellers === 1 ? "labeller" : "labellers"}
         </span>
+        {LEARNABLE.includes(batch.kind) && (
+          <Link href={`/label/learn/${batch.kind}`} className="text-[14px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+            How this task works
+          </Link>
+        )}
         {onStart && (
           <button
             type="button"
