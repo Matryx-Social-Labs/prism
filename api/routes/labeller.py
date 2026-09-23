@@ -6,6 +6,7 @@ GET  /api/v1/labeller/batches               — listed batches, in your language
 POST /api/v1/labeller/batches/{key}/start   — the write credential for one batch
 POST /api/v1/labeller/practice/{kind}/start  — a practice round: answer, then see why
 POST /api/v1/labeller/qualify/{kind}/start   — a scored test; 90% to pass (phase 3)
+GET  /api/v1/labeller/guides/{kind}          — a task's guide, once you have applied
 
 api/routes/label.py is the task protocol — one judgement at a time, keyed by a
 per-batch invite. This is the signed-in surface in front of it, and it
@@ -39,6 +40,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
+from common import label_guides
 from common.db import get_db
 from common.label_scoring import (
     CHECK_MIN,
@@ -94,6 +96,27 @@ async def languages_for_invite(db: AsyncSession, invite_user_id: uuid.UUID | Non
     if row is None or row["status"] != "active":
         raise HTTPException(status_code=403, detail="this labeller is not active")
     return list(row["languages_read"])
+
+
+# Who may read a guide (founder decision G1, 2026-09-23): anyone who has
+# applied. Anyone can make an account, so "signed in" alone is still an
+# outsider; a removed labeller is not a labeller any more.
+READS_GUIDES = ("applied", "active", "paused")
+
+
+@router.get("/api/v1/labeller/guides/{kind}")
+async def read_guide(kind: str, user_id: uuid.UUID = Depends(get_current_user),
+                     db: AsyncSession = Depends(get_db)):
+    """A task's guide — what it asks, DO / DO NOT, worked examples. Served only
+    here and to a batch's own invites (api/routes/label.py), never in the site's
+    JavaScript (common/label_guides says why)."""
+    g = label_guides.guide(kind)
+    if g is None:
+        raise HTTPException(status_code=404, detail="no such task")
+    row = await labeller_row(db, user_id)
+    if row is None or row["status"] not in READS_GUIDES:
+        raise HTTPException(status_code=403, detail="apply at /label to read the guides")
+    return g
 
 
 @router.get("/api/v1/labeller/me")

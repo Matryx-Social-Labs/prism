@@ -919,6 +919,46 @@ export async function joinLabelBatch(key: string, name: string): Promise<string>
   return (await r.json()).token as string;
 }
 
+/** A task's guide (common/label_guides.py). Served by the API only — to an
+ *  applicant's account or to a batch's own invite — so none of it ships in the
+ *  site's JavaScript (founder, 2026-09-23). Text carries **strong**, *em* and
+ *  ==highlight== markup; see components/label/GuideView.Rich. */
+export interface GuideExample {
+  mark?: "yes" | "no";
+  head: string;
+  body: string;
+  illustration?: boolean;
+}
+export interface GuideBlock {
+  mark?: "yes" | "no";
+  label: string;
+  lines: string[];
+  body: string;
+}
+export interface LabelGuide {
+  kind: string;
+  question: string;
+  minutes: number;
+  in_short: string;
+  lede: string[];
+  do: string[];
+  dont: string[];
+  examples_label: string | null;
+  examples: GuideExample[];
+  decide?: { blocks: GuideBlock[]; closing: string };
+  start: string;
+  after: string | null;
+}
+
+export async function fetchLabelGuide(key: string, token: string): Promise<LabelGuide> {
+  const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/guide`, {
+    cache: "no-store",
+    headers: { "X-Label-Token": token },
+  });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+
 export async function fetchLabelBatch(key: string, token: string): Promise<LabelBatch> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}`, {
     cache: "no-store",

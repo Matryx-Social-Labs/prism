@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "check:guides": "node scripts/check-no-guides.mjs",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",

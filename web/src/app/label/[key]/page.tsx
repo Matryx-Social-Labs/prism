@@ -22,17 +22,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   fetchLabelBatch,
+  fetchLabelGuide,
   fetchLabelTask,
   joinLabelBatch,
   postLabelAnswer,
   type LabelBatch,
   type LabelClaim,
   type LabelFeedback,
+  type LabelGuide,
   type LabelResult,
   type LabelEvent,
   type LabelTask,
 } from "@/lib/api";
-import { ClaimGuide, Guide, Primer, TopicGuide } from "@/components/label/guides";
+import { GuidePrimer, HowToDecide } from "@/components/label/GuideView";
 import { PracticeFeedback, RoundResult } from "@/components/label/rounds";
 import { QuoteRenderingTask } from "@/components/label/QuoteRenderingTask";
 
@@ -70,12 +72,13 @@ function provenance(e: LabelEvent): string {
  *  the minister", "according to Kaspersky"). Shown alone the question would be
  *  unanswerable and the labeller would be guessing. */
 function ClaimTask({
-  claim, position, saving, onAnswer,
+  claim, position, saving, onAnswer, decide,
 }: {
   claim: LabelClaim;
   position: number;
   saving: boolean;
   onAnswer: (verdict: "yes" | "no" | "unsure" | "skip") => void;
+  decide?: LabelGuide["decide"];
 }) {
   return (
     <>
@@ -170,7 +173,7 @@ function ClaimTask({
           shows its guide open — so collapsed here meant the guide was never put
           in front of anyone. The point of it is being read BEFORE the first
           judgement, not after a wrong one. */}
-      <ClaimGuide open={position === 0} />
+      {decide && <HowToDecide blocks={decide.blocks} closing={decide.closing} open={position === 0} />}
     </>
   );
 }
@@ -192,6 +195,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   // someone who has already dismissed it.
   const [primed, setPrimed] = useState<boolean | null>(null);
   const [task, setTask] = useState<LabelTask | null>(null);
+  // The guide for this batch's kind, from the API with this batch's invite —
+  // never from the site's JavaScript (common/label_guides.py).
+  const [guide, setGuide] = useState<LabelGuide | null>(null);
+  const [guideFailed, setGuideFailed] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "result" | "requalify" | "error">("loading");
   // Practice only: the answer to the question just answered, shown until "Next".
@@ -244,6 +251,17 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       /* private mode: the session simply is not remembered */
     }
   }, [batchKey]);
+
+  useEffect(() => {
+    if (!batchKey || !token) return;
+    let live = true;
+    fetchLabelGuide(batchKey, token)
+      .then((g) => live && setGuide(g))
+      .catch(() => live && setGuideFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [batchKey, token]);
 
   const load = useCallback(async () => {
     if (!batchKey || !token) return;
@@ -418,7 +436,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         <p className="mt-4 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
           YOUR NAME IS ONLY USED TO REMEMBER WHERE YOU GOT TO
         </p>
-        <Guide open />
+        {/* No guide here any more: this screen is reached by anyone holding the
+            batch link, before they have a credential, and the guide goes only
+            to a credential (founder, 2026-09-23). It is the first thing shown
+            once they have joined. */}
       </Shell>
     );
   }
@@ -477,9 +498,12 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         </Note>
       )}
 
-      {state === "ready" && task && primed === false && (
-        <Primer
-          kind={batch?.kind ?? "story_boundary"}
+      {state === "ready" && task && primed === false && !guide && guideFailed && (
+        <Note>The guide for this task could not be loaded. Reload the page to read it before you start.</Note>
+      )}
+      {state === "ready" && task && primed === false && guide && (
+        <GuidePrimer
+          guide={guide}
           onStart={() => {
             try {
               window.localStorage.setItem(PRIMER_KEY(batchKey), "1");
@@ -504,6 +528,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             claim={task.claim}
             position={task.position}
             saving={saving}
+            decide={guide?.decide}
             onAnswer={(verdict) => void submit(verdict === "unsure", verdict === "skip",
                                               verdict === "yes")}
           />
@@ -653,7 +678,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           {/* An INVITED labeller never sees the join screen, so this is the only
               route the worked example has to them. Collapsed, because it is
               reference rather than instruction once you are going. */}
-          {sameTopic ? <TopicGuide /> : <Guide />}
+          {guide?.decide && <HowToDecide blocks={guide.decide.blocks} closing={guide.decide.closing} />}
         </>
         )
       )}

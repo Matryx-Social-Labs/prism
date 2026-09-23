@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import LabelPage from "@/app/label/[key]/page";
-import type { LabelTask } from "@/lib/api";
+import type { LabelGuide, LabelTask } from "@/lib/api";
 
 // The gold set this page produces is what every story-layer decision is measured
 // against, so the failures worth pinning are the ones that still LOOK like a
@@ -14,12 +14,41 @@ const fetchLabelBatch = vi.hoisted(() => vi.fn());
 const fetchLabelTask = vi.hoisted(() => vi.fn());
 const postLabelAnswer = vi.hoisted(() => vi.fn());
 const joinLabelBatch = vi.hoisted(() => vi.fn());
+const fetchLabelGuide = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({
   fetchLabelBatch,
+  fetchLabelGuide,
   fetchLabelTask,
   postLabelAnswer,
   joinLabelBatch,
 }));
+
+// The guides' WORDS live on the server now (common/label_guides.py, where
+// tests/test_label_guides.py pins them). These tests pin what the page does
+// with whatever guide the API sends, so the guide here is a stand-in.
+function guideFor(kind: string, over: Partial<LabelGuide> = {}): LabelGuide {
+  return {
+    kind,
+    question: `Question for ${kind}`,
+    minutes: 2,
+    in_short: `In short for ${kind}`,
+    lede: [`Lede for ${kind}`],
+    do: ["Do this"],
+    dont: ["Do not do that"],
+    examples_label: "Examples",
+    examples: [{ mark: "no", head: `Example for ${kind}`, body: "Why it is so." }],
+    decide: {
+      blocks: [
+        { mark: "yes", label: "Yes — the article says so", lines: ["…said the state would ==act==…"], body: "Named." },
+        { mark: "no", label: "No — right quote, wrong mouth", lines: ["…others called it ==optimistic==…"], body: "Someone else." },
+      ],
+      closing: `Closing for ${kind}.`,
+    },
+    start: "I have read this — start",
+    after: null,
+    ...over,
+  };
+}
 
 function task(over: Partial<LabelTask> = {}): LabelTask {
   return {
@@ -90,6 +119,7 @@ beforeEach(() => {
   fetchLabelTask.mockResolvedValue({ task: task(), closed: false });
   postLabelAnswer.mockResolvedValue(undefined);
   joinLabelBatch.mockResolvedValue("tok-abc");
+  fetchLabelGuide.mockResolvedValue(guideFor("claim_attribution"));
 });
 
 afterEach(() => {
@@ -350,7 +380,7 @@ describe("a claim task", () => {
 
     // "Attribution" is abstract, and abstract lost last time — a careful person
     // grouped stories by shared organisation in good faith. Show the mistake.
-    expect(await screen.findByText(/RIGHT QUOTE, WRONG MOUTH/)).toBeInTheDocument();
+    expect(await screen.findByText(/right quote, wrong mouth/i)).toBeInTheDocument();
   });
 });
 
@@ -383,7 +413,7 @@ describe("the claims guide actually reaches the labeller", () => {
     fetchLabelTask.mockResolvedValue({ task: taskAt(0), closed: false });
     const { container } = render(<LabelPage params={params} />);
 
-    await screen.findByText(/RIGHT QUOTE, WRONG MOUTH/);
+    await screen.findByText(/right quote, wrong mouth/i);
     const details = container.querySelector("details");
     expect(details).not.toBeNull();
     expect(details!.open).toBe(true);
@@ -396,7 +426,7 @@ describe("the claims guide actually reaches the labeller", () => {
     fetchLabelTask.mockResolvedValue({ task: taskAt(1), closed: false });
     const { container } = render(<LabelPage params={params} />);
 
-    await screen.findByText(/RIGHT QUOTE, WRONG MOUTH/);
+    await screen.findByText(/right quote, wrong mouth/i);
     expect(container.querySelector("details")!.open).toBe(false);
   });
 });
@@ -513,7 +543,7 @@ describe("the primer is read before the first judgement", () => {
     context_after: " before the monsoon.", target: null, stance: "neutral",
   };
 
-  function ready(kind: string, task: Record<string, unknown>) {
+  function ready(kind: string, task: Record<string, unknown>, guideFails = false) {
     stubStorage({
       "prism.label.token.batch-key": "t", "prism.labeller": "ana", primer: false,
     } as never);
@@ -522,6 +552,8 @@ describe("the primer is read before the first judgement", () => {
       kind, total: 10, done: 0,
     });
     fetchLabelTask.mockResolvedValue({ task, closed: false });
+    if (guideFails) fetchLabelGuide.mockRejectedValue(new Error("403"));
+    else fetchLabelGuide.mockResolvedValue(guideFor(kind, kind === "event_identity" ? { start: "Start", decide: undefined } : {}));
     return render(<LabelPage params={params} />);
   }
 
@@ -532,8 +564,10 @@ describe("the primer is read before the first judgement", () => {
       candidates: [],
     });
     // The task itself must NOT be reachable yet.
-    expect(await screen.findByText(/READ THIS FIRST/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Question for story_boundary" })).toBeInTheDocument();
     expect(screen.queryByText("Seed headline")).not.toBeInTheDocument();
+    // Fetched with this batch's own credential, the only way a guide is served.
+    expect(fetchLabelGuide).toHaveBeenCalledWith("batch-key", "t");
 
     await userEvent.click(screen.getByRole("button", { name: /I have read this/ }));
     expect(await screen.findByText("Seed headline")).toBeInTheDocument();
@@ -555,59 +589,39 @@ describe("the primer is read before the first judgement", () => {
         source_count: 1, actors: [], signals: ["headline"],
       }],
     }) });
-    await screen.findByText(/READ THIS FIRST/);
+    await screen.findByRole("heading", { name: "Question for event_identity" });
     await userEvent.click(screen.getByRole("button", { name: "Start" }));
     expect(await screen.findByText(/the same incident, whatever day it was reported\?/)).toBeInTheDocument();
     expect(screen.queryByText(/the same day\?/)).not.toBeInTheDocument();
     expect(screen.getByText(/16 Aug/)).toBeInTheDocument();
   });
 
-  it("teaches the STORY rule with the mistakes that were actually made", async () => {
-    ready("story_boundary", {
-      id: "t1", position: 0, sector: "news",
-      seed: { id: "s", title: "Seed", at: null, source_count: 1, actors: [], signals: [] },
-      candidates: [],
-    });
-    await screen.findByText(/READ THIS FIRST/);
-    // Over-ticking: the round-1 error.
-    expect(screen.getByText(/Monsoon Session/)).toBeInTheDocument();
-    expect(screen.getByText(/shared word is not a shared story/i)).toBeInTheDocument();
-
-    // UNDER-ticking: the round-2 error, and the reason this primer was rebalanced.
-    // Round 1 taught "same topic is not the same story" so well that a labeller
-    // stopped grouping several outlets covering ONE incident — which cut true
-    // pairs by two thirds. Both directions have to be taught or the fix to one
-    // becomes the cause of the other.
-    expect(screen.getByText(/one breach reported twice/i)).toBeInTheDocument();
-    expect(screen.getByText(/two languages/i)).toBeInTheDocument();
-    expect(screen.getByText(/five reports of one/i)).toBeInTheDocument();
-  });
-
-  it("teaches the CLAIM rule instead when the batch is claims", async () => {
-    ready("claim_attribution", { id: "t1", position: 0, kind: "claim_attribution", claim: CLAIM });
-    await screen.findByText(/READ THIS FIRST/);
-    expect(screen.getByText(/right quote, wrong mouth/i)).toBeInTheDocument();
-    // Story guidance must not leak into the claim primer; they ask opposite things.
-    expect(screen.queryByText(/Monsoon Session/)).not.toBeInTheDocument();
-  });
-
-  it("teaches topic relation as a third, narrower judgement", async () => {
+  it("shows the guide's own words, examples marked, and its worked pair beside the task after", async () => {
     ready("topic_relation", {
       id: "t1", position: 0, sector: "news",
       seed: { id: "s", title: "Seed headline", at: null, source_count: 1, actors: [], signals: [] },
-      candidates: [{
-        id: "c", title: "Candidate headline", at: null,
-        source_count: 1, actors: [], signals: ["embedding"],
-      }],
+      candidates: [{ id: "c", title: "Candidate headline", at: null, source_count: 1, actors: [], signals: ["embedding"] }],
     });
-
-    expect(await screen.findByText(/already agreed these are/i)).toBeInTheDocument();
-    expect(screen.getByText(/useful related context/i)).toBeInTheDocument();
-    expect(screen.getByText(/same person, place, organisation/i)).toBeInTheDocument();
-    expect(screen.queryByText(/same unfolding story/i)).not.toBeInTheDocument();
-
+    expect(await screen.findByText("In short for topic_relation")).toBeInTheDocument();
+    expect(screen.getByText("Example for topic_relation")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /I have read this/ }));
-    expect((await screen.findAllByText(/genuinely useful context/i)).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Seed headline")).toBeInTheDocument();
+    // The worked pair stays within reach beside the task, collapsed.
+    expect(screen.getByText("Closing for topic_relation.")).toBeInTheDocument();
+    expect(screen.getByText("How to decide").closest("details")!.open).toBe(false);
+  });
+
+  it("will not let anyone past a guide that did not load", async () => {
+    // Skipping the guide cost 30% disagreement in round one; a failed fetch
+    // must not be a way round it.
+    ready("story_boundary", {
+      id: "t1", position: 0, sector: "news",
+      seed: { id: "s", title: "Seed headline", at: null, source_count: 1, actors: [], signals: [] },
+      candidates: [],
+    }, true);
+    expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
+    expect(screen.queryByText("Seed headline")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /I have read this/ })).not.toBeInTheDocument();
   });
 
   it("does not show again once acknowledged", async () => {
@@ -624,7 +638,7 @@ describe("the primer is read before the first judgement", () => {
     });
     render(<LabelPage params={params} />);
     expect((await screen.findAllByText(/double its outlay/)).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/READ THIS FIRST/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Question for claim_attribution" })).not.toBeInTheDocument();
   });
 });
 
