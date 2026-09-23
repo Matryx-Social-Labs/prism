@@ -32,7 +32,10 @@ export default function PeoplePage() {
           {error}
         </p>
       )}
-      <AdminSection title={data ? `Accounts · ${data.total}` : "Accounts"}>
+      {/* Never a total above rows that are not all there (review, 2026-09-23). */}
+      <AdminSection
+        title={!data ? "Accounts" : data.people.length < data.total ? `Accounts · newest ${data.people.length} of ${data.total}` : `Accounts · ${data.total}`}
+      >
         {data?.people.length === 0 && <Quiet>No accounts yet.</Quiet>}
         {data && data.people.length > 0 && (
           <div className="overflow-x-auto">
