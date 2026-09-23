@@ -9,7 +9,7 @@
 import { API_URL } from "@/lib/api";
 import { authHeader, type Session } from "@/lib/session";
 
-export type LabellerStatus = "none" | "applied" | "active" | "paused";
+export type LabellerStatus = "none" | "applied" | "active" | "paused" | "removed";
 
 export interface LanguageChoice {
   code: string;

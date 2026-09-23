@@ -34,6 +34,8 @@ export function useAdmin(): Admin {
 
 export const ADMIN_NAV: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin/labellers", label: "Labellers" },
+  { href: "/admin/batches", label: "Batches" },
   { href: "/admin/audit", label: "Audit" },
 ];
 
@@ -142,5 +144,28 @@ export function AdminSection({ title, children }: { title: string; children: Rea
       <h2 className="mb-3 text-[17px] font-semibold">{title}</h2>
       {children}
     </section>
+  );
+}
+
+/** A row action: accent for the usual step, ink-2 for the one to think about. */
+export function TextButton({ onClick, muted, children }: { onClick: () => void; muted?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-h-[44px] text-[14px] font-semibold underline-offset-4 hover:underline"
+      style={{ color: muted ? "var(--ink-2)" : "var(--accent)" }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** An empty state: what would be here. */
+export function Quiet({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[15px]" style={{ color: "var(--ink-2)" }}>
+      {children}
+    </p>
   );
 }

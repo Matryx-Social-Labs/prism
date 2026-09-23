@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.deps import assert_admin_token_configured
 from api.routes import (
     admin,
+    admin_labellers,
     auth,
     billing,
     digest,
@@ -66,3 +67,4 @@ app.include_router(watchlist.router)
 app.include_router(label.router)
 app.include_router(labeller.router)
 app.include_router(admin.router)
+app.include_router(admin_labellers.router)

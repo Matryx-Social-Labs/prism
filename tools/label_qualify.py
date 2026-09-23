@@ -60,7 +60,9 @@ import sys
 import uuid
 
 import asyncpg
+from sqlalchemy.ext.asyncio import create_async_engine
 
+from common import label_ops
 from common.label_scoring import PASS_MARK, QUESTIONS_PER_TEST, constant_strategy_scores
 from tools.snapshot_l2 import _prod_url
 
@@ -257,25 +259,6 @@ def fair(items: list[dict]) -> dict[str, float]:
         [{"id": str(i), "expected": {"selected": [str(i)] if it["yes"] else []}} for i, it in enumerate(items)])
 
 
-async def check(c: asyncpg.Connection, key: str) -> bool:
-    b = await c.fetchrow("SELECT id, purpose, name FROM label_batches WHERE key = $1", key)
-    if b is None:
-        raise SystemExit(f"no batch with key {key}")
-    tasks = await c.fetch("SELECT id, expected, explanation, languages FROM label_tasks WHERE batch_id = $1", b["id"])
-    items = [{"id": str(t["id"]), "expected": t["expected"] if isinstance(t["expected"], dict) else json.loads(t["expected"] or "{}")}
-             for t in tasks]
-    scores = constant_strategy_scores(items)
-    missing = sum(1 for t in tasks if not (t["explanation"] or "").strip())
-    ok = bool(tasks) and missing == 0 and all(v < PASS_MARK for v in scores.values())
-    if b["purpose"] == "qualify":
-        ok = ok and len(tasks) >= QUESTIONS_PER_TEST
-    print(f"  {b['name']!r} ({b['purpose']}): {len(tasks)} items, {missing} without an explanation")
-    for strat, v in scores.items():
-        print(f"    {strat:30} would score {v:.0%} {'— FAILS the pass mark, good' if v < PASS_MARK else '— PASSES: refuse'}")
-    print(f"  {'OK to publish' if ok else 'NOT publishable'}")
-    return ok
-
-
 async def seed_checks(c: asyncpg.Connection, work_key: str, round_key: str, every: int, apply: bool) -> None:
     work = await c.fetchrow("SELECT id, kind, purpose FROM label_batches WHERE key = $1", work_key)
     src = await c.fetchrow("SELECT id, kind, purpose FROM label_batches WHERE key = $1", round_key)
@@ -326,6 +309,40 @@ async def seed_checks(c: asyncpg.Connection, work_key: str, round_key: str, ever
     print("  written")
 
 
+async def review(a: argparse.Namespace) -> int:
+    """--dump / --load / --check / --publish: the same operations /admin runs
+    (common/label_ops), so a round reviewed in either place is reviewed once."""
+    url = (a.db or _prod_url()).replace("postgresql://", "postgresql+asyncpg://", 1)
+    engine = create_async_engine(url, connect_args={"timeout": 60})
+    try:
+        async with engine.begin() as conn:
+            if a.dump:
+                print(json.dumps(await label_ops.round_items(conn, a.dump), ensure_ascii=False, indent=1))
+            elif a.load:
+                key, path = a.load
+                edits = [(e["position"], e["explanation"]) for e in json.loads(open(path).read())]
+                print(f"  {await label_ops.save_explanations(conn, key, edits, a.by)} explanations written to {key}")
+            else:
+                verdict = await label_ops.check_round(conn, a.check or a.publish)
+                print(f"  {verdict['name']!r} ({verdict['purpose']}): {verdict['items']} items, "
+                      f"{verdict['missing']} without an explanation")
+                for strat, v in verdict["scores"].items():
+                    print(f"    {strat:30} would score {v:.0%} "
+                          f"{'— FAILS the pass mark, good' if v < PASS_MARK else '— PASSES: refuse'}")
+                print("  OK to publish" if verdict["ok"] else "  NOT publishable: " + "; ".join(verdict["reasons"]))
+                if not verdict["ok"]:
+                    return 1
+                if a.publish:
+                    await label_ops.set_open(conn, a.publish, True, a.by)
+                    print(f"  {a.publish} is open")
+        return 0
+    except (LookupError, ValueError) as e:
+        print(f"  refused: {e}", file=sys.stderr)
+        return 1
+    finally:
+        await engine.dispose()
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--claims", action="store_true", help="build the claim-attribution practice round and test")
@@ -340,7 +357,10 @@ async def main() -> int:
     ap.add_argument("--every", type=int, default=10, help="one hidden check in every N tasks")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
+    ap.add_argument("--by", default="founder", help="recorded in admin_audit for --load and --publish")
     a = ap.parse_args()
+    if a.dump or a.load or a.check or a.publish:
+        return await review(a)
     c = await asyncpg.connect(a.db or _prod_url(), timeout=60)
     try:
         if a.claims or a.from_batch:
@@ -368,37 +388,12 @@ async def main() -> int:
                 pk = await write_round(c, "practice", f"Practice — {kind}", practice, kind)
                 qk = await write_round(c, "qualify", f"Test — {kind}", pool, kind)
                 print(f"  written CLOSED: practice {pk}, test {qk}. Review with --dump, then --check and --publish.")
-        elif a.dump:
-            rows = await c.fetch(
-                "SELECT t.position, t.payload, t.expected, t.explanation FROM label_tasks t "
-                "JOIN label_batches b ON b.id = t.batch_id WHERE b.key = $1 ORDER BY t.position", a.dump)
-            out = []
-            for r in rows:
-                p = r["payload"] if isinstance(r["payload"], dict) else json.loads(r["payload"] or "{}")
-                e = r["expected"] if isinstance(r["expected"], dict) else json.loads(r["expected"] or "{}")
-                out.append({"position": r["position"], "speaker": p.get("speaker"), "quote": p.get("quote_text"),
-                            "answer": "yes" if e.get("selected") else "no", "explanation": r["explanation"]})
-            print(json.dumps(out, ensure_ascii=False, indent=1))
-        elif a.load:
-            key, path = a.load
-            edits = json.loads(open(path).read())
-            bid = await c.fetchval("SELECT id FROM label_batches WHERE key = $1", key)
-            await c.executemany("UPDATE label_tasks SET explanation = $3 WHERE batch_id = $1 AND position = $2",
-                                [(bid, e["position"], e["explanation"]) for e in edits])
-            print(f"  {len(edits)} explanations written to {key}")
-        elif a.check:
-            return 0 if await check(c, a.check) else 1
         elif a.seed_checks:
             if not a.source or a.every < 2:
                 raise SystemExit("--seed-checks needs --from ROUND_KEY and --every >= 2")
             if not a.apply:
                 await c.execute("SET default_transaction_read_only = on")
             await seed_checks(c, a.seed_checks, a.source, a.every, a.apply)
-        elif a.publish:
-            if not await check(c, a.publish):
-                return 1
-            await c.execute("UPDATE label_batches SET open = true WHERE key = $1", a.publish)
-            print(f"  {a.publish} is open")
         else:
             ap.print_help()
             return 2
