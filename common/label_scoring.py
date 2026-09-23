@@ -32,6 +32,21 @@ QUESTIONS_PER_TEST = 15
 # A failed attempt can be retaken after this long, on a fresh random draw.
 RETAKE_AFTER_HOURS = 24
 
+# LIVE CHECKS (phase 5). Work batches carry hidden check items with a known
+# answer; a labeller's accuracy on their last CHECK_WINDOW of them is watched,
+# and below LIVE_MIN (once CHECK_MIN have been answered) the kind is withdrawn
+# until they pass its test again.
+#
+# LIVE_MIN IS NOT THE PASS MARK, on purpose. Twenty items is a small window: a
+# labeller who is truly right 92% of the time lands below 90% in about one
+# 20-item window in five (21%, demo() computes it) — the pass mark would
+# withdraw good labellers on noise. Below 80% happens to that labeller in under
+# 2% of windows: a signal, not a bad afternoon. The 90% bar still applies to
+# the test itself.
+CHECK_WINDOW = 20
+CHECK_MIN = 10
+LIVE_MIN = 0.80
+
 
 def is_correct(answer: Mapping[str, Any], expected: Mapping[str, Any]) -> bool:
     if answer.get("unsure") or answer.get("skipped"):
@@ -86,7 +101,14 @@ def demo() -> None:
     balanced = [{"id": f"y{i}", "expected": {"selected": [f"y{i}"]}} for i in range(8)] + [
         {"id": f"n{i}", "expected": {"selected": []}} for i in range(7)]
     assert max(constant_strategy_scores(balanced).values()) < PASS_MARK
-    print(f"ok: marking rule, constant strategies caught (pass mark {PASS_MARK})")
+    # The window arithmetic the LIVE_MIN comment rests on: a true 92% labeller,
+    # 20 items, P(at most 17 right) — i.e. under 90%.
+    from math import comb
+    p_under_pass = sum(comb(20, k) * 0.92 ** k * 0.08 ** (20 - k) for k in range(0, 18))
+    p_under_live = sum(comb(20, k) * 0.92 ** k * 0.08 ** (20 - k) for k in range(0, 16))
+    assert 0.2 < p_under_pass < 0.5 and p_under_live < 0.02, (p_under_pass, p_under_live)
+    print(f"ok: marking rule, constant strategies caught (pass mark {PASS_MARK}); a 92% labeller "
+          f"dips under {PASS_MARK:.0%} in {p_under_pass:.0%} of 20-item windows, under {LIVE_MIN:.0%} in {p_under_live:.1%}")
 
 
 if __name__ == "__main__":

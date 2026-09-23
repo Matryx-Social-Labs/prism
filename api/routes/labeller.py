@@ -40,7 +40,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
 from common.db import get_db
-from common.label_scoring import PASS_MARK, QUESTIONS_PER_TEST, RETAKE_AFTER_HOURS, is_correct
+from common.label_scoring import (
+    CHECK_MIN,
+    CHECK_WINDOW,
+    LIVE_MIN,
+    PASS_MARK,
+    QUESTIONS_PER_TEST,
+    RETAKE_AFTER_HOURS,
+    is_correct,
+)
 from common.languages import LANGUAGES
 
 router = APIRouter()
@@ -524,3 +532,45 @@ def _about(row: Any) -> str:
     if isinstance(payload, dict) and payload.get("quote_text"):
         return f"{payload.get('speaker', '')}: “{payload['quote_text'][:140]}”"
     return row["seed_title"] or ""
+
+
+# ── Live checks in work batches (plan phase 5) ──────────────────────────────
+
+
+async def live_accuracy(db: AsyncSession, user_id: Any, kind: str) -> tuple[int, int]:
+    """(right, answered) over this account's last CHECK_WINDOW DEFINITE answers
+    to hidden check items in work batches of this kind. Unsure and skip are
+    neither right nor wrong here: a check measures the answers that become gold,
+    and those are the definite ones."""
+    rows = (
+        await db.execute(
+            text("""
+                SELECT r.selected, t.expected FROM label_responses r
+                JOIN label_invites i ON i.id = r.invite_id
+                JOIN label_tasks t ON t.id = r.task_id
+                JOIN label_batches b ON b.id = t.batch_id
+                WHERE i.user_id = :u AND b.kind = :k AND b.purpose = 'work'
+                  AND t.expected IS NOT NULL AND NOT r.unsure AND NOT r.skipped
+                ORDER BY r.created_at DESC LIMIT :n
+            """),
+            {"u": str(user_id), "k": kind, "n": CHECK_WINDOW},
+        )
+    ).mappings().all()
+    right = sum(is_correct({"selected": _json(r["selected"]) or []}, _json(r["expected"])) for r in rows)
+    return right, len(rows)
+
+
+async def recheck(db: AsyncSession, user_id: Any, kind: str) -> bool:
+    """Withdraw a kind whose live accuracy fell below LIVE_MIN. Returns True when
+    it did. The retake clock restarts, so the way back is the test, tomorrow."""
+    right, n = await live_accuracy(db, user_id, kind)
+    if n < CHECK_MIN or right / n >= LIVE_MIN:
+        return False
+    withdrawn = (
+        await db.execute(
+            text("UPDATE labeller_qualifications SET passed_at = NULL, last_attempt_at = now() "
+                 "WHERE user_id = :u AND kind = :k AND passed_at IS NOT NULL RETURNING kind"),
+            {"u": str(user_id), "k": kind},
+        )
+    ).first()
+    return withdrawn is not None

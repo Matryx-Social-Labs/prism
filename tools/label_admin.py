@@ -2,6 +2,7 @@
 
     uv run python -m tools.label_admin --pending                  # applications waiting on you
     uv run python -m tools.label_admin --labellers                # everyone, with status and languages
+    uv run python -m tools.label_admin --board                    # per kind: passed, attempts, live check accuracy
     uv run python -m tools.label_admin --approve a@x.com b@y.com  # applied|paused -> active
     uv run python -m tools.label_admin --pause a@x.com            # stops their writes at once
     uv run python -m tools.label_admin --list KEY                 # show a batch on the dashboard
@@ -72,6 +73,39 @@ async def labellers(c: asyncpg.Connection) -> None:
         """):
         print(f"  {r['status']:8} {r['email']:34} reads {','.join(r['languages_read']):14} "
               f"{r['answers']:5} answers")
+
+
+async def board(c: asyncpg.Connection) -> None:
+    """Every labeller's standing per kind: passed (by test or grant), best score,
+    attempts, and accuracy on the last 20 definite answers to hidden checks —
+    the numbers api/routes/labeller.recheck acts on."""
+    from common.label_scoring import CHECK_WINDOW, is_correct
+
+    for r in await c.fetch(
+        """
+        SELECT u.email, l.status, q.kind, q.passed_at, q.best_score, q.attempts, q.granted_by, q.user_id
+        FROM labellers l JOIN users u ON u.id = l.user_id
+        LEFT JOIN labeller_qualifications q ON q.user_id = l.user_id
+        ORDER BY u.email, q.kind
+        """):
+        if r["kind"] is None:
+            print(f"  {r['email']:34} {r['status']:8} (no kinds yet)")
+            continue
+        checks = await c.fetch(
+            """
+            SELECT r.selected, t.expected FROM label_responses r
+            JOIN label_invites i ON i.id = r.invite_id JOIN label_tasks t ON t.id = r.task_id
+            JOIN label_batches b ON b.id = t.batch_id
+            WHERE i.user_id = $1 AND b.kind = $2 AND b.purpose = 'work' AND t.expected IS NOT NULL
+              AND NOT r.unsure AND NOT r.skipped
+            ORDER BY r.created_at DESC LIMIT $3
+            """, r["user_id"], r["kind"], CHECK_WINDOW)
+        right = sum(is_correct({"selected": json.loads(x["selected"]) if isinstance(x["selected"], str) else x["selected"]},
+                               json.loads(x["expected"]) if isinstance(x["expected"], str) else x["expected"]) for x in checks)
+        how = "granted" if r["granted_by"] else (f"best {r['best_score']:.0%}" if r["best_score"] is not None else "-")
+        live = f"checks {right}/{len(checks)}" if checks else "no checks yet"
+        print(f"  {r['email']:34} {r['status']:8} {r['kind']:18} {'PASSED' if r['passed_at'] else 'not passed':10} "
+              f"{how:10} {r['attempts']} attempts  {live}")
 
 
 async def set_status(c: asyncpg.Connection, emails: list[str], status: str, by: str) -> None:
@@ -158,6 +192,7 @@ async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pending", action="store_true")
     ap.add_argument("--labellers", action="store_true")
+    ap.add_argument("--board", action="store_true")
     ap.add_argument("--approve", nargs="+", metavar="EMAIL")
     ap.add_argument("--pause", nargs="+", metavar="EMAIL")
     ap.add_argument("--list", metavar="KEY")
@@ -173,6 +208,8 @@ async def main() -> int:
             await pending(c)
         elif a.labellers:
             await labellers(c)
+        elif a.board:
+            await board(c)
         elif a.approve:
             await set_status(c, a.approve, "active", a.by)
         elif a.pause:
