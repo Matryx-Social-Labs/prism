@@ -58,7 +58,7 @@ def brief_ok(b: str | None) -> bool:
     return len(b) >= 80 and b.count(".") >= 2 and not re.search(r"[ऀ-෿]", b)
 
 
-async def sample(n: int) -> list[dict]:
+async def sample(n: int, languages: list[str] | None = None) -> list[dict]:
     c = await asyncpg.connect(_prod_url(), timeout=180)
     try:
         await c.execute("SET default_transaction_read_only = on")
@@ -73,10 +73,18 @@ async def sample(n: int) -> list[dict]:
             JOIN enrichments en ON en.article_id = a.id
             WHERE s.source_type <> 'cve_feed' AND a.word_count >= 120
               AND a.created_at > now() - interval '3 days'
+              AND ($2::text[] IS NULL OR ri.language = ANY($2::text[]))
             ORDER BY random() LIMIT $1
-            """, n)]
+            """, n, languages)]
     finally:
         await c.close()
+
+
+def native_script(quote: str) -> bool:
+    """True when the quote is mostly outside Latin script — the article's own
+    words for a Hindi or Kannada report, rather than an English rendering."""
+    letters = [ch for ch in quote if ch.isalpha()]
+    return bool(letters) and sum(ord(ch) > 0x24F for ch in letters) / len(letters) > 0.5
 
 
 def slugs(entities) -> set[str]:
@@ -111,9 +119,11 @@ async def run_model(model: str, rows: list[dict], prompt) -> dict:
         m["entities_inc"] += len(theirs)
         if mine or theirs:
             jacc.append(len(mine & theirs) / len(mine | theirs))
-        kept, _ = verify_claims(sh.claims, r["clean_text"] or "")
+        kept, rejected = verify_claims(sh.claims, r["clean_text"] or "")
         m["claims"] += len(sh.claims)
         m["claims_kept"] += len(kept)
+        m["not_verbatim"] += rejected["not_verbatim"]
+        m["kept_native"] += sum(native_script(c.quote_text) for c in kept)
         m["claims_inc"] += len(inc.get("claims") or [])
     n = max(1, m["ok"])
     return {
@@ -123,6 +133,10 @@ async def run_model(model: str, rows: list[dict], prompt) -> dict:
         "entity_jaccard_vs_incumbent": round(sum(jacc) / max(1, len(jacc)), 2),
         "claims_per_article": round(m["claims"] / n, 2), "claims_kept_per_article": round(m["claims_kept"] / n, 2),
         "incumbent_claims_per_article": round(m["claims_inc"] / n, 2),
+        # A quote the model translated fails verify_claims as not_verbatim, so on
+        # non-English articles this is the translation rate, measured.
+        "not_verbatim_per_article": round(m["not_verbatim"] / n, 2),
+        "kept_native_share": round(m["kept_native"] / max(1, m["claims_kept"]), 2),
         "secs_per_article": round(secs / n, 1),
     }
 
@@ -131,20 +145,32 @@ async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--articles", type=int, default=40)
     ap.add_argument("--models", nargs="+", required=True)
+    ap.add_argument("--languages", nargs="+", help="sample only articles in these languages (e.g. kn hi)")
+    ap.add_argument("--baseline-prompt", type=Path,
+                    help="a second extract-shared JSON to run beside the current one on the same "
+                         "articles and models — a PROMPT bake-off rather than a model one")
     a = ap.parse_args()
-    rows = await sample(a.articles)
+    rows = await sample(a.articles, a.languages)
     print(f"  {len(rows)} articles (seed {SAMPLE_SEED}); languages {dict(Counter(r['language'] for r in rows))}")
-    prompt = fetch_prompt("extract-shared")
+    prompts = [("current", fetch_prompt("extract-shared"))]
+    if a.baseline_prompt:
+        from common.observability import _LocalPrompt
+
+        prompts.insert(0, ("baseline", _LocalPrompt("extract-shared", json.loads(a.baseline_prompt.read_text()), "chat")))
     results = []
     for model in a.models:
-        print(f"  running {model} …", flush=True)
-        results.append(await run_model(model, rows, prompt))
+        for label, prompt in prompts:
+            print(f"  running {model} with the {label} prompt …", flush=True)
+            out = await run_model(model, rows, prompt)
+            out["model"] = f"{model} [{label}]" if a.baseline_prompt else model
+            results.append(out)
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(results, indent=1))
-    keys = ["schema_fail", "headline_ok", "brief_ok", "entities_per_article", "entity_jaccard_vs_incumbent", "claims_per_article", "claims_kept_per_article", "secs_per_article"]
-    print(f"\n  {'model':34} " + " ".join(f"{k[:14]:>14}" for k in keys))
+    keys = ["schema_fail", "headline_ok", "brief_ok", "entities_per_article", "entity_jaccard_vs_incumbent",
+            "claims_per_article", "claims_kept_per_article", "not_verbatim_per_article", "kept_native_share", "secs_per_article"]
+    print(f"\n  {'model':46} " + " ".join(f"{k[:14]:>14}" for k in keys))
     for r in results:
-        print(f"  {r['model']:34} " + " ".join(f"{str(r[k]):>14}" for k in keys))
+        print(f"  {r['model']:46} " + " ".join(f"{str(r[k]):>14}" for k in keys))
     print(f"\n  incumbent stored: {results[0]['incumbent_entities_per_article']} entities, {results[0]['incumbent_claims_per_article']} claims per article")
     return 0
 
