@@ -383,10 +383,13 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
             "u": body.unsure, "sk": body.skipped, "ms": body.ms_spent,
         },
     )
-    if b["purpose"] == "work" and owned["expected"] is not None and inv["user_id"]:
-        # A hidden check item. The labeller is not told which it was; they are
-        # told only if their recent checks have cost them the kind.
-        return {"ok": True, "requalify": await recheck(db, inv["user_id"], b["kind"])}
+    if b["purpose"] == "work" and inv["user_id"]:
+        # Every account's work answer gets the same reply, check or not. A reply
+        # that carried `requalify` only for a hidden check would itself say which
+        # tasks are checks — and a labeller who knows that answers those
+        # carefully and the rest however they like.
+        is_check = owned["expected"] is not None
+        return {"ok": True, "requalify": await recheck(db, inv["user_id"], b["kind"]) if is_check else False}
     if b["purpose"] == "practice":
         # Practice teaches as it goes. A TEST never answers here: its results
         # come once, at the end (finish_attempt), when nothing can be changed.

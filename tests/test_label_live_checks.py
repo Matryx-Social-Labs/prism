@@ -181,3 +181,21 @@ async def test_seeding_checks_interleaves_them_and_refuses_a_batch_already_answe
             await seed_checks(c, work_key, round_key, every=10, apply=True)
     finally:
         await c.close()
+
+
+async def test_the_reply_to_a_check_is_the_reply_to_any_task():
+    """A reply that differed on check items would point them out."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key, answers = await _work_with_checks(2, 2)
+    uid, h = await _qualified_labeller()
+    try:
+        async with _client() as c:
+            tok = (await c.post(f"/api/v1/labeller/batches/{key}/start", headers=h)).json()["token"]
+            shapes = set()
+            for _ in range(4):
+                task = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()["task"]
+                shapes.add(tuple(sorted((await _answer(c, key, tok, task["id"], [])).json())))
+            assert shapes == {("ok", "requalify")}
+    finally:
+        await _cleanup(uid)
