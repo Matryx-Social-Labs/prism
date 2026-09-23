@@ -18,6 +18,7 @@ from api.routes import (
     events,
     feed,
     label,
+    labeller,
     meta,
     search,
     subject,
@@ -63,4 +64,5 @@ app.include_router(subject.router)
 app.include_router(trending.router)
 app.include_router(watchlist.router)
 app.include_router(label.router)
+app.include_router(labeller.router)
 app.include_router(admin.router)
