@@ -31,7 +31,7 @@ from api.schemas import (
     SpeakerClaims,
     XPostOut,
 )
-from common import outlets
+from common import outlets, usage
 from common.billing import plan_for
 from common.config import get_settings
 from common.db import get_db
@@ -681,6 +681,10 @@ async def ask(
         db, str(user_id) if user_id else None, session_id, plan
     )
     if not allowed:
+        # Someone who wanted another answer and could not have one: the demand
+        # signal for Plus (admin dashboard). Counted apart from this request,
+        # whose transaction the 429 rolls back.
+        await usage.bump_detached("ask_limit", plan if user_id else "anonymous")
         raise HTTPException(
             status_code=429,
             detail={
@@ -702,6 +706,7 @@ async def ask(
     if reason == "burst":
         raise HTTPException(status_code=429, detail={"error": "too many questions this minute", "retry_after_s": 60})
     if reason == "ip":
+        await usage.bump_detached("ask_limit", "anonymous")
         raise HTTPException(status_code=429, detail={"error": "question limit reached", "signin_helps": True})
     if reason == "ceiling" and plan != "plus":
         raise HTTPException(status_code=503, detail={"error": "Ask is resting for today for free readers; it is back at midnight UTC", "plus_helps": user_id is not None})
