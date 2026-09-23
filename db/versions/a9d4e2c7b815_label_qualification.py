@@ -72,6 +72,14 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("labeller_qualifications")
+    # Practice and test attempts are extra invites for the same (batch,
+    # account). The index being restored allows one, so they go first — with
+    # their answers — or recreating it fails on any database where someone has
+    # practised twice. Their only home was the columns this downgrade drops
+    # (code review, 2026-09-23: `make check` round-trips an empty table and
+    # could not see it).
+    op.execute("DELETE FROM label_responses WHERE invite_id IN (SELECT id FROM label_invites WHERE attempt > 0)")
+    op.execute("DELETE FROM label_invites WHERE attempt > 0")
     op.drop_index("uq_label_invites_batch_user_attempt", table_name="label_invites")
     op.create_index(
         "uq_label_invites_batch_user", "label_invites", ["batch_id", "user_id"],

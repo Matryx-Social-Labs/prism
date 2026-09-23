@@ -314,14 +314,33 @@ async def _new_attempt(db: AsyncSession, batch_id: Any, user_id: uuid.UUID, task
             {"b": batch_id, "u": str(user_id)},
         )
     ).scalar_one()
-    token = secrets.token_urlsafe(24)
+    # ON CONFLICT, then read back — the guard `start` has for the same reason:
+    # two taps on "Take the test" read the same max(attempt), and without it the
+    # second is a unique-index 500 (code review, 2026-09-23). The loser gets the
+    # winner's attempt, so both taps land on one draw.
     await db.execute(
         text("INSERT INTO label_invites (id, token, batch_id, name, user_id, attempt, task_ids) "
-             "VALUES (:i, :t, :b, :n, :u, :a, CAST(:ids AS uuid[]))"),
-        {"i": uuid.uuid4(), "t": token, "b": batch_id, "n": (who["name"] or who["email"].split("@", 1)[0])[:60],
+             "VALUES (:i, :t, :b, :n, :u, :a, CAST(:ids AS uuid[])) "
+             "ON CONFLICT (batch_id, user_id, attempt) WHERE user_id IS NOT NULL DO NOTHING"),
+        {"i": uuid.uuid4(), "t": secrets.token_urlsafe(24), "b": batch_id,
+         "n": (who["name"] or who["email"].split("@", 1)[0])[:60],
          "u": str(user_id), "a": attempt, "ids": [str(x) for x in task_ids] if task_ids is not None else None},
     )
-    return token
+    return (
+        await db.execute(
+            text("SELECT token FROM label_invites WHERE batch_id = :b AND user_id = :u AND attempt = :a"),
+            {"b": batch_id, "u": str(user_id), "a": attempt},
+        )
+    ).scalar_one()
+
+
+async def _serialise(db: AsyncSession, batch_id: Any, user_id: uuid.UUID) -> None:
+    """One attempt start at a time per (round, account), held to the end of the
+    transaction. Without it two simultaneous starts could each miss the other's
+    unfinished attempt and open two draws of one pool at once — finish one, read
+    its explanations, answer the other (security review, 2026-09-23)."""
+    await db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+                     {"k": f"label-attempt:{batch_id}:{user_id}"})
 
 
 async def _unfinished(db: AsyncSession, batch_id: Any, user_id: uuid.UUID) -> str | None:
@@ -352,6 +371,7 @@ async def start_practice(kind: str, user_id: uuid.UUID = Depends(get_current_use
     batch = await _round_batch(db, kind, "practice")
     if batch is None:
         raise HTTPException(status_code=404, detail="no practice for this task yet")
+    await _serialise(db, batch["id"], user_id)
     token = await _unfinished(db, batch["id"], user_id) or await _new_attempt(db, batch["id"], user_id, None)
     return {"key": batch["key"], "token": token}
 
@@ -367,6 +387,7 @@ async def start_test(kind: str, user_id: uuid.UUID = Depends(get_current_user), 
     batch = await _round_batch(db, kind, "qualify")
     if batch is None:
         raise HTTPException(status_code=404, detail="no test for this task yet")
+    await _serialise(db, batch["id"], user_id)
     resumed = await _unfinished(db, batch["id"], user_id)
     if resumed:
         return {"key": batch["key"], "token": resumed}
@@ -378,16 +399,45 @@ async def start_test(kind: str, user_id: uuid.UUID = Depends(get_current_user), 
     ).scalar_one_or_none()
     if last and last + timedelta(hours=RETAKE_AFTER_HOURS) > datetime.now(UTC):
         raise HTTPException(status_code=429, detail=f"you can retake this test after {RETAKE_AFTER_HOURS} hours")
+    revealed = await _revealed(db, batch["id"], user_id)
     pool = [r[0] for r in (
         await db.execute(
             text(f"SELECT t.id FROM label_tasks t WHERE t.batch_id = :b AND {ELIGIBLE}"),
             {"b": batch["id"], "langs": langs},
         )
-    ).all()]
+    ).all() if str(r[0]) not in revealed]
     if len(pool) < QUESTIONS_PER_TEST:
-        raise HTTPException(status_code=409, detail="not enough test questions in your languages yet")
+        detail = ("you have seen the answers to too many of this test's questions — ask an admin"
+                  if revealed else "not enough test questions in your languages yet")
+        raise HTTPException(status_code=409, detail=detail)
     draw = random.SystemRandom().sample(pool, QUESTIONS_PER_TEST)
     return {"key": batch["key"], "token": await _new_attempt(db, batch["id"], user_id, draw)}
+
+
+async def _revealed(db: AsyncSession, batch_id: Any, user_id: uuid.UUID) -> set[str]:
+    """Questions whose answer this account has been SHOWN: the ones it missed on
+    a finished attempt of this test, whose explanations the result printed. A
+    retake never draws them again — otherwise failing a few times would read
+    the answer key off the result screens (security review, 2026-09-23)."""
+    rows = (
+        await db.execute(
+            text("""
+                SELECT t.id, t.expected, r.selected, r.unsure, r.skipped
+                FROM label_invites i
+                JOIN label_tasks t ON t.id = ANY(i.task_ids)
+                LEFT JOIN label_responses r ON r.task_id = t.id AND r.invite_id = i.id
+                WHERE i.batch_id = :b AND i.user_id = :u AND i.finished_at IS NOT NULL
+            """),
+            {"b": batch_id, "u": str(user_id)},
+        )
+    ).mappings().all()
+    return {
+        str(r["id"]) for r in rows
+        # Answered and missed: exactly the questions the result screen explained.
+        if r["selected"] is not None and not is_correct(
+            {"selected": _json(r["selected"]) or [], "unsure": r["unsure"], "skipped": r["skipped"]},
+            _json(r["expected"]))
+    }
 
 
 async def finish_attempt(db: AsyncSession, batch: dict, invite: dict) -> dict:
@@ -413,7 +463,10 @@ async def finish_attempt(db: AsyncSession, batch: dict, invite: dict) -> dict:
     rows = [{**r, "expected": _json(r["expected"]), "payload": _json(r["payload"]),
              "selected": _json(r["selected"]) or []} for r in rows]
     right = sum(is_correct(r, r["expected"]) for r in rows)
-    total = len(rows)
+    # A test is scored over its DRAW: a drawn question with no answer is a
+    # wrong one. Scoring over what was answered let an attempt that somehow
+    # ended early pass on the few questions its labeller chose to answer.
+    total = len(invite["task_ids"]) if invite.get("task_ids") else len(rows)
     score = right / total if total else 0.0
     passed = total > 0 and score >= PASS_MARK
     won = (
