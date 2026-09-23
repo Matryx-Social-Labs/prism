@@ -46,7 +46,7 @@ async def _labeller() -> tuple[uuid.UUID, dict]:
     return uid, {"Authorization": f"Bearer {bearer}"}
 
 
-async def _round(purpose: str, n: int, *, lang: str = "en") -> dict[str, bool]:
+async def _round(purpose: str, n: int, *, lang: str | list[str] = "en") -> dict[str, bool]:
     """A practice or qualify batch of `n` claim items, alternating yes / no so no
     constant strategy passes. Returns task id -> the expected "yes"."""
     bid = uuid.uuid4()
@@ -63,11 +63,12 @@ async def _round(purpose: str, n: int, *, lang: str = "en") -> dict[str, bool]:
             tid = uuid.uuid4()
             yes = pos % 2 == 0
             answers[str(tid)] = yes
+            task_lang = lang[pos % len(lang)] if isinstance(lang, list) else lang
             await s.execute(
                 text("INSERT INTO label_tasks (id, batch_id, position, candidates, payload, languages, expected, explanation) "
                      "VALUES (:i, :b, :p, '[]'::jsonb, CAST(:pl AS jsonb), CAST(:l AS text[]), CAST(:e AS jsonb), :x)"),
-                {"i": tid, "b": bid, "p": pos, "l": [lang],
-                 "pl": json.dumps({"kind": KIND, "speaker": "S", "quote_text": f"q{pos}", "language": lang}),
+                {"i": tid, "b": bid, "p": pos, "l": [task_lang],
+                 "pl": json.dumps({"kind": KIND, "speaker": "S", "quote_text": f"q{pos}", "language": task_lang}),
                  "e": json.dumps({"selected": [str(tid)] if yes else []}),
                  "x": f"because {pos}"})
     return answers
@@ -261,3 +262,92 @@ async def test_the_scoring_and_the_pool_builder_hold_their_own_invariants():
 
     label_scoring.demo()
     label_qualify.demo()
+
+
+
+async def test_dropping_a_language_mid_test_does_not_shrink_the_test():
+    """Security review 2026-09-23 (CRITICAL): the draw was re-filtered by the
+    labeller's CURRENT languages, so answering the easy ones, dropping a
+    language and asking for the next question ended the test on a handful —
+    and 3 of 3 is 100%. The draw is authoritative for the attempt's life."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    answers = await _round("qualify", QUESTIONS_PER_TEST * 2, lang=["en", "kn"])
+    uid, h = await _labeller()
+    try:
+        async with session_scope() as db:
+            await db.execute(text("UPDATE labellers SET languages_read = '{en,kn}' WHERE user_id = :u"), {"u": uid})
+        async with _client() as c:
+            s = (await c.post(f"/api/v1/labeller/qualify/{KIND}/start", headers=h)).json()
+            first = (await c.get(f"/api/v1/label/{s['key']}/next", headers={"X-Label-Token": s["token"]})).json()["task"]
+            await c.post(f"/api/v1/label/{s['key']}/answer",
+                         json={"task_id": first["id"], "token": s["token"], "selected": [first["id"]] if answers[first["id"]] else []})
+            await c.post("/api/v1/labeller/apply", json={"languages_read": ["en"]}, headers=h)
+            after = (await c.get(f"/api/v1/label/{s['key']}/next", headers={"X-Label-Token": s["token"]})).json()
+            assert after["task"] is not None and "result" not in after, "the rest of the draw must still be served"
+            result = (await _answer_all(c, s["key"], s["token"], answers))["result"]
+            assert result["total"] == QUESTIONS_PER_TEST, "scored over the whole draw"
+        async with session_scope() as db:
+            served = (await db.execute(text(
+                "SELECT count(*) FROM label_responses r JOIN label_invites i ON i.id = r.invite_id WHERE i.token = :t"),
+                {"t": s["token"]})).scalar_one()
+        # Two defences, both pinned: the whole draw is SERVED (not just the part
+        # in the languages they kept), and it is SCORED as a whole.
+        assert served == QUESTIONS_PER_TEST, "every drawn question — Kannada included — was still served"
+    finally:
+        await _cleanup(uid)
+
+
+async def test_a_retake_never_redraws_a_question_whose_answer_was_shown():
+    """Security review 2026-09-23: a failed attempt explains the questions
+    missed; drawing them again would let a few failures read the answer key."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    answers = await _round("qualify", QUESTIONS_PER_TEST * 3)
+    uid, h = await _labeller()
+    try:
+        async with _client() as c:
+            s = (await c.post(f"/api/v1/labeller/qualify/{KIND}/start", headers=h)).json()
+            await _answer_all(c, s["key"], s["token"], answers, wrong=4)
+            async with session_scope() as db:
+                await db.execute(text("UPDATE labeller_qualifications SET last_attempt_at = now() - interval '25 hours' "
+                                      "WHERE user_id = :u"), {"u": uid})
+            again = (await c.post(f"/api/v1/labeller/qualify/{KIND}/start", headers=h)).json()
+            async with session_scope() as db:
+                first_draw = set(map(str, (await db.execute(text("SELECT task_ids FROM label_invites WHERE token = :t"),
+                                                            {"t": s["token"]})).scalar_one()))
+                second_draw = set(map(str, (await db.execute(text("SELECT task_ids FROM label_invites WHERE token = :t"),
+                                                             {"t": again["token"]})).scalar_one()))
+            # _answer_all got the first four SERVED questions wrong: those are the revealed ones.
+            async with session_scope() as db:
+                served = [str(r[0]) for r in (await db.execute(text(
+                    "SELECT r.task_id FROM label_responses r JOIN label_invites i ON i.id = r.invite_id "
+                    "WHERE i.token = :t ORDER BY r.created_at"), {"t": s["token"]})).all()]
+            revealed = set(served[:4])
+            assert revealed <= first_draw and not (revealed & second_draw)
+    finally:
+        await _cleanup(uid)
+
+
+async def test_two_simultaneous_starts_open_one_attempt():
+    """Code + security review 2026-09-23: two taps on "Take the test" read the
+    same max(attempt) — a 500, or two open draws of one pool."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    import asyncio
+
+    await _round("qualify", QUESTIONS_PER_TEST + 5)
+    uid, h = await _labeller()
+    try:
+        async with _client() as c:
+            a, b = await asyncio.gather(
+                c.post(f"/api/v1/labeller/qualify/{KIND}/start", headers=h),
+                c.post(f"/api/v1/labeller/qualify/{KIND}/start", headers=h),
+            )
+        assert a.status_code == b.status_code == 200 and a.json()["token"] == b.json()["token"]
+        async with session_scope() as db:
+            open_attempts = (await db.execute(text(
+                "SELECT count(*) FROM label_invites WHERE user_id = :u AND finished_at IS NULL"), {"u": uid})).scalar_one()
+        assert open_attempts == 1
+    finally:
+        await _cleanup(uid)

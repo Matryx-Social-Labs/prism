@@ -50,9 +50,17 @@ from common.db import get_db
 router = APIRouter()
 
 MAX_LABELLER = 60
-# A qualification attempt serves only its own random draw; every other invite
-# (NULL task_ids) is served the whole batch, as before.
-IN_ATTEMPT = "(CAST(:subset AS uuid[]) IS NULL OR t.id = ANY(CAST(:subset AS uuid[])))"
+# Which tasks an invite may be served and may answer. A qualification attempt
+# is its own random draw, and THE DRAW IS AUTHORITATIVE for its lifetime: the
+# language gate chose it at start and is not re-applied. Re-applying it let a
+# labeller answer the questions they were sure of, drop a language, and have
+# the rest vanish — the attempt then finished on three questions instead of
+# fifteen (security review, 2026-09-23, CRITICAL). Every other invite (NULL
+# task_ids) is served the batch through the live language gate, as before.
+SCOPE = (
+    "((CAST(:subset AS uuid[]) IS NULL AND " + ELIGIBLE + ") "
+    "OR t.id = ANY(CAST(:subset AS uuid[])))"
+)
 
 
 class Join(BaseModel):
@@ -164,7 +172,7 @@ async def batch_header(
     langs = await languages_for_invite(db, inv["user_id"]) if inv else None
     total = (
         await db.execute(
-            text(f"SELECT count(*) FROM label_tasks t WHERE t.batch_id = :b AND {ELIGIBLE} AND {IN_ATTEMPT}"),
+            text(f"SELECT count(*) FROM label_tasks t WHERE t.batch_id = :b AND {SCOPE}"),
             {"b": b["id"], "langs": langs, "subset": _ids(inv["task_ids"]) if inv else None},
         )
     ).scalar_one()
@@ -213,8 +221,7 @@ async def next_task(
                 SELECT t.id, t.position, t.sector, t.candidates, t.seed_event_id, t.payload
                 FROM label_tasks t
                 WHERE t.batch_id = :b
-                  AND {ELIGIBLE}
-                  AND {IN_ATTEMPT}
+                  AND {SCOPE}
                   AND NOT EXISTS (
                     SELECT 1 FROM label_responses r
                     WHERE r.task_id = t.id AND r.invite_id = :i
@@ -320,7 +327,7 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     owned = (
         await db.execute(
             text(f"SELECT t.expected, t.explanation FROM label_tasks t WHERE t.id = :t AND t.batch_id = :b "
-                 f"AND {ELIGIBLE} AND {IN_ATTEMPT}"),
+                 f"AND {SCOPE}"),
             {"t": body.task_id, "b": b["id"], "langs": langs, "subset": _ids(inv["task_ids"])},
         )
     ).mappings().first()
