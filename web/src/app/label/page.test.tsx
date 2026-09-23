@@ -103,6 +103,14 @@ describe("the labeller workspace", () => {
     expect(fetchLabellerBatches).not.toHaveBeenCalled();
   });
 
+  it("tells a removed labeller their labelling has ended, and offers no batches", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchLabellerMe.mockResolvedValue(me("removed", ["en"]));
+    render(<LabellerWorkspace />);
+    expect(await screen.findByText("Your labelling has ended")).toBeInTheDocument();
+    expect(fetchLabellerBatches).not.toHaveBeenCalled();
+  });
+
   it("lets anyone read how each task works, before applying or being approved", async () => {
     render(<LabellerWorkspace />);
     const link = await screen.findByRole("link", { name: "Who said this?" });

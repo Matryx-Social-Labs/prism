@@ -127,8 +127,8 @@ export default function LabellerWorkspace() {
         </Section>
       )}
 
-      {session && me && me.status === "paused" && (
-        <Section title="Your labelling is paused">
+      {session && me && (me.status === "paused" || me.status === "removed") && (
+        <Section title={me.status === "paused" ? "Your labelling is paused" : "Your labelling has ended"}>
           <p className="text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
             Write to <a className="underline" href="mailto:hello@readprism.news">hello@readprism.news</a> and we will
             tell you why.

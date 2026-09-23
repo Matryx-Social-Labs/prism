@@ -53,6 +53,17 @@ EXPECTED = {
     # The /admin dashboard, guarded by a founder account (api/deps.require_admin_user).
     ("GET", "/api/v1/admin/me"),
     ("GET", "/api/v1/admin/audit"),
+    # Running the labeller workspace from /admin (api/routes/admin_labellers.py).
+    ("GET", "/api/v1/admin/labellers"),
+    ("POST", "/api/v1/admin/labellers/status"),
+    ("POST", "/api/v1/admin/labellers/add"),
+    ("POST", "/api/v1/admin/labellers/qualify"),
+    ("GET", "/api/v1/admin/batches"),
+    ("POST", "/api/v1/admin/batches/{key}/listed"),
+    ("POST", "/api/v1/admin/batches/{key}/open"),
+    ("POST", "/api/v1/admin/batches/{key}/languages"),
+    ("GET", "/api/v1/admin/batches/{key}/items"),
+    ("PUT", "/api/v1/admin/batches/{key}/explanations"),
     # Labelling — how the gold set grows without a checkout (api/routes/label.py).
     ("POST", "/api/v1/label/{key}/join"),
     ("GET", "/api/v1/label/{key}"),

@@ -56,3 +56,99 @@ export function istTime(iso: string): string {
     minute: "2-digit",
   });
 }
+
+// ── Labellers and batches (api/routes/admin_labellers.py) ─────────────────────
+
+export type LabellerStatusAdmin = "applied" | "active" | "paused" | "removed";
+
+export interface AdminLabeller {
+  email: string;
+  name: string | null;
+  status: LabellerStatusAdmin;
+  languages_read: string[];
+  note: string | null;
+  created_at: string;
+  approved_at: string | null;
+  approved_by: string | null;
+  answers: number;
+  last_answer_at: string | null;
+}
+
+export interface Standing {
+  email: string;
+  status: LabellerStatusAdmin;
+  kind: string;
+  passed: boolean;
+  best_score: number | null;
+  attempts: number;
+  granted_by: string | null;
+  checks_right: number;
+  checks_total: number;
+}
+
+export interface AdminBatch {
+  key: string;
+  name: string;
+  kind: string;
+  purpose: "work" | "practice" | "qualify";
+  open: boolean;
+  listed: boolean;
+  self_join: boolean;
+  created_at: string;
+  tasks: number;
+  gated: number;
+  answered_tasks: number;
+  responses: number;
+  people: number;
+}
+
+export interface RoundItem {
+  position: number;
+  speaker: string | null;
+  quote: string | null;
+  answer: string;
+  explanation: string;
+}
+
+export interface RoundCheck {
+  name: string;
+  purpose: string;
+  items: number;
+  missing: number;
+  scores: Record<string, number>;
+  ok: boolean;
+  reasons: string[];
+}
+
+const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
+const batchPath = (key: string, rest: string) => `/api/v1/admin/batches/${encodeURIComponent(key)}/${rest}`;
+
+export const fetchLabellers = (s: Session) =>
+  adminCall<{ labellers: AdminLabeller[]; board: Standing[]; languages: string[] }>(s, "/api/v1/admin/labellers");
+
+export const setLabellerStatus = (s: Session, email: string, status: Exclude<LabellerStatusAdmin, "applied">) =>
+  adminCall(s, "/api/v1/admin/labellers/status", post({ email, status }));
+
+export const addLabeller = (s: Session, email: string, languages_read: string[]) =>
+  adminCall(s, "/api/v1/admin/labellers/add", post({ email, languages_read }));
+
+export const setQualification = (s: Session, email: string, kind: string, granted: boolean) =>
+  adminCall(s, "/api/v1/admin/labellers/qualify", post({ email, kind, granted }));
+
+export const fetchBatches = (s: Session) => adminCall<{ batches: AdminBatch[] }>(s, "/api/v1/admin/batches");
+
+export const setListed = (s: Session, key: string, on: boolean) => adminCall(s, batchPath(key, "listed"), post({ on }));
+
+export const setOpen = (s: Session, key: string, on: boolean) => adminCall(s, batchPath(key, "open"), post({ on }));
+
+export const gateLanguages = (s: Session, key: string) =>
+  adminCall<{ gated: Record<string, number> }>(s, batchPath(key, "languages"), { method: "POST" });
+
+export const fetchRound = (s: Session, key: string) =>
+  adminCall<{ items: RoundItem[]; check: RoundCheck }>(s, batchPath(key, "items"));
+
+export const saveExplanations = (s: Session, key: string, edits: { position: number; explanation: string }[]) =>
+  adminCall<{ saved: number; check: RoundCheck }>(s, batchPath(key, "explanations"), {
+    method: "PUT",
+    body: JSON.stringify({ edits }),
+  });
