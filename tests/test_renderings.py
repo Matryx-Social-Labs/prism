@@ -141,9 +141,29 @@ async def test_one_failing_event_cannot_block_the_rest_of_the_sweep(monkeypatch)
 
     monkeypatch.setattr(renderings, "recent_events", fake_recent)
     monkeypatch.setattr(renderings, "judge_event", fake_judge)
-    async with session_scope() as s:
-        out = await renderings.sweep(s)
+    out = await renderings.sweep()
     assert out["judged"] == 1, "the event after the failing one must still be judged"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_each_event_commits_on_its_own(monkeypatch):
+    """Code review 2026-09-23: one transaction for the whole sweep meant a
+    failure on a late event rolled back verdicts already paid for on every
+    earlier one. Each event must run in its own session."""
+    ids = [uuid.uuid4() for _ in range(3)]
+    sessions: list = []
+
+    async def fake_recent(session, *, days, limit, offset=0):
+        return [(i, "t") for i in ids]
+
+    async def fake_judge(session, event_id, title, *, write=True):
+        sessions.append(session)  # kept alive, so their ids cannot be reused
+        return {"cards": 1, "judged": 1, "cost": 0.0, "verdicts": {}}
+
+    monkeypatch.setattr(renderings, "recent_events", fake_recent)
+    monkeypatch.setattr(renderings, "judge_event", fake_judge)
+    await renderings.sweep()
+    assert len(sessions) == 3 and len({id(x) for x in sessions}) == 3, "every event gets its own session"
 
 
 def test_scraped_text_cannot_become_a_spreadsheet_formula():

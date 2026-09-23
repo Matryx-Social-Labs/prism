@@ -276,6 +276,10 @@ async def judge_event(session: AsyncSession, event_id: Any, title: str, *, write
     }
     todo = [(k, name, claims) for k, (name, claims) in cards.items()
             if any(c.lang for c in claims) and known.get(k) != card_hash(claims)][:MAX_CARDS]
+    # End the read transaction before the network. A Jev round trip can take
+    # 45 s with retries, and a transaction left open across it sits idle
+    # holding a pooled connection the API and the consumers share.
+    await session.commit()
     sem = asyncio.Semaphore(JUDGE_CONCURRENCY)
 
     async def one(key: str, name: str, claims: list[CardClaim]) -> tuple[str, str, dict[str, Any], Decisions] | None:
@@ -335,16 +339,25 @@ async def recent_events(session: AsyncSession, *, days: int, limit: int, offset:
     return [(r.id, r.title or "") for r in rows]
 
 
-async def sweep(session: AsyncSession, *, days: int = 2, limit: int = 200) -> dict[str, float]:
+async def sweep(*, days: int = 2, limit: int = 200) -> dict[str, float]:
     """The worker's pass: recently touched events, only the cards that changed.
-    A card nobody touched costs one indexed read and nothing else."""
+    A card nobody touched costs one indexed read and nothing else.
+
+    ONE SESSION PER EVENT, committed as it finishes — xposts/poll.py's shape,
+    for the same reason. The sweep used to run every event in one transaction
+    committed at the end, so a dropped connection on event 150 rolled back the
+    verdicts already PAID FOR on events 1-149, the next sweep saw the same
+    stale hashes and paid again, and one pooled connection stayed checked out
+    for the whole sweep (code review, 2026-09-23). A failure now costs one
+    event and the rest proceed."""
+    from common.db import session_scope
+
+    async with session_scope() as session:
+        events = await recent_events(session, days=days, limit=limit)
     judged, cost = 0, 0.0
-    for event_id, title in await recent_events(session, days=days, limit=limit):
-        # One event, one savepoint: a failure rolls back that event alone and
-        # leaves the session usable, so a bad card can never block the events
-        # sorted after it on this sweep or any later one.
+    for event_id, title in events:
         try:
-            async with session.begin_nested():
+            async with session_scope() as session:
                 out = await judge_event(session, event_id, title)
         except Exception:  # noqa: BLE001 — logged; the rest of the sweep proceeds
             logger.exception("renderings_event_failed", event_id=str(event_id))
