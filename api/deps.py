@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import auth
@@ -55,6 +56,10 @@ async def require_admin(x_admin_token: str = Header(default="")) -> None:
         raise HTTPException(status_code=403, detail="admin token required")
 
 
+def admin_emails() -> frozenset[str]:
+    return frozenset(e.strip().lower() for e in get_settings().prism_admin_emails.split(",") if e.strip())
+
+
 async def get_current_user(
     authorization: str = Header(default=""),
     db: AsyncSession = Depends(get_db),
@@ -93,3 +98,19 @@ async def get_current_user_optional(
     if scheme.lower() != "bearer" or not token:
         return None
     return await auth.resolve_session(db, token)
+
+
+async def require_admin_user(
+    user_id: UUID = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> str:
+    """The signed-in founder's email, when it is on PRISM_ADMIN_EMAILS; else 403.
+
+    The /admin dashboard's guard (founder decision D1). An account, not the
+    shared token: every change it makes is recorded against a person
+    (common/admin_audit), and a founder who leaves is removed by editing one
+    variable rather than rotating a secret everyone holds."""
+    email = (await db.execute(text("SELECT lower(email) FROM users WHERE id = :u"), {"u": user_id})).scalar()
+    if not email or email not in admin_emails():
+        raise HTTPException(status_code=403, detail="not an admin")
+    return email

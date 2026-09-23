@@ -225,6 +225,10 @@ class Settings(BaseSettings):
     # API
     cors_origins: str = "http://localhost:3000"
     prism_admin_token: str = Field("change-me", repr=False)
+    # Who may open /admin (founder decision D1, 2026-09-23): the signed-in
+    # accounts whose email is on this comma-separated list. Empty means nobody —
+    # there is no screen that grants it, so the only way in is this variable.
+    prism_admin_emails: str = ""
     # How many proxies sit in front of the API. `X-Forwarded-For` is a list the
     # CLIENT can start: only the hops a trusted proxy appended are evidence, so
     # the client address is read this many entries from the RIGHT. Railway puts

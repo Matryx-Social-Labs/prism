@@ -50,6 +50,9 @@ EXPECTED = {
     ("GET", "/api/v1/watchlist/events"),
     ("POST", "/api/v1/admin/pipeline/run"),
     ("GET", "/api/v1/admin/status"),
+    # The /admin dashboard, guarded by a founder account (api/deps.require_admin_user).
+    ("GET", "/api/v1/admin/me"),
+    ("GET", "/api/v1/admin/audit"),
     # Labelling — how the gold set grows without a checkout (api/routes/label.py).
     ("POST", "/api/v1/label/{key}/join"),
     ("GET", "/api/v1/label/{key}"),
