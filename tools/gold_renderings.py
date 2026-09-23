@@ -57,6 +57,7 @@ from tools.snapshot_l2 import _prod_url
 
 GATE = 0.95
 SAMPLE_PER_SIDE = 60
+EVENT_CONCURRENCY = 8
 
 
 def cell(value: object) -> object:
@@ -80,6 +81,7 @@ async def judge(limit: int, apply: bool) -> None:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     engine = _engine(read_only=not apply)
+    sem = asyncio.Semaphore(EVENT_CONCURRENCY)
     total, judged, cost = 0, 0, 0.0
     offset, page = 0, 100
     try:
@@ -88,11 +90,18 @@ async def judge(limit: int, apply: bool) -> None:
                 events = await renderings.recent_events(s, days=3650, limit=page, offset=offset)
             if not events:
                 break
-            for event_id, title in events[: (limit - total) if limit else None]:
-                async with AsyncSession(engine) as s:
+            batch = events[: (limit - total) if limit else None]
+
+            async def one(event_id, title):
+                async with sem, AsyncSession(engine) as s:
                     out = await renderings.judge_event(s, event_id, title, write=apply)
                     if apply:
                         await s.commit()
+                return title, out
+
+            # Events in parallel: one at a time is ~2 h for the archive over the
+            # prod proxy, and each event is its own session either way.
+            for title, out in await asyncio.gather(*(one(e, t) for e, t in batch)):
                 total += 1
                 judged += out["judged"]
                 cost += out["cost"]
