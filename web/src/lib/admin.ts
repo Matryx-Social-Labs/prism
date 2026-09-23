@@ -213,3 +213,34 @@ export async function downloadWeeklyCsv(s: Session, weeks = 12): Promise<void> {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// ── People, switches, the collection trigger (api/routes/admin_controls.py) ──
+
+export interface Person {
+  email: string;
+  name: string | null;
+  profession: string | null;
+  languages: string[];
+  state: string | null;
+  created_at: string;
+  plan: string | null;
+  plan_status: string | null;
+  provider: string | null;
+  active_days: number;
+  last_active: string | null;
+  labeller: string | null;
+}
+
+export interface Flag {
+  name: string;
+  value: boolean | number;
+  does: string;
+}
+
+export const fetchPeople = (s: Session) =>
+  adminCall<{ total: number; active_window_days: number; people: Person[] }>(s, "/api/v1/admin/people?limit=500");
+
+export const fetchFlags = (s: Session) => adminCall<{ seen_by: string; flags: Flag[] }>(s, "/api/v1/admin/flags");
+
+export const triggerCollection = (s: Session) =>
+  adminCall<{ status: string; collecting: boolean }>(s, "/api/v1/admin/pipeline/trigger", { method: "POST" });

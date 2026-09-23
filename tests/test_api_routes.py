@@ -67,6 +67,10 @@ EXPECTED = {
     # The product's numbers for founders and investors (api/routes/admin_metrics.py).
     ("GET", "/api/v1/admin/metrics"),
     ("GET", "/api/v1/admin/metrics/weekly.csv"),
+    # People, read-only switches, and the collection trigger (api/routes/admin_controls.py).
+    ("GET", "/api/v1/admin/people"),
+    ("GET", "/api/v1/admin/flags"),
+    ("POST", "/api/v1/admin/pipeline/trigger"),
     # Cookieless usage counts from the web (api/routes/beacon.py).
     ("POST", "/api/v1/beacon"),
     # Labelling — how the gold set grows without a checkout (api/routes/label.py).
