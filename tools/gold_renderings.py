@@ -7,7 +7,7 @@ the answers are good (PRISM_QUOTE_VERDICTS stays off on the API until then).
 
     uv run python -m tools.gold_renderings --judge --limit 20          # dry run: asks, prints, writes nothing
     uv run python -m tools.gold_renderings --judge --apply             # shadow backfill into claim_verdicts
-    uv run python -m tools.gold_renderings --push "Quotes — round 1"          # a batch on /label (closed to the dashboard until listed)
+    uv run python -m tools.gold_renderings --push "Quotes — round 1" --apply  # a batch on /label (unlisted until an admin lists it)
     uv run python -m tools.label_admin --languages KEY && uv run python -m tools.label_admin --list KEY
     uv run python -m tools.gold_renderings --score KEY                         # the gate, from the batch's answers
 
@@ -41,8 +41,8 @@ quote as a translation or group two quotes BY THE SAME SPEAKER, never invent
 or reattribute words — but a targeted attack on one story is not something a
 random-sample precision number measures. Read that before turning the API on.
 
-WRITES TO PRODUCTION only with --judge --apply (claim_verdicts) and --push
-(one new label batch, unlisted).
+WRITES TO PRODUCTION only with --apply: --judge --apply (claim_verdicts) and
+--push --apply (one new label batch, unlisted). --db points it anywhere else.
 """
 
 from __future__ import annotations
@@ -66,8 +66,11 @@ SAMPLE_PER_SIDE = 60
 EVENT_CONCURRENCY = 8
 
 
+DB_URL: list[str | None] = [None]  # --db; production when unset
+
+
 def _engine(read_only: bool):
-    url = _prod_url().replace("postgresql://", "postgresql+asyncpg://", 1)
+    url = (DB_URL[0] or _prod_url()).replace("postgresql://", "postgresql+asyncpg://", 1)
     settings = {"default_transaction_read_only": "on"} if read_only else {}
     return create_async_engine(url, connect_args={"server_settings": settings, "timeout": 120})
 
@@ -113,11 +116,11 @@ async def judge(limit: int, apply: bool) -> None:
     print(f"\n{'wrote' if apply else 'would write'} {judged} cards across {total} events, ${cost:.4f}")
 
 
-async def push(name: str, seed: int) -> None:
+async def push(name: str, seed: int, apply: bool) -> None:
     """Sample from the verdicts first, then read only the sampled quotes, and
     write them as one quote_rendering batch — unlisted, so it reaches nobody
     until an admin lists it (tools/label_admin --list)."""
-    engine = _engine(read_only=False)
+    engine = _engine(read_only=not apply)
     try:
         async with engine.begin() as conn:
             rows = (await conn.execute(text(
@@ -144,6 +147,10 @@ async def push(name: str, seed: int) -> None:
 
             wanted = {k.split(":", 1)[0] for _, _, _, a, b in picked for k in (a, b) if k}
             quotes = await _quotes(conn, wanted)
+            if not apply:
+                print(f"DRY RUN: would write {len(picked)} tasks to a new unlisted batch {name!r} "
+                      "(same 60+60, 60+60 sample). Add --apply to write it.")
+                return
 
             key = secrets.token_urlsafe(9)
             bid = uuid.uuid4()
@@ -265,17 +272,19 @@ async def score(key: str) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--judge", action="store_true", help="ask about every card with quotes")
-    ap.add_argument("--apply", action="store_true", help="with --judge: write claim_verdicts")
+    ap.add_argument("--apply", action="store_true", help="with --judge or --push: write; without it nothing is")
+    ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     ap.add_argument("--limit", type=int, default=0, help="with --judge: stop after this many events")
     ap.add_argument("--push", metavar="NAME", help="write a stratified quote_rendering batch (unlisted)")
     ap.add_argument("--score", metavar="KEY", help="score a labelled batch against the gate")
     ap.add_argument("--seed", type=int, default=2026)
     a = ap.parse_args()
+    DB_URL[0] = a.db
     if a.judge:
         asyncio.run(judge(a.limit, a.apply))
         return 0
     if a.push:
-        asyncio.run(push(a.push, a.seed))
+        asyncio.run(push(a.push, a.seed, a.apply))
         return 0
     if a.score:
         return asyncio.run(score(a.score))

@@ -173,3 +173,23 @@ async def test_each_event_commits_on_its_own(monkeypatch):
     monkeypatch.setattr(renderings, "judge_event", fake_judge)
     await renderings.sweep()
     assert len(sessions) == 3 and len({id(x) for x in sessions}) == 3, "every event gets its own session"
+
+
+
+async def test_pushing_a_labelling_batch_writes_nothing_without_apply():
+    """Security review 2026-09-23: --push wrote to production on its own."""
+    from sqlalchemy import text as sql
+
+    from tools import gold_renderings
+    from tools.scratch import _local_url
+
+    async with session_scope() as s:
+        before = (await s.execute(sql("SELECT count(*) FROM label_batches"))).scalar_one()
+    gold_renderings.DB_URL[0] = _local_url()
+    try:
+        await gold_renderings.push("dry run", 1, apply=False)
+    finally:
+        gold_renderings.DB_URL[0] = None
+    async with session_scope() as s:
+        after = (await s.execute(sql("SELECT count(*) FROM label_batches"))).scalar_one()
+    assert after == before

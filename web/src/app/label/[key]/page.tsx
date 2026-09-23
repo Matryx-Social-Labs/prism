@@ -307,8 +307,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         if (res?.feedback) setFeedback(res.feedback);
         else if (res?.requalify) setState("requalify");
         else await load();
-      } catch {
-        setState("error");
+      } catch (e) {
+        // The same reading as load(): a 403 here means the kind was withdrawn
+        // or the labeller paused between fetching this task and answering it.
+        setState(e instanceof Error && e.message === "403" ? "requalify" : "error");
       } finally {
         setSaving(false);
       }
