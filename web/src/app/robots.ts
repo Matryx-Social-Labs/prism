@@ -12,8 +12,8 @@ import { SITE_URL } from "@/lib/site";
 // index, and they need auth anyway); internal search results and the
 // labelling tool are not pages. "/label" (no trailing slash) covers the
 // labeller workspace and every batch under it — "/label/" left the workspace
-// itself crawlable.
-const PRIVATE = ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist", "/you", "/search", "/label", "/plus/welcome"];
+// itself crawlable. "/admin" is the founders' dashboard.
+const PRIVATE = ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist", "/you", "/search", "/label", "/admin", "/plus/welcome"];
 const TRAINING_CRAWLERS = ["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent"];
 
 export default function robots(): MetadataRoute.Robots {
