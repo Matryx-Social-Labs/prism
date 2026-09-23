@@ -56,6 +56,11 @@ EXPECTED = {
     ("GET", "/api/v1/label/{key}/next"),
     ("POST", "/api/v1/label/{key}/answer"),
     ("GET", "/api/v1/label/{key}/export"),
+    # The labeller workspace in front of it: apply, approval, your batches (api/routes/labeller.py).
+    ("GET", "/api/v1/labeller/me"),
+    ("POST", "/api/v1/labeller/apply"),
+    ("GET", "/api/v1/labeller/batches"),
+    ("POST", "/api/v1/labeller/batches/{key}/start"),
 }
 
 

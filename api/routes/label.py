@@ -44,6 +44,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import require_admin
+from api.routes.labeller import ELIGIBLE, languages_for_invite
 from common.db import get_db
 
 router = APIRouter()
@@ -82,7 +83,7 @@ async def _invite(db: AsyncSession, batch_id, token: str) -> dict:
     row = (
         await db.execute(
             text(
-                "SELECT id, name, revoked FROM label_invites "
+                "SELECT id, name, revoked, user_id FROM label_invites "
                 "WHERE token = :t AND batch_id = :b"
             ),
             {"t": token, "b": batch_id},
@@ -146,15 +147,17 @@ async def batch_header(
     had barely started.
     """
     b = await _batch(db, key)
+    inv = await _invite(db, b["id"], token) if token else None
+    langs = await languages_for_invite(db, inv["user_id"]) if inv else None
     total = (
         await db.execute(
-            text("SELECT count(*) FROM label_tasks WHERE batch_id = :b"), {"b": b["id"]}
+            text(f"SELECT count(*) FROM label_tasks t WHERE t.batch_id = :b AND {ELIGIBLE}"),
+            {"b": b["id"], "langs": langs},
         )
     ).scalar_one()
     done = 0
     name = ""
-    if token:
-        inv = await _invite(db, b["id"], token)
+    if inv:
         name = inv["name"] or ""
         done = (
             await db.execute(
@@ -189,13 +192,15 @@ async def next_task(
     if not b["open"]:
         return {"task": None, "closed": True}
     inv = await _invite(db, b["id"], token)
+    langs = await languages_for_invite(db, inv["user_id"])
     row = (
         await db.execute(
             text(
-                """
+                f"""
                 SELECT t.id, t.position, t.sector, t.candidates, t.seed_event_id, t.payload
                 FROM label_tasks t
                 WHERE t.batch_id = :b
+                  AND {ELIGIBLE}
                   AND NOT EXISTS (
                     SELECT 1 FROM label_responses r
                     WHERE r.task_id = t.id AND r.invite_id = :i
@@ -204,7 +209,7 @@ async def next_task(
                 LIMIT 1
                 """
             ),
-            {"b": b["id"], "i": inv["id"]},
+            {"b": b["id"], "i": inv["id"], "langs": langs},
         )
     ).mappings().first()
     if row is None:
@@ -291,6 +296,7 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     if not b["open"]:
         raise HTTPException(status_code=409, detail="batch is closed")
     inv = await _invite(db, b["id"], body.token)
+    await languages_for_invite(db, inv["user_id"])  # 403 once the labeller is paused
     owned = (
         await db.execute(
             text("SELECT 1 FROM label_tasks WHERE id = :t AND batch_id = :b"),

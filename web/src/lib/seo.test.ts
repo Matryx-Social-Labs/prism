@@ -75,7 +75,8 @@ describe("robots", () => {
     const rule = Array.isArray(r.rules) ? r.rules[0] : r.rules;
     expect(rule.userAgent).toBe("*");
     expect(rule.allow).toBe("/");
-    for (const p of ["/account", "/search", "/label/", "/you", "/plus/welcome"]) expect(rule.disallow).toContain(p);
+    // "/label", not "/label/": the trailing slash left the labeller workspace itself crawlable.
+    for (const p of ["/account", "/search", "/label", "/you", "/plus/welcome"]) expect(rule.disallow).toContain(p);
     expect(r.sitemap).toEqual([expect.stringMatching(/\/sitemap\.xml$/), expect.stringMatching(/\/news-sitemap\.xml$/), expect.stringMatching(/\/records-sitemap\.xml$/), expect.stringMatching(/\/entities-sitemap\.xml$/)]);
     const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
     const blocked = rules.filter((x) => x.disallow === "/").map((x) => x.userAgent);
