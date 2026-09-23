@@ -101,7 +101,7 @@ async def _invite(db: AsyncSession, batch_id, token: str) -> dict:
 async def _batch(db: AsyncSession, key: str) -> dict:
     row = (
         await db.execute(
-            text("SELECT id, name, notes, open, self_join, kind FROM label_batches WHERE key = :k"),
+            text("SELECT id, name, notes, open, self_join, kind, listed FROM label_batches WHERE key = :k"),
             {"k": key},
         )
     ).mappings().first()
@@ -122,6 +122,14 @@ async def join(key: str, body: Join, db: AsyncSession = Depends(get_db)):
     b = await _batch(db, key)
     if not b["open"]:
         raise HTTPException(status_code=409, detail="batch is closed")
+    if b["listed"]:
+        # A batch on the labeller dashboard is reached through an APPROVED
+        # account (api/routes/labeller.py start), never anonymously. Without this
+        # the batch key — which every active labeller is shown — minted an
+        # anonymous credential with no approval, no language gate, and no way to
+        # pause it: anyone forwarded the key, or a paused labeller holding it,
+        # could keep writing into the gold set (security review, 2026-09-23).
+        raise HTTPException(status_code=403, detail="sign in at /label to work on this batch")
     if not b["self_join"]:
         raise HTTPException(status_code=403, detail="this batch is invite-only")
     token = secrets.token_urlsafe(24)
@@ -296,15 +304,17 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     if not b["open"]:
         raise HTTPException(status_code=409, detail="batch is closed")
     inv = await _invite(db, b["id"], body.token)
-    await languages_for_invite(db, inv["user_id"])  # 403 once the labeller is paused
+    langs = await languages_for_invite(db, inv["user_id"])  # 403 once the labeller is paused
     owned = (
         await db.execute(
-            text("SELECT 1 FROM label_tasks WHERE id = :t AND batch_id = :b"),
-            {"t": body.task_id, "b": b["id"]},
+            text(f"SELECT 1 FROM label_tasks t WHERE t.id = :t AND t.batch_id = :b AND {ELIGIBLE}"),
+            {"t": body.task_id, "b": b["id"], "langs": langs},
         )
     ).first()
     if owned is None:
-        # A task id from another batch must not be writable through this key.
+        # A task id from another batch — or one in a language this labeller
+        # never said they read, which `next` would not have served them — must
+        # not be writable through this key.
         raise HTTPException(status_code=404, detail="task not in this batch")
 
     await db.execute(

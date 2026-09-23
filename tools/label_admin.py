@@ -82,7 +82,12 @@ async def set_status(c: asyncpg.Connection, emails: list[str], status: str, by: 
 
 
 async def listed(c: asyncpg.Connection, key: str, on: bool) -> None:
-    name = await c.fetchval("UPDATE label_batches SET listed = $2 WHERE key = $1 RETURNING name", key, on)
+    # Listing also closes anonymous self-join: a listed batch is reached only
+    # through an approved account, and api/routes/label.py refuses /join on it.
+    # Doing both here keeps the row honest for anything that reads self_join.
+    name = await c.fetchval(
+        "UPDATE label_batches SET listed = $2, self_join = CASE WHEN $2 THEN false ELSE self_join END "
+        "WHERE key = $1 RETURNING name", key, on)
     if name is None:
         raise SystemExit(f"no batch with key {key}")
     print(f"  {name!r} is {'listed on' if on else 'removed from'} the labeller dashboard")

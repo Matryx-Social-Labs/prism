@@ -208,3 +208,37 @@ async def test_a_founders_invite_link_is_served_every_task_as_before():
         tok = (await c.post(f"/api/v1/label/{key}/join", json={"name": "founder"})).json()["token"]
         task = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()["task"]
         assert task is not None and task["claim"]["quote_text"] == "quote 0"
+
+
+async def test_a_listed_batch_cannot_be_joined_anonymously():
+    """Security review 2026-09-23 (CRITICAL): the batch key is shown to every
+    active labeller, and label.py's anonymous /join minted a credential on it
+    with no approval, no language gate and no pause — a paused labeller holding
+    the key, or anyone it was forwarded to, kept writing."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key = await _batch([["en", "kn"]])  # listed
+    async with _client() as c:
+        r = await c.post(f"/api/v1/label/{key}/join", json={"name": "stranger"})
+        assert r.status_code == 403
+
+
+async def test_an_answer_for_a_task_outside_your_languages_is_refused():
+    """Security review 2026-09-23: `next` never serves it, but the answer route
+    must refuse it too — a task id can be learnt from another labeller."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key = await _batch([["en", "kn"], ["en"]])
+    uid, bearer = await _user(status="active", langs=("en",))
+    try:
+        async with session_scope() as s:
+            kannada = (await s.execute(text(
+                "SELECT t.id FROM label_tasks t JOIN label_batches b ON b.id = t.batch_id "
+                "WHERE b.key = :k AND t.position = 0"), {"k": key})).scalar_one()
+        async with _client() as c:
+            tok = (await c.post(f"/api/v1/labeller/batches/{key}/start",
+                                headers={"Authorization": f"Bearer {bearer}"})).json()["token"]
+            r = await c.post(f"/api/v1/label/{key}/answer", json={"task_id": str(kannada), "token": tok, "selected": []})
+            assert r.status_code == 404
+    finally:
+        await _cleanup(uid)
