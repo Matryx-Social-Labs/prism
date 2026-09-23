@@ -64,6 +64,9 @@ EXPECTED = {
     ("POST", "/api/v1/admin/batches/{key}/languages"),
     ("GET", "/api/v1/admin/batches/{key}/items"),
     ("PUT", "/api/v1/admin/batches/{key}/explanations"),
+    # The product's numbers for founders and investors (api/routes/admin_metrics.py).
+    ("GET", "/api/v1/admin/metrics"),
+    ("GET", "/api/v1/admin/metrics/weekly.csv"),
     # Cookieless usage counts from the web (api/routes/beacon.py).
     ("POST", "/api/v1/beacon"),
     # Labelling — how the gold set grows without a checkout (api/routes/label.py).

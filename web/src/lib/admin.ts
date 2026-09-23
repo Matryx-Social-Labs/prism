@@ -152,3 +152,64 @@ export const saveExplanations = (s: Session, key: string, edits: { position: num
     method: "PUT",
     body: JSON.stringify({ edits }),
   });
+
+// ── The product's numbers (api/routes/admin_metrics.py, common/metrics.py) ────
+
+export type MetricUnit = "count" | "inr" | "usd" | "time";
+
+export interface MetricRow {
+  key: string;
+  label: string;
+  /** null: not counted (yet) — never shown as zero. */
+  current: number | string | null;
+  previous: number | string | null;
+  /** One value per IST day of the period; null before counting began. */
+  series: Array<number | null> | null;
+  unit: MetricUnit;
+  source: string;
+  note: string | null;
+}
+
+export interface SplitRow {
+  label: string;
+  current: number | null;
+  previous: number | null;
+}
+
+export interface Breakdown {
+  key: string;
+  title: string;
+  rows: SplitRow[];
+  source: string;
+}
+
+export interface MetricSection {
+  key: string;
+  title: string;
+  rows: MetricRow[];
+  breakdowns: Breakdown[];
+  retention?: { title: string; source: string; rows: { week: string; accounts: number; returned: number; complete: boolean }[] };
+  lag?: { title: string; source: string; min_stories: number; rows: { outlet: string; stories: number; first: number; median_hours: number }[] };
+}
+
+export interface Metrics {
+  range: { days: number; start: string; end: string; prev_start: string; prev_end: string; tz: string };
+  counting_since: { usage: string | null; active: string | null };
+  sections: MetricSection[];
+}
+
+export const fetchMetrics = (s: Session, days: number) => adminCall<Metrics>(s, `/api/v1/admin/metrics?days=${days}`);
+
+/** The weekly CSV. A plain link cannot carry the Bearer session, so fetch it
+ *  and hand the browser a file. */
+export async function downloadWeeklyCsv(s: Session, weeks = 12): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/admin/metrics/weekly.csv?weeks=${weeks}`, {
+    headers: authHeader(s),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new AdminError(res.status, "Could not download the CSV");
+  const url = URL.createObjectURL(await res.blob());
+  const a = Object.assign(document.createElement("a"), { href: url, download: "prism-weekly.csv" });
+  a.click();
+  URL.revokeObjectURL(url);
+}
