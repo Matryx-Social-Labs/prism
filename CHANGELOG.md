@@ -3,6 +3,63 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.92.0] - 2026-09-23
+
+### Added — the labeller workspace (`.claude/plans/labeller-workspace.plan.md`)
+Every quality gate on the roadmap waits on labels — the quote verdicts, the
+cross-language merge tier, X posts — and the last labelling round came back
+with its two labellers biased in opposite directions "because nothing made
+them" read the guidance. Founder decisions 2026-09-23: open application with
+admin approval, language gating, a 90% test per task kind, payment later.
+
+- **`/label`** — sign in (Google or email link), say which languages you read
+  well, apply. An admin approves (`tools/label_admin --pending / --approve`).
+  Approved labellers see their batches with their own progress and a head count
+  of labellers, never anyone's answers.
+- **`/label/learn/<kind>`** — every task explained with DO / DO NOT and worked
+  examples, readable before applying. The four guides moved out of the task page
+  (1,018 lines to 639).
+- **Practice and a qualification test per kind.** Practice marks each answer
+  and says why. The test: 15 questions drawn at random from a 40-item pool in
+  your languages, no feedback until the end, 90% to pass, a fresh draw 24 hours
+  after a fail. Work of a kind appears only once its test is passed.
+- **A test a lazy strategy cannot pass.** The claims answer key is 58 yes to 1
+  no, so `tools/label_qualify` builds known "no" items by construction (the
+  quote, asked about another person named in the same article) and refuses to
+  publish any pool a constant strategy can pass. Production dry run: 20/20,
+  every constant strategy at 50%. Explanations are drafted from each article's
+  own attribution and written closed until a founder reviews and publishes.
+- **The quote-rendering task** — "same statement in two languages?" and
+  "spoken in the language printed?" — so the verdicts' gate is labelled on the
+  dashboard, not in a CSV (`tools/gold_renderings --push / --score`).
+- **Hidden checks in the work.** A known-answer item every so often; an
+  account below 80% on its last 20 definite check answers loses the kind until
+  it passes the test again (why 80% and not 90%: `common/label_scoring`).
+- `tools/label_admin --board / --qualify / --languages / --list`.
+
+### Security — found by review before any of this shipped
+- CRITICAL: a listed batch's key minted an anonymous credential through the old
+  `/join` route — no approval, no language gate, no pause. `/join` now refuses
+  listed batches and practice/test rounds.
+- CRITICAL: dropping a language mid-test made the rest of the draw vanish, and
+  the attempt was scored over what had been answered — 3 of 3 is 100%. The draw
+  is now authoritative for the attempt's life and scored as a whole.
+- A retake never re-draws a question whose answer was already shown; starting
+  an attempt is serialised; an answer outside your languages is refused; a
+  check item's reply is identical to any other task's.
+- The phase 3 migration's downgrade failed on any database where someone had
+  practised twice; fixed and verified by hand against real rows.
+
+### Changed
+- `robots.ts` disallowed `/label/` — the trailing slash left the workspace
+  itself crawlable. Now `/label`, plus a noindex layout.
+
+### Not built, deliberately
+- A web admin page. The app has no admin identity a browser can hold (admin is
+  a server secret), so a page would mean putting that secret in a browser or
+  adding roles to accounts — its own decision. The CLI covers it.
+- Payment (founder decision); `ms_spent` is recorded per answer for when it lands.
+
 ## [0.0.91.0] - 2026-09-23
 
 ### Added

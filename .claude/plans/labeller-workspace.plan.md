@@ -4,7 +4,7 @@
 view all the available tasks, submit, see examples and an explanation per task,
 and pass a practice test before they start"
 **Complexity**: Large (5 phases, each shippable on its own)
-**Status**: RATIFIED 2026-09-23 — building in order 1 → 5
+**Status**: ALL FIVE PHASES BUILT 2026-09-23 (v0.0.92.0). Open: founders apply, get approved and qualified, and publish the first test.
 
 ## Founder decisions (2026-09-23)
 
@@ -181,3 +181,22 @@ cd web && npx vitest run src/app/label
 - [ ] No API response carries an expected answer before it should
 - [ ] Existing `/label/<key>#token` links keep working; `tools/gold_candidates` unchanged
 - [ ] The quote-rendering sheet is a batch, not a CSV
+
+## Outcome (2026-09-23)
+
+| phase | shipped | notes |
+|---|---|---|
+| 1 dashboard | #182 | + CRITICAL fix: listed batches refuse anonymous `/join` |
+| 2 learn | #183 | guides moved out of the task page (1,018 → 639 lines) |
+| 3 practice + test | #183 | + CRITICAL fix: the draw is fixed for the attempt's life and scored whole; retakes never re-draw a shown answer; starts serialised; downgrade fixed |
+| 4 quote_rendering | this PR | the translation CSV became a batch; `--from-batch` pools |
+| 5 hidden checks | this PR | 80% over 20, not 90% — see common/label_scoring; reply identical for checks |
+
+Deviations from the plan, each explained where it lives:
+- **Live bar 80% over 20, not the pass mark.** The pass mark would withdraw a
+  truly-92% labeller in 21% of windows.
+- **No web admin page.** No browser-holdable admin identity exists; the CLI
+  covers approve / pause / qualify / board / agreement.
+- **Kinds without adjudicated gold** (event_identity, quote_rendering) get their
+  test from their first labellers' agreed answers (`--from-batch`), so their
+  first labellers are qualified by hand (`label_admin --qualify`).
