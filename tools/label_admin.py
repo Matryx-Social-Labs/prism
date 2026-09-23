@@ -7,6 +7,7 @@
     uv run python -m tools.label_admin --list KEY                 # show a batch on the dashboard
     uv run python -m tools.label_admin --unlist KEY
     uv run python -m tools.label_admin --languages KEY            # fill in what each task needs read
+    uv run python -m tools.label_admin --qualify a@x.com event_identity   # qualify by hand, no test
 
 FOUNDER DECISION (2026-09-23): open application, ADMIN APPROVAL. Anyone with a
 Prism account can apply at /label; nobody is served a task until this tool
@@ -19,6 +20,11 @@ languages, which means "shown to everyone" — correct for a founder's link, wro
 for a Kannada seed served to someone who reads only Hindi. It fills them in
 from the events a task shows (every article's language, plus English for the
 Prism headline above each) or from a claim task's own `language`.
+
+`--qualify` is for a kind that has no test yet — the cross-language task's
+first labellers ARE the answer key its test will be built from — and for
+people whose judgement the founders already trust. It is recorded as a grant
+(`granted_by`), never as a score, so it can always be told apart from a pass.
 
 Writes to PRODUCTION by default (it is an admin tool — every command here is a
 deliberate act); --db points it anywhere else.
@@ -133,6 +139,21 @@ async def languages(c: asyncpg.Connection, key: str) -> None:
     print(f"  {len(updates)} tasks gated: " + ", ".join(f"{k} {v}" for k, v in sorted(tally.items(), key=lambda x: -x[1])))
 
 
+async def qualify(c: asyncpg.Connection, email: str, kind: str, by: str) -> None:
+    uid = await c.fetchval("SELECT l.user_id FROM labellers l JOIN users u ON u.id = l.user_id "
+                           "WHERE lower(u.email) = lower($1)", email)
+    if uid is None:
+        raise SystemExit(f"{email} has not applied at /label")
+    await c.execute(
+        """
+        INSERT INTO labeller_qualifications (user_id, kind, passed_at, granted_by)
+        VALUES ($1, $2, now(), $3)
+        ON CONFLICT (user_id, kind) DO UPDATE
+          SET passed_at = coalesce(labeller_qualifications.passed_at, now()), granted_by = $3
+        """, uid, kind, by)
+    print(f"  {email} qualified for {kind} by {by} (a grant, not a test score)")
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pending", action="store_true")
@@ -142,6 +163,7 @@ async def main() -> int:
     ap.add_argument("--list", metavar="KEY")
     ap.add_argument("--unlist", metavar="KEY")
     ap.add_argument("--languages", metavar="KEY")
+    ap.add_argument("--qualify", nargs=2, metavar=("EMAIL", "KIND"))
     ap.add_argument("--by", default="founder", help="recorded as approved_by")
     ap.add_argument("--db", metavar="URL", help="target database (default: production)")
     a = ap.parse_args()
@@ -161,6 +183,8 @@ async def main() -> int:
             await listed(c, a.unlist, False)
         elif a.languages:
             await languages(c, a.languages)
+        elif a.qualify:
+            await qualify(c, a.qualify[0], a.qualify[1], a.by)
         else:
             ap.print_help()
             return 2

@@ -44,12 +44,15 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import require_admin
-from api.routes.labeller import ELIGIBLE, languages_for_invite
+from api.routes.labeller import ELIGIBLE, _ids, feedback, finish_attempt, languages_for_invite
 from common.db import get_db
 
 router = APIRouter()
 
 MAX_LABELLER = 60
+# A qualification attempt serves only its own random draw; every other invite
+# (NULL task_ids) is served the whole batch, as before.
+IN_ATTEMPT = "(CAST(:subset AS uuid[]) IS NULL OR t.id = ANY(CAST(:subset AS uuid[])))"
 
 
 class Join(BaseModel):
@@ -83,7 +86,7 @@ async def _invite(db: AsyncSession, batch_id, token: str) -> dict:
     row = (
         await db.execute(
             text(
-                "SELECT id, name, revoked, user_id FROM label_invites "
+                "SELECT id, name, revoked, user_id, attempt, task_ids, finished_at FROM label_invites "
                 "WHERE token = :t AND batch_id = :b"
             ),
             {"t": token, "b": batch_id},
@@ -101,7 +104,7 @@ async def _invite(db: AsyncSession, batch_id, token: str) -> dict:
 async def _batch(db: AsyncSession, key: str) -> dict:
     row = (
         await db.execute(
-            text("SELECT id, name, notes, open, self_join, kind, listed FROM label_batches WHERE key = :k"),
+            text("SELECT id, name, notes, open, self_join, kind, listed, purpose FROM label_batches WHERE key = :k"),
             {"k": key},
         )
     ).mappings().first()
@@ -122,13 +125,15 @@ async def join(key: str, body: Join, db: AsyncSession = Depends(get_db)):
     b = await _batch(db, key)
     if not b["open"]:
         raise HTTPException(status_code=409, detail="batch is closed")
-    if b["listed"]:
+    if b["listed"] or b["purpose"] != "work":
         # A batch on the labeller dashboard is reached through an APPROVED
         # account (api/routes/labeller.py start), never anonymously. Without this
         # the batch key — which every active labeller is shown — minted an
         # anonymous credential with no approval, no language gate, and no way to
         # pause it: anyone forwarded the key, or a paused labeller holding it,
         # could keep writing into the gold set (security review, 2026-09-23).
+        # Practice and test rounds likewise belong to an account: an anonymous
+        # attempt could never be recorded as a pass, only read for its answers.
         raise HTTPException(status_code=403, detail="sign in at /label to work on this batch")
     if not b["self_join"]:
         raise HTTPException(status_code=403, detail="this batch is invite-only")
@@ -159,8 +164,8 @@ async def batch_header(
     langs = await languages_for_invite(db, inv["user_id"]) if inv else None
     total = (
         await db.execute(
-            text(f"SELECT count(*) FROM label_tasks t WHERE t.batch_id = :b AND {ELIGIBLE}"),
-            {"b": b["id"], "langs": langs},
+            text(f"SELECT count(*) FROM label_tasks t WHERE t.batch_id = :b AND {ELIGIBLE} AND {IN_ATTEMPT}"),
+            {"b": b["id"], "langs": langs, "subset": _ids(inv["task_ids"]) if inv else None},
         )
     ).scalar_one()
     done = 0
@@ -179,7 +184,7 @@ async def batch_header(
         ).scalar_one()
     return {
         "name": b["name"], "notes": b["notes"], "open": b["open"],
-        "self_join": b["self_join"], "labeller": name, "kind": b["kind"],
+        "self_join": b["self_join"], "labeller": name, "kind": b["kind"], "purpose": b["purpose"],
         "total": total, "done": done,
     }
 
@@ -209,6 +214,7 @@ async def next_task(
                 FROM label_tasks t
                 WHERE t.batch_id = :b
                   AND {ELIGIBLE}
+                  AND {IN_ATTEMPT}
                   AND NOT EXISTS (
                     SELECT 1 FROM label_responses r
                     WHERE r.task_id = t.id AND r.invite_id = :i
@@ -217,10 +223,13 @@ async def next_task(
                 LIMIT 1
                 """
             ),
-            {"b": b["id"], "i": inv["id"], "langs": langs},
+            {"b": b["id"], "i": inv["id"], "langs": langs, "subset": _ids(inv["task_ids"])},
         )
     ).mappings().first()
     if row is None:
+        # A practice round or a test ends with its result; work just ends.
+        if b["purpose"] != "work" and inv["user_id"]:
+            return {"task": None, "closed": False, "result": await finish_attempt(db, b, inv)}
         return {"task": None, "closed": False}
 
     # A claim task carries everything it needs in `payload` — no events to join.
@@ -305,15 +314,20 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=409, detail="batch is closed")
     inv = await _invite(db, b["id"], body.token)
     langs = await languages_for_invite(db, inv["user_id"])  # 403 once the labeller is paused
+    if inv["finished_at"] is not None:
+        # A scored attempt cannot be edited after it was scored.
+        raise HTTPException(status_code=409, detail="this round is finished")
     owned = (
         await db.execute(
-            text(f"SELECT 1 FROM label_tasks t WHERE t.id = :t AND t.batch_id = :b AND {ELIGIBLE}"),
-            {"t": body.task_id, "b": b["id"], "langs": langs},
+            text(f"SELECT t.expected, t.explanation FROM label_tasks t WHERE t.id = :t AND t.batch_id = :b "
+                 f"AND {ELIGIBLE} AND {IN_ATTEMPT}"),
+            {"t": body.task_id, "b": b["id"], "langs": langs, "subset": _ids(inv["task_ids"])},
         )
-    ).first()
+    ).mappings().first()
     if owned is None:
-        # A task id from another batch — or one in a language this labeller
-        # never said they read, which `next` would not have served them — must
+        # A task id from another batch, one in a language this labeller never
+        # said they read, or one outside this attempt's draw — none of which
+        # `next` would have served them — must
         # not be writable through this key.
         raise HTTPException(status_code=404, detail="task not in this batch")
 
@@ -336,6 +350,11 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
             "u": body.unsure, "sk": body.skipped, "ms": body.ms_spent,
         },
     )
+    if b["purpose"] == "practice":
+        # Practice teaches as it goes. A TEST never answers here: its results
+        # come once, at the end (finish_attempt), when nothing can be changed.
+        answer = {"selected": [str(x) for x in body.selected], "unsure": body.unsure, "skipped": body.skipped}
+        return {"ok": True, "feedback": feedback(dict(owned), answer)}
     return {"ok": True}
 
 

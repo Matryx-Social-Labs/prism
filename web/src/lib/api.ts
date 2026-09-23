@@ -854,6 +854,28 @@ export interface LabelBatch {
   kind?: string;
   total: number;
   done: number; // THIS invite's count, not everyone's
+  /** work, or a practice round / a qualification test (labeller workspace, phase 3). */
+  purpose?: "work" | "practice" | "qualify";
+}
+
+/** A PRACTICE answer's feedback. A test never returns one until it is over. */
+export interface LabelFeedback {
+  correct: boolean;
+  /** The ids that should have been selected: candidates, or the task's own id for "yes". */
+  expected: string[];
+  explanation: string;
+}
+
+/** A practice round's or a test's result, once every question in it is answered. */
+export interface LabelResult {
+  right: number;
+  total: number;
+  score: number;
+  passed: boolean;
+  pass_mark: number;
+  purpose: "practice" | "qualify";
+  /** Only the ones missed, and only now that nothing can be changed. */
+  missed: { position: number; about: string; explanation: string }[];
 }
 
 /**
@@ -887,7 +909,7 @@ export async function fetchLabelBatch(key: string, token: string): Promise<Label
 export async function fetchLabelTask(
   key: string,
   token: string
-): Promise<{ task: LabelTask | null; closed: boolean }> {
+): Promise<{ task: LabelTask | null; closed: boolean; result?: LabelResult }> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/next`, {
     cache: "no-store",
     headers: { "X-Label-Token": token },
@@ -907,11 +929,12 @@ export async function postLabelAnswer(
     skipped?: boolean;
     ms_spent: number;
   }
-): Promise<void> {
+): Promise<{ feedback?: LabelFeedback }> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/answer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(String(r.status));
+  return r.json();
 }

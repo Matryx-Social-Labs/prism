@@ -26,10 +26,13 @@ import {
   postLabelAnswer,
   type LabelBatch,
   type LabelClaim,
+  type LabelFeedback,
+  type LabelResult,
   type LabelEvent,
   type LabelTask,
 } from "@/lib/api";
 import { ClaimGuide, Guide, Primer, TopicGuide } from "@/components/label/guides";
+import { PracticeFeedback, RoundResult } from "@/components/label/rounds";
 
 const WHO_KEY = "prism.labeller";
 // Per batch, because one person may be invited to several and each carries its own
@@ -186,7 +189,11 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   const [primed, setPrimed] = useState<boolean | null>(null);
   const [task, setTask] = useState<LabelTask | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "result" | "error">("loading");
+  // Practice only: the answer to the question just answered, shown until "Next".
+  const [feedback, setFeedback] = useState<LabelFeedback | null>(null);
+  // Practice or test: the score, once every question in the round is answered.
+  const [result, setResult] = useState<LabelResult | null>(null);
   const [saving, setSaving] = useState(false);
   const startedAt = useRef<number>(Date.now());
 
@@ -250,9 +257,14 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       // recorded under.
       if (b.labeller) setWho(b.labeller);
       setPicked(new Set());
+      setFeedback(null);
       startedAt.current = Date.now();
       if (t.closed) setState("closed");
-      else if (!t.task) {
+      else if (t.result) {
+        setTask(null);
+        setResult(t.result);
+        setState("result");
+      } else if (!t.task) {
         setTask(null);
         setState("done");
       } else {
@@ -273,7 +285,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       if (!task || saving) return;
       setSaving(true);
       try {
-        await postLabelAnswer(batchKey, {
+        const res = await postLabelAnswer(batchKey, {
           task_id: task.id,
           token,
           // A skip carries no opinion, so whatever was ticked is discarded rather
@@ -286,7 +298,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           skipped,
           ms_spent: Date.now() - startedAt.current,
         });
-        await load();
+        // A practice answer is marked straight away and waits for "Next";
+        // everything else moves on.
+        if (res?.feedback) setFeedback(res.feedback);
+        else await load();
       } catch {
         setState("error");
       } finally {
@@ -436,6 +451,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         </Note>
       )}
       {state === "closed" && <Note>This batch is closed. Thank you.</Note>}
+      {state === "result" && result && <RoundResult result={result} />}
+      {state === "ready" && task && feedback && (
+        <PracticeFeedback task={task} feedback={feedback} onNext={() => void load()} />
+      )}
       {state === "done" && (
         <Note>
           That&apos;s everything — {batch?.total ?? 0} judgements. Thank you, {who}.
@@ -456,7 +475,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         />
       )}
 
-      {state === "ready" && task && primed !== false && (
+      {state === "ready" && task && primed !== false && !feedback && (
         task.claim ? (
           <ClaimTask
             claim={task.claim}

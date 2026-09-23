@@ -108,4 +108,44 @@ describe("the labeller workspace", () => {
     const link = await screen.findByRole("link", { name: "Who said this?" });
     expect(link).toHaveAttribute("href", "/label/learn/claim_attribution");
   });
+
+  describe("learn and qualify (phase 3)", () => {
+    const kind = (over: Record<string, unknown>) => ({
+      kind: "claim_attribution", qualified: false, best_score: null, attempts: 0,
+      can_practise: true, can_test: true, retake_at: null, has_work: true, ...over,
+    });
+    const board = (k: Record<string, unknown>) => {
+      useSession.mockReturnValue(SESSION);
+      fetchLabellerMe.mockResolvedValue(me("active", ["en"]));
+      fetchLabellerBatches.mockResolvedValue({ status: "active", ready: [], done: [], kinds: [kind(k)] });
+      render(<LabellerWorkspace />);
+    };
+    const section = async () => within((await screen.findByRole("heading", { name: "Learn and qualify" })).closest("section")!);
+
+    it("offers practice and the test to someone who has not taken it, and the test opens its task page", async () => {
+      board({});
+      const s = await section();
+      expect(s.getByText("Not taken yet")).toBeInTheDocument();
+      expect(s.getByRole("button", { name: "Practise" })).toBeInTheDocument();
+      fetchSpy.mockResolvedValue(new Response(JSON.stringify({ key: "q1", token: "tok-q" }), { status: 200 }));
+      await userEvent.click(s.getByRole("button", { name: "Take the test" }));
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith("/label/q1"));
+      expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/v1/labeller/qualify/claim_attribution/start");
+      expect(localStorage.getItem("prism.label.token.q1")).toBe("tok-q");
+    });
+
+    it("says when a failed test can be retaken, and offers no test until then", async () => {
+      board({ attempts: 1, best_score: 0.8667, can_test: false, retake_at: "2026-09-24T12:00:00+00:00" });
+      const s = await section();
+      expect(s.getByText(/Best so far 87% · you can retake it after/)).toBeInTheDocument();
+      expect(s.queryByRole("button", { name: "Take the test" })).not.toBeInTheDocument();
+      expect(s.getByRole("button", { name: "Practise" })).toBeInTheDocument();
+    });
+
+    it("marks a passed kind as passed", async () => {
+      board({ qualified: true, best_score: 1, attempts: 1, can_test: false });
+      expect((await section()).getByText("Passed")).toBeInTheDocument();
+    });
+  });
 });
+
