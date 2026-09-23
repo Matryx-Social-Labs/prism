@@ -37,6 +37,9 @@ def upgrade() -> None:
         sa.Column("event", sa.Text(), primary_key=True),
         sa.Column("dim", sa.Text(), primary_key=True, server_default=""),
         sa.Column("count", sa.BigInteger(), nullable=False, server_default="0"),
+        # The app only ever writes words from closed lists (common/usage); this
+        # is the floor under that, on a table a public endpoint writes to.
+        sa.CheckConstraint("char_length(event) <= 24 AND char_length(dim) <= 48", name="ck_usage_daily_words"),
     )
     op.create_table(
         "user_days",

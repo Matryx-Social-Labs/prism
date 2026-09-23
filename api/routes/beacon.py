@@ -39,6 +39,14 @@ class Beacon(BaseModel):
     s: Annotated[str, Field(max_length=16)] = ""
 
 
+async def _over(r, key: str, cap: int) -> bool:
+    """Count one against a daily ceiling; True once it is past it."""
+    n = await r.incr(key)
+    if n == 1:
+        await r.expire(key, usage.TWO_DAYS_S)
+    return n > cap
+
+
 @router.post("/api/v1/beacon", status_code=204)
 async def beacon(
     body: Beacon,
@@ -53,18 +61,23 @@ async def beacon(
     day = usage.today()
     try:
         r = get_redis()
-        v = usage.visitor(await usage.day_salt(r, day.isoformat()), client_ip(request) or "", ua)
-        n_key = f"prism:usage:n:{day.isoformat()}:{v}"
-        n = await r.incr(n_key)
-        if n == 1:
-            await r.expire(n_key, usage.TWO_DAYS_S)
-        if n > usage.EVENTS_PER_VISITOR_PER_DAY:
+        salt = await usage.day_salt(r, day.isoformat())
+        ip = client_ip(request) or ""
+        v, addr = usage.visitor(salt, ip, ua), usage.visitor(salt, ip, "")
+        # Two ceilings: per visitor (salt + address + browser), and per address
+        # alone — the one a script cannot rotate past by changing its
+        # User-Agent (review, 2026-09-23).
+        if (await _over(r, f"prism:usage:n:{day.isoformat()}:{v}", usage.EVENTS_PER_VISITOR_PER_DAY)
+                or await _over(r, f"prism:usage:ip:{day.isoformat()}:{addr}", usage.EVENTS_PER_IP_PER_DAY)):
             return Response(status_code=204)
         new_visitor = False
         if body.e == "view":
             v_key = f"prism:usage:v:{day.isoformat()}"
             new_visitor = await r.sadd(v_key, v) == 1
             await r.expire(v_key, usage.TWO_DAYS_S)
+            if new_visitor and await _over(r, f"prism:usage:vip:{day.isoformat()}:{addr}",
+                                           usage.NEW_VISITORS_PER_IP_PER_DAY):
+                new_visitor = False
     except Exception as exc:  # noqa: BLE001 — fail closed: see the module docstring
         logger.warning("beacon_redis_unavailable", error_type=type(exc).__name__)
         return Response(status_code=204)
