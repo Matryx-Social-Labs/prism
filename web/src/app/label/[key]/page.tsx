@@ -47,7 +47,9 @@ const PRIMER_KEY = (batch: string) => `prism.label.primer.${batch}`;
 
 function provenance(e: LabelEvent): string {
   const bits = [
-    e.at ? new Date(e.at).toLocaleDateString(undefined, { day: "2-digit", month: "short" }) : "—",
+    // IST, the product's one clock: in the same-happening task the day a report
+    // appeared is on the screen, and a browser elsewhere would move it.
+    e.at ? new Date(e.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" }) : "—",
     `${e.source_count} ${e.source_count === 1 ? "outlet" : "outlets"}`,
   ];
   if (e.actors.length) bits.push(e.actors.slice(0, 3).join(" · "));
@@ -527,7 +529,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
 
           <p className="mt-8 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
             {sameEvent
-              ? "Which of these report the same happening — the same incident, the same day?"
+              ? "Which of these report the same happening — the same incident, whatever day it was reported?"
               : sameTopic
                 ? "Which of these are genuinely useful context about the same issue?"
                 : "Which of these are part of the same unfolding story?"}
