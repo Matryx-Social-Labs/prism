@@ -5,15 +5,33 @@
 // story, never a question, never a name. No cookie is set; the privacy policy
 // says exactly this ("What we collect").
 //
-// A signed-in reader's beacon carries their session so the API can note that
-// they were active today — the day only, which is what retention is measured
-// on. That is the one reason this uses fetch (sendBeacon cannot carry it).
+// A signed-in reader's FIRST beacon of the day carries their session so the
+// API can note that they were active today — the day only, which is what
+// retention is measured on — and no other beacon does: a live token on every
+// page view was exposure for nothing (review, 2026-09-23). That is the one
+// reason this uses fetch (sendBeacon cannot carry it).
 
 import { API_URL } from "@/lib/api";
 import { loadSession } from "@/lib/session";
 
 type Props = Record<string, string | number | boolean | undefined>;
 type Event = "Sign in" | "Ask" | "Lens" | "Subscribe" | "Share";
+
+const ACTIVE = "prism.active";
+
+/** The session header, once per account per IST day; nothing otherwise. */
+function onceADay(): Record<string, string> {
+  const session = loadSession();
+  if (!session) return {};
+  const mark = `${session.userId}|${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })}`;
+  try {
+    if (window.localStorage.getItem(ACTIVE) === mark) return {};
+    window.localStorage.setItem(ACTIVE, mark);
+  } catch {
+    return {};
+  }
+  return { Authorization: `Bearer ${session.token}` };
+}
 
 const NAME: Record<Event, string> = { "Sign in": "signin", Ask: "ask", Lens: "lens", Subscribe: "subscribe", Share: "share" };
 
@@ -48,11 +66,10 @@ function dimension(event: Event, p: Props): string {
 export function send(e: string, d: string, extra: Record<string, string> = {}): void {
   // Tests render components that count things; they must not reach a network.
   if (typeof window === "undefined" || process.env.NODE_ENV === "test") return;
-  const token = loadSession()?.token;
   void fetch(`${API_URL}/api/v1/beacon`, {
     method: "POST",
     keepalive: true,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { "Content-Type": "application/json", ...onceADay() },
     body: JSON.stringify({ e, d, ...extra }),
   }).catch(() => undefined);
 }

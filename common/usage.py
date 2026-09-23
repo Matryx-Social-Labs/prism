@@ -29,6 +29,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.lenses import LENSES
 from common.logging import get_logger
 
 logger = get_logger(__name__)
@@ -38,6 +39,15 @@ TWO_DAYS_S = 2 * 24 * 60 * 60
 # Beacons one visitor may send in a day before the rest are dropped. A reader
 # who opens forty stories sends ~100; a script sends thousands.
 EVENTS_PER_VISITOR_PER_DAY = 400
+# The same, per ADDRESS, whatever browser it claims to be. The visitor hash
+# includes the User-Agent, which the caller writes: rotating it minted a new
+# visitor (and a fresh cap) per request from one machine (review, 2026-09-23).
+# These are the ceilings a script cannot rotate its way past. Generous,
+# because Indian mobile carriers put many readers behind one address (CGNAT).
+# ponytail: a fixed per-address ceiling undercounts a busy carrier NAT; raise
+# it or key on a /24 if the dashboard ever shows addresses pinned at it.
+EVENTS_PER_IP_PER_DAY = 5000
+NEW_VISITORS_PER_IP_PER_DAY = 50
 
 # Kinds of page (web/src/lib/analytics.pageKind is the other half of this list).
 PAGES = frozenset({
@@ -46,8 +56,18 @@ PAGES = frozenset({
 })
 SHARE_SURFACES = frozenset({"story", "quote", "trending", "other"})
 SIGNIN_METHODS = frozenset({"link", "google"})
-SLUG = re.compile(r"^[a-z0-9][a-z0-9:_.-]{0,47}$")
-LENS = re.compile(r"^[a-z0-9-]{1,24}:(open|locked)$")
+# Every word below is a closed list, never a pattern: a pattern let a script
+# write a new row per request ("lens:<random>:open") into a table investors
+# read (review, 2026-09-23). The web's own vocabularies, mirrored.
+ASK_VIA = frozenset({"bar", "foot", "thumb", "selection", "quote", "entity", "chip"})  # AskContext.AskVia
+LENS_STATES = frozenset({f"{slug}:{state}" for slug in LENSES for state in ("open", "locked")})
+SUBSCRIBE_STAGES = frozenset({"prompt", "page", "welcome", "cancel-sheet", "paused", "cancelled",
+                              "switched-yearly", "checkout", "paid"})
+SUBSCRIBE_DETAIL = frozenset({
+    "ask-limit", "ask-rest", "generic", "account", "header", "direct",  # the door (UpgradeReason, ?from=)
+    "not-using", "too-expensive", "missing-something", "other", "none",  # billing.CancelReason
+    "plus_monthly", "plus_yearly", "founding",  # common/billing plan ids
+})
 HOST = re.compile(r"^[a-z0-9.-]{1,253}$")
 
 # Where an arrival came from, by referrer host. Suffix match on the host.
@@ -109,9 +129,16 @@ def dimension(event: str, d: str, ref: str = "", s: str = "") -> str | None:
     if event == "signin":
         return d if d in SIGNIN_METHODS else None
     if event == "lens":
-        return d if LENS.match(d) else None
-    if event in ("ask", "subscribe"):
-        return d if SLUG.match(d) else None
+        return d if d in LENS_STATES else None
+    if event == "ask":
+        return d if d in ASK_VIA else None
+    if event == "subscribe":
+        # The step counts even when what led there is unknown: /plus?from= is
+        # an address anyone can type, and a stray one must not lose the view.
+        stage, _, detail = d.partition(":")
+        if stage not in SUBSCRIBE_STAGES:
+            return None
+        return d if detail in SUBSCRIBE_DETAIL else stage
     return None
 
 
@@ -165,6 +192,11 @@ def demo() -> None:
     assert dimension("view", "story") == "story" and dimension("view", "story/abc") is None
     assert dimension("ask", "What is RBI doing?") is None, "a question must never become a dimension"
     assert dimension("lens", "markets:locked") == "markets:locked" and dimension("lens", "markets") is None
+    assert dimension("lens", "made-up-lens:open") is None, "a lens must be a real one"
+    assert dimension("ask", "bar") == "bar" and dimension("ask", "barx") is None
+    assert dimension("subscribe", "prompt:ask-limit") == "prompt:ask-limit"
+    assert dimension("subscribe", "page:anything-typed") == "page", "an unknown door keeps the step"
+    assert dimension("subscribe", "made-up") is None
     assert dimension("admin", "x") is None
     assert is_bot("Mozilla/5.0 (compatible; Googlebot/2.1)") and is_bot("") and not is_bot("Mozilla/5.0 (iPhone)")
     assert visitor("s1", "1.2.3.4", "ua") != visitor("s2", "1.2.3.4", "ua"), "a new salt must give a new hash"

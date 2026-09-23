@@ -48,9 +48,17 @@ def _client() -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://t")
 
 
-def _reader() -> dict[str, str]:
-    """A browser nobody has seen today: the visitor hash is salt + IP + UA."""
-    return {"user-agent": f"Mozilla/5.0 (iPhone) test-{uuid.uuid4().hex}"}
+def _address() -> str:
+    """An address nobody has used today. Railway's one proxy appends the
+    client's address last, which is what api/deps.client_ip reads."""
+    n = uuid.uuid4().int
+    return f"10.{n % 256}.{(n >> 8) % 256}.{(n >> 16) % 256}"
+
+
+def _reader(address: str | None = None) -> dict[str, str]:
+    """A browser nobody has seen today: the visitor hash is salt + IP + UA, and
+    the per-address ceilings count per address, so each reader gets its own."""
+    return {"user-agent": f"Mozilla/5.0 (iPhone) test-{uuid.uuid4().hex}", "x-forwarded-for": address or _address()}
 
 
 async def test_the_rules_hold_without_a_database():
@@ -69,25 +77,32 @@ async def test_a_view_counts_once_as_a_visitor_per_day():
     assert await _count("visitors") == visitors + 1
 
 
+async def _leaked() -> int:
+    async with session_scope() as s:
+        return (await s.execute(text("SELECT count(*) FROM usage_daily WHERE dim LIKE '%rbi%' OR dim LIKE '%/%' "
+                                     "OR (event = 'lens' AND dim LIKE 'x%')"))).scalar()
+
+
 async def test_bots_unknown_words_and_questions_are_not_counted():
     if not await _db_reachable():
         pytest.skip("no database")
     before = await _count("view", "story")
     asks = await _count("ask", "bar")
+    leaked = await _leaked()
     async with _client() as c:
         await c.post("/api/v1/beacon", json={"e": "view", "d": "story"},
-                     headers={"user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1)"})
-        await c.post("/api/v1/beacon", json={"e": "view", "d": "story"}, headers={"user-agent": ""})
+                     headers={**_reader(), "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1)"})
+        await c.post("/api/v1/beacon", json={"e": "view", "d": "story"}, headers={**_reader(), "user-agent": ""})
         r = await c.post("/api/v1/beacon", json={"e": "view", "d": "story/9f3c"}, headers=_reader())
         assert r.status_code == 204
-        # The one place a reader's own words could leak is Ask; its word must be a slug.
+        # The one place a reader's own words could leak is Ask; its word must be one of the entry points.
         await c.post("/api/v1/beacon", json={"e": "ask", "d": "why did the rbi cut rates"}, headers=_reader())
+        # A made-up lens is a new row per request if the word is a pattern, not a list.
+        await c.post("/api/v1/beacon", json={"e": "lens", "d": f"x{uuid.uuid4().hex[:12]}:open"}, headers=_reader())
         assert (await c.post("/api/v1/beacon", json={"e": "admin", "d": "x"}, headers=_reader())).status_code == 422
     assert await _count("view", "story") == before
     assert await _count("ask", "bar") == asks
-    async with session_scope() as s:
-        leaked = (await s.execute(text("SELECT count(*) FROM usage_daily WHERE dim LIKE '%rbi%' OR dim LIKE '%/%'"))).scalar()
-    assert leaked == 0
+    assert await _leaked() == leaked
 
 
 async def test_arrivals_are_counted_by_where_they_came_from():
@@ -112,6 +127,22 @@ async def test_a_visitor_past_the_days_cap_is_not_counted(monkeypatch):
         for _ in range(5):
             await c.post("/api/v1/beacon", json={"e": "view", "d": "feed"}, headers=h)
     assert await _count("view", "feed") == before + 2
+
+
+async def test_rotating_the_browser_string_does_not_mint_visitors(monkeypatch):
+    """One machine, one address, a new User-Agent per request: each used to be a
+    new visitor with a fresh cap (review, 2026-09-23)."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    monkeypatch.setattr(usage, "NEW_VISITORS_PER_IP_PER_DAY", 2)
+    monkeypatch.setattr(usage, "EVENTS_PER_IP_PER_DAY", 4)
+    visitors, views = await _count("visitors"), await _count("view", "search")
+    address = _address()
+    async with _client() as c:
+        for _ in range(6):
+            await c.post("/api/v1/beacon", json={"e": "view", "d": "search"}, headers=_reader(address))
+    assert await _count("visitors") == visitors + 2
+    assert await _count("view", "search") == views + 4
 
 
 async def test_nothing_is_counted_while_redis_is_away(monkeypatch):

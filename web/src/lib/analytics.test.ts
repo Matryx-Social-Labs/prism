@@ -6,6 +6,7 @@ const fetchSpy = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/session", () => ({ loadSession: () => ({ token: "tok", userId: "u", email: "e@example.test" }) }));
 
 beforeEach(() => {
+  localStorage.clear();
   fetchSpy.mockReset().mockResolvedValue(new Response(null, { status: 204 }));
   vi.stubGlobal("fetch", fetchSpy);
 });
@@ -28,6 +29,15 @@ describe("usage counting", () => {
     expect(sent()).toEqual({ e: "lens", d: "markets:locked" });
     expect(fetchSpy.mock.calls[0][1].headers).toMatchObject({ Authorization: "Bearer tok" });
     expect(fetchSpy.mock.calls[0][1].keepalive).toBe(true);
+  });
+
+  it("sends the session on the first beacon of the day only", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    send("view", "feed");
+    send("view", "story");
+    track("Ask", { via: "bar" });
+    const withToken = fetchSpy.mock.calls.filter(([, init]) => "Authorization" in (init.headers as Record<string, string>));
+    expect(withToken).toHaveLength(1);
   });
 
   it("keeps the step of subscribing and what led there, as a slug", () => {
