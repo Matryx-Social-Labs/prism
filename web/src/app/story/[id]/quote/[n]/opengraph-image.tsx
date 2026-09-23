@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 
 import { fetchEvent } from "@/lib/api";
 import { shortDate } from "@/lib/dateline";
+import { langName } from "@/lib/languages";
 import { QuoteCard } from "@/lib/ogCard";
 import { ogFonts } from "@/lib/ogFonts";
 import { findQuote } from "@/lib/quotes";
@@ -21,6 +22,7 @@ export default async function Image({ params }: { params: Promise<{ id: string; 
   let outlet = "";
   let when: string | null = null;
   let storyTitle: string | null = null;
+  let lang: string | null = null;
   let degraded = false;
   try {
     const e = await fetchEvent(id);
@@ -32,12 +34,15 @@ export default async function Image({ params }: { params: Promise<{ id: string; 
     outlet = q.claim.source_name;
     when = q.claim.published_at ? shortDate(q.claim.published_at) : null;
     storyTitle = e.title;
+    // The honesty line names the language the words were PRINTED in; "Verbatim"
+    // on its own would assert more than the write-time check ever proved.
+    lang = q.claim.lang ?? null;
   } catch {
     degraded = true;
   }
-  const fonts = await ogFonts(quote, speaker, role ?? "", outlet, when ?? "", storyTitle ?? "", host, "Prism Who said what Verbatim");
+  const fonts = await ogFonts(quote, speaker, role ?? "", outlet, when ?? "", storyTitle ?? "", host, `Prism Who said what Verbatim in ${lang ? langName(lang) : ""}`);
   return new ImageResponse(
-    <QuoteCard quote={quote} speaker={speaker} role={role} outlet={outlet} when={when} host={host} storyTitle={storyTitle} />,
+    <QuoteCard quote={quote} speaker={speaker} role={role} outlet={outlet} when={when} host={host} storyTitle={storyTitle} lang={lang} />,
     { ...size, fonts: fonts.length ? fonts : undefined, headers: degraded ? { "cache-control": "no-store" } : undefined },
   );
 }

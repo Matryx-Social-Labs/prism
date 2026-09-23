@@ -203,6 +203,43 @@ async def event_clips(db: AsyncSession, event_id: uuid.UUID) -> list[ClipOut]:
     return out
 
 
+ENGLISH = "en"
+
+
+def interleave_languages(claims: list[ClaimOut]) -> tuple[list[ClaimOut], list[str]]:
+    """One quote per language before any language's second. Returns the order
+    the languages were taken in.
+
+    The card shows two quotes and the rest on request
+    (`web/src/components/Said.tsx`), and this list used to be ordered by recency
+    alone. So a later report in another language pushed the earlier one clean out
+    of the fold: a reader saw a Kannada rendering of words spoken in English with
+    the English rendering hidden behind a button, and nothing on the card said a
+    language was missing. Round-robin instead — whatever the fold is, it covers
+    as many languages as it has room for.
+
+    English leads for a reader who has expressed no preference (PRODUCT.md
+    "English-first display"); the client re-orders for a reader who has. Ties
+    break on quote count, then first appearance, so the payload is byte-identical
+    for every reader and the route stays cacheable.
+    """
+    buckets: dict[str, list[ClaimOut]] = {}
+    # Position of each language's FIRST quote, kept as we bucket rather than
+    # looked up afterwards: ClaimOut is a Pydantic model, so `list.index` would
+    # compare by field values and hand back the wrong position for a speaker
+    # quoted identically by two outlets.
+    seen_at: dict[str, int] = {}
+    for i, c in enumerate(claims):
+        lang = c.lang or ""
+        buckets.setdefault(lang, []).append(c)
+        seen_at.setdefault(lang, i)
+    order = sorted(buckets, key=lambda lang: (lang != ENGLISH, -len(buckets[lang]), seen_at[lang]))
+    out: list[ClaimOut] = []
+    for i in range(max((len(b) for b in buckets.values()), default=0)):
+        out += [buckets[lang][i] for lang in order if i < len(buckets[lang])]
+    return out, [lang for lang in order if lang]
+
+
 def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
     """Speaker-grouped, most-quoted first; newest article first, article order within it.
 
@@ -261,15 +298,22 @@ def group_claims(sources: list[dict]) -> list[SpeakerClaims]:
                 source_name=src["source_name"],
                 url=src["url"],
                 published_at=pub.isoformat() if pub else None,
+                lang=src.get("lang"),
             )))
-    return [
-        SpeakerClaims(
-            speaker=label[k],
-            role=max(roles[k], key=roles[k].get) if k in roles else None,
-            claims=[cl for _, cl in sorted(by[k], key=lambda x: x[0])],
+    out: list[SpeakerClaims] = []
+    for k in sorted(by, key=lambda k: (-len(by[k]), first_seen[k])):
+        ordered, languages = interleave_languages(
+            [cl for _, cl in sorted(by[k], key=lambda x: x[0])]
         )
-        for k in sorted(by, key=lambda k: (-len(by[k]), first_seen[k]))
-    ]
+        out.append(
+            SpeakerClaims(
+                speaker=label[k],
+                role=max(roles[k], key=roles[k].get) if k in roles else None,
+                claims=ordered,
+                languages=languages,
+            )
+        )
+    return out
 
 
 @router.get("/api/v1/events/{event_id}", response_model=EventDetail)
@@ -300,6 +344,7 @@ async def get_event(
                 SELECT a.id AS article_id, s.name AS source_name, s.slug AS source_slug,
                        s.reliability ->> 'funding' AS funding,
                        ri.url, ri.url_canonical, ri.title, ri.published_at, ri.image_url, ri.image_phash,
+                       ri.language AS lang,
                        e.shared_fields -> 'stance' ->> 'label' AS stance,
                        e.shared_fields -> 'claims' AS claims,
                        CASE WHEN jsonb_typeof(e.shared_fields -> 'claims') = 'array'

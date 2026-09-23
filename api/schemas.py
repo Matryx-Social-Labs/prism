@@ -252,6 +252,15 @@ class ClaimOut(BaseModel):
     source_name: str
     url: str | None
     published_at: str | None
+    # THE LANGUAGE THE ARTICLE PRINTED THESE WORDS IN (`raw_items.language`).
+    # It is NOT a claim about the language they were SPOKEN in, and the
+    # difference is the whole point: an outlet's own translation passes the
+    # verbatim check in enrichment/claims.py perfectly, because that check asks
+    # whether the words are in THIS ARTICLE, not whether they are the speaker's.
+    # Printing the language is what stops a Kannada rendering of an Italian
+    # sentence from reading as Giorgia Meloni's exact words. Null for a row
+    # whose source never carried one.
+    lang: str | None = None
 
 
 class SpeakerClaims(BaseModel):
@@ -260,6 +269,11 @@ class SpeakerClaims(BaseModel):
     # States"): the most-repeated non-empty role across the speaker's claims.
     role: str | None = None
     claims: list[ClaimOut]
+    # Every language this speaker is quoted in here, English first then by how
+    # many quotes each carries — the same order `claims` is interleaved in. One
+    # entry is the ordinary case and the card says nothing; two or more is the
+    # case that needs labelling.
+    languages: list[str] = []
 
 
 class EventDetail(BaseModel):

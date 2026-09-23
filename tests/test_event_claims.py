@@ -20,9 +20,10 @@ T1 = datetime(2026, 7, 28, 10, 0, tzinfo=UTC)
 
 
 def _src(article_id, claims, published_at=T0, name="The Hindu", url="https://h.example/a",
-         canonical=None):
+         canonical=None, lang="en"):
     return {"article_id": article_id, "source_name": name, "url": url,
-            "url_canonical": canonical, "published_at": published_at, "claims": claims}
+            "url_canonical": canonical, "published_at": published_at, "claims": claims,
+            "lang": lang}
 
 
 def _c(speaker, quote, start=None):
@@ -46,6 +47,9 @@ def test_only_verified_fields_leave_the_server():
     assert cl.model_dump().keys() == {
         "quote_text", "quote_start", "quote_end", "context_before", "context_after",
         "article_id", "source_name", "url", "published_at",
+        # `lang` is verified in the same sense the rest are: it is the article's
+        # own language from raw_items, not something the extractor asserted.
+        "lang",
     }
     assert cl.quote_start == 40
     assert cl.published_at == T0.isoformat()
@@ -185,7 +189,7 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
                 article = {"source_name": "Mint", "source_slug": "mint", "funding": None,
                            "url": "https://m.example/x?utm_source=rss",
                            "url_canonical": "https://m.example/x", "title": "T",
-                           "published_at": T0, "stance": None,
+                           "published_at": T0, "stance": None, "lang": "en",
                            "claims": [_c("Anita Dipke", "We were receiving proposals", start=12)]}
                 # The same publisher document was observed under two unstable
                 # feed ids. The route, not only the helper, must collapse it.
@@ -212,7 +216,8 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
                             "quote_end": None, "context_before": "", "context_after": "",
                             "article_id": str(aid), "source_name": "Mint",
                             "url": "https://m.example/x?utm_source=rss",
-                            "published_at": T0.isoformat()}],
+                            "published_at": T0.isoformat(), "lang": "en"}],
+                "languages": ["en"],
             }], "the route did not pass claims through, or leaked an unverified field"
             assert body["sources"] and body["sources"][0]["article_id"] == str(aid), (
                 "the sources query was changed and sources stopped arriving"
@@ -279,3 +284,66 @@ def test_context_rides_the_claim_when_the_row_carries_the_article_text():
     src["clean_text"] = text
     cl = group_claims([src])[0].claims[0]
     assert cl.context_before == "Intro words here." and cl.context_after == "Trailing words here."
+
+
+# ── The language a quote was printed in ──────────────────────────────────────
+#
+# A quote is verified VERBATIM AGAINST ITS ARTICLE (enrichment/claims.py), which
+# is not the same as verbatim against the speaker: an outlet's own translation
+# passes that check perfectly. Speaker names are canonicalised to English by the
+# extractor, so a Kannada retelling lands on the SAME speaker card as the English
+# one — measured on production, 10,763 of 10,766 speaker strings are Latin. The
+# card shows two quotes; ordering by recency alone therefore let a later
+# rendering hide an earlier one with nothing saying a language was missing.
+
+
+def test_a_later_language_cannot_push_an_earlier_one_out_of_the_fold():
+    """The founder-reported bug: TV9 Kannada files later, the English rendering
+    disappears behind "2 more quotes" with nothing marking it missing."""
+    out = group_claims([
+        _src("kn2", [_c("Donald Trump", "a later kannada line")], published_at=T1, lang="kn"),
+        _src("kn1", [_c("Donald Trump", "an earlier kannada line")], published_at=T1, lang="kn"),
+        _src("en1", [_c("Donald Trump", "what he actually said")], published_at=T0, lang="en"),
+    ])
+    fold = [c.quote_text for c in out[0].claims[:2]]
+    assert "what he actually said" in fold
+    assert {c.lang for c in out[0].claims[:2]} == {"en", "kn"}
+
+
+def test_english_leads_for_a_reader_who_has_expressed_no_preference():
+    out = group_claims([
+        _src("kn1", [_c("X", "kannada one"), _c("X", "kannada two")], published_at=T1, lang="kn"),
+        _src("en1", [_c("X", "english one")], published_at=T0, lang="en"),
+    ])
+    assert out[0].claims[0].lang == "en"
+    assert out[0].languages == ["en", "kn"]
+
+
+def test_one_language_is_left_exactly_as_it_was():
+    """Round-robin over a single bucket is the identity: 43% of stored quotes are
+    non-English originals and nothing about them should move."""
+    out = group_claims([
+        _src("a2", [_c("X", "newer")], published_at=T1, lang="kn"),
+        _src("a1", [_c("X", "older")], published_at=T0, lang="kn"),
+    ])
+    assert [c.quote_text for c in out[0].claims] == ["newer", "older"]
+    assert out[0].languages == ["kn"]
+
+
+def test_an_untagged_article_is_not_reported_as_a_language():
+    """A source with no `language` still yields quotes; it must not print as one
+    more language on a card that counts them."""
+    out = group_claims([_src("a1", [_c("X", "no language on this row")], lang=None)])
+    assert out[0].claims[0].lang is None
+    assert out[0].languages == []
+
+
+def test_a_speaker_quoted_identically_by_two_outlets_still_orders_deterministically():
+    """Two ClaimOut rows with equal fields compare equal under Pydantic, so the
+    language order must come from where each was bucketed, not from list.index."""
+    out = group_claims([
+        _src("a1", [_c("X", "the same sentence")], published_at=T1, name="Hindu", lang="hi"),
+        _src("a2", [_c("X", "the same sentence")], published_at=T0, name="Mint", lang="hi"),
+        _src("a3", [_c("X", "a third")], published_at=T0, name="TV9", lang="kn"),
+    ])
+    assert out[0].languages == ["hi", "kn"]
