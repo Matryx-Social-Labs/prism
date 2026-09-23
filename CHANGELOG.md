@@ -3,6 +3,58 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.93.0] - 2026-09-23
+
+### Added — the founders' dashboard, `/admin`
+One place to run the labeller workspace and read the product's numbers, open
+only to the founders (`PRISM_ADMIN_EMAILS`; decision D1). Every change made
+from it is written to `admin_audit` against the founder who made it.
+
+- **Labellers and batches** — approve, pause, remove (answers kept, every kind
+  withdrawn; decision D5), add an account directly, grant or withdraw a kind;
+  every batch with its progress, list/unlist, open/close, the language gate;
+  review a practice round or test and edit its explanations before publishing
+  (still refused while a constant strategy could pass). `tools/label_admin` and
+  `label_qualify` run the same code (`common/label_ops`).
+- **The ledger** — visits, sign-ups, engagement (with weekly retention), money
+  (paying, MRR, the way to paying), demand (hit the free question limit, locked
+  lenses, upgrade prompts, languages readers chose) and supply (reports,
+  stories, corroboration, **who reports first** — each outlet's first report of
+  a story against anyone's, by the outlet's own clock) for 7/28/90 days against
+  the period before. Every figure names where it was counted; days before
+  counting began are empty, never zero; below 30 a share is printed as a count.
+  A weekly CSV for investors.
+- **People and controls** — every account with plan, activity and labelling;
+  the feature switches as the API sees them (read-only; decision D4); "Collect
+  now", audited.
+
+### Added — counting how Prism is used, without knowing who
+First-party and cookieless (decision D2): page views by kind of page, arrivals
+by where they came from, shares, lens opens, Ask by entry point, the steps of
+subscribing, and Ask refusals, as daily totals. Visitors are counted once a day
+with a daily-rotating salt that is deleted within two days; no hash reaches the
+database. Signed-in accounts record the day they were active, and nothing else
+(decision D3). The beacon takes only words from closed lists, caps each visitor
+and each address, and counts nothing while Redis is away. The privacy policy
+says all of this.
+
+### Changed
+- **The same happening is the same incident, whatever day it was reported.**
+  The guide and the task said "the same day"; 252 of the 364 candidates in the
+  unlabelled cross-language batch are 1–5 days from their seed. Founder
+  correction; no existing answer was affected.
+- **The labelling guides go only to people who label.** They were in the site's
+  public JavaScript; they are now served by the API to accounts that have
+  applied (decision G1) and to a batch's own invites. `/label` shows a stranger
+  the pitch and "Sign in". CI fails if any guide sentence reaches `.next/static`.
+
+### Fixed
+- The Ask limit's IP hash is salted daily. Unsalted sha256 of an IPv4 address
+  can be reversed by trying all four billion, which made the privacy policy's
+  "cannot be turned back into your address" untrue.
+- `label_admin` with several emails ran them in one transaction: a typo in the
+  second rolled back the first after it had printed as done.
+
 ## [0.0.92.0] - 2026-09-23
 
 ### Added — the labeller workspace (`.claude/plans/labeller-workspace.plan.md`)
