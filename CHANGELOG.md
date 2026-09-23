@@ -3,6 +3,55 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.90.0] - 2026-09-23
+
+### Fixed
+- **A quote now says which language it was printed in.** A founder reported that
+  a later Kannada report seemed to replace the English quotes on a story. Nothing
+  was overwritten: claims are stored per article and never merged. Four things
+  composed into it — the extractor canonicalises speaker names to English (10,763
+  of 10,766 stored speaker strings are Latin), so a Kannada retelling lands on the
+  SAME speaker card; the card was ordered newest-article-first; it shows two quotes
+  and folds the rest; and **verbatim is checked against the ARTICLE, not against
+  the speaker** (`enrichment/claims.py` asks whether the words are in this article,
+  which an outlet's own translation satisfies perfectly). Measured on production:
+  93 speaker cards mix scripts, and the fold held whichever outlet published last
+  with nothing saying a language was missing.
+
+  The sharpest case is Giorgia Meloni, who spoke **Italian**: Times of India
+  printed an English translation, Prajavani a Kannada one, and Prism showed both
+  as her exact words under a share card whose honesty line said VERBATIM. Neither
+  is what she said — so "prefer English" would have been wrong twice over, and it
+  would have emptied the 2,445 events whose claims come only from non-English
+  sources, where the Indic quote IS the original.
+
+  Now: every claim carries `lang` from `raw_items.language` (a join, no model call);
+  `group_claims` rotates the languages so none can be pushed out of the fold,
+  English first for a reader who has expressed no preference; the card prints the
+  language beside the outlet in the provenance voice and counts languages the way
+  the coverage bar does; a signed-in reader's own language leads the rotation with
+  the other rendering beside it, never instead of it; and the quote share card
+  reads VERBATIM IN <LANGUAGE> · outlet · date. The label says what was PRINTED
+  and never claims which was spoken — that is the next phase, and it is founder-
+  ratified to be decided by evidence (one utterance in two languages means at most
+  one is the original) before any model is asked.
+
+### Changed
+- `common/languages.py` and `web/src/lib/languages.ts` cover every language Prism
+  INGESTS, not only the ones onboarding offers, so a Punjabi quote is labelled
+  "ਪੰਜਾਬੀ" and not "PA". `web/src/lib/coverage.ts` kept a second, longer copy of the
+  same map while the shorter one was what the chips rendered from; there is one
+  registry now.
+- A reader-specific display order carries each quote's position in the API's array,
+  because that position IS the quote's share address — renumbering would have handed
+  a Kannada reader a share link whose card showed a different sentence.
+
+### Added
+- `.claude/plans/quote-language.plan.md` (founder decisions D-quote-1..4) and
+  `.claude/plans/crosslingual-merge.plan.md` — the measured cross-language merge
+  hole: 621 event pairs whose two Prism English headlines score >= 0.55, 915 events
+  (5.6%), topped by byte-identical headlines. The quote fix lands first because
+  merging multiplies mixed-language cards roughly tenfold.
 ## [0.0.89.0] - 2026-09-22
 
 ### Added

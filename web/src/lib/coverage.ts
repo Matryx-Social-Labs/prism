@@ -1,4 +1,5 @@
 import type { OutletRef } from "@/lib/api";
+import { langName } from "@/lib/languages";
 
 /**
  * The coverage arithmetic, with no React in it, so a SERVER component (the
@@ -16,11 +17,6 @@ export const ORIGIN_LABEL: Record<Origin, string> = {
   intl: "International",
   regional: "Indian-language",
   wire: "Wire / agency",
-};
-
-const LANGUAGE_NAME: Record<string, string> = {
-  en: "English", hi: "Hindi", kn: "Kannada", ta: "Tamil", te: "Telugu", bn: "Bengali", gu: "Gujarati",
-  mr: "Marathi", pa: "Punjabi", ur: "Urdu", ml: "Malayalam", or: "Odia", ar: "Arabic", ru: "Russian",
 };
 
 export function coverageCounts(outlets: OutletRef[]): Record<Origin, number> {
@@ -45,7 +41,7 @@ export function languagesOf(outlets: OutletRef[]): string[] {
 }
 
 export function languageNames(codes: string[]): string {
-  return codes.map((c) => LANGUAGE_NAME[c] ?? c.toUpperCase()).join(", ");
+  return codes.map(langName).join(", ");
 }
 
 /** "9 outlets · 2 languages" — counts, never adjectives. */

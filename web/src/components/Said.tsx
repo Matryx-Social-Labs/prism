@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAsk } from "@/components/AskContext";
 import type { SpeakerClaims } from "@/lib/api";
 import { ChevronDown } from "@/components/icons";
@@ -8,7 +8,9 @@ import { OutletIcon } from "@/components/Coverage";
 import { fallbackCode } from "@/components/SourceList";
 import { relativeTime } from "@/lib/dateline";
 import { quoteLink } from "@/lib/quoteLink";
-import { quoteId } from "@/lib/quotes";
+import { langName, langNative } from "@/lib/languages";
+import { loadProfile } from "@/lib/profile";
+import { orderForReader, quoteId } from "@/lib/quotes";
 import { ShareButton } from "@/components/ShareButton";
 
 /**
@@ -18,6 +20,14 @@ import { ShareButton } from "@/components/ShareButton";
  * index the Coverage list also uses, so the two can never number one article
  * differently. Nothing here is lens-coloured and nothing here is unverified:
  * every quote was checked against its article at write time.
+ *
+ * VERBATIM IS CHECKED AGAINST THE ARTICLE, NOT AGAINST THE SPEAKER. An outlet
+ * writing in its own language prints a translation, and that translation passes
+ * the write-time check perfectly — so a card can hold one sentence in two
+ * languages and neither is necessarily the words that were spoken. Speaker names
+ * are canonicalised to English by the extractor, which is what puts them on the
+ * same card. When a card holds more than one language it SAYS SO on every quote;
+ * the label makes no claim about which was spoken, only about what was printed.
  */
 function initials(name: string): string {
   const words = name.replace(/[^\p{L}\p{N} ]/gu, " ").split(/\s+/).filter(Boolean);
@@ -41,22 +51,34 @@ export function Said({
   /** When set, each quote carries Share → its own address and quote card. */
   eventId?: string;
 }) {
+  // The reader's own languages, read once for every card. In an effect and not
+  // during render: the server has no localStorage, and reading it inline would
+  // render one order on the server and another on the client.
+  const [prefer, setPrefer] = useState<readonly string[]>([]);
+  useEffect(() => setPrefer(loadProfile()?.languages ?? []), []);
   return (
     <div className={`grid gap-3 ${claims.length > 1 ? "md:grid-cols-2" : ""}`}>
       {claims.map((sp, si) => (
-        <SpeakerCard key={sp.speaker} sp={sp} si={si} sourceIndex={sourceIndex} outletOf={outletOf} eventId={eventId} />
+        <SpeakerCard key={sp.speaker} sp={sp} si={si} prefer={prefer} sourceIndex={sourceIndex} outletOf={outletOf} eventId={eventId} />
       ))}
     </div>
   );
 }
 
-function SpeakerCard({ sp, si, sourceIndex, outletOf, eventId }: { sp: SpeakerClaims; si: number; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined; eventId?: string }) {
+function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: SpeakerClaims; si: number; prefer: readonly string[]; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined; eventId?: string }) {
   // Two quotes per speaker, the rest on request: a minister with nine quotes
   // is a column of italics that buries the next speaker.
   const [all, setAll] = useState(false);
   const ask = useAsk();
-  const shown = all ? sp.claims : sp.claims.slice(0, QUOTES_FOLD);
+  // The API already rotates the languages so none can be pushed out of the fold;
+  // this lifts the reader's own to the front of that rotation. Each entry keeps
+  // its position in the API's array, because that position IS the quote's share
+  // address and the card behind it is rendered from the API's order.
+  const ordered = orderForReader(sp.claims, prefer);
+  const shown = all ? ordered : ordered.slice(0, QUOTES_FOLD);
   const outlets = new Set(sp.claims.map((c) => c.source_name)).size;
+  const languages = sp.languages ?? [];
+  const multilingual = languages.length > 1;
   return (
           <article className="card flex flex-col gap-3">
             <header className="flex items-center gap-2.5">
@@ -73,20 +95,31 @@ function SpeakerCard({ sp, si, sourceIndex, outletOf, eventId }: { sp: SpeakerCl
                 {sp.role && <p className="truncate text-[12.5px] leading-snug" style={{ color: "var(--ink-2)" }}>{sp.role}</p>}
                 <p className="text-[12px]" style={{ color: "var(--ink-3)" }}>
                   {sp.claims.length} {sp.claims.length === 1 ? "quote" : "quotes"} · {outlets} {outlets === 1 ? "outlet" : "outlets"}
+                  {/* Counted, the way the coverage bar counts languages. */}
+                  {multilingual && ` · ${languages.length} languages`}
                 </p>
               </div>
             </header>
             <ul className="flex flex-col gap-4">
-              {shown.map((c, j) => {
+              {shown.map(({ claim: c, index }, j) => {
                 const n = sourceIndex.get(c.article_id);
                 return (
-                  <li key={`${c.article_id}-${j}`} className={j > 0 ? "border-t pt-4" : ""} style={j > 0 ? { borderColor: "var(--line)" } : undefined}>
+                  <li key={`${c.article_id}-${index}`} className={j > 0 ? "border-t pt-4" : ""} style={j > 0 ? { borderColor: "var(--line)" } : undefined}>
                     <blockquote className="font-record text-[17px] italic leading-[1.5]" style={{ color: "var(--ink)", textWrap: "pretty" }}>
                       “{c.quote_text}”
                     </blockquote>
                     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
                       {n != null && (
                         <span className="font-mono text-[11px]">[{n}]</span>
+                      )}
+                      {/* Which language this rendering is in. Shown only when the
+                          card holds more than one, because on a single-language
+                          card it answers a question nobody asked. It says what was
+                          PRINTED — never that these were the words spoken. */}
+                      {multilingual && c.lang && (
+                        <span className="font-mono text-[11px]" title={`Printed in ${langName(c.lang)} by ${c.source_name}`}>
+                          {langNative(c.lang)}
+                        </span>
                       )}
                       <span className="chip h-6 gap-1 px-2 text-[12px]">
                         <OutletIcon domain={outletOf?.(c.article_id)?.domain} code={outletOf?.(c.article_id)?.code ?? fallbackCode(c.source_name)} name={c.source_name} size={16} />
@@ -106,7 +139,7 @@ function SpeakerCard({ sp, si, sourceIndex, outletOf, eventId }: { sp: SpeakerCl
                         </a>
                       )}
                       {eventId && (
-                        <span className="inline-flex"><ShareButton url={`/story/${eventId}/quote/${quoteId(si, j)}`} title={`“${c.quote_text}” — ${sp.speaker}`} compact /></span>
+                        <span className="inline-flex"><ShareButton url={`/story/${eventId}/quote/${quoteId(si, index)}`} title={`“${c.quote_text}” — ${sp.speaker}`} compact /></span>
                       )}
                       {ask && (
                         <button
@@ -139,7 +172,7 @@ function SpeakerCard({ sp, si, sourceIndex, outletOf, eventId }: { sp: SpeakerCl
                 );
               })}
             </ul>
-            {!all && sp.claims.length > QUOTES_FOLD && (
+            {!all && ordered.length > QUOTES_FOLD && (
               <button type="button" onClick={() => setAll(true)} className="btn btn-ghost btn-sm self-start -ml-3" style={{ color: "var(--accent)" }}>
                 {sp.claims.length - QUOTES_FOLD} more {sp.claims.length - QUOTES_FOLD === 1 ? "quote" : "quotes"}
               </button>

@@ -114,6 +114,11 @@ export interface ClaimOut {
   source_name: string;
   url: string | null;
   published_at: string | null;
+  /** The language the ARTICLE printed these words in — never a claim about the
+   *  language they were SPOKEN in. An outlet's own translation passes the
+   *  verbatim check, because that check asks whether the words are in THIS
+   *  ARTICLE. Printing the language is what keeps the card honest. */
+  lang?: string | null;
 }
 
 export interface SpeakerClaims {
@@ -121,6 +126,9 @@ export interface SpeakerClaims {
   /** Who they are, as the articles put it ("Vice President of the United States"); null when no article said. */
   role?: string | null;
   claims: ClaimOut[];
+  /** Every language this speaker is quoted in, in the order `claims` is
+   *  interleaved. More than one is the case the card has to label. */
+  languages?: string[];
 }
 
 export interface ImpactOut {

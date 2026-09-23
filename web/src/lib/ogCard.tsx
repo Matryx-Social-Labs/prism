@@ -1,3 +1,4 @@
+import { langName } from "@/lib/languages";
 import { MARK_BAND, MARK_BOX, MARK_TRIANGLE, SPECTRUM_STOPS } from "@/lib/mark";
 import { OG_COLORS, OG_DISPLAY, OG_MONO, OG_SANS, bodyStack, displayStack } from "@/lib/ogFonts";
 
@@ -106,10 +107,18 @@ export function OgCard({ meta, headline, summary, coverage, coverageText, foot, 
 /**
  * The quote card (PLAN-LAUNCH §6): a verbatim quote in the record's italic,
  * who said it and their role in the reading voice, and the outlet it was
- * printed in — the honesty line: VERBATIM · outlet · date. The most shared
- * thing on WhatsApp is a sentence someone said.
+ * printed in — the honesty line: VERBATIM IN <LANGUAGE> · outlet · date. The
+ * most shared thing on WhatsApp is a sentence someone said.
+ *
+ * The language belongs on that line and used to be missing from it. Verbatim is
+ * checked against the ARTICLE (enrichment/claims.py), so an outlet's own
+ * translation passes — and this card is the one place the word VERBATIM is
+ * asserted in isolation, with no outlet list and no other quote beside it to
+ * hint that a language was involved. "Verbatim in Kannada · TV9 Kannada" is
+ * true of a Kannada rendering of words spoken in English; "Verbatim" alone is
+ * not. Falls back to the old line when the row carries no language.
  */
-export function QuoteCard({ quote, speaker, role, outlet, when, host, storyTitle }: { quote: string; speaker: string; role?: string | null; outlet: string; when?: string | null; host: string; storyTitle?: string | null }) {
+export function QuoteCard({ quote, speaker, role, outlet, when, host, storyTitle, lang }: { quote: string; speaker: string; role?: string | null; outlet: string; when?: string | null; host: string; storyTitle?: string | null; lang?: string | null }) {
   const q = fit(quote, 230);
   const size = q.length > 170 ? 38 : q.length > 110 ? 44 : 52;
   return (
@@ -124,7 +133,7 @@ export function QuoteCard({ quote, speaker, role, outlet, when, host, storyTitle
         {storyTitle && <div style={{ marginTop: 8, fontFamily: bodyStack(storyTitle), fontSize: 20, color: c.inkFaint, maxWidth: 980, display: "flex" }}>{fit(storyTitle, 110)}</div>}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${c.line}`, paddingTop: 20, fontFamily: OG_MONO, fontSize: 16, color: c.inkFaint, letterSpacing: 1, textTransform: "uppercase" }}>
-        <span>Verbatim · {outlet}{when ? ` · ${when}` : ""}</span>
+        <span>Verbatim{lang ? ` in ${langName(lang)}` : ""} · {outlet}{when ? ` · ${when}` : ""}</span>
         <span>{host}</span>
       </div>
     </div>
