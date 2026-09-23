@@ -140,7 +140,8 @@ export default function LabellerWorkspace() {
       {session && me && me.status === "active" && batches && !editing && (
         <>
           <Languages me={me} onEdit={() => setEditing(true)} />
-          <Section title="Ready to label">
+          <NeedsYou batches={batches} />
+          <Section title="Ready to label" id="ready">
             {batches.ready.length === 0 ? (
               <p className="text-[15px]" style={{ color: "var(--ink-muted)" }}>
                 Nothing waiting in your languages right now.
@@ -158,7 +159,7 @@ export default function LabellerWorkspace() {
       )}
 
       {session && me?.status === "active" && batches?.kinds && batches.kinds.length > 0 && !editing && (
-        <Section title="Learn and qualify">
+        <Section title="Learn and qualify" id="learn">
           <p className="mb-3 text-[14px]" style={{ color: "var(--ink-muted)" }}>
             Each kind of task has a short test. Pass it (90%) and that kind of work appears above.
           </p>
@@ -318,9 +319,41 @@ function KindRow({ k, onPractise, onTest }: { k: LabellerKind; onPractise: (kind
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** What is waiting for this labeller, counted — the same row the founders'
+ *  dashboard opens with ("The ledger", DESIGN.md). Counts, never a percentage. */
+function NeedsYou({ batches }: { batches: LabellerBatches }) {
+  const tasks = batches.ready.reduce((n, b) => n + Math.max(0, b.eligible - b.answered), 0);
+  const tests = (batches.kinds ?? []).filter((k) => k.can_test && !k.qualified).length;
+  const items = [
+    { href: "#ready", count: tasks, text: tasks === 1 ? "task ready in your languages" : "tasks ready in your languages" },
+    { href: "#learn", count: tests, text: tests === 1 ? "test you can take" : "tests you can take" },
+  ].filter((i) => i.count > 0);
   return (
-    <section className="mt-10">
+    <section className="mt-8 border-t pt-4" style={{ borderColor: "var(--line-strong)" }} aria-labelledby="needs-you">
+      <h2 id="needs-you" className="text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
+        Waiting for you
+      </h2>
+      {items.length === 0 ? (
+        <p className="mt-2 text-[15px]" style={{ color: "var(--ink-muted)" }}>Nothing right now. New batches in your languages appear here.</p>
+      ) : (
+        <ul className="mt-1 flex flex-wrap gap-x-8 gap-y-1">
+          {items.map((i) => (
+            <li key={i.href}>
+              <a href={i.href} className="inline-flex min-h-[44px] items-baseline gap-2 underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+                <span className="font-mono text-[17px] tabular-nums">{i.count}</span>{" "}
+                <span className="text-[15px]">{i.text}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-10 scroll-mt-20" id={id}>
       <h2 className="mb-3 text-[17px] font-semibold">{title}</h2>
       {children}
     </section>

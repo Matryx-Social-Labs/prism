@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 
+import { Check, Dash } from "@/components/icons";
 import type { LabelFeedback, LabelResult, LabelTask } from "@/lib/api";
 
 export function PracticeFeedback({ task, feedback, onNext }: { task: LabelTask; feedback: LabelFeedback; onNext: () => void }) {
@@ -39,7 +40,11 @@ export function PracticeFeedback({ task, feedback, onNext }: { task: LabelTask; 
       className="mt-8 pl-4"
       style={{ borderLeft: `${feedback.correct ? 2 : 4}px solid var(--ink)` }}
     >
-      <p className="text-[17px] font-semibold">{feedback.correct ? "Right." : "Not quite."}</p>
+      {/* The word carries it; the mark repeats it, as the guides' verdicts do. */}
+      <p className="flex items-center gap-2 text-[17px] font-semibold">
+        <span aria-hidden className="inline-flex">{feedback.correct ? <Check size={15} /> : <Dash size={15} />}</span>
+        {feedback.correct ? "Right." : "Not quite."}
+      </p>
       {typeof answer === "string" ? (
         <p className="mt-2 text-[15px]">{answer}</p>
       ) : answer.length ? (
