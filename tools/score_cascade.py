@@ -35,6 +35,8 @@ import asyncpg
 from tools.scratch import _local_url, _prod_url, build_scratch, replay
 
 TITLE_GATE: list[float | None] = [None]
+# The cross-language headline tier's threshold; 0 is production's "off".
+HEADLINE_TIER: list[float] = [0.0]
 TITLE_TIER: list[str] = ["trigram"]
 DOC_PREFIX: list[str] = ["passage"]
 
@@ -156,8 +158,10 @@ async def run(models: list[str], limit: int | None) -> None:
             from common.config import get_settings
             from common.embeddings import _get_model, _needs_prefix, embed_texts_sync
 
+            os.environ["PRISM_HEADLINE_TIER_THRESHOLD"] = str(HEADLINE_TIER[0])
             get_settings.cache_clear()
             _get_model.cache_clear()
+            print(f"  headline tier: {HEADLINE_TIER[0] or 'off'}")
             import common.embeddings as emb
             emb.DOC_PREFIX = DOC_PREFIX[0]
             if _needs_prefix(model):
@@ -204,7 +208,7 @@ async def run(models: list[str], limit: int | None) -> None:
             # Dumped so a re-score costs nothing. The replay is the expensive part
             # and its OUTPUT is just a placement map; re-running it to ask a second
             # question of the same run is pure waste.
-            dump = Path(f".cache/cascade_placements_{TITLE_TIER[0]}.json")
+            dump = Path(f".cache/cascade_placements_{TITLE_TIER[0]}_hl{HEADLINE_TIER[0]}.json")
             dump.parent.mkdir(parents=True, exist_ok=True)
             dump.write_text(json.dumps(placed_all))
 
@@ -233,7 +237,11 @@ def main() -> None:
     ap.add_argument("--title-tier", choices=("trigram", "cosine"), default="trigram",
                     help="similarity used by the title_time tier; 'cosine' replaces "
                          "pg_trgm with IDF-weighted word cosine (plan step 4)")
+    ap.add_argument("--headline-tier", type=float, default=0.0,
+                    help="threshold for the cross-language headline tier "
+                         "(correlation.clustering._match_by_headline); 0 = off, as in production")
     a = ap.parse_args()
+    HEADLINE_TIER[0] = a.headline_tier
     TITLE_GATE[0] = a.title_gate
     TITLE_TIER[0] = a.title_tier
     DOC_PREFIX[0] = a.doc_prefix

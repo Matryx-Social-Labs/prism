@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from common.text import entity_slug
 from correlation.clustering import ENTITY_MATCH_TYPES, find_event
+from correlation.consumer import english_headline
 
 SCRATCH = "repair_scratch"
 OVER_MERGE_MIN = 20
@@ -49,7 +50,11 @@ OVER_MERGE_MIN = 20
 # scratch has no `sources` table, and a foreign key to one would be a copy of
 # production's shape rather than of its behaviour.
 COLUMNS = {
-    "events": "id, title, sector, occurred_at, last_updated_at, embedding, projection",
+    # headline_by is what makes an event visible to the cross-language headline
+    # tier (`_match_by_headline` reads only `headline_by = 'prism'`). Without it
+    # that tier found zero rows in every replay, so it could never be measured
+    # here — scored "on" and "off" it produced identical numbers.
+    "events": "id, title, headline_by, sector, occurred_at, last_updated_at, embedding, projection",
     "entities": "id, slug, name, entity_type",
     "event_entities": "id, event_id, entity_id, role",
     # Since 0.0.81.0 the matcher derives an event's cast from the articles it
@@ -201,13 +206,24 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: di
                     english_title=m["xh"] or None,
                 )
                 if match is None:
-                    # A new event, written exactly as the consumer writes one.
+                    # A new event, written exactly as the consumer writes one —
+                    # INCLUDING its title. Production titles an event with Prism's
+                    # English headline when the extractor wrote one (founder
+                    # decision 1b); this used to write the outlet's native title,
+                    # which made every later tier compare against a string
+                    # production never holds: the trigram tier matched Kannada
+                    # titles to Kannada titles that in production are English, and
+                    # the headline tier saw no 'prism' events at all.
                     eid = uuid.uuid4()
                     created.add(str(eid))
+                    # consumer.canonical_title's rule, without its tracing decorator:
+                    # a replay must not write spans into production's Langfuse.
+                    headline = english_headline({"headline": m["xh"]})
+                    title, by = (headline, "prism") if headline else (m["title"] or "", None)
                     await s.execute(
-                        sa_text("INSERT INTO events (id,title,sector,occurred_at,last_updated_at,embedding) "
-                                "VALUES (:i,:t,'politics',:o,now(),CAST(:v AS vector))"),
-                        {"i": str(eid), "t": m["title"] or "", "o": m["published_at"],
+                        sa_text("INSERT INTO events (id,title,headline_by,sector,occurred_at,last_updated_at,embedding) "
+                                "VALUES (:i,:t,:b,'politics',:o,now(),CAST(:v AS vector))"),
+                        {"i": str(eid), "t": title, "b": by, "o": m["published_at"],
                          "v": "[" + ",".join(str(x) for x in vec) + "]"},
                     )
                 else:
