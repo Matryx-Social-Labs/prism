@@ -43,7 +43,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.decisions import Decisions, Noul, Question, decide
+from common.decisions import Decisions, Noul, NoulAnswer, Question, decide
 from common.languages import display_name
 from common.logging import get_logger
 from enrichment.claims import dedupe_sources, speaker_key
@@ -63,6 +63,9 @@ SPOKEN_MAX = 0.2
 # Past this many pairs the rest stay unjudged, which is today's behaviour.
 MAX_PAIRS = 40
 MAX_CLAIMS = 24
+# Cards judged per event per sweep. An extraction that finds forty "speakers"
+# in one story would otherwise cost forty calls on every change to it.
+MAX_CARDS = 30
 
 QUESTIONS_VERSION = "renderings-v1"
 JUDGE_CONCURRENCY = 8
@@ -144,14 +147,22 @@ def questions_for(speaker: str, event_title: str, claims: list[CardClaim]) -> tu
     return state, questions
 
 
-def verdicts_from(answers: Decisions, claims: list[CardClaim]) -> dict[str, Any]:
+def verdicts_from(answers: Decisions, claims: list[CardClaim], asked: dict[str, Question]) -> dict[str, Any]:
     """Raw probabilities keyed by claim identity, never by position, so they
-    survive the card being re-ordered or partly deduped at read time."""
+    survive the card being re-ordered or partly deduped at read time.
+
+    Reads ONLY the keys Prism asked. Those were built by questions_for, so
+    their indices are well-formed and in range by construction; the response's
+    own keys are never parsed. `decide` guarantees every asked key came back but
+    not that nothing else did, and the Decisions API is alpha — parsing an
+    unexpected key like `same_1` or `spoken_99` would raise, and a raise here
+    once wedged a card so that every sweep re-selected and re-crashed on it
+    (security review, 2026-09-23)."""
     claims = claims[:MAX_CLAIMS]
     spoken: dict[str, float] = {}
     same: list[list[Any]] = []
-    for name, ans in answers.answers.items():
-        p = getattr(ans, "noul", None)
+    for name in asked:
+        p = getattr(answers.answers.get(name), "noul", None)
         if p is None:
             continue
         parts = name.split("_")
@@ -264,7 +275,7 @@ async def judge_event(session: AsyncSession, event_id: Any, title: str, *, write
         )).all()
     }
     todo = [(k, name, claims) for k, (name, claims) in cards.items()
-            if any(c.lang for c in claims) and known.get(k) != card_hash(claims)]
+            if any(c.lang for c in claims) and known.get(k) != card_hash(claims)][:MAX_CARDS]
     sem = asyncio.Semaphore(JUDGE_CONCURRENCY)
 
     async def one(key: str, name: str, claims: list[CardClaim]) -> tuple[str, str, dict[str, Any], Decisions] | None:
@@ -275,10 +286,11 @@ async def judge_event(session: AsyncSession, event_id: Any, title: str, *, write
             try:
                 answers = await decide(state, questions, trace_name="quote-renderings",
                                        metadata={"event_id": str(event_id), "speaker": name})
+                verdicts = verdicts_from(answers, claims, questions)
             except Exception as exc:  # noqa: BLE001 — an unjudged card is today's card; the next sweep retries
                 logger.warning("renderings_judge_failed", event_id=str(event_id), speaker=name, error=str(exc)[:160])
                 return None
-        return key, card_hash(claims), verdicts_from(answers, claims), answers
+        return key, card_hash(claims), verdicts, answers
 
     judged = [r for r in await asyncio.gather(*(one(*t) for t in todo)) if r]
     if write and judged:
@@ -328,7 +340,15 @@ async def sweep(session: AsyncSession, *, days: int = 2, limit: int = 200) -> di
     A card nobody touched costs one indexed read and nothing else."""
     judged, cost = 0, 0.0
     for event_id, title in await recent_events(session, days=days, limit=limit):
-        out = await judge_event(session, event_id, title)
+        # One event, one savepoint: a failure rolls back that event alone and
+        # leaves the session usable, so a bad card can never block the events
+        # sorted after it on this sweep or any later one.
+        try:
+            async with session.begin_nested():
+                out = await judge_event(session, event_id, title)
+        except Exception:  # noqa: BLE001 — logged; the rest of the sweep proceeds
+            logger.exception("renderings_event_failed", event_id=str(event_id))
+            continue
         judged += out["judged"]
         cost += out["cost"]
     if judged:
@@ -346,6 +366,12 @@ def demo() -> None:
     state, qs = questions_for("Giorgia Meloni", "Italy schools", [en, kn, en2])
     assert set(qs) == {"spoken_0", "spoken_1", "spoken_2", "same_0_1", "same_1_2"}, qs.keys()
     assert state["quotes"][1]["printed_in"] == "Kannada"
+    # Only the asked keys are read: a stray or malformed key in the response
+    # is ignored, never parsed.
+    stray = Decisions(answers={"spoken_0": NoulAnswer(noul=0.9), "same_1": NoulAnswer(noul=0.9),
+                               "spoken_99": NoulAnswer(noul=0.1), **{k: NoulAnswer(noul=0.5) for k in qs if k != "spoken_0"}})
+    got = verdicts_from(stray, [en, kn, en2], qs)
+    assert set(got["spoken"]) == {en.key, kn.key, en2.key} and len(got["same"]) == 2, got
     v = {"spoken": {en.key: 0.9, kn.key: 0.05, en2.key: 0.5}, "same": [[en.key, kn.key, 0.93], [kn.key, en2.key, 0.1]]}
     utt, tr = apply([en.key, kn.key, en2.key], [v])
     assert utt[en.key] == utt[kn.key] and en2.key not in utt

