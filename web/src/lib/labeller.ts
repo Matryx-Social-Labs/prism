@@ -37,10 +37,25 @@ export interface LabellerBatch {
   labellers: number;
 }
 
+/** One task kind's standing for this labeller (phase 3). */
+export interface LabellerKind {
+  kind: string;
+  qualified: boolean;
+  best_score: number | null;
+  attempts: number;
+  can_practise: boolean;
+  /** False once passed, during the retake wait, or while the test has too few
+   *  questions in this labeller's languages. */
+  can_test: boolean;
+  retake_at: string | null;
+  has_work: boolean;
+}
+
 export interface LabellerBatches {
   status: LabellerStatus;
   ready: LabellerBatch[];
   done: LabellerBatch[];
+  kinds?: LabellerKind[];
 }
 
 /** The key the task page reads its credential from (web/src/app/label/[key]). */
@@ -92,6 +107,24 @@ export async function startBatch(s: Session, key: string): Promise<string> {
 
 /** The kinds with a guide on /label/learn/<kind>. */
 export const LEARNABLE: readonly string[] = ["event_identity", "story_boundary", "claim_attribution", "topic_relation"];
+
+async function startRound(s: Session, path: string): Promise<string> {
+  const { key, token } = await call<{ key: string; token: string }>(s, path, { method: "POST" });
+  try {
+    window.localStorage.setItem(labelTokenKey(key), token);
+  } catch {
+    throw new Error("This browser is blocking storage, which labelling needs. Try a normal window.");
+  }
+  return `/label/${encodeURIComponent(key)}`;
+}
+
+/** A practice round: answer, then see the expected answer and why. */
+export const startPractice = (s: Session, kind: string) =>
+  startRound(s, `/api/v1/labeller/practice/${encodeURIComponent(kind)}/start`);
+
+/** A scored test for one kind: questions drawn at random, 90% to pass. */
+export const startTest = (s: Session, kind: string) =>
+  startRound(s, `/api/v1/labeller/qualify/${encodeURIComponent(kind)}/start`);
 
 /** What each kind of task asks, in the reader's words. */
 export const KIND_QUESTION: Record<string, string> = {

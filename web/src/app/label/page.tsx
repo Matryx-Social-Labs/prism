@@ -26,8 +26,11 @@ import {
   fetchLabellerBatches,
   fetchLabellerMe,
   startBatch,
+  startPractice,
+  startTest,
   type LabellerBatch,
   type LabellerBatches,
+  type LabellerKind,
   type LabellerMe,
 } from "@/lib/labeller";
 import { useSession } from "@/lib/session";
@@ -60,15 +63,18 @@ export default function LabellerWorkspace() {
     void load();
   }, [load]);
 
-  const start = async (key: string) => {
-    if (!session) return;
+  // Every way into a task page: a work batch, a practice round, a test.
+  const go = async (open: () => Promise<string>, failed: string) => {
     setError("");
     try {
-      router.push(await startBatch(session, key));
+      router.push(await open());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start that batch");
+      setError(e instanceof Error ? e.message : failed);
     }
   };
+  const start = (key: string) => session && go(() => startBatch(session, key), "Could not start that batch");
+  const practise = (kind: string) => session && go(() => startPractice(session, kind), "Could not start practice");
+  const test = (kind: string) => session && go(() => startTest(session, kind), "Could not start the test");
 
   if (!mounted) return <Shell />;
 
@@ -148,6 +154,15 @@ export default function LabellerWorkspace() {
             </Section>
           )}
         </>
+      )}
+
+      {session && me?.status === "active" && batches?.kinds && batches.kinds.length > 0 && !editing && (
+        <Section title="Learn and qualify">
+          <p className="mb-3 text-[14px]" style={{ color: "var(--ink-muted)" }}>
+            Each kind of task has a short test. Pass it (90%) and that kind of work appears above.
+          </p>
+          <ul>{batches.kinds.map((k) => <KindRow key={k.kind} k={k} onPractise={practise} onTest={test} />)}</ul>
+        </Section>
       )}
 
       {/* Readable by anyone, approved or not: the guide is the first thing a
@@ -253,6 +268,39 @@ function BatchRow({ batch, onStart }: { batch: LabellerBatch; onStart?: (key: st
             style={{ color: "var(--accent)" }}
           >
             {batch.answered > 0 ? "Continue" : "Start"}
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function KindRow({ k, onPractise, onTest }: { k: LabellerKind; onPractise: (kind: string) => void; onTest: (kind: string) => void }) {
+  const status = k.qualified
+    ? "Passed"
+    : k.retake_at
+      ? `Best so far ${Math.round((k.best_score ?? 0) * 100)}% · you can retake it after ${new Date(k.retake_at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+      : k.can_test
+        ? k.attempts > 0 ? "Not passed yet" : "Not taken yet"
+        : "Test coming soon";
+  return (
+    <li className="border-t py-4" style={{ borderColor: "var(--line)" }}>
+      <p className="text-[16px] font-semibold">{KIND_QUESTION[k.kind] ?? k.kind}</p>
+      <p className="mt-0.5 text-[14px]" style={{ color: "var(--ink-muted)" }}>{status}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px]">
+        {LEARNABLE.includes(k.kind) && (
+          <Link href={`/label/learn/${k.kind}`} className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+            Read the guide
+          </Link>
+        )}
+        {k.can_practise && (
+          <button type="button" onClick={() => onPractise(k.kind)} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+            Practise
+          </button>
+        )}
+        {k.can_test && (
+          <button type="button" onClick={() => onTest(k.kind)} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+            Take the test
           </button>
         )}
       </div>

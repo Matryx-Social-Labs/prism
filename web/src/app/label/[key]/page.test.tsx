@@ -604,3 +604,60 @@ describe("the primer is read before the first judgement", () => {
     expect(screen.queryByText(/READ THIS FIRST/)).not.toBeInTheDocument();
   });
 });
+
+describe("practice rounds and tests (labeller workspace, phase 3)", () => {
+  const CLAIM = {
+    article_id: "a1", title: "Minister announces road outlay", source: "The Hindu",
+    speaker: "The minister", quote_text: "double its outlay on rural roads",
+    context_before: "the minister said the state would ", context_after: " before the monsoon.",
+    target: null, stance: "neutral",
+  };
+  const claim = { id: "task-c1", position: 0, kind: "claim_attribution" as const, claim: CLAIM };
+
+  it("marks a practice answer straight away, and waits for Next before moving on", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claim, closed: false });
+    postLabelAnswer.mockResolvedValue({
+      ok: true,
+      feedback: { correct: false, expected: ["task-c1"], explanation: "The words either side name the minister." },
+    });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: /No —/ }));
+
+    expect(await screen.findByText("Not quite.")).toBeInTheDocument();
+    expect(screen.getByText(/Yes — the article credits these words to The minister/)).toBeInTheDocument();
+    expect(screen.getByText("The words either side name the minister.")).toBeInTheDocument();
+    // The question cannot be answered twice while its answer is on screen.
+    expect(screen.queryByRole("button", { name: /No —/ })).not.toBeInTheDocument();
+    const loadsBefore = fetchLabelTask.mock.calls.length;
+    await userEvent.click(screen.getByRole("button", { name: "Next question" }));
+    await waitFor(() => expect(fetchLabelTask.mock.calls.length).toBeGreaterThan(loadsBefore));
+  });
+
+  it("moves straight on after a test answer — a test says nothing until the end", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claim, closed: false });
+    postLabelAnswer.mockResolvedValue({ ok: true });
+    render(<LabelPage params={params} />);
+    const loadsBefore = (await screen.findByRole("button", { name: /Yes —/ }), fetchLabelTask.mock.calls.length);
+    await userEvent.click(screen.getByRole("button", { name: /Yes —/ }));
+    await waitFor(() => expect(fetchLabelTask.mock.calls.length).toBeGreaterThan(loadsBefore));
+    expect(screen.queryByText("Not quite.")).not.toBeInTheDocument();
+  });
+
+  it("ends a failed test with the score, the pass mark and the reasons for what was missed", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({
+      task: null, closed: false,
+      result: {
+        right: 13, total: 15, score: 13 / 15, passed: false, pass_mark: 0.9, purpose: "qualify",
+        missed: [{ position: 4, about: "S: “q4”", explanation: "Somebody else is named before the quote." }],
+      },
+    });
+    render(<LabelPage params={params} />);
+    expect(await screen.findByText("Not this time.")).toBeInTheDocument();
+    expect(screen.getByText(/13 of 15 right/)).toBeInTheDocument();
+    expect(screen.getByText(/You need 90%/)).toBeInTheDocument();
+    expect(screen.getByText("Somebody else is named before the quote.")).toBeInTheDocument();
+  });
+});

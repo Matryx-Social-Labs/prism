@@ -61,6 +61,9 @@ EXPECTED = {
     ("POST", "/api/v1/labeller/apply"),
     ("GET", "/api/v1/labeller/batches"),
     ("POST", "/api/v1/labeller/batches/{key}/start"),
+    # Practice and the qualification test for a task kind (phase 3).
+    ("POST", "/api/v1/labeller/practice/{kind}/start"),
+    ("POST", "/api/v1/labeller/qualify/{kind}/start"),
 }
 
 

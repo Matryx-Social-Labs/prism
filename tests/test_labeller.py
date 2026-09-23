@@ -32,8 +32,10 @@ async def _db_reachable() -> bool:
         return False
 
 
-async def _user(status: str | None = None, langs: tuple[str, ...] = ("en",)) -> tuple[uuid.UUID, str]:
-    """A Prism account with a live session; optionally already a labeller."""
+async def _user(status: str | None = None, langs: tuple[str, ...] = ("en",),
+                qualified: tuple[str, ...] = ("claim_attribution",)) -> tuple[uuid.UUID, str]:
+    """A Prism account with a live session; optionally already a labeller, and
+    (when active) already past the test for the given kinds."""
     uid = uuid.uuid4()
     async with session_scope() as s:
         await s.execute(text("INSERT INTO users (id, email, name) VALUES (:i, :e, 'Test Labeller')"),
@@ -42,6 +44,11 @@ async def _user(status: str | None = None, langs: tuple[str, ...] = ("en",)) -> 
             await s.execute(
                 text("INSERT INTO labellers (user_id, languages_read, status) VALUES (:u, CAST(:l AS text[]), :s)"),
                 {"u": uid, "l": list(langs), "s": status})
+        if status == "active":
+            for kind in qualified:
+                await s.execute(
+                    text("INSERT INTO labeller_qualifications (user_id, kind, passed_at, best_score, attempts) "
+                         "VALUES (:u, :k, now(), 1.0, 1)"), {"u": uid, "k": kind})
         bearer = await auth.create_session(s, uid)
     return uid, bearer
 
@@ -113,7 +120,7 @@ async def test_an_applicant_is_served_nothing_and_cannot_start():
         async with _client() as c:
             h = {"Authorization": f"Bearer {bearer}"}
             r = await c.get("/api/v1/labeller/batches", headers=h)
-            assert r.json() == {"status": "applied", "ready": [], "done": []}
+            assert r.json() == {"status": "applied", "ready": [], "done": [], "kinds": []}
             assert (await c.post(f"/api/v1/labeller/batches/{key}/start", headers=h)).status_code == 403
     finally:
         await _cleanup(uid)
