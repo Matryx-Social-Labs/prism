@@ -149,7 +149,6 @@ async def _quote_reconciler() -> None:
     PRISM_QUOTE_VERDICTS is on for this service — on the worker alone it is a
     shadow run that writes claim_verdicts and serves nothing."""
     from common.config import get_settings
-    from common.db import session_scope
     from enrichment.renderings import sweep
 
     while True:
@@ -157,8 +156,7 @@ async def _quote_reconciler() -> None:
         if not get_settings().prism_quote_verdicts:
             continue
         try:
-            async with session_scope() as session:
-                await sweep(session)
+            await sweep()  # commits per event; see its docstring
         except Exception:
             logger.exception("quote_reconciler_error")
 

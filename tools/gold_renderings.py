@@ -76,37 +76,33 @@ def _engine(read_only: bool):
 
 
 async def judge(limit: int, apply: bool) -> None:
+    """One session per event, committed as it finishes — as the worker does."""
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     engine = _engine(read_only=not apply)
     total, judged, cost = 0, 0, 0.0
+    offset, page = 0, 100
     try:
-        async with engine.connect() as conn:
-            from sqlalchemy.ext.asyncio import AsyncSession
-
-            offset, page = 0, 100
-            while True:
-                async with AsyncSession(bind=conn) as s:
-                    events = await renderings.recent_events(s, days=3650, limit=page, offset=offset)
-                if not events:
-                    break
-                for event_id, title in events:
-                    if limit and total >= limit:
-                        break
-                    async with AsyncSession(bind=conn) as s:
-                        out = await renderings.judge_event(s, event_id, title, write=apply)
-                        if apply:
-                            await s.commit()
-                    total += 1
-                    judged += out["judged"]
-                    cost += out["cost"]
-                    if not apply:
-                        for key, v in out["verdicts"].items():
-                            flagged = [k for k, p in v["spoken"].items() if p < renderings.SPOKEN_MAX]
-                            same = [x for x in v["same"] if x[2] >= renderings.SAME_MIN]
-                            print(f"  {title[:48]:48} {key[:22]:22} translated={len(flagged)} same={len(same)}")
-                if limit and total >= limit:
-                    break
-                offset += page
-                print(f"  {total:6d} events   {judged:6d} cards judged   ${cost:.4f}   {'written' if apply else 'DRY RUN'}", flush=True)
+        while not (limit and total >= limit):
+            async with AsyncSession(engine) as s:
+                events = await renderings.recent_events(s, days=3650, limit=page, offset=offset)
+            if not events:
+                break
+            for event_id, title in events[: (limit - total) if limit else None]:
+                async with AsyncSession(engine) as s:
+                    out = await renderings.judge_event(s, event_id, title, write=apply)
+                    if apply:
+                        await s.commit()
+                total += 1
+                judged += out["judged"]
+                cost += out["cost"]
+                if not apply:
+                    for key, v in out["verdicts"].items():
+                        flagged = [k for k, p in v["spoken"].items() if p < renderings.SPOKEN_MAX]
+                        same = [x for x in v["same"] if x[2] >= renderings.SAME_MIN]
+                        print(f"  {title[:48]:48} {key[:22]:22} translated={len(flagged)} same={len(same)}")
+            offset += page
+            print(f"  {total:6d} events   {judged:6d} cards judged   ${cost:.4f}   {'written' if apply else 'DRY RUN'}", flush=True)
     finally:
         await engine.dispose()
     print(f"\n{'wrote' if apply else 'would write'} {judged} cards across {total} events, ${cost:.4f}")
