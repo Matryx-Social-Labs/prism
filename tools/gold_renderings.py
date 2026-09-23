@@ -29,6 +29,13 @@ served verdict must reach 0.95 on each kind. Recall is printed, not gated —
 a missed translation leaves today's card, which is the default everywhere else
 in this module.
 
+WHAT THE GATE DOES NOT COVER. The sample is ordinary production cards. Quote
+text reaches Jev as part of the state, so a hostile outlet could try to steer
+one card's verdict. Its reach is bounded by design — a verdict can only mark a
+quote as a translation or group two quotes BY THE SAME SPEAKER, never invent
+or reattribute words — but a targeted attack on one story is not something a
+random-sample precision number measures. Read that before turning the API on.
+
 WRITES TO PRODUCTION only with --judge --apply, and only to claim_verdicts.
 """
 
@@ -50,6 +57,16 @@ from tools.snapshot_l2 import _prod_url
 
 GATE = 0.95
 SAMPLE_PER_SIDE = 60
+
+
+def cell(value: object) -> object:
+    """A spreadsheet cannot run it. Quotes, speakers and titles are scraped
+    text, and a cell beginning = + - @ (or a tab or CR) is a formula when the
+    sheet is opened — a hostile article could make the labeller's own
+    spreadsheet fetch a URL with the rest of the row in it."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
 
 
 def _engine(read_only: bool):
@@ -135,10 +152,11 @@ async def export(path: Path, seed: int) -> None:
             qa, qb = quotes[a], quotes.get(b) if b else None
             question = ("Same statement? y/n" if kind == "same"
                         else f"Spoken in {qa['language']} by the speaker (not translated by {qa['outlet']})? y/n")
-            w.writerow([f"{a}|{b or ''}", kind, question, qa["speaker"], r.title,
-                        qa["language"], qa["outlet"], qa["quote"],
-                        qb["language"] if qb else "", qb["outlet"] if qb else "", qb["quote"] if qb else "",
-                        p, ""])
+            w.writerow([cell(v) for v in (
+                f"{a}|{b or ''}", kind, question, qa["speaker"], r.title,
+                qa["language"], qa["outlet"], qa["quote"],
+                qb["language"] if qb else "", qb["outlet"] if qb else "", qb["quote"] if qb else "",
+                p, "")])
     print(f"wrote {len(picked)} rows to {path}: "
           f"same {min(len(same_yes), SAMPLE_PER_SIDE)}+{min(len(same_no), SAMPLE_PER_SIDE)}, "
           f"spoken {min(len(spoken_no), SAMPLE_PER_SIDE)}+{min(len(spoken_yes), SAMPLE_PER_SIDE)}")
