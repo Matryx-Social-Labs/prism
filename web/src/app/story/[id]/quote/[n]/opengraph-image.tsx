@@ -23,6 +23,7 @@ export default async function Image({ params }: { params: Promise<{ id: string; 
   let when: string | null = null;
   let storyTitle: string | null = null;
   let lang: string | null = null;
+  let translated = false;
   let degraded = false;
   try {
     const e = await fetchEvent(id);
@@ -37,12 +38,13 @@ export default async function Image({ params }: { params: Promise<{ id: string; 
     // The honesty line names the language the words were PRINTED in; "Verbatim"
     // on its own would assert more than the write-time check ever proved.
     lang = q.claim.lang ?? null;
+    translated = q.claim.translated ?? false;
   } catch {
     degraded = true;
   }
-  const fonts = await ogFonts(quote, speaker, role ?? "", outlet, when ?? "", storyTitle ?? "", host, `Prism Who said what Verbatim in ${lang ? langName(lang) : ""}`);
+  const fonts = await ogFonts(quote, speaker, role ?? "", outlet, when ?? "", storyTitle ?? "", host, `Prism Who said what Verbatim Translated into by in ${lang ? langName(lang) : ""}`);
   return new ImageResponse(
-    <QuoteCard quote={quote} speaker={speaker} role={role} outlet={outlet} when={when} host={host} storyTitle={storyTitle} lang={lang} />,
+    <QuoteCard quote={quote} speaker={speaker} role={role} outlet={outlet} when={when} host={host} storyTitle={storyTitle} lang={lang} translated={translated} />,
     { ...size, fonts: fonts.length ? fonts : undefined, headers: degraded ? { "cache-control": "no-store" } : undefined },
   );
 }

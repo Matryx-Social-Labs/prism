@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ClaimOut, SpeakerClaims } from "@/lib/api";
 import { Said } from "@/components/Said";
 
-const claim = (quote_text: string, lang: string | null, source_name = "Outlet"): ClaimOut => ({
+const claim = (
+  quote_text: string,
+  lang: string | null,
+  source_name = "Outlet",
+  extra: Partial<ClaimOut> = {},
+): ClaimOut => ({
   quote_text,
   quote_start: null,
   quote_end: null,
@@ -12,6 +17,7 @@ const claim = (quote_text: string, lang: string | null, source_name = "Outlet"):
   url: "https://o.example/a",
   published_at: null,
   lang,
+  ...extra,
 });
 
 const index = (sp: SpeakerClaims) =>
@@ -60,5 +66,37 @@ describe("the quote card and the language its words were printed in", () => {
     expect(quotes[0]).toContain("ಅವರು ಹೇಳಿದ್ದು");
     // D-quote-2: the reader's rendering does not replace the original, it sits beside it.
     expect(quotes[1]).toContain("what he said");
+  });
+});
+
+describe("one statement printed in two languages, and an outlet's translation", () => {
+  it("shows one statement once, with the other rendering beside it — not as a second quote", () => {
+    const sp: SpeakerClaims = {
+      speaker: "Giorgia Meloni",
+      claims: [
+        claim("You must go to school with your face uncovered", "en", "Mint", { utterance: "u1" }),
+        claim("ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು", "kn", "Prajavani", { utterance: "u1" }),
+        claim("A measure will soon go to Cabinet", "en", "Mint"),
+      ],
+      languages: ["en", "kn"],
+    };
+    render(<Said claims={[sp]} sourceIndex={index(sp)} />);
+    // Two STATEMENTS fit the fold, so the second distinct one is visible too —
+    // the Kannada rendering no longer spends a place.
+    expect(screen.getByText(/A measure will soon go to Cabinet/)).toBeInTheDocument();
+    expect(screen.getByText(/ಶಾಲೆಗೆ ಮುಖ ಮುಚ್ಚದೆ ಬರಬೇಕು/)).toBeInTheDocument();
+    expect(screen.getByText(/The same statement in 2 languages\. At most one is the words as spoken\./)).toBeInTheDocument();
+    expect(screen.queryByText(/more quote/)).not.toBeInTheDocument();
+  });
+
+  it("labels an outlet's translation even when it is the only quote on the card", () => {
+    // TV9 Kannada quoting Donald Trump in Kannada, nothing else on the story.
+    const sp: SpeakerClaims = {
+      speaker: "Donald Trump",
+      claims: [claim("ಯುದ್ಧ ತಡೆದಿದ್ದೇನೆ", "kn", "TV9 Kannada", { translated: true })],
+      languages: ["kn"],
+    };
+    render(<Said claims={[sp]} sourceIndex={index(sp)} />);
+    expect(screen.getByText("ಕನ್ನಡ translation")).toBeInTheDocument();
   });
 });

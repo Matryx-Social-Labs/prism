@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClaimOut } from "@/lib/api";
-import { findQuote, orderForReader, quoteId } from "@/lib/quotes";
+import { honestyLine } from "@/lib/ogCard";
+import { findQuote, orderForReader, quoteId, unitsForReader } from "@/lib/quotes";
 
 const q = (quote_text: string, lang: string | null): ClaimOut => ({
   quote_text,
@@ -53,5 +54,35 @@ describe("orderForReader", () => {
       "tagged",
       "untagged",
     ]);
+  });
+});
+
+describe("unitsForReader", () => {
+  it("collapses renderings of one utterance under the one this reader meets first", () => {
+    const claims = [
+      { ...q("english", "en"), utterance: "u" },
+      { ...q("kannada", "kn"), utterance: "u" },
+      q("other", "en"),
+    ];
+    const units = unitsForReader(claims, ["kn"]);
+    expect(units.map((u) => u.lead.claim.quote_text)).toEqual(["kannada", "other"]);
+    expect(units[0].also.map((a) => a.claim.quote_text)).toEqual(["english"]);
+    // Every rendering keeps its API position: it is the share address.
+    expect(units[0].also[0].index).toBe(0);
+  });
+
+  it("is one unit per quote when nothing has been judged", () => {
+    const claims = [q("a", "en"), q("b", "kn")];
+    expect(unitsForReader(claims, []).map((u) => u.also.length)).toEqual([0, 0]);
+  });
+});
+
+describe("the quote card's honesty line", () => {
+  it("never says VERBATIM over an outlet's translation", () => {
+    expect(honestyLine({ lang: "kn", outlet: "TV9 Kannada", when: "22 Sept", translated: true }))
+      .toBe("Translated into Kannada by TV9 Kannada · 22 Sept");
+    expect(honestyLine({ lang: "kn", outlet: "Prajavani", when: null }))
+      .toBe("Verbatim in Kannada · Prajavani");
+    expect(honestyLine({ lang: null, outlet: "Mint" })).toBe("Verbatim · Mint");
   });
 });

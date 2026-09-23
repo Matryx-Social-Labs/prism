@@ -139,6 +139,30 @@ async def _veto_reconciler() -> None:
             logger.exception("veto_reconciler_error")
 
 
+QUOTES_INTERVAL_S = int(os.environ.get("PRISM_QUOTES_INTERVAL_S", "900"))
+
+
+async def _quote_reconciler() -> None:
+    """Judge the speaker cards a new report changed: which quotes are one
+    statement printed in two languages, which an outlet's translation
+    (enrichment/renderings.py). Off the ingest path, and only when
+    PRISM_QUOTE_VERDICTS is on for this service — on the worker alone it is a
+    shadow run that writes claim_verdicts and serves nothing."""
+    from common.config import get_settings
+    from common.db import session_scope
+    from enrichment.renderings import sweep
+
+    while True:
+        await asyncio.sleep(QUOTES_INTERVAL_S)
+        if not get_settings().prism_quote_verdicts:
+            continue
+        try:
+            async with session_scope() as session:
+                await sweep(session)
+        except Exception:
+            logger.exception("quote_reconciler_error")
+
+
 async def _health_server() -> None:
     """Minimal HTTP 200 responder on $PORT.
 
@@ -333,6 +357,7 @@ async def main(stages: list[str]) -> None:
         tasks.append(asyncio.create_task(_trending_reconciler()))
         tasks.append(asyncio.create_task(_partition_reconciler()))
         tasks.append(asyncio.create_task(_veto_reconciler()))
+        tasks.append(asyncio.create_task(_quote_reconciler()))
 
     if len(tasks) <= 1:  # only the health server — no stage selected
         raise SystemExit("no stages selected")

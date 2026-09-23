@@ -118,7 +118,7 @@ export function OgCard({ meta, headline, summary, coverage, coverageText, foot, 
  * true of a Kannada rendering of words spoken in English; "Verbatim" alone is
  * not. Falls back to the old line when the row carries no language.
  */
-export function QuoteCard({ quote, speaker, role, outlet, when, host, storyTitle, lang }: { quote: string; speaker: string; role?: string | null; outlet: string; when?: string | null; host: string; storyTitle?: string | null; lang?: string | null }) {
+export function QuoteCard({ quote, speaker, role, outlet, when, host, storyTitle, lang, translated }: { quote: string; speaker: string; role?: string | null; outlet: string; when?: string | null; host: string; storyTitle?: string | null; lang?: string | null; translated?: boolean }) {
   const q = fit(quote, 230);
   const size = q.length > 170 ? 38 : q.length > 110 ? 44 : 52;
   return (
@@ -133,11 +133,22 @@ export function QuoteCard({ quote, speaker, role, outlet, when, host, storyTitle
         {storyTitle && <div style={{ marginTop: 8, fontFamily: bodyStack(storyTitle), fontSize: 20, color: c.inkFaint, maxWidth: 980, display: "flex" }}>{fit(storyTitle, 110)}</div>}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${c.line}`, paddingTop: 20, fontFamily: OG_MONO, fontSize: 16, color: c.inkFaint, letterSpacing: 1, textTransform: "uppercase" }}>
-        <span>Verbatim{lang ? ` in ${langName(lang)}` : ""} · {outlet}{when ? ` · ${when}` : ""}</span>
+        <span>{honestyLine({ lang, outlet, when, translated })}</span>
         <span>{host}</span>
       </div>
     </div>
   );
+}
+
+/**
+ * The foot of the quote card. VERBATIM only when nothing says otherwise, and
+ * never over a quote shown to be the outlet's own translation: this card is
+ * shared alone, and the word would be the one claim on it that is false.
+ */
+export function honestyLine({ lang, outlet, when, translated }: { lang?: string | null; outlet: string; when?: string | null; translated?: boolean }): string {
+  const tail = when ? ` · ${when}` : "";
+  if (translated && lang) return `Translated into ${langName(lang)} by ${outlet}${tail}`;
+  return `Verbatim${lang ? ` in ${langName(lang)}` : ""} · ${outlet}${tail}`;
 }
 
 /** The site card: the promise, and the bar that is how a reader learns what Prism is. */

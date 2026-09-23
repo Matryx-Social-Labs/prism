@@ -23,8 +23,11 @@ would let a near-quote pass as a quote.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
+from typing import Any
 
 from common.logging import get_logger
+from common.urls import canonicalize_url
 from enrichment.schemas import Claim
 
 logger = get_logger(__name__)
@@ -155,3 +158,43 @@ def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], di
     if any(rejected.values()):
         logger.info("claims_verified", kept=len(kept), **rejected)
     return kept, rejected
+
+
+def speaker_key(name: str) -> str:
+    """Fold punctuation and case ONLY: "D.K. Shivakumar" == "D K Shivakumar".
+
+    Measured on the live window: 3% of events carry one person under two speaker
+    strings, and every real duplicate was a punctuation or case variant. A surname
+    key would also have merged Chinna Reddy with Komatireddy Rajagopal Reddy, who
+    are different people, so tokens are kept: "Jaishankar" and "S Jaishankar" stay
+    two rows. That fold is the QID ledger's job (plan step 5), not this one's.
+    """
+    return " ".join(name.replace(".", " ").split()).casefold()
+
+
+def dedupe_sources(sources: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Keep one reader-facing row per publisher document.
+
+    A feed's external id is not always stable. BBC, for example, has emitted
+    one article URL with ``#0``, ``#2`` and ``#5`` ids as the item moved in its
+    feed. Those observations remain in the database for provenance, but they
+    are one document, not three sources and not three copies of every quote.
+
+    Rows arrive newest-first, so the first row is the latest observation. The
+    runtime canonicalizer is a fallback for rows created before the canonical
+    URL column was backfilled.
+    """
+    seen: set[tuple[str, str]] = set()
+    unique: list[Mapping[str, Any]] = []
+    for src in sources:
+        canonical = src.get("url_canonical") or canonicalize_url(src.get("url"))
+        key = (
+            ("url", canonical)
+            if canonical
+            else ("article", str(src["article_id"]))
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(src)
+    return unique

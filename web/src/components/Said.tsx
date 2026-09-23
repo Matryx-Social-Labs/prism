@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAsk } from "@/components/AskContext";
-import type { SpeakerClaims } from "@/lib/api";
+import type { ClaimOut, SpeakerClaims } from "@/lib/api";
 import { ChevronDown } from "@/components/icons";
 import { OutletIcon } from "@/components/Coverage";
 import { fallbackCode } from "@/components/SourceList";
@@ -10,7 +10,7 @@ import { relativeTime } from "@/lib/dateline";
 import { quoteLink } from "@/lib/quoteLink";
 import { langName, langNative } from "@/lib/languages";
 import { loadProfile } from "@/lib/profile";
-import { orderForReader, quoteId } from "@/lib/quotes";
+import { quoteId, unitsForReader } from "@/lib/quotes";
 import { ShareButton } from "@/components/ShareButton";
 
 /**
@@ -37,6 +37,25 @@ function initials(name: string): string {
 }
 
 const QUOTES_FOLD = 2;
+
+/**
+ * The language a quote was PRINTED in, in the provenance voice. When the
+ * outlet's words are shown to be its own translation, the label says so —
+ * the one case where a quote is printed knowing it is not the speaker's words
+ * (founder D-quote-3), so it is never printed without saying it.
+ */
+function LangLabel({ claim }: { claim: ClaimOut }) {
+  if (!claim.lang) return null;
+  const title = claim.translated
+    ? `${claim.source_name}'s ${langName(claim.lang)} translation — not the words as spoken`
+    : `Printed in ${langName(claim.lang)} by ${claim.source_name}`;
+  return (
+    <span className="font-mono text-[11px]" title={title}>
+      {langNative(claim.lang)}
+      {claim.translated && " translation"}
+    </span>
+  );
+}
 
 export function Said({
   claims,
@@ -71,11 +90,13 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
   const [all, setAll] = useState(false);
   const ask = useAsk();
   // The API already rotates the languages so none can be pushed out of the fold;
-  // this lifts the reader's own to the front of that rotation. Each entry keeps
-  // its position in the API's array, because that position IS the quote's share
-  // address and the card behind it is rendered from the API's order.
-  const ordered = orderForReader(sp.claims, prefer);
-  const shown = all ? ordered : ordered.slice(0, QUOTES_FOLD);
+  // this lifts the reader's own to the front of that rotation, and makes one
+  // unit per STATEMENT — a statement printed in two languages is one unit with
+  // the other rendering nested under it, so the fold counts things said. Each
+  // entry keeps its position in the API's array, because that position IS the
+  // quote's share address and the card behind it reads the API's order.
+  const units = unitsForReader(sp.claims, prefer);
+  const shown = all ? units : units.slice(0, QUOTES_FOLD);
   const outlets = new Set(sp.claims.map((c) => c.source_name)).size;
   const languages = sp.languages ?? [];
   const multilingual = languages.length > 1;
@@ -101,8 +122,9 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
               </div>
             </header>
             <ul className="flex flex-col gap-4">
-              {shown.map(({ claim: c, index }, j) => {
+              {shown.map(({ lead: { claim: c, index }, also }, j) => {
                 const n = sourceIndex.get(c.article_id);
+                const unitLanguages = new Set([c.lang, ...also.map((a) => a.claim.lang)].filter(Boolean)).size;
                 return (
                   <li key={`${c.article_id}-${index}`} className={j > 0 ? "border-t pt-4" : ""} style={j > 0 ? { borderColor: "var(--line)" } : undefined}>
                     <blockquote className="font-record text-[17px] italic leading-[1.5]" style={{ color: "var(--ink)", textWrap: "pretty" }}>
@@ -112,15 +134,12 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                       {n != null && (
                         <span className="font-mono text-[11px]">[{n}]</span>
                       )}
-                      {/* Which language this rendering is in. Shown only when the
-                          card holds more than one, because on a single-language
-                          card it answers a question nobody asked. It says what was
-                          PRINTED — never that these were the words spoken. */}
-                      {multilingual && c.lang && (
-                        <span className="font-mono text-[11px]" title={`Printed in ${langName(c.lang)} by ${c.source_name}`}>
-                          {langNative(c.lang)}
-                        </span>
-                      )}
+                      {/* Which language this rendering is in. Shown when the card
+                          holds more than one, or when this quote is the outlet's
+                          own translation — then even a lone quote must say so.
+                          Otherwise a single-language card says nothing: it would
+                          answer a question nobody asked. */}
+                      {(multilingual || c.translated) && c.lang && <LangLabel claim={c} />}
                       <span className="chip h-6 gap-1 px-2 text-[12px]">
                         <OutletIcon domain={outletOf?.(c.article_id)?.domain} code={outletOf?.(c.article_id)?.code ?? fallbackCode(c.source_name)} name={c.source_name} size={16} />
                         {c.source_name}
@@ -168,13 +187,47 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                         </p>
                       </details>
                     )}
+                    {/* The same statement as other outlets printed it. Shown, not
+                        folded (founder D-quote-2: the original WITH the
+                        translation), and headed by the one thing Prism knows
+                        without asking anyone: two languages, one statement, so at
+                        most one of these is the words as spoken. */}
+                    {also.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-2.5 border-l-2 pl-3" style={{ borderColor: "var(--line-strong)" }}>
+                        {unitLanguages > 1 && (
+                          <p className="text-[12.5px] leading-snug" style={{ color: "var(--ink-3)" }}>
+                            The same statement in {unitLanguages} languages. At most one is the words as spoken.
+                          </p>
+                        )}
+                        {also.map(({ claim: a, index: ai }) => {
+                          const an = sourceIndex.get(a.article_id);
+                          return (
+                            <div key={`${a.article_id}-${ai}`}>
+                              <blockquote className="font-record text-[15px] italic leading-[1.5]" style={{ color: "var(--ink-2)", textWrap: "pretty" }}>
+                                “{a.quote_text}”
+                              </blockquote>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]" style={{ color: "var(--ink-3)" }}>
+                                {an != null && <span className="font-mono text-[11px]">[{an}]</span>}
+                                {a.lang && <LangLabel claim={a} />}
+                                <span>{a.source_name}</span>
+                                {a.url && an != null && (
+                                  <a href={quoteLink(a.url, a.quote_text)} target="_blank" rel="noopener noreferrer" aria-label={`Source ${an}: ${a.source_name}`} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+                                    Open at the quote ↗
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </li>
                 );
               })}
             </ul>
-            {!all && ordered.length > QUOTES_FOLD && (
+            {!all && units.length > QUOTES_FOLD && (
               <button type="button" onClick={() => setAll(true)} className="btn btn-ghost btn-sm self-start -ml-3" style={{ color: "var(--accent)" }}>
-                {sp.claims.length - QUOTES_FOLD} more {sp.claims.length - QUOTES_FOLD === 1 ? "quote" : "quotes"}
+                {units.length - QUOTES_FOLD} more {units.length - QUOTES_FOLD === 1 ? "quote" : "quotes"}
               </button>
             )}
           </article>
