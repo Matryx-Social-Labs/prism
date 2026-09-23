@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LabellerWorkspace from "@/app/label/page";
 
@@ -72,10 +72,11 @@ describe("the labeller workspace", () => {
       done: [],
     });
     render(<LabellerWorkspace />);
-    expect(await screen.findByText("Cross-language")).toBeInTheDocument();
-    expect(screen.getByText("Is this the same happening?")).toBeInTheDocument();
-    expect(screen.getByText("12 of 40 done · 3 labellers")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    const row = within((await screen.findByText("Cross-language")).closest("li")!);
+    expect(row.getByText("Is this the same happening?")).toBeInTheDocument();
+    expect(row.getByText("12 of 40 done · 3 labellers")).toBeInTheDocument();
+    expect(row.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(row.getByRole("link", { name: "How this task works" })).toHaveAttribute("href", "/label/learn/event_identity");
   });
 
   it("starting a batch stores the credential where the task page reads it, then opens it", async () => {
@@ -100,5 +101,11 @@ describe("the labeller workspace", () => {
     render(<LabellerWorkspace />);
     expect(await screen.findByText("Your labelling is paused")).toBeInTheDocument();
     expect(fetchLabellerBatches).not.toHaveBeenCalled();
+  });
+
+  it("lets anyone read how each task works, before applying or being approved", async () => {
+    render(<LabellerWorkspace />);
+    const link = await screen.findByRole("link", { name: "Who said this?" });
+    expect(link).toHaveAttribute("href", "/label/learn/claim_attribution");
   });
 });
