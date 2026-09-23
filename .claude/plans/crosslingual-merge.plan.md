@@ -164,3 +164,21 @@ Phase 1 has proven the threshold on live traffic.
 - [ ] `tools/score_cascade` replay recorded for the chosen threshold, not a pairwise number
 - [ ] Two events with the same Prism headline in a 4-day window cannot both exist
 - [ ] Mixed-language quote cards are honest before the merge rate rises
+
+## Outcome (2026-09-23)
+
+- **Phase 1 (flip the tier) is BLOCKED on labels, not on code.** The replay
+  harness could not see the tier at all (fixed: it now copies `headline_by` and
+  titles events as the consumer does). But `gold_pairs` holds July articles and
+  extracted English headlines only exist from 2026-09-16, so the tier cannot
+  fire on any existing labelled pair. Baseline on the corrected harness, mE5,
+  tier off: P 0.8857 R 0.5082 Cdet 0.5393 (held out P 1.0000 R 0.4848).
+- **Phase 2 is in the founders' hands**: batch `tKECdZfjiL0n` (150 tasks, 364
+  candidate pairs). Invite with `tools/gold_candidates --invite Name Name
+  --batch tKECdZfjiL0n`; compile with `tools/gold_crosslingual --compile`;
+  then `tools/score_cascade --headline-tier 0.55` on the compiled set.
+- **Phase 3**: `tools/score_headline_signal` built. Reported UNGA pair: word
+  cosine 0.329, mE5 headline embedding 0.932. Scores the batch once answered.
+- **Phase 4 NOT BUILT.** ~15 tables reference an event id, including
+  `lens_unlocks` (paid, no cascade); a merged-away `/story/<id>` is indexed and
+  shared and needs a redirect. Which id survives is a founder decision.

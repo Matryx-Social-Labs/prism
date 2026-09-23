@@ -3,6 +3,56 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.91.0] - 2026-09-23
+
+### Added
+- **One statement printed twice is one quote, and a translation says so**
+  (quote-language plan, Phase 1; founder decisions D-quote-1..4). Verbatim is
+  checked against the article, not the speaker, so an outlet's own translation
+  passes it. When one statement appears in two languages the card now shows it
+  once with the other rendering beside it — "The same statement in 2 languages.
+  At most one is the words as spoken." — and its fold counts statements, not
+  quotes. A quote the model is confident was NOT spoken in the language printed
+  is labelled "ಕನ್ನಡ translation", even alone on its card, and its share card
+  reads "Translated into Kannada by TV9 Kannada" rather than VERBATIM. The model
+  may only downgrade a claim, never assert which language was spoken
+  (D-quote-4). One Jev call per speaker card (~$0.0001), verdicts cached as raw
+  probabilities in the new `claim_verdicts` table, keyed by quote identity.
+  **Shadow only**: `PRISM_QUOTE_VERDICTS` stays off on the API until
+  `tools/gold_renderings --score` reads >= 0.95 on a founder-labelled sheet.
+- `tools/gold_renderings` — shadow-judge the archive, export a stratified
+  labelling sheet, score it against the gate.
+- `tools/score_headline_signal` — IDF word cosine against an mE5 embedding of
+  the extractor's English headlines. On the founder-reported UNGA pair: 0.329
+  against 0.932.
+- A cross-language label batch (key `tKECdZfjiL0n`, 150 tasks, 364 candidate
+  pairs) — the labels the headline tier has been waiting for since 2026-09-17.
+
+### Fixed
+- **A quotation is the one value never translated into English.** The
+  extraction prompt ordered every value into English and every quote verbatim;
+  for an Indic article those cannot both hold. It names its exception now.
+  Bake-off on identical articles, kn+hi: claims kept 0.82 -> 0.90 per article,
+  headlines and briefs unchanged, no schema failures; English unchanged.
+- **The cascade replay can measure the headline tier.** It titled replayed
+  events with the outlet's native title and never copied `headline_by`, so the
+  tier found nothing in any replay and could never have been scored on or off.
+  (It still cannot be scored on `gold_pairs`: those articles predate the
+  English headline field, which exists only from 2026-09-16 — hence the batch.)
+- The subject tree placed the archive: 15,903 events for $1.56; all 15,915
+  served events now carry a path, including every one created since deploy.
+
+### Not done, deliberately
+- The headline tier stays OFF. There is no labelled set it can be measured on
+  until the batch above is answered, and this repo's rule is to flip a matcher
+  tier on cascade-replay evidence only.
+- The repair of the ~621 cross-language twins already on disk is not built.
+  About fifteen tables reference an event id — `lens_unlocks` (readers' paid
+  unlocks) among them, without a cascade — and a merged-away `/story/<id>` is
+  already indexed and shared, so it needs a redirect. Which id survives is a
+  product decision, and the plan sequences the repair after the tier's
+  threshold is proven.
+
 ## [0.0.90.0] - 2026-09-23
 
 ### Fixed

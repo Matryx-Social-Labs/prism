@@ -2,7 +2,7 @@
 
 **Source**: founder report — "a Kannada report arriving later replaces the English quotes"
 **Complexity**: Medium (Phase 0 small, Phases 1–2 measured and gated)
-**Status**: Phase 0 SHIPPED 2026-09-23 (v0.0.90.0). Phases 1–3 open.
+**Status**: Phase 0 SHIPPED (v0.0.90.0). Phases 1+2 SHIPPED IN SHADOW and Phase 3 SHIPPED (v0.0.91.0). Open: founders label `tools/gold_renderings --export`; turn PRISM_QUOTE_VERDICTS on for the API only if `--score` passes.
 
 ## What is actually happening (measured on production, read-only, 2026-09-22)
 
@@ -198,3 +198,19 @@ when `raw_items.language` is NULL. Each mutation-verified (`CLAUDE.md`).
 - [ ] No language can displace another out of the 2-quote fold
 - [ ] `VERBATIM` never appears unqualified over a rendering
 - [ ] The Meloni card reads truthfully
+
+## Outcome (2026-09-23)
+
+- **Phase 1 + 2 merged into one mechanism.** One Jev call per speaker card asks
+  "spoken in the language printed?" for every quote and "same statement?" for
+  every cross-language pair. Evidence first holds by construction: a
+  cross-language group is shown as one statement with "at most one is the words
+  as spoken" without any model assertion about which; the "spoken here?" answer
+  can only DOWNGRADE (below 0.2) — D-quote-4. "The article says so" (a new
+  extraction field) was dropped: forward-only, and the one-sided question
+  already covers what it would.
+- **Phase 3** shipped after a prompt bake-off (claims kept 0.82 -> 0.90 on kn+hi,
+  everything else unchanged).
+- **Gate**: `tools/gold_renderings --judge --apply` (shadow backfill) ->
+  `--export` -> founders label -> `--score`. Crossing points SAME_MIN 0.8 and
+  SPOKEN_MAX 0.2 are provisional and settable from labels without re-asking.
