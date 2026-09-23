@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import LabelPage from "@/app/label/[key]/page";
 import type { LabelTask } from "@/lib/api";
@@ -537,6 +537,29 @@ describe("the primer is read before the first judgement", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /I have read this/ }));
     expect(await screen.findByText("Seed headline")).toBeInTheDocument();
+  });
+
+  it("asks for the same incident whatever day it was reported, and dates each report in IST", async () => {
+    // vitest.setup pins the runner to IST, which would hide a date printed in
+    // the browser's own zone. A reader in New York is the case to prove.
+    const zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    onTestFinished(() => {
+      process.env.TZ = zone;
+    });
+    ready("event_identity", { ...task({
+      candidates: [{
+        // 20:00 UTC on the 15th is 01:30 on the 16th in India: the day a
+        // labeller sees must be the product's own, not the browser's.
+        id: "late", title: "Same collapse, reported the next day", at: "2026-08-15T20:00:00+00:00",
+        source_count: 1, actors: [], signals: ["headline"],
+      }],
+    }) });
+    await screen.findByText(/READ THIS FIRST/);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(await screen.findByText(/the same incident, whatever day it was reported\?/)).toBeInTheDocument();
+    expect(screen.queryByText(/the same day\?/)).not.toBeInTheDocument();
+    expect(screen.getByText(/16 Aug/)).toBeInTheDocument();
   });
 
   it("teaches the STORY rule with the mistakes that were actually made", async () => {

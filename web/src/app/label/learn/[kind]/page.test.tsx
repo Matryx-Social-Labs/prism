@@ -26,6 +26,19 @@ describe("learning a task before labelling it", () => {
     expect(screen.getByText(/Do not tick the/)).toBeInTheDocument();
   });
 
+  it("counts a late report of the same incident as the same happening", async () => {
+    // The founder's correction, 2026-09-23: most candidates in the cross-language
+    // batch are dated a day or more after their seed, and "the same day" told a
+    // labeller to reject every one of them.
+    await renderKind("event_identity");
+    const page = document.body.textContent ?? "";
+    expect(page).toMatch(/When it was reported does not matter/);
+    expect(page).toMatch(/Tick a late report/);
+    expect(page).not.toMatch(/same day|a day apart/i);
+    // The one invented example says so, as every written example must.
+    expect(screen.getByText("ILLUSTRATION")).toBeInTheDocument();
+  });
+
   it("shows the claim task's worked examples opened, not collapsed", async () => {
     await renderKind("claim_attribution");
     expect(screen.getByText("NO — RIGHT QUOTE, WRONG MOUTH")).toBeVisible();

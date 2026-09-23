@@ -142,7 +142,14 @@ export function TopicGuide({ open = false }: { open?: boolean }) {
  *  make, not invented ones.
  */
 /** The same-happening task: stricter than the story task. One incident, any
- *  language, any wording — but the follow-up is a different happening here. */
+ *  language, any wording, any day it was reported — but the follow-up is a
+ *  different happening here.
+ *
+ *  "Any day" is the founder's correction (2026-09-23): this said "the same day",
+ *  and the cross-language batch shows 252 of its 364 candidates on another day
+ *  than their seed, up to five days apart. Every late report of the same
+ *  incident would have been answered No. What separates two happenings is that
+ *  something NEW happened, never the date an outlet got round to it. */
 export function EventPrimer({ onStart, action = "Start" }: { onStart: () => void; action?: string }) {
   return (
     <div className="mx-auto max-w-[640px] pt-2">
@@ -154,14 +161,17 @@ export function EventPrimer({ onStart, action = "Start" }: { onStart: () => void
       </h1>
       <p className="mt-4 text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
         You will see one report — usually in Hindi, Kannada or another language, with our English
-        headline above it — then English reports from the same days. Tick the ones that report the
-        <strong> same incident</strong>: the same thing, the same people, the same day. Wording and
-        language do not matter. This is narrower than &ldquo;the same story&rdquo;.
+        headline above it — then English reports from the days around it. Tick the ones that report
+        the <strong>same incident</strong>: the same thing that happened, to the same people.
+        <strong> When it was reported does not matter</strong> — an outlet that got to it a day or
+        three later is still reporting the same happening. Neither do wording and language. This is
+        narrower than &ldquo;the same story&rdquo;.
       </p>
       <div className="mt-7 border-l-2 pl-4" style={{ borderColor: "var(--ink)" }}>
         <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO</p>
         <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink)" }}>
           <li>Tick every English report of <strong>the one incident</strong>, however it is worded.</li>
+          <li>Tick a <strong>late report</strong> of it too. Outlets report on their own clock; the date under a headline says when they wrote, not what happened.</li>
           <li>Read the outlet&apos;s own headline under ours when they seem to disagree; the outlet&apos;s is the truth.</li>
           <li>Tick nothing when nothing matches — that is the most common right answer here.</li>
           <li>Answer <strong>Not sure</strong> when you cannot tell from the headlines. It is a real answer.</li>
@@ -170,26 +180,30 @@ export function EventPrimer({ onStart, action = "Start" }: { onStart: () => void
       <div className="mt-6 border-l-2 pl-4" style={{ borderColor: "var(--danger, #b91c1c)" }}>
         <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>DO NOT</p>
         <ul className="mt-2 space-y-2 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
-          <li>Do not tick the <strong>follow-up</strong>. The arrests the day after the attack are a different happening in this task (they were the same <em>story</em> in the other one).</li>
+          <li>Do not tick the <strong>follow-up</strong>: something new that happened after the incident. The arrests the day after the attack are a different happening in this task (they were the same <em>story</em> in the other one). The test is whether something new happened, never the date on the report.</li>
           <li>Do not tick a <strong>different incident of the same kind</strong>: two foundation stones laid in two towns, two Lokayukta arrests, two road crashes.</li>
           <li>Do not tick because the two share a name, a place, or a subject.</li>
         </ul>
       </div>
       <p className="mt-7 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-        EXAMPLES FROM THE DATA THIS ROUND CAME FROM
+        EXAMPLES — FROM THE DATA THIS ROUND CAME FROM, UNLESS MARKED
       </p>
       <div className="mt-3 space-y-4">
         {[
           ["TICK — “India rejects China-Pakistan Boundary Joint Commission” (Aaj Tak, Hindi) with “India rejects Pakistan-China Boundary Joint Commission” (The Hindu)",
            "One statement by the MEA, reported in two languages. The order of the country names is the only difference."],
           ["TICK — a Kannada report that Anant Nag will receive the Dadasaheb Phalke Award, with the English reports of the same announcement",
-           "Same award, same day, same actor. The words share nothing because the scripts share nothing."],
+           "Same award, same announcement, same actor. The words share nothing because the scripts share nothing."],
           ["DO NOT TICK — “Foundation stone laid for Bidar Fort development” with “Foundation stone laid for Mahadeshwara Swamy temple”",
            "Same kind of thing happening in two places. Two incidents."],
-          ["DO NOT TICK — “Jarange ends 20-day fast” with “Jarange dehydrated, doctors warn”, if they are a day apart",
-           "Same man, same story, two happenings. In this task that is a No."],
-        ].map(([head, body]) => (
+          ["DO NOT TICK — “Jarange ends 20-day fast” with “Jarange dehydrated, doctors warn”",
+           "Same man, same story, two things that happened: the fast ended, then his health failed. A No because something new happened — not because of the dates."],
+          ["TICK — a Kannada report of a bridge collapse dated the 12th, with an English report of the same collapse dated the 13th",
+           "One collapse. The English outlet reported it a day later: a late report, not a different happening.",
+           "ILLUSTRATION"],
+        ].map(([head, body, note]) => (
           <div key={head}>
+            {note && <p className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>{note}</p>}
             <p className="text-[14px] font-medium" style={{ color: "var(--ink)" }}>{head}</p>
             <p className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{body}</p>
           </div>
