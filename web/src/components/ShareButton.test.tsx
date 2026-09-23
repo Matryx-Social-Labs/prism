@@ -25,8 +25,16 @@ describe("ShareButton", () => {
 
     // Most chat apps ignore `title` and paste text+url, so `text` must carry the headline.
     expect(share).toHaveBeenCalledWith(
-      expect.objectContaining({ text: STORY.title, url: `${window.location.origin}/story/abc` })
+      expect.objectContaining({ text: STORY.title, url: `${window.location.origin}/story/abc?s=story` })
     );
+  });
+
+  it("marks a shared quote as a quote, so the visit it brings back is counted as one", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    stubNavigator({ share });
+    render(<ShareButton url="/story/abc/quote/0-1" title="“We will build it” — A. Speaker" compact />);
+    await userEvent.click(screen.getByRole("button", { name: /share this quote/i }));
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: `${window.location.origin}/story/abc/quote/0-1?s=quote` }));
   });
 
   it("does nothing when the reader dismisses the sheet", async () => {
@@ -58,7 +66,7 @@ describe("ShareButton", () => {
     render(<ShareButton {...STORY} />);
     await clickShare();
 
-    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/story/abc`);
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/story/abc?s=story`);
     expect(await screen.findByText(/link copied/i)).toBeInTheDocument();
   });
 

@@ -12,7 +12,7 @@ export const LEGAL_ENTITY = "Prism Media Intelligence LLP";
 export const LEGAL_PARTNER = "Matryx Social Labs Private Limited (Matrix Social Labs)";
 export const CONTACT_EMAIL = "hello@readprism.news";
 export const LEGAL_CITY = "Bengaluru, Karnataka";
-export const LEGAL_UPDATED = "2026-09-21";
+export const LEGAL_UPDATED = "2026-09-23";
 
 /** A paragraph, or a bullet list. */
 export type Block = string | string[];
@@ -48,9 +48,10 @@ export const PRIVACY: LegalDoc = {
       short: "Nothing while you read; your email and what you tell us once you sign in.",
       blocks: [
         "Reading without an account: nothing that identifies you. One cookie, prism.returning, tells the front page you have been here before so it can take you straight to the chart. Your browser keeps a few settings on your device (theme, the scope you last chose, the last story you opened) and sends them nowhere.",
-        "Asking a question without an account: the question and the answer are stored against a random session id that lives in your browser. To keep the free box open for everyone we count questions per session and per hashed IP address; the hash cannot be turned back into your address and the counter expires within a day.",
+        "How Prism is used, counted without knowing who: we count page views and a handful of actions (opening a lens, asking a question, sharing, each step of subscribing) as daily totals by kind. A kind of page, never which story; how a question was opened, never the question; the site a visit came from, never the page. To count how many people visited in a day, we hash your IP address and browser with a random value that is replaced every day and deleted within two days; the hash is used only for that day's count, never stored in our database, and cannot be linked to you or to another day. None of this sets a cookie.",
+        "Asking a question without an account: the question and the answer are stored against a random session id that lives in your browser. To keep the free box open for everyone we count questions per session and per IP address, hashed with a value that changes every day, so the hash cannot be turned back into your address; the counter expires within a day.",
         "An account: your email address, from the sign-in link you click or from Google if you sign in with Google. From Google we receive your email and the fact that Google has verified it, nothing else. At onboarding you may tell us your name, profession, state and reading languages, and we record the time you agreed to the Terms.",
-        "What you do with an account: the tickers and sectors on your watchlist; the questions you ask and their answers, linked to your account; and, once paid plans exist, your plan, its status and the amount. We never see or store card or UPI details, the payment provider holds those.",
+        "What you do with an account: the tickers and sectors on your watchlist; the questions you ask and their answers, linked to your account; the days on which you used Prism while signed in (the date only, never what you read), so we can see how many readers come back; and, once paid plans exist, your plan, its status and the amount. We never see or store card or UPI details, the payment provider holds those.",
         "Technical records: our hosts keep ordinary server logs (IP address, browser, pages requested) for a short period to run and secure the service.",
       ],
     },
@@ -63,6 +64,7 @@ export const PRIVACY: LegalDoc = {
           "To show you your state's news and your reading language.",
           "To answer your question and remember the thread.",
           "To apply fair-use limits on the question box.",
+          "To count, in totals, how Prism is used and how many readers come back, so we know what to build.",
           "To bill you for a plan you chose and send its invoices.",
           "To send you the email you asked for: a sign-in link, and later a daily brief if you opt in.",
         ],
@@ -89,7 +91,7 @@ export const PRIVACY: LegalDoc = {
       heading: "Cookies and device storage",
       short: "One routing cookie and a few settings on your device. No trackers.",
       blocks: [
-        "One cookie, prism.returning, for routing a returning reader. On your device: your session token, your profile, your theme, your last scope and your last opened story. There are no advertising cookies and no cross-site tracking. If we add usage analytics we will use a tool that sets no cookies, and say so here.",
+        "One cookie, prism.returning, for routing a returning reader. On your device: your session token, your profile, your theme, your last scope and your last opened story. There are no advertising cookies and no cross-site tracking. Usage is counted without cookies, as “What we collect” describes.",
       ],
     },
     {
@@ -101,6 +103,7 @@ export const PRIVACY: LegalDoc = {
           "A session lasts 30 days unless you sign out.",
           "Account data stays until you delete the account.",
           "Anonymous questions stay against their random session id only.",
+          "Daily usage totals are kept; they hold nothing about a person. The days an account was active are deleted with the account.",
           "Billing records stay as long as tax law requires.",
         ],
       ],

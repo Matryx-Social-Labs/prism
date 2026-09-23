@@ -6,14 +6,20 @@ import { ArrowUpRight } from "@/components/icons";
 // path); copy-link fallback on desktop. Shares the shareable /trending/<slug> URL.
 import { useState } from "react";
 
+import { shareSurface, track } from "@/lib/analytics";
+
 export function ShareButton({ url, title, fill, compact }: { url: string; title: string; fill?: boolean; compact?: boolean }) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
     const nav = typeof navigator !== "undefined" ? navigator : undefined;
-    const absolute = url.startsWith("http")
-      ? url
-      : `${typeof window !== "undefined" ? window.location.origin : ""}${url}`;
+    const surface = shareSurface(url);
+    // `?s=` marks the link as shared, so the visit it brings back is counted as
+    // one even when a chat app strips the referrer (api/routes/beacon.py).
+    // Pages set their canonical URL, so the marker never splits a page in search.
+    const target = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://readprism.news");
+    target.searchParams.set("s", surface);
+    const absolute = target.toString();
     // Native sheet (WhatsApp/Instagram/…) wherever the browser offers it. It is
     // secure-context-only: over plain http:// — a LAN IP in dev — navigator.share
     // is undefined and we fall back to copying the link.
@@ -22,6 +28,7 @@ export function ShareButton({ url, title, fill, compact }: { url: string; title:
         // `text` too: most chat apps ignore `title` and paste only text+url, so
         // without it the headline is lost and the share is a naked link.
         await nav.share({ title, text: title, url: absolute });
+        track("Share", { surface });
         return;
       } catch (err) {
         // Dismissing the sheet is a decision, not a failure — copying the link
@@ -37,6 +44,7 @@ export function ShareButton({ url, title, fill, compact }: { url: string; title:
     if (!nav?.clipboard) return;
     try {
       await nav.clipboard.writeText(absolute);
+      track("Share", { surface });
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {

@@ -203,3 +203,41 @@ async def test_a_session_already_owned_is_never_reassigned():
             )
         ).scalar_one()
         assert owner == first, "an owned session was transferred to another reader"
+
+
+async def test_a_refused_question_is_counted_as_demand():
+    """The 429 rolls the request's transaction back; the count must survive it
+    (admin dashboard: people who wanted another answer are the Plus signal)."""
+    if not await _db():
+        pytest.skip("no database")
+    from httpx import ASGITransport, AsyncClient
+
+    from api.main import app
+    from common import usage
+
+    async with session_scope() as s:
+        sid = await _session_with(s, None, n_user_msgs=ANON_ASK_PER_SESSION)
+        eid = (await s.execute(text("SELECT event_id FROM agent_sessions WHERE id = :i"), {"i": str(sid)})).scalar()
+
+    async def refused() -> int:
+        async with session_scope() as s:
+            return (await s.execute(text("SELECT coalesce(sum(count), 0) FROM usage_daily "
+                                         "WHERE day = :d AND event = 'ask_limit' AND dim = 'anonymous'"),
+                                    {"d": usage.today()})).scalar()
+
+    before = await refused()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.post(f"/api/v1/events/{eid}/ask", json={"question": "and then?", "session_id": str(sid)})
+    assert r.status_code == 429
+    assert await refused() == before + 1
+
+
+async def test_the_address_hash_is_salted():
+    """Unsalted sha256 of an IPv4 address is reversible by brute force (2^32),
+    which made the privacy policy's promise untrue."""
+    import hashlib
+
+    from common.quota import _ip_key
+
+    assert _ip_key("203.0.113.7", "day-a") != _ip_key("203.0.113.7", "day-b")
+    assert _ip_key("203.0.113.7", "day-a") != hashlib.sha256(b"203.0.113.7").hexdigest()[:24]

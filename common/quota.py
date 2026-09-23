@@ -219,10 +219,15 @@ async def ask_allowance(
     return used < cap, used, cap
 
 
-def _ip_key(ip: str) -> str:
+def _ip_key(ip: str, salt: str) -> str:
+    """The address, hashed with a salt that changes daily and is deleted within
+    two days (common/usage.day_salt). Unsalted, sha256 of an IPv4 address is
+    reversible by trying all four billion — which made the privacy policy's
+    "cannot be turned back into your address" untrue (admin dashboard review,
+    2026-09-23)."""
     import hashlib
 
-    return hashlib.sha256(ip.encode()).hexdigest()[:24]
+    return hashlib.sha256(f"{salt}|{ip}".encode()).hexdigest()[:24]
 
 
 async def ask_burst_ok(identity: str, ip: str | None, anonymous: bool) -> str | None:
@@ -245,7 +250,9 @@ async def ask_burst_ok(identity: str, ip: str | None, anonymous: bool) -> str | 
         if n > ASK_PER_MINUTE:
             return "burst"
         if anonymous and ip:
-            ip_key = f"prism:ask:ip:{_ip_key(ip)}:{day}"
+            from common.usage import day_salt
+
+            ip_key = f"prism:ask:ip:{_ip_key(ip, await day_salt(r, f'ask-{day}'))}:{day}"
             m = await r.incr(ip_key)
             if m == 1:
                 await r.expire(ip_key, 60 * 60 * 26)
