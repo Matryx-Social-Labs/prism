@@ -7,15 +7,20 @@ the answers are good (PRISM_QUOTE_VERDICTS stays off on the API until then).
 
     uv run python -m tools.gold_renderings --judge --limit 20          # dry run: asks, prints, writes nothing
     uv run python -m tools.gold_renderings --judge --apply             # shadow backfill into claim_verdicts
-    uv run python -m tools.gold_renderings --export gold_renderings.csv
-    uv run python -m tools.gold_renderings --score gold_renderings.csv
+    uv run python -m tools.gold_renderings --push "Quotes — round 1"          # a batch on /label (closed to the dashboard until listed)
+    uv run python -m tools.label_admin --languages KEY && uv run python -m tools.label_admin --list KEY
+    uv run python -m tools.gold_renderings --score KEY                         # the gate, from the batch's answers
 
-THE LABELLING SHEET. One row per question the model answered. A founder fills
-the `label` column with y or n and nothing else:
+THE LABELLING BATCH. One task per question the model answered, served on the
+labeller dashboard as the `quote_rendering` kind (web/src/components/label):
 
-  kind=same    — are these two quotes the same statement? (y = the same)
-  kind=spoken  — were these words spoken in the language printed? (y = spoken so,
-                 n = the outlet translated them)
+  question=same    — are these two quotes the same statement? (yes = the same)
+  question=spoken  — were these words spoken in the language printed? (yes =
+                     spoken so; no = the outlet translated them)
+
+It replaced a CSV. A spreadsheet opened scraped quotes as cells, which needed
+formula-escaping to be safe; a batch shows them as text, and gets approval,
+language gating and the qualification test with it.
 
 The sample is stratified so both sides of each crossing point are read: every
 pair the model called the same and an equal number it did not; every quote it
@@ -36,18 +41,19 @@ quote as a translation or group two quotes BY THE SAME SPEAKER, never invent
 or reattribute words — but a targeted attack on one story is not something a
 random-sample precision number measures. Read that before turning the API on.
 
-WRITES TO PRODUCTION only with --judge --apply, and only to claim_verdicts.
+WRITES TO PRODUCTION only with --judge --apply (claim_verdicts) and --push
+(one new label batch, unlisted).
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
-import csv
 import json
 import random
+import secrets
 import sys
-from pathlib import Path
+import uuid
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -58,16 +64,6 @@ from tools.snapshot_l2 import _prod_url
 GATE = 0.95
 SAMPLE_PER_SIDE = 60
 EVENT_CONCURRENCY = 8
-
-
-def cell(value: object) -> object:
-    """A spreadsheet cannot run it. Quotes, speakers and titles are scraped
-    text, and a cell beginning = + - @ (or a tab or CR) is a formula when the
-    sheet is opened — a hostile article could make the labeller's own
-    spreadsheet fetch a URL with the rest of the row in it."""
-    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
-        return "'" + value
-    return value
 
 
 def _engine(read_only: bool):
@@ -117,16 +113,13 @@ async def judge(limit: int, apply: bool) -> None:
     print(f"\n{'wrote' if apply else 'would write'} {judged} cards across {total} events, ${cost:.4f}")
 
 
-async def export(path: Path, seed: int) -> None:
-    """Sample from the verdicts first, then fetch only the sampled quotes.
-
-    The first version fetched every judged event's articles one query at a
-    time to label ~240 rows — 5,500 round trips over the prod proxy, 15+
-    minutes. A verdict key already names its article, so the sample can be
-    drawn from the verdicts alone and its quotes read in one query."""
-    engine = _engine(read_only=True)
+async def push(name: str, seed: int) -> None:
+    """Sample from the verdicts first, then read only the sampled quotes, and
+    write them as one quote_rendering batch — unlisted, so it reaches nobody
+    until an admin lists it (tools/label_admin --list)."""
+    engine = _engine(read_only=False)
     try:
-        async with engine.connect() as conn:
+        async with engine.begin() as conn:
             rows = (await conn.execute(text(
                 """
                 SELECT cv.event_id, cv.speaker_key, cv.verdicts, e.title
@@ -147,35 +140,37 @@ async def export(path: Path, seed: int) -> None:
             for pool in (same_yes, same_no, spoken_no, spoken_yes):
                 rng.shuffle(pool)
                 picked += pool[:SAMPLE_PER_SIDE]
-            rng.shuffle(picked)  # the labeller must not read the model's answer from row order
+            rng.shuffle(picked)  # a labeller must not read the model's answer from the order
 
             wanted = {k.split(":", 1)[0] for _, _, _, a, b in picked for k in (a, b) if k}
             quotes = await _quotes(conn, wanted)
+
+            key = secrets.token_urlsafe(9)
+            bid = uuid.uuid4()
+            await conn.execute(
+                text("INSERT INTO label_batches (id, key, name, kind, purpose, open, self_join, listed, notes) "
+                     "VALUES (:i, :k, :n, 'quote_rendering', 'work', true, false, false, :notes)"),
+                {"i": bid, "k": key, "n": name,
+                 "notes": "Same statement in two languages, or a translation? Scored by tools/gold_renderings --score."})
+            written = 0
+            for kind, p, r, a, b in picked:
+                qa, qb = quotes.get(a), quotes.get(b) if b else None
+                if qa is None or (b and qb is None):
+                    continue  # the report left the event since it was judged
+                payload = {"kind": "quote_rendering", "question": kind, "speaker": qa["speaker"], "story": r.title,
+                           "a": qa, "b": qb, "model_p": p, "keys": [a, b] if b else [a]}
+                langs = sorted({"en", qa["code"], *( [qb["code"]] if qb else [] )} - {""})
+                await conn.execute(
+                    text("INSERT INTO label_tasks (id, batch_id, position, candidates, payload, languages) "
+                         "VALUES (:i, :b, :p, '[]'::jsonb, CAST(:pl AS jsonb), CAST(:l AS text[]))"),
+                    {"i": uuid.uuid4(), "b": bid, "p": written, "pl": json.dumps(payload, ensure_ascii=False), "l": langs})
+                written += 1
     finally:
         await engine.dispose()
-
-    written = 0
-    with path.open("w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["id", "kind", "question", "speaker", "story",
-                    "a_language", "a_outlet", "a_quote", "b_language", "b_outlet", "b_quote",
-                    "model_p", "label"])
-        for kind, p, r, a, b in picked:
-            qa, qb = quotes.get(a), quotes.get(b) if b else None
-            if qa is None or (b and qb is None):
-                continue  # the report left the event since it was judged
-            question = ("Same statement? y/n" if kind == "same"
-                        else f"Spoken in {qa['language']} by the speaker (not translated by {qa['outlet']})? y/n")
-            w.writerow([cell(v) for v in (
-                f"{a}|{b or ''}", kind, question, qa["speaker"], r.title,
-                qa["language"], qa["outlet"], qa["quote"],
-                qb["language"] if qb else "", qb["outlet"] if qb else "", qb["quote"] if qb else "",
-                p, "")])
-            written += 1
-    print(f"wrote {written} rows to {path}: "
+    print(f"wrote {written} tasks to batch {key!r} ({name}): "
           f"same {min(len(same_yes), SAMPLE_PER_SIDE)}+{min(len(same_no), SAMPLE_PER_SIDE)}, "
           f"spoken {min(len(spoken_no), SAMPLE_PER_SIDE)}+{min(len(spoken_yes), SAMPLE_PER_SIDE)}")
-    print("fill the `label` column with y or n; leave `model_p` alone; do not re-sort before scoring")
+    print(f"next: grant the first labellers (tools/label_admin --qualify EMAIL quote_rendering), then --list {key}")
 
 
 async def _quotes(conn, article_ids: set[str]) -> dict[str, dict]:
@@ -200,14 +195,15 @@ async def _quotes(conn, article_ids: set[str]) -> dict[str, dict]:
             q = c["quote_text"].strip()
             out[renderings.claim_key(str(src["article_id"]), q)] = {
                 "speaker": c.get("speaker") or "", "quote": q,
-                "language": display_name(src["lang"]) or "unknown", "outlet": src["source_name"],
+                "language": display_name(src["lang"]) or "unknown", "code": src["lang"] or "",
+                "outlet": src["source_name"],
             }
     return out
 
 
-def score(path: Path) -> int:
-    """Precision of the SERVED verdict per kind, at the module's crossing points."""
-    rows = [r for r in csv.DictReader(path.open()) if r["label"].strip().lower() in ("y", "n")]
+def gate(rows: list[dict]) -> bool:
+    """Precision of the SERVED verdict per question, at the module's crossing
+    points. `rows`: {"kind": same|spoken, "model_p": float, "label": "y"|"n"}."""
     ok = True
     for kind, served, served_label in (
         ("same", lambda p: p >= renderings.SAME_MIN, "y"),
@@ -215,8 +211,8 @@ def score(path: Path) -> int:
     ):
         mine = [r for r in rows if r["kind"] == kind]
         fired = [r for r in mine if served(float(r["model_p"]))]
-        right = [r for r in fired if r["label"].strip().lower() == served_label]
-        truly = [r for r in mine if r["label"].strip().lower() == served_label]
+        right = [r for r in fired if r["label"] == served_label]
+        truly = [r for r in mine if r["label"] == served_label]
         precision = len(right) / len(fired) if fired else 0.0
         recall = len(right) / len(truly) if truly else 0.0
         verdict = "PASS" if fired and precision >= GATE else "FAIL"
@@ -226,7 +222,44 @@ def score(path: Path) -> int:
               f"precision {precision:.3f}   recall {recall:.3f}   gate {GATE}  {verdict}")
     print("\nGATE PASSED — PRISM_QUOTE_VERDICTS may be turned on for the API" if ok
           else "\ngate not passed — leave PRISM_QUOTE_VERDICTS off on the API")
-    return 0 if ok else 1
+    return ok
+
+
+def labels_from(responses: list[dict]) -> str | None:
+    """One task's label from everyone who answered it: the answer every DEFINITE
+    answer agrees on, or None. Unsure and skip are not votes; a split is not a
+    label (tools/gold_candidates keeps disputes out of gold the same way)."""
+    definite = {("y" if r["selected"] else "n") for r in responses if not r["unsure"] and not r["skipped"]}
+    return definite.pop() if len(definite) == 1 else None
+
+
+async def score(key: str) -> int:
+    engine = _engine(read_only=True)
+    try:
+        async with engine.connect() as conn:
+            rows = (await conn.execute(text(
+                """
+                SELECT t.id, t.payload, r.selected, r.unsure, r.skipped
+                FROM label_tasks t JOIN label_batches b ON b.id = t.batch_id
+                LEFT JOIN label_responses r ON r.task_id = t.id
+                WHERE b.key = :k
+                """), {"k": key})).mappings().all()
+    finally:
+        await engine.dispose()
+    by_task: dict[str, dict] = {}
+    for r in rows:
+        payload = r["payload"] if isinstance(r["payload"], dict) else json.loads(r["payload"])
+        t = by_task.setdefault(str(r["id"]), {"payload": payload, "responses": []})
+        if r["selected"] is not None:
+            sel = r["selected"] if isinstance(r["selected"], list) else json.loads(r["selected"])
+            t["responses"].append({"selected": sel, "unsure": r["unsure"], "skipped": r["skipped"]})
+    labelled = []
+    for t in by_task.values():
+        label = labels_from(t["responses"])
+        if label:
+            labelled.append({"kind": t["payload"]["question"], "model_p": t["payload"]["model_p"], "label": label})
+    print(f"  {len(labelled)} of {len(by_task)} tasks carry an agreed label")
+    return 0 if gate(labelled) else 1
 
 
 def main() -> int:
@@ -234,18 +267,18 @@ def main() -> int:
     ap.add_argument("--judge", action="store_true", help="ask about every card with quotes")
     ap.add_argument("--apply", action="store_true", help="with --judge: write claim_verdicts")
     ap.add_argument("--limit", type=int, default=0, help="with --judge: stop after this many events")
-    ap.add_argument("--export", type=Path, help="write a stratified labelling sheet")
-    ap.add_argument("--score", type=Path, help="score a labelled sheet against the gate")
+    ap.add_argument("--push", metavar="NAME", help="write a stratified quote_rendering batch (unlisted)")
+    ap.add_argument("--score", metavar="KEY", help="score a labelled batch against the gate")
     ap.add_argument("--seed", type=int, default=2026)
     a = ap.parse_args()
     if a.judge:
         asyncio.run(judge(a.limit, a.apply))
         return 0
-    if a.export:
-        asyncio.run(export(a.export, a.seed))
+    if a.push:
+        asyncio.run(push(a.push, a.seed))
         return 0
     if a.score:
-        return score(a.score)
+        return asyncio.run(score(a.score))
     ap.print_help()
     return 2
 

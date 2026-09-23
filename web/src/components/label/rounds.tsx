@@ -20,11 +20,19 @@ export function PracticeFeedback({ task, feedback, onNext }: { task: LabelTask; 
   const expected = new Set(feedback.expected);
   // What the right answer WAS, in the task's own terms: which reports should
   // have been ticked, or whether the article credits the quote to this person.
+  const yes = expected.has(task.id);
+  const rendering = task.rendering;
   const answer = task.claim
-    ? expected.has(task.id)
+    ? yes
       ? `Yes — the article credits these words to ${task.claim.speaker}.`
       : `No — the article does not credit these words to ${task.claim.speaker}.`
-    : (task.candidates ?? []).filter((c) => expected.has(c.id)).map((c) => c.title);
+    : rendering
+      ? rendering.question === "same"
+        ? yes ? "Yes — the same statement, in two languages." : "No — two different things said."
+        : yes
+          ? `Yes — ${rendering.speaker} said it in ${rendering.a.language}.`
+          : `No — ${rendering.a.outlet} translated it.`
+      : (task.candidates ?? []).filter((c) => expected.has(c.id)).map((c) => c.title);
   return (
     <section
       aria-live="polite"

@@ -351,3 +351,43 @@ async def test_two_simultaneous_starts_open_one_attempt():
         assert open_attempts == 1
     finally:
         await _cleanup(uid)
+
+async def test_a_test_built_from_a_labelled_batch_uses_only_what_two_people_agreed():
+    """--from-batch turns a founder-labelled batch into a kind's test. A task one
+    person answered, or two people split on, has no answer to test against."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    import asyncpg
+
+    from tools.label_qualify import batch_items
+    from tools.scratch import _local_url
+
+    key = f"b{uuid.uuid4().hex[:12]}"
+    bid = uuid.uuid4()
+    tasks = {name: uuid.uuid4() for name in ("agreed", "split", "alone")}
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO label_batches (id, key, name, kind, open) VALUES (:i, :k, 'r', 'quote_rendering', true)"),
+                        {"i": bid, "k": key})
+        for pos, (name, tid) in enumerate(tasks.items()):
+            await s.execute(text("INSERT INTO label_tasks (id, batch_id, position, candidates, payload) "
+                                 "VALUES (:i, :b, :p, '[]'::jsonb, CAST(:pl AS jsonb))"),
+                            {"i": tid, "b": bid, "p": pos, "pl": json.dumps({"kind": "quote_rendering", "name": name})})
+        invites = []
+        for n in range(2):
+            iid = uuid.uuid4()
+            invites.append(iid)
+            await s.execute(text("INSERT INTO label_invites (id, token, batch_id, name) VALUES (:i, :t, :b, :n)"),
+                            {"i": iid, "t": uuid.uuid4().hex, "b": bid, "n": f"founder{n}"})
+        votes = {("agreed", 0): True, ("agreed", 1): True, ("split", 0): True, ("split", 1): False, ("alone", 0): True}
+        for (name, who), yes in votes.items():
+            tid = tasks[name]
+            await s.execute(text("INSERT INTO label_responses (id, task_id, invite_id, labeller, selected) "
+                                 "VALUES (:i, :t, :v, 'f', CAST(:sel AS jsonb))"),
+                            {"i": uuid.uuid4(), "t": tid, "v": invites[who], "sel": json.dumps([str(tid)] if yes else [])})
+    c = await asyncpg.connect(_local_url(), timeout=30)
+    try:
+        kind, items = await batch_items(c, key)
+    finally:
+        await c.close()
+    assert kind == "quote_rendering"
+    assert [it["payload"]["name"] for it in items] == ["agreed"] and items[0]["yes"] is True

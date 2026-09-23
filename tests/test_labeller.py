@@ -249,3 +249,26 @@ async def test_an_answer_for_a_task_outside_your_languages_is_refused():
             assert r.status_code == 404
     finally:
         await _cleanup(uid)
+
+
+async def test_a_quote_rendering_task_is_served_in_its_own_shape():
+    """Phase 4: payload tasks name their shape. A quote_rendering task must not
+    come back dressed as a claim, or the page would ask "who said this?" about
+    a question that is "same statement, or a translation?"."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key = f"k{uuid.uuid4().hex[:12]}"
+    bid = uuid.uuid4()
+    payload = {"kind": "quote_rendering", "question": "spoken", "speaker": "S", "story": "t",
+               "a": {"speaker": "S", "quote": "q", "language": "Kannada", "code": "kn", "outlet": "O"}, "b": None}
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO label_batches (id, key, name, kind, open) VALUES (:i, :k, 'r', 'quote_rendering', true)"),
+                        {"i": bid, "k": key})
+        await s.execute(text("INSERT INTO label_tasks (id, batch_id, position, candidates, payload) "
+                             "VALUES (:i, :b, 0, '[]'::jsonb, CAST(:p AS jsonb))"),
+                        {"i": uuid.uuid4(), "b": bid, "p": json.dumps(payload)})
+    async with _client() as c:
+        tok = (await c.post(f"/api/v1/label/{key}/join", json={"name": "founder"})).json()["token"]
+        task = (await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})).json()["task"]
+    assert task["kind"] == "quote_rendering" and task["rendering"]["question"] == "spoken"
+    assert "claim" not in task
