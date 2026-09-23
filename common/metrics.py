@@ -26,11 +26,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common import billing, budget, usage
 
 DAY_IST = "(({col}) AT TIME ZONE 'Asia/Kolkata')::date"
-PAYING = "status IN ('active', 'past_due')"
 # An outlet's median is printed only over this many shared events: a median of
 # one event is an anecdote.
 LAG_MIN_EVENTS = 5
 LAG_MAX = "interval '7 days'"  # a "report" a week after the first is a new story
+# raw_items.relevance: pending | relevant | rejected | duplicate (common/models.py)
+RELEVANT = "relevance = 'relevant'"
 
 
 def window(days: int, today: date | None = None) -> dict[str, date]:
@@ -203,41 +204,53 @@ async def retention(db: AsyncSession, end: date, weeks: int = 8) -> dict[str, An
             "source": f"users + user_days · {_since_label(since)}"}
 
 
+# A subscription that was ever paid has had a paid cycle start
+# (common/razorpay sets current_period_start from Razorpay's current_start and
+# never clears it). A checkout row is written the moment Razorpay opens, before
+# any payment; one abandoned there never gets a cycle (review, 2026-09-23).
+EVER_PAID = "provider <> 'manual' AND current_period_start IS NOT NULL"
+ENDED = f"{EVER_PAID} AND status IN ('cancelled', 'halted', 'expired', 'completed') AND current_period_end IS NOT NULL"
+
+
 async def money(db: AsyncSession, w: dict[str, date], since: date | None) -> dict[str, Any]:
     src = "subscriptions · now"
-    paid = f"{PAYING} AND provider <> 'manual'"
-    subs = (await db.execute(text(f"SELECT plan, price_paise FROM subscriptions WHERE {paid}"))).all()
+    rows = (await db.execute(text(
+        "SELECT plan, price_paise, provider, status, current_period_end FROM subscriptions "
+        "WHERE status IN ('active', 'past_due')"))).all()
+    # "Paying" is the product's own test, billing.entitled — the status alone
+    # would keep a lapsed row until the hourly reconcile catches it.
+    live = [r for r in rows if billing.entitled(r.status, r.current_period_end)]
+    paid = [r for r in live if r.provider != "manual"]
     # A plan's period is billing's own (month | year), not guessed from its name.
     period = {p.plan: p.period for p in (*billing.REGULAR.values(), *billing.OFFER.values())}
     per_plan: dict[str, int] = {}
     mrr_paise = 0.0
-    for plan, price in subs:
-        per_plan[plan] = per_plan.get(plan, 0) + 1
-        mrr_paise += (price or 0) / (12 if period.get(plan) == "year" else 1)
+    for r in paid:
+        per_plan[r.plan] = per_plan.get(r.plan, 0) + 1
+        mrr_paise += (r.price_paise or 0) / (12 if period.get(r.plan) == "year" else 1)
     plans = sorted(per_plan.items(), key=lambda x: -x[1])
-    comp = (await db.execute(text(f"SELECT count(*) FROM subscriptions WHERE {PAYING} AND provider = 'manual'"))).scalar() or 0
-    started = await _count(db, "subscriptions", "created_at", w["start"], w["end"], "provider <> 'manual'")
-    started_before = await _count(db, "subscriptions", "created_at", w["prev_start"], w["prev_end"], "provider <> 'manual'")
-    ended_where = "provider <> 'manual' AND status IN ('cancelled', 'halted', 'expired')"
     funnel = await _usage(db, w, "subscribe", since)
     steps = {"prompt": "Saw the upgrade prompt", "page": "Opened the Plus page", "checkout": "Started checkout", "paid": "Paid"}
     by_step: dict[str, int] = {}
     for r in funnel["split"]:
         stage = r["label"].split(":")[0]
         by_step[stage] = by_step.get(stage, 0) + r["current"]
+    history = "subscriptions · since launch"
     return {
         "key": "money", "title": "Money",
         "rows": [
-            _row("paying", "Paying subscriptions", len(subs), None, src,
-                 note="Paid through Razorpay, active or retrying a charge, today."),
+            _row("paying", "Paying subscriptions", len(paid), None, src,
+                 note="Paid through Razorpay and entitled to Plus today: active, or retrying a charge within the grace days."),
             _row("mrr", "Monthly recurring revenue", round(mrr_paise / 100), None, src, unit="inr",
                  note="Today's paying subscriptions, a yearly price counted as a twelfth a month. "
                       "No history: subscriptions keep no record of past states."),
-            _row("complimentary", "Complimentary", comp, None, src, note="Given by hand; not revenue."),
-            _row("started", "Subscriptions started", started, started_before, "subscriptions · since launch"),
-            _row("ended", "Subscriptions ended", await _count(db, "subscriptions", "updated_at", w["start"], w["end"], ended_where),
-                 await _count(db, "subscriptions", "updated_at", w["prev_start"], w["prev_end"], ended_where),
-                 "subscriptions · since launch", note="Cancelled, halted or expired, by when the row last changed."),
+            _row("complimentary", "Complimentary", len(live) - len(paid), None, src, note="Given by hand; not revenue."),
+            _row("started", "Subscriptions started", await _count(db, "subscriptions", "current_period_start", w["start"], w["end"], EVER_PAID),
+                 await _count(db, "subscriptions", "current_period_start", w["prev_start"], w["prev_end"], EVER_PAID), history,
+                 note="By the day the first paid period began. A checkout left unpaid is not a subscription."),
+            _row("ended", "Subscriptions ended", await _count(db, "subscriptions", "current_period_end", w["start"], w["end"], ENDED),
+                 await _count(db, "subscriptions", "current_period_end", w["prev_start"], w["prev_end"], ENDED), history,
+                 note="Paid subscriptions cancelled, halted, refunded or run out, by the day Plus stopped."),
         ],
         "breakdowns": [
             {"key": "funnel", "title": "The way to paying", "source": f"usage_daily · {_since_label(since)}",
@@ -288,25 +301,28 @@ async def supply(db: AsyncSession, w: dict[str, date]) -> dict[str, Any]:
     return {
         "key": "supply", "title": "Supply",
         "rows": [
-            _row("reports", "Reports taken in", await _count(db, "raw_items", "observed_at", w["start"], w["end"]),
+            _row("reports", "Reports fetched", await _count(db, "raw_items", "observed_at", w["start"], w["end"]),
                  await _count(db, "raw_items", "observed_at", w["prev_start"], w["prev_end"]), src,
-                 series=await _daily_count(db, w, "raw_items", "observed_at")),
+                 series=await _daily_count(db, w, "raw_items", "observed_at"),
+                 note="Everything the collectors fetched, before relevance and duplicates are filtered."),
+            _row("relevant", "…kept as relevant", await _count(db, "raw_items", "observed_at", w["start"], w["end"], RELEVANT),
+                 await _count(db, "raw_items", "observed_at", w["prev_start"], w["prev_end"], RELEVANT), src),
             _row("events", "Stories formed", await _count(db, "events", "created_at", w["start"], w["end"]),
                  await _count(db, "events", "created_at", w["prev_start"], w["prev_end"]), src,
                  series=await _daily_count(db, w, "events", "created_at")),
             _row("corroborated", "…reported by two outlets or more",
                  await _count(db, "events", "created_at", w["start"], w["end"], corroborated),
                  await _count(db, "events", "created_at", w["prev_start"], w["prev_end"], corroborated), src),
-            _row("outlets", "Outlets that reported",
-                 (await db.execute(text(f"SELECT count(DISTINCT source_id) FROM raw_items WHERE "
+            _row("outlets", "Outlets with a relevant report",
+                 (await db.execute(text(f"SELECT count(DISTINCT source_id) FROM raw_items WHERE {RELEVANT} AND "
                                         f"{DAY_IST.format(col='observed_at')} BETWEEN :a AND :b"),
                                    {"a": w["start"], "b": w["end"]})).scalar() or 0, None, src),
             _row("llm_balance", "LLM balance", round(bal["balance"], 2) if bal else None, None, bal_src, unit="usd"),
             _row("last_report", "Last report taken in", last.isoformat() if last else None, None, "raw_items", unit="time"),
         ],
         "breakdowns": [
-            {"key": "report_languages", "title": "Reports by language", "source": src,
-             "rows": await _split(db, f"SELECT language, count(*) FROM raw_items WHERE "
+            {"key": "report_languages", "title": "Relevant reports, by language", "source": src,
+             "rows": await _split(db, f"SELECT language, count(*) FROM raw_items WHERE {RELEVANT} AND "
                                       f"{DAY_IST.format(col='observed_at')} BETWEEN :a AND :b GROUP BY 1 ORDER BY 2 DESC",
                                   {"a": w["start"], "b": w["end"]})},
         ],
@@ -328,11 +344,16 @@ async def reporting_lag(db: AsyncSession, w: dict[str, date]) -> dict[str, Any]:
             JOIN raw_items ri ON ri.id = ar.raw_item_id JOIN events e ON e.id = m.event_id
             WHERE ri.published_at IS NOT NULL AND {DAY_IST.format(col='e.created_at')} BETWEEN :a AND :b
             GROUP BY m.event_id, ri.source_id),
-        f AS (SELECT event_id, min(t) AS first FROM a GROUP BY event_id HAVING count(*) >= 2)
-        SELECT s.name AS outlet, count(*) AS stories, count(*) FILTER (WHERE a.t = f.first) AS first,
-               percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM a.t - f.first) / 3600.0) AS median_hours
-        FROM a JOIN f USING (event_id) JOIN sources s ON s.id = a.source_id
-        WHERE a.t - f.first <= {LAG_MAX}
+        f AS (SELECT event_id, min(t) AS first FROM a GROUP BY event_id),
+        -- The window FIRST, then "two outlets": a story whose only other report
+        -- came three weeks later is not shared, and its lone early outlet must
+        -- not be credited as first on it (review, 2026-09-23 — reproduced).
+        k AS (SELECT a.event_id, a.source_id, a.t, f.first FROM a JOIN f USING (event_id)
+              WHERE a.t - f.first <= {LAG_MAX}),
+        shared AS (SELECT event_id FROM k GROUP BY event_id HAVING count(*) >= 2)
+        SELECT s.name AS outlet, count(*) AS stories, count(*) FILTER (WHERE k.t = k.first) AS first,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM k.t - k.first) / 3600.0) AS median_hours
+        FROM k JOIN shared USING (event_id) JOIN sources s ON s.id = k.source_id
         GROUP BY s.name HAVING count(*) >= :n
         ORDER BY median_hours, stories DESC LIMIT 25
         """), {"a": w["start"], "b": w["end"], "n": LAG_MIN_EVENTS})).mappings().all()
@@ -367,32 +388,48 @@ WEEKLY_COLUMNS = ("week_start", "visitor_days", "page_views", "arrivals", "share
 
 async def weekly(db: AsyncSession, weeks: int, today: date | None = None) -> list[dict[str, Any]]:
     """The CSV for investors: one row per IST week (Monday start), counts only.
-    usage columns are empty (not 0) for weeks before counting began."""
+    usage columns are empty (not 0) for weeks before counting began.
+
+    One grouped query per source, not one per week: a two-year export was ~800
+    round trips of sequential scans (review, 2026-09-23)."""
     end = today or usage.today()
-    this_monday = end - timedelta(days=end.weekday())
+    first = end - timedelta(days=end.weekday()) - timedelta(weeks=weeks - 1)
+    last = first + timedelta(weeks=weeks) - timedelta(days=1)
+    week = "date_trunc('week', {d})::date"
+    rng = {"a": first, "b": last}
+
     since = (await db.execute(text("SELECT min(day) FROM usage_daily"))).scalar()
     since_active = (await db.execute(text("SELECT min(day) FROM user_days"))).scalar()
+    used: dict[tuple[date, str], int] = {
+        (r[0], r[1]): int(r[2]) for r in (await db.execute(text(
+            f"SELECT {week.format(d='day')}, event, sum(count) FROM usage_daily WHERE day BETWEEN :a AND :b GROUP BY 1, 2"),
+            rng)).all()}
+    active = dict((await db.execute(text(
+        f"SELECT {week.format(d='day')}, count(DISTINCT user_id) FROM user_days WHERE day BETWEEN :a AND :b GROUP BY 1"),
+        rng)).all())
+
+    async def per_week(table: str, col: str, where: str = "TRUE") -> dict[date, int]:
+        day = DAY_IST.format(col=col)
+        return dict((await db.execute(text(
+            f"SELECT {week.format(d=day)}, count(*) FROM {table} WHERE {where} AND {day} BETWEEN :a AND :b GROUP BY 1"),
+            rng)).all())
+
+    accounts = await per_week("users", "created_at")
+    questions = await per_week("agent_messages", "created_at", "role = 'user'")
+    started = await per_week("subscriptions", "current_period_start", EVER_PAID)
     out = []
-    for i in range(weeks - 1, -1, -1):
-        a = this_monday - timedelta(weeks=i)
-        b = a + timedelta(days=6)
+    for i in range(weeks):
+        a = first + timedelta(weeks=i)
+        counted = since is not None and a + timedelta(days=6) >= since
 
-        async def used(event: str, a: date = a, b: date = b) -> int | None:
-            if since is None or b < since:
-                return None
-            return (await db.execute(text("SELECT coalesce(sum(count), 0)::bigint FROM usage_daily WHERE event = :e "
-                                          "AND day BETWEEN :a AND :b"), {"e": event, "a": a, "b": b})).scalar()
+        def u(event: str, a: date = a, counted: bool = counted) -> int | None:
+            return used.get((a, event), 0) if counted else None
 
-        active = None
-        if since_active is not None and b >= since_active:
-            active = (await db.execute(text("SELECT count(DISTINCT user_id) FROM user_days WHERE day BETWEEN :a AND :b"),
-                                       {"a": a, "b": b})).scalar()
         out.append({
-            "week_start": a.isoformat(), "visitor_days": await used("visitors"), "page_views": await used("view"),
-            "arrivals": await used("arrival"), "shares": await used("share"),
-            "new_accounts": await _count(db, "users", "created_at", a, b), "active_accounts": active,
-            "questions": await _count(db, "agent_messages", "created_at", a, b, "role = 'user'"),
-            "hit_question_limit": await used("ask_limit"),
-            "subscriptions_started": await _count(db, "subscriptions", "created_at", a, b, "provider <> 'manual'"),
+            "week_start": a.isoformat(), "visitor_days": u("visitors"), "page_views": u("view"),
+            "arrivals": u("arrival"), "shares": u("share"), "new_accounts": accounts.get(a, 0),
+            "active_accounts": active.get(a, 0) if since_active is not None and a + timedelta(days=6) >= since_active else None,
+            "questions": questions.get(a, 0), "hit_question_limit": u("ask_limit"),
+            "subscriptions_started": started.get(a, 0),
         })
     return out

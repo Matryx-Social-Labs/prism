@@ -12,7 +12,7 @@ only a founder can read any of it.
 import csv
 import io
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -116,14 +116,18 @@ async def test_revenue_counts_a_year_as_twelve_months_and_leaves_gifts_out(seede
     async with session_scope() as s:
         before = await metrics.money(s, metrics.window(28, TODAY), since=None)
         u = seeded["users"]
-        for uid, plan, status, price, provider in [
-            (u[0], "plus_yearly", "active", 119900, "razorpay"),
-            (u[1], "plus_monthly", "past_due", 14900, "razorpay"),
-            (u[2], "plus_monthly", "active", 14900, "manual"),
+        soon = datetime.now(UTC) + timedelta(days=5)
+        lapsed = datetime.now(UTC) - timedelta(days=30)
+        for uid, plan, status, price, provider, period_end in [
+            (u[0], "plus_yearly", "active", 119900, "razorpay", soon),
+            (u[1], "plus_monthly", "past_due", 14900, "razorpay", soon),
+            (u[2], "plus_monthly", "active", 14900, "manual", soon),
+            # "active" in the row, but its paid time ran out a month ago: not paying.
+            (u[2], "plus_monthly", "active", 14900, "razorpay", lapsed),
         ]:
-            await s.execute(text("INSERT INTO subscriptions (id, user_id, provider, plan, status, price_paise) "
-                                 "VALUES (:i, :u, :p, :pl, :st, :pr)"),
-                            {"i": uuid.uuid4(), "u": uid, "p": provider, "pl": plan, "st": status, "pr": price})
+            await s.execute(text("INSERT INTO subscriptions (id, user_id, provider, plan, status, price_paise, current_period_end) "
+                                 "VALUES (:i, :u, :p, :pl, :st, :pr, :e)"),
+                            {"i": uuid.uuid4(), "u": uid, "p": provider, "pl": plan, "st": status, "pr": price, "e": period_end})
         await s.flush()
         after = await metrics.money(s, metrics.window(28, TODAY), since=None)
     assert _row(after, "paying")["current"] - _row(before, "paying")["current"] == 2
@@ -133,20 +137,54 @@ async def test_revenue_counts_a_year_as_twelve_months_and_leaves_gifts_out(seede
     assert _row(after, "complimentary")["current"] - _row(before, "complimentary")["current"] == 1
 
 
+async def test_a_subscription_starts_when_it_is_paid_and_ends_when_plus_stops(seeded):
+    """An abandoned checkout is a row with no paid cycle and must not count as
+    a start; an end is the day Plus stopped, which a duplicate webhook touching
+    the row later does not move (review, 2026-09-23: CRITICAL and HIGH)."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    u = seeded["users"]
+    w = metrics.window(28, TODAY)
+    async with session_scope() as s:
+        for uid, status, begun, ended in [
+            (u[0], "created", None, None),                                # checkout opened, never paid
+            (u[1], "active", _at(date(2031, 1, 10)), _at(date(2031, 2, 10))),  # paid in the period
+            (u[2], "cancelled", _at(date(2030, 11, 1)), _at(date(2031, 1, 20))),  # paid before, stopped in the period
+        ]:
+            # Every row was CREATED inside the period — the checkout opening — so
+            # only the paid-cycle test separates a start from an abandoned cart.
+            await s.execute(text("INSERT INTO subscriptions (id, user_id, provider, plan, status, price_paise, "
+                                 "current_period_start, current_period_end, created_at, updated_at) "
+                                 "VALUES (:i, :u, 'razorpay', 'plus_monthly', :st, 14900, :b, :e, :c, now())"),
+                            {"i": uuid.uuid4(), "u": uid, "st": status, "b": begun, "e": ended, "c": _at(date(2031, 1, 12))})
+        await s.flush()
+        money = await metrics.money(s, w, since=None)
+        # A duplicate webhook weeks later re-touches the ended row.
+        await s.execute(text("UPDATE subscriptions SET updated_at = :t WHERE user_id = :u"), {"t": _at(TODAY), "u": u[2]})
+        again = await metrics.money(s, w, since=None)
+        weeks = await metrics.weekly(s, 5, TODAY)
+    assert _row(money, "started")["current"] == 1
+    assert _row(money, "ended")["current"] == 1 and _row(again, "ended")["current"] == 1
+    assert sum(r["subscriptions_started"] for r in weeks) == 1
+    assert next(r for r in weeks if r["week_start"] == "2031-01-06")["new_accounts"] == 1
+
+
 async def test_who_reports_first_is_measured_by_the_outlets_own_clocks(monkeypatch):
     if not await _db_reachable():
         pytest.skip("no database")
     monkeypatch.setattr(metrics, "LAG_MIN_EVENTS", 2)
     tag = uuid.uuid4().hex[:8]
     first, late = uuid.uuid4(), uuid.uuid4()
-    events = [uuid.uuid4(), uuid.uuid4()]
+    events = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
     t0 = _at(date(2031, 1, 20), 9)
     try:
         async with session_scope() as s:
             for src, name in ((first, f"First {tag}"), (late, f"Late {tag}")):
                 await s.execute(text("INSERT INTO sources (id, slug, name, source_type, publisher, country, language) "
                                      "VALUES (:i, :s, :n, 'rss', :s, 'IN', 'en')"), {"i": src, "s": f"lag-{src.hex[:10]}", "n": name})
-            for ev, hours_late in zip(events, (2, 4), strict=True):
+            # The third story's other report came three weeks later: a new story,
+            # so neither outlet shared it and "First" must not be credited with it.
+            for ev, hours_late in zip(events, (2, 4, 21 * 24), strict=True):
                 await s.execute(text("INSERT INTO events (id, title, summary, last_updated_at, created_at) "
                                      "VALUES (:e, 't', 's', now(), :c)"), {"e": ev, "c": t0})
                 for src, at in ((first, t0), (late, t0 + timedelta(hours=hours_late))):
@@ -162,6 +200,7 @@ async def test_who_reports_first_is_measured_by_the_outlets_own_clocks(monkeypat
             lag = await metrics.reporting_lag(s, metrics.window(28, TODAY))
         mine = {r["outlet"]: r for r in lag["rows"] if tag in r["outlet"]}
         assert mine[f"First {tag}"]["median_hours"] == 0.0 and mine[f"First {tag}"]["first"] == 2
+        assert mine[f"First {tag}"]["stories"] == 2 and mine[f"Late {tag}"]["stories"] == 2
         assert mine[f"Late {tag}"]["median_hours"] == 3.0 and mine[f"Late {tag}"]["first"] == 0
         assert list(mine) == [f"First {tag}", f"Late {tag}"], "the first to report is listed first"
     finally:

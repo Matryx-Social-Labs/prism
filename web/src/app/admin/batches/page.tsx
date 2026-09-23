@@ -80,7 +80,9 @@ export default function BatchesPage() {
                   <p className="mt-0.5 text-[14px]" style={{ color: "var(--ink-2)" }}>
                     {KIND_QUESTION[b.kind] ?? b.kind} · {b.open ? "Open" : "Closed"}
                     {b.listed && " · On the labeller dashboard"}
-                    {b.self_join && " · Anyone with the link can join"}
+                    {/* api/routes/label.join refuses a listed batch and any round,
+                        whatever self_join says: only say what is true. */}
+                    {b.self_join && !b.listed && b.purpose === "work" && " · Anyone with the link can join"}
                   </p>
                   <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
                     {b.key} · {b.answered_tasks} OF {b.tasks} ANSWERED · {b.responses} ANSWERS · {b.people} PEOPLE ·{" "}

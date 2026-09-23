@@ -110,12 +110,20 @@ export function LedgerSection({ section, start }: { section: MetricSection; star
       <h2 id={`ledger-${section.key}`} className="text-[21px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
         {section.title}
       </h2>
-      <table className="mt-3 w-full border-collapse text-left">
+      {/* Fixed columns, the same in every section, so the figures of the whole
+          page line up in one column — a ledger, not six tables. */}
+      <table className="mt-3 w-full table-fixed border-collapse text-left">
+        <colgroup>
+          <col />
+          <col className="w-[7.5rem]" />
+          <col className="hidden w-[7.5rem] sm:table-column" />
+          <col className="hidden w-[196px] md:table-column" />
+        </colgroup>
         <thead>
           <tr className="text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
             <th scope="col" className="py-2 pr-4 font-semibold">Measure</th>
             <th scope="col" className="py-2 pr-4 text-right font-semibold">This period</th>
-            <th scope="col" className="hidden py-2 pr-4 text-right font-semibold sm:table-cell">The one before</th>
+            <th scope="col" className="hidden py-2 pr-4 text-right font-semibold sm:table-cell">Before</th>
             <th scope="col" className="hidden py-2 font-semibold md:table-cell">By day</th>
           </tr>
         </thead>

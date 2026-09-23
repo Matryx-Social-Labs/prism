@@ -92,8 +92,13 @@ async def trigger(actor: str = Depends(require_admin_user), db: AsyncSession = D
     """The same signal as the token-guarded /admin/pipeline/run, from a founder's
     account and recorded against them. The worker still decides: with
     collection switched off it does nothing."""
-    await stream.publish(stream.ADMIN_TRIGGERS, {"requested_by": actor})
+    # Record first, commit, then publish. The worker is in Redis and the record
+    # in Postgres, so the two cannot share a transaction; this order means a
+    # failure can leave a record of a request that did not go out, never a run
+    # nobody recorded (review, 2026-09-23).
     await audit(db, actor, "pipeline.run", "ingestion")
+    await db.commit()
+    await stream.publish(stream.ADMIN_TRIGGERS, {"requested_by": actor})
     logger.info("admin_trigger_published", actor=actor)
     return {"status": "the worker will collect on its next read of the queue",
             "collecting": get_settings().prism_ingestion_enabled}

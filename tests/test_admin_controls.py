@@ -85,6 +85,19 @@ async def test_people_flags_and_trigger_are_a_founders_alone(monkeypatch):
             actors = (await s.execute(text("SELECT actor FROM admin_audit WHERE action = 'pipeline.run' AND actor = :a"),
                                       {"a": f"founder-{tag}@example.test"})).scalars().all()
         assert actors == [f"founder-{tag}@example.test"]
+
+        # Redis refusing the publish must still leave the record: a request
+        # nobody saw go out is recoverable, a run nobody recorded is not.
+        async def down(topic, message):
+            raise ConnectionError("redis is away")
+
+        monkeypatch.setattr(admin_controls.stream, "publish", down)
+        async with AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://t") as c:
+            assert (await c.post("/api/v1/admin/pipeline/trigger", headers={"Authorization": f"Bearer {fb}"})).status_code == 500
+        async with session_scope() as s:
+            n = (await s.execute(text("SELECT count(*) FROM admin_audit WHERE action = 'pipeline.run' AND actor = :a"),
+                                 {"a": f"founder-{tag}@example.test"})).scalar()
+        assert n == 2
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM admin_audit WHERE actor = :a"), {"a": f"founder-{tag}@example.test"})

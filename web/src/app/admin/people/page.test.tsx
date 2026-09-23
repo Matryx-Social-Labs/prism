@@ -33,6 +33,12 @@ describe("people", () => {
     expect(screen.getByRole("heading", { name: "Accounts · 2" })).toBeInTheDocument();
   });
 
+  it("never prints a total above rows that are not all there", async () => {
+    fetchPeople.mockResolvedValue({ total: 812, active_window_days: 28, people: [person({ email: "one@example.test" })] });
+    render(<PeoplePage />);
+    expect(await screen.findByRole("heading", { name: "Accounts · newest 1 of 812" })).toBeInTheDocument();
+  });
+
   it("marks a given plan as given, not as revenue", async () => {
     render(<PeoplePage />);
     const row = within((await screen.findByText("gift@example.test")).closest("tr")!);
