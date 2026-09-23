@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   KIND_QUESTION,
   LEARNABLE,
+  READS_GUIDES,
   applyAsLabeller,
   fetchLabellerBatches,
   fetchLabellerMe,
@@ -165,8 +166,11 @@ export default function LabellerWorkspace() {
         </Section>
       )}
 
-      {/* Readable by anyone, approved or not: the guide is the first thing a
-          labeller should meet, and waiting for approval is a good time to. */}
+      {/* For anyone who has applied, approved or not — waiting for approval is
+          a good time to read them — and for nobody else: the guides are how we
+          judge the work, so a stranger does not get them (founder, 2026-09-23;
+          the API enforces the same rule, this only stops offering the links). */}
+      {me && READS_GUIDES.includes(me.status) && (
       <Section title="Learn the tasks">
         <ul>
           {LEARNABLE.map((kind) => (
@@ -178,6 +182,12 @@ export default function LabellerWorkspace() {
           ))}
         </ul>
       </Section>
+      )}
+      {session && me?.status === "none" && (
+        <p className="mt-10 text-[14px]" style={{ color: "var(--ink-2)" }}>
+          A short guide to each kind of task opens once you have applied.
+        </p>
+      )}
     </Shell>
   );
 }

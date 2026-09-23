@@ -111,7 +111,26 @@ describe("the labeller workspace", () => {
     expect(fetchLabellerBatches).not.toHaveBeenCalled();
   });
 
-  it("lets anyone read how each task works, before applying or being approved", async () => {
+  it("offers a stranger the pitch and a sign-in, and no guides", async () => {
+    // The guides are how the work is judged; they are for people who have
+    // applied (founder, 2026-09-23). The API refuses anyone else too.
+    render(<LabellerWorkspace />);
+    await screen.findByRole("link", { name: "Sign in to apply" });
+    expect(screen.queryByRole("heading", { name: "Learn the tasks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Who said this?" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the guides from a signed-in reader until they apply", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchLabellerMe.mockResolvedValue(me("none"));
+    render(<LabellerWorkspace />);
+    expect(await screen.findByText(/opens once you have applied/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Who said this?" })).not.toBeInTheDocument();
+  });
+
+  it("lets an applicant read how each task works while they wait", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchLabellerMe.mockResolvedValue(me("applied", ["en"]));
     render(<LabellerWorkspace />);
     const link = await screen.findByRole("link", { name: "Who said this?" });
     expect(link).toHaveAttribute("href", "/label/learn/claim_attribution");

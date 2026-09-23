@@ -53,6 +53,7 @@ from api.routes.labeller import (
     languages_for_invite,
     recheck,
 )
+from common import label_guides
 from common.db import get_db
 
 router = APIRouter()
@@ -170,6 +171,26 @@ async def join(key: str, body: Join, db: AsyncSession = Depends(get_db)):
          "n": body.name.strip()[:MAX_LABELLER] or None},
     )
     return {"token": token}
+
+
+@router.get("/api/v1/label/{key}/guide")
+async def batch_guide(
+    key: str,
+    token: str = Header("", alias="X-Label-Token"),
+    db: AsyncSession = Depends(get_db),
+):
+    """The guide for this batch's kind, to someone holding one of its invites —
+    a founder's link included — and to nobody else (common/label_guides). An
+    account's invite reads it only while the account is an active labeller."""
+    b = await _batch(db, key)
+    if not token:
+        raise HTTPException(status_code=403, detail="open this batch from its link or your workspace")
+    inv = await _invite(db, b["id"], token)
+    await languages_for_invite(db, inv["user_id"])
+    g = label_guides.guide(b["kind"])
+    if g is None:
+        raise HTTPException(status_code=404, detail="this task has no guide")
+    return g
 
 
 @router.get("/api/v1/label/{key}")

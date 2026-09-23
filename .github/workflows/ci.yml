@@ -137,6 +137,12 @@ jobs:
           NEXT_PUBLIC_API_URL: 'http://localhost:8000'
         run: npm run build
 
+      - name: No labelling guide in the public bundle
+        # The guides are served by the API to applicants and a batch's own
+        # invites only (common/label_guides.py); a sentence of one in
+        # .next/static would hand them to anyone who opens the site.
+        run: npm run check:guides
+
   vouched:
     # The commit on main must already carry green backend + web checks — the
     # ones its run on dev produced. The ruleset on main enforces the same

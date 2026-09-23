@@ -2,33 +2,94 @@
 
 /**
  * One task kind, taught: what it asks, DO / DO NOT, and worked examples — the
- * same guide a labeller meets before a batch, readable before anyone is
- * approved or has a batch to open (labeller workspace plan, phase 2).
+ * same guide a labeller meets before a batch, readable at leisure.
  *
- * The first round shipped its guidance collapsed and the two labellers came
- * back with opposite systematic biases, "because nothing made them" read it.
- * This page is where it can be read at leisure; phase 3 is what makes it count.
+ * Behind sign-in and an application (founder, 2026-09-23; decision G1): the
+ * guide is fetched from the API for an account that has applied, and nobody
+ * else receives it — not even in the page's JavaScript. A stranger is asked
+ * to sign in; a signed-in reader who has not applied is sent to apply.
  */
 
+import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 
-import { ClaimGuide, Guide, Primer } from "@/components/label/guides";
-import { LEARNABLE } from "@/lib/labeller";
+import { GuidePrimer } from "@/components/label/GuideView";
+import type { LabelGuide } from "@/lib/api";
+import { LEARNABLE, fetchGuide } from "@/lib/labeller";
+import { useSession } from "@/lib/session";
+
+type State = "loading" | "signed-out" | "apply" | "error" | "ok";
 
 export default function LearnTask({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = use(params);
   const router = useRouter();
+  const session = useSession();
+  // useSession reads storage in an effect, so its first value is null for everyone.
+  const [mounted, setMounted] = useState(false);
+  const [state, setState] = useState<State>("loading");
+  const [guide, setGuide] = useState<LabelGuide | null>(null);
+
+  useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (!session) {
+      setState("signed-out");
+      return;
+    }
+    let live = true;
+    fetchGuide(session, kind)
+      .then((g) => {
+        if (!live) return;
+        setGuide(g);
+        setState("ok");
+      })
+      .catch((e: unknown) => {
+        if (!live) return;
+        const status = (e as { status?: number }).status;
+        setState(status === 401 ? "signed-out" : status === 403 ? "apply" : "error");
+      });
+    return () => {
+      live = false;
+    };
+  }, [mounted, session, kind]);
+
   if (!LEARNABLE.includes(kind)) notFound();
-  // Story and claim primers carry their DO / DO NOT and real mistakes; their
-  // invented worked examples live in the "How to decide" guide the task page
-  // shows beside each task, opened here. The other two primers already hold theirs.
-  const more = kind === "story_boundary" ? <Guide open /> : kind === "claim_attribution" ? <ClaimGuide open /> : null;
   return (
     <main className="mx-auto min-h-dvh w-full max-w-[720px] px-5 pb-24 pt-6 sm:px-8">
-      <Primer kind={kind} onStart={() => router.push("/label")} action="Back to your workspace">
-        {more}
-      </Primer>
+      {state === "ok" && guide && (
+        <GuidePrimer guide={guide} onStart={() => router.push("/label")} action="Back to your workspace" />
+      )}
+      {state === "signed-out" && (
+        <Gate text="The guides are for people who label for Prism. Sign in to read them.">
+          <Link href={`/signin?next=/label/learn/${kind}`} className="btn btn-primary mt-6">
+            Sign in
+          </Link>
+        </Gate>
+      )}
+      {state === "apply" && (
+        <Gate text="The guides open once you have applied to label.">
+          <Link href="/label" className="btn btn-primary mt-6">
+            Apply to label
+          </Link>
+        </Gate>
+      )}
+      {state === "error" && <Gate text="The guide could not be loaded. Reload to try again." />}
     </main>
+  );
+}
+
+function Gate({ text, children }: { text: string; children?: React.ReactNode }) {
+  return (
+    <div className="mt-10">
+      <h1 className="text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+        Label for Prism
+      </h1>
+      <p className="mt-3 text-[15px]" style={{ color: "var(--ink-2)" }}>
+        {text}
+      </p>
+      {children}
+    </div>
   );
 }

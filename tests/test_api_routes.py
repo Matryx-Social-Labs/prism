@@ -80,6 +80,9 @@ EXPECTED = {
     # Practice and the qualification test for a task kind (phase 3).
     ("POST", "/api/v1/labeller/practice/{kind}/start"),
     ("POST", "/api/v1/labeller/qualify/{kind}/start"),
+    # Guides, served only to applicants and to a batch's own invites (plan: guides behind sign-in).
+    ("GET", "/api/v1/labeller/guides/{kind}"),
+    ("GET", "/api/v1/label/{key}/guide"),
 }
 
 

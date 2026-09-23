@@ -6,7 +6,7 @@
 // the task page already looks for one — so from Start onward the task page is
 // unchanged.
 
-import { API_URL } from "@/lib/api";
+import { API_URL, type LabelGuide } from "@/lib/api";
 import { authHeader, type Session } from "@/lib/session";
 
 export type LabellerStatus = "none" | "applied" | "active" | "paused" | "removed";
@@ -74,12 +74,21 @@ async function call<T>(session: Session, path: string, init?: RequestInit): Prom
     } catch {
       /* keep the generic message */
     }
-    throw new Error(message);
+    // The status travels with the message: the guide page tells "sign in"
+    // (401) from "apply first" (403) from "no such task" (404).
+    throw Object.assign(new Error(message), { status: res.status });
   }
   return (await res.json()) as T;
 }
 
 export const fetchLabellerMe = (s: Session) => call<LabellerMe>(s, "/api/v1/labeller/me");
+
+/** A task's guide, for an account that has applied (api/routes/labeller.read_guide). */
+export const fetchGuide = (s: Session, kind: string) =>
+  call<LabelGuide>(s, `/api/v1/labeller/guides/${encodeURIComponent(kind)}`);
+
+/** Who may read the guides: anyone who has applied (founder decision G1). */
+export const READS_GUIDES: readonly LabellerStatus[] = ["applied", "active", "paused"];
 
 export const applyAsLabeller = (s: Session, languages_read: string[], note: string) =>
   call<{ status: LabellerStatus; languages_read: string[] }>(s, "/api/v1/labeller/apply", {
