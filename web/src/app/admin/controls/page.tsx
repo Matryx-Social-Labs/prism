@@ -6,6 +6,10 @@
  * setting them would move them out of the environment and change how a bad
  * change is rolled back. The values are this API's own view; the worker reads
  * its own environment, which is how a feature runs in shadow there first.
+ *
+ * Each switch is a state row (admin charts, phase 5): ON on a solid rule, OFF
+ * on a dashed one — line form, a word beside it, and nothing that looks like
+ * it could be flipped. Numbers are listed apart from the switches.
  */
 
 import { useEffect, useState } from "react";
@@ -27,6 +31,8 @@ export default function ControlsPage() {
   }, [session]);
 
   const collecting = flags?.find((f) => f.name === "PRISM_INGESTION_ENABLED")?.value;
+  const switches = flags?.filter((f) => typeof f.value === "boolean") ?? [];
+  const numbers = flags?.filter((f) => typeof f.value === "number") ?? [];
 
   const collect = async () => {
     if (!window.confirm("Ask the worker to collect new reports now? It is recorded against you.")) return;
@@ -65,24 +71,52 @@ export default function ControlsPage() {
         )}
       </AdminSection>
 
-      <AdminSection title="Switches">
+      <AdminSection title={switches.length ? `Switches · ${switches.filter((f) => f.value).length} of ${switches.length} on` : "Switches"}>
         <p className="mb-3 text-[14px]" style={{ color: "var(--ink-2)" }}>
           As the API sees them. They are changed in Railway&apos;s environment, not here; the worker has its own copy.
         </p>
-        <ul>
-          {flags?.map((f) => (
-            <li key={f.name} className="flex items-baseline justify-between gap-4 border-t py-2.5" style={{ borderColor: "var(--line)" }}>
-              <span>
-                <span className="block text-[15px]" style={{ color: "var(--ink)" }}>{f.does}</span>
-                <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{f.name}</span>
+        <ul className="grid gap-x-6 sm:grid-cols-2">
+          {switches.map((f) => (
+            <FlagRow key={f.name} f={f}>
+              <span
+                className="inline-flex h-6 min-w-[3.25rem] items-center justify-center rounded-[var(--r-sm)] px-2 font-mono text-[12px] font-semibold"
+                style={{
+                  border: f.value ? "1.5px solid var(--ink)" : "1.5px dashed var(--line-strong)",
+                  color: f.value ? "var(--ink)" : "var(--ink-3)",
+                }}
+              >
+                {f.value ? "ON" : "OFF"}
               </span>
-              <span className="font-mono text-[14px] tabular-nums" style={{ color: "var(--ink)" }}>
-                {typeof f.value === "boolean" ? (f.value ? "ON" : "OFF") : f.value}
-              </span>
-            </li>
+            </FlagRow>
           ))}
         </ul>
       </AdminSection>
+
+      {numbers.length > 0 && (
+        <AdminSection title="Limits">
+          <ul className="grid gap-x-6 sm:grid-cols-2">
+            {numbers.map((f) => (
+              <FlagRow key={f.name} f={f}>
+                <span className="font-mono text-[14px] tabular-nums" style={{ color: "var(--ink)" }}>
+                  {f.value.toLocaleString("en-IN")}
+                </span>
+              </FlagRow>
+            ))}
+          </ul>
+        </AdminSection>
+      )}
     </>
+  );
+}
+
+function FlagRow({ f, children }: { f: Flag; children: React.ReactNode }) {
+  return (
+    <li className="flex items-center justify-between gap-4 border-t py-2.5" style={{ borderColor: "var(--line)" }}>
+      <span>
+        <span className="block text-[15px]" style={{ color: "var(--ink)" }}>{f.does}</span>
+        <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{f.name}</span>
+      </span>
+      {children}
+    </li>
   );
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import PeoplePage from "@/app/admin/people/page";
 
@@ -10,14 +11,14 @@ vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/ad
 
 const person = (over: Record<string, unknown>) => ({
   email: "a@example.test", name: null, profession: null, languages: [], state: null, created_at: "2026-09-20T10:00:00Z",
-  plan: null, plan_status: null, provider: null, active_days: 0, last_active: null, labeller: null, ...over,
+  plan: null, plan_status: null, provider: null, active_days: 0, active_on: [], last_active: null, labeller: null, ...over,
 });
 
 beforeEach(() => {
   fetchPeople.mockReset().mockResolvedValue({
-    total: 2, active_window_days: 28,
+    total: 2, active_window_days: 28, window_start: "2026-08-27",
     people: [
-      person({ email: "paid@example.test", name: "Asha", profession: "journalist", languages: ["kn"], plan: "plus_monthly", plan_status: "active", provider: "razorpay", active_days: 5, last_active: "2026-09-23", labeller: "active" }),
+      person({ email: "paid@example.test", name: "Asha", profession: "journalist", languages: ["kn"], plan: "plus_monthly", plan_status: "active", provider: "razorpay", active_days: 2, active_on: ["2026-09-20", "2026-09-23"], last_active: "2026-09-23", labeller: "active" }),
       person({ email: "gift@example.test", plan: "plus_yearly", plan_status: "active", provider: "manual" }),
     ],
   });
@@ -34,7 +35,7 @@ describe("people", () => {
   });
 
   it("never prints a total above rows that are not all there", async () => {
-    fetchPeople.mockResolvedValue({ total: 812, active_window_days: 28, people: [person({ email: "one@example.test" })] });
+    fetchPeople.mockResolvedValue({ total: 812, active_window_days: 28, window_start: "2026-08-27", people: [person({ email: "one@example.test" })] });
     render(<PeoplePage />);
     expect(await screen.findByRole("heading", { name: "Accounts · newest 1 of 812" })).toBeInTheDocument();
   });
@@ -44,5 +45,40 @@ describe("people", () => {
     const row = within((await screen.findByText("gift@example.test")).closest("tr")!);
     expect(row.getByText("plus yearly · active · given")).toBeInTheDocument();
     expect(row.getByText("Nothing told us yet")).toBeInTheDocument();
+  });
+
+  it("draws each day of the window, marking only the days they were active", async () => {
+    render(<PeoplePage />);
+    const row = within((await screen.findByText("paid@example.test")).closest("tr")!);
+    const strip = row.getByRole("img", { name: "Active on 2 of the last 28 days, last on 23 Sept" });
+    const marks = Array.from(strip.children) as HTMLElement[];
+    expect(marks).toHaveLength(28);
+    expect(marks.filter((m) => m.style.background === "var(--viz-1)")).toHaveLength(2);
+    // 27 Aug + 24 = 20 Sep and + 27 = 23 Sep: the marks sit on those days.
+    expect(marks[24].style.background).toBe("var(--viz-1)");
+    expect(marks[27].style.background).toBe("var(--viz-1)");
+  });
+
+  it("filters by plan and finds an account by what they told us", async () => {
+    render(<PeoplePage />);
+    await screen.findByText("paid@example.test");
+    await userEvent.click(screen.getByRole("tab", { name: /Given/ }));
+    expect(screen.queryByText("paid@example.test")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Accounts · 1 of 2" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /All/ }));
+    await userEvent.type(screen.getByRole("searchbox"), "journalist");
+    expect(screen.getByText("paid@example.test")).toBeInTheDocument();
+    expect(screen.queryByText("gift@example.test")).not.toBeInTheDocument();
+  });
+
+  it("calls a checkout left open or a plan that ended free, and says which plan it was", async () => {
+    fetchPeople.mockResolvedValue({
+      total: 1, active_window_days: 28, window_start: "2026-08-27",
+      people: [person({ email: "left@example.test", plan: "plus_monthly", plan_status: "created", provider: "razorpay" })],
+    });
+    render(<PeoplePage />);
+    const row = within((await screen.findByText("left@example.test")).closest("tr")!);
+    expect(row.getByText("Free")).toBeInTheDocument();
+    expect(row.getByText("plus monthly · created")).toBeInTheDocument();
   });
 });

@@ -231,6 +231,8 @@ export interface Person {
   plan_status: string | null;
   provider: string | null;
   active_days: number;
+  /** The IST days in the window they used Prism signed in, oldest first. */
+  active_on: string[];
   last_active: string | null;
   labeller: string | null;
 }
@@ -242,9 +244,32 @@ export interface Flag {
 }
 
 export const fetchPeople = (s: Session) =>
-  adminCall<{ total: number; active_window_days: number; people: Person[] }>(s, "/api/v1/admin/people?limit=500");
+  adminCall<{ total: number; active_window_days: number; window_start: string; people: Person[] }>(s, "/api/v1/admin/people?limit=500");
 
 export const fetchFlags = (s: Session) => adminCall<{ seen_by: string; flags: Flag[] }>(s, "/api/v1/admin/flags");
 
 export const triggerCollection = (s: Session) =>
   adminCall<{ status: string; collecting: boolean }>(s, "/api/v1/admin/pipeline/trigger", { method: "POST" });
+
+// ── Who covers what with whom (api/routes/admin_metrics.py, common/coverage.py) ──
+
+export interface CoverageOutlet {
+  id: string;
+  name: string;
+  language: string;
+  country: string | null;
+  stories: number;
+  /** Of those, stories at least one other outlet also reported. */
+  shared: number;
+}
+
+export interface Coverage {
+  range: { start: string; end: string };
+  source: string;
+  outlets: CoverageOutlet[];
+  links: Array<{ a: string; b: string; shared: number }>;
+  languages: Array<{ a: string; b: string; stories: number }>;
+  per_language: Array<{ language: string; stories: number }>;
+}
+
+export const fetchCoverage = (s: Session, days: number) => adminCall<Coverage>(s, `/api/v1/admin/coverage?days=${days}`);

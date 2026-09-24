@@ -67,6 +67,7 @@ EXPECTED = {
     # The product's numbers for founders and investors (api/routes/admin_metrics.py).
     ("GET", "/api/v1/admin/metrics"),
     ("GET", "/api/v1/admin/metrics/weekly.csv"),
+    ("GET", "/api/v1/admin/coverage"),
     # People, read-only switches, and the collection trigger (api/routes/admin_controls.py).
     ("GET", "/api/v1/admin/people"),
     ("GET", "/api/v1/admin/flags"),

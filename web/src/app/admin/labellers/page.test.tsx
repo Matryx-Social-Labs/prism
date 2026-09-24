@@ -69,7 +69,9 @@ describe("the labellers page", () => {
 
   it("prints a grant as a grant, with the live check count", async () => {
     render(<LabellersPage />);
-    expect(await screen.findByText(/GRANTED BY f@example.test/)).toHaveTextContent("CHECKS 9/10");
+    const card = within((await screen.findByText(/GRANTED BY f@example.test/)).closest("li")!);
+    expect(card.getByText("Granted")).toBeInTheDocument();
+    expect(card.getByText("Hidden checks right").parentElement).toHaveTextContent("9 of 10");
     await userEvent.click(screen.getByRole("button", { name: "Withdraw" }));
     expect(setQualification).toHaveBeenCalledWith(expect.anything(), "on@example.test", "event_identity", false);
   });
@@ -88,5 +90,24 @@ describe("the labellers page", () => {
     await userEvent.click(within(form).getByRole("checkbox", { name: "Hindi" }));
     await userEvent.click(within(form).getByRole("button", { name: "Add labeller" }));
     expect(addLabeller).toHaveBeenCalledWith(expect.anything(), "friend@example.test", ["en", "hi"]);
+  });
+
+  it("finds a labeller by email or name, and by status", async () => {
+    fetchLabellers.mockResolvedValue({
+      labellers: [person("asha@example.test", "active", { name: "Asha" }), person("ravi@example.test", "paused")],
+      board: [],
+      languages: ["en"],
+    });
+    render(<LabellersPage />);
+    // The list, not the grant form's picker, which names every active labeller too.
+    const list = async () => within((await screen.findByRole("heading", { name: /^Labellers ·/ })).closest("section")!);
+    expect((await list()).getByText("asha@example.test")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /Paused/ }));
+    expect((await list()).queryByText("asha@example.test")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Labellers · 1 of 2" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /All/ }));
+    await userEvent.type(screen.getByRole("searchbox"), "asha");
+    expect((await list()).getByText("asha@example.test")).toBeInTheDocument();
+    expect((await list()).queryByText("ravi@example.test")).not.toBeInTheDocument();
   });
 });

@@ -70,6 +70,10 @@ async def test_people_flags_and_trigger_are_a_founders_alone(monkeypatch):
             me = next(p for p in r.json()["people"] if p["email"] == f"reader-{tag}@example.test")
             assert (me["plan"], me["plan_status"], me["labeller"]) == ("plus_monthly", "active", "applied")
             assert me["active_days"] == 2 and me["languages"] == ["kn"]
+            # The days themselves, for the activity strip: in the window only, oldest first.
+            today = usage.today()
+            assert me["active_on"] == [(today - timedelta(days=3)).isoformat(), today.isoformat()]
+            assert r.json()["window_start"] == (today - timedelta(days=admin_controls.ACTIVE_WINDOW_DAYS - 1)).isoformat()
 
             r = await c.get("/api/v1/admin/flags", headers=h)
             shown = {f["name"]: f["value"] for f in r.json()["flags"]}

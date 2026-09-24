@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import ControlsPage from "@/app/admin/controls/page";
@@ -49,5 +49,14 @@ describe("controls", () => {
     await screen.findByText("OFF");
     await userEvent.click(screen.getByRole("button", { name: "Collect now" }));
     expect(await screen.findByText(/collection is switched off/)).toBeInTheDocument();
+  });
+
+  it("counts the switches that are on, and draws off on a dashed rule, numbers apart", async () => {
+    fetchFlags.mockResolvedValue(flags(false));
+    render(<ControlsPage />);
+    expect(await screen.findByRole("heading", { name: "Switches · 0 of 1 on" })).toBeInTheDocument();
+    expect(screen.getByText("OFF").style.border).toContain("dashed");
+    const limits = within(screen.getByRole("heading", { name: "Limits" }).closest("section")!);
+    expect(limits.getByText("Match stories across languages by headline (0: off)")).toBeInTheDocument();
   });
 });
