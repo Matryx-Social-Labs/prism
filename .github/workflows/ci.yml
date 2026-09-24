@@ -135,7 +135,8 @@ jobs:
         env:
           # Public env Next embeds into the bundle; CI uses a placeholder.
           NEXT_PUBLIC_API_URL: 'http://localhost:8000'
-        run: npm run build
+        # Retries only a next/font Google fetch failure (scripts/retry-next-font.sh).
+        run: ./scripts/retry-next-font.sh npm run build
 
       - name: No labelling guide in the public bundle
         # The guides are served by the API to applicants and a batch's own
@@ -246,7 +247,8 @@ jobs:
           done
 
       - name: Build with Vercel
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        # Retries only a next/font Google fetch failure (web/scripts/retry-next-font.sh).
+        run: web/scripts/retry-next-font.sh vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy prebuilt output
         run: |

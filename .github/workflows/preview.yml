@@ -83,7 +83,8 @@ jobs:
 
       - name: Build with Vercel
         # No --prod: this is what makes it a preview rather than a release.
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        # Retries only a next/font Google fetch failure (web/scripts/retry-next-font.sh).
+        run: web/scripts/retry-next-font.sh vercel build --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy prebuilt output
         # REF COMES THROUGH env, NOT ${{ }} INTERPOLATION. A workflow_dispatch
