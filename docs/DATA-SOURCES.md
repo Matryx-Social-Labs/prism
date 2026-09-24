@@ -55,6 +55,8 @@ leave a real gap. Defer finance feeds to Phase 2.
 
 Bengali, Gujarati and Punjabi candidates failed with 403/Cloudflare from a datacenter IP; retry them from Railway's egress before calling them dead.
 
+**After deploy (2026-09-24):** Business Standard 403s from Railway's egress on every cycle (never one success) and is disabled. Indian Express and Sakshi 403 intermittently (success 15–30 min apart), so they stay on; watch `/sources`.
+
 ### How a source reaches production
 
 - `ingestion/runner.py::run_all()` calls `await seed_sources()` as the FIRST step of
