@@ -125,7 +125,13 @@ structured report-a-problem links (mailto; becomes a form once D-c decides the q
 **Also shipped 2026-09-24:** 0.6 Ask questions to no-retention providers only (PR #197, measured: no cost/latency penalty);
 H11 projection single writer (PR #198); `event_revisions` + trigger keeps every published headline/summary/brief version
 and a deleted record's last one (IT Rules R19(3); the store the public corrections log will read).
-**Still open, in order:** H12 (typed projection reads; not blocking) → Phase 2 (claim-level citations) → Phase 3.1 public
+**Phase 2 shadow layer shipped:** `correlation/cites.py` cites each line of the reader brief to its report(s) and checks
+every figure is there, stored as `projection.lens_cites` on every brief save; `tools/score_brief_cites.py` measures it.
+**Prod baseline 2026-09-24 (newest 500 records, 2,092 lines):** 86.7% of lines cited, 85.0% with every figure in a cited
+report, **35 lines (1.7%) state a figure no cited report has** (rounded margins, lakh-to-million conversions, number words
+turned into digits, inferred years). Cross-language multi-report records cite ~13% (wording cannot match across scripts).
+Next for Phase 2: label ~200 lines in /label (reported / Prism's reading / unsupported), tune LEXICAL_MIN, then the UI.
+**Still open, in order:** Phase 2 gold + UI → H12 (typed projection reads; not blocking) → Phase 3.1 public
 corrections log (reads event_revisions + an editorial reason) → Phase 1 build once D-c lands → Phase 5 launch (checklist) → Phase 6 → Phase 7 (C5 is unblocked).
 Data-quality gate for lifting D-d: single-source share falling week on week after the expansion, cross-language merge hole
 closed (`crosslingual-merge.plan.md`), Phase 2 support rate ≥ 99.5% on the gold set.
