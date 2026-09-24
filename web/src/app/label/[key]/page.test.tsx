@@ -740,6 +740,45 @@ describe("a quote-rendering task (phase 4)", () => {
   });
 });
 
+describe("a brief-line task (does the report say this?)", () => {
+  const report = { title: "RBI holds rates", outlet: "Mint", language: "English", code: "en", url: "https://m.example/a",
+    excerpt: "The Reserve Bank kept the repo rate at 5.5 per cent.", text: "Full report. The Reserve Bank kept the repo rate at 5.5 per cent." };
+  const line = { id: "task-b1", position: 2, kind: "brief_support" as const,
+    line: { kind: "brief_support" as const, line: "The RBI held the repo rate at 5.5%.", story: "Rates unchanged", report } };
+
+  it("shows Prism's line, the report's closest passage and the whole report behind a disclosure", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: line, closed: false });
+    render(<LabelPage params={params} />);
+    expect(await screen.findByRole("heading", { name: "Does the report say this?" })).toBeInTheDocument();
+    expect(screen.getByText("The RBI held the repo rate at 5.5%.")).toBeInTheDocument();
+    expect(screen.getByText("The Reserve Bank kept the repo rate at 5.5 per cent.")).toBeInTheDocument();
+    expect(screen.getByText("Read the whole report")).toBeInTheDocument();
+    // An English report offers no "can't read" skip.
+    expect(screen.queryByRole("button", { name: /I can't read/ })).toBeNull();
+  });
+
+  it("files yes as this task's sentinel and no as an empty definite answer", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: line, closed: false });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Yes — the report says this" }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
+    expect(postLabelAnswer.mock.calls[0][1]).toMatchObject({ selected: ["task-b1"], unsure: false, skipped: false });
+  });
+
+  it("offers a skip, never a vote, when the report is in a language the labeller may not read", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    const kn = { ...line, line: { ...line.line, report: { ...report, language: "Kannada", code: "kn", excerpt: "ರೆಪೊ ದರ ೫.೫" } } };
+    fetchLabelTask.mockResolvedValue({ task: kn, closed: false });
+    render(<LabelPage params={params} />);
+    expect(await screen.findByText("ರೆಪೊ ದರ ೫.೫")).toHaveAttribute("lang", "kn");
+    await userEvent.click(screen.getByRole("button", { name: "I can't read Kannada" }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
+    expect(postLabelAnswer.mock.calls[0][1]).toMatchObject({ selected: [], skipped: true });
+  });
+});
+
 describe("live checks (phase 5)", () => {
   const CLAIM = {
     article_id: "a1", title: "t", source: "s", speaker: "The minister", quote_text: "double its outlay",

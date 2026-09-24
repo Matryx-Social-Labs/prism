@@ -889,16 +889,36 @@ export interface LabelRendering {
   b: LabelRenderedQuote | null;
 }
 
+/** "Does the report say this?" — one line of Prism's brief and the report it
+ *  was written from (tools/gold_brief_cites; the Phase 2 gate). */
+export interface LabelBriefLine {
+  kind: "brief_support";
+  line: string;
+  story: string;
+  report: {
+    title: string;
+    outlet: string;
+    /** The language's English name, and its code for the lang attribute. */
+    language: string;
+    code: string;
+    url: string | null;
+    /** The passage closest to the line; the whole report sits behind a disclosure. */
+    excerpt: string;
+    text: string;
+  };
+}
+
 export interface LabelTask {
   id: string;
   position: number;
   sector?: string | null;
   /** Absent on story tasks, which predate the second kind. */
-  kind?: "claim_attribution" | "quote_rendering";
+  kind?: "claim_attribution" | "quote_rendering" | "brief_support";
   seed?: LabelEvent;
   candidates?: LabelEvent[];
   claim?: LabelClaim;
   rendering?: LabelRendering;
+  line?: LabelBriefLine;
 }
 
 export interface LabelBatch {

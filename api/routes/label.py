@@ -297,6 +297,11 @@ async def next_task(
             shaped = {"kind": "quote_rendering", "rendering": payload}
         elif kind == "claim_attribution":
             shaped = {"kind": "claim_attribution", "claim": payload}
+        elif kind == "brief_support":
+            # Keys starting "_" are the machine's own verdict, kept for scoring
+            # (tools/gold_brief_cites --score). A labeller who could read it in
+            # the response would be grading the machine's answer, not the report.
+            shaped = {"kind": "brief_support", "line": {k: v for k, v in payload.items() if not k.startswith("_")}}
         else:
             # Served in the wrong shape, an unknown kind would ask a labeller a
             # question nobody wrote. Loud beats plausible.

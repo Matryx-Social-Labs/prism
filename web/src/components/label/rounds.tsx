@@ -23,7 +23,11 @@ export function PracticeFeedback({ task, feedback, onNext }: { task: LabelTask; 
   // have been ticked, or whether the article credits the quote to this person.
   const yes = expected.has(task.id);
   const rendering = task.rendering;
-  const answer = task.claim
+  const answer = task.line
+    ? yes
+      ? "Yes — the report says this."
+      : "No — the report does not say this."
+    : task.claim
     ? yes
       ? `Yes — the article credits these words to ${task.claim.speaker}.`
       : `No — the article does not credit these words to ${task.claim.speaker}.`

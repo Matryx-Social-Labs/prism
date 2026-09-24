@@ -261,6 +261,56 @@ GUIDES: dict[str, dict[str, Any]] = {
         "start": START,
         "after": None,
     },
+    # The Phase 2 gate on the brief (correlation/cites.py, tools/gold_brief_cites):
+    # a line the machine calls evidenced is printed as reported, with its [n]; a
+    # line people say the report does not state becomes Prism's reading. The
+    # distinction to teach is that an interpretation, however fair, is a No.
+    "brief_support": {
+        "question": "Does the report say this?",
+        "minutes": 2,
+        "in_short": "Say Yes only when the report states everything in the line, in any words or any language. "
+                    "A figure, name or conclusion the report does not state is a No.",
+        "lede": ["Prism writes a short brief for every story from the reports under it, and each line should "
+                 "restate something a report says. You see one line and the report it was written from, and you "
+                 "judge one thing: **does this report say what the line says?**"],
+        "do": [
+            "Say **Yes** when every fact in the line is in the report, even in other words or in another language.",
+            "Say **No** when the line adds anything the report does not state: a figure, a name, a date, a cause, "
+            "a comparison such as “the highest in a decade”.",
+            "Say **No** when the line is a judgement the report does not make: why it matters, what it could lead "
+            "to. That is Prism's reading, and the page will label it so.",
+            "Check every number against the report. 5.5% is not 6%, and 8 lakh is not “nearly a million” unless "
+            "the report says so.",
+            "Open **Read the whole report** when the passage shown does not settle it.",
+            "Answer **Not sure** when you genuinely cannot tell. It is a real answer.",
+        ],
+        "dont": [
+            "Do not say Yes because the line is true, or matches what you know from elsewhere. Only this report counts.",
+            "Do not say Yes because the line is on the same subject as the report.",
+            "Do not say No over a harmless change of wording: “the RBI” for “the Reserve Bank of India” is the same fact.",
+        ],
+        "examples_label": "Worked examples · invented",
+        "examples": [
+            {"mark": "yes", "head": "YES — other words, the same fact",
+             "body": "Report: “The Reserve Bank kept its policy rate unchanged at 5.5 per cent.” Line: “The RBI held "
+                     "the repo rate at 5.5%.” Every fact in the line is in the report."},
+            {"mark": "no", "head": "NO — a figure the report does not give",
+             "body": "Report: “Over 60,000 families received interim relief.” Line: “Relief reached 75,000 families.” "
+                     "The number is not the report's."},
+            {"mark": "no", "head": "NO — something added",
+             "body": "Report: “The bridge was closed for repairs.” Line: “The bridge was closed for repairs for the "
+                     "first time in a decade.” The last part is not in the report."},
+            {"mark": "no", "head": "NO — Prism's reading, not the report's",
+             "body": "Line: “The decision could reshape the state's politics before the next election.” The report "
+                     "says nothing about what the decision could mean. It may be a fair reading; it is still not "
+                     "what the report says."},
+            {"head": "NOT SURE — the passage stops before the fact",
+             "body": "If the report shown is cut off and even the whole report does not settle it, say Not sure "
+                     "rather than guessing."},
+        ],
+        "start": START,
+        "after": STOP_ANY_TIME,
+    },
 }
 
 KINDS = tuple(GUIDES)
