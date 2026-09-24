@@ -275,6 +275,32 @@ async def test_a_quote_rendering_task_is_served_in_its_own_shape():
 
 
 
+async def test_a_brief_line_task_never_shows_the_machine_its_verdict():
+    """The brief_support task carries the machine's own verdict for scoring
+    (tools/gold_brief_cites) under "_" keys. A labeller who could read it in the
+    response would grade the machine's answer instead of the report."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    key = f"k{uuid.uuid4().hex[:12]}"
+    bid = uuid.uuid4()
+    payload = {"kind": "brief_support", "line": "The RBI held rates.", "story": "t",
+               "report": {"title": "t", "outlet": "O", "language": "English", "code": "en", "url": None,
+                          "excerpt": "e", "text": "x"},
+               "_machine": {"stratum": "single", "method": "single", "supported": True}, "_event_id": "e1"}
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO label_batches (id, key, name, kind, open) VALUES (:i, :k, 'r', 'brief_support', true)"),
+                        {"i": bid, "k": key})
+        await s.execute(text("INSERT INTO label_tasks (id, batch_id, position, candidates, payload) "
+                             "VALUES (:i, :b, 0, '[]'::jsonb, CAST(:p AS jsonb))"),
+                        {"i": uuid.uuid4(), "b": bid, "p": json.dumps(payload)})
+    async with _client() as c:
+        tok = (await c.post(f"/api/v1/label/{key}/join", json={"name": "founder"})).json()["token"]
+        r = await c.get(f"/api/v1/label/{key}/next", headers={"X-Label-Token": tok})
+    task = r.json()["task"]
+    assert task["kind"] == "brief_support" and task["line"]["line"] == "The RBI held rates."
+    assert "supported" not in r.text and "_machine" not in r.text and "_event_id" not in r.text
+
+
 async def test_an_unknown_task_kind_fails_loudly_rather_than_posing_as_a_claim():
     if not await _db_reachable():
         pytest.skip("no database")

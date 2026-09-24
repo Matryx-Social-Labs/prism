@@ -115,7 +115,7 @@ export async function startBatch(s: Session, key: string): Promise<string> {
 }
 
 /** The kinds with a guide on /label/learn/<kind>. */
-export const LEARNABLE: readonly string[] = ["event_identity", "story_boundary", "claim_attribution", "quote_rendering", "topic_relation"];
+export const LEARNABLE: readonly string[] = ["event_identity", "story_boundary", "claim_attribution", "quote_rendering", "topic_relation", "brief_support"];
 
 async function startRound(s: Session, path: string): Promise<string> {
   const { key, token } = await call<{ key: string; token: string }>(s, path, { method: "POST" });
@@ -142,4 +142,5 @@ export const KIND_QUESTION: Record<string, string> = {
   topic_relation: "Is this the same topic?",
   claim_attribution: "Who said this?",
   quote_rendering: "Same statement, or a translation?",
+  brief_support: "Does the report say this?",
 };
