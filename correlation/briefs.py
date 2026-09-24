@@ -20,6 +20,7 @@ from common.lenses import LENSES
 from common.llm import structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
+from correlation.cites import cite_lines
 from correlation.schemas import LensBriefs
 
 logger = get_logger(__name__)
@@ -212,6 +213,25 @@ async def persist_briefs(event_id: uuid.UUID, briefs: dict[str, dict | str]) -> 
             ),
             {"eid": str(event_id), "briefs": json.dumps(texts), "points": json.dumps(points)},
         )
+        # Which report each line of the free brief came from, and whether its
+        # figures are in it (correlation/cites.py). Shadow: stored, not shown.
+        if texts.get("reader"):
+            reports = (
+                await session.execute(
+                    sql_text(
+                        "SELECT a.id, a.clean_text FROM event_memberships em "
+                        "JOIN articles a ON a.id = em.article_id WHERE em.event_id = :eid"
+                    ),
+                    {"eid": str(event_id)},
+                )
+            ).all()
+            await session.execute(
+                sql_text(
+                    "UPDATE events SET projection = jsonb_set(COALESCE(projection, '{}'::jsonb), '{lens_cites}', "
+                    "COALESCE(projection -> 'lens_cites', '{}'::jsonb) || CAST(:cites AS jsonb), true) WHERE id = :eid"
+                ),
+                {"eid": str(event_id), "cites": json.dumps({"reader": cite_lines(texts["reader"], [(r[0], r[1]) for r in reports])})},
+            )
 
 
 def available_lenses(projection: dict | None, sector: str | None = None) -> list[str]:
