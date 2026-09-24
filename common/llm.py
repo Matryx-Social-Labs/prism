@@ -190,6 +190,14 @@ def reasoning_payload(model: str, reasoning: dict[str, Any]) -> dict[str, Any]:
 
 _reasoning_payload = reasoning_payload
 
+# A reader's own words (an Ask question, and the guard that reads it) go only to
+# providers that neither retain nor train on them. Measured 2026-09-24 on the
+# three models that see reader text (qwen3.7-plus, glm-5.3-flash,
+# gemini-3.1-flash-lite): each still answers, Plus and the guard keep their
+# provider, free Ask stays on the same providers at the same median latency.
+# Pipeline calls read published news and do not need it.
+PRIVATE_PROVIDERS: dict[str, Any] = {"data_collection": "deny"}
+
 
 async def _structured_chat[T: BaseModel](
     *,
@@ -204,6 +212,7 @@ async def _structured_chat[T: BaseModel](
     max_retries: int = 2,
     prune_fields: set[str] | None = None,
     reasoning: dict[str, Any] | None = None,
+    private: bool = False,
 ) -> T:
     """Chat completion constrained to a JSON schema, validated into a Pydantic model.
 
@@ -224,6 +233,9 @@ async def _structured_chat[T: BaseModel](
     ceiling is spent on the JSON. A model that marks reasoning mandatory
     rejects "off" and gets the smallest effort instead, so the choice never
     costs an article.
+
+    private routes the request only to providers that neither retain nor train
+    on it (PRIVATE_PROVIDERS): pass it whenever a reader's own words are in it.
     """
     client = get_llm()
     schema = output_model.model_json_schema()
@@ -252,8 +264,14 @@ async def _structured_chat[T: BaseModel](
         kwargs["langfuse_prompt"] = langfuse_prompt
     if temperature is not None:
         kwargs["temperature"] = temperature
-    if reasoning is not None and get_settings().llm_provider == "openrouter":
-        kwargs["extra_body"] = {"reasoning": _reasoning_payload(model, reasoning)}
+    if get_settings().llm_provider == "openrouter":
+        body: dict[str, Any] = {}
+        if reasoning is not None:
+            body["reasoning"] = _reasoning_payload(model, reasoning)
+        if private:
+            body["provider"] = PRIVATE_PROVIDERS
+        if body:
+            kwargs["extra_body"] = body
 
     last_err: Exception | None = None
     for attempt in range(max_retries):
@@ -267,7 +285,7 @@ async def _structured_chat[T: BaseModel](
                 # rejects "off"; it accepts the smallest effort, which measured at
                 # ~40-70 output tokens against 230-460 with the default.
                 logger.info("reasoning_control_rejected", model=model, trace=trace_name)
-                kwargs["extra_body"] = {"reasoning": {"effort": "minimal"}}
+                kwargs["extra_body"] = {**kwargs["extra_body"], "reasoning": {"effort": "minimal"}}
                 response = await client.chat.completions.create(**kwargs)
             else:
                 _maybe_start_cooldown(e, kwargs["model"])
@@ -402,7 +420,7 @@ def _swap_to_fallback(kwargs: dict[str, Any], reasoning: dict[str, Any] | None, 
     logger.info("llm_content_blocked_fallback", trace=trace_name, blocked_model=kwargs["model"], model=fallback)
     kwargs["model"] = fallback
     if reasoning is not None and get_settings().llm_provider == "openrouter":
-        kwargs["extra_body"] = {"reasoning": _reasoning_payload(fallback, reasoning)}
+        kwargs["extra_body"] = {**kwargs.get("extra_body", {}), "reasoning": _reasoning_payload(fallback, reasoning)}
     return True
 
 

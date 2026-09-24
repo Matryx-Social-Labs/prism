@@ -82,7 +82,7 @@ export const PRIVACY: LegalDoc = {
           "Resend delivers our email.",
           "Google, only if you choose Sign in with Google.",
           "Razorpay processes payments, once paid plans are on sale.",
-          "OpenRouter, and the model providers it routes to, receive the text of a question in order to answer it. Your email and name are not sent with it.",
+          "OpenRouter, and the model providers it routes to, receive the text of a question in order to answer it. Your email and name are not sent with it. Every question is sent with OpenRouter's instruction to use only providers that do not store or train on it; a provider that does not accept that instruction is not used. Do not put personal or confidential details in a question.",
         ],
         "Some of these providers run servers outside India. Each is bound by its own contract to process data only on our instructions.",
       ],
