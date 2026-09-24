@@ -9,11 +9,16 @@
  *
  * Removing someone keeps their answers (they are the measurement) and takes
  * every kind away (founder decision D5, 2026-09-23).
+ *
+ * Standing is drawn per labeller (admin charts, phase 4): each kind they hold
+ * or tried, with hidden checks right as a bar and its count — a count, since
+ * ten checks are not a rate.
  */
 
 import { useCallback, useEffect, useState } from "react";
 
 import { AdminSection, AdminTitle, Quiet, TextButton, useAdmin } from "@/components/admin/AdminShell";
+import { Badge, FilterSeg, Progress, SearchBox, matches } from "@/components/admin/ui";
 import {
   addLabeller,
   fetchLabellers,
@@ -35,10 +40,14 @@ const STATUS_WORD: Record<AdminLabeller["status"], string> = {
   removed: "Removed",
 };
 
+type Show = "all" | Exclude<AdminLabeller["status"], "applied">;
+
 export default function LabellersPage() {
   const { session } = useAdmin();
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [show, setShow] = useState<Show>("all");
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +80,13 @@ export default function LabellersPage() {
 
   const applicants = data?.labellers.filter((l) => l.status === "applied") ?? [];
   const others = data?.labellers.filter((l) => l.status !== "applied") ?? [];
+  const shown = others.filter((l) => (show === "all" || l.status === show) && matches(query, l.email, l.name));
+  // Standing grouped by person — anyone with a standing, an applicant who
+  // took a test included — under the same search and filter as the list.
+  const board = data?.board ?? [];
+  const standing = [...new Set(board.map((b) => b.email))]
+    .map((email) => ({ email, kinds: board.filter((b) => b.email === email) }))
+    .filter(({ email, kinds }) => (show === "all" || kinds[0].status === show) && matches(query, email, data?.labellers.find((l) => l.email === email)?.name));
 
   return (
     <>
@@ -95,10 +111,26 @@ export default function LabellersPage() {
         </ul>
       </AdminSection>
 
-      <AdminSection title={`Labellers · ${others.length}`}>
+      <AdminSection title={shown.length < others.length ? `Labellers · ${shown.length} of ${others.length}` : `Labellers · ${others.length}`}>
+        {others.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <SearchBox label="Search by email or name" value={query} onChange={setQuery} />
+            <FilterSeg
+              label="Show"
+              value={show}
+              onChange={setShow}
+              options={(["all", "active", "paused", "removed"] as const).map((v) => ({
+                value: v,
+                label: v === "all" ? "All" : STATUS_WORD[v],
+                count: v === "all" ? others.length : others.filter((l) => l.status === v).length,
+              }))}
+            />
+          </div>
+        )}
         {data && others.length === 0 && <Quiet>Nobody approved yet.</Quiet>}
+        {others.length > 0 && shown.length === 0 && <Quiet>Nobody matches.</Quiet>}
         <ul>
-          {others.map((l) => (
+          {shown.map((l) => (
             <PersonRow key={l.email} l={l}>
               {l.status === "active" && <TextButton onClick={() => status(l, "paused")}>Pause</TextButton>}
               {l.status !== "active" && <TextButton onClick={() => status(l, "active")}>{l.status === "paused" ? "Resume" : "Restore"}</TextButton>}
@@ -114,22 +146,35 @@ export default function LabellersPage() {
 
       <AdminSection title="Standing per kind">
         {data && data.board.length === 0 && <Quiet>Nobody has passed or been granted a kind yet.</Quiet>}
-        <ul>
-          {data?.board.map((b) => (
-            <li key={`${b.email}-${b.kind}`} className="border-t py-3" style={{ borderColor: "var(--line)" }}>
-              <p className="text-[15px]">
-                <span className="font-semibold">{b.email}</span> · {KIND_QUESTION[b.kind] ?? b.kind}
-              </p>
-              <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-                {b.passed ? (b.granted_by ? `GRANTED BY ${b.granted_by}` : "PASSED") : "NOT PASSED"}
-                {b.best_score !== null && ` · BEST ${Math.round(b.best_score * 100)}%`} · {b.attempts} ATTEMPTS ·{" "}
-                {b.checks_total ? `CHECKS ${b.checks_right}/${b.checks_total}` : "NO CHECKS YET"}
-              </p>
-              <div className="mt-1.5">
-                <TextButton onClick={() => void act(() => setQualification(session, b.email, b.kind, !b.passed))} muted={b.passed}>
-                  {b.passed ? "Withdraw" : "Grant"}
-                </TextButton>
-              </div>
+        <ul className="grid gap-3 lg:grid-cols-2">
+          {standing.map(({ email, kinds }) => (
+            <li key={email} className="admin-panel">
+              <p className="text-[15px] font-semibold">{email}</p>
+              <p className="text-[13px]" style={{ color: "var(--ink-2)" }}>{STATUS_WORD[kinds[0].status]}</p>
+              <ul>
+                {kinds.map((b) => (
+                  <li key={b.kind} className="mt-3 border-t pt-3" style={{ borderColor: "var(--line)" }}>
+                    <p className="flex flex-wrap items-center justify-between gap-2 text-[14px]">
+                      <span style={{ color: "var(--ink)" }}>{KIND_QUESTION[b.kind] ?? b.kind}</span>
+                      <Badge strong={b.passed}>{b.passed ? (b.granted_by ? "Granted" : "Passed") : "Not passed"}</Badge>
+                    </p>
+                    <div className="mt-2">
+                      {b.checks_total ? (
+                        <Progress label="Hidden checks right" done={b.checks_right} total={b.checks_total} />
+                      ) : (
+                        <p className="text-[13px]" style={{ color: "var(--ink-2)" }}>No hidden checks answered yet</p>
+                      )}
+                    </div>
+                    <p className="mt-1.5 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
+                      {b.granted_by ? `GRANTED BY ${b.granted_by}` : b.passed ? "PASSED THE TEST" : "NOT PASSED"}
+                      {b.best_score !== null && ` · BEST ${Math.round(b.best_score * 100)}%`} · {b.attempts} ATTEMPTS
+                    </p>
+                    <TextButton onClick={() => void act(() => setQualification(session, b.email, b.kind, !b.passed))} muted={b.passed}>
+                      {b.passed ? "Withdraw" : "Grant"}
+                    </TextButton>
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>

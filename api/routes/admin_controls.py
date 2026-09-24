@@ -65,7 +65,8 @@ async def people(
         """
         SELECT u.email, u.name, u.profession, u.languages, u.state, u.created_at,
                sub.plan, sub.status AS plan_status, sub.provider,
-               (SELECT count(*) FROM user_days d WHERE d.user_id = u.id AND d.day >= :since) AS active_days,
+               (SELECT coalesce(array_agg(d.day ORDER BY d.day), '{}') FROM user_days d
+                 WHERE d.user_id = u.id AND d.day >= :since) AS active_on,
                (SELECT max(d.day) FROM user_days d WHERE d.user_id = u.id) AS last_active,
                l.status AS labeller
         FROM users u
@@ -75,8 +76,9 @@ async def people(
         ORDER BY u.created_at DESC LIMIT :n OFFSET :o
         """), {"since": since, "n": limit, "o": offset})).mappings().all()
     total = (await db.execute(text("SELECT count(*) FROM users"))).scalar() or 0
-    return {"total": total, "active_window_days": ACTIVE_WINDOW_DAYS,
-            "people": [{**r, "languages": list(r["languages"] or [])} for r in rows]}
+    return {"total": total, "active_window_days": ACTIVE_WINDOW_DAYS, "window_start": since.isoformat(),
+            "people": [{**r, "languages": list(r["languages"] or []), "active_days": len(r["active_on"]),
+                        "active_on": [d.isoformat() for d in r["active_on"]]} for r in rows]}
 
 
 @router.get("/api/v1/admin/flags")
