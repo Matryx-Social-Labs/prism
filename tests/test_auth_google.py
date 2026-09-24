@@ -97,7 +97,9 @@ async def test_the_route_returns_the_same_session_shape_as_magic_link(monkeypatc
         r = await c.post("/api/v1/auth/google", json={"credential": "x"})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert set(body) >= {"token", "user_id", "email", "needs_profile"} and body["email"] == "google-signin@t.test"
+    assert set(body) >= {"user_id", "email", "needs_profile"} and body["email"] == "google-signin@t.test"
+    # The session is the HttpOnly cookie, never a token in the body (audit C5).
+    assert "token" not in body and "httponly" in r.headers["set-cookie"].lower()
     from sqlalchemy import text
 
     from common.db import session_scope

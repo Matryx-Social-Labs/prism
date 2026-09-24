@@ -67,7 +67,11 @@ def admin_emails() -> frozenset[str]:
 # SameSite does not (audit C5, defence in depth). A request with no Origin is
 # not a browser page and carries no ambient cookie of ours unless it copied one.
 _SAFE = frozenset({"GET", "HEAD", "OPTIONS"})
-_PREVIEW = re.compile(r"https://prism-[a-z0-9-]+-matrixsociallabs-projects\.vercel\.app")
+# This project's Vercel previews only; CORS (api/main.py) reads the same pattern,
+# so the origins that may call with credentials and the origins whose cookie
+# writes count can never drift apart.
+PREVIEW_ORIGIN = r"https://prism-[a-z0-9-]+-matrixsociallabs-projects\.vercel\.app"
+_PREVIEW = re.compile(PREVIEW_ORIGIN)
 
 
 def _origin_ok(request: Request) -> bool:

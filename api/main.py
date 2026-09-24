@@ -8,7 +8,7 @@ middleware, and routers. Response models live in api/schemas.py.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.deps import assert_admin_token_configured
+from api.deps import PREVIEW_ORIGIN, assert_admin_token_configured
 from api.routes import (
     admin,
     admin_controls,
@@ -49,7 +49,7 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     # This project's Vercel previews only. `.*\.vercel\.app` matched every
     # tenant's deployment — vercel.app is a shared suffix anyone can publish under.
-    allow_origin_regex=r"https://prism-[a-z0-9-]+-matrixsociallabs-projects\.vercel\.app",
+    allow_origin_regex=PREVIEW_ORIGIN,
     # The session is an HttpOnly cookie on .readprism.news (audit C5); a page on
     # www reads api with credentials, which needs the exact origin echoed back.
     allow_credentials=True,
