@@ -144,6 +144,11 @@ jobs:
         # .next/static would hand them to anyone who opens the site.
         run: npm run check:guides
 
+      - name: Chart library only on /admin
+        # Recharts is ~130 kB; a reader page must never download it
+        # (scripts/check-admin-only.mjs).
+        run: npm run check:charts
+
   vouched:
     # The commit on main must already carry green backend + web checks — the
     # ones its run on dev produced. The ruleset on main enforces the same

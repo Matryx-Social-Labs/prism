@@ -1,21 +1,38 @@
 "use client";
 
 /**
- * The founders' desk: what needs you, then the ledger — visits, sign-ups,
- * engagement, money, demand and supply for a period against the one before,
- * every figure with where it was counted (common/metrics.py; design direction
- * "The ledger", DESIGN.md). One primary action is not the point of this page;
- * the period switch and the CSV are secondary on purpose.
+ * The founders' desk: what needs you, eight headline numbers, then each area
+ * drawn as charts — supply first (it has the longest record), then visits,
+ * sign-ups, engagement, money and demand, each against the period before
+ * (common/metrics.py; founder decisions V1–V5, 2026-09-24). Where a number was
+ * counted sits behind its ⓘ; every chart turns into its table.
  */
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { AdminTitle, useAdmin } from "@/components/admin/AdminShell";
-import { LedgerSection, dayLabel } from "@/components/admin/Ledger";
-import { downloadWeeklyCsv, fetchBatches, fetchLabellers, fetchMetrics, type Metrics } from "@/lib/admin";
+import { KpiTile } from "@/components/admin/charts/KpiTile";
+import { dayLabel } from "@/components/admin/charts/format";
+import { DashboardSection } from "@/components/admin/Dashboard";
+import { downloadWeeklyCsv, fetchBatches, fetchLabellers, fetchMetrics, type MetricRow, type Metrics } from "@/lib/admin";
 
 const PERIODS = [7, 28, 90] as const;
+
+/** The headline row: [section, measure]. */
+const HEADLINE: ReadonlyArray<[string, string]> = [
+  ["visits", "visitor_days"],
+  ["signups", "new_accounts"],
+  ["engagement", "active_accounts"],
+  ["engagement", "questions"],
+  ["money", "paying"],
+  ["money", "mrr"],
+  ["supply", "reports"],
+  ["supply", "events"],
+];
+
+/** Supply first: it is counted since launch, so it is the fullest picture. */
+const ORDER = ["supply", "visits", "signups", "engagement", "money", "demand"];
 
 interface Need {
   href: string;
@@ -67,6 +84,10 @@ export default function AdminOverview() {
   };
 
   const open = needs?.filter((n) => n.count > 0) ?? [];
+  const find = (section: string, key: string): MetricRow | undefined =>
+    data?.sections.find((x) => x.key === section)?.rows.find((r) => r.key === key);
+  const headline = HEADLINE.map(([sec, key]) => find(sec, key)).filter((r): r is MetricRow => !!r);
+  const sections = data ? [...data.sections].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key)) : [];
 
   return (
     <>
@@ -124,7 +145,24 @@ export default function AdminOverview() {
         </ul>
       </section>
 
-      {data?.sections.map((s) => <LedgerSection key={s.key} section={s} start={data.range.start} />)}
+      {headline.length > 0 && (
+        <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {headline.map((r) => (
+            <KpiTile
+              key={r.key}
+              label={r.label}
+              current={r.current}
+              previous={r.previous}
+              series={r.series}
+              unit={r.unit}
+              source={r.source}
+              note={r.note}
+            />
+          ))}
+        </div>
+      )}
+
+      {data && sections.map((s) => <DashboardSection key={s.key} section={s} start={data.range.start} />)}
     </>
   );
 }

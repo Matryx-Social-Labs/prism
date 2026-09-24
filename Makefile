@@ -39,7 +39,7 @@ test-db:  ## Python tests, FAILING (not skipping) if Postgres is absent.
 	PRISM_REQUIRE_DB=1 uv run pytest -q
 
 web:  ## Web tests + typecheck + build
-	cd web && npm test && npm run lint && npx tsc --noEmit && ./scripts/retry-next-font.sh npm run build && npm run check:guides
+	cd web && npm test && npm run lint && npx tsc --noEmit && ./scripts/retry-next-font.sh npm run build && npm run check:guides && npm run check:charts
 
 # `fmt-check` is deliberately NOT part of `check`. The repo has never been
 # formatted: 87 of 151 files would change. Doing that mid-rebuild would bury
@@ -54,7 +54,7 @@ agent.rag, personalization.ranking, common.lenses"
 	uv run alembic downgrade -1
 	uv run alembic upgrade head
 	PRISM_REQUIRE_DB=1 uv run pytest -q
-	cd web && npm test && npm run lint && npx tsc --noEmit && ./scripts/retry-next-font.sh npm run build && npm run check:guides
+	cd web && npm test && npm run lint && npx tsc --noEmit && ./scripts/retry-next-font.sh npm run build && npm run check:guides && npm run check:charts
 	@echo ""
 	@echo "  check: PASS"
 

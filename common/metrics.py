@@ -44,10 +44,16 @@ def _days(w: dict[str, date]) -> list[date]:
     return [w["start"] + timedelta(days=i) for i in range((w["end"] - w["start"]).days + 1)]
 
 
+def _prev_days(w: dict[str, date]) -> list[date]:
+    return [w["prev_start"] + timedelta(days=i) for i in range((w["prev_end"] - w["prev_start"]).days + 1)]
+
+
 def _row(key: str, label: str, current: Any, previous: Any, source: str, *, series: list | None = None,
-         unit: str = "count", note: str | None = None) -> dict[str, Any]:
+         prev_series: list | None = None, unit: str = "count", note: str | None = None) -> dict[str, Any]:
+    """One measure. `series` is the period day by day; `prev_series` the period
+    before, day by day, so a chart can lay one over the other."""
     return {"key": key, "label": label, "current": current, "previous": previous, "series": series,
-            "unit": unit, "source": source, "note": note}
+            "prev_series": prev_series, "unit": unit, "source": source, "note": note}
 
 
 async def _usage(db: AsyncSession, w: dict[str, date], event: str, since: date | None) -> dict[str, Any]:
@@ -57,17 +63,29 @@ async def _usage(db: AsyncSession, w: dict[str, date], event: str, since: date |
         "SELECT day, dim, count FROM usage_daily WHERE event = :e AND day BETWEEN :a AND :b"),
         {"e": event, "a": w["prev_start"], "b": w["end"]})).mappings().all()
     by_day: dict[date, int] = {}
+    by_day_before: dict[date, int] = {}
+    by_dim_day: dict[str, dict[date, int]] = {}
     now: dict[str, int] = {}
     before: dict[str, int] = {}
     for r in rows:
         if r["day"] >= w["start"]:
             by_day[r["day"]] = by_day.get(r["day"], 0) + r["count"]
             now[r["dim"]] = now.get(r["dim"], 0) + r["count"]
+            days = by_dim_day.setdefault(r["dim"] or "—", {})
+            days[r["day"]] = days.get(r["day"], 0) + r["count"]
         else:
+            by_day_before[r["day"]] = by_day_before.get(r["day"], 0) + r["count"]
             before[r["dim"]] = before.get(r["dim"], 0) + r["count"]
-    series = [None if since is None or d < since else by_day.get(d, 0) for d in _days(w)]
+
+    def counted(d: date, values: dict[date, int]) -> int | None:
+        return None if since is None or d < since else values.get(d, 0)
+
+    series = [counted(d, by_day) for d in _days(w)]
     prev = sum(before.values()) if since is not None and since <= w["prev_end"] else None
     return {"current": sum(now.values()) if since is not None else None, "previous": prev, "series": series,
+            "prev_series": [counted(d, by_day_before) for d in _prev_days(w)],
+            # Each word's own day-by-day, for a stacked chart.
+            "split_series": {dim: [counted(d, days) for d in _days(w)] for dim, days in by_dim_day.items()},
             "split": sorted(({"label": k or "—", "current": v, "previous": before.get(k, 0) if prev is not None else None}
                              for k, v in now.items()), key=lambda x: -x["current"])}
 
@@ -86,27 +104,34 @@ async def visits(db: AsyncSession, w: dict[str, date], since: date | None) -> di
         "key": "visits", "title": "Visits",
         "rows": [
             _row("visitor_days", "Visitor-days", vis["current"], vis["previous"], src, series=vis["series"],
+                 prev_series=vis["prev_series"],
                  note="Distinct visitors each day, added up: one person on three days counts three. "
                       "Unique visitors over a month cannot be counted without tracking people, which we do not."),
-            _row("views", "Page views", views["current"], views["previous"], src, series=views["series"]),
+            _row("views", "Page views", views["current"], views["previous"], src, series=views["series"],
+                 prev_series=views["prev_series"]),
             _row("arrivals", "Arrivals", arr["current"], arr["previous"], src, series=arr["series"],
                  note="The first page of each visit."),
             _row("shares", "Shares", shares["current"], shares["previous"], src, series=shares["series"]),
         ],
         "breakdowns": [
-            {"key": "sources", "title": "Where visits came from", "rows": arr["split"], "source": src},
+            {"key": "sources", "title": "Where visits came from", "rows": arr["split"], "source": src,
+             "series": arr["split_series"]},
             {"key": "pages", "title": "Views by kind of page", "rows": views["split"], "source": src},
             {"key": "shared", "title": "What was shared", "rows": shares["split"], "source": src},
         ],
     }
 
 
-async def _daily_count(db: AsyncSession, w: dict[str, date], table: str, col: str, where: str = "TRUE") -> list[int]:
+async def _daily_count(db: AsyncSession, w: dict[str, date], table: str, col: str, where: str = "TRUE",
+                       *, before: bool = False) -> list[int]:
+    """Rows per IST day across the period — or, with before=True, across the
+    period before it."""
     day = DAY_IST.format(col=col)
+    a, b = (w["prev_start"], w["prev_end"]) if before else (w["start"], w["end"])
     rows = dict((await db.execute(text(
         f"SELECT {day} AS d, count(*) FROM {table} WHERE {where} AND {day} BETWEEN :a AND :b GROUP BY 1"),
-        {"a": w["start"], "b": w["end"]})).all())
-    return [rows.get(d, 0) for d in _days(w)]
+        {"a": a, "b": b})).all())
+    return [rows.get(d, 0) for d in (_prev_days(w) if before else _days(w))]
 
 
 async def _count(db: AsyncSession, table: str, col: str, a: date, b: date, where: str = "TRUE") -> int:
@@ -125,13 +150,19 @@ async def signups(db: AsyncSession, w: dict[str, date]) -> dict[str, Any]:
     total = (await db.execute(text("SELECT count(*) FROM users"))).scalar() or 0
     before_end = (await db.execute(text(f"SELECT count(*) FROM users WHERE {DAY_IST.format(col='created_at')} <= :b"),
                                    {"b": w["prev_end"]})).scalar() or 0
+    new = await _daily_count(db, w, "users", "created_at")
+    cumulative, running = [], before_end
+    for n in new:
+        running += n
+        cumulative.append(running)
     return {
         "key": "signups", "title": "Sign-ups",
         "rows": [
             _row("new_accounts", "New accounts", await _count(db, "users", "created_at", w["start"], w["end"]),
                  await _count(db, "users", "created_at", w["prev_start"], w["prev_end"]), src,
-                 series=await _daily_count(db, w, "users", "created_at")),
-            _row("accounts", "All accounts", total, before_end, src, note="At the end of each period."),
+                 series=new, prev_series=await _daily_count(db, w, "users", "created_at", before=True)),
+            _row("accounts", "All accounts", total, before_end, src, note="At the end of each period.",
+                 series=cumulative),
         ],
         "breakdowns": [
             {"key": "professions", "title": "Accounts by profession", "source": src,
@@ -167,8 +198,9 @@ async def engagement(db: AsyncSession, w: dict[str, date], since_active: date | 
                  note="Accounts that used Prism signed in on at least one day of the period."),
             _row("questions", "Questions asked", await _count(db, "agent_messages", "created_at", w["start"], w["end"], q_where),
                  await _count(db, "agent_messages", "created_at", w["prev_start"], w["prev_end"], q_where), asked_src,
-                 series=await _daily_count(db, w, "agent_messages", "created_at", q_where)),
-            _row("questions_signed_in", "…of which signed in",
+                 series=await _daily_count(db, w, "agent_messages", "created_at", q_where),
+                 prev_series=await _daily_count(db, w, "agent_messages", "created_at", q_where, before=True)),
+            _row("questions_signed_in", "Questions asked signed in",
                  await _count(db, "agent_messages", "created_at", w["start"], w["end"], signed),
                  await _count(db, "agent_messages", "created_at", w["prev_start"], w["prev_end"], signed), asked_src),
             _row("lens_opens", "Lens opens", lens["current"], lens["previous"], f"usage_daily · {_since_label(since)}",
@@ -176,31 +208,48 @@ async def engagement(db: AsyncSession, w: dict[str, date], since_active: date | 
         ],
         "breakdowns": [
             {"key": "ask_via", "title": "How Ask was opened", "rows": ask["split"], "source": f"usage_daily · {_since_label(since)}"},
-            {"key": "lenses", "title": "Lens opens, by lens", "rows": lens["split"], "source": f"usage_daily · {_since_label(since)}"},
+            {"key": "lenses", "title": "Lens opens, by lens", "rows": lens["split"], "source": f"usage_daily · {_since_label(since)}",
+             "series": lens["split_series"]},
         ],
-        "retention": await retention(db, w["end"]),
+        "retention": await retention(db, w["end"], since_active),
     }
 
 
-async def retention(db: AsyncSession, end: date, weeks: int = 8) -> dict[str, Any]:
-    """Accounts that signed up in a week, and how many were active the week after.
-    Weeks start on Monday, IST. Counts only: a cohort of 3 is not a percentage."""
+async def retention(db: AsyncSession, end: date, since: date | None, weeks: int = 8) -> dict[str, Any]:
+    """Accounts that signed up in a week, and how many used Prism signed in in
+    each week after — the cohort grid. Weeks start on Monday, IST. A week with
+    no full record is None, never a zero: one not over yet, and one that began
+    before sign-ins were counted (`since`) — a part-counted week would print an
+    undercount as a fact. Counts only; a cohort of 3 is not a percentage."""
     this_monday = end - timedelta(days=end.weekday())
+    first = this_monday - timedelta(weeks=weeks)
+    cohort_day = DAY_IST.format(col="u.created_at")
+    sizes = dict((await db.execute(text(
+        f"SELECT date_trunc('week', {cohort_day})::date, count(*) FROM users u "
+        f"WHERE {cohort_day} BETWEEN :a AND :b GROUP BY 1"),
+        {"a": first, "b": this_monday - timedelta(days=1)})).all())
+    back: dict[tuple[date, int], int] = {
+        (r[0], int(r[1])): r[2] for r in (await db.execute(text(
+            f"""
+            SELECT date_trunc('week', {cohort_day})::date AS cohort,
+                   (date_trunc('week', d.day)::date - date_trunc('week', {cohort_day})::date) / 7 AS k,
+                   count(DISTINCT u.id)
+            FROM users u JOIN user_days d ON d.user_id = u.id
+            WHERE {cohort_day} BETWEEN :a AND :b AND d.day > {cohort_day}
+            GROUP BY 1, 2
+            """), {"a": first, "b": this_monday - timedelta(days=1)})).all()}
+    def cell(cohort: date, k: int) -> int | None:
+        week = cohort + timedelta(weeks=k)
+        if since is None or week < since or week + timedelta(days=6) > end:
+            return None
+        return back.get((cohort, k), 0)
+
     rows = []
     for i in range(weeks, 0, -1):
         start = this_monday - timedelta(weeks=i)
-        after = start + timedelta(weeks=1)
-        r = (await db.execute(text(
-            f"""
-            SELECT count(*) AS accounts,
-                   count(*) FILTER (WHERE EXISTS (SELECT 1 FROM user_days d WHERE d.user_id = u.id
-                                                  AND d.day BETWEEN :c AND :e)) AS returned
-            FROM users u WHERE {DAY_IST.format(col='u.created_at')} BETWEEN :a AND :b
-            """), {"a": start, "b": after - timedelta(days=1), "c": after, "e": after + timedelta(days=6)})).one()
-        rows.append({"week": start.isoformat(), "accounts": r.accounts, "returned": r.returned,
-                     "complete": after + timedelta(days=6) <= end})
-    since = (await db.execute(text("SELECT min(day) FROM user_days"))).scalar()
-    return {"title": "Came back the week after signing up", "rows": rows,
+        rows.append({"week": start.isoformat(), "accounts": sizes.get(start, 0),
+                     "by_week": [cell(start, k) for k in range(1, weeks + 1)]})
+    return {"title": "Came back in the weeks after signing up", "rows": rows,
             "source": f"users + user_days · {_since_label(since)}"}
 
 
@@ -274,6 +323,7 @@ async def demand(db: AsyncSession, w: dict[str, date], since: date | None) -> di
         "key": "demand", "title": "Demand",
         "rows": [
             _row("ask_limit", "Hit the free question limit", limit["current"], limit["previous"], src, series=limit["series"],
+                 prev_series=limit["prev_series"],
                  note="Asked for another answer and could not have one."),
             _row("locked_lens", "Opened a locked lens", sum(r["current"] for r in locked) if since else None, None, src),
             _row("prompts", "Saw the upgrade prompt", sum(r["current"] for r in prompts) if since else None, None, src),
@@ -298,21 +348,33 @@ async def supply(db: AsyncSession, w: dict[str, date]) -> dict[str, Any]:
     bal = await budget.current()
     bal_src = f"OpenRouter · as the worker last read it at {bal['at']}" if bal else "OpenRouter · not read yet"
     last = (await db.execute(text("SELECT max(observed_at) FROM raw_items"))).scalar()
+    fetched_day = DAY_IST.format(col="observed_at")
+    by_status: dict[str, dict[date, int]] = {}
+    for d, relevance, n in (await db.execute(text(
+            f"SELECT {fetched_day}, relevance, count(*) FROM raw_items WHERE {fetched_day} BETWEEN :a AND :b GROUP BY 1, 2"),
+            {"a": w["start"], "b": w["end"]})).all():
+        by_status.setdefault(relevance, {})[d] = n
+    # Kept first, then what was filtered out, in a fixed order a chart can colour by.
+    status = {k: [by_status.get(k, {}).get(d, 0) for d in _days(w)]
+              for k in ("relevant", "duplicate", "rejected", "pending") if k in by_status}
     return {
         "key": "supply", "title": "Supply",
         "rows": [
             _row("reports", "Reports fetched", await _count(db, "raw_items", "observed_at", w["start"], w["end"]),
                  await _count(db, "raw_items", "observed_at", w["prev_start"], w["prev_end"]), src,
                  series=await _daily_count(db, w, "raw_items", "observed_at"),
+                 prev_series=await _daily_count(db, w, "raw_items", "observed_at", before=True),
                  note="Everything the collectors fetched, before relevance and duplicates are filtered."),
-            _row("relevant", "…kept as relevant", await _count(db, "raw_items", "observed_at", w["start"], w["end"], RELEVANT),
+            _row("relevant", "Reports kept as relevant", await _count(db, "raw_items", "observed_at", w["start"], w["end"], RELEVANT),
                  await _count(db, "raw_items", "observed_at", w["prev_start"], w["prev_end"], RELEVANT), src),
             _row("events", "Stories formed", await _count(db, "events", "created_at", w["start"], w["end"]),
                  await _count(db, "events", "created_at", w["prev_start"], w["prev_end"]), src,
-                 series=await _daily_count(db, w, "events", "created_at")),
-            _row("corroborated", "…reported by two outlets or more",
+                 series=await _daily_count(db, w, "events", "created_at"),
+                 prev_series=await _daily_count(db, w, "events", "created_at", before=True)),
+            _row("corroborated", "Stories two or more outlets reported",
                  await _count(db, "events", "created_at", w["start"], w["end"], corroborated),
-                 await _count(db, "events", "created_at", w["prev_start"], w["prev_end"], corroborated), src),
+                 await _count(db, "events", "created_at", w["prev_start"], w["prev_end"], corroborated), src,
+                 series=await _daily_count(db, w, "events", "created_at", corroborated)),
             _row("outlets", "Outlets with a relevant report",
                  (await db.execute(text(f"SELECT count(DISTINCT source_id) FROM raw_items WHERE {RELEVANT} AND "
                                         f"{DAY_IST.format(col='observed_at')} BETWEEN :a AND :b"),
@@ -321,6 +383,9 @@ async def supply(db: AsyncSession, w: dict[str, date]) -> dict[str, Any]:
             _row("last_report", "Last report taken in", last.isoformat() if last else None, None, "raw_items", unit="time"),
         ],
         "breakdowns": [
+            {"key": "report_status", "title": "What happened to the reports fetched", "source": src,
+             "rows": [{"label": k, "current": sum(v), "previous": None} for k, v in status.items()],
+             "series": status},
             {"key": "report_languages", "title": "Relevant reports, by language", "source": src,
              "rows": await _split(db, f"SELECT language, count(*) FROM raw_items WHERE {RELEVANT} AND "
                                       f"{DAY_IST.format(col='observed_at')} BETWEEN :a AND :b GROUP BY 1 ORDER BY 2 DESC",

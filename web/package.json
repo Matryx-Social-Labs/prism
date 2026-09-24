@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "check:guides": "node scripts/check-no-guides.mjs",
+    "check:charts": "node scripts/check-admin-only.mjs",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
@@ -18,6 +19,7 @@
     "next": "^15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "recharts": "^3.10.1",
     "three": "^0.185.1"
   },
   "devDependencies": {

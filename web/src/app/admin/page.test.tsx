@@ -49,6 +49,26 @@ describe("the overview", () => {
     expect(screen.getByRole("tab", { name: "90 days" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("leads with the headline numbers and puts supply, counted longest, first", async () => {
+    fetchMetrics.mockResolvedValue({
+      ...metrics(28),
+      sections: [
+        { key: "visits", title: "Visits", breakdowns: [],
+          rows: [{ key: "visitor_days", label: "Visitor-days", current: null, previous: null, series: null, unit: "count", source: "usage_daily", note: null }] },
+        { key: "supply", title: "Supply", breakdowns: [],
+          rows: [{ key: "reports", label: "Reports fetched", current: 1284, previous: 1000, series: null, unit: "count", source: "raw_items", note: null }] },
+      ],
+    });
+    render(<AdminOverview />);
+    const tile = (await screen.findAllByRole("heading", { name: "Reports fetched" }))[0].closest(".admin-panel")!;
+    expect(tile).toHaveTextContent("1,284");
+    expect(tile).toHaveTextContent("+28%");
+    // Uncounted is a dash, never a zero, in the headline as everywhere.
+    expect(screen.getAllByRole("heading", { name: "Visitor-days" })[0].closest(".admin-panel")).toHaveTextContent("Not counted yet");
+    const sections = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(sections.indexOf("Supply")).toBeLessThan(sections.indexOf("Visits"));
+  });
+
   it("never says nothing is waiting when it could not look", async () => {
     fetchBatches.mockRejectedValue(new Error("offline"));
     render(<AdminOverview />);
