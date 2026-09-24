@@ -52,7 +52,8 @@ class ProfileRequest(BaseModel):
 
 
 class SessionResponse(BaseModel):
-    token: str
+    # No token: the session is the HttpOnly cookie set on this response, and a
+    # credential handed to page script is exactly what audit C5 retired.
     user_id: str
     email: str
     needs_profile: bool  # true → route the reader to onboarding
@@ -109,12 +110,7 @@ async def verify(body: VerifyRequest, response: Response, db: AsyncSession = Dep
     ).scalar_one()
     needs_profile = not await auth.profile_complete(db, user_id)
     set_session_cookie(response, token)
-    # ponytail: `token` stays in the body for one release so a page deployed
-    # before or after this API still signs in; the new web never stores it.
-    # Drop it from SessionResponse once both deploys carry the cookie.
-    return SessionResponse(
-        token=token, user_id=str(user_id), email=email, needs_profile=needs_profile
-    )
+    return SessionResponse(user_id=str(user_id), email=email, needs_profile=needs_profile)
 
 
 class GoogleSignIn(BaseModel):
@@ -142,7 +138,7 @@ async def google_sign_in(body: GoogleSignIn, response: Response, db: AsyncSessio
     token = await auth.create_session(db, user_id)
     needs_profile = not await auth.profile_complete(db, user_id)
     set_session_cookie(response, token)
-    return SessionResponse(token=token, user_id=str(user_id), email=email, needs_profile=needs_profile)
+    return SessionResponse(user_id=str(user_id), email=email, needs_profile=needs_profile)
 
 
 @router.post("/api/v1/auth/profile", response_model=MeResponse)

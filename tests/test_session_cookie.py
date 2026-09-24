@@ -54,6 +54,7 @@ async def test_sign_in_sets_an_httponly_cookie_that_authenticates_on_its_own():
         async with _client() as c:
             r = await _signed_in(c, email)
             assert r.status_code == 200, r.text
+            assert "token" not in r.json(), "a credential handed to page script is what C5 retired"
             header = r.headers["set-cookie"].lower()
             assert "prism_session=" in header and "httponly" in header and "samesite=lax" in header
             assert "secure" in header and "max-age=2592000" in header
@@ -85,7 +86,8 @@ async def test_signing_out_kills_the_session_and_the_cookie():
     email = f"c-{uuid.uuid4().hex[:8]}@example.com"
     try:
         async with _client() as c:
-            token = (await _signed_in(c, email)).json()["token"]
+            await _signed_in(c, email)
+            token = c.cookies.get("prism_session")
             out = await c.delete("/api/v1/auth/session", headers={"Origin": OURS})
             assert out.status_code == 204
             assert "max-age=0" in out.headers["set-cookie"].lower()
@@ -102,7 +104,8 @@ async def test_a_page_signed_in_before_the_cookie_adopts_it_and_the_header_still
     email = f"c-{uuid.uuid4().hex[:8]}@example.com"
     try:
         async with _client() as c:
-            token = (await _signed_in(c, email)).json()["token"]
+            await _signed_in(c, email)
+            token = c.cookies.get("prism_session")
         async with _client() as c:  # a fresh browser that only has the stored token
             assert (await c.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})).status_code == 200
             adopted = await c.post("/api/v1/auth/cookie", headers={"Authorization": f"Bearer {token}", "Origin": OURS})
