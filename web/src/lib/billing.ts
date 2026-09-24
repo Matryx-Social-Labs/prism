@@ -54,15 +54,16 @@ export async function fetchPlans(): Promise<PlansOut> {
   return r.json();
 }
 
-export async function fetchMySubscription(token: string): Promise<MySubscription> {
-  const r = await fetch(`${API_URL}/api/v1/billing/me`, { headers: authHeaders(token), cache: "no-store" });
+export async function fetchMySubscription(token?: string | null): Promise<MySubscription> {
+  const r = await fetch(`${API_URL}/api/v1/billing/me`, { headers: authHeaders(token), credentials: "include", cache: "no-store" });
   if (!r.ok) throw new Error(`billing/me ${r.status}`);
   return r.json();
 }
 
-export async function cancelSubscription(token: string, why?: { reason?: CancelReason; comment?: string }): Promise<{ access_until: string | null }> {
+export async function cancelSubscription(token?: string | null, why?: { reason?: CancelReason; comment?: string }): Promise<{ access_until: string | null }> {
   const r = await fetch(`${API_URL}/api/v1/billing/cancel`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify(why ?? {}),
   });
@@ -70,9 +71,10 @@ export async function cancelSubscription(token: string, why?: { reason?: CancelR
   return r.json();
 }
 
-export async function pauseSubscription(token: string, months: 1 | 2 | 3): Promise<{ paused_until: string; paid_until: string | null }> {
+export async function pauseSubscription(token: string | null | undefined, months: 1 | 2 | 3): Promise<{ paused_until: string; paid_until: string | null }> {
   const r = await fetch(`${API_URL}/api/v1/billing/pause`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ months }),
   });
@@ -80,20 +82,20 @@ export async function pauseSubscription(token: string, months: 1 | 2 | 3): Promi
   return r.json();
 }
 
-export async function resumeSubscription(token: string): Promise<{ status: string }> {
-  const r = await fetch(`${API_URL}/api/v1/billing/resume`, { method: "POST", headers: authHeaders(token) });
+export async function resumeSubscription(token?: string | null): Promise<{ status: string }> {
+  const r = await fetch(`${API_URL}/api/v1/billing/resume`, { method: "POST", headers: authHeaders(token), credentials: "include" });
   if (!r.ok) throw new Error(`resume ${r.status}`);
   return r.json();
 }
 
-export async function fetchPayments(token: string): Promise<Payment[]> {
-  const r = await fetch(`${API_URL}/api/v1/billing/history`, { headers: authHeaders(token), cache: "no-store" });
+export async function fetchPayments(token?: string | null): Promise<Payment[]> {
+  const r = await fetch(`${API_URL}/api/v1/billing/history`, { headers: authHeaders(token), credentials: "include", cache: "no-store" });
   if (!r.ok) throw new Error(`history ${r.status}`);
   return ((await r.json()) as { payments: Payment[] }).payments;
 }
 
-export async function refundSubscription(token: string): Promise<{ refund_id: string; amount_paise: number; ended_at: string }> {
-  const r = await fetch(`${API_URL}/api/v1/billing/refund`, { method: "POST", headers: authHeaders(token) });
+export async function refundSubscription(token?: string | null): Promise<{ refund_id: string; amount_paise: number; ended_at: string }> {
+  const r = await fetch(`${API_URL}/api/v1/billing/refund`, { method: "POST", headers: authHeaders(token), credentials: "include" });
   if (!r.ok) throw new Error(`refund ${r.status}`);
   return r.json();
 }
@@ -132,7 +134,7 @@ export interface Subscribed {
  */
 export async function subscribe(
   plan: string,
-  token: string,
+  token: string | null | undefined,
   email: string | undefined,
   onEvent?: (kind: "payment_failed", detail: string) => void,
   opts: { startAfterCurrent?: boolean } = {},
@@ -140,6 +142,7 @@ export async function subscribe(
   track("Subscribe", { plan, stage: "checkout" });
   const r = await fetch(`${API_URL}/api/v1/billing/checkout`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ plan, start_after_current: !!opts.startAfterCurrent }),
   });
@@ -174,6 +177,7 @@ export async function subscribe(
   });
   const v = await fetch(`${API_URL}/api/v1/billing/verify`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify(paid),
   });

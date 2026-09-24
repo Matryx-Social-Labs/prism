@@ -1,10 +1,11 @@
 "use client";
 
-// Bearer session from magic-link auth, persisted in localStorage (mirrors
-// lib/profile.ts). The raw bearer token lives only here and in the
-// Authorization header; the server stores only its SHA-256 hash. Email
-// delivery is server-side and pluggable — in dev the sign-in link is printed
-// to the API logs (console sender), so the flow works with no email provider.
+// The session is an HttpOnly cookie the API sets at sign-in (audit C5): no
+// script on the page can read it, so an injected one cannot steal it. What the
+// page keeps in localStorage is only who is signed in (user id and email), for
+// the header and the gates; every API call sends the cookie with
+// `credentials: "include"`. A page signed in before the cookie still holds its
+// old bearer token until adoptCookie() swaps it for the cookie and deletes it.
 
 import { track } from "@/lib/analytics";
 import { useEffect, useState } from "react";
@@ -12,9 +13,10 @@ import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
 
 export interface Session {
-  token: string;
   userId: string;
   email: string;
+  /** Only on a page signed in before the cookie, until adoptCookie() runs. Never written. */
+  token?: string;
 }
 
 const KEY = "prism.session.v1";
@@ -26,17 +28,39 @@ export function loadSession(): Session | null {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return null;
     const p = JSON.parse(raw) as Partial<Session>;
-    return p.token && p.userId && p.email
-      ? { token: p.token, userId: p.userId, email: p.email }
-      : null;
+    if (!p.userId || !p.email) return null;
+    return p.token ? { userId: p.userId, email: p.email, token: p.token } : { userId: p.userId, email: p.email };
   } catch {
     return null;
   }
 }
 
 export function saveSession(s: Session): void {
-  window.localStorage.setItem(KEY, JSON.stringify(s));
+  // Who, never the credential: the cookie is the credential.
+  window.localStorage.setItem(KEY, JSON.stringify({ userId: s.userId, email: s.email }));
   window.dispatchEvent(new Event(EVENT));
+}
+
+let adopting: Promise<void> | null = null;
+/** A page signed in before the cookie: trade its stored bearer token for the
+ *  HttpOnly cookie (same session), then forget the token. Once per page load. */
+export function adoptCookie(): Promise<void> {
+  const s = loadSession();
+  if (!s?.token || typeof window === "undefined") return Promise.resolve();
+  adopting ??= fetch(`${API_URL}/api/v1/auth/cookie`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${s.token}` },
+    credentials: "include",
+  })
+    .then((res) => {
+      if (res.ok) saveSession(s);
+      else if (res.status === 401) {
+        window.localStorage.removeItem(KEY);
+        window.dispatchEvent(new Event(EVENT));
+      }
+    })
+    .catch(() => undefined);
+  return adopting;
 }
 
 export function clearSession(): void {
@@ -45,18 +69,18 @@ export function clearSession(): void {
   window.dispatchEvent(new Event(EVENT));
   // Revoke server-side too: the row is gone, so the token is dead now rather
   // than at its 30-day expiry. Fire-and-forget — the local sign-out is the UX.
-  if (token) {
-    void fetch(`${API_URL}/api/v1/auth/session`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-      keepalive: true,
-    }).catch(() => undefined);
-  }
+  void fetch(`${API_URL}/api/v1/auth/session`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
+    keepalive: true,
+  }).catch(() => undefined);
 }
 
-/** Authorization header for gated calls (pro lenses, watchlist, personalized brief). */
+/** The old bearer header, only for a page that has not adopted the cookie yet.
+ *  Every gated call also sends `credentials: "include"`, which carries the cookie. */
 export function authHeader(session: Session | null): Record<string, string> {
-  return session ? { Authorization: `Bearer ${session.token}` } : {};
+  return session?.token ? { Authorization: `Bearer ${session.token}` } : {};
 }
 
 async function detail(res: Response, fallback: string): Promise<string> {
@@ -111,57 +135,52 @@ export interface VerifyResult {
 export async function verifyMagicLink(token: string): Promise<VerifyResult> {
   const res = await fetch(`${API_URL}/api/v1/auth/verify`, {
     method: "POST",
+    // Without it the browser drops the Set-Cookie on a cross-origin response.
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token }),
   });
   if (!res.ok) throw new Error(await detail(res, "This sign-in link is invalid or expired"));
-  const d = (await res.json()) as {
-    token: string;
-    user_id: string;
-    email: string;
-    needs_profile: boolean;
-  };
+  const d = (await res.json()) as { user_id: string; email: string; needs_profile: boolean };
   track("Sign in", { method: "link" });
-  return {
-    session: { token: d.token, userId: d.user_id, email: d.email },
-    needsProfile: d.needs_profile,
-  };
+  return { session: { userId: d.user_id, email: d.email }, needsProfile: d.needs_profile };
 }
 
 /** A Google OAuth access token (from our button's token flow) → the same session a magic link gives. */
 export async function signInWithGoogle(accessToken: string): Promise<VerifyResult> {
   const res = await fetch(`${API_URL}/api/v1/auth/google`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ access_token: accessToken }),
   });
   if (!res.ok) throw new Error(await detail(res, "Google sign-in failed"));
-  const d = (await res.json()) as { token: string; user_id: string; email: string; needs_profile: boolean };
+  const d = (await res.json()) as { user_id: string; email: string; needs_profile: boolean };
   track("Sign in", { method: "google" });
-  return { session: { token: d.token, userId: d.user_id, email: d.email }, needsProfile: d.needs_profile };
+  return { session: { userId: d.user_id, email: d.email }, needsProfile: d.needs_profile };
 }
 
 /** Who the session belongs to and the plan it is on (`plan`: free | plus). */
 export async function fetchMe(session: Session): Promise<{ user_id: string; email: string; plan: "free" | "plus" | string }> {
-  const res = await fetch(`${API_URL}/api/v1/auth/me`, { headers: { Authorization: `Bearer ${session.token}` }, cache: "no-store" });
+  const res = await fetch(`${API_URL}/api/v1/auth/me`, { headers: authHeader(session), credentials: "include", cache: "no-store" });
   if (!res.ok) throw new Error(`me ${res.status}`);
   return res.json();
 }
 
 /** The session's plan, "free" until known; anonymous is "free". Cached per
- * token for the tab so the header does not ask on every route. */
+ * account for the tab so the header does not ask on every route. */
 const planCache = new Map<string, "free" | "plus">();
 export function usePlan(session: Session | null): "free" | "plus" {
-  const [plan, setPlan] = useState<"free" | "plus">(session ? planCache.get(session.token) ?? "free" : "free");
+  const [plan, setPlan] = useState<"free" | "plus">(session ? planCache.get(session.userId) ?? "free" : "free");
   useEffect(() => {
     if (!session) return setPlan("free");
-    const cached = planCache.get(session.token);
+    const cached = planCache.get(session.userId);
     if (cached) return setPlan(cached);
     let live = true;
     fetchMe(session)
       .then((m) => {
         const p = m.plan === "plus" ? "plus" : "free";
-        planCache.set(session.token, p);
+        planCache.set(session.userId, p);
         if (live) setPlan(p);
       })
       .catch(() => {});
@@ -180,6 +199,7 @@ export async function setProfile(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/auth/profile`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeader(session) },
     body: JSON.stringify(body),
   });
@@ -192,6 +212,7 @@ export function useSession(): Session | null {
   useEffect(() => {
     const sync = () => setSession(loadSession());
     sync();
+    void adoptCookie();
     window.addEventListener(EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {

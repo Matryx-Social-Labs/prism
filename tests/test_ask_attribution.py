@@ -25,8 +25,19 @@ class _FakeDB:
     pass
 
 
+def _req(cookie: str | None = None, method: str = "GET", origin: str | None = None):
+    from starlette.requests import Request
+
+    headers = []
+    if cookie:
+        headers.append((b"cookie", f"prism_session={cookie}".encode()))
+    if origin:
+        headers.append((b"origin", origin.encode()))
+    return Request({"type": "http", "method": method, "headers": headers, "path": "/", "query_string": b""})
+
+
 async def test_no_token_is_anonymous_not_an_error(monkeypatch):
-    assert await get_current_user_optional(authorization="", db=_FakeDB()) is None
+    assert await get_current_user_optional(request=_req(), authorization="", db=_FakeDB()) is None
 
 
 async def test_a_lapsed_token_is_anonymous_not_an_error(monkeypatch):
@@ -38,7 +49,7 @@ async def test_a_lapsed_token_is_anonymous_not_an_error(monkeypatch):
         return None
 
     monkeypatch.setattr(auth, "resolve_session", expired)
-    got = await get_current_user_optional(authorization="Bearer stale", db=_FakeDB())
+    got = await get_current_user_optional(request=_req(), authorization="Bearer stale", db=_FakeDB())
     assert got is None
 
 
@@ -52,7 +63,7 @@ async def test_a_valid_token_is_resolved_so_usage_can_be_attributed(monkeypatch)
         return uid
 
     monkeypatch.setattr(auth, "resolve_session", resolve)
-    assert await get_current_user_optional(authorization="Bearer good", db=_FakeDB()) == uid
+    assert await get_current_user_optional(request=_req(), authorization="Bearer good", db=_FakeDB()) == uid
 
 
 async def test_a_non_bearer_scheme_is_anonymous(monkeypatch):
@@ -64,7 +75,7 @@ async def test_a_non_bearer_scheme_is_anonymous(monkeypatch):
         raise AssertionError("resolve_session called for a non-bearer scheme")
 
     monkeypatch.setattr(auth, "resolve_session", boom)
-    assert await get_current_user_optional(authorization="Basic abc", db=_FakeDB()) is None
+    assert await get_current_user_optional(request=_req(), authorization="Basic abc", db=_FakeDB()) is None
 
 
 async def test_the_session_records_the_user_rather_than_a_placeholder(monkeypatch):

@@ -243,6 +243,14 @@ class Settings(BaseSettings):
     prism_email_from: str = "Prism <onboarding@resend.dev>"  # set to a verified domain sender
     prism_magic_token_ttl_min: int = 15  # magic-link lifetime
     prism_session_ttl_days: int = 30  # bearer session lifetime
+    # The session travels in an HttpOnly cookie, never in storage a script can
+    # read (audit C5). Empty domain = host-only on the API's own host, which is
+    # right in production too: pages on www call api.readprism.news with
+    # credentials, and the two are the same site, so SameSite=Lax sends it.
+    # Localhost shares it across ports. Secure off only for plain-http local dev.
+    prism_session_cookie: str = "prism_session"
+    prism_cookie_domain: str = ""
+    prism_cookie_secure: bool = True
     prism_magic_request_cooldown_s: int = 30  # per-email rate limit on link requests
     prism_free_markets_samples: int = 3  # sample grant on signup (D13 Markets-only)
     # Google sign-in (Google Identity Services, ID-token mode). The client id is

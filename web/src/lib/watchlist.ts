@@ -23,6 +23,7 @@ export interface WatchEvent {
 async function req(session: Session | null, path: string, init: RequestInit = {}) {
   const res = await fetch(`${API_URL}/api/v1/watchlist${path}`, {
     ...init,
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeader(session), ...(init.headers ?? {}) },
   });
   if (!res.ok) throw new Error(`watchlist ${res.status}`);

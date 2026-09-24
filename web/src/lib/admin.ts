@@ -18,6 +18,7 @@ export class AdminError extends Error {
 export async function adminCall<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeader(session), ...(init?.headers ?? {}) },
     cache: "no-store",
   });
@@ -209,6 +210,7 @@ export const fetchMetrics = (s: Session, days: number) => adminCall<Metrics>(s, 
 export async function downloadWeeklyCsv(s: Session, weeks = 12): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/admin/metrics/weekly.csv?weeks=${weeks}`, {
     headers: authHeader(s),
+    credentials: "include",
     cache: "no-store",
   });
   if (!res.ok) throw new AdminError(res.status, "Could not download the CSV");
