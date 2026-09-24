@@ -61,8 +61,11 @@ convenience (whole-story Ask, allowance, later follow and alerts), never a model
 
 ## Operating Context
 
-- **Corpus:** 42 registered sources; 27 RSS feeds are currently active, spanning
-  English and Indian-language coverage. Display is English-first. Production
+- **Corpus:** 47 RSS feeds enabled from 33 mastheads across English and 12 Indian
+  languages (19 Indian outlets added 2026-09-24, D-e: Malayalam, Odia and Assamese
+  were unread before; Bengali, Gujarati and Punjabi outlets were all bot-blocked from
+  a datacenter IP and wait for a retry from Railway's egress —
+  `docs/DATA-SOURCES.md` § Expansion 2026-09-24). Display is English-first. Production
   ingestion is active at a 120-minute Railway override as of 2026-09-17; `dev`
   targets five-minute conditional polling, pending deploy and canary validation.
 - **Signal, not coverage:** posts from an allowlist of official accounts on X

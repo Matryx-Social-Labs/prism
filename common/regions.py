@@ -25,7 +25,7 @@ IN_STATES: list[tuple[str, str]] = [
 ]
 
 # States with a dedicated state-edition source today (see ingestion/rss.py).
-COVERED = {"IN-TN", "IN-KL", "IN-KA", "IN-AP", "IN-TG", "IN-DL", "IN-MH"}
+COVERED = {"IN-TN", "IN-KL", "IN-KA", "IN-AP", "IN-TG", "IN-DL", "IN-MH", "IN-OD", "IN-AS"}
 
 _VALID = {code for code, _ in IN_STATES}
 

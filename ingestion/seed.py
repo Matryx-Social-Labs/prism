@@ -19,8 +19,16 @@ SOURCES = [
     {"slug": "timesofindia", "name": "The Times of India", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "ndtv", "name": "NDTV", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "hindustantimes", "name": "Hindustan Times", "source_type": "rss", "country": "IN", "language": "en"},
+    # ── India national — English breadth (audience expansion 2026-09-24) ──
+    {"slug": "indianexpress", "name": "The Indian Express", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "scroll", "name": "Scroll.in", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "deccanherald", "name": "Deccan Herald", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "deccanchronicle", "name": "Deccan Chronicle", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "telanganatoday", "name": "Telangana Today", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "livemint", "name": "Mint", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "hindu_businessline", "name": "The Hindu BusinessLine", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "businessstandard", "name": "Business Standard", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "economictimes", "name": "The Economic Times", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "espncricinfo", "name": "ESPNcricinfo", "source_type": "rss", "country": "IN", "language": "en"},
     # ── Origin feeds (the institution's own release). source_type stays "rss" so
     # a release counts as one publisher toward story support: the government's
@@ -31,9 +39,25 @@ SOURCES = [
     # ── India national — other languages (multilingual clustering) ──
     {"slug": "aajtak", "name": "Aaj Tak", "source_type": "rss", "country": "IN", "language": "hi"},
     {"slug": "amarujala", "name": "Amar Ujala", "source_type": "rss", "country": "IN", "language": "hi"},
+    {"slug": "dainikbhaskar", "name": "Dainik Bhaskar", "source_type": "rss", "country": "IN", "language": "hi"},
+    {"slug": "navbharattimes", "name": "Navbharat Times", "source_type": "rss", "country": "IN", "language": "hi"},
     {"slug": "bbc_tamil", "publisher": "bbc", "name": "BBC Tamil", "source_type": "rss", "country": "IN", "language": "ta", "reliability": {"funding": "public"}},
+    {"slug": "dinamani", "name": "Dinamani", "source_type": "rss", "country": "IN", "language": "ta"},
     {"slug": "prajavani", "name": "Prajavani", "source_type": "rss", "country": "IN", "language": "kn"},
     {"slug": "tv9kannada", "name": "TV9 Kannada", "source_type": "rss", "country": "IN", "language": "kn"},
+    {"slug": "sakshi", "name": "Sakshi", "source_type": "rss", "country": "IN", "language": "te"},
+    {"slug": "maharashtratimes", "name": "Maharashtra Times", "source_type": "rss", "country": "IN", "language": "mr"},
+    # Malayalam had zero sources before this pass — three added together so a
+    # story clears the >=2-source corroboration bar within the language.
+    {"slug": "mathrubhumi", "name": "Mathrubhumi", "source_type": "rss", "country": "IN", "language": "ml"},
+    {"slug": "madhyamam", "name": "Madhyamam", "source_type": "rss", "country": "IN", "language": "ml"},
+    {"slug": "manoramaonline", "name": "Malayala Manorama", "source_type": "rss", "country": "IN", "language": "ml"},
+    # Odia and Assamese: new languages, not yet in common/languages.py's picker
+    # (LAUNCH_LANGUAGES untouched) — see common/languages.py for the display-name entries added alongside.
+    {"slug": "dharitri", "name": "Dharitri", "source_type": "rss", "country": "IN", "language": "or"},
+    {"slug": "sambad", "name": "Sambad", "source_type": "rss", "country": "IN", "language": "or"},
+    {"slug": "asomiyapratidin", "name": "Asomiya Pratidin", "source_type": "rss", "country": "IN", "language": "as"},
+    {"slug": "qaumiawaz", "name": "Qaumi Awaz", "source_type": "rss", "country": "IN", "language": "ur"},
     # ── India, other languages (BBC's Indian-language services) ──
     # One newsroom across eight languages, which is the point: BBC Hindi and BBC
     # Tamil frequently cover the SAME story, so these supply genuine cross-lingual

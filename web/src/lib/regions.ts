@@ -8,7 +8,7 @@ const STATES: Record<string, string> = {
   "IN-DL": "Delhi", "IN-GA": "Goa", "IN-GJ": "Gujarat", "IN-HR": "Haryana", "IN-HP": "Himachal Pradesh",
   "IN-JK": "Jammu & Kashmir", "IN-JH": "Jharkhand", "IN-KA": "Karnataka", "IN-KL": "Kerala", "IN-LA": "Ladakh",
   "IN-MP": "Madhya Pradesh", "IN-MH": "Maharashtra", "IN-MN": "Manipur", "IN-ML": "Meghalaya", "IN-MZ": "Mizoram",
-  "IN-NL": "Nagaland", "IN-OR": "Odisha", "IN-PB": "Punjab", "IN-RJ": "Rajasthan", "IN-SK": "Sikkim",
+  "IN-NL": "Nagaland", "IN-OD": "Odisha", "IN-PB": "Punjab", "IN-RJ": "Rajasthan", "IN-SK": "Sikkim",
   "IN-TN": "Tamil Nadu", "IN-TG": "Telangana", "IN-TR": "Tripura", "IN-UP": "Uttar Pradesh", "IN-UT": "Uttarakhand",
   "IN-WB": "West Bengal", "IN-CH": "Chandigarh", "IN-PY": "Puducherry",
 };

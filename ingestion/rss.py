@@ -53,9 +53,20 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("timesofindia", "https://timesofindia.indiatimes.com/rssfeedstopstories.cms"),
     FeedSpec("ndtv", "https://feeds.feedburner.com/NDTV-LatestNews"),
     FeedSpec("hindustantimes", "https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml"),
+    # ── India national — English breadth (audience expansion 2026-09-24; verified
+    # 200 + fresh <48h + non-paywalled via a direct-fetch spot check) ──
+    FeedSpec("indianexpress", "https://indianexpress.com/section/india/feed/"),
+    FeedSpec("scroll", "https://feeds.feedburner.com/ScrollinArticles.rss"),
+    FeedSpec("deccanherald", "https://www.deccanherald.com/feed"),
+    FeedSpec("deccanchronicle", "https://www.deccanchronicle.com/rss_feed/"),
+    # Telangana Today is a single-state masthead, not a section of a bigger one —
+    # same treatment as prajavani/tv9kannada below.
+    FeedSpec("telanganatoday", "https://telanganatoday.com/feed", state="IN-TG"),
     # ── India national (single-topic — deterministic, zero LLM) ──
     FeedSpec("livemint", "https://www.livemint.com/rss/news", sector="business"),
     FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss", sector="business"),
+    FeedSpec("businessstandard", "https://www.business-standard.com/rss/latest.rss", sector="business"),
+    FeedSpec("economictimes", "https://economictimes.indiatimes.com/rssfeedstopstories.cms", sector="business"),
     FeedSpec("espncricinfo", "https://www.espncricinfo.com/rss/content/story/feeds/0.xml", sector="sports", subsector="cricket"),
     # ── Origin feeds: the institution's own release, not an outlet's report of it.
     # Measured 2026-09-21 with this User-Agent: RBI answers 200, entries are dated
@@ -75,7 +86,13 @@ FEEDS: list[FeedSpec] = [
     # with the English coverage of the same story) ──
     FeedSpec("aajtak", "https://www.aajtak.in/rssfeeds/?id=home"),
     FeedSpec("amarujala", "https://www.amarujala.com/rss/breaking-news.xml"),
+    FeedSpec("dainikbhaskar", "https://www.bhaskar.com/rss-v1--category-1061.xml"),
+    # Same Times Internet CMS as timesofindia/toi_*; the shared endpoint template
+    # is `langapi/sitemap/gstandrssfeed.xml`, discovered from the site's own
+    # <link rel="alternate"> tag rather than guessed.
+    FeedSpec("navbharattimes", "https://navbharattimes.indiatimes.com/langapi/sitemap/gstandrssfeed.xml"),
     FeedSpec("bbc_tamil", "https://feeds.bbci.co.uk/tamil/rss.xml"),
+    FeedSpec("dinamani", "https://www.dinamani.com/stories.rss"),
     # The rest of BBC's Indian-language services. Language is NOT set here — the
     # SOURCE declares it (see ingestion/base.py::persist_envelopes); a collector
     # asserting a language it cannot know is how 1,385 non-Latin articles ended
@@ -90,6 +107,24 @@ FEEDS: list[FeedSpec] = [
     # Kannada (Bangalore launch). Validated: 5/5 Kannada titles, fresh dailies.
     FeedSpec("prajavani", "https://www.prajavani.net/feed", state="IN-KA"),
     FeedSpec("tv9kannada", "https://tv9kannada.com/feed", state="IN-KA"),
+    # Telugu spans two states (Andhra Pradesh + Telangana post-bifurcation), same
+    # ambiguity as bbc_telugu above — no single state code fits, so none is set.
+    FeedSpec("sakshi", "https://www.sakshi.com/rss.xml"),
+    FeedSpec("maharashtratimes", "https://maharashtratimes.com/langapi/sitemap/gstandrssfeed.xml", state="IN-MH"),
+    # Malayalam had zero sources before this pass. Three added together (not one)
+    # so a story clears the >=2-source corroboration bar within the language
+    # instead of landing as a single-source record every time.
+    FeedSpec("mathrubhumi", "https://www.mathrubhumi.com/sitemaps/mathrubhumi/rss", state="IN-KL"),
+    FeedSpec("madhyamam", "https://www.madhyamam.com/feeds.xml", state="IN-KL"),
+    FeedSpec("manoramaonline", "https://www.manoramaonline.com/news/latest-news.feeds.rss.xml", state="IN-KL"),
+    # Odia and Assamese: new to this registry (see common/languages.py for the
+    # display-name entries added alongside — LAUNCH_LANGUAGES is untouched).
+    FeedSpec("dharitri", "https://dharitri.com/feed", state="IN-OD"),
+    FeedSpec("sambad", "https://sambad.in/rss", state="IN-OD"),
+    FeedSpec("asomiyapratidin", "https://www.asomiyapratidin.in/rss", state="IN-AS"),
+    # Second Urdu source alongside bbc_urdu; no state set for the same
+    # multi-state reason as bbc_urdu (Urdu readership isn't one state).
+    FeedSpec("qaumiawaz", "https://qaumiawaz.com/feed"),
     # ── India state editions (The Hindu state feeds + TOI metros) ──
     FeedSpec("thehindu_tamilnadu", "https://www.thehindu.com/news/national/tamil-nadu/feeder/default.rss", state="IN-TN"),
     FeedSpec("thehindu_kerala", "https://www.thehindu.com/news/national/kerala/feeder/default.rss", state="IN-KL"),
