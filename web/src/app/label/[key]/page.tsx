@@ -350,13 +350,23 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
 
   // Number keys toggle, Enter submits. Labelling is repetitive by nature and the
   // hand should not leave the keyboard for a hundred screens.
+  //
+  // Only while a candidate task is what is on screen: not under the guide, not
+  // under a practice answer, and never on a claim or rendering task, which
+  // advertise no shortcut. And Enter on a focused control answers as that
+  // control — a window-wide Enter used to cancel "Yes" and file "No", and file
+  // the ticked rows for a focused "Not sure" (2026-09-24). A candidate row is
+  // the exception: Enter there submits, rather than unticking what was ticked.
+  const candidateTask = state === "ready" && !!task && !task.claim && !task.rendering && primed !== false && !feedback;
   useEffect(() => {
-    if (state !== "ready" || !task) return;
+    if (!candidateTask || !task) return;
     const onKey = (ev: KeyboardEvent) => {
       if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
       const target = ev.target as HTMLElement | null;
-      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      if (target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)) return;
       if (ev.key === "Enter") {
+        const control = target?.closest("button, a, summary");
+        if (control && !control.hasAttribute("data-candidate")) return;
         ev.preventDefault();
         void submit(false);
         return;
@@ -369,7 +379,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [state, task, submit, toggle]);
+  }, [candidateTask, task, submit, toggle]);
 
   const pct = useMemo(
     () => (batch && batch.total ? Math.round((batch.done / batch.total) * 100) : 0),
@@ -577,6 +587,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
                 <li key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
                   <button
                     type="button"
+                    data-candidate
                     onClick={() => toggle(c.id)}
                     aria-pressed={on}
                     className="flex w-full items-start gap-3 py-3 text-left motion-reduce:transition-none"

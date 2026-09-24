@@ -777,3 +777,95 @@ describe("answering after the kind was withdrawn (phase 5 review)", () => {
     expect(await screen.findByText(/You can't label this batch right now/)).toBeInTheDocument();
   });
 });
+
+describe("the keyboard never answers for the labeller (2026-09-24)", () => {
+  // Enter was bound on the window for every task and every screen. On a claim
+  // or rendering task it filed "No" wherever focus was — including on the "Yes"
+  // button, whose own click it cancelled — and it answered the task hidden
+  // under the guide or under a practice answer. Keyboard answers were wrong
+  // answers in the gold data.
+  const CLAIM = {
+    article_id: "a1", title: "Minister announces road outlay", source: "The Hindu",
+    speaker: "The minister", quote_text: "double its outlay on rural roads",
+    context_before: "the minister said the state would ", context_after: " before the monsoon.",
+    target: null, stance: "neutral",
+  };
+  const claim = { id: "task-c1", position: 0, kind: "claim_attribution" as const, claim: CLAIM };
+
+  it("records yes when Enter is pressed on a focused yes", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claim, closed: false });
+    render(<LabelPage params={params} />);
+    (await screen.findByRole("button", { name: /Yes —/ })).focus();
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalledTimes(1));
+    expect(postLabelAnswer.mock.calls[0][1].selected).toEqual(["task-c1"]);
+  });
+
+  it("files nothing when Enter is pressed on a claim with no answer focused", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claim, closed: false });
+    render(<LabelPage params={params} />);
+    await screen.findByRole("button", { name: /Yes —/ });
+    await userEvent.keyboard("{Enter}");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(postLabelAnswer).not.toHaveBeenCalled();
+  });
+
+  it("records not sure when Enter is pressed on a focused not sure, whatever is ticked", async () => {
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Shan Masood/ }));
+    screen.getByRole("button", { name: "Not sure" }).focus();
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalledTimes(1));
+    expect(postLabelAnswer.mock.calls[0][1].unsure).toBe(true);
+  });
+
+  it("submits the ticked rows when Enter is pressed on a row just ticked, rather than unticking it", async () => {
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Shan Masood/ }));
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalledTimes(1));
+    expect(postLabelAnswer.mock.calls[0][1].selected).toEqual(["cand-1"]);
+  });
+
+  it("answers nothing while the guide is on screen", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana", primer: false } as never);
+    fetchLabelBatch.mockResolvedValue({ name: "B", notes: "", open: true, self_join: false, labeller: "ana", kind: "story_boundary", total: 10, done: 0 });
+    fetchLabelGuide.mockResolvedValue(guideFor("story_boundary"));
+    render(<LabelPage params={params} />);
+    await screen.findByRole("button", { name: /I have read this/ });
+    await userEvent.keyboard("1{Enter}");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(postLabelAnswer).not.toHaveBeenCalled();
+  });
+
+  it("answers nothing twice when Enter is pressed while a story task's practice answer is showing", async () => {
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
+    postLabelAnswer.mockResolvedValue({ ok: true, feedback: { correct: true, expected: [], explanation: "Different matches." } });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
+    await screen.findByRole("button", { name: "Next question" });
+    (document.activeElement as HTMLElement | null)?.blur();
+    await userEvent.keyboard("{Enter}");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(postLabelAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves on, and answers nothing twice, when Enter is pressed on Next after a practice answer", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: claim, closed: false });
+    postLabelAnswer.mockResolvedValue({ ok: true, feedback: { correct: true, expected: ["task-c1"], explanation: "Named in the sentence." } });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Yes —/ }));
+    const next = await screen.findByRole("button", { name: "Next question" });
+    const loadsBefore = fetchLabelTask.mock.calls.length;
+    next.focus();
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(fetchLabelTask.mock.calls.length).toBeGreaterThan(loadsBefore));
+    expect(postLabelAnswer).toHaveBeenCalledTimes(1);
+  });
+});
+
