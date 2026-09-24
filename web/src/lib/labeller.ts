@@ -64,6 +64,7 @@ export const labelTokenKey = (batch: string) => `prism.label.token.${batch}`;
 async function call<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeader(session), ...(init?.headers ?? {}) },
     cache: "no-store",
   });

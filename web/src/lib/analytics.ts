@@ -12,25 +12,26 @@
 // reason this uses fetch (sendBeacon cannot carry it).
 
 import { API_URL } from "@/lib/api";
-import { loadSession } from "@/lib/session";
+import { authHeader, loadSession } from "@/lib/session";
 
 type Props = Record<string, string | number | boolean | undefined>;
 type Event = "Sign in" | "Ask" | "Lens" | "Subscribe" | "Share";
 
 const ACTIVE = "prism.active";
 
-/** The session header, once per account per IST day; nothing otherwise. */
-function onceADay(): Record<string, string> {
+/** True once per signed-in account per IST day: the one count that says who
+ *  (so returning readers can be counted); every other count is anonymous. */
+function onceADay(): boolean {
   const session = loadSession();
-  if (!session) return {};
+  if (!session) return false;
   const mark = `${session.userId}|${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })}`;
   try {
-    if (window.localStorage.getItem(ACTIVE) === mark) return {};
+    if (window.localStorage.getItem(ACTIVE) === mark) return false;
     window.localStorage.setItem(ACTIVE, mark);
   } catch {
-    return {};
+    return false;
   }
-  return { Authorization: `Bearer ${session.token}` };
+  return true;
 }
 
 const NAME: Record<Event, string> = { "Sign in": "signin", Ask: "ask", Lens: "lens", Subscribe: "subscribe", Share: "share" };
@@ -66,10 +67,14 @@ function dimension(event: Event, p: Props): string {
 export function send(e: string, d: string, extra: Record<string, string> = {}): void {
   // Tests render components that count things; they must not reach a network.
   if (typeof window === "undefined" || process.env.NODE_ENV === "test") return;
+  const who = onceADay();
   void fetch(`${API_URL}/api/v1/beacon`, {
     method: "POST",
     keepalive: true,
-    headers: { "Content-Type": "application/json", ...onceADay() },
+    // The session cookie rides only on the once-a-day count; "omit" keeps every
+    // other count from saying who sent it (the privacy policy's promise).
+    credentials: who ? "include" : "omit",
+    headers: { "Content-Type": "application/json", ...(who ? authHeader(loadSession()) : {}) },
     body: JSON.stringify({ e, d, ...extra }),
   }).catch(() => undefined);
 }

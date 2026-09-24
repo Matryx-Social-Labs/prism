@@ -50,7 +50,9 @@ app.add_middleware(
     # This project's Vercel previews only. `.*\.vercel\.app` matched every
     # tenant's deployment — vercel.app is a shared suffix anyone can publish under.
     allow_origin_regex=r"https://prism-[a-z0-9-]+-matrixsociallabs-projects\.vercel\.app",
-    allow_credentials=False,
+    # The session is an HttpOnly cookie on .readprism.news (audit C5); a page on
+    # www reads api with credentials, which needs the exact origin echoed back.
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

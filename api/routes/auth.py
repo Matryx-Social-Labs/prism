@@ -7,12 +7,12 @@ console sender, so the flow works end-to-end in dev with no provider configured.
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_current_user
+from api.deps import clear_session_cookie, get_current_user, session_token, set_session_cookie
 from common import auth
 from common.billing import plan_for
 from common.config import get_settings
@@ -99,7 +99,7 @@ async def request_link(body: MagicLinkRequest, db: AsyncSession = Depends(get_db
 
 
 @router.post("/api/v1/auth/verify", response_model=SessionResponse)
-async def verify(body: VerifyRequest, db: AsyncSession = Depends(get_db)):
+async def verify(body: VerifyRequest, response: Response, db: AsyncSession = Depends(get_db)):
     user_id = await auth.verify_and_consume(db, body.token)
     if user_id is None:
         raise HTTPException(status_code=401, detail="invalid or expired token")
@@ -108,6 +108,10 @@ async def verify(body: VerifyRequest, db: AsyncSession = Depends(get_db)):
         await db.execute(text("SELECT email FROM users WHERE id = :i"), {"i": str(user_id)})
     ).scalar_one()
     needs_profile = not await auth.profile_complete(db, user_id)
+    set_session_cookie(response, token)
+    # ponytail: `token` stays in the body for one release so a page deployed
+    # before or after this API still signs in; the new web never stores it.
+    # Drop it from SessionResponse once both deploys carry the cookie.
     return SessionResponse(
         token=token, user_id=str(user_id), email=email, needs_profile=needs_profile
     )
@@ -121,7 +125,7 @@ class GoogleSignIn(BaseModel):
 
 
 @router.post("/api/v1/auth/google", response_model=SessionResponse)
-async def google_sign_in(body: GoogleSignIn, db: AsyncSession = Depends(get_db)):
+async def google_sign_in(body: GoogleSignIn, response: Response, db: AsyncSession = Depends(get_db)):
     """A Google ID token from the button or One Tap → the same session a
     consumed magic link gets. The verified email is the identity, so an address
     that signed in by link before lands in its existing account."""
@@ -137,6 +141,7 @@ async def google_sign_in(body: GoogleSignIn, db: AsyncSession = Depends(get_db))
     user_id = await auth.user_for_verified_email(db, email)
     token = await auth.create_session(db, user_id)
     needs_profile = not await auth.profile_complete(db, user_id)
+    set_session_cookie(response, token)
     return SessionResponse(token=token, user_id=str(user_id), email=email, needs_profile=needs_profile)
 
 
@@ -168,13 +173,29 @@ async def set_profile(
 
 
 @router.delete("/api/v1/auth/session", status_code=204)
-async def sign_out(authorization: str = Header(default=""), db: AsyncSession = Depends(get_db)) -> Response:
-    """Revoke the bearer session presented. 204 either way: whether the token was
-    live is not something an unauthenticated caller gets to learn."""
-    token = authorization.removeprefix("Bearer ").strip()
+async def sign_out(request: Request, authorization: str = Header(default=""), db: AsyncSession = Depends(get_db)) -> Response:
+    """Revoke the session presented (header or cookie) and clear the cookie. 204
+    either way: whether it was live is not something a caller gets to learn."""
+    token = session_token(request, authorization)
     if token:
         await auth.revoke_session(db, token)
-    return Response(status_code=204)
+    out = Response(status_code=204)
+    clear_session_cookie(out)
+    return out
+
+
+@router.post("/api/v1/auth/cookie", status_code=204)
+async def adopt_cookie(request: Request, authorization: str = Header(default=""),
+                       db: AsyncSession = Depends(get_db)) -> Response:
+    """Move a page signed in before the cookie onto it: the Bearer token it kept
+    in localStorage becomes the HttpOnly cookie (same session, no new row), and
+    the page deletes its copy. 401 when the token is dead, so the page signs out."""
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token or await auth.resolve_session(db, token) is None:
+        raise HTTPException(status_code=401, detail="missing or invalid session")
+    out = Response(status_code=204)
+    set_session_cookie(out, token)
+    return out
 
 
 @router.get("/api/v1/auth/me", response_model=MeResponse)

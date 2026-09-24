@@ -696,6 +696,7 @@ export async function fetchEvent(id: string, token?: string | null): Promise<Eve
     // keep the cache.
     ...(token ? { cache: "no-store" as const } : { next: { revalidate: 60 } }),
     headers: authHeaders(token),
+    credentials: "include",
   });
   if (!res.ok) throw new Error(`event failed: ${res.status}`);
   return (await res.json()) as EventDetail;
@@ -714,6 +715,7 @@ export async function fetchQuestions(
     // shared cache entry for identity to poison.
     cache: "no-store",
     headers: authHeaders(token),
+    credentials: "include",
   });
   if (!res.ok) return [];
   const data = (await res.json()) as { questions: string[] };
@@ -729,6 +731,7 @@ export async function fetchBrief(
     const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/brief?lens=${encodeURIComponent(lens)}`, {
       cache: "no-store",
       headers: authHeaders(token),
+      credentials: "include",
     });
     // 401 and 402 ARE THE PRODUCT, not failures. The previous `if (!res.ok)
     // return null` collapsed them into "no brief", so a reader who needed to
@@ -804,6 +807,7 @@ export async function askQuestion(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/ask`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ question, session_id: sessionId }),
     signal,

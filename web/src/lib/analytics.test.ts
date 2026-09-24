@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pageKind, send, shareSurface, track, word } from "@/lib/analytics";
 
 const fetchSpy = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/session", () => ({ loadSession: () => ({ token: "tok", userId: "u", email: "e@example.test" }) }));
+// A signed-in reader whose session is the HttpOnly cookie: the page holds no token.
+vi.mock("@/lib/session", () => ({ loadSession: () => ({ userId: "u", email: "e@example.test" }), authHeader: () => ({}) }));
 
 beforeEach(() => {
   localStorage.clear();
@@ -23,21 +24,21 @@ describe("usage counting", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("posts one event and one word, with the session so the day can be noted", () => {
+  it("posts one event and one word, with the session cookie so the day can be noted", () => {
     vi.stubEnv("NODE_ENV", "production");
     track("Lens", { lens: "markets", locked: true });
     expect(sent()).toEqual({ e: "lens", d: "markets:locked" });
-    expect(fetchSpy.mock.calls[0][1].headers).toMatchObject({ Authorization: "Bearer tok" });
+    expect(fetchSpy.mock.calls[0][1].credentials).toBe("include");
     expect(fetchSpy.mock.calls[0][1].keepalive).toBe(true);
   });
 
-  it("sends the session on the first beacon of the day only", () => {
+  it("sends the session on the first beacon of the day only; every other count omits it", () => {
     vi.stubEnv("NODE_ENV", "production");
     send("view", "feed");
     send("view", "story");
     track("Ask", { via: "bar" });
-    const withToken = fetchSpy.mock.calls.filter(([, init]) => "Authorization" in (init.headers as Record<string, string>));
-    expect(withToken).toHaveLength(1);
+    const modes = fetchSpy.mock.calls.map(([, init]) => (init as RequestInit).credentials);
+    expect(modes).toEqual(["include", "omit", "omit"]);
   });
 
   it("keeps the step of subscribing and what led there, as a slug", () => {

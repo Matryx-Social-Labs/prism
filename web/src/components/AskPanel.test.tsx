@@ -5,7 +5,7 @@ import { AskPanel } from "@/components/AskPanel";
 import type { AskCallbacks } from "@/lib/api";
 
 const askQuestion = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ askQuestion }));
+vi.mock("@/lib/api", () => ({ askQuestion, API_URL: "http://api.test" }));
 
 const PROPS = { eventId: "e1", sourceCount: 4, suggestedQuestions: ["What led to this?"] };
 
