@@ -18,6 +18,9 @@ const COUNTRIES: Record<string, string> = {
   AU: "Australia", CA: "Canada", DE: "Germany", FR: "France", QA: "Qatar", SG: "Singapore",
 };
 
+/** A state's name from its ISO 3166-2 code ("IN-KA" → Karnataka). */
+export const stateName = (code: string): string | null => STATES[code] ?? null;
+
 export function regionLabel(regions: string[] | null | undefined): string | null {
   if (!regions?.length) return null;
   const state = regions.find((r) => r in STATES);

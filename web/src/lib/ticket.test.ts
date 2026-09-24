@@ -24,7 +24,7 @@ const base = {
 } as unknown as EventDetail;
 
 const src = (published_at: string | null) =>
-  ({ article_id: "a", source_name: "s", source_slug: "s", url: null, title: "t", published_at, stance: null, funding: null });
+  ({ article_id: "a", source_name: "s", source_slug: "s", url: null, title: "t", published_at, funding: null });
 
 describe("ticketFacts — the header strip", () => {
   it("prints code · sources · origins · the newest article's IST stamp, in that order", () => {

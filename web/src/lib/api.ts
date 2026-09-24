@@ -73,7 +73,6 @@ export interface SourceRef {
   url: string | null;
   title: string;
   published_at: string | null;
-  stance: string | null;
   funding: string | null;
 }
 
@@ -93,7 +92,6 @@ export interface EntityOut {
 
 export interface PerspectiveOut {
   label: string;
-  stance: string | null;
   origin_country: string | null;
   summary: string | null;
   article_ids: string[];
@@ -204,6 +202,10 @@ export interface EventDetail {
   // What the ticket carries is the way to that owner. Optional: an older
   // payload (two deploy pipelines, 60s cache) simply has no route.
   story_slug?: string | null;
+  /** The denominator: outlets Prism monitors, and the collector's last poll.
+   *  Optional for the same two-pipeline reason as story_slug. */
+  monitored_outlets?: number | null;
+  monitored_checked_at?: string | null;
   projection: {
     event_type?: string | null;
     source_count?: number;
@@ -280,6 +282,39 @@ export interface RegionState {
   code: string;
   name: string;
   covered: boolean;
+}
+
+/** One monitored feed on the public source list (GET /api/v1/sources). */
+export interface MonitoredFeed {
+  slug: string;
+  name: string;
+  publisher: string;
+  code: string;
+  origin: string;
+  language: string | null;
+  state: string | null;
+  sector: string | null;
+  domain: string | null;
+  official: boolean;
+  checked_at: string | null;
+  ok_at: string | null;
+  reachable: boolean;
+}
+
+export interface MonitoredSet {
+  /** Distinct publishers: what a story's "k of N monitored outlets" is out of. */
+  outlets: number;
+  checked_at: string | null;
+  feeds: MonitoredFeed[];
+}
+
+export async function fetchSources(): Promise<MonitoredSet | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/sources`, { next: { revalidate: 300 } });
+    return res.ok ? ((await res.json()) as MonitoredSet) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchRegions(): Promise<RegionState[]> {

@@ -52,3 +52,15 @@ export function coverageText(outlets: OutletRef[], fallbackCount?: number): stri
   if (langs.length > 1) parts.push(`${langs.length} languages`);
   return parts.join(" · ");
 }
+
+/**
+ * "2 of 27 monitored outlets": a story's count is out of the outlets Prism
+ * reads, never out of everyone who covered it (the denominator made visible).
+ * Without the set's size — an older payload — it stays the bare count, and a
+ * total smaller than the count (a feed retired since) is not printed as a
+ * fraction that reads as a mistake.
+ */
+export function monitoredText(count: number, monitored: number | null | undefined): string {
+  if (!monitored || monitored < count) return `${count} ${count === 1 ? "outlet" : "outlets"}`;
+  return `${count} of ${monitored} monitored outlets`;
+}

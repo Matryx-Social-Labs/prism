@@ -337,7 +337,6 @@ async def get_event(
                        s.reliability ->> 'funding' AS funding,
                        ri.url, ri.url_canonical, ri.title, ri.published_at, ri.image_url, ri.image_phash,
                        ri.language AS lang,
-                       e.shared_fields -> 'stance' ->> 'label' AS stance,
                        e.shared_fields -> 'claims' AS claims,
                        CASE WHEN jsonb_typeof(e.shared_fields -> 'claims') = 'array'
                              AND jsonb_array_length(e.shared_fields -> 'claims') > 0
@@ -360,7 +359,7 @@ async def get_event(
         await db.execute(
             text(
                 """
-                SELECT label, stance, origin_country, summary, member_articles
+                SELECT label, origin_country, summary, member_articles
                 FROM perspectives WHERE event_id = :eid ORDER BY created_at
                 """
             ),
@@ -462,6 +461,7 @@ async def get_event(
             safe_projection[key] = None
 
     reg = await outlets.registry(db)
+    mon = await outlets.monitored(db)
     placeholders = await placeholder_hashes(db)
     return EventDetail(
         id=str(event["id"]),
@@ -483,6 +483,8 @@ async def get_event(
             EntityOut(name=e["name"], entity_type=e["entity_type"], role=e["role"], slug=e["slug"]) for e in entities
         ],
         story_slug=story["slug"] if story else None,
+        monitored_outlets=mon.outlets,
+        monitored_checked_at=mon.checked_at,
         sources=[
             SourceRef(
                 article_id=str(s["article_id"]),
@@ -491,7 +493,6 @@ async def get_event(
                 url=s["url"],
                 title=s["title"],
                 published_at=s["published_at"].isoformat() if s["published_at"] else None,
-                stance=s["stance"],
                 funding=s["funding"],
                 code=reg[s["source_slug"]].code if s["source_slug"] in reg else None,
                 origin=reg[s["source_slug"]].origin if s["source_slug"] in reg else None,
@@ -506,7 +507,6 @@ async def get_event(
         perspectives=[
             PerspectiveOut(
                 label=p["label"],
-                stance=p["stance"],
                 origin_country=p["origin_country"],
                 summary=p["summary"],
                 article_ids=[str(a) for a in (p["member_articles"] or [])],

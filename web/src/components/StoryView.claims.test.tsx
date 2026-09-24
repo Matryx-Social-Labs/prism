@@ -24,7 +24,7 @@ vi.mock("@/lib/lenses", () => ({
 
 const SRC = (id: string, name: string, url: string | null = `https://x.example/${id}`) => ({
   article_id: id, source_name: name, source_slug: name.toLowerCase(), url, title: `T ${id}`,
-  published_at: "2026-07-27T10:00:00Z", stance: null, funding: null,
+  published_at: "2026-07-27T10:00:00Z", funding: null,
 });
 
 const BASE = {

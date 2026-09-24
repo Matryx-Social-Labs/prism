@@ -28,7 +28,6 @@ const FAQ: { q: string; a: string }[] = [
   { q: "What if I change my mind?", a: "A yearly or founding charge is refunded in full if you ask within 7 days — no questions. Monthly charges are not refunded; cancelling stops the next one." },
   { q: "Who charges me, and how?", a: "Razorpay processes the payment (UPI Autopay, cards, net banking). It is collected by Matryx Social Labs Private Limited on behalf of Prism Media Intelligence LLP until the LLP's own merchant account is live, so that is the name you may see on your statement." },
   { q: "Are the prices final?", a: "Yes. Every price on this page includes GST, and each charge comes with an invoice by email." },
-  { q: "What happens when the offer's twelve months end?", a: "Your subscription completes and nothing renews on its own. We write to you first with the price of the day, and you decide." },
   { q: "What does Plus not change?", a: "Reading. Every record, source, quote, coverage split and clip stays free for everyone, with or without an account. Plus changes how much you can ask of it." },
 ];
 
@@ -125,7 +124,7 @@ export function PlusPage() {
         </p>
         <h1 className="font-record mt-3 text-[36px] font-bold leading-[1.18] text-balance sm:text-[44px]">Ask more of every story.</h1>
         <p className="mt-4 text-[17px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
-          The record stays free for everyone. Plus is for the reader who needs answers from the whole story — a hundred times a day, on the stronger model.
+          The evidence stays free for everyone. Plus is for the reader who asks more of it: answers drawn from the whole story, a hundred questions a day.
         </p>
         <div className="mt-7 inline-flex flex-col items-center gap-2">
           <div className="seg" role="tablist" aria-label="Billing period">
@@ -160,10 +159,10 @@ export function PlusPage() {
             </p>
             <div className="mt-5"><Action plan={period === "year" ? "plus_yearly" : "plus_monthly"} primary label="Get Plus" /></div>
             <ul className="mt-5 flex flex-col">
-              <Row ok><b className="font-semibold">{ASK.plus} questions a day</b> on any story</Row>
-              <Row ok><b className="font-semibold">The stronger model</b> on every answer</Row>
               <Row ok>Answers from the <b className="font-semibold">whole story</b> — every development&rsquo;s reports</Row>
+              <Row ok><b className="font-semibold">{ASK.plus} questions a day</b> on any story</Row>
               <Row ok>Ask <b className="font-semibold">stays on</b> when the free box rests for the day</Row>
+              <Row ok>A larger model on every answer</Row>
               <Row ok>Everything in Free</Row>
             </ul>
           </article>
@@ -185,7 +184,7 @@ export function PlusPage() {
               )}
             </div>
             <ul className="mt-5 flex flex-col">
-              <Row ok>Every record, source, quote, coverage split and clip</Row>
+              <Row ok>Every record, source, verified quote, coverage count and clip, forever</Row>
               <Row ok><b className="font-semibold">{ASK.free} questions a day</b> with an account, {ASK.anon} without</Row>
               <Row ok>The standard model</Row>
               <Row ok={false} muted>Answers from this development only</Row>

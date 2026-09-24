@@ -40,7 +40,7 @@ export function PlusWelcome() {
       <ul className="mt-6 flex flex-col">
         {[
           <><b className="font-semibold">100 questions a day</b> — the box no longer rests for you.</>,
-          <><b className="font-semibold">The stronger model</b>, reading the <b className="font-semibold">whole story</b>, not one development.</>,
+          <>Answers from the <b className="font-semibold">whole story</b>, not one development, on a larger model.</>,
           <>Ask <b className="font-semibold">stays on</b> when the free box rests.</>,
         ].map((line, i) => (
           <li key={i} className="flex items-start gap-2.5 border-t py-3 text-[16px] leading-[1.55]" style={{ borderColor: "var(--line)" }}>

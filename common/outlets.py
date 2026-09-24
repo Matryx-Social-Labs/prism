@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
 from sqlalchemy import text
@@ -168,3 +169,101 @@ async def registry(db: AsyncSession) -> dict[str, Outlet]:
 def reset_cache() -> None:
     global _cache
     _cache = None
+
+# ── The monitored set: the denominator every story's count is out of ─────────
+# A story with 2 outlets means "2 of the outlets Prism reads", never "2 on the
+# internet". The set is every ENABLED feed in ingestion/rss.py, counted by
+# publisher (The Hindu's state feeds are one masthead), and its freshness is the
+# feed watermark the collector writes on every poll.
+MONITORED_TTL_S = 300  # the collector polls every 5 minutes; this is its cadence
+REACHABLE_WITHIN = timedelta(hours=1)  # twelve polls without an answer is a failure
+_OK_STATUSES = (200, 304)  # 304 is "nothing new", which is still an answer
+
+
+@dataclass(frozen=True)
+class Feed:
+    slug: str
+    name: str
+    publisher: str
+    code: str
+    origin: str
+    language: str | None
+    state: str | None  # ISO 3166-2 when the feed is one state's desk
+    sector: str | None  # set when the feed is single-topic
+    domain: str | None
+    official: bool  # the institution's own releases (RBI), not an outlet's reporting
+    checked_at: str | None  # the collector's last poll
+    ok_at: str | None  # the last poll that returned new items
+    reachable: bool
+
+
+@dataclass(frozen=True)
+class Monitored:
+    feeds: tuple[Feed, ...]
+    outlets: int  # distinct publishers
+    checked_at: str | None  # the most recent poll of any feed
+
+
+def _reachable(watermark: dict, now: datetime) -> bool:
+    try:
+        checked = datetime.fromisoformat(watermark["rss_last_checked_at"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return watermark.get("rss_last_status") in _OK_STATUSES and not watermark.get("rss_last_error") and now - checked <= REACHABLE_WITHIN
+
+
+_monitored_cache: tuple[float, Monitored] | None = None
+
+
+async def monitored(db: AsyncSession) -> Monitored:
+    """Every enabled news feed with its last poll, cached for one poll cycle."""
+    global _monitored_cache
+    t = time.monotonic()
+    if _monitored_cache and t - _monitored_cache[0] < MONITORED_TTL_S:
+        return _monitored_cache[1]
+    from ingestion.rss import FEEDS  # lazily, as domain_for does
+
+    specs = {f.slug: f for f in FEEDS if f.enabled}
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT slug, name, source_type, publisher, country, language,
+                       reliability ->> 'funding' AS funding, watermark
+                FROM sources WHERE slug = ANY(:slugs) ORDER BY slug
+                """
+            ),
+            {"slugs": list(specs)},
+        )
+    ).mappings().all()
+    now = datetime.now(UTC)
+    feeds = []
+    for r in rows:
+        spec, wm = specs[r["slug"]], r["watermark"] or {}
+        publisher = r["publisher"] or r["slug"]
+        feeds.append(
+            Feed(
+                slug=r["slug"],
+                name=r["name"],
+                publisher=publisher,
+                code=code_for(publisher, r["name"]),
+                origin=classify(r["country"], r["language"], r["source_type"]),
+                language=r["language"],
+                state=spec.state,
+                sector=spec.sector,
+                domain=domain_for(publisher, r["slug"]),
+                official=r["funding"] == "state",
+                checked_at=wm.get("rss_last_checked_at"),
+                ok_at=wm.get("rss_last_success_at"),
+                reachable=_reachable(wm, now),
+            )
+        )
+    checked = [f.checked_at for f in feeds if f.checked_at]
+    result = Monitored(feeds=tuple(feeds), outlets=len({f.publisher for f in feeds}), checked_at=max(checked) if checked else None)
+    _monitored_cache = (t, result)
+    return result
+
+
+def reset_monitored_cache() -> None:
+    global _monitored_cache
+    _monitored_cache = None

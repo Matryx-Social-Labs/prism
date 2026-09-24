@@ -9,13 +9,15 @@ import { LensRegistry } from "@/components/LensRegistry";
 import { PrismFigure } from "@/components/PrismFigure";
 import { Said } from "@/components/Said";
 import { SectionHead } from "@/components/SectionHead";
-import { AVAILABLE, NEXT, StatusColumn, VALIDATION } from "@/components/StatusGrid";
+import { AVAILABLE, FREE_LINE, NEXT, StatusColumn, VALIDATION } from "@/components/StatusGrid";
 import { OutletIcon } from "@/components/Coverage";
 import { ArrowRight } from "@/components/icons";
 import { fallbackCode, indexSources } from "@/lib/sources";
+import { monitoredText } from "@/lib/coverage";
 import {
   fetchEvent,
   fetchFeed,
+  fetchSources,
   fetchTrendingStory,
   type EventDetail,
   type FeedItem,
@@ -44,11 +46,13 @@ type Evidence = {
   route: { event: EventDetail; story: TrendingStoryDetail } | null;
   outlets: number;
   languages: number;
+  /** Outlets Prism monitors: the denominator every count on the page is out of. */
+  monitored: number | null;
 };
 
 async function loadEvidence(): Promise<Evidence | null> {
   try {
-    const all = await fetchFeed({ limit: 60 });
+    const [all, monitored] = await Promise.all([fetchFeed({ limit: 60 }), fetchSources()]);
     const rows = chartOrder(all.filter((item) => item.sector !== "cybersecurity"));
     const events = (
       await Promise.all(rows.slice(0, 16).map((item) => fetchEvent(item.id).catch(() => null)))
@@ -73,6 +77,7 @@ async function loadEvidence(): Promise<Evidence | null> {
       route,
       outlets: new Set(outletRefs.map((o) => o.publisher)).size,
       languages: new Set(outletRefs.map((o) => o.language ?? "en")).size,
+      monitored: monitored?.outlets ?? null,
     };
   } catch {
     return null;
@@ -108,7 +113,7 @@ export async function Landing() {
               Follow the story, not the headlines.
             </h1>
             <p className="mt-5 max-w-[44ch] text-[17px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
-              Prism turns the day&rsquo;s reports from monitored outlets into one live record per story: what changed, who said what, exactly, and which outlets covered it. Then read the same facts through the lens of your work.
+              Prism assembles each story once from the outlets it monitors and keeps the evidence attached: every report, the exact words said, which outlets covered it and how many have not yet. Then read the same facts through the lens of your work.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-2.5">
               <Link href="/feed" className="btn btn-primary btn-lg">{CTA} <ArrowRight /></Link>
@@ -116,7 +121,7 @@ export async function Landing() {
             </div>
             {evidence && evidence.outlets > 0 && (
               <div className="mt-8 grid grid-cols-3 border-y" style={{ borderColor: "var(--line)" }}>
-                {[[String(evidence.outlets), "outlets in today's record"], [String(evidence.languages), evidence.languages === 1 ? "language read" : "languages read"], ["1", "record per story"]].map(([n, l]) => (
+                {[[String(evidence.outlets), evidence.monitored && evidence.monitored >= evidence.outlets ? `of ${evidence.monitored} monitored outlets in today's record` : "outlets in today's record"], [String(evidence.languages), evidence.languages === 1 ? "language read" : "languages read"], ["1", "record per story"]].map(([n, l]) => (
                   <div key={l} className="border-r px-3.5 py-4 last:border-r-0" style={{ borderColor: "var(--line)" }}>
                     <b className="font-record block text-[28px] font-bold leading-none">{n}</b>
                     <span className="mt-1 block text-[12.5px]" style={{ color: "var(--ink-3)" }}>{l}</span>
@@ -194,14 +199,18 @@ export async function Landing() {
           </div>
 
           <div className="card flex flex-col gap-3 p-5">
-            <h3 className="font-record text-[22px] font-bold leading-[1.2]">Who covered it</h3>
-            <p className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>See at a glance whether a story is carried by English national outlets, Indian-language outlets, the international press, or just one of them.</p>
+            <h3 className="font-record text-[22px] font-bold leading-[1.2]">Who covered it, and how sure</h3>
+            <p className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>See whether a story is carried by English national outlets, Indian-language outlets or the international press. Every count is out of the outlets Prism monitors, and a story only one of them has is marked not yet corroborated.</p>
             <div className="mt-auto border-t pt-4" style={{ borderColor: "var(--line)" }}>
               {proofOutlets.length > 0 ? (
                 <>
                   <p className="flex items-center gap-3">
                     <CoverageBar outlets={proofOutlets} size="lg" width={180} />
                     <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>{coverageText(proofOutlets)}</span>
+                  </p>
+                  <p className="mt-2 font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>
+                    <Link href="/sources" className="underline-offset-4 hover:underline">{monitoredText(publishers(proofOutlets).length, proof?.monitored_outlets ?? evidence?.monitored)}</Link>
+                    {proof?.monitored_checked_at && ` · checked ${relativeTime(proof.monitored_checked_at)}`}
                   </p>
                   <div className="mt-3"><CoverageLegend outlets={proofOutlets} /></div>
                   <div className="mt-3"><MonogramStack outlets={proofOutlets} limit={6} /></div>
@@ -271,7 +280,7 @@ export async function Landing() {
           <StatusColumn tone="next" label="Next" items={NEXT} />
         </div>
         <p className="mt-6 max-w-[64ch] text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
-          The record, the sources, the verified quotes and the story status are free for every reader. Professional readings, watchlists and alerts are the part of Prism that can be paid for.
+          {FREE_LINE}
         </p>
       </section>
 

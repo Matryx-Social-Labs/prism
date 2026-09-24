@@ -12,7 +12,7 @@ export const LEGAL_ENTITY = "Prism Media Intelligence LLP";
 export const LEGAL_PARTNER = "Matryx Social Labs Private Limited (Matrix Social Labs)";
 export const CONTACT_EMAIL = "hello@readprism.news";
 export const LEGAL_CITY = "Bengaluru, Karnataka";
-export const LEGAL_UPDATED = "2026-09-23";
+export const LEGAL_UPDATED = "2026-09-24";
 
 /** A paragraph, or a bullet list. */
 export type Block = string | string[];
@@ -36,18 +36,18 @@ export const PRIVACY: LegalDoc = {
   title: "Privacy policy",
   kind: "Policy",
   inShort: [
-    "Read without an account and we know nothing about you.",
+    "Read without an account and we keep no history of what you read.",
     "An account is your email, plus what you choose to tell us at onboarding.",
     "Your questions are stored to keep the thread; nothing is sold or used for ads.",
     "Ask, and we delete it all.",
   ],
-  lede: `Prism is owned and operated by ${LEGAL_ENTITY} ("Prism", "we"), and built and run with ${LEGAL_PARTNER} as its technology partner. This page says what we collect, why, where it goes, and how to have it removed. It is written to India's Digital Personal Data Protection Act, 2023, under which ${LEGAL_ENTITY} is the data fiduciary.`,
+  lede: `Prism is owned and operated by ${LEGAL_ENTITY} ("Prism", "we"), and built and run with ${LEGAL_PARTNER} as its technology partner. This page says what we collect, why, where it goes, and how to have it removed. It is written to India's Digital Personal Data Protection Act, 2023 and its Rules ahead of the dates their main duties begin, and under them ${LEGAL_ENTITY} is the data fiduciary.`,
   sections: [
     {
       heading: "What we collect",
-      short: "Nothing while you read; your email and what you tell us once you sign in.",
+      short: "No history of what you read; your email and what you tell us once you sign in.",
       blocks: [
-        "Reading without an account: nothing that identifies you. One cookie, prism.returning, tells the front page you have been here before so it can take you straight to the chart. Your browser keeps a few settings on your device (theme, the scope you last chose, the last story you opened) and sends them nowhere.",
+        "Reading without an account: we keep no history of what you read, and nothing in our database identifies you. One cookie, prism.returning, tells the front page you have been here before so it can take you straight to the chart. Your browser keeps a few settings on your device (theme, the scope you last chose, the last story you opened) and sends them nowhere.",
         "How Prism is used, counted without knowing who: we count page views and a handful of actions (opening a lens, asking a question, sharing, each step of subscribing) as daily totals by kind. A kind of page, never which story; how a question was opened, never the question; the site a visit came from, never the page. To count how many people visited in a day, we hash your IP address and browser with a random value that is replaced every day and deleted within two days; the hash is used only for that day's count, never stored in our database, and cannot be linked to you or to another day. None of this sets a cookie.",
         "Asking a question without an account: the question and the answer are stored against a random session id that lives in your browser. To keep the free box open for everyone we count questions per session and per IP address, hashed with a value that changes every day, so the hash cannot be turned back into your address; the counter expires after about a day (26 hours).",
         "An account: your email address, from the sign-in link you click or from Google if you sign in with Google. From Google we receive your email and the fact that Google has verified it, nothing else. At onboarding you may tell us your name, profession, state and reading languages, and we record the time you agreed to the Terms.",

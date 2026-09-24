@@ -144,7 +144,9 @@ class SourceRef(BaseModel):
     url: str | None
     title: str
     published_at: str | None
-    stance: str | None
+    # No `stance`: the extraction's tone label (critical/neutral/supportive) never
+    # reaches a reader. It had no published definition, and on a row it read as the
+    # outlet rating Prism says it does not make (DESIGN.md D4; founder D-a 2026-09-24).
     funding: str | None = None  # "state" | "public" | None — outlet transparency chip
     code: str | None = None  # monogram, from common/outlets.py
     origin: str | None = None  # national | intl | regional | wire
@@ -157,9 +159,32 @@ class SourceRef(BaseModel):
     image_phash: str | None = None  # 64-bit dHash of the photo, hex; the rail drops near-identical ones
 
 
+class FeedOut(BaseModel):
+    """One monitored feed on the public source list (/sources)."""
+
+    slug: str
+    name: str
+    publisher: str
+    code: str
+    origin: str  # national | intl | regional | wire
+    language: str | None
+    state: str | None
+    sector: str | None
+    domain: str | None
+    official: bool
+    checked_at: str | None
+    ok_at: str | None
+    reachable: bool
+
+
+class SourcesResponse(BaseModel):
+    outlets: int  # distinct publishers: the denominator a story's count is out of
+    checked_at: str | None
+    feeds: list[FeedOut]
+
+
 class PerspectiveOut(BaseModel):
     label: str
-    stance: str | None
     origin_country: str | None
     summary: str | None
     article_ids: list[str]
@@ -316,6 +341,11 @@ class EventDetail(BaseModel):
     # route from /trending/{slug} — the same arc the share page shows. None when
     # no story holds the event.
     story_slug: str | None = None
+    # The denominator: how many outlets Prism monitors, and when the collector
+    # last polled them, so "2 outlets" reads as "2 of 27 monitored · checked
+    # 4 min ago" and never as everyone who covered it.
+    monitored_outlets: int | None = None
+    monitored_checked_at: str | None = None
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]
