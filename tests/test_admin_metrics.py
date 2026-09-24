@@ -103,11 +103,11 @@ async def test_sign_ups_and_retention_are_counted_per_week(seeded):
         pytest.skip("no database")
     async with session_scope() as s:
         signups = await metrics.signups(s, metrics.window(28, TODAY))
-        retention = await metrics.retention(s, TODAY)
+        retention = await metrics.retention(s, TODAY, since=date(2031, 1, 1))
     new = _row(signups, "new_accounts")
     assert (new["current"], new["previous"]) == (2, 1)
     week = next(r for r in retention["rows"] if r["week"] == "2031-01-06")
-    assert (week["accounts"], week["returned"], week["complete"]) == (1, 1, True)
+    assert (week["accounts"], week["by_week"][0]) == (1, 1)
 
 
 async def test_revenue_counts_a_year_as_twelve_months_and_leaves_gifts_out(seeded):
@@ -240,3 +240,79 @@ async def test_only_a_founder_reads_the_numbers_and_the_csv_is_counts(monkeypatc
         async with session_scope() as s:
             await s.execute(text("DELETE FROM sessions WHERE user_id = ANY(:u)"), {"u": [founder, reader]})
             await s.execute(text("DELETE FROM users WHERE id = ANY(:u)"), {"u": [founder, reader]})
+
+
+async def test_charts_get_the_period_before_each_word_and_accounts_over_time(seeded):
+    """What the charts draw (admin charts, phase 2): the period before laid over
+    this one, each word's own day by day, and accounts as a running total."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    w = metrics.window(28, TODAY)
+    async with session_scope() as s:
+        visits = await metrics.visits(s, w, since=date(2031, 1, 1))
+        signups = await metrics.signups(s, w)
+    views = _row(visits, "views")
+    # The period before ends 3 Jan: 4 views on the 2nd, none on the 3rd, and
+    # nothing at all (not zero) before counting began on the 1st.
+    assert views["prev_series"][-2:] == [4, 0] and views["prev_series"][0] is None
+    assert len(views["prev_series"]) == 28
+    by_page = next(b for b in visits["breakdowns"] if b["key"] == "sources")
+    assert "series" in by_page
+    async with session_scope() as s:
+        raw = await metrics._usage(s, w, "view", date(2031, 1, 1))
+    assert raw["split_series"]["story"][-2:] == [5, 0] and raw["split_series"]["feed"][-2:] == [0, 2]
+    accounts = _row(signups, "accounts")
+    # Two sign-ups inside the window (6 and 31 Jan): the running total rises by two.
+    assert accounts["series"][-1] == accounts["series"][0] + 2
+    assert accounts["series"] == sorted(accounts["series"]), "a running total never goes down"
+
+
+async def test_retention_is_a_grid_and_an_unfinished_week_is_not_a_zero(seeded):
+    if not await _db_reachable():
+        pytest.skip("no database")
+    u = seeded["users"]
+    async with session_scope() as s:
+        # Back in week 2 as well as week 1 after signing up on Monday 6 Jan.
+        await s.execute(text("INSERT INTO user_days (user_id, day) VALUES (:u, :d)"), {"u": u[0], "d": date(2031, 1, 22)})
+    async with session_scope() as s:
+        grid = await metrics.retention(s, TODAY, since=date(2031, 1, 1))
+        # Sign-ins counted only from Monday 20 Jan: the week of 13 Jan has no record.
+        late = await metrics.retention(s, TODAY, since=date(2031, 1, 20))
+        # Counted from Tuesday 14 Jan: that week is part-counted, and a part is not a count.
+        midweek = await metrics.retention(s, TODAY, since=date(2031, 1, 14))
+        never = await metrics.retention(s, TODAY, since=None)
+    week = next(r for r in grid["rows"] if r["week"] == "2031-01-06")
+    # Weeks after: 13–19 Jan, 20–26 Jan, then 27 Jan–2 Feb, which is not over on the 31st.
+    assert week["by_week"][:3] == [1, 1, None]
+    assert all(v is None for v in week["by_week"][2:])
+    assert week["accounts"] == 1
+    # Before sign-ins were counted, nobody "did not come back": there is no record.
+    assert next(r for r in late["rows"] if r["week"] == "2031-01-06")["by_week"][:2] == [None, 1]
+    assert next(r for r in midweek["rows"] if r["week"] == "2031-01-06")["by_week"][:2] == [None, 1]
+    assert all(v is None for r in never["rows"] for v in r["by_week"])
+
+
+async def test_reports_are_split_by_what_happened_to_them():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    src = uuid.uuid4()
+    try:
+        async with session_scope() as s:
+            await s.execute(text("INSERT INTO sources (id, slug, name, source_type, publisher, country, language) "
+                                 "VALUES (:i, :s, 'Status test', 'rss', :s, 'IN', 'en')"), {"i": src, "s": f"st-{src.hex[:10]}"})
+            for relevance, n in (("relevant", 3), ("duplicate", 2), ("rejected", 1)):
+                for _ in range(n):
+                    rid = uuid.uuid4()
+                    await s.execute(text("INSERT INTO raw_items (id, source_id, external_id, url, title, published_at, observed_at, "
+                                         "language, raw, relevance) VALUES (:r, :s, :x, :u, 't', :t, :t, 'en', '{}', :rel)"),
+                                    {"r": rid, "s": src, "x": f"st-{rid.hex}", "u": f"https://example.org/st/{rid.hex}",
+                                     "t": _at(date(2031, 1, 30)), "rel": relevance})
+        async with session_scope() as s:
+            supply = await metrics.supply(s, metrics.window(28, TODAY))
+        status = next(b for b in supply["breakdowns"] if b["key"] == "report_status")
+        assert list(status["series"]) == ["relevant", "duplicate", "rejected"]
+        assert {k: v[-2] for k, v in status["series"].items()} == {"relevant": 3, "duplicate": 2, "rejected": 1}
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM raw_items WHERE source_id = :s"), {"s": src})
+            await s.execute(text("DELETE FROM sources WHERE id = :s"), {"s": src})

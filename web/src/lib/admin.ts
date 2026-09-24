@@ -165,6 +165,8 @@ export interface MetricRow {
   previous: number | string | null;
   /** One value per IST day of the period; null before counting began. */
   series: Array<number | null> | null;
+  /** The period before, day by day, for the dashed line under `series`. */
+  prev_series?: Array<number | null> | null;
   unit: MetricUnit;
   source: string;
   note: string | null;
@@ -181,6 +183,8 @@ export interface Breakdown {
   title: string;
   rows: SplitRow[];
   source: string;
+  /** Each word's own day-by-day, where the breakdown is drawn stacked. */
+  series?: Record<string, Array<number | null>>;
 }
 
 export interface MetricSection {
@@ -188,7 +192,7 @@ export interface MetricSection {
   title: string;
   rows: MetricRow[];
   breakdowns: Breakdown[];
-  retention?: { title: string; source: string; rows: { week: string; accounts: number; returned: number; complete: boolean }[] };
+  retention?: { title: string; source: string; rows: { week: string; accounts: number; by_week: Array<number | null> }[] };
   lag?: { title: string; source: string; min_stories: number; rows: { outlet: string; stories: number; first: number; median_hours: number }[] };
 }
 

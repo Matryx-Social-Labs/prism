@@ -1,0 +1,75 @@
+/*
+ * /admin only (founder decisions V2/V3, 2026-09-24): chart panels and one
+ * categorical palette. Reader pages stay monochrome (DESIGN.md, the Prism
+ * Rule); an internal dashboard needs colour to tell series apart.
+ *
+ * The palette is the dataviz method's reference order with Prism's teal as
+ * slot 1, run through scripts/validate_palette.js on Prism's own surfaces:
+ * light (#FCFBF7) and dark (#181D19) both pass lightness, chroma, colour-blind
+ * separation (worst adjacent ΔE 10.7 light, 12.4 dark) and the normal-vision
+ * floor. Light slots 4–5 sit under 3:1 against the surface, so every chart
+ * carries labels or a data table — never colour alone (the Legend Rule).
+ */
+.admin-viz {
+  --viz-1: #009c86; /* teal — Prism's accent family */
+  --viz-2: #eb6834; /* orange */
+  --viz-3: #2a78d6; /* blue */
+  --viz-4: #eda100; /* yellow */
+  --viz-5: #e87ba4; /* pink */
+  --viz-6: #4a3aa7; /* violet */
+  --viz-grid: var(--line);
+  --viz-axis: var(--ink-3);
+  --viz-prev: var(--ink-3);
+  --viz-uncounted: var(--sunken);
+  /* One hue, light to dark, for magnitude (the cohort grid). */
+  --viz-seq-1: #dff3ef;
+  --viz-seq-2: #a9e0d5;
+  --viz-seq-3: #5cc3b0;
+  --viz-seq-4: #009c86;
+  --viz-seq-5: #00685a;
+  /* Text on the two darkest steps, 4.5:1 in each mode (ink holds on 1–3). */
+  --viz-seq-on-4: var(--ink);
+  --viz-seq-on-5: #fcfbf7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .admin-viz {
+    --viz-1: #1aa88f;
+    --viz-2: #d95926;
+    --viz-3: #3987e5;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-6: #9085e9;
+    --viz-seq-1: #16302b;
+    --viz-seq-2: #1d4c43;
+    --viz-seq-3: #1f6f60;
+    --viz-seq-4: #1aa88f;
+    --viz-seq-5: #7fdcc8;
+    --viz-seq-on-4: #171a18;
+    --viz-seq-on-5: #171a18;
+  }
+}
+:root[data-theme="dark"] .admin-viz {
+  --viz-1: #1aa88f;
+  --viz-2: #d95926;
+  --viz-3: #3987e5;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #9085e9;
+  --viz-seq-1: #16302b;
+  --viz-seq-2: #1d4c43;
+  --viz-seq-3: #1f6f60;
+  --viz-seq-4: #1aa88f;
+  --viz-seq-5: #7fdcc8;
+  --viz-seq-on-4: #171a18;
+  --viz-seq-on-5: #171a18;
+}
+
+/* A panel: the dashboard's unit, on /admin only (V2). A hairline and the
+   surface, no shadow — the chrome stays quiet so the data can speak. */
+.admin-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  min-width: 0;
+}

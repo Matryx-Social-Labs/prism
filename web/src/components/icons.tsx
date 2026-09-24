@@ -90,3 +90,7 @@ export const XIcon = ({ size = 14, className }: P) => (
 export const Headphones = ({ size = 16, className }: P) => (
   <svg {...base(size)} className={className}><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><path d="M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1z" /></svg>
 );
+/** "Where this number comes from" — the admin charts' provenance tip. */
+export const InfoIcon = ({ size = 16, className }: P) => (
+  <svg {...base(size, 1.8)} className={className}><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none" /></svg>
+);

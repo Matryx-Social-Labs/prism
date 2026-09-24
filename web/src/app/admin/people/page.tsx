@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { AdminSection, AdminTitle, Quiet, useAdmin } from "@/components/admin/AdminShell";
-import { dayLabel } from "@/components/admin/Ledger";
+import { dayLabel } from "@/components/admin/charts/format";
 import { fetchPeople, type Person } from "@/lib/admin";
 import { langName } from "@/lib/languages";
 
