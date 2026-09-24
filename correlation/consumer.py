@@ -540,13 +540,14 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         # newest member would also be coherent, but it rewrites the headline a
         # reader may have arrived on, which is a bigger product change than this.
         event.summary = summaries[0] if summaries else event.summary
-        # Briefs are written by the analysis pass and the extractor, not derived
-        # here; rebuilding the projection used to drop them, so a cached brief
-        # vanished the moment a second outlet arrived and the next reader paid
-        # for it again (565 of 1,658 multi-source events had none).
-        kept = {k: v for k, v in (event.projection or {}).items() if k in ("lens_briefs", "lens_points") and v}
-        event.projection = {
-            **kept,
+        # Merged at WRITE time, never replaced (audit H11). This rebuild owns
+        # the keys below and nothing else: lens_briefs and lens_points belong to
+        # persist_briefs (the analysis pass, the extractor, and the API's
+        # on-demand lens brief). It used to read the projection, keep the briefs
+        # it saw, and write the whole object back, so a brief committed between
+        # that read and this write was lost and the next reader paid for it
+        # again. `||` in one UPDATE reads the row as it is when the write lands.
+        computed = {
             "event_type": max(set(event_types), key=event_types.count) if event_types else None,
             "source_count": len(rows),
             # The newest member's publication time. events.last_updated_at is
@@ -584,6 +585,10 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
             "cyber": cyber or None,
             "finance": finance or None,
         }
+        await session.execute(
+            text("UPDATE events SET projection = COALESCE(projection, '{}'::jsonb) || CAST(:p AS jsonb) WHERE id = :eid"),
+            {"p": json.dumps(computed, default=str), "eid": str(event_id)},
+        )
         event.last_updated_at = func.now()
 
 
