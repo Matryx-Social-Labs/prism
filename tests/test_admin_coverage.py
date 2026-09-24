@@ -33,7 +33,7 @@ async def _db_reachable() -> bool:
         return False
 
 
-async def test_outlets_are_linked_by_the_stories_they_share():
+async def test_outlets_are_linked_by_the_stories_they_share(monkeypatch):
     if not await _db_reachable():
         pytest.skip("no database")
     tag = uuid.uuid4().hex[:8]
@@ -77,6 +77,11 @@ async def test_outlets_are_linked_by_the_stories_they_share():
         # One story in both English and Hindi, however many outlets carried it.
         assert net["languages"] == [{"a": "en", "b": "hi", "stories": 1}]
         assert {r["language"]: r["stories"] for r in net["per_language"]} == {"en": 4, "hi": 1}
+        # Capped at the outlets with the most stories, in SQL: no link reaches one left out.
+        monkeypatch.setattr(coverage, "MAX_OUTLETS", 1)
+        async with session_scope() as s:
+            top = await coverage.network(s, metrics.window(28, TODAY))
+        assert len(top["outlets"]) == 1 and top["links"] == []
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM event_memberships WHERE event_id = ANY(:e)"), {"e": events})

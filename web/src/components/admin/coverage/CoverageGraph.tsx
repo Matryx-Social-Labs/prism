@@ -27,7 +27,7 @@ export interface GraphOutlet {
   color: string;
 }
 
-const LABELLED = 8;
+const LABELLED = 6;
 
 /** A CSS variable's value where the element sits (three.js needs real colours). */
 const resolve = (el: Element, css: string) => {
@@ -40,9 +40,13 @@ export default function CoverageGraph({ outlets, links, label }: { outlets: Grap
   const [paint, setPaint] = useState<{ nodes: Record<string, string>; edge: string; bg: string } | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [still, setStill] = useState(false);
+  const [noGl, setNoGl] = useState(false);
 
   useEffect(() => {
     const el = box.current!;
+    // A browser without WebGL (or with it switched off) gets a sentence, not a blank box.
+    const probe = document.createElement("canvas");
+    setNoGl(!(probe.getContext("webgl2") ?? probe.getContext("webgl")));
     setPaint({
       nodes: Object.fromEntries([...new Set(outlets.map((o) => o.color))].map((c) => [c, resolve(el, c)])),
       edge: resolve(el, "var(--ink-3)"),
@@ -73,10 +77,18 @@ export default function CoverageGraph({ outlets, links, label }: { outlets: Grap
     g.setAttribute("color", new THREE.BufferAttribute(col, 3));
     return g;
   }, [links, at, paint]);
+  // Built by hand, so ours to free: react-three-fiber disposes only what it
+  // created, and a new period would otherwise leave the old buffers on the GPU.
+  useEffect(() => () => edges?.dispose(), [edges]);
 
   return (
     <div ref={box} role="img" aria-label={label} className="relative h-[420px] w-full cursor-grab active:cursor-grabbing sm:h-[520px]">
-      {paint && edges && (
+      {noGl && (
+        <p className="flex h-full items-center justify-center px-6 text-center text-[14px]" style={{ color: "var(--ink-2)" }}>
+          This browser cannot draw 3D here. The tables on this page carry every number the view would show.
+        </p>
+      )}
+      {!noGl && paint && edges && (
         <Canvas camera={{ position: [0, 0, 34], fov: 50 }} dpr={[1, 2]}>
           <ambientLight intensity={0.9} />
           <directionalLight position={[10, 14, 10]} intensity={0.9} />

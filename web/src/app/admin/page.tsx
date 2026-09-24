@@ -9,7 +9,7 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AdminTitle, useAdmin } from "@/components/admin/AdminShell";
 import { KpiTile } from "@/components/admin/charts/KpiTile";
@@ -48,18 +48,17 @@ export default function AdminOverview() {
   const [needsFailed, setNeedsFailed] = useState(false);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      setData(await fetchMetrics(session, days));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load the numbers");
-    }
-  }, [session, days]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    // A slow 90-day answer must not land over the 7 days asked for after it.
+    let current = true;
+    setError("");
+    fetchMetrics(session, days)
+      .then((d) => current && setData(d))
+      .catch((e: unknown) => current && setError(e instanceof Error ? e.message : "Could not load the numbers"));
+    return () => {
+      current = false;
+    };
+  }, [session, days]);
 
   useEffect(() => {
     // What is waiting on a founder, from the same routes the pages below use.

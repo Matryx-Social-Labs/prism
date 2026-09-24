@@ -23,7 +23,7 @@ export function InfoTip({ label, children }: { label: string; children: React.Re
     <details className="relative">
       <summary
         aria-label={`Where ${label} comes from`}
-        className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full hover:bg-[var(--sunken)] [&::-webkit-details-marker]:hidden"
+        className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full hover:bg-[var(--sunken)] [&::-webkit-details-marker]:hidden"
         style={{ color: "var(--ink-3)" }}
       >
         <InfoIcon />
@@ -62,7 +62,7 @@ export function ChartPanel({
   return (
     <section className={`admin-panel ${className}`} aria-label={title}>
       <header className="mb-3 flex items-start justify-between gap-3">
-        <h3 className="pt-1.5 text-[14px] font-semibold leading-snug" style={{ color: "var(--ink)" }}>
+        <h3 className="pt-3 text-[14px] font-semibold leading-snug" style={{ color: "var(--ink)" }}>
           {title}
         </h3>
         <div className="flex shrink-0 items-center gap-1">
@@ -71,7 +71,7 @@ export function ChartPanel({
               type="button"
               aria-pressed={asTable}
               onClick={() => setAsTable((v) => !v)}
-              className="h-8 rounded-full px-3 text-[12.5px] font-semibold hover:bg-[var(--sunken)]"
+              className="h-11 rounded-full px-3 text-[12.5px] font-semibold hover:bg-[var(--sunken)]"
               style={{ color: "var(--ink-2)" }}
             >
               {asTable ? "Chart" : "Table"}

@@ -84,7 +84,7 @@ function Figures({ rows }: { rows: MetricRow[] }) {
   return (
     <section className="admin-panel" aria-label="In figures">
       <header className="mb-2 flex items-start justify-between gap-3">
-        <h3 className="pt-1.5 text-[14px] font-semibold" style={{ color: "var(--ink)" }}>In figures</h3>
+        <h3 className="pt-3 text-[14px] font-semibold" style={{ color: "var(--ink)" }}>In figures</h3>
         <InfoTip label="these figures">
           <ul className="space-y-2">
             {rows.map((r) => (

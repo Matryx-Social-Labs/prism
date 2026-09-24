@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { layout, type Point3 } from "./layout";
+import { RIM, layout, type Point3 } from "./layout";
 
 const dist = (p: Point3, q: Point3) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
 
@@ -32,6 +32,17 @@ describe("the coverage layout", () => {
   it("never stacks two outlets on one point, linked or not", () => {
     const at = [...layout([...ids, "alone"], links).values()];
     for (let i = 0; i < at.length; i++) for (let j = i + 1; j < at.length; j++) expect(dist(at[i], at[j])).toBeGreaterThan(0.5);
+  });
+
+  it("keeps every outlet in view, a lone one beside a dense cluster included", () => {
+    // Thirty outlets that all share stories, and one that shares none: the
+    // push would leave the loner far outside the frame.
+    const cluster = Array.from({ length: 30 }, (_, i) => `c${i}`);
+    const dense = cluster.flatMap((a, i) => cluster.slice(i + 1).map((b) => ({ a, b, shared: 10 })));
+    const at = layout([...cluster, "alone"], dense);
+    // The camera looks at the origin and frames the rim.
+    for (const p of at.values()) expect(Math.hypot(...p)).toBeLessThanOrEqual(RIM + 1e-9);
+    expect(Math.hypot(...at.get("alone")!)).toBeGreaterThan(Math.hypot(...at.get("c0")!));
   });
 
   it("ignores a link to an outlet it was not given", () => {

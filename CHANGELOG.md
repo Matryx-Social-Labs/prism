@@ -3,6 +3,39 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.94.0] - 2026-09-24
+
+### Changed — `/admin` is drawn, not written
+The founders said the dashboard read as prose. Every page is now charts and
+panels, with the ledger's honesty rules kept: where a number comes from sits
+behind an ⓘ on every panel, every chart turns into its table, a day not counted
+is shaded and never drawn as zero, and below 30 a share is a count.
+
+- **Overview** — eight headline tiles (the figure, how it moved against the
+  period before as "+3 from 4" off a small base, a sparkline), then supply,
+  visits, sign-ups, engagement, money and demand as chart panels: trends with
+  the period before dashed under them, stacked splits (what happened to the
+  reports fetched, where visits came from, lens opens by lens), ranked bars,
+  the way to paying as a funnel, retention as a cohort grid, who reports first
+  as a dot plot. Recharts, loaded on `/admin` only (CI checks it).
+- **Coverage** (new) — outlets linked by the stories both reported: stories
+  reported in two languages, the strongest links, every outlet, and a 3D
+  network coloured by language that loads only when opened. Few stories shared
+  across two languages while each reports plenty is what the cross-language
+  merge hole looks like from here.
+- **Labellers, batches, people, controls, audit** — search and filters with
+  counts; batches as a progress board; each labeller's hidden checks as a bar;
+  a 28-day activity strip per account; switches as ON/OFF state rows; the audit
+  log as a timeline by IST day.
+
+### Fixed
+- Retention printed "0 came back" for weeks before sign-ins were counted
+  (user_days began 23 Sep): those weeks, and a week only part-counted, now have
+  no record rather than a zero.
+- People called an abandoned checkout a Plus subscriber; only an active or
+  retrying paid plan is Plus now, as in the overview's "paying".
+- Switching the period quickly could leave a slower, older answer on screen.
+
 ## [0.0.93.0] - 2026-09-23
 
 ### Added — the founders' dashboard, `/admin`

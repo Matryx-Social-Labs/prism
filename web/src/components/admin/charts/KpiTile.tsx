@@ -53,7 +53,7 @@ export function KpiTile({
   return (
     <div className="admin-panel flex flex-col">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="pt-1.5 text-[13px] font-semibold leading-snug" style={{ color: "var(--ink-2)" }}>
+        <h3 className="pt-3 text-[13px] font-semibold leading-snug" style={{ color: "var(--ink-2)" }}>
           {label}
         </h3>
         <InfoTip label={label}>

@@ -37,16 +37,26 @@ export default function CoveragePage() {
   const [open3d, setOpen3d] = useState(false);
 
   useEffect(() => {
+    // A slow 90-day answer must not land over the 7 days asked for after it.
+    let current = true;
     setError("");
     fetchCoverage(session, days)
-      .then(setData)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not load coverage"));
+      .then((d) => current && setData(d))
+      .catch((e: unknown) => current && setError(e instanceof Error ? e.message : "Could not load coverage"));
+    return () => {
+      current = false;
+    };
   }, [session, days]);
 
   const byId = new Map(data?.outlets.map((o) => [o.id, o]) ?? []);
   const perLang = new Map(data?.per_language.map((l) => [l.language, l.stories]) ?? []);
   const { colour, key } = languageColours(data?.per_language ?? []);
   const empty = data && data.outlets.length === 0 ? "No stories were formed in this period." : null;
+  // The 3D view is the network: an outlet that shared no story has no place in
+  // it and would only crowd the frame. The tables still list it.
+  const linked = new Set(data?.links.flatMap((l) => [l.a, l.b]) ?? []);
+  const inNetwork = data?.outlets.filter((o) => linked.has(o.id)) ?? [];
+  const alone = (data?.outlets.length ?? 0) - inNetwork.length;
 
   return (
     <>
@@ -117,14 +127,14 @@ export default function CoveragePage() {
           >
             {open3d ? (
               <CoverageGraph
-                outlets={data.outlets.map((o) => ({ id: o.id, name: o.name, language: o.language, stories: o.stories, color: colour(o.language) }))}
+                outlets={inNetwork.map((o) => ({ id: o.id, name: o.name, language: o.language, stories: o.stories, color: colour(o.language) }))}
                 links={data.links}
-                label={`${data.outlets.length} outlets and ${data.links.length} links between them; the tables on this page list the same numbers.`}
+                label={`${inNetwork.length} outlets and ${data.links.length} links between them; the tables on this page list the same numbers.`}
               />
             ) : (
               <div className="flex min-h-[160px] flex-col items-center justify-center gap-3 rounded-[var(--r-md)]" style={{ background: "var(--sunken)" }}>
                 <p className="max-w-[46ch] px-4 text-center text-[14px]" style={{ color: "var(--ink-2)" }}>
-                  {data.outlets.length} outlets, {data.links.length} links. The 3D view loads when you open it.
+                  {inNetwork.length} outlets, {data.links.length} links. The 3D view loads when you open it.
                 </p>
                 <button type="button" className="btn btn-secondary" onClick={() => setOpen3d(true)}>
                   Open the 3D view
@@ -132,6 +142,11 @@ export default function CoveragePage() {
               </div>
             )}
             <SeriesKey items={key} />
+            {alone > 0 && (
+              <p className="mt-2 text-[12.5px]" style={{ color: "var(--ink-2)" }}>
+                {alone} {alone === 1 ? "outlet" : "outlets"} that shared no story with another {alone === 1 ? "is" : "are"} left out of the 3D view; the table below lists {alone === 1 ? "it" : "them"}.
+              </p>
+            )}
           </ChartPanel>
 
           <ChartPanel
