@@ -17,6 +17,7 @@ EXPECTED = {
     ("GET", "/api/v1/subjects"),
     ("GET", "/api/v1/subject/{path}"),
     ("GET", "/api/v1/regions"),
+    ("POST", "/api/v1/csp-report"),
     ("GET", "/api/v1/sources"),
     ("GET", "/api/v1/corrections"),
     ("GET", "/api/v1/events/{event_id}/versions"),
