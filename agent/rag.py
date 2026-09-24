@@ -18,7 +18,7 @@ from agent.structure import TailSplitter
 from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_query
-from common.llm import REASONING_OFF, get_llm, reasoning_payload
+from common.llm import PRIVATE_PROVIDERS, REASONING_OFF, get_llm, reasoning_payload
 from common.logging import get_logger
 from common.models import AgentMessage, AgentSession
 from common.moderation import REFUSAL, guard_question
@@ -181,7 +181,12 @@ async def answer_stream(
             # thinking on "who is involved and what did they say?" and 7 of 50
             # eval answers came back EMPTY (tools/eval_ask.py, 2026-09-20).
             # Off where allowed, minimal where mandatory.
-            extra_body={"reasoning": reasoning_payload(model, REASONING_OFF)},
+            # The question is the reader's own words: providers that neither
+            # retain nor train on it only (common/llm.PRIVATE_PROVIDERS).
+            extra_body={
+                "reasoning": reasoning_payload(model, REASONING_OFF),
+                **({"provider": PRIVATE_PROVIDERS} if settings.llm_provider == "openrouter" else {}),
+            },
             name="agent-qa",
             metadata={
                 "stage": "agent",

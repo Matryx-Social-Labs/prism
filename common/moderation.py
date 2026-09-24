@@ -65,6 +65,7 @@ async def guard_question(question: str) -> GuardResult:
             trace_name="ask-guard",
             max_tokens=400,
             reasoning=REASONING_OFF,
+            private=True,  # the reader's own question
         )
         _consecutive_failures = 0
         if not result.allowed:
