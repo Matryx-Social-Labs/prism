@@ -86,7 +86,11 @@ def usable_sentences(text: str) -> list[str]:
 
 def swap_figure(sentence: str, report_text: str, rng: random.Random) -> tuple[str, str, str] | None:
     """The sentence with one figure changed to a number the report never prints."""
-    nums = [m for m in re.finditer(r"\d[\d,]*(?:\.\d+)?", sentence) if not re.fullmatch(r"(19|20)\d\d", m.group())]
+    # A figure standing alone: never a year, never glued to letters ("72nd" would
+    # become "144nd" and give the answer away by its form; "H-2B" is a name).
+    # Thousands groups are 2 or 3 digits (3,000 · 1,00,000); "Forms 6,7 and 8" is a list, not a number.
+    nums = [m for m in re.finditer(r"(?<![\w.,-])(?:\d{1,3}(?:,\d{2,3})+|\d+)(?:\.\d+)?(?![\w,-]|\.\d)", sentence)
+            if not re.fullmatch(r"1[5-9]\d\d|20\d\d", m.group())]
     if not nums:
         return None
     m = rng.choice(nums)

@@ -29,6 +29,20 @@ def test_a_swapped_figure_is_one_the_report_never_prints():
     assert new.replace(",", "") not in figures(REPORT)
 
 
+def test_an_ordinal_or_a_code_is_never_swapped():
+    s = "The 72nd National Film Awards were held under the H-2B visa row, the organisers said."
+    assert swap_figure(s, REPORT, random.Random(4)) is None
+
+
+def test_a_year_followed_by_a_comma_is_still_a_year():
+    assert swap_figure("The movement began around 1890, when a farmer left his village.", REPORT, random.Random(5)) is None
+
+
+def test_a_list_of_numbers_is_not_one_number():
+    swapped = swap_figure("Regarding Forms 6,7 and 8 used in the revision, officials issued a notice.", REPORT, random.Random(6))
+    assert swapped is None or ("6,7" in swapped[0] and swapped[1] == "8")
+
+
 def test_an_appended_claim_is_one_the_report_never_makes():
     s = "The committee voted 4 to 2 to keep the stance neutral, with two members arguing for a cut."
     changed, extra = add_claim(s, REPORT, random.Random(2))
