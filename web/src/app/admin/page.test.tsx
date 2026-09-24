@@ -82,4 +82,19 @@ describe("the overview", () => {
     render(<AdminOverview />);
     expect(await screen.findByText("Nothing is waiting on you.")).toBeInTheDocument();
   });
+
+  it("keeps the period last asked for when an earlier, slower answer lands after it", async () => {
+    let answer90: (v: unknown) => void = () => {};
+    fetchMetrics.mockImplementation((_s: unknown, days: number) => (days === 90 ? new Promise((r) => (answer90 = r)) : Promise.resolve(metrics(days))));
+    render(<AdminOverview />);
+    await userEvent.click(await screen.findByRole("tab", { name: "90 days" }));
+    await userEvent.click(screen.getByRole("tab", { name: "7 days" }));
+    expect(await screen.findByText(/VISITS COUNTED SINCE/)).toBeInTheDocument();
+    const shown = () => screen.getByText(/· IST/).textContent;
+    const seven = shown();
+    answer90({ ...metrics(90), range: { ...metrics(90).range, start: "2030-11-03" } });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(shown()).toBe(seven);
+    expect(shown()).not.toMatch(/3 NOV/);
+  });
 });

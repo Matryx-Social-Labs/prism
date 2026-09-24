@@ -22,6 +22,7 @@ const net = {
   outlets: [
     { id: "a", name: "The Hindu", language: "en", country: "IN", stories: 40, shared: 30 },
     { id: "h", name: "Dainik Jagran", language: "hi", country: "IN", stories: 12, shared: 3 },
+    { id: "z", name: "Lone Weekly", language: "en", country: "IN", stories: 2, shared: 0 },
   ],
   links: [{ a: "a", b: "h", shared: 3 }],
   languages: [{ a: "en", b: "hi", stories: 3 }],
@@ -45,10 +46,27 @@ describe("the coverage page", () => {
     expect(screen.queryByText(/^3D:/)).not.toBeInTheDocument();
   });
 
-  it("loads the 3D view only when asked, coloured by language", async () => {
+  it("loads the 3D view only when asked, coloured by language, the unlinked left to the table", async () => {
     render(<CoveragePage />);
     await userEvent.click(await screen.findByRole("button", { name: "Open the 3D view" }));
     expect(await screen.findByText("3D: The Hindu var(--viz-1), Dainik Jagran var(--viz-2)")).toBeInTheDocument();
+    expect(screen.getByText(/1 outlet that shared no story with another is left out of the 3D view/)).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Outlets" })).getByRole("row", { name: /Lone Weekly/ })).toBeInTheDocument();
+  });
+
+  it("keeps the period last asked for when an earlier, slower answer lands after it", async () => {
+    let answer90: (v: unknown) => void = () => {};
+    fetchCoverage.mockImplementation((_s: unknown, days: number) =>
+      days === 90 ? new Promise((r) => (answer90 = r)) : Promise.resolve({ ...net, outlets: [{ ...net.outlets[0], name: `Seven-day ${days}` }] }),
+    );
+    render(<CoveragePage />);
+    await userEvent.click(await screen.findByRole("tab", { name: "90 days" }));
+    await userEvent.click(screen.getByRole("tab", { name: "7 days" }));
+    expect(await screen.findByText("Seven-day 7")).toBeInTheDocument();
+    answer90({ ...net, outlets: [{ ...net.outlets[0], name: "Ninety-day" }] });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByText("Ninety-day")).not.toBeInTheDocument();
+    expect(screen.getByText("Seven-day 7")).toBeInTheDocument();
   });
 
   it("re-reads on a new period", async () => {

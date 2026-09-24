@@ -17,7 +17,13 @@ export interface Link {
 }
 
 const STEPS = 300;
-const RADIUS = 10;
+export const RADIUS = 10;
+/** No outlet is drawn further out than this: one with few links sits on the
+ *  rim, in view, rather than wherever the push left it. */
+export const RIM = 1.3 * RADIUS;
+/** A pull to the centre (Gephi's Fruchterman–Reingold gravity), so parts of
+ *  the network with no link between them stay near each other. */
+const GRAVITY = 0.1;
 
 /** n points spread evenly over a sphere (the Fibonacci lattice). */
 function sphere(n: number): Point3[] {
@@ -62,11 +68,27 @@ export function layout(ids: string[], links: Link[], steps = STEPS): Map<string,
       }
     }
     for (let i = 0; i < n; i++) {
+      for (let c = 0; c < 3; c++) move[i][c] -= GRAVITY * k * at[i][c];
       const len = Math.max(0.01, Math.hypot(...move[i]));
       const by = Math.min(len, heat);
-      // A slight pull to the middle keeps an outlet with no links in view.
-      at[i] = at[i].map((v, c) => (v + (move[i][c] / len) * by) * 0.995) as Point3;
+      at[i] = at[i].map((v, c) => v + (move[i][c] / len) * by) as Point3;
     }
   }
-  return new Map(ids.map((id, i) => [id, at[i]]));
+  const fitted = fit(at);
+  return new Map(ids.map((id, i) => [id, fitted[i]]));
+}
+
+/** Centred, scaled so most outlets fill a sphere of RADIUS, the rest pulled in
+ *  to the rim — the camera frames RADIUS, so everything is in view. */
+function fit(at: Point3[]): Point3[] {
+  if (at.length === 0) return at;
+  const centre = [0, 1, 2].map((c) => at.reduce((a, p) => a + p[c], 0) / at.length);
+  const moved = at.map((p) => p.map((v, c) => v - centre[c]) as Point3);
+  const radii = moved.map((p) => Math.hypot(...p)).sort((a, b) => a - b);
+  const scale = RADIUS / Math.max(0.01, radii[Math.floor(0.9 * (radii.length - 1))]);
+  return moved.map((p) => {
+    const r = Math.hypot(...p) * scale;
+    const f = r > RIM ? (RIM / r) * scale : scale;
+    return p.map((v) => v * f) as Point3;
+  });
 }
