@@ -8,12 +8,12 @@
 // one was the one the chips rendered from.
 export const LANG_NATIVE: Record<string, string> = {
   en: "EN", hi: "हिंदी", kn: "ಕನ್ನಡ", ta: "தமிழ்", te: "తెలుగు", bn: "বাংলা", mr: "मराठी",
-  gu: "ગુજરાતી", pa: "ਪੰਜਾਬੀ", ur: "اردو", ml: "മലയാളം", or: "ଓଡ଼ିଆ",
+  gu: "ગુજરાતી", pa: "ਪੰਜਾਬੀ", ur: "اردو", ml: "മലയാളം", or: "ଓଡ଼ିଆ", as: "অসমীয়া",
 };
 
 export const LANG_NAME: Record<string, string> = {
   en: "English", hi: "Hindi", kn: "Kannada", ta: "Tamil", te: "Telugu", bn: "Bengali", mr: "Marathi",
-  gu: "Gujarati", pa: "Punjabi", ur: "Urdu", ml: "Malayalam", or: "Odia", ar: "Arabic", ru: "Russian",
+  gu: "Gujarati", pa: "Punjabi", ur: "Urdu", ml: "Malayalam", or: "Odia", as: "Assamese", ar: "Arabic", ru: "Russian",
 };
 
 export const langNative = (code: string): string => LANG_NATIVE[code] ?? code.toUpperCase();

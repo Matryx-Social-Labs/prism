@@ -19,10 +19,12 @@ import { AskBar } from "@/components/AskBar";
 import { AskContext, type AskOpen } from "@/components/AskContext";
 import { SelectionAsk } from "@/components/SelectionAsk";
 import { Brand } from "@/components/Brand";
-import { CoverageBar, CoverageLegend, MonogramStack, OutletIcon, coverageText, languageNames, languagesOf, publishers } from "@/components/Coverage";
+import { CoverageBar, CoverageLegend, MonogramStack, OutletIcon, languageNames, languagesOf, publishers } from "@/components/Coverage";
+import { monitoredText } from "@/lib/coverage";
 import { EntityText } from "@/components/EntityText";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill } from "@/components/StatusPill";
+import { ReportProblem } from "@/components/ReportProblem";
 import { StoryRoute } from "@/components/StoryRoute";
 import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { Said } from "@/components/Said";
@@ -401,11 +403,14 @@ export function StoryView({ event }: { event: EventDetail }) {
                 <MonogramStack outlets={outlets} limit={5} />
                 <CoverageBar outlets={outlets} fallbackCount={sourceCount} size="lg" draw />
               </span>
+              {/* How sure: the count out of the monitored set, never out of
+                  everyone who covered it, and when the outlets were last read. */}
               <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>
-                {outlets.length ? coverageText(outlets) : `${outletCount} ${outletCount === 1 ? "outlet" : "outlets"}`} · {sourceCount} {sourceCount === 1 ? "report" : "reports"}
+                <Link href="/sources" className="underline-offset-4 hover:underline">{monitoredText(outletCount, event.monitored_outlets)}</Link> · {sourceCount} {sourceCount === 1 ? "report" : "reports"}
                 {outlets.length > 0 && ` · ${languageNames(languagesOf(outlets))}`}
+                {event.monitored_checked_at && ` · checked ${relativeTime(event.monitored_checked_at)}`}
               </span>
-              {single && <StatusPill status="provisional" label="One source so far" />}
+              {single && <StatusPill status="provisional" label="Single source · not yet corroborated" />}
             </div>
             <div className="mt-6"><PhotoDeck sources={event.sources} /></div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -425,7 +430,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               <Head
                 id="record-title"
                 title="The record"
-                hint={lens === "reader" ? `Written from the ${sourceCount} ${sourceCount === 1 ? "report" : "reports"} below. Nothing here is unsourced.` : `The same reports, read for ${meta.plain ?? meta.short.toLowerCase()}.`}
+                hint={lens === "reader" ? `Written by software from the ${sourceCount} ${sourceCount === 1 ? "report" : "reports"} below. The points restate them; where one says why it matters, that is Prism's reading, not a reported fact.` : `The same reports, read for ${meta.plain ?? meta.short.toLowerCase()}.`}
                 right={
                   <span className="hidden items-center gap-2 font-mono text-[11px] lg:inline-flex" style={{ color: "var(--ink-3)" }} aria-hidden>
                     {offered.length > 1 && <>Press {offered.map((_, i) => i + 1).join(" · ")}</>}
@@ -700,6 +705,12 @@ export function StoryView({ event }: { event: EventDetail }) {
                 <RelatedRoutes related={routeStory!.related} />
               </section>
             )}
+
+            {/* ── Something wrong: structured reports, never comments ─── */}
+            <section id="report" className="border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="report-title">
+              <Head id="report-title" title="Something wrong?" hint="Say what, and it arrives with this record's address filled in. A correction is welcome." />
+              <div className="max-w-[420px]"><ReportProblem path={`/story/${event.id}`} /></div>
+            </section>
 
             {/* ── Ask: the heading here, the bar below it. The bar is a direct
                 child of the article (not of this section) so `sticky` can hold

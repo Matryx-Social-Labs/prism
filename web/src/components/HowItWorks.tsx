@@ -9,10 +9,11 @@ import { HeroLensDemo } from "@/components/HeroLensDemo";
 import { LensRegistry } from "@/components/LensRegistry";
 import { PrismFigure } from "@/components/PrismFigure";
 import { ReportCard } from "@/components/SourceList";
+import { ReportProblem } from "@/components/ReportProblem";
 import { Reveal } from "@/components/Reveal";
 import { Said } from "@/components/Said";
 import { StepRail } from "@/components/StepRail";
-import { AVAILABLE, NEXT, StatusColumn, VALIDATION } from "@/components/StatusGrid";
+import { AVAILABLE, FREE_LINE, NEXT, StatusColumn, VALIDATION } from "@/components/StatusGrid";
 import { ArrowRight } from "@/components/icons";
 import { fetchEvent, fetchFeed, type EventDetail, type FeedItem, type OutletRef } from "@/lib/api";
 import { coverageText, languageNames, languagesOf, publishers, type Origin } from "@/lib/coverage";
@@ -39,14 +40,30 @@ const STEPS = [
   { id: "lens", n: "06", label: "Read it through a lens" },
   { id: "ask", n: "07", label: "Ask the record" },
   { id: "refuses", n: "08", label: "What Prism refuses" },
+  { id: "words", n: "09", label: "The words it uses" },
+  { id: "accountability", n: "10", label: "Who answers for it" },
 ];
 
 const REFUSALS: [string, string][] = [
   ["No invented numbers.", "Every count on a page is counted from the reports: outlets, languages, quotes, developments. If it is not countable, it is not printed."],
-  ["No unsourced lines.", "A quote appears only when the same words are in the article. The brief is written from the reports below it and says so."],
-  ["No left, right or centre.", "Coverage is described by where an outlet comes from, a fact of the source, not by a rating nobody has made for Indian outlets."],
+  ["No count without its denominator.", "\u201C2 outlets\u201D means 2 of the outlets Prism monitors, never everyone who covered the story. The list of them is public, with when each was last read."],
+  ["No quote that is not in the article.", "A quote appears only when the same words are in the article it came from. When the check fails the quote is dropped, never paraphrased."],
+  ["No guess presented as a fact.", "The brief restates the reports. Where it says why something matters, that is Prism\u2019s reading, and the page says so."],
+  ["No left, right or centre.", "Coverage is described by where an outlet comes from, a fact of the source. Prism rates neither an outlet\u2019s politics nor a report\u2019s tone: nobody has made those ratings for Indian outlets, and a machine\u2019s guess is not one."],
   ["No photos of its own.", "A picture is only ever the outlet's, shown as a credited link preview of that outlet's report, never as Prism's."],
   ["No silent edits.", "Every record shows when it was last updated; a new report never erases what came before it."],
+];
+
+// The words a record uses, for a reader meeting them for the first time. Plain
+// definitions, in the order a record shows them.
+const WORDS: [string, string][] = [
+  ["Report", "One article by one outlet, kept as it was published, with its outlet and time. Prism links to it; the journalism is the outlet\u2019s."],
+  ["Record", "Everything Prism holds on one story: the reports, who said what, who covered it, and the brief written from them."],
+  ["Monitored outlets", "The fixed list of outlets Prism reads. Every count on a record is out of this list."],
+  ["Single source", "Only one monitored outlet has the story so far. It may be right; nobody else has confirmed it yet."],
+  ["Coverage", "Which kinds of outlet carry the story: English national, Indian-language, international or wire."],
+  ["Prism\u2019s reading", "A line the software wrote about what the reports mean, such as why a story matters. It is not something an outlet reported."],
+  ["Lens", "The same record read for a kind of work. The facts underneath never change; only the reading does."],
 ];
 
 // Editorial accountability, in the vocabulary a reader and a policy review
@@ -57,7 +74,7 @@ const ACCOUNTABILITY: [string, string][] = [
   ["A record is written by machine, and says so.", "Every headline, brief and summary on Prism is written by software from the reports listed under it, never by a journalist and never presented as one. That is why a record is bylined \u201CHeadline by Prism\u201D and names the reports it was written from."],
   ["The reporting is the outlets\u2019.", "Prism does not report. It reads what registered outlets published, keeps each report as it was, and links to it. The journalism belongs to the outlet that did it. What Prism adds is the grouping, the counts and the reading."],
   ["A quote is the article\u2019s words or it is not there.", "Quotes are checked against the article they came from before they appear. When a check fails the quote is dropped rather than paraphrased."],
-  ["A correction does not overwrite the past.", "A record carries the time it was last updated, and a later report is added to it rather than replacing what came before. Where a record is wrong it is fixed, and it stays dated."],
+  ["A new report never replaces an old one.", "A record carries the time it was last updated, and a later report is added to it rather than replacing what came before. A public corrections log is next; until it ships, a fixed record shows only its updated time."],
 ];
 
 type Example = { row: FeedItem; event: EventDetail; outlets: OutletRef[] };
@@ -155,7 +172,7 @@ export async function HowItWorks() {
         <div className="min-w-0">
           <Step id="reports" n="01" title="Reports come in, and stay as they were." rule="A report is kept as published, with its outlet and time."
             example={<ReportsExample reports={reports} outlets={outlets} />}>
-            <p>Prism watches a fixed list of outlets: English national papers, Indian-language papers, the international press and the wires. Every report keeps its own headline, its outlet and the minute it published.</p>
+            <p>Prism watches a fixed, <Link href="/sources" className="underline underline-offset-4">public list of outlets</Link>: English national papers, Indian-language papers, the international press and the wires. Every report keeps its own headline, its outlet and the minute it published.</p>
             {event && <p>This story arrived as {event.sources.length} {event.sources.length === 1 ? "report" : "reports"} from {publishers(outlets).length || event.sources.length} {publishers(outlets).length === 1 ? "outlet" : "outlets"}{langs.length > 1 ? ` in ${langs.length} languages` : ""}.</p>}
           </Step>
 
@@ -178,8 +195,8 @@ export async function HowItWorks() {
                 <p className="mt-3 text-[13px]" style={{ color: "var(--ink-3)" }}>{publishers(outlets).map((o) => o.name).join(" · ")}</p>
               </div>
             ) : <Unavailable what="Coverage" />}>
-            <p>The bar splits the reporting by where each outlet comes from: English national, Indian-language, international, wire. It answers &ldquo;who has this story?&rdquo; at a glance, and a single-source story is drawn dashed so you know it is thin.</p>
-            <p>No Indian outlet has an agreed left/right rating, so Prism does not invent one.</p>
+            <p>The bar splits the reporting by where each outlet comes from: English national, Indian-language, international, wire. It answers &ldquo;who has this story?&rdquo; at a glance. The count beside it is out of the outlets Prism monitors, and a story only one of them carries is drawn dashed and marked <em>not yet corroborated</em>.</p>
+            <p>No Indian outlet has an agreed left/right rating, so Prism does not invent one, and it does not label a report&rsquo;s tone either.</p>
           </Step>
 
           <Step id="said" n="04" title="Who said what, in their exact words." rule="Verbatim or absent. Every quote links to the line in the article."
@@ -192,7 +209,7 @@ export async function HowItWorks() {
             {quote?.role && <p>Here: {quote.speaker}, {quote.role}.</p>}
           </Step>
 
-          <Step id="brief" n="05" title="A brief written from the reports below it." rule="Nothing in the brief is unsourced; names link to every story about them."
+          <Step id="brief" n="05" title="A brief written from the reports below it." rule="Written by software from the reports. Why it matters is Prism's reading."
             example={event && points.length > 0 ? (
               <div className="card">
                 <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>The record · written from {event.sources.length} {event.sources.length === 1 ? "report" : "reports"}</p>
@@ -209,7 +226,7 @@ export async function HowItWorks() {
                 )}
               </div>
             ) : <Unavailable what="A brief" />}>
-            <p>Each point is one fact from the reports, written to stand on its own; the last says why it matters. Underlined names are the people and bodies in the story: hover or tap one for who they are and what they said here.</p>
+            <p>Each point is one fact from the reports, written to stand on its own. The last says why it matters: that one is Prism&rsquo;s reading of the reports, not something an outlet reported. Underlined names are the people and bodies in the story: hover or tap one for who they are and what they said here.</p>
           </Step>
 
           <Step id="lens" n="06" title="Read the same facts for your work." rule="The record never changes. Only the reading does."
@@ -238,13 +255,26 @@ export async function HowItWorks() {
             </ul>
           </section>
 
+          <section id="words" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="words-title">
+            <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 09</p>
+            <h2 id="words-title" className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">The words on a record.</h2>
+            <dl className="mt-6 grid gap-x-10 md:grid-cols-2">
+              {WORDS.map(([term, meaning]) => (
+                <div key={term} className="border-t py-4" style={{ borderColor: "var(--line)" }}>
+                  <dt className="font-record text-[19px] font-bold leading-[1.25]">{term}</dt>
+                  <dd className="mt-1 text-[15px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>{meaning}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
           {/* The address `correctionsPolicy` and `publishingPrinciples` point at
               (lib/seo.ts). It carried no `id`, so the schema's /about#status
               resolved to the page and to no anchor on it — and a machine-written
               byline is exactly what a news policy review reads a page like this
               to understand. */}
           <section id="accountability" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="accountability-title">
-            <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 09</p>
+            <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 10</p>
             <h2 id="accountability-title" className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">Who writes this, and how to correct it.</h2>
             <div className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
               {ACCOUNTABILITY.map(([head, body], i) => (
@@ -258,10 +288,12 @@ export async function HowItWorks() {
             </div>
             <p className="mt-5 max-w-[64ch] text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
               Something wrong in a record is a correction we want: a quote that is not in the article, a
-              headline that misreads it, an outlet credited for a photograph that is not theirs. Write to{" "}
+              headline that misreads it, an outlet credited for a photograph that is not theirs. Every record
+              has these links at its foot, with its address filled in; or write to{" "}
               <a className="underline underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>{" "}
-              with the record\u2019s link. {LEGAL_ENTITY} publishes Prism and is answerable for it.
+              with the record&rsquo;s link. {LEGAL_ENTITY} publishes Prism and is answerable for it.
             </p>
+            <div className="mt-4 max-w-[420px]"><ReportProblem /></div>
           </section>
 
           <section id="status" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="status-title">
@@ -271,7 +303,7 @@ export async function HowItWorks() {
               <StatusColumn tone="val" label="In validation" items={VALIDATION} />
               <StatusColumn tone="next" label="Next" items={NEXT} />
             </div>
-            <p className="mt-5 max-w-[64ch] text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>The record, the sources, the verified quotes and the story status are free for every reader. Professional readings, watchlists and alerts are the part of Prism that can be paid for.</p>
+            <p className="mt-5 max-w-[64ch] text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>{FREE_LINE}</p>
           </section>
 
           <section className="border-t py-12 text-center" style={{ borderColor: "var(--line)" }}>

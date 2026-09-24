@@ -5,9 +5,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import (
+    FeedOut,
     LensesResponse,
     LensOut,
     SectorOut,
+    SourcesResponse,
     SubsectorOut,
     TaxonomyResponse,
 )
@@ -15,6 +17,7 @@ from common.db import get_db
 from common.embeddings import check_corpus_model
 from common.freshness import MAX_WINDOW_HOURS, MIN_WINDOW_HOURS, WINDOW_HOURS, pipeline_freshness
 from common.lenses import DEFAULT_LENS, active_lenses
+from common.outlets import monitored
 from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
 
@@ -62,6 +65,19 @@ async def get_lenses():
             for lens in active_lenses()  # shipped lenses only; upcoming drafts excluded
         ],
         default=DEFAULT_LENS,
+    )
+
+
+@router.get("/api/v1/sources", response_model=SourcesResponse)
+async def get_sources(db: AsyncSession = Depends(get_db)):
+    """The outlets Prism monitors, each with its last poll: the public source
+    list, and the denominator every story's outlet count is out of. No feed URL,
+    no error text: what is read and whether it answered, nothing operational."""
+    m = await monitored(db)
+    return SourcesResponse(
+        outlets=m.outlets,
+        checked_at=m.checked_at,
+        feeds=[FeedOut(**{k: getattr(f, k) for k in FeedOut.model_fields}) for f in m.feeds],
     )
 
 

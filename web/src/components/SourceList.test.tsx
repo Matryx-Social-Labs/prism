@@ -5,7 +5,7 @@ import type { SourceRef } from "@/lib/api";
 
 const src = (id: string, over: Partial<SourceRef> = {}): SourceRef => ({
   article_id: id, source_name: "The Hindu", source_slug: "thehindu", code: "TH", origin: "national", language: "en", publisher: "thehindu", domain: "thehindu.com",
-  url: `https://x.test/${id}`, title: `Report ${id}`, published_at: "2026-09-18T06:00:00Z", stance: null, funding: null, ...over,
+  url: `https://x.test/${id}`, title: `Report ${id}`, published_at: "2026-09-18T06:00:00Z", funding: null, ...over,
 });
 
 describe("ReportImages — the outlets' photographs, only as credited link previews", () => {
@@ -38,13 +38,20 @@ describe("ReportCard", () => {
     expect(card.textContent).toMatch(/English national/);
     expect(screen.getByAltText("Photo from The Hindu")).toBeInTheDocument();
   });
+
+  it("never prints a tone label, even from an old payload that still carries one (founder D-a)", () => {
+    // An older API (two deploy pipelines, a 60s cache) can still send `stance`.
+    // On a row it read as the outlet rating Prism says it does not make.
+    render(<ReportCard source={{ ...src("a"), stance: "supportive" } as never} n={1} />);
+    expect(screen.getByRole("link").textContent).not.toMatch(/supportive/i);
+  });
 });
 
 describe("ReportImages — one photo per publisher first", () => {
   it("leads with each publisher's first photo before a second from the same one", async () => {
     const { ReportImages } = await import("@/components/SourceList");
     const { render, screen, within } = await import("@testing-library/react");
-    const src = (id: string, publisher: string, name: string) => ({ article_id: id, source_name: name, source_slug: id, url: `https://x.example/${id}`, title: `T ${id}`, published_at: null, stance: null, funding: null, publisher, image_url: `https://img.example/${id}.jpg` }) as never;
+    const src = (id: string, publisher: string, name: string) => ({ article_id: id, source_name: name, source_slug: id, url: `https://x.example/${id}`, title: `T ${id}`, published_at: null, funding: null, publisher, image_url: `https://img.example/${id}.jpg` }) as never;
     render(<ReportImages sources={[src("bbc-ta", "bbc", "BBC Tamil"), src("bbc-te", "bbc", "BBC Telugu"), src("hindu", "thehindu", "The Hindu"), src("bbc-bn", "bbc", "BBC Bengali")]} />);
     const tiles = within(screen.getByRole("list", { name: "Images from the reports" })).getAllByRole("link");
     expect(tiles.map((a) => a.getAttribute("aria-label")?.split(":")[0])).toEqual(["BBC Tamil", "The Hindu", "BBC Telugu", "BBC Bengali"]);
@@ -56,7 +63,7 @@ describe("ReportImages — the same picture under two urls is one tile", () => {
     const { ReportImages, hamming } = await import("@/components/SourceList");
     const { render, screen, within } = await import("@testing-library/react");
     expect(hamming("ffffffffffffffff", "fffffffffffffff0")).toBe(4);
-    const src = (id: string, name: string, phash: string | null) => ({ article_id: id, source_name: name, source_slug: id, url: `https://x.example/${id}`, title: `T ${id}`, published_at: null, stance: null, funding: null, publisher: name, image_url: `https://img.example/${id}.jpg`, image_phash: phash }) as never;
+    const src = (id: string, name: string, phash: string | null) => ({ article_id: id, source_name: name, source_slug: id, url: `https://x.example/${id}`, title: `T ${id}`, published_at: null, funding: null, publisher: name, image_url: `https://img.example/${id}.jpg`, image_phash: phash }) as never;
     render(<ReportImages sources={[src("ta", "BBC Tamil", "3c3c1e1e0f0f8787"), src("bn", "BBC Bengali", "3c3c1e1e0f0f8783"), src("hindu", "The Hindu", "0000ffff0000ffff"), src("none", "Mint", null)]} />);
     const tiles = within(screen.getByRole("list", { name: "Images from the reports" })).getAllByRole("link");
     expect(tiles.map((a) => a.getAttribute("aria-label")?.split(":")[0])).toEqual(["BBC Tamil", "The Hindu", "Mint"]);

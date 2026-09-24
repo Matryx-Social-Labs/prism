@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { headlineByline } from "@/lib/headline";
 
-const src = (source_name: string) => ({ article_id: "a", source_slug: "s", source_name, title: "t", url: null, published_at: null, language: "en", stance: null, funding: null });
+const src = (source_name: string) => ({ article_id: "a", source_slug: "s", source_name, title: "t", url: null, published_at: null, language: "en", funding: null });
 
 describe("headlineByline — whose words the title is", () => {
   it("says Prism wrote it, from how many reports, when the record says so", () => {

@@ -49,6 +49,16 @@ bias; Particle and Inshorts summarise. Prism shows the record and lets the lens
 re-read it. The **lens flip** — the same story re-typesetting itself for a different
 reader — is the memorable thing and the brand.
 
+**The category (strategy report, founder, 2026-09-24): India's verifiable news record.**
+Summarisation is commoditising; claim traceability is not. Prism wins on evidence a
+reader can check: every count printed out of the public list of monitored outlets
+("2 of 27 monitored outlets · checked 4m ago", `/sources`), single-source stories
+marked *not yet corroborated*, quotes verbatim or absent, and the software's own
+inference labelled as Prism's reading. Never positioned as "AI-powered" or "unbiased";
+never an outlet or tone rating. **The evidence is never the premium feature:** the
+record, its reports, quotes, coverage and corrections stay free; Plus sells depth and
+convenience (whole-story Ask, allowance, later follow and alerts), never a model.
+
 ## Operating Context
 
 - **Corpus:** 42 registered sources; 27 RSS feeds are currently active, spanning
@@ -94,7 +104,7 @@ reader — is the memorable thing and the brand.
 - Validated tickers (symbol master of 15,701 securities; zero unvalidated tickers
   stored). No price data yet.
 - Ask: grounded per-story Q&A, cites the story's own sources or says it cannot;
-  metered (3 per anonymous session, 30/day signed in).
+  metered (3 per anonymous session, 10/day signed in, 100/day on Plus; `common/quota.py`).
 
 **Decisions that bind the redesign (founder, 2026-09-15)**
 - **D1** The general reader leads the first screen; professional depth is one tap away
@@ -116,6 +126,21 @@ reader — is the memorable thing and the brand.
 - The most-corroborated stories lead. Single-source stories do not lead a front page
   whose promise is "every perspective".
 - English-first display for a reader with no language preference.
+
+**Decisions on the strategy report (founder, 2026-09-24)** — plan and verification
+ledger in `.claude/plans/trust-india-indic.plan.md`
+- **D-a** The extraction's tone label (critical/neutral/supportive) is removed from
+  report cards and from the payload; D4 already said an LLM's stance never reaches it.
+- **D-b** Plan renewal terms are undecided and are settled at the paid launch; until
+  then no page promises how a plan ends or renews.
+- **D-c** India compliance (IT Rules digital-media code, DPDP, CERT-In, consumer
+  protection) is a team decision on `docs/COMPLIANCE-INDIA.md`.
+- **D-d** Translation of Prism's own writing into Indian languages is held until the
+  rest of the product is complete and data quality is good; no copy promises it.
+- **D-e** Source expansion first: as much Indian news as possible, in the Indian
+  languages with the largest audiences first.
+- **D-f** Translating the interface itself is deferred (recommendation on record: the
+  record's content before the chrome, on an adoption signal).
 
 **Undecided (recorded, not invented)**
 - Which markets sources to add, and which additional regional feeds meet the

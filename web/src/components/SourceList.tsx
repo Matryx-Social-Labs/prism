@@ -51,12 +51,11 @@ export function ReportCard({ source, n, compact = false }: { source: SourceRef; 
       <span className={`mt-2 block font-medium leading-[1.35] [display:-webkit-box] [-webkit-box-orient:vertical] overflow-hidden ${compact ? "text-[13.5px] [-webkit-line-clamp:3]" : "text-[15px] [-webkit-line-clamp:3]"}`} style={{ color: "var(--ink)" }}>
         {s.title}
       </span>
-      {(n != null || origin || funding || s.stance) && (
+      {(n != null || origin || funding) && (
         <span className="mt-2 flex items-center gap-2 text-[11.5px]" style={{ color: "var(--ink-3)" }}>
           {n != null && <span className="font-mono text-[11px]">[{n}]</span>}
           {origin && <span>{origin}</span>}
           {funding && <span>· {funding}</span>}
-          {s.stance && <span>· {s.stance}</span>}
         </span>
       )}
     </>

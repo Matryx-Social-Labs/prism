@@ -4,7 +4,7 @@ import { PlusPage } from "@/components/PlusPage";
 
 export const metadata: Metadata = {
   title: "Plus",
-  description: "The record stays free. Plus is for the reader who asks more of it: 100 questions a day, the stronger model, answers from the whole story.",
+  description: "The evidence stays free. Plus is for the reader who asks more of it: answers from the whole story, 100 questions a day.",
   alternates: { canonical: "/plus" },
 };
 

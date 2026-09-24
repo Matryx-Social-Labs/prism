@@ -15,7 +15,7 @@ const item = (id: string, source_count: number, sector = "politics"): FeedItem =
 
 const src = (id: string, name = "Mint") => ({
   article_id: id, source_name: name, source_slug: name.toLowerCase(), url: `https://m.example/${id}`, title: `Report ${id}`, published_at: "2026-09-04T19:55:00Z",
-  stance: null, funding: null, code: name.slice(0, 2).toUpperCase(), origin: "national", language: "en", publisher: name, domain: null, image_url: null,
+  funding: null, code: name.slice(0, 2).toUpperCase(), origin: "national", language: "en", publisher: name, domain: null, image_url: null,
 });
 
 const event = (id: string, over: Partial<EventDetail> = {}): EventDetail =>
@@ -59,7 +59,7 @@ describe("/about — how Prism works, on one live story", () => {
     // Eight steps, in order, in the rail.
     const rail = screen.getByRole("navigation", { name: "Steps" });
     expect(within(rail).getAllByRole("link").map((a) => a.textContent?.replace(/^\d+/, ""))).toEqual([
-      "Reports come in", "One record", "Who covered it", "Who said what", "The brief", "Read it through a lens", "Ask the record", "What Prism refuses",
+      "Reports come in", "One record", "Who covered it", "Who said what", "The brief", "Read it through a lens", "Ask the record", "What Prism refuses", "The words it uses", "Who answers for it",
     ]);
   });
 
@@ -82,10 +82,24 @@ describe("/about — how Prism works, on one live story", () => {
   it("names what Prism refuses to do, and uses no em-dash anywhere", async () => {
     fetchFeed.mockResolvedValue([]);
     render(await AboutPage());
-    for (const head of ["No invented numbers.", "No unsourced lines.", "No left, right or centre.", "No photos of its own.", "No silent edits."]) {
+    for (const head of ["No invented numbers.", "No count without its denominator.", "No quote that is not in the article.", "No guess presented as a fact.", "No left, right or centre.", "No photos of its own.", "No silent edits."]) {
       expect(screen.getByText(head)).toBeInTheDocument();
     }
     expect(document.body.textContent).not.toMatch(/[—–]/);
+    // The strategy report caught "nothing unsourced" beside a brief that infers;
+    // the page claims what it can show, and a literal \u escape never prints.
+    expect(document.body.textContent).not.toMatch(/unsourced/i);
+    expect(document.body.textContent).not.toMatch(/\\u20/);
+  });
+
+  it("defines the words a record uses, and offers the structured ways to report a problem", async () => {
+    fetchFeed.mockResolvedValue([]);
+    render(await AboutPage());
+    for (const term of ["Monitored outlets", "Single source", "Prism\u2019s reading"]) expect(screen.getByText(term)).toBeInTheDocument();
+    const report = screen.getByRole("list", { name: "Report a problem" });
+    const first = within(report).getAllByRole("link")[0];
+    expect(first.getAttribute("href")).toMatch(/^mailto:hello@readprism\.news\?subject=A%20fact%20is%20wrong/);
+    expect(screen.getByRole("link", { name: "public list of outlets" })).toHaveAttribute("href", "/sources");
   });
 
   it("carries the accountability anchor the organisation schema points at", async () => {

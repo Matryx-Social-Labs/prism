@@ -105,7 +105,7 @@ export function UpgradeSheet({
             <ul className="mt-4 flex flex-col">
               {[
                 <><b className="font-semibold">100 questions a day</b> instead of 10</>,
-                <><b className="font-semibold">The stronger model</b>, reading the <b className="font-semibold">whole story</b></>,
+                <>Answers from the <b className="font-semibold">whole story</b>, on a larger model</>,
                 <>Ask <b className="font-semibold">stays on</b> when the free box rests</>,
               ].map((line, i) => (
                 <li key={i} className="flex items-start gap-2.5 border-t py-2.5 text-[14.5px] leading-[1.5]" style={{ borderColor: "var(--line)" }}>

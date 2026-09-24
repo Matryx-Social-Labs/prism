@@ -15,7 +15,7 @@ vi.mock("@/lib/lenses", () => ({
 }));
 
 const src = (id: string, published_at: string | null) => ({
-  article_id: id, source_name: "The Hindu", source_slug: "hindu", url: "https://x.test/a", title: "A report", published_at, stance: null, funding: null,
+  article_id: id, source_name: "The Hindu", source_slug: "hindu", url: "https://x.test/a", title: "A report", published_at, funding: null,
 });
 
 function event(over: Partial<EventDetail> = {}): EventDetail {
@@ -55,13 +55,29 @@ describe("the record — the header", () => {
     expect(meta.textContent).toMatch(/Updated/);
     expect(meta.textContent).toMatch(/Business & Markets/);
     // Two reports from one masthead: the coverage line counts outlets AND reports.
-    expect(screen.getByText(/1 outlet · 2 reports/)).toBeInTheDocument();
+    expect(document.querySelector("header")!.textContent).toMatch(/1 outlet · 2 reports/);
+  });
+
+  it("prints the count out of the monitored set, links the set, and says when it was last read", () => {
+    const checked = new Date(Date.now() - 5 * 60_000).toISOString();
+    render(<StoryView event={event({ monitored_outlets: 27, monitored_checked_at: checked })} />);
+    // Never "1 outlet" as if that were everyone who covered it.
+    const denominator = screen.getByRole("link", { name: "1 of 27 monitored outlets" });
+    expect(denominator).toHaveAttribute("href", "/sources");
+    expect(document.querySelector("header")!.textContent).toMatch(/1 of 27 monitored outlets · 2 reports.* · checked 5m ago/);
+  });
+
+  it("ends with the structured ways to report a problem, addressed to this record", () => {
+    render(<StoryView event={event()} />);
+    const links = within(screen.getByRole("list", { name: "Report a problem" })).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual(["A fact is wrong", "A quote is not in the article", "An outlet says something different", "An outlet that covered this is missing"]);
+    expect(decodeURIComponent(links[0].getAttribute("href")!)).toContain("/story/");
   });
 
   it("says so when there is one source, in words — never colour alone", () => {
     render(<StoryView event={event({ sources: [src("a1", "2026-09-04T19:55:00Z")] })} />);
-    expect(screen.getByText("One source so far")).toBeInTheDocument();
-    expect(screen.getByText(/1 outlet · 1 report/)).toBeInTheDocument();
+    expect(screen.getByText("Single source · not yet corroborated")).toBeInTheDocument();
+    expect(document.querySelector("header")!.textContent).toMatch(/1 outlet · 1 report/);
   });
 
   it("sends the reader back to /feed — never to /, which is the landing for a first visitor", () => {
@@ -93,7 +109,7 @@ describe("the record — retired sections (D4) and Why it matters", () => {
     render(
       <StoryView
         event={event({
-          perspectives: [{ label: "Access won", stance: "for", origin_country: "IN", summary: "A model's summary.", article_ids: ["a1"] }],
+          perspectives: [{ label: "Access won", origin_country: "IN", summary: "A model's summary.", article_ids: ["a1"] }],
           impacts: [{ id: "i1", entity_name: "Someone", effect: "loses", direction: "negative", horizon: "weeks", confidence: 0.5, parent_impact_id: null }],
         })}
       />,
