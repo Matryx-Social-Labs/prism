@@ -31,6 +31,9 @@ LANGUAGES: dict[str, Language] = {
     "gu": Language("gu", "Gujarati", "ગુજરાતી"),
     "pa": Language("pa", "Punjabi", "ਪੰਜਾਬੀ"),
     "ur": Language("ur", "Urdu", "اردو"),
+    "ml": Language("ml", "Malayalam", "മലയാളം"),
+    "or": Language("or", "Odia", "ଓଡ଼ିଆ"),
+    "as": Language("as", "Assamese", "অসমীয়া"),
 }
 
 # The Bangalore-launch set the onboarding picker offers, in display order.

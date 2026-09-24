@@ -120,3 +120,20 @@ def test_regional_editions_fold_into_one_masthead():
             f"{len(publishers)} publishers {sorted(publishers)} — corroboration will "
             "count this newsroom republishing itself as independent sources"
         )
+
+
+def test_every_feed_has_a_seed_row_and_a_language_name():
+    """A feed URL lives in ingestion/rss.py and its outlet row in ingestion/seed.py.
+    A FeedSpec without a seed row raises "source not seeded" on every cycle; a
+    seeded language missing from common/languages.py prints as a bare code on
+    every quote. The 2026-09-24 expansion added 19 outlets across both files and
+    three new languages (Malayalam, Odia, Assamese)."""
+    from common.languages import LANGUAGES
+    from ingestion.seed import SOURCES
+
+    seeded = {s["slug"]: s for s in SOURCES}
+    unseeded = [f.slug for f in FEEDS if f.slug not in seeded]
+    assert not unseeded, f"feeds with no seed row: {unseeded}"
+    assert len({f.slug for f in FEEDS}) == len(FEEDS), "a feed slug is listed twice"
+    unnamed = sorted({seeded[f.slug]["language"] for f in FEEDS} - set(LANGUAGES))
+    assert not unnamed, f"languages with no display name: {unnamed}"
