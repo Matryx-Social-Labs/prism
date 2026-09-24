@@ -128,6 +128,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/about" className="hover:underline underline-offset-[3px]">About</Link>
               <Link href="/about#status" className="hover:underline underline-offset-[3px]">What&rsquo;s live</Link>
               <Link href="/sources" className="hover:underline underline-offset-[3px]">Sources</Link>
+              <Link href="/corrections" className="hover:underline underline-offset-[3px]">Corrections</Link>
               <Link href="/plus" className="hover:underline underline-offset-[3px]">Plus</Link>
               <Link href="/privacy" className="hover:underline underline-offset-[3px]">Privacy</Link>
               <Link href="/terms" className="hover:underline underline-offset-[3px]">Terms</Link>

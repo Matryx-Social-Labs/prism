@@ -206,6 +206,8 @@ export interface EventDetail {
    *  Optional for the same two-pipeline reason as story_slug. */
   monitored_outlets?: number | null;
   monitored_checked_at?: string | null;
+  /** Editorial corrections, newest first. Optional: an older payload has none. */
+  corrections?: RecordCorrection[];
   projection: {
     event_type?: string | null;
     source_count?: number;
@@ -306,6 +308,38 @@ export interface MonitoredSet {
   outlets: number;
   checked_at: string | null;
   feeds: MonitoredFeed[];
+}
+
+/** A correction a founder recorded on a record (tools/correct_record.py). */
+export interface RecordCorrection {
+  created_at: string;
+  reason: "source_correction" | "prism_error";
+  note: string;
+  event_id?: string | null;
+  title?: string | null;
+}
+
+/** One replaced version of a record: its headline, summary and free brief. */
+export interface RecordVersion {
+  replaced_at: string;
+  title: string | null;
+  summary: string | null;
+  brief: string | null;
+}
+
+export async function fetchVersions(eventId: string): Promise<{ versions: RecordVersion[]; corrections: RecordCorrection[] }> {
+  const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/versions`);
+  if (!res.ok) throw new Error(`versions ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCorrections(): Promise<RecordCorrection[] | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/corrections`, { next: { revalidate: 300 } });
+    return res.ok ? ((await res.json()) as { corrections: RecordCorrection[] }).corrections : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchSources(): Promise<MonitoredSet | null> {

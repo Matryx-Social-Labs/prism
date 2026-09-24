@@ -18,6 +18,8 @@ EXPECTED = {
     ("GET", "/api/v1/subject/{path}"),
     ("GET", "/api/v1/regions"),
     ("GET", "/api/v1/sources"),
+    ("GET", "/api/v1/corrections"),
+    ("GET", "/api/v1/events/{event_id}/versions"),
     ("GET", "/api/v1/professions"),
     ("GET", "/api/v1/languages"),
     ("POST", "/api/v1/auth/request"),

@@ -67,6 +67,12 @@ describe("the record — the header", () => {
     expect(document.querySelector("header")!.textContent).toMatch(/1 of 27 monitored outlets · 2 reports.* · checked 5m ago/);
   });
 
+  it("marks a corrected record in its header and prints the correction", () => {
+    render(<StoryView event={event({ corrections: [{ created_at: "2026-09-24T06:00:00Z", reason: "prism_error", note: "The headline named the wrong district." }] })} />);
+    expect(screen.getByText("Corrected 24 Sept")).toBeInTheDocument();
+    expect(screen.getByText("The headline named the wrong district.")).toBeInTheDocument();
+  });
+
   it("ends with the structured ways to report a problem, addressed to this record", () => {
     render(<StoryView event={event()} />);
     const links = within(screen.getByRole("list", { name: "Report a problem" })).getAllByRole("link");

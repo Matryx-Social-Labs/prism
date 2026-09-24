@@ -183,6 +183,30 @@ class SourcesResponse(BaseModel):
     feeds: list[FeedOut]
 
 
+class CorrectionOut(BaseModel):
+    created_at: str
+    reason: str  # source_correction | prism_error
+    note: str
+    event_id: str | None = None  # on the public log only
+    title: str | None = None
+
+
+class RecordVersion(BaseModel):
+    replaced_at: str
+    title: str | None
+    summary: str | None
+    brief: str | None  # the free reader brief only; a paid lens stays paid in its history
+
+
+class VersionsResponse(BaseModel):
+    versions: list[RecordVersion]
+    corrections: list[CorrectionOut]
+
+
+class CorrectionsResponse(BaseModel):
+    corrections: list[CorrectionOut]
+
+
 class PerspectiveOut(BaseModel):
     label: str
     origin_country: str | None
@@ -346,6 +370,8 @@ class EventDetail(BaseModel):
     # 4 min ago" and never as everyone who covered it.
     monitored_outlets: int | None = None
     monitored_checked_at: str | None = None
+    # Editorial corrections, newest first (api/routes/corrections.py).
+    corrections: list[CorrectionOut] = []
     sources: list[SourceRef]
     perspectives: list[PerspectiveOut]
     impacts: list[ImpactOut]
