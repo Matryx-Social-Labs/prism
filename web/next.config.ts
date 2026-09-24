@@ -1,5 +1,29 @@
 import type { NextConfig } from "next";
 
+// The Content-Security-Policy, REPORT-ONLY first (audit H4): a wrong allowance
+// breaks sign-in or checkout silently, so it reports to the API for a while
+// before anything is enforced. Every origin here is one the browser really
+// loads: Google's sign-in script and frame, Razorpay's checkout script, frames
+// and calls, publishers' photographs and podcast audio (any https host), and
+// our API. Next.js inlines its RSC payload, so script-src keeps 'unsafe-inline'
+// until nonces are wired; the report still catches any unexpected host.
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://accounts.google.com https://checkout.razorpay.com",
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' https:",
+  "font-src 'self' data:",
+  `connect-src 'self' ${API} https://accounts.google.com https://api.razorpay.com https://lumberjack.razorpay.com`,
+  "frame-src https://accounts.google.com https://api.razorpay.com https://checkout.razorpay.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+  `report-uri ${API}/api/v1/csp-report`,
+].join("; ");
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
@@ -17,10 +41,7 @@ const nextConfig: NextConfig = {
         // Every page. No framing (the account page's cancel and refund are one
         // click each — an overlay on a framed page would be a clickjack), no MIME
         // sniffing, a year of HSTS, and the browser features the site never uses
-        // switched off. A Content-Security-Policy is deliberately absent: Google
-        // sign-in, Razorpay checkout, Plausible and the inline JSON-LD each need
-        // an allowance, and a wrong one breaks sign-in silently — it lands
-        // report-only first, once there is somewhere for the reports to go.
+        // switched off, and the CSP in report-only mode (above).
         source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
@@ -28,6 +49,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(self)" },
+          { key: "Content-Security-Policy-Report-Only", value: CSP },
         ],
       },
       {

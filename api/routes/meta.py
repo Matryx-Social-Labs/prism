@@ -1,6 +1,9 @@
 """Meta routes: health, lens registry, taxonomy. No LLM, no heavy queries."""
 
-from fastapi import APIRouter, Depends, Query
+import json
+import time
+
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +20,13 @@ from common.db import get_db
 from common.embeddings import check_corpus_model
 from common.freshness import MAX_WINDOW_HOURS, MIN_WINDOW_HOURS, WINDOW_HOURS, pipeline_freshness
 from common.lenses import DEFAULT_LENS, active_lenses
+from common.logging import get_logger
 from common.outlets import monitored
 from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.get("/healthz")
@@ -79,6 +84,40 @@ async def get_sources(db: AsyncSession = Depends(get_db)):
         checked_at=m.checked_at,
         feeds=[FeedOut(**{k: getattr(f, k) for k in FeedOut.model_fields}) for f in m.feeds],
     )
+
+
+# A browser posts a CSP violation here while the policy is report-only
+# (web/next.config.ts). Logged in one compact line so a wrong allowance shows up
+# in the API logs before anything is enforced. Public and unauthenticated by
+# nature, so the body is capped and at most CSP_LOGS_PER_MINUTE are logged.
+# ponytail: a per-process minute window; a shared counter if it ever matters.
+CSP_LOGS_PER_MINUTE = 60
+_csp_window: list[float] = [0.0, 0]
+
+
+@router.post("/api/v1/csp-report", status_code=204)
+async def csp_report(request: Request):
+    body = (await request.body())[:8192]
+    now = time.monotonic()
+    if now - _csp_window[0] >= 60:
+        _csp_window[0], _csp_window[1] = now, 0
+    if _csp_window[1] >= CSP_LOGS_PER_MINUTE:
+        return Response(status_code=204)
+    _csp_window[1] += 1
+    try:
+        data = json.loads(body or b"{}")
+    except ValueError:
+        return Response(status_code=204)
+    # application/csp-report wraps it in "csp-report"; Reporting API sends a list.
+    report = data.get("csp-report", data) if isinstance(data, dict) else (data[0].get("body", {}) if data else {})
+    if isinstance(report, dict):
+        logger.warning(
+            "csp_violation",
+            directive=str(report.get("effective-directive") or report.get("violated-directive") or report.get("effectiveDirective"))[:80],
+            blocked=str(report.get("blocked-uri") or report.get("blockedURL") or "")[:200],
+            page=str(report.get("document-uri") or report.get("documentURL") or "")[:200],
+        )
+    return Response(status_code=204)
 
 
 @router.get("/api/v1/regions")
