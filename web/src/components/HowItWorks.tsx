@@ -51,7 +51,7 @@ const REFUSALS: [string, string][] = [
   ["No guess presented as a fact.", "The brief restates the reports. Where it says why something matters, that is Prism\u2019s reading, and the page says so."],
   ["No left, right or centre.", "Coverage is described by where an outlet comes from, a fact of the source. Prism rates neither an outlet\u2019s politics nor a report\u2019s tone: nobody has made those ratings for Indian outlets, and a machine\u2019s guess is not one."],
   ["No photos of its own.", "A picture is only ever the outlet's, shown as a credited link preview of that outlet's report, never as Prism's."],
-  ["No silent edits.", "Every record shows when it was last updated; a new report never erases what came before it."],
+  ["No silent edits.", "Every record shows when it was last updated and keeps every earlier version; a correction says what was wrong and why."],
 ];
 
 // The words a record uses, for a reader meeting them for the first time. Plain
@@ -74,7 +74,7 @@ const ACCOUNTABILITY: [string, string][] = [
   ["A record is written by machine, and says so.", "Every headline, brief and summary on Prism is written by software from the reports listed under it, never by a journalist and never presented as one. That is why a record is bylined \u201CHeadline by Prism\u201D and names the reports it was written from."],
   ["The reporting is the outlets\u2019.", "Prism does not report. It reads what registered outlets published, keeps each report as it was, and links to it. The journalism belongs to the outlet that did it. What Prism adds is the grouping, the counts and the reading."],
   ["A quote is the article\u2019s words or it is not there.", "Quotes are checked against the article they came from before they appear. When a check fails the quote is dropped rather than paraphrased."],
-  ["A new report never replaces an old one.", "A record carries the time it was last updated, and a later report is added to it rather than replacing what came before. A public corrections log is next; until it ships, a fixed record shows only its updated time."],
+  ["A correction is public.", "A record that was wrong is fixed and says so, with the date, the reason and what was wrong, and every correction is listed on the corrections page. Every earlier version of a record is kept and can be opened on it."],
 ];
 
 type Example = { row: FeedItem; event: EventDetail; outlets: OutletRef[] };

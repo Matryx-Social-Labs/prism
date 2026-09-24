@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent.questions import suggested_questions
 from agent.rag import answer_stream, ensure_session
 from api.deps import client_ip, get_current_user_optional
+from api.routes.corrections import corrections_for
 from api.schemas import (
     AskRequest,
     BriefResponse,
@@ -484,6 +485,7 @@ async def get_event(
         ],
         story_slug=story["slug"] if story else None,
         monitored_outlets=mon.outlets,
+        corrections=await corrections_for(db, event_id),
         monitored_checked_at=mon.checked_at,
         sources=[
             SourceRef(

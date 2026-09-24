@@ -7,6 +7,7 @@ export const AVAILABLE = [
   "Coverage by outlet origin on every story",
   "Professional readings of the same facts",
   "Ask, cited to the story's own reports",
+  "A public corrections log, and every earlier version of a record",
 ];
 export const VALIDATION = [
   "Story timelines across days (two-reviewer gate)",
@@ -17,7 +18,6 @@ export const VALIDATION = [
 // quality are complete (founder D-d, 2026-09-24), so it is not promised here.
 export const NEXT = [
   "Each line of a brief linked to the report it came from",
-  "A corrections log on every record",
   "More Indian-language outlets, the most-read languages first",
   "Follow a story and see only what changed since you last read",
 ];

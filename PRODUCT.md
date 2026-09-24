@@ -142,6 +142,9 @@ ledger in `.claude/plans/trust-india-indic.plan.md`
   rest of the product is complete and data quality is good; no copy promises it.
 - **D-e** Source expansion first: as much Indian news as possible, in the Indian
   languages with the largest audiences first.
+- Corrections (2026-09-24): every replaced headline/summary/free brief is kept (event_revisions trigger); a founder
+  records a correction with `tools/correct_record.py` (reason: the outlet corrected its report | Prism's error), which
+  the record shows and `/corrections` lists. New reporting is not a correction.
 - **D-f** Translating the interface itself is deferred (recommendation on record: the
   record's content before the chrome, on an adoption signal).
 

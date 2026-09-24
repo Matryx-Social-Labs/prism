@@ -25,6 +25,7 @@ import { EntityText } from "@/components/EntityText";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill } from "@/components/StatusPill";
 import { ReportProblem } from "@/components/ReportProblem";
+import { RecordHistory } from "@/components/RecordHistory";
 import { StoryRoute } from "@/components/StoryRoute";
 import { RelatedRoutes } from "@/components/RelatedRoutes";
 import { Said } from "@/components/Said";
@@ -36,7 +37,7 @@ import { PhotoDeck } from "@/components/PhotoDeck";
 import { Rail } from "@/components/Rail";
 import { BriefPlayer } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
-import { relativeTime } from "@/lib/dateline";
+import { relativeTime, shortDate } from "@/lib/dateline";
 import { sectorGroup } from "@/lib/sectors";
 
 /**
@@ -378,6 +379,9 @@ export function StoryView({ event }: { event: EventDetail }) {
               {routeStory && event.story_slug && (
                 <StatusPill status={boundaryVerified ? "verified" : "provisional"} title={boundaryVerified ? "Story boundary verified; developments below are in sequence." : "Grouping provisional; related reporting is shown without implying chronology."} />
               )}
+              {(event.corrections?.length ?? 0) > 0 && (
+                <a href="#history"><StatusPill status="corrected" label={`Corrected ${shortDate(event.corrections![0].created_at)}`} /></a>
+              )}
               <span>Updated <time dateTime={event.last_updated_at}>{relativeTime(event.last_updated_at)}</time></span>
               {group && (
                 <>
@@ -705,6 +709,12 @@ export function StoryView({ event }: { event: EventDetail }) {
                 <RelatedRoutes related={routeStory!.related} />
               </section>
             )}
+
+            {/* ── Corrections and every earlier version, kept ─────────── */}
+            <section id="history" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="history-title">
+              <Head id="history-title" title="Corrections and versions" hint="A correction says what was wrong and why. Every earlier headline and brief of this record is kept." />
+              <RecordHistory eventId={event.id} corrections={event.corrections ?? []} />
+            </section>
 
             {/* ── Something wrong: structured reports, never comments ─── */}
             <section id="report" className="border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="report-title">
