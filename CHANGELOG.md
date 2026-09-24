@@ -3,6 +3,52 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.95.0] - 2026-09-24
+
+### Changed — the product claims what it can show
+An outside strategy report audited readprism.news. Its main finding held:
+Prism promised more than a reader could check. Every claim was checked against
+the code and the live API before anything changed (`.claude/plans/trust-india-indic.plan.md`).
+
+- **Every count has its denominator.** A story reads "2 of 14 monitored outlets
+  · checked 4m ago", not "2 outlets", on the record and the landing. The count
+  links to **`/sources`** (new): every outlet Prism reads, by language, each with
+  when it was last read, a feed silent for an hour on a dashed rule, and the
+  most-read Indian languages it does not read yet. `GET /api/v1/sources` serves
+  it with nothing operational in it.
+- **No tone labels.** "neutral", "critical", "supportive" printed on every
+  source row (76 of 76 sampled) beside a page saying Prism rates no outlet.
+  They are gone from the cards and from the API.
+- **No absolute claims.** "Nothing here is unsourced" sat beside a brief whose
+  last line is inference; the brief now says it is written by software and that
+  why-it-matters is Prism's reading. A single-source story reads "Single source
+  · not yet corroborated". The privacy summary no longer says "we know nothing
+  about you" beside the server logs it describes.
+- **Report a problem, in four kinds** (a fact, a quote, an outlet that says
+  something different, a missing outlet) at the foot of every record and on
+  /about, each arriving with the record's address filled in.
+- **/about** gains "The words on a record", a plain glossary, and its refusals
+  now include "No count without its denominator". **The landing** leads with the
+  evidence and states that the evidence is free and stays free. **/plus** sells
+  whole-story answers rather than "the stronger model", and no longer promises
+  how the offer ends: renewal terms are decided at the paid launch.
+
+### Added — 19 Indian outlets
+Indian Express, Scroll, Deccan Herald, Deccan Chronicle, Telangana Today,
+Business Standard, Economic Times, Dainik Bhaskar, Navbharat Times, Maharashtra
+Times, Sakshi, Dinamani, Qaumi Awaz, and three new languages: Malayalam
+(Mathrubhumi, Madhyamam, Manorama), Odia (Dharitri, Sambad), Assamese (Asomiya
+Pratidin). 33 mastheads across English and 12 Indian languages, from 14.
+
+### Fixed
+- /about printed a literal `\u2019` in its corrections paragraph.
+- Odisha never got a name on the web: the API stamps `IN-OD`, the web looked up `IN-OR`.
+
+### Docs
+- `docs/COMPLIANCE-INDIA.md`: the IT Rules digital-media code (and the 2021 stay
+  on Rules 9(1)/9(3)), DPDP phasing, CERT-In and consumer protection, laid out for
+  a team decision.
+
 ## [0.0.94.0] - 2026-09-24
 
 ### Changed — `/admin` is drawn, not written

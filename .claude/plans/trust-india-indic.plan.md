@@ -26,7 +26,7 @@ then Indic output, then paid launch.
 | V7 | "we know nothing about you" vs server logs | **CONFIRMED** | `legal.ts:39` vs `legal.ts:55`. |
 | V8 | Model-provider disclosure thin | **CONFIRMED, plus a real gap** | One line (`legal.ts:87`). No OpenRouter `provider.data_collection` setting anywhere in `common/llm.py`, so routed providers **may retain or train on Ask text**. We cannot promise "no training" until that flag is set. |
 | V9 | DPDP main obligations start ~May 2027 | Plausible; wording fix | Privacy says it is "written to" the Act. Change to "written ahead of its phased commencement". |
-| V10 | No named Grievance Officer / compliance hub | **CONFIRMED**, context missing | `legal.ts:136` says only "the same address reaches our grievance officer". No name, SLA, form or monthly report. **Missing from the report:** since Aug 2021 the Bombay HC has stayed Rules 9(1) and 9(3), the ethics code and the three-tier mechanism, as an interim order that applies across India. Counsel must say what is operative. A named officer, a 24h/15d SLA and a monthly report are cheap either way. |
+| V10 | No named Grievance Officer / compliance hub | **CONFIRMED**, and more in force than first thought | `legal.ts:136` says only "the same address reaches our grievance officer". No name, SLA, form or monthly report. Bombay HC (Aug 2021, now pending in Delhi HC) stayed **only Rules 9(1) and 9(3)**, the ethics code and the three-tier structure. **Rules 10–19 are not stayed** (grievance officer, 24h/15d, MIB filing within 30 days of starting (possibly overdue), monthly report, 60-day records). Full analysis: `docs/COMPLIANCE-INDIA.md`. |
 | V11 | CERT-In: 6h incident reporting, 180-day logs in India | Partly right | CERT-In's FAQ allows logs outside India if they can be produced promptly on demand. **Financial-transaction records must stay in India.** An LLP is a body corporate. Railway log retention is well short of 180 days, so we need a log drain. |
 | V12 | No corrections/version log | **CONFIRMED** | Listed as "Next" in `StatusGrid.tsx:17`. No revisions table. |
 | V13 | No claim types (reported/attributed/inference/context/unknown) | **CONFIRMED** | None exist. |
@@ -109,13 +109,23 @@ Razorpay live keys on the LLP's own merchant account, the contracting entity nam
 ## Phase 7: Security (runs alongside)
 C5: HttpOnly `Secure` `SameSite=Lax` cookie on `.readprism.news`, now possible. CSP report-only, then enforce. Close `/api/docs` in prod. Security headers on the API. A second factor for `/admin`. External VAPT before B2B.
 
-## Founder decisions needed
-- **D-a** Stance labels: remove from the UI (recommended) or keep with a published definition, method and appeal?
-- **D-b** Plan terms: is it intended that the monthly offer completes after 12 charges, the yearly renews, and founding completes after 3 years?
-- **D-c** Named India-based Grievance Officer + counsel engagement for V10/V11.
-- **D-d** Translation v1: benchmark existing LLM vs Google NMT (recommended), or go straight to one?
-- **D-e** Source expansion: which outlets and how many, Malayalam first?
-- **D-f** v1 translates record content only (recommended), or UI chrome too?
+## Founder rulings (2026-09-24) and status
+| # | Ruling | Status |
+|---|---|---|
+| D-a | Remove stance labels | **DONE** 0821781 — gone from the payload and the cards |
+| D-b | Plan renewal terms undecided; settle at launch | On the launch checklist (memory `prism-launch-checklist`); the undecided renewal FAQ removed from /plus |
+| D-c | Team has no view on compliance | Decision doc `docs/COMPLIANCE-INDIA.md` for the team; Phase 1 build waits on it |
+| D-d | Hold translation until the product is complete and data quality is good | Phase 4 **HELD**; no copy promises translation |
+| D-e | As much Indian news as possible, top languages first | **DONE** 4cc56db — 19 outlets, Malayalam/Odia/Assamese new; bn/gu/pa blocked from a datacenter IP, retry from Railway egress |
+| D-f | UI-chrome translation deferred | Deferred; recommendation on record: record content before chrome, on an adoption signal |
+
+**Shipped on `feat/trust-alignment` (0821781):** Phase 0 (0.1, 0.2, 0.5, 0.7, 0.8; 0.3 and 0.4 deferred to launch per D-b),
+Phase 3.2 + 3.3 (public `/sources` registry, "k of N monitored outlets · checked" on the record and landing),
+structured report-a-problem links (mailto; becomes a form once D-c decides the queue), the /about glossary, evidence-first landing.
+**Still open, in order:** 0.6 OpenRouter `data_collection: deny` (measure Ask cost first) → H11/H12 → Phase 2 (claim-level
+citations) → Phase 3.1 corrections log → Phase 1 build once D-c lands → Phase 5 launch (checklist) → Phase 6 → Phase 7 (C5 is unblocked).
+Data-quality gate for lifting D-d: single-source share falling week on week after the expansion, cross-language merge hole
+closed (`crosslingual-merge.plan.md`), Phase 2 support rate ≥ 99.5% on the gold set.
 
 ## Risks
 | Risk | Likelihood | Mitigation |
