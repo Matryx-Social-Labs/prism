@@ -61,7 +61,7 @@ convenience (whole-story Ask, allowance, later follow and alerts), never a model
 
 ## Operating Context
 
-- **Corpus:** 47 RSS feeds enabled from 33 mastheads across English and 12 Indian
+- **Corpus:** 46 RSS feeds enabled from 32 mastheads across English and 12 Indian
   languages (19 Indian outlets added 2026-09-24, D-e: Malayalam, Odia and Assamese
   were unread before; Bengali, Gujarati and Punjabi outlets were all bot-blocked from
   a datacenter IP and wait for a retry from Railway's egress —

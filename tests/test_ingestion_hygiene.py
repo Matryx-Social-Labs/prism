@@ -62,7 +62,7 @@ def test_every_other_feed_stays_on():
     """A disable flag is a trapdoor — one stray default and ingestion goes quiet."""
     on = [f.slug for f in FEEDS if f.enabled]
     # Every feed that is off is off for a measured reason written beside it.
-    assert {f.slug for f in FEEDS if not f.enabled} == {"bleepingcomputer", "pib", "sebi"}
+    assert {f.slug for f in FEEDS if not f.enabled} == {"bleepingcomputer", "pib", "sebi", "businessstandard"}
     for core in ("thehindu", "timesofindia", "ndtv", "thehackernews", "rbi"):
         assert core in on
 
