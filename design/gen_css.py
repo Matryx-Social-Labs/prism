@@ -137,7 +137,7 @@ def scoped(t: dict, mode: str) -> str:
 
 def render(t: dict) -> str:
     lay = t["layout"]
-    desk = "\n".join("  " + l for l in type_scale(t, 1))
+    desk = "\n".join("  " + line for line in type_scale(t, 1))
     d = dark(t)
     return f"""{BEGIN}
 :root,
