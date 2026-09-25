@@ -82,7 +82,8 @@ def article_block(*, source: str, published_at, headline: str, summary: str) -> 
     return f"Published {when} by {source}.\nHeadline: {headline}\nSummary: {summary}"
 
 
-async def _event_blocks(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+async def event_blocks(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Each candidate's FOUNDING headline and summary — what the judge reads."""
     rows = (
         await session.execute(
             text("SELECT id, title, summary, first_seen_at FROM events WHERE id = ANY(CAST(:ids AS uuid[]))"),
@@ -96,15 +97,15 @@ async def _event_blocks(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uui
 
 
 async def judge(
-    session: AsyncSession, *, article_id: uuid.UUID, block: str, candidates: list[Candidate], mode: str
-) -> list[tuple[Candidate, float]]:
+    *, article_id: uuid.UUID, block: str, candidates: list[Candidate], blocks: dict[uuid.UUID, str]
+) -> tuple[list[tuple[Candidate, float]], str]:
     """Jev's probability, per candidate, that the article reports the event's
-    happening — recorded in event_match_verdicts. Raises on failure or timeout;
-    the caller treats that as no match."""
-    blocks = await _event_blocks(session, [c.event_id for c in candidates])
+    happening, and the model that answered. The network call only — no database:
+    a Jev failure or timeout raises, and the caller treats that as no match,
+    which is only safe because nothing here can leave the transaction aborted."""
     asked = [c for c in candidates if c.event_id in blocks]
     if not asked:
-        return []
+        return [], ""
     state = {"ARTICLE": block, **{f"EVENT_{k}": blocks[c.event_id] for k, c in enumerate(asked, 1)}}
     questions = {f"same_{k}": Noul(instructions=SAME_HAPPENING.format(a="ARTICLE", b=f"EVENT_{k}"))
                  for k in range(1, len(asked) + 1)}
@@ -117,13 +118,22 @@ async def judge(
         answer = d.answers[f"same_{k}"]
         assert isinstance(answer, NoulAnswer)
         scored.append((c, answer.noul))
+    return scored, d.model or get_settings().prism_model_decide
+
+
+async def record(
+    session: AsyncSession, *, article_id: uuid.UUID, scored: list[tuple[Candidate, float]], model: str, mode: str
+) -> None:
+    """Every answer, matched or not, into event_match_verdicts — the audit trail
+    and the replay cache. A failure here is a database failure and propagates."""
+    if not scored:
+        return
     await session.execute(
         text(
             "INSERT INTO event_match_verdicts (article_id, event_id, noul, gist_distance, model, mode) "
             "VALUES (:a, :e, :n, :d, :m, :mode) "
             "ON CONFLICT (article_id, event_id) DO UPDATE SET noul = EXCLUDED.noul, model = EXCLUDED.model, mode = EXCLUDED.mode"
         ),
-        [{"a": str(article_id), "e": str(c.event_id), "n": p, "d": c.distance, "m": d.model or get_settings().prism_model_decide,
-          "mode": mode} for c, p in scored],
+        [{"a": str(article_id), "e": str(c.event_id), "n": p, "d": c.distance, "m": model, "mode": mode}
+         for c, p in scored],
     )  # executemany — one round trip
-    return scored

@@ -228,3 +228,28 @@ def test_the_gist_is_the_english_headline_and_summary():
     assert verify.gist_text({"headline_summary": "S."}, "Raw title").startswith("Raw title. S.")
     # No summary: no gist — a title alone is not what was measured.
     assert verify.gist_text({"headline": "H"}, "Raw") is None
+
+
+async def test_a_database_failure_is_never_swallowed_as_no_match(monkeypatch, jev):
+    """REGRESSION: the verdict INSERT sat inside the try that turns a Jev failure
+    into "no match". A database error there was swallowed with the transaction
+    already aborted, so the attach that followed failed and the message looped.
+    Only the network call may fall back; database errors propagate."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    _, answers = jev
+    monkeypatch.setattr(get_settings(), "prism_event_verify", "live")
+
+    async def broken(*_a, **_k):
+        raise RuntimeError("verdict insert failed")
+
+    monkeypatch.setattr(clustering, "record", broken)
+    g = _direction()
+    tag = uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        await _event_with_member(s, f"Seema Kumari wins bronze {tag}", _at(g, FLOOR / 2))
+        answers[f"Seema Kumari wins bronze {tag}"] = 0.95
+        aid = await _incoming_article(s)
+        with pytest.raises(RuntimeError, match="verdict insert failed"):
+            await _run(s, g, aid)
+        await s.rollback()

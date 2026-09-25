@@ -143,7 +143,8 @@ async def build_scratch(prod: asyncpg.Connection, local: asyncpg.Connection, tar
     # The verified tier records every answer; in scratch it must land in scratch
     # (public's copy has foreign keys into local rows that do not exist).
     await local.execute(
-        f"CREATE TABLE {SCRATCH}.event_match_verdicts (LIKE public.event_match_verdicts INCLUDING DEFAULTS)"
+        # INCLUDING INDEXES: the tier upserts ON CONFLICT (article_id, event_id).
+        f"CREATE TABLE {SCRATCH}.event_match_verdicts (LIKE public.event_match_verdicts INCLUDING DEFAULTS INCLUDING INDEXES)"
     )
     print(f"  removed {len(ids)} target event(s) from scratch\n")
 
