@@ -64,7 +64,7 @@ async def place(rows: list[dict]) -> list[dict]:
             try:
                 answers = await decide(state, questions, trace_name="backfill-subject")
             except Exception as exc:  # noqa: BLE001 — an unplaced row stays unplaced and is retried next run
-                logger.warning("backfill_place_failed", event=r["id"], error=str(exc)[:140])
+                logger.warning("backfill_place_failed", event_id=r["id"], error=str(exc)[:140])
                 return {**r, "path": None}
             path, confidence = path_from(answers)
             cost = answers.usage.cost
