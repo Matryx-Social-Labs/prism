@@ -13,8 +13,10 @@ transitively chained a week of Trump–Xi coverage into one 46-event group.
   uv run python -m tools.audit_event_dups --judge --days 3 --tau 0.7 0.85
 
 Baseline, 2026-09-25 (7 days, 11,193 events, 85% single-article): 17,590
-candidate pairs; at tau 0.85, 11.5% of events are copies, and 20 of 20 sampled
-merges were right. Jev's answers are cached in .cache/audit_event_dups.json, so a
+candidate pairs; at tau 0.85, 10.1% of events are copies (1,118 in 756 groups,
+the largest 9), and 20 of 20 sampled merges were right. The same pairs linked
+transitively would claim 11.5% — and one 46-event chain at 0.7 — which is why
+this counts by founder. Jev's answers are cached in .cache/audit_event_dups.json, so a
 re-run pays only for new pairs. Production is opened read-only.
 """
 
