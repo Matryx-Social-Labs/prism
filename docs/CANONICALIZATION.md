@@ -104,7 +104,16 @@ verified tier decides (`tools/audit_event_dups`, founder-anchored):
 | 0.70 | 1,674 | 15.2% | 1,058 | 11 |
 
 A random sample of 20 merges at ≥ 0.85 was 20/20 correct (week run,
-2026-09-25). Linking the same pairs **transitively** (union-find) instead chained
+2026-09-25).
+
+**Replayed through the real cascade** (`tools/score_cascade`, all 794 labelled
+pairs — July gold, batch 3 and silver — 922 events re-decided against a copy of
+production, mE5, 2026-09-25), today's matcher keeps what it merges and misses
+almost everything else:
+
+| Cascade | Pairs | TP | FP | FN | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|---|
+| current (no verified tier) | 794 | 30 | 3 | 136 | 0.909 | **0.181** | 0.302 | Linking the same pairs **transitively** (union-find) instead chained
 a week of Trump–Xi coverage (itinerary, airport arrival, the meeting) into one
 46-event group at 0.7 — which is why an article is only ever judged against an
 event's founder.

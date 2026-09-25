@@ -17,6 +17,10 @@ best evidence available that the sample is representative:
     batch 2 (242 pairs, 33 pos):  P=0.629  R=0.667
     combined (398 pairs, 61 pos): P=0.621  R=0.672
 
+(As measured then. On 2026-09-25 two batch-2 positives were found wrong — a
+Thrissur leopard paired with a Palakkad one — so batch 2 now holds 31 positives
+and the set 59; see tools/gold_same_happening.)
+
 Because they are the same distribution, batch 1 trains and batch 2 tests. That is
 the split every threshold here is fitted and reported under.
 
