@@ -3,6 +3,32 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.97.0] - 2026-09-25
+
+### Added — one happening, one event (the verified matching tier, off by default)
+Mushtaq Khan's death became 13 events from 22 articles; across a week, 10.1% of
+events are copies of another. An event was matched on its founding article's
+first 1200 raw characters, which separates same-happening pairs at AUC 0.46 on
+hard same-language pairs. Measured on three labelled sets (docs/CANONICALIZATION.md):
+
+- **The gist.** The extractor already writes an English headline and summary for
+  every article in every language; embedded, they separate duplicates at AUC
+  0.91–0.99. Stored as `articles.gist_embedding` at enrichment (migration
+  `e5a9c3b7d2f1`; `tools/backfill_gist` fills the window, no LLM spend).
+- **The judge.** No similarity threshold is safe alone — two co-operative
+  societies' results sit at cosine 0.95 — so the gist only finds candidates and
+  Jev decides: one call per article, up to five candidate events, each judged
+  against its founding headline and summary (never transitively), attach at 0.85
+  (precision 1.00 on the hard labels, 20/20 on a production sample). About
+  $2–4 a month. Every answer is kept in `event_match_verdicts`.
+- **Safe to switch.** `PRISM_EVENT_VERIFY=off|shadow|live`, default off; the tier
+  runs last, only for articles every other tier refused; a slow or failing judge
+  (6 s ceiling under the correlation lock) founds a new event exactly as before.
+- **Measurement.** `tools/audit_event_dups` (the week's copy rate),
+  `tools/gold_same_happening` (the September labels, compiled at last), and
+  `tools/score_cascade --verify --sets` (replay with the tier on). Two wrong
+  labels in `gold_pairs` corrected (a Thrissur leopard paired with a Palakkad one).
+
 ## [0.0.96.0] - 2026-09-25
 
 ### Fixed — search shows what the story shows, and finds the names it offers
