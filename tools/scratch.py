@@ -42,6 +42,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from common.text import entity_slug
 from correlation.clustering import ENTITY_MATCH_TYPES, find_event
 from correlation.consumer import english_headline
+from correlation.verify import article_block
 
 SCRATCH = "repair_scratch"
 OVER_MERGE_MIN = 20
@@ -139,24 +140,35 @@ async def build_scratch(prod: asyncpg.Connection, local: asyncpg.Connection, tar
         f"CREATE INDEX ON {SCRATCH}.raw_items (url)",
     ):
         await local.execute(idx)
+    # The verified tier records every answer; in scratch it must land in scratch
+    # (public's copy has foreign keys into local rows that do not exist).
+    await local.execute(
+        f"CREATE TABLE {SCRATCH}.event_match_verdicts (LIKE public.event_match_verdicts INCLUDING DEFAULTS)"
+    )
     print(f"  removed {len(ids)} target event(s) from scratch\n")
 
 
-async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: dict | None = None) -> dict:
+async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: dict | None = None,
+                 gists: dict | None = None) -> dict:
     """Replay one event's articles through the real find_event.
 
     `vectors` overrides the STORED chunk embedding per article id. Without it the
     replay reuses whatever model was live at ingest, so comparing two embedding
     models would score them identically — see tools/score_cascade.
+
+    `gists` (article id -> gist vector) turns the verified tier on for this
+    replay: each article carries its gist and judge block into find_event, as
+    correlation/consumer does. Which mode the tier runs in is the settings'.
     """
     members = await prod.fetch(
         """SELECT a.id aid, ri.title, ri.url, ri.published_at, a.created_at,
                   ac.embedding::text vec, e.shared_fields->'entities' ents,
-                  e.shared_fields->>'headline' xh,
+                  e.shared_fields->>'headline' xh, e.summary esum, src.slug src,
                   e.model, e.lens_fields
            FROM event_memberships em
            JOIN articles a ON a.id = em.article_id
            JOIN raw_items ri ON ri.id = a.raw_item_id
+           JOIN sources src ON src.id = ri.source_id
            JOIN article_chunks ac ON ac.article_id = a.id AND ac.chunk_index = 0
            LEFT JOIN enrichments e ON e.article_id = a.id
            WHERE em.event_id = $1
@@ -204,6 +216,13 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: di
                     entity_slugs=slugs or None,
                     cve_record=(m["model"] or "").startswith("deterministic:"),
                     english_title=m["xh"] or None,
+                    gist=(gists or {}).get(str(m["aid"])),
+                    verify_block=article_block(
+                        source=m["src"], published_at=m["published_at"],
+                        headline=english_headline({"headline": m["xh"]}) or m["title"] or "",
+                        summary=m["esum"] or "",
+                    ) if gists else None,
+                    article_id=m["aid"] if gists else None,
                 )
                 if match is None:
                     # A new event, written exactly as the consumer writes one —
@@ -220,11 +239,15 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: di
                     # a replay must not write spans into production's Langfuse.
                     headline = english_headline({"headline": m["xh"]})
                     title, by = (headline, "prism") if headline else (m["title"] or "", None)
+                    # The founder's summary and its first-seen time too: the verified
+                    # tier's judge reads both, and a blank summary dated today would
+                    # be a different question from the one production asks.
                     await s.execute(
-                        sa_text("INSERT INTO events (id,title,headline_by,sector,occurred_at,last_updated_at,embedding) "
-                                "VALUES (:i,:t,:b,'politics',:o,now(),CAST(:v AS vector))"),
-                        {"i": str(eid), "t": title, "b": by, "o": m["published_at"],
-                         "v": "[" + ",".join(str(x) for x in vec) + "]"},
+                        sa_text("INSERT INTO events (id,title,headline_by,summary,sector,occurred_at,first_seen_at,"
+                                "last_updated_at,embedding) "
+                                "VALUES (:i,:t,:b,:su,'politics',:o,coalesce(:f, now()),now(),CAST(:v AS vector))"),
+                        {"i": str(eid), "t": title, "b": by, "su": m["esum"], "o": m["published_at"],
+                         "f": m["published_at"], "v": "[" + ",".join(str(x) for x in vec) + "]"},
                     )
                 else:
                     eid = match.event_id

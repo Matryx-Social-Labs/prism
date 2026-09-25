@@ -12,7 +12,9 @@ from tools.gold_pairs import GOLD_PAIRS, pair_count, positive_count
 
 def test_counts_match_what_was_labelled():
     assert pair_count() == 398
-    assert positive_count() == 61
+    # 61 until 2026-09-25: two positives paired the Thrissur leopard with a
+    # Palakkad one and were corrected on re-reading (tools/gold_same_happening).
+    assert positive_count() == 59
 
 
 def test_keys_are_article_uuid_pairs():
@@ -33,7 +35,7 @@ def test_no_pair_is_labelled_twice_in_either_direction():
 
 
 def test_the_positive_rate_is_what_the_measurements_assumed():
-    """15.3% positives (61 of 398). Every precision/recall figure in the module
+    """14.8% positives (59 of 398; 61 before the 2026-09-25 correction). Every precision/recall figure in the module
     docstring is computed against this base rate; if the labels change, those
     numbers are stale and the docstring needs rewriting rather than this test
     relaxing to accommodate them."""

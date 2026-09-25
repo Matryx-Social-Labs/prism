@@ -714,9 +714,9 @@ GOLD_PAIRS: dict[tuple[str, str], bool] = {
     # NYC Mayor Mamdani hires 'tech crew': Here's   ||  R&amp;B engineer who took up US job 20 years
     ("3c5d2503-26fe-47d9-a22e-a572a1e788dd", "5bd32407-4f60-4b5d-ab85-fa76a0fe9265"): True,
     # Leopard that attacked poultry captured in Fo  ||  Leopard that attacked poultry captured in Fo
-    ("3c5d2503-26fe-47d9-a22e-a572a1e788dd", "36d17456-2fca-4e41-a6de-7412fd83d133"): True,
+    ("3c5d2503-26fe-47d9-a22e-a572a1e788dd", "36d17456-2fca-4e41-a6de-7412fd83d133"): False,  # CORRECTED 2026-09-25: Palakkad leopard, not the Thrissur one
     # Leopard that attacked poultry captured in Fo  ||  Leopard trapped in cage set up by Forest dep
-    ("3c5d2503-26fe-47d9-a22e-a572a1e788dd", "558fb8e0-a839-4088-97bf-faf83d735f59"): True,
+    ("3c5d2503-26fe-47d9-a22e-a572a1e788dd", "558fb8e0-a839-4088-97bf-faf83d735f59"): False,  # CORRECTED 2026-09-25: Palakkad leopard, not the Thrissur one
     # Leopard that attacked poultry captured in Fo  ||  Leopard trapped in cage set up by Forest dep
     ("3c5d2503-26fe-47d9-a22e-a572a1e788dd", "88e02a19-b05f-4638-aa04-5649fa07af06"): False,
     # Leopard that attacked poultry captured in Fo  ||  Tanker lorry operators stage flash strike at
