@@ -11,14 +11,16 @@ lens-flip brief later in the tutorial.
 - **Docker** (for Postgres + Redis)
 - **Python 3.12+** with [uv](https://docs.astral.sh/uv/)
 - **Node 20+**
-- Optional, for news + lens briefs: an **Ollama Cloud** API key (`OLLAMA_API_KEY`)
+- Optional, for news + lens briefs: an **OpenRouter** API key (`OPENROUTER_API_KEY`; production
+  uses OpenRouter for chat models and for Jev, the Decisions API — `LLM_PROVIDER=ollama` with
+  `OLLAMA_API_KEY` also works for chat models; see [LOCAL_DEV.md](./LOCAL_DEV.md))
 
 ---
 
 ## Step 1: Bring up infra and the schema
 
 ```bash
-cp .env.example .env           # defaults work for local; leave OLLAMA_API_KEY blank for now
+cp .env.example .env           # defaults work for local; leave OPENROUTER_API_KEY blank for now
 docker compose up -d           # Postgres (pgvector) + Redis
 uv sync                        # Python deps
 uv run alembic upgrade head    # create the schema
@@ -87,12 +89,12 @@ outlet that covered it (see [STORY-GRAPH.md](./STORY-GRAPH.md)).
 
 ## Step 6: Flip the lens
 
-This is the payoff. Add your `OLLAMA_API_KEY` to `.env` and restart the worker and
+This is the payoff. Add your `OPENROUTER_API_KEY` to `.env` and restart the worker and
 API (news items and lens briefs both need the model):
 
 ```bash
 # .env
-OLLAMA_API_KEY=your-key-here
+OPENROUTER_API_KEY=your-key-here
 ```
 
 Trigger a fresh run so news (not just CVEs) flows in:
@@ -123,10 +125,10 @@ Next:
 - **Ship it** — [DEPLOYMENT.md](./DEPLOYMENT.md): Railway + Vercel.
 
 ## Troubleshooting
-- **Feed stays empty** — check terminal 1 for `collector_run`. RSS/GDELT news needs
-  `OLLAMA_API_KEY`; without it only CVE feeds (cyber lens) populate. Confirm
+- **Feed stays empty** — check terminal 1 for `collector_run`. RSS news needs
+  `OPENROUTER_API_KEY` (and `PRISM_INGESTION_ENABLED=true`); without it only CVE feeds (cyber lens) populate. Confirm
   Postgres and Redis are up (`docker compose ps`).
 - **`alembic upgrade` fails** — Postgres isn't ready yet; wait a few seconds after
   `docker compose up -d` and retry.
 - **Lens brief says "not available yet"** — the brief is an on-demand LLM call; set
-  `OLLAMA_API_KEY` and it generates on first view (then caches).
+  `OPENROUTER_API_KEY` and it generates on first view (then caches).
