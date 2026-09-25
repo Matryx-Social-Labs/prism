@@ -8,15 +8,18 @@
  * guide is fetched from the API for an account that has applied, and nobody
  * else receives it — not even in the page's JavaScript. A stranger is asked
  * to sign in; a signed-in reader who has not applied is sent to apply.
+ *
+ * Design System v2 · Label board, "The guide": the kind as its provenance line,
+ * the question as the title; loading as bars in the guide's shape; a failure in
+ * words with another try and the way back.
  */
 
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
-import { SectionHead } from "@/components/SectionHead";
-import { GuidePrimer } from "@/components/label/GuideView";
-import { LabelStrip } from "@/components/label/parts";
+import { GuideFailed, GuideLoading, GuidePrimer } from "@/components/label/GuideView";
+import { Column, LabelStrip, Lede, Title } from "@/components/label/parts";
 import type { LabelGuide } from "@/lib/api";
 import { LEARNABLE, fetchGuide } from "@/lib/labeller";
 import { useSession } from "@/lib/session";
@@ -31,6 +34,7 @@ export default function LearnTask({ params }: { params: Promise<{ kind: string }
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<State>("loading");
   const [guide, setGuide] = useState<LabelGuide | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => setMounted(true), []);
 
@@ -41,6 +45,7 @@ export default function LearnTask({ params }: { params: Promise<{ kind: string }
       return;
     }
     let live = true;
+    setState("loading");
     fetchGuide(session, kind)
       .then((g) => {
         if (!live) return;
@@ -55,43 +60,49 @@ export default function LearnTask({ params }: { params: Promise<{ kind: string }
     return () => {
       live = false;
     };
-  }, [mounted, session, kind]);
+  }, [mounted, session, kind, attempt]);
 
   if (!LEARNABLE.includes(kind)) notFound();
-  // The layout already provides <main>; this is the column.
+  // The layout already provides <main>; this is the label bar and the column.
   return (
-    <div className="mx-auto grid min-h-dvh w-full max-w-[720px] content-start gap-8 px-4 pb-12 pt-6">
-      <LabelStrip />
-      {state === "ok" && guide && (
-        <GuidePrimer guide={guide} onStart={() => router.push("/label")} action="Back to your workspace" />
-      )}
-      {state === "signed-out" && (
-        <Gate text="The guides are for people who label for Prism. Sign in to read them.">
-          <Link href={`/signin?next=/label/learn/${kind}`} className="p-btn p-btn--primary">
-            Sign in
-          </Link>
-        </Gate>
-      )}
-      {state === "apply" && (
-        <Gate text="The guides open once you have applied to label.">
-          <Link href="/label" className="p-btn p-btn--primary">
-            Apply to label
-          </Link>
-        </Gate>
-      )}
-      {state === "error" && <Gate text="The guide could not be loaded. Reload to try again." />}
+    <div className="flex min-h-dvh w-full flex-col">
+      <LabelStrip email={session?.email} />
+      <Column>
+        {state === "loading" && mounted && <GuideLoading />}
+        {state === "ok" && guide && (
+          <GuidePrimer
+            guide={guide}
+            context={<p className="p-count">Guide · {kind}</p>}
+            onStart={() => router.push("/label")}
+            action="Back to your workspace"
+          />
+        )}
+        {state === "signed-out" && (
+          <Gate text="The guides are for people who label for Prism. Sign in to read them.">
+            <Link href={`/signin?next=/label/learn/${kind}`} className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">
+              Sign in
+            </Link>
+          </Gate>
+        )}
+        {state === "apply" && (
+          <Gate text="The guides open once you have applied to label.">
+            <Link href="/label" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">
+              Apply to label
+            </Link>
+          </Gate>
+        )}
+        {state === "error" && <GuideFailed onRetry={() => setAttempt((n) => n + 1)} />}
+      </Column>
     </div>
   );
 }
 
 function Gate({ text, children }: { text: string; children?: React.ReactNode }) {
   return (
-    <div className="grid justify-items-start gap-4">
-      <div className="w-full">
-        <SectionHead id="h-label" as="h1" title="Label for Prism" />
-        <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>{text}</p>
-      </div>
-      {children}
+    <div className="grid gap-4">
+      <Title>Label for Prism</Title>
+      <Lede>{text}</Lede>
+      <div>{children}</div>
     </div>
   );
 }

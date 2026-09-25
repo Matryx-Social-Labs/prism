@@ -85,7 +85,7 @@ export default function CoverageGraph({ outlets, links, label }: { outlets: Grap
     <div ref={box} role="img" aria-label={label} className="relative h-[420px] w-full cursor-grab active:cursor-grabbing sm:h-[520px]">
       {noGl && (
         <p className="flex h-full items-center justify-center px-6 text-center text-[14px]" style={{ color: "var(--ink-2)" }}>
-          This browser cannot draw 3D here. The tables on this page carry every number the view would show.
+          This browser can&apos;t draw the 3D network. The tables above hold the same links.
         </p>
       )}
       {!noGl && paint && edges && (

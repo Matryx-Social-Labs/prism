@@ -118,6 +118,33 @@ describe("the labeller workspace", () => {
     expect(localStorage.getItem("prism.label.token.k1")).toBe("tok-123");
   });
 
+  it("puts a refusal into words, with the one way on", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchLabellerMe.mockResolvedValue(me("active", ["en"]));
+    fetchLabellerBatches.mockResolvedValue({
+      status: "active",
+      ready: [{ key: "k1", name: "Batch", kind: "claim_attribution", notes: "", eligible: 5, answered: 0, labellers: 0 }],
+      done: [],
+    });
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ detail: "no tasks in the languages you read" }), { status: 403 }));
+    render(<LabellerWorkspace />);
+    await userEvent.click(await screen.findByRole("button", { name: "Start" }));
+    expect(await screen.findByText("No tasks in your languages")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Change languages" }));
+    expect(await screen.findByRole("button", { name: "Save my languages" })).toBeInTheDocument();
+  });
+
+  it("keeps an application's answers when it does not send, and says so", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchLabellerMe.mockResolvedValue(me("none"));
+    applyAsLabeller.mockRejectedValue(new Error("Something went wrong"));
+    render(<LabellerWorkspace />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: /Kannada/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(await screen.findByText("Your application did not send")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Kannada/ })).toBeChecked();
+  });
+
   it("tells a paused labeller who to ask, and offers no batches", async () => {
     useSession.mockReturnValue(SESSION);
     fetchLabellerMe.mockResolvedValue(me("paused", ["en"]));
@@ -184,12 +211,21 @@ describe("the labeller workspace", () => {
       expect(localStorage.getItem("prism.label.token.q1")).toBe("tok-q");
     });
 
-    it("says when a failed test can be retaken, and offers no test until then", async () => {
+    it("says when a failed test can be retaken, in IST, and offers no test until then", async () => {
       board({ attempts: 1, best_score: 0.8667, can_test: false, retake_at: "2026-09-24T12:00:00+00:00" });
       const s = await section();
-      expect(s.getByText(/Best so far 87% · you can retake it after/)).toBeInTheDocument();
-      expect(s.queryByRole("button", { name: "Take the test" })).not.toBeInTheDocument();
+      expect(s.getByText("Not passed yet")).toBeInTheDocument();
+      expect(s.getByText(/You can retake it after/)).toHaveTextContent("You can retake it after 24 Sep, 17:30 IST, with new questions.");
+      expect(s.getByRole("button", { name: "Take the test" })).toBeDisabled();
       expect(s.getByRole("button", { name: "Practise" })).toBeInTheDocument();
+    });
+
+    it("never prints a test score as a percent — the API sends no count it is out of", async () => {
+      // 15 questions is below 30: a share is "k of n", never a percent, and the
+      // best score arrives without its n.
+      board({ attempts: 1, best_score: 0.8667, can_test: false, retake_at: "2026-09-24T12:00:00+00:00" });
+      await section();
+      expect(screen.queryByText(/%/)).not.toBeInTheDocument();
     });
 
     it("marks a passed kind as passed", async () => {

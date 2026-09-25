@@ -50,11 +50,11 @@ function item(over: Partial<FeedItem> = {}): FeedItem {
   };
 }
 
-/** The mono strip that marks the start screen: what can be searched. */
-const START = "Stories · people · tickers · CVE ids";
+/** The line that marks the start screen: what can be searched. */
+const START = "Search the headline and summary of every record: a story, a person, a place, a ticker or a CVE id.";
 
 function input() {
-  return screen.getByRole("searchbox", { name: "Search stories, entities and sources" });
+  return screen.getByRole("searchbox", { name: "Search the record" });
 }
 
 beforeEach(() => {
@@ -136,7 +136,7 @@ describe("Search — results", () => {
     searchEvents.mockResolvedValue([]);
     render(<SearchPage />);
     await userEvent.type(input(), "zzzqqq");
-    const msg = await screen.findByText(/Nothing matches/);
+    const msg = await screen.findByText(/No records match/);
     expect(msg).toHaveTextContent("zzzqqq");
   });
 
@@ -195,7 +195,7 @@ describe("Search — a failed request", () => {
 
     expect(await screen.findByText(/Search is unreachable right now/i)).toBeInTheDocument();
     // And it must NOT claim the query simply had no matches — that's a lie.
-    expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No records match/)).not.toBeInTheDocument();
   });
 
   it("still says 'no match' when the search genuinely returned nothing", async () => {
@@ -203,7 +203,7 @@ describe("Search — a failed request", () => {
     render(<SearchPage />);
     await userEvent.type(screen.getByRole("searchbox"), "zzzz");
 
-    expect(await screen.findByText(/Nothing matches/)).toBeInTheDocument();
+    expect(await screen.findByText(/No records match/)).toBeInTheDocument();
     expect(screen.queryByText(/unreachable/i)).not.toBeInTheDocument();
   });
 
@@ -221,12 +221,12 @@ describe("Search — a failed request", () => {
     // Wait for the SETTLED result first. Asserting "no error" directly races the
     // loading state: while `loading` is true the error is hidden anyway, so
     // waitFor passes on that instant and the test guards nothing.
-    expect(await screen.findByText(/Nothing matches/)).toBeInTheDocument();
+    expect(await screen.findByText(/No records match/)).toBeInTheDocument();
     expect(screen.queryByText(/unreachable/i)).not.toBeInTheDocument();
   });
 });
 
-describe("Search — the masthead counts the results", () => {
+describe("Search — the Records head counts the results", () => {
   it("counts what matched and the sources behind it, on the masthead's dateline", async () => {
     searchEvents.mockResolvedValue([
       item({ id: "a", source_count: 5 }),
@@ -237,6 +237,16 @@ describe("Search — the masthead counts the results", () => {
     // Distinct mastheads across the results, not a per-row sum: two rows from
     // the same two outlets count two, and rows that predate outlet data count none.
     expect(await screen.findByText("2 results")).toBeInTheDocument();
+  });
+
+  // The API serves a page of 30: a full page may hide more.
+  it("prints a full page as 30+, and draws no people section it has no data for", async () => {
+    searchEvents.mockResolvedValue(Array.from({ length: 30 }, (_, i) => item({ id: `r${i}` })));
+    render(<SearchPage />);
+    await userEvent.type(input(), "freight");
+    expect(await screen.findByText("30+ results")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Records" })).toBeInTheDocument();
+    expect(screen.queryByText(/People and organisations/)).toBeNull();
   });
 
   it("Esc empties the box, and so does the Clear button", async () => {
@@ -261,10 +271,10 @@ describe("Search — the masthead counts the results", () => {
     render(<SearchPage />);
     await userEvent.type(input(), "result");
     await screen.findByRole("link", { name: /Poll result/ });
-    await userEvent.click(screen.getByRole("button", { name: /BIZ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Business & Markets/ }));
     expect(screen.getByRole("link", { name: /Rupee slides/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Poll result/ })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: /SPO/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Sports/ }));
     expect(screen.getByText(/None of the 2 matches for “result” are in Sports/)).toBeInTheDocument();
   });
 });

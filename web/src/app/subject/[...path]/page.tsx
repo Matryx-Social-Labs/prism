@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
+import { DevelopingRail, MetaLine, PageTitle, ReadingColumns } from "@/components/reading/parts";
+import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
-import { fetchSubject, type SubjectPage as SubjectPayload } from "@/lib/api";
+import { TickerChip } from "@/components/tabs/Markets";
+import { BackBar, EmptyState } from "@/components/ui";
+import { fetchSubject, fetchSubjects, fetchTrending, type SubjectPage as SubjectPayload } from "@/lib/api";
+import { sectorGroup, sectorParam } from "@/lib/sectors";
 import { breadcrumbLd, feedListItems, itemListLd, jsonLd } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
@@ -37,6 +42,15 @@ export async function generateMetadata({ params }: { params: Promise<{ path: str
   };
 }
 
+/** Best effort: the rail and the 30-day count never hold the page up. */
+async function soft<T>(p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch {
+    return null;
+  }
+}
+
 export default async function SubjectPageRoute({ params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   const page = await load(path);
@@ -44,6 +58,20 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
   const { node, ancestors, children, story_count, stories } = page;
   const href = (p: string) => `/subject/${p.split(".").join("/")}`;
   const url = `${SITE_URL}${href(node.path)}`;
+  const root = ancestors[0] ?? node;
+  // A subject root that is one of the six sector groups has a story list to
+  // draw "Developing" from; Education and Civic have none, so no rail.
+  const group = sectorGroup(root.slug);
+  const [tree, developing] = await Promise.all([
+    soft(fetchSubjects()),
+    group ? soft(fetchTrending({ sector: sectorParam(group), limit: 3 })) : Promise.resolve(null),
+  ]);
+  // The tree counts the live window (30 days); the page counts the archive. Both are printed, each named.
+  const live = tree?.nodes.find((n) => n.path === node.path)?.story_count ?? null;
+  // The companies the listed reports name — the markets lens's tickers, on Business & Markets only.
+  const tickers = root.slug === "business" ? [...new Set(stories.flatMap((s) => s.tickers ?? []))].slice(0, 12) : [];
+  const withTickers = stories.filter((s) => (s.tickers ?? []).length > 0).length;
+  const parent = ancestors[ancestors.length - 1];
 
   return (
     <>
@@ -65,41 +93,67 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
           dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(`${node.label} — today's record`, url, feedListItems(stories))) }}
         />
       )}
-      <SectorStrip active={node.path.split(".")[0]} />
-      <main className="mx-auto w-full max-w-[860px] px-4 pb-20 pt-4">
-        <header className="border-t pt-3" style={{ borderColor: "var(--rule)" }}>
-          {ancestors.length > 0 && (
-            <nav aria-label="Breadcrumb" className="p-eyebrow">
-              {ancestors.map((a) => (
-                <Link key={a.path} href={href(a.path)} className="underline-offset-4 hover:underline">
-                  {a.label}
-                  <span aria-hidden> / </span>
-                </Link>
-              ))}
-            </nav>
-          )}
-          <h1 className="font-display mt-1 text-[34px] leading-[1.08]">{node.label}</h1>
-          <p className="font-mono mt-1 text-[11px]" style={{ color: "var(--ink-3)" }}>
-            {story_count} {story_count === 1 ? "story" : "stories"}
-          </p>
-          {children.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {children.map((c) => (
-                <Link key={c.path} href={href(c.path)} className="chip h-[30px] px-2.5 text-[13px]">{c.label}</Link>
-              ))}
-            </div>
-          )}
-        </header>
-        {stories.length === 0 ? (
-          <p className="mt-6 text-[15px]" style={{ color: "var(--ink-2)" }}>No stories here yet.</p>
-        ) : (
-          <ol className="p-print mt-4 grid gap-3">
-            {stories.map((item, i) => (
-              <ChartRow key={item.id} item={item} lead={i === 0} />
-            ))}
-          </ol>
-        )}
-      </main>
+      {/* Claude Design · ReadingB Subject: the subject rail on the left, the node's
+          stories in the 640 column, what is developing in its subject on the right. */}
+      <div className="contents lg:hidden">
+        <BackBar label="Today" href="/feed" />
+      </div>
+      <ReadingColumns
+        left={<SectorStrip active={root.slug} responsiveRail />}
+        railLabel="Developing in this subject"
+        rail={developing && developing.length > 0 ? <DevelopingRail stories={developing} title={ancestors.length ? `Developing in ${root.label}` : "Developing here"} /> : undefined}
+        main={
+          <>
+            <header className="grid gap-2.5">
+              {ancestors.length > 0 && (
+                <nav aria-label="Breadcrumb">
+                  <ol className="flex flex-wrap items-center gap-1.5" style={{ font: "500 13.5px/1.3 var(--font-read)", color: "var(--ink-3)" }}>
+                    {ancestors.map((a) => (
+                      <li key={a.path} className="flex items-center gap-1.5">
+                        <Link href={href(a.path)} className="p-link">{a.label}</Link>
+                        <span aria-hidden="true">›</span>
+                      </li>
+                    ))}
+                    <li aria-current="page">{node.label}</li>
+                  </ol>
+                </nav>
+              )}
+              <PageTitle>{node.label}</PageTitle>
+              <MetaLine items={[`${story_count} ${story_count === 1 ? "story" : "stories"}`, live != null ? `30 days: ${live}` : null, stories.length > 1 ? "newest first" : null]} />
+            </header>
+            {children.length > 0 && (
+              <nav aria-label="Sub-topics" className="p-hide-scroll -mx-[var(--gutter)] flex gap-1.5 overflow-x-auto px-[var(--gutter)] lg:mx-0 lg:flex-wrap lg:px-0">
+                <Link href={href(node.path)} className="p-chip" aria-current="page">All</Link>
+                {children.map((c) => (
+                  <Link key={c.path} href={href(c.path)} className="p-chip">{c.label}</Link>
+                ))}
+              </nav>
+            )}
+            {tickers.length > 0 && (
+              <section aria-labelledby="companies-named" className="grid gap-2">
+                <SectionHead id="companies-named" title="Companies named" sub={`in ${withTickers} of the ${stories.length} stories below`} />
+                <ul className="flex flex-wrap gap-2">
+                  {tickers.map((t) => <li key={t}><TickerChip symbol={t} /></li>)}
+                </ul>
+              </section>
+            )}
+            <section aria-label={`${node.label} stories`}>
+              {stories.length === 0 ? (
+                <EmptyState
+                  title={`No stories in ${node.label} yet`}
+                  action={parent ? <Link href={href(parent.path)} className="p-link" style={{ font: "600 14.5px/1.3 var(--font-read)" }}>All of {parent.label} →</Link> : undefined}
+                />
+              ) : (
+                <ol className="p-print grid grid-cols-[minmax(0,1fr)] gap-3">
+                  {stories.map((item) => (
+                    <ChartRow key={item.id} item={item} pageCode={group?.code ?? null} />
+                  ))}
+                </ol>
+              )}
+            </section>
+          </>
+        }
+      />
     </>
   );
 }

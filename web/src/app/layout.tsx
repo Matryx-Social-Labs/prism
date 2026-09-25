@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { NavMemory } from "@/components/NavMemory";
 import { UsageBeacon } from "@/components/UsageBeacon";
-import { Anek_Bangla, Anek_Devanagari, Anek_Gujarati, Anek_Kannada, Anek_Latin, Anek_Tamil, Anek_Telugu, Geist_Mono, Newsreader, Noto_Naskh_Arabic, Noto_Nastaliq_Urdu, Noto_Serif_Bengali, Noto_Serif_Devanagari, Noto_Serif_Gujarati, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu } from "next/font/google";
+import { Anek_Bangla, Anek_Devanagari, Anek_Gujarati, Anek_Gurmukhi, Anek_Kannada, Anek_Latin, Anek_Malayalam, Anek_Odia, Anek_Tamil, Anek_Telugu, Geist_Mono, Newsreader, Noto_Naskh_Arabic, Noto_Nastaliq_Urdu, Noto_Serif_Bengali, Noto_Serif_Devanagari, Noto_Serif_Gujarati, Noto_Serif_Gurmukhi, Noto_Serif_Kannada, Noto_Serif_Malayalam, Noto_Serif_Oriya, Noto_Serif_Tamil, Noto_Serif_Telugu } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -27,10 +27,14 @@ const recordTa = Noto_Serif_Tamil({ subsets: ["tamil"], weight: "variable", vari
 const recordTe = Noto_Serif_Telugu({ subsets: ["telugu"], weight: "variable", variable: "--font-noto-serif-telugu", preload: false, adjustFontFallback: false });
 const recordBn = Noto_Serif_Bengali({ subsets: ["bengali"], weight: "variable", variable: "--font-noto-serif-bengali", preload: false, adjustFontFallback: false });
 const recordGu = Noto_Serif_Gujarati({ subsets: ["gujarati"], weight: "variable", variable: "--font-noto-serif-gujarati", preload: false, adjustFontFallback: false });
+const recordPa = Noto_Serif_Gurmukhi({ subsets: ["gurmukhi"], weight: "variable", variable: "--font-noto-serif-gurmukhi", preload: false, adjustFontFallback: false });
+const recordMl = Noto_Serif_Malayalam({ subsets: ["malayalam"], weight: "variable", variable: "--font-noto-serif-malayalam", preload: false, adjustFontFallback: false });
+const recordOr = Noto_Serif_Oriya({ subsets: ["oriya"], weight: "variable", variable: "--font-noto-serif-oriya", preload: false, adjustFontFallback: false });
 const recordUr = Noto_Nastaliq_Urdu({ subsets: ["arabic"], weight: "variable", variable: "--font-noto-nastaliq-urdu", preload: false, adjustFontFallback: false });
 
 // Reading and UI — everything read or tapped: Anek (Ek Type), one Indic-first
-// design across Latin, Devanagari, Kannada, Tamil, Telugu, Bangla and Gujarati;
+// design across Latin, Devanagari, Kannada, Tamil, Telugu, Bangla, Gujarati,
+// Gurmukhi, Malayalam and Odia;
 // Noto Naskh Arabic for Urdu.
 const readLatin = Anek_Latin({ subsets: ["latin"], weight: "variable", variable: "--font-anek-latin" });
 const readHi = Anek_Devanagari({ subsets: ["devanagari"], weight: "variable", variable: "--font-anek-devanagari", preload: false, adjustFontFallback: false });
@@ -39,12 +43,15 @@ const readTa = Anek_Tamil({ subsets: ["tamil"], weight: "variable", variable: "-
 const readTe = Anek_Telugu({ subsets: ["telugu"], weight: "variable", variable: "--font-anek-telugu", preload: false, adjustFontFallback: false });
 const readBn = Anek_Bangla({ subsets: ["bengali"], weight: "variable", variable: "--font-anek-bangla", preload: false, adjustFontFallback: false });
 const readGu = Anek_Gujarati({ subsets: ["gujarati"], weight: "variable", variable: "--font-anek-gujarati", preload: false, adjustFontFallback: false });
+const readPa = Anek_Gurmukhi({ subsets: ["gurmukhi"], weight: "variable", variable: "--font-anek-gurmukhi", preload: false, adjustFontFallback: false });
+const readMl = Anek_Malayalam({ subsets: ["malayalam"], weight: "variable", variable: "--font-anek-malayalam", preload: false, adjustFontFallback: false });
+const readOr = Anek_Odia({ subsets: ["oriya"], weight: "variable", variable: "--font-anek-odia", preload: false, adjustFontFallback: false });
 const readUr = Noto_Naskh_Arabic({ subsets: ["arabic"], weight: "variable", variable: "--font-noto-naskh-arabic", preload: false, adjustFontFallback: false });
 
 // Provenance ONLY: times, counts, [n], outlet codes, tickers, CVE ids. Tabular.
 const mono = Geist_Mono({ subsets: ["latin"], weight: "variable", variable: "--font-geist-mono" });
 
-const FONT_VARIABLES = [newsreader, recordHi, recordKn, recordTa, recordTe, recordBn, recordGu, recordUr, readLatin, readHi, readKn, readTa, readTe, readBn, readGu, readUr, mono]
+const FONT_VARIABLES = [newsreader, recordHi, recordKn, recordTa, recordTe, recordBn, recordGu, recordPa, recordMl, recordOr, recordUr, readLatin, readHi, readKn, readTa, readTe, readBn, readGu, readPa, readMl, readOr, readUr, mono]
   .map((f) => f.variable)
   .join(" ");
 

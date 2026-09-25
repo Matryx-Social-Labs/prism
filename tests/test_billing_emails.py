@@ -72,7 +72,10 @@ async def test_each_transition_sends_its_email_and_others_send_nothing(monkeypat
     ]
     welcome = sender.sent[0]
     assert welcome[0] == email and "Plus · yearly" in welcome[2] and "1 January 2100" in welcome[2] and "₹1,499" in welcome[2]
-    assert "/account" in welcome[3] and "<h1" in welcome[3] and "Next charge" in welcome[3]
+    assert "/account" in welcome[3] and "<h1" in welcome[3] and "NEXT CHARGE" in welcome[3]
+    # Why the reader got it names the address it went to; no invented reference rides along.
+    assert f"You are getting this because Plus started on your Prism account, {email}." in welcome[2]
+    assert "ILLUSTRATION" not in welcome[3] and "example.com" not in welcome[3]
     not_renew = sender.sent[2][2]
     assert "You keep Plus until 1 January 2100" in not_renew
     ended = sender.sent[3][2]
@@ -124,7 +127,7 @@ async def test_a_scheduled_cancel_is_confirmed_at_once_and_its_end_is_reported_a
         await _drop(uid)
     assert [x[1] for x in sender.sent] == ["Your Prism Plus is set to end", "Your Prism Plus has ended"]
     first = sender.sent[0]
-    assert first[0] == email and "1 March 2027" in first[2] and "Plus ends" in first[3] and "None" in first[3]
+    assert first[0] == email and "Ends: 1 March 2027 IST" in first[2] and "Further charges: None" in first[2] and "ENDS" in first[3]
     assert "will not renew" not in sender.sent[1][1]
 
 

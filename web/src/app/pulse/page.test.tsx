@@ -17,7 +17,9 @@ beforeEach(() => {
 describe("Market Pulse — the chart supplement", () => {
   it("prints the digest, counts the stories behind it, and sends a ticker to search for a reader with no watchlist", async () => {
     render(<PulsePage />);
-    expect(await screen.findByRole("heading", { level: 1, name: "Rupee steadies" })).toBeInTheDocument();
+    // The page is Market Pulse (h1, Reading board flow 03); the day's reading is its lead (h2).
+    expect(await screen.findByRole("heading", { level: 1, name: "Market Pulse" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Rupee steadies" })).toBeInTheDocument();
     expect(screen.getByText(/written from 2 stories/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "RELIANCE" })).toHaveAttribute("href", "/search?q=RELIANCE");
   });
@@ -44,7 +46,8 @@ describe("the pulse shows the record under the reading", () => {
     });
     const { default: Page } = await import("@/app/pulse/page");
     render(<Page />);
-    expect(await screen.findByText("Written from")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Business & Markets stories" })).toBeInTheDocument();
+    expect(screen.getByText("The stories the reading was written from, most-corroborated first.")).toBeInTheDocument();
     expect(screen.getByText("RBI holds the repo rate")).toBeInTheDocument();
   });
 });

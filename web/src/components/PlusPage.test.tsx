@@ -3,12 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlusPage } from "@/components/PlusPage";
 import { PlanCard } from "@/components/PlanCard";
+import { Payments } from "@/components/Payments";
 
 const billing = vi.hoisted(() => ({
   fetchPlans: vi.fn(),
   subscribe: vi.fn(),
   fetchMySubscription: vi.fn(),
   cancelSubscription: vi.fn(),
+  fetchPayments: vi.fn(),
 }));
 vi.mock("@/lib/billing", async (orig) => ({ ...(await orig<typeof import("@/lib/billing")>()), ...billing }));
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -80,7 +82,7 @@ describe("PlusPage", () => {
     });
     render(<PlusPage />);
     await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
-    expect(await screen.findByRole("status")).toHaveTextContent(/Card declined\. The sheet is still open/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/The payment did not go through.*Card declined\. Nothing was charged; Razorpay’s sheet is still open/);
     expect(screen.getAllByRole("button", { name: "Opening…" })[0]).toBeDisabled();
   });
 
@@ -90,10 +92,14 @@ describe("PlusPage", () => {
     render(<PlusPage />);
     await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
     await waitFor(() => expect(billing.subscribe).toHaveBeenCalled());
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
     billing.subscribe.mockRejectedValueOnce(new Error("payment failed"));
     await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
-    expect(await screen.findByRole("status")).toHaveTextContent("payment failed");
+    expect(await screen.findByRole("alert")).toHaveTextContent("payment failed");
+    // "Try again" reopens checkout for the same plan.
+    billing.subscribe.mockRejectedValueOnce(new Error("dismissed"));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(billing.subscribe).toHaveBeenLastCalledWith("plus_yearly", "t", "a@b.c", expect.any(Function));
   });
 
   it("answers the questions people ask before paying, and names who charges them", async () => {
@@ -120,7 +126,6 @@ describe("PlanCard — every state of a subscription's life", () => {
     render(<PlanCard session={s} />);
     expect(await screen.findByText("Plus · monthly")).toBeInTheDocument();
     expect(screen.getByText(/Renews 20 Oct 2026/)).toBeInTheDocument();
-    expect(screen.getByText(/Razorpay emails one for every charge to a@b.c/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(billing.cancelSubscription).not.toHaveBeenCalled();
     expect(await screen.findByRole("dialog", { name: "Before you go" })).toBeInTheDocument();
@@ -135,7 +140,9 @@ describe("PlanCard — every state of a subscription's life", () => {
     billing.fetchMySubscription.mockResolvedValue({ plan: "plus_yearly", status: "past_due", current_period_end: "2026-10-01T00:00:00Z", cancel_at: null, price_paise: 119900 });
     render(<PlanCard session={s} />);
     expect(await screen.findByText(/The last charge did not go through/)).toBeInTheDocument();
-    expect(screen.getByText(/until 1 Oct 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/The last charge did not go through · Plus stays on until 1 Oct 2026/)).toBeInTheDocument();
+    // Said above the card too, with the amount and what to do.
+    expect(screen.getByRole("alert")).toHaveTextContent(/A charge did not go through.*could not take ₹1,199.*until 1 Oct 2026.*update the payment method/);
     expect(screen.getByText("Check your email")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   });
@@ -145,5 +152,35 @@ describe("PlanCard — every state of a subscription's life", () => {
     render(<PlanCard session={s} />);
     expect(await screen.findByText(/Your Plus ended on 1 Sept 2026/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Get Plus" })).toBeInTheDocument();
+  });
+});
+
+describe("Payments — every charge from Razorpay's history, in words", () => {
+  const s = { token: "t", userId: "u1", email: "a@b.c" };
+
+  it("prints each charge with its state and invoice, a refund on a dashed tag, and says where receipts come from", async () => {
+    billing.fetchPayments.mockResolvedValue([
+      { paid_at: "2026-09-24T04:00:00Z", plan: "plus_yearly", amount_paise: 119900, status: "refunded", invoice_url: "https://rzp.io/i/a", invoice_id: "inv_a", payment_id: "pay_a" },
+      { paid_at: "2026-08-24T04:00:00Z", plan: "plus_monthly", amount_paise: 14900, status: "paid", invoice_url: "https://rzp.io/i/b", invoice_id: "inv_b", payment_id: "pay_b" },
+    ]);
+    render(<Payments session={s} />);
+    expect(screen.getByText("RECEIPTS AND INVOICES COME FROM RAZORPAY")).toBeInTheDocument();
+    const refunded = await screen.findByText("refunded");
+    expect(refunded).toHaveStyle({ borderStyle: "dashed" });
+    expect(screen.getByText("paid")).toHaveStyle({ borderStyle: "solid" });
+    expect(screen.getAllByRole("link", { name: /Invoice/ })[0]).toHaveAttribute("href", "https://rzp.io/i/a");
+  });
+
+  it("says 'No charges yet' before the first, and a Razorpay failure in words with a retry", async () => {
+    billing.fetchPayments.mockResolvedValueOnce([]);
+    const { unmount } = render(<Payments session={s} />);
+    expect(await screen.findByText("No charges yet.")).toBeInTheDocument();
+    unmount();
+    billing.fetchPayments.mockRejectedValueOnce(new Error("history 502"));
+    render(<Payments session={s} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Payments could not load.*Razorpay did not answer\. Your plan is not affected/);
+    billing.fetchPayments.mockResolvedValueOnce([]);
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("No charges yet.")).toBeInTheDocument();
   });
 });

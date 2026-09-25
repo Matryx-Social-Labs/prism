@@ -5,9 +5,10 @@ import userEvent from "@testing-library/user-event";
 import PeoplePage from "@/app/admin/people/page";
 
 const fetchPeople = vi.hoisted(() => vi.fn());
+const adminCall = vi.hoisted(() => vi.fn());
 const ADMIN = vi.hoisted(() => ({ session: { token: "t", userId: "u", email: "f@example.test" }, email: "f@example.test" }));
 vi.mock("@/components/admin/AdminShell", async (orig) => ({ ...(await orig<typeof import("@/components/admin/AdminShell")>()), useAdmin: () => ADMIN }));
-vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchPeople }));
+vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchPeople, adminCall }));
 
 const person = (over: Record<string, unknown>) => ({
   email: "a@example.test", name: null, profession: null, languages: [], state: null, created_at: "2026-09-20T10:00:00Z",
@@ -31,13 +32,21 @@ describe("people", () => {
     expect(row.getByText("Asha · journalist · Kannada")).toBeInTheDocument();
     expect(row.getByText("plus monthly · active")).toBeInTheDocument();
     expect(row.getByText(/LAST 23 SEP/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Accounts · 2" })).toBeInTheDocument();
+    expect(screen.getByText("NEWEST FIRST · 2 ACCOUNTS")).toBeInTheDocument();
   });
 
   it("never prints a total above rows that are not all there", async () => {
     fetchPeople.mockResolvedValue({ total: 812, active_window_days: 28, window_start: "2026-08-27", people: [person({ email: "one@example.test" })] });
     render(<PeoplePage />);
-    expect(await screen.findByRole("heading", { name: "Accounts · newest 1 of 812" })).toBeInTheDocument();
+    expect(await screen.findByText("NEWEST FIRST · SHOWING THE NEWEST 1 OF 812")).toBeInTheDocument();
+    expect(screen.queryByText(/812 ACCOUNTS/)).not.toBeInTheDocument();
+    // The rest load on request, from where the loaded rows end.
+    fetchPeople.mockClear();
+    adminCall.mockResolvedValue({ total: 812, active_window_days: 28, window_start: "2026-08-27", people: [person({ email: "two@example.test" })] });
+    await userEvent.click(screen.getByRole("button", { name: "Load the next 500" }));
+    expect(adminCall).toHaveBeenCalledWith(expect.anything(), "/api/v1/admin/people?limit=500&offset=1");
+    expect(await screen.findByText("two@example.test")).toBeInTheDocument();
+    expect(screen.getByText("NEWEST FIRST · SHOWING THE NEWEST 2 OF 812")).toBeInTheDocument();
   });
 
   it("marks a given plan as given, not as revenue", async () => {
@@ -53,19 +62,19 @@ describe("people", () => {
     const strip = row.getByRole("img", { name: "Active on 2 of the last 28 days, last on 23 Sept" });
     const marks = Array.from(strip.children) as HTMLElement[];
     expect(marks).toHaveLength(28);
-    expect(marks.filter((m) => m.style.background === "var(--viz-1)")).toHaveLength(2);
+    expect(marks.filter((m) => m.style.background === "var(--ink)")).toHaveLength(2);
     // 27 Aug + 24 = 20 Sep and + 27 = 23 Sep: the marks sit on those days.
-    expect(marks[24].style.background).toBe("var(--viz-1)");
-    expect(marks[27].style.background).toBe("var(--viz-1)");
+    expect(marks[24].style.background).toBe("var(--ink)");
+    expect(marks[27].style.background).toBe("var(--ink)");
   });
 
   it("filters by plan and finds an account by what they told us", async () => {
     render(<PeoplePage />);
     await screen.findByText("paid@example.test");
-    await userEvent.click(screen.getByRole("tab", { name: /Given/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /Given/ }));
     expect(screen.queryByText("paid@example.test")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Accounts · 1 of 2" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: /All/ }));
+    expect(screen.getByText("NEWEST FIRST · 2 ACCOUNTS · 1 MATCH")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: /All/ }));
     await userEvent.type(screen.getByRole("searchbox"), "journalist");
     expect(screen.getByText("paid@example.test")).toBeInTheDocument();
     expect(screen.queryByText("gift@example.test")).not.toBeInTheDocument();

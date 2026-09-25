@@ -17,6 +17,8 @@ import { InfoIcon } from "@/components/icons";
 export interface TableData {
   columns: string[];
   rows: Array<Array<string | number | null>>;
+  /** Columns of words (a language), set in the reading voice rather than as figures. */
+  text?: number[];
 }
 
 /** The ⓘ: opens "Counted in" under the panel's header. */
@@ -125,7 +127,7 @@ export function DataTable({ table }: { table: TableData }) {
         <thead className="sticky top-0" style={{ background: "var(--surface)" }}>
           <tr>
             {table.columns.map((c, i) => (
-              <th key={c} scope="col" className={i ? "num" : undefined}>
+              <th key={c} scope="col" className={i && !table.text?.includes(i) ? "num" : undefined}>
                 {c}
               </th>
             ))}
@@ -140,7 +142,7 @@ export function DataTable({ table }: { table: TableData }) {
                     {v ?? "—"}
                   </th>
                 ) : (
-                  <td key={j} className="num" style={{ color: "var(--ink)" }}>
+                  <td key={j} className={table.text?.includes(j) ? undefined : "num"} style={{ color: "var(--ink)" }}>
                     {v === null || v === undefined ? "—" : typeof v === "number" ? v.toLocaleString("en-IN") : v}
                   </td>
                 ),
@@ -155,18 +157,22 @@ export function DataTable({ table }: { table: TableData }) {
 
 /** A legend: a swatch and a word per series, the words in ink — identity is
  *  never carried by colour alone. `dashed` draws the period before. */
-export function SeriesKey({ items }: { items: Array<{ label: string; color: string; dashed?: boolean; total?: string }> }) {
+export function SeriesKey({ items }: { items: Array<{ label: string; color: string; dashed?: boolean; hatched?: boolean; total?: string }> }) {
   return (
     <ul className="mt-3 flex flex-wrap gap-x-3.5 gap-y-1" style={{ font: "500 12.5px/1.3 var(--font-read)", color: "var(--ink-2)" }}>
       {items.map((it) => (
         <li key={it.label} className="inline-flex items-center gap-1.5">
-          <svg width={it.dashed ? 14 : 10} height="10" aria-hidden className="shrink-0">
-            {it.dashed ? (
-              <line x1="0" x2="14" y1="5" y2="5" stroke={it.color} strokeWidth="2" strokeDasharray="3 2" />
-            ) : (
-              <rect width="10" height="10" rx="2" fill={it.color} />
-            )}
-          </svg>
+          {it.hatched ? (
+            <span aria-hidden className="h-2.5 w-3.5 shrink-0 border" style={{ background: "var(--data-uncounted), var(--sunken)", borderColor: "var(--line-strong)" }} />
+          ) : (
+            <svg width={it.dashed ? 14 : 10} height="10" aria-hidden className="shrink-0">
+              {it.dashed ? (
+                <line x1="0" x2="14" y1="5" y2="5" stroke={it.color} strokeWidth="2" strokeDasharray="3 2" />
+              ) : (
+                <rect width="10" height="10" rx="2" fill={it.color} />
+              )}
+            </svg>
+          )}
           <span>{it.label}</span>
           {it.total && <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--ink)" }}>{it.total}</span>}
         </li>

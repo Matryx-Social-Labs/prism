@@ -2,21 +2,26 @@
 
 // Every change made from /admin, newest first, with the founder who made it
 // (common/admin_audit). Read-only: the app never edits or deletes these rows.
-// A timeline (admin charts, phase 5): grouped by IST day on a rail, each
-// change in words with its code and details in mono, filterable by area.
+// Grouped by IST day, each day under its rule with a count; each change an
+// AuditItem (the time, in words what and to what, then the code, the founder
+// and the details in mono); filterable by area. Only the newest are loaded,
+// and the line under the title says so when the list may run on.
 
 import { useEffect, useState } from "react";
 
-import { AdminSection, AdminTitle, useAdmin } from "@/components/admin/AdminShell";
-import { ACTION_WORD, istClock, istDay } from "@/components/admin/AuditItem";
-import { dayLabel } from "@/components/admin/charts/format";
-import { FilterSeg } from "@/components/admin/ui";
+import { AdminHead, AdminSection, Quiet, useAdmin } from "@/components/admin/AdminShell";
+import { AuditItem, istDay } from "@/components/admin/AuditItem";
+import { FilterSwitch } from "@/components/admin/ui";
+import { Alert } from "@/components/ui";
 import { fetchAudit, type AuditEntry } from "@/lib/admin";
 
 type Area = "all" | "labeller" | "batch" | "pipeline";
 const AREA_WORD: Record<Area, string> = { all: "All", labeller: "Labellers", batch: "Batches", pipeline: "Collection" };
+const LIMIT = 100;
 
-const shown = (v: unknown) => (v !== null && typeof v === "object" ? JSON.stringify(v) : String(v));
+/** "Thu 24 Sept · IST" for an IST calendar day (YYYY-MM-DD). */
+const dayTitle = (day: string) =>
+  `${new Date(`${day}T12:00:00+05:30`).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short" }).replace(",", "")} · IST`;
 
 export default function AuditPage() {
   const { session } = useAdmin();
@@ -25,7 +30,7 @@ export default function AuditPage() {
   const [area, setArea] = useState<Area>("all");
 
   useEffect(() => {
-    fetchAudit(session)
+    fetchAudit(session, LIMIT)
       .then((r) => setEntries(r.entries))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not load the audit log"));
   }, [session]);
@@ -42,59 +47,27 @@ export default function AuditPage() {
 
   return (
     <>
-      <AdminTitle>Audit</AdminTitle>
-      {error && (
-        <p role="alert" className="mt-5 text-[14px]" style={{ color: "var(--danger)" }}>
-          {error}
-        </p>
+      <AdminHead title="Audit" line={entries && entries.length >= LIMIT ? `NEWEST ${LIMIT} CHANGES` : null} />
+      {error && <Alert tone="error">{error}</Alert>}
+      {entries?.length === 0 && <Quiet>Nothing yet. Every approval, pause, publish and listing made here will appear in this list.</Quiet>}
+      {all.length > 0 && (
+        <FilterSwitch
+          label="Area"
+          value={area}
+          onChange={setArea}
+          options={(["all", "labeller", "batch", "pipeline"] as const).map((a) => ({ value: a, label: AREA_WORD[a], count: all.filter((e) => inArea(e, a)).length }))}
+        />
       )}
-      <AdminSection title="Changes made from this dashboard">
-        {entries?.length === 0 && (
-          <p className="text-[15px]" style={{ color: "var(--ink-2)" }}>
-            Nothing yet. Every approval, pause, publish and listing made here will appear in this list.
-          </p>
-        )}
-        {all.length > 0 && (
-          <div className="mb-5">
-            <FilterSeg
-              label="Area"
-              value={area}
-              onChange={setArea}
-              options={(["all", "labeller", "batch", "pipeline"] as const).map((a) => ({
-                value: a,
-                label: AREA_WORD[a],
-                count: all.filter((e) => inArea(e, a)).length,
-              }))}
-            />
-          </div>
-        )}
-        {days.map(({ day, rows }) => (
-          <section key={day} aria-label={dayLabel(day)} className="mb-6">
-            <h3 className="mb-2 flex items-baseline gap-2 text-[14px] font-semibold">
-              {dayLabel(day)}
-              <span className="font-mono text-[11px] font-normal tabular-nums" style={{ color: "var(--ink-3)" }}>
-                {rows.length} {rows.length === 1 ? "CHANGE" : "CHANGES"}
-              </span>
-            </h3>
-            <ol className="ml-[5px] border-l" style={{ borderColor: "var(--line-strong)" }}>
-              {rows.map((e, i) => (
-                <li key={`${e.created_at}-${i}`} className="relative pb-4 pl-5">
-                  <span aria-hidden className="absolute -left-[5px] top-[7px] h-[9px] w-[9px] rounded-full" style={{ background: "var(--viz-1)", boxShadow: "0 0 0 2px var(--bg)" }} />
-                  <p className="text-[15px]">
-                    <span className="font-mono text-[12px] tabular-nums" style={{ color: "var(--ink-3)" }}>{istClock(e.created_at)}</span>{" "}
-                    <span className="font-semibold">{ACTION_WORD[e.action] ?? e.action}</span>{" "}
-                    <span style={{ color: "var(--ink-2)" }}>· {e.target}</span>
-                  </p>
-                  <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-                    {e.action} · {e.actor}
-                    {Object.entries(e.detail ?? {}).map(([k, v]) => ` · ${k} ${shown(v)}`).join("")}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ))}
-      </AdminSection>
+      {all.length > 0 && kept.length === 0 && <Quiet>No changes in this area.</Quiet>}
+      {days.map(({ day, rows }) => (
+        <AdminSection key={day} title={dayTitle(day)} sub={`${rows.length} ${rows.length === 1 ? "CHANGE" : "CHANGES"}`}>
+          <ul>
+            {rows.map((e, i) => (
+              <AuditItem key={`${e.created_at}-${i}`} entry={e} />
+            ))}
+          </ul>
+        </AdminSection>
+      ))}
     </>
   );
 }

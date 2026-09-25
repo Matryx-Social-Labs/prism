@@ -2,10 +2,12 @@
 
 /**
  * The approved labeller's workspace, as the page renders it from the API
- * (Design System v2 · labeller Workspace): what is waiting, counted; the batches
- * ready to label; learn and qualify; what is done. A labeller never sees another
- * labeller's answers here — only how many people are on a batch, the
- * anti-anchoring rule the task routes already keep. Every number is the API's.
+ * (Design System v2 · Label board, "The workspace"): what is waiting, counted;
+ * the batches ready to label; learn and qualify; what is done. A labeller never
+ * sees another labeller's answers here — only how many people are on a batch,
+ * the anti-anchoring rule the task routes already keep. Every number is the
+ * API's; a share of a test is never printed as a percent, because the API sends
+ * the best score without the question count it is out of.
  */
 
 import Link from "next/link";
@@ -24,27 +26,27 @@ import {
 // p-btn--sm is 36px: tall enough for a pointer, not for a thumb.
 const SMALL = "p-btn--sm min-h-11 lg:min-h-9";
 
-export function Section({ title, id, hint, children }: { title: string; id?: string; hint?: string; children: React.ReactNode }) {
+export function Section({ title, id, sub, hint, children }: { title: string; id?: string; sub?: string; hint?: string; children: React.ReactNode }) {
   const slug = id ?? title.toLowerCase().replace(/[^a-z]+/g, "-");
   return (
     <section id={id} className="scroll-mt-20">
-      <SectionHead id={`h-${slug}`} title={title} hint={hint} />
+      <SectionHead id={`h-${slug}`} title={title} sub={sub} hint={hint} />
       {children}
     </section>
   );
 }
 
-/** "You read: English, Kannada · Change" — the language gate, as a provenance strip. */
-export function Languages({ me, onEdit }: { me: LabellerMe; onEdit: () => void }) {
-  const names = me.languages_available.filter((l) => me.languages_read.includes(l.code)).map((l) => l.name);
-  return (
-    <p className="p-sechead__sub">
-      You read: {names.join(", ")} ·{" "}
-      <button type="button" className="p-link" style={{ padding: "12px 4px", margin: "-12px -4px" }} onClick={onEdit}>
-        Change
-      </button>
-    </p>
-  );
+/** The languages this labeller reads, by their English names or their own. */
+export const languageNames = (me: LabellerMe, native = false) =>
+  me.languages_available.filter((l) => me.languages_read.includes(l.code)).map((l) => (native ? l.native : l.name));
+
+/** A time the way the product prints one: IST, day and month, 24-hour. */
+export function ist(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata",
+  }).formatToParts(new Date(iso));
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  return `${p.day} ${p.month}, ${p.hour}:${p.minute} IST`;
 }
 
 /** What is waiting for this labeller, counted — the same list the founders'
@@ -60,7 +62,9 @@ function NeedsYou({ batches }: { batches: LabellerBatches }) {
     <section aria-labelledby="needs-you">
       <h2 id="needs-you" className="p-eyebrow mb-2">Waiting for you</h2>
       {items.length === 0 ? (
-        <p className="p-alert p-alert--info">Nothing right now. New batches in your languages appear here.</p>
+        <p className="border-t py-3" style={{ borderColor: "var(--line)", font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+          Nothing right now. New batches in your languages appear here.
+        </p>
       ) : (
         <ul className="grid gap-1.5">
           {items.map((i) => (
@@ -87,7 +91,7 @@ function BatchRow({ batch, onStart }: { batch: LabellerBatch; onStart?: (key: st
   return (
     <li className="grid gap-2 border-t py-4" style={{ borderColor: "var(--line)" }}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="min-w-0 flex-[1_1_14rem]" style={{ font: "var(--t-title-s)" }}>{batch.name}</h3>
+        <h3 className="min-w-0 flex-[1_1_14rem]" style={{ font: "var(--t-title-s)", overflowWrap: "anywhere" }}>{batch.name}</h3>
         <span className="p-count">
           {batch.answered} of {batch.eligible} done · {batch.labellers} {batch.labellers === 1 ? "labeller" : "labellers"}
         </span>
@@ -117,13 +121,10 @@ function BatchRow({ batch, onStart }: { batch: LabellerBatch; onStart?: (key: st
 function QualifyRow({ k, onPractise, onTest }: { k: LabellerKind; onPractise: (kind: string) => void; onTest: (kind: string) => void }) {
   const [status, badge] = k.qualified
     ? ["Passed", "p-badge--ink"]
-    : k.retake_at
-      ? [
-          `Best so far ${Math.round((k.best_score ?? 0) * 100)}% · you can retake it after ${new Date(k.retake_at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
-          "p-badge--outline",
-        ]
+    : k.retake_at || k.attempts > 0
+      ? ["Not passed yet", "p-badge--outline"]
       : k.can_test
-        ? [k.attempts > 0 ? "Not passed yet" : "Not taken yet", "p-badge--outline"]
+        ? ["Not taken yet", "p-badge--outline"]
         : ["Test coming soon", "p-badge--dashed"];
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 border-t py-3.5" style={{ borderColor: "var(--line)" }}>
@@ -131,7 +132,12 @@ function QualifyRow({ k, onPractise, onTest }: { k: LabellerKind; onPractise: (k
         <h3 style={{ font: "600 15px/1.3 var(--font-read)" }}>{KIND_QUESTION[k.kind] ?? k.kind}</h3>
         <p className="p-count">{k.kind}</p>
       </div>
-      <span className={`p-badge ${badge} max-w-[20ch] self-start`} style={{ whiteSpace: "normal" }}>{status}</span>
+      <span className={`p-badge ${badge} self-start`}>{status}</span>
+      {k.retake_at && (
+        <p className="col-span-2" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+          You can retake it after <span className="font-mono text-[13px]">{ist(k.retake_at)}</span>, with new questions.
+        </p>
+      )}
       <div className="col-span-2 flex flex-wrap gap-1.5">
         {LEARNABLE.includes(k.kind) && (
           <Link href={`/label/learn/${k.kind}`} className={`p-btn p-btn--ghost ${SMALL}`}>
@@ -143,8 +149,8 @@ function QualifyRow({ k, onPractise, onTest }: { k: LabellerKind; onPractise: (k
             Practise
           </button>
         )}
-        {k.can_test && (
-          <button type="button" onClick={() => onTest(k.kind)} className={`p-btn p-btn--secondary ${SMALL}`}>
+        {(k.can_test || k.retake_at) && (
+          <button type="button" disabled={!k.can_test} onClick={() => onTest(k.kind)} className={`p-btn p-btn--secondary ${SMALL}`}>
             Take the test
           </button>
         )}
@@ -162,20 +168,17 @@ export function ActiveWorkspace({
   onTest: (kind: string) => void;
 }) {
   const kinds = batches.kinds ?? [];
+  const n = batches.ready.length;
   return (
     <>
       <NeedsYou batches={batches} />
-      <Section title="Ready to label" id="ready">
-        {batches.ready.length === 0 ? (
-          <p className="border-t py-4" style={{ borderColor: "var(--line)", font: "var(--t-body)", color: "var(--ink-2)" }}>
-            Nothing waiting in your languages right now.
-          </p>
-        ) : (
+      {n > 0 && (
+        <Section title="Ready to label" id="ready" sub={`${n} ${n === 1 ? "batch" : "batches"}`}>
           <ul>{batches.ready.map((b) => <BatchRow key={b.key} batch={b} onStart={onStart} />)}</ul>
-        )}
-      </Section>
+        </Section>
+      )}
       {kinds.length > 0 && (
-        <Section title="Learn and qualify" id="learn" hint="Each kind of task has a short test. Pass it (90%) and that kind of work appears above.">
+        <Section title="Learn and qualify" id="learn" hint="Each kind of task has a short test. Pass it and that kind of work appears above.">
           <ul>{kinds.map((k) => <QualifyRow key={k.kind} k={k} onPractise={onPractise} onTest={onTest} />)}</ul>
         </Section>
       )}
@@ -186,4 +189,33 @@ export function ActiveWorkspace({
       )}
     </>
   );
+}
+
+/** A refusal from the labeller API, in words: what happened, and the one way on.
+ *  Keyed on the API's own `detail` strings (api/routes/labeller.py); anything
+ *  else is shown as the API said it. */
+export type Explained = { title: string; body?: string; tone: "info" | "error"; action?: "languages" | "learn" };
+
+const EXPLAIN: Record<string, Explained> = {
+  "pass this task's test first": { title: "Pass the test first", body: "Pass this kind of task's test and the batch opens here.", tone: "error", action: "learn" },
+  "batch is closed": { title: "This batch has closed", body: "It no longer takes answers.", tone: "info" },
+  "no tasks in the languages you read": { title: "No tasks in your languages", body: "Add a language you read well, or wait for the next batch.", tone: "error", action: "languages" },
+  "your access to this batch was revoked": { title: "Your access to this batch was withdrawn", body: "Write to hello@readprism.news if you think this is a mistake.", tone: "error" },
+  "not enough test questions in your languages yet": { title: "Not enough questions in your languages yet", body: "The test opens once it has enough questions in the languages you read.", tone: "info" },
+  "you have already passed this test": { title: "You have already passed this test", tone: "info" },
+  "your application has not been approved yet": { title: "Your application has not been approved yet", body: "A founder reads every application.", tone: "info" },
+  "This browser is blocking storage, which labelling needs. Try a normal window.": {
+    title: "Your browser blocked storage",
+    body: "Prism keeps your place in a batch in this browser. Allow site storage, or use a normal window, and try again.",
+    tone: "error",
+  },
+};
+
+export function explain(message: string): Explained {
+  if (EXPLAIN[message]) return EXPLAIN[message];
+  // "you can retake this test after 24 hours" — the hours are the API's.
+  if (message.startsWith("you can retake this test after")) {
+    return { title: `You ${message.slice(4)}`, body: "Retakes come with new questions.", tone: "info" };
+  }
+  return { title: "That did not work", body: message, tone: "error" };
 }

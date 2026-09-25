@@ -6,9 +6,9 @@
  * telling series apart), and the period's shape as a sparkline. Where it was
  * counted opens under the ⓘ like every panel's.
  *
- * Nothing before to compare with is not "no change": the line is left out, or
- * says from when counting began. Below 30 a change is "+3 from 4", never a
- * percentage (format.change).
+ * Nothing before to compare with is not "no change": it says the earlier
+ * period was not counted, and the ⓘ says from when counting began. Below 30 a
+ * change is "+3 from 4", never a percentage; flat is "±0" (format.change).
  */
 
 import { useState } from "react";
@@ -73,36 +73,34 @@ export function KpiTile({
         </h3>
         <InfoButton label={label} open={info} onToggle={() => setInfo((v) => !v)} />
       </div>
-      {info && <CountedIn source={source} note={note} />}
+      {info && <CountedIn source={source} note={[note, countedSince && `Counting began ${dayLabel(countedSince)}.`].filter(Boolean).join(" ")} />}
       <p
         className="tabular-nums [overflow-wrap:anywhere]"
         style={{ font: "600 32px/1 var(--font-record)", letterSpacing: "-0.02em", color: current === null ? "var(--ink-3)" : "var(--ink)" }}
       >
         {figure(current, unit)}
       </p>
-      <Moved current={current} moved={moved} countedSince={previous == null ? countedSince : null} />
+      <Moved current={current} moved={moved} />
       {series && <Sparkline values={series} />}
     </div>
   );
 }
 
-function Moved({
-  current,
-  moved,
-  countedSince,
-}: {
-  current: number | string | null;
-  moved: ReturnType<typeof change>;
-  countedSince?: string | null;
-}) {
+function Moved({ current, moved }: { current: number | string | null; moved: ReturnType<typeof change> }) {
   if (current === null) return <span className="p-count">Not counted yet</span>;
-  if (!moved) return countedSince ? <span className="p-count whitespace-normal">Not counted before {dayLabel(countedSince)}</span> : null;
+  if (!moved) {
+    return (
+      <span className="text-[12.5px] font-medium leading-[1.2]" style={{ color: "var(--ink-3)" }}>
+        Earlier period not counted yet
+      </span>
+    );
+  }
   const { Icon, word } = MOVE[moved.dir];
   return (
     <span className="inline-flex flex-wrap items-center gap-1 text-[12.5px] font-medium leading-[1.2]" style={{ color: "var(--ink-2)" }}>
       <Icon size={12} />
       {word}
-      {moved.dir !== "flat" && <span className="font-mono text-[11.5px] tabular-nums">{moved.text}</span>}
+      <span className="font-mono text-[11.5px] tabular-nums">{moved.text}</span>
     </span>
   );
 }

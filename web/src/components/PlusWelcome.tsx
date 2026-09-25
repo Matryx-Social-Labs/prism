@@ -4,17 +4,16 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PLAN_LABEL, refundOpen } from "@/components/PlanCard";
-import { PrismMark } from "@/components/PrismMark";
 import { track } from "@/lib/analytics";
 import { fetchMySubscription, rupees, type MySubscription } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
 import { safeNext } from "@/lib/next";
 import { useSession } from "@/lib/session";
 
-// Where a reader lands the moment they have paid: told plainly that Plus is
-// on, what changed, when the next charge is, that the receipt is in their
-// inbox — and one primary way back to what they were reading. No upsell, no
-// tour; the door they came in by. Every fact is the subscription's own.
+// Where a reader lands the moment they have paid (Design System v2 · money
+// board, Welcome): told plainly that Plus is on, what changed, when the next
+// charge is, where the receipt is and how to change their mind — then the
+// door they came in by. No upsell, no tour. Every fact is the subscription's own.
 export function PlusWelcome() {
   const session = useSession();
   const params = useSearchParams();
@@ -31,38 +30,38 @@ export function PlusWelcome() {
   const renews = sub?.current_period_end ? billingDay(sub.current_period_end, { long: true }) : null;
   const refundUntil = refundOpen(sub) ? billingDay(sub!.refundable_until!, { long: true }) : null;
   const facts: [string, React.ReactNode][] = [
-    ...(sub?.price_paise ? [["Plan", `${label} · ${rupees(sub.price_paise)}`] as [string, string]] : []),
+    ...(sub?.price_paise ? [["Plan", `${label} · ${rupees(sub.price_paise)} · GST included`] as [string, string]] : []),
     ["Next charge", renews ?? "Shown on your account shortly"],
     ["Receipt", <>Razorpay has emailed it{session ? ` to ${session.email}` : ""}; it is also under Payments in <Link href="/account" className="p-link">your account</Link>.</>],
     [
       "Changing your mind",
       refundUntil
-        ? `A full refund until ${refundUntil}, from your account. Or cancel in one click, any time; you keep Plus to the end of the period you paid for.`
+        ? `Full refund until ${refundUntil}, in one click from your account.`
         : "Cancel in one click from your account, any time; you keep Plus to the end of the period you paid for.",
     ],
   ];
+  const big = "p-btn p-btn--lg max-sm:w-full";
 
-  // Welcome (ui_kits/plus): the mark, the fact in one line, what changed, the
-  // facts on mono labels, and the door back to what they were reading.
   return (
-    <div className="mx-auto grid w-full max-w-[var(--reading)] gap-4 px-[var(--gutter)] pb-24 pt-12 lg:pt-[72px]">
-      <PrismMark size={40} />
-      <h1 className="text-balance" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>You&rsquo;re on Plus.</h1>
-      <p style={{ font: "var(--t-body-l)", color: "var(--ink-2)" }}>
-        Thank you. From now on Ask answers 100 questions a day, drawn from the whole story on a larger model, and stays on when the free box rests.
+    <div className="mx-auto grid w-full max-w-[560px] gap-[18px] px-[var(--gutter)] pb-24 pt-8 lg:py-[72px]">
+      {sub?.plan && sub.plan !== "free" && <p className="p-mono uppercase" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{sub.plan === "founding" ? "Founding member" : "Plus is on"}</p>}
+      <h1 className="text-balance [font:var(--t-display-l)] lg:[font:var(--t-display-xl)]" style={{ letterSpacing: "var(--track-display)" }}>You&rsquo;re on Plus.</h1>
+      <p className="max-w-[60ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
+        Ask is on at 100 questions a day, answered from the whole story, and it stays on when the free tier rests.
       </p>
-      <dl className="grid gap-x-4 gap-y-2.5 pt-3.5 sm:grid-cols-[160px_minmax(0,1fr)]" style={{ borderTop: "1px solid var(--line)", font: "var(--t-body-s)" }}>
+      <dl className="m-0 grid gap-0.5 pt-3.5 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-3" style={{ borderTop: "1px solid var(--line)" }}>
         {facts.map(([k, v]) => (
           <div key={k} className="contents">
-            <dt className="font-mono text-[11.5px] uppercase tracking-[0.04em] sm:pt-[3px]" style={{ color: "var(--ink-3)" }}>{k}</dt>
-            <dd className="m-0 mb-1.5 sm:mb-0">{v}</dd>
+            <dt className="p-mono pt-2.5 uppercase sm:pt-0.5" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{k}</dt>
+            <dd className="m-0" style={{ font: "var(--t-body-s)" }}>{v}</dd>
           </div>
         ))}
       </dl>
-      <div className="mt-2 flex flex-wrap items-center gap-2.5">
-        <Link href={next} className="p-btn p-btn--primary">{next.startsWith("/story/") ? "Back to the story" : "Continue reading"}</Link>
-        <Link href="/account" className="p-btn p-btn--secondary">Your account</Link>
+      <div className="flex flex-wrap gap-2.5">
+        <Link href={next} className={`${big} p-btn--primary`}>{next.startsWith("/story/") ? "Back to the story" : "Continue reading"}</Link>
+        <Link href="/account" className={`${big} p-btn--secondary`}>Your account</Link>
       </div>
+      {next !== "/feed" && <Link href="/feed" className="p-link inline-flex min-h-[44px] items-center justify-self-start" style={{ font: "600 14.5px/1 var(--font-read)" }}>Continue reading today&rsquo;s record →</Link>}
     </div>
   );
 }

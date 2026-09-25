@@ -234,3 +234,23 @@ describe("FrontPage — coming back", () => {
     await waitFor(() => expect(useScrollRestore).toHaveBeenLastCalledWith(expect.stringMatching(/^feed:all:today:(all|region):scrollY$/), true));
   });
 });
+
+describe("FrontPage — has a professional read", () => {
+  it("keeps only the rows that earn a lens, counts them against the loaded window, and says so when none do", async () => {
+    const user = userEvent.setup();
+    // One outlet each, so the Top of the record rail stays empty and each title is one heading.
+    fetchFeed.mockResolvedValue([item({ id: "m", title: "Ticker story", tickers: ["INFY"], source_count: 1 }), item({ id: "p", title: "Plain story", source_count: 1 })]);
+    render(<FrontPage />);
+    await screen.findByRole("heading", { name: "Plain story" });
+    await user.click(screen.getByRole("button", { name: "Has a professional read" }));
+    expect(screen.queryByRole("heading", { name: "Plain story" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Ticker story" })).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 records · most-reported first")).toBeInTheDocument();
+
+    fetchFeed.mockResolvedValue([item({ id: "p", title: "Plain story", source_count: 1 })]);
+    await user.click(screen.getByRole("button", { name: "World" }));
+    expect(await screen.findByText("No stories with a professional read today")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show every story" }));
+    expect(screen.getByRole("heading", { name: "Plain story" })).toBeInTheDocument();
+  });
+});

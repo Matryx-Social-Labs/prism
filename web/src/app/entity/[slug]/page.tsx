@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
+import { MetaLine, PageTitle, ReadingColumns } from "@/components/reading/parts";
+import { SectionHead } from "@/components/SectionHead";
+import { BackBar, EmptyState } from "@/components/ui";
 import { fetchEntity, type EntityPage as EntityPayload } from "@/lib/api";
 import { entityLd, feedListItems, itemListLd, jsonLd } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
@@ -38,13 +41,30 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
+/** The eyebrow for the actor's kind — only for the kinds the API maps with confidence ("Thing" says nothing). */
+const KIND: Record<string, string> = {
+  Person: "Person",
+  Organization: "Organisation",
+  GovernmentOrganization: "Organisation",
+  NewsMediaOrganization: "Organisation",
+  Place: "Place",
+  Country: "Place",
+  Product: "Product",
+};
+
 export default async function EntityHubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const page = await load(slug);
   if (!page) notFound();
   const { entity, record_count, records } = page;
   const url = `${SITE_URL}/entity/${entity.slug}`;
+  const kind = KIND[entity.schema_type];
+  const stories = `${record_count} ${record_count === 1 ? "story" : "stories"}`;
 
+  // Claude Design · ReadingB Entity. What the design also draws and the API does
+  // not carry is left out, never estimated: a role, a quote count and the
+  // Quotes tab, "Named alongside", stories per day, and Follow (the watchlist
+  // follows tickers and sectors only).
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(entityLd(entity, url, record_count)) }} />
@@ -54,26 +74,40 @@ export default async function EntityHubPage({ params }: { params: Promise<{ slug
           dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(`${entity.name} — every record`, url, feedListItems(records))) }}
         />
       )}
-      <main className="mx-auto w-full max-w-[860px] px-4 pb-20 pt-6">
-        <header className="border-t pt-3" style={{ borderColor: "var(--rule)" }}>
-          <p className="font-mono text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--ink-3)" }}>
-            {entity.entity_type.split("|")[0]} · {record_count} {record_count === 1 ? "record" : "records"}
-          </p>
-          <h1 className="font-display mt-1 text-[34px] leading-[1.08]">{entity.name}</h1>
-          {entity.aliases.length > 0 && (
-            <p className="mt-1 text-[13px]" style={{ color: "var(--ink-3)" }}>Also written {entity.aliases.slice(0, 4).join(" · ")}</p>
-          )}
-        </header>
-        {records.length === 0 ? (
-          <p className="mt-6 text-[15px]" style={{ color: "var(--ink-2)" }}>No records name this actor yet.</p>
-        ) : (
-          <ol className="p-print mt-4 grid gap-3">
-            {records.map((item, i) => (
-              <ChartRow key={item.id} item={item} lead={i === 0} />
-            ))}
-          </ol>
-        )}
-      </main>
+      <div className="contents lg:hidden">
+        <BackBar label="Today" href="/feed" />
+      </div>
+      <ReadingColumns
+        main={
+          <>
+            <header className="grid gap-2.5">
+              {kind && <p className="p-eyebrow">{kind}</p>}
+              <PageTitle>{entity.name}</PageTitle>
+              <MetaLine items={[stories]} />
+              {entity.aliases.length > 0 && (
+                <p style={{ font: "400 13px/1.5 var(--font-read)", color: "var(--ink-3)" }}>Also written {entity.aliases.slice(0, 4).join(" · ")}</p>
+              )}
+            </header>
+            <section aria-labelledby="entity-stories" className="grid grid-cols-[minmax(0,1fr)] gap-3">
+              <SectionHead
+                id="entity-stories"
+                title="Stories"
+                count={record_count}
+                sub={records.length < record_count ? `newest first · the latest ${records.length}` : records.length > 1 ? "newest first" : undefined}
+              />
+              {records.length === 0 ? (
+                <EmptyState title="No stories name this actor yet">A story joins this page when a report on it names {entity.name}.</EmptyState>
+              ) : (
+                <ol className="p-print grid grid-cols-[minmax(0,1fr)] gap-3">
+                  {records.map((item) => (
+                    <ChartRow key={item.id} item={item} />
+                  ))}
+                </ol>
+              )}
+            </section>
+          </>
+        }
+      />
     </>
   );
 }

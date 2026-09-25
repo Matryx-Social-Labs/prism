@@ -47,7 +47,6 @@ beforeEach(() => {
   setLabellerStatus.mockReset().mockResolvedValue({});
   setQualification.mockReset().mockResolvedValue({});
   addLabeller.mockReset().mockResolvedValue({});
-  vi.stubGlobal("confirm", vi.fn(() => true));
 });
 
 describe("the labellers page", () => {
@@ -59,12 +58,17 @@ describe("the labellers page", () => {
     expect(fetchLabellers).toHaveBeenCalledTimes(2);
   });
 
-  it("asks before removing someone, and does nothing if the founder backs out", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => false));
+  it("asks in place before removing someone, and does nothing if the founder backs out", async () => {
     render(<LabellersPage />);
     await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
-    expect(window.confirm).toHaveBeenCalled();
+    const ask = within(screen.getByRole("group", { name: "Yes, remove" }));
+    expect(ask.getByText(/Their 3 answers are kept, and every kind they qualified for is withdrawn/)).toBeInTheDocument();
+    await userEvent.click(ask.getByRole("button", { name: "Keep" }));
     expect(setLabellerStatus).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: "Yes, remove" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await userEvent.click(screen.getByRole("button", { name: "Yes, remove" }));
+    expect(setLabellerStatus).toHaveBeenCalledWith(expect.anything(), "on@example.test", "removed");
   });
 
   it("prints a grant as a grant, with the live check count", async () => {
@@ -85,10 +89,11 @@ describe("the labellers page", () => {
 
   it("adds an account with the languages ticked", async () => {
     render(<LabellersPage />);
-    const form = (await screen.findByRole("heading", { name: "Add a labeller" })).closest("section")!;
-    await userEvent.type(within(form).getByLabelText("Their account email"), "friend@example.test");
-    await userEvent.click(within(form).getByRole("checkbox", { name: "Hindi" }));
-    await userEvent.click(within(form).getByRole("button", { name: "Add labeller" }));
+    const form = (await screen.findByRole("heading", { name: "Add a labeller" })).closest("form")!;
+    await userEvent.type(within(form).getByLabelText("Account email"), "friend@example.test");
+    await userEvent.click(within(form).getByRole("button", { name: "Hindi" }));
+    expect(within(form).getByRole("button", { name: "Hindi" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(within(form).getByRole("button", { name: "Add" }));
     expect(addLabeller).toHaveBeenCalledWith(expect.anything(), "friend@example.test", ["en", "hi"]);
   });
 
@@ -102,10 +107,11 @@ describe("the labellers page", () => {
     // The list, not the grant form's picker, which names every active labeller too.
     const list = async () => within((await screen.findByRole("heading", { name: /^Labellers ·/ })).closest("section")!);
     expect((await list()).getByText("asha@example.test")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: /Paused/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /Paused/ }));
+    expect(screen.getByRole("radio", { name: /Paused/ })).toHaveAttribute("aria-checked", "true");
     expect((await list()).queryByText("asha@example.test")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Labellers · 1 of 2" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: /All/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /All/ }));
     await userEvent.type(screen.getByRole("searchbox"), "asha");
     expect((await list()).getByText("asha@example.test")).toBeInTheDocument();
     expect((await list()).queryByText("ravi@example.test")).not.toBeInTheDocument();

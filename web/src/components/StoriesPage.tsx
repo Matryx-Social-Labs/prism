@@ -4,27 +4,27 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CoverageBar } from "@/components/Coverage";
 import { Masthead } from "@/components/Masthead";
-import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { StatusPill } from "@/components/StatusPill";
+import { Alert, EmptyState } from "@/components/ui";
 import { fetchTrending, type TrendingStory } from "@/lib/api";
-import { PhotoStack } from "@/components/PhotoStack";
-import { RowListSkeleton } from "@/components/Skeletons";
 import { arcHref, isStale, spanDays } from "@/lib/arc";
-import { istTime, relativeTime } from "@/lib/dateline";
+import { Ago } from "@/components/Ago";
+import { istTime } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
-import { RouteGlyph } from "@/components/RouteGlyph";
-import { EmptyState } from "@/components/tabs/EmptyState";
 
 /**
- * Stories: what is developing over days (the URL stays /trending). Rows are
- * stories, not events, on the same row grammar as Today: subject · last moved ·
- * span, the story's name in the record voice, a counted line, then the coverage
- * bar and the verification status. A row opens the record with the route in view.
+ * Stories: what is developing over days (the URL stays /trending). Design
+ * System v2 · Reading board, flow 01: a title and one line on what the page
+ * is, the subject chips (no counts: the list is one capped page), then one
+ * ArcRow per story — status, subject · span · last update, the story's name in
+ * the record voice, and a bar in one ink with its counts. The list API carries
+ * no outlet-origin split, so the bar cannot be split by origin; the page says
+ * so under the list rather than draw a split it does not know.
  *
  * Trending has no "all" tier — National IS everything here — so the shared
  * scope is narrowed at this one call site, and writing it back never narrows
@@ -91,7 +91,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
   // list is capped), how many gained a new outlet in the last six hours, and
   // the order the API ranks them in.
   const subline = useMemo(() => {
-    if (!stories) return undefined;
+    if (!stories?.length) return undefined;
     const n = stories.length >= LIMIT ? `${LIMIT}+` : String(stories.length);
     // Ranked by new reporting, so the moving ones come first: fewer than a full
     // page is the exact count; a full page of them may hide more ("24+").
@@ -101,96 +101,126 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
   }, [stories]);
 
   const scopes: [Scope, string][] = [["region", stateName ?? "Your state"], ["national", "National"]];
-  const subject = sectorGroup(group)?.name ?? "all sectors";
+  const subject = sectorGroup(group)?.name ?? null;
 
   return (
-    <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
+    <div className="mx-auto max-w-[760px] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-16">
       <Masthead dateline={clock ? `Stories · ${clock} IST` : "Stories"} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6">
-        <SectorStrip active={group} onPick={setGroup} allHref="/trending" allLabel="All stories" responsiveRail />
-        <div className="grid min-w-0 content-start gap-3 pt-4 lg:pt-0">
-          <SectionHead id="stories-title" as="h1" title="Stories" sub={subline} />
-          {state && (
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
-              {scopes.map(([s, l]) => (
-                <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s} className="p-chip min-h-8 px-3 text-[13px]">{l}</button>
-              ))}
-            </div>
-          )}
-          <section aria-label={`Stories, ${subject}`}>
-            {error ? (
-              <div className="p-alert p-alert--error" role="status"><p>{error}</p></div>
-            ) : stories === null ? (
-              <RowListSkeleton n={5} label="Loading stories" />
-            ) : stories.length === 0 ? (
-              <EmptyState title={`No story is developing in ${subject} right now.`} />
-            ) : (
-              <ol className="p-print grid gap-2.5">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 pt-4 lg:gap-5 lg:pt-8">
+        <div className="grid gap-2">
+          <h1 id="stories-title" className="[font:var(--t-display-m)] lg:[font:var(--t-display-l)]" style={{ letterSpacing: "var(--track-display)", textWrap: "balance" }}>
+            Developing stories
+          </h1>
+          <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+            Stories that run over days, each with its developments in order. Provisional groupings say so.
+          </p>
+        </div>
+        {state && (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
+            {scopes.map(([s, l]) => (
+              <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s} className="p-chip">{l}</button>
+            ))}
+          </div>
+        )}
+        <SectorStrip active={group} onPick={setGroup} allHref="/trending" allLabel="All stories" />
+        <section aria-labelledby="stories-title" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1">
+          {error ? (
+            <Alert tone="error">{error}</Alert>
+          ) : stories === null ? (
+            <ArcListSkeleton />
+          ) : stories.length === 0 ? (
+            <EmptyState
+              title={subject ? `No developing ${subject} stories right now` : "No developing stories right now"}
+              action={subject ? <button type="button" onClick={() => setGroup(null)} className="p-link inline-flex min-h-11 items-center">All subjects →</button> : undefined}
+            >
+              A story appears here once two or more outlets have reported two or more developments.
+            </EmptyState>
+          ) : (
+            <>
+              {subline && <p className="p-count whitespace-normal">{subline}</p>}
+              <ol className="p-print">
                 {stories.map((s) => <ArcRow key={s.slug} story={s} />)}
               </ol>
-            )}
-          </section>
-        </div>
+            </>
+          )}
+        </section>
+        <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+          Coverage bars are drawn in one ink until the list carries the outlet-origin split.
+        </p>
       </div>
     </div>
   );
 }
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 /**
- * One developing story, on the story row grammar (Design System v2 · StoryRow,
- * reader-phone PhoneStories): meta (subject · last moved · span), the story's
- * name, a counted line with who is named, the photo pile on the right; the foot
- * under both — the bar and its count, then whether the chronology is verified
- * or the grouping is still under review (fail-closed: a provisional route is
- * never drawn as one). Single-outlet rows are dashed, stale ones half-weight.
+ * One developing story (Reading board · ArcRow): the status first — verified,
+ * or a provisional grouping that says so — then subject · span · last update,
+ * the story's name, and the one-ink bar labelled with its counts. State is line
+ * form: a single-outlet story sits on a dashed rule, one that has not moved in
+ * three days at reduced weight. Verified arcs open on their hero's route;
+ * provisional groups open on the group page (lib/arc).
  */
 function ArcRow({ story }: { story: TrendingStory }) {
+  const verified = story.boundary_status === "verified";
   const single = story.source_count <= 1;
   const stale = isStale(story);
   const span = spanDays(story);
-  const verified = story.boundary_status === "verified";
   const group = sectorGroup(story.sector);
-  const memberLabel = verified
-    ? `${story.developments} ${story.developments === 1 ? "development" : "developments"}`
-    : `${story.developments} related ${story.developments === 1 ? "report" : "reports"}`;
-  const outlets = `${story.source_count} ${story.source_count === 1 ? "outlet" : "outlets"}`;
-  const cast = story.cast?.length ? story.cast.slice(0, 4).join(", ") : null;
-  const moved = story.velocity > 0 ? "moving now" : story.last_updated_at ? `moved ${relativeTime(story.last_updated_at)}` : null;
-  const clockLine = [moved, span != null && span > 0 ? `${span} ${span === 1 ? "day" : "days"}` : null].filter(Boolean).join(" · ");
+  // "updated 11h ago" goes through <Ago>: this page is prerendered, so the
+  // server's relative time and the reader's legitimately differ (React #418).
+  const prov: React.ReactNode[] = [
+    span ? plural(span, "day", "days") : null,
+    story.last_updated_at ? <>updated <Ago iso={story.last_updated_at} /></> : null,
+  ].filter(Boolean);
+  const parts = [...(group ? [{ key: "s", subject: true, text: group.name }] : []), ...prov.map((t, i) => ({ key: `p${i}`, subject: false, text: t }))];
 
   return (
     <li>
       <Link
         href={arcHref(story)}
-        className={`p-row group ${single ? "p-row--single" : ""} ${stale ? "p-row--stale" : ""}`}
-        style={{ padding: "14px 16px", gap: 8 }}
+        className={`group grid gap-2 border-b py-4 ${single ? "p-row--single" : ""} ${stale ? "p-row--stale" : ""}`}
+        style={{ borderColor: single ? "var(--line-strong)" : "var(--line)", color: "var(--ink)" }}
       >
-        <div className="flex items-start gap-3">
-          <div className="grid min-w-0 flex-1 gap-1.5">
-            <div className="p-meta">
-              {group && <span className="p-meta__subject">{group.name}</span>}
-              {group && clockLine && <span className="p-meta__sep" />}
-              {clockLine && <span className="p-meta__prov">{clockLine}</span>}
-            </div>
-            <h2 className="p-row__title">{story.label ?? story.hero_title}</h2>
-            <p className="p-row__sum">{memberLabel} across {outlets}.{cast ? ` Named: ${cast}.` : ""}</p>
-            <RouteGlyph route={verified ? story.route : null} />
-          </div>
-          {story.photos?.length ? <PhotoStack photos={story.photos} /> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : "Provisional grouping"} />
+          {parts.length > 0 && (
+            <span className="p-meta">
+              {parts.map((p, i) => (
+                <span key={p.key} className="contents">
+                  {i > 0 && <span className="p-meta__sep" />}
+                  <span className={p.subject ? "p-meta__subject" : "p-meta__prov"}>{p.text}</span>
+                </span>
+              ))}
+            </span>
+          )}
         </div>
-        {/* The foot wraps under the whole card: a pill that cannot shrink beside
-            the pile widened the page on a phone (2026-09-21). The list API has
-            no origin split, so the bar is drawn neutral; its count is the legend. */}
-        <div className="p-row__foot">
-          <span className="inline-flex min-w-0 items-center gap-2.5">
-            <CoverageBar outlets={[]} fallbackCount={story.source_count} className="p-covbar--mono" />
-            <span className="p-count">{outlets} · {story.developments} {story.developments === 1 ? "report" : "reports"}</span>
+        <h2 className="text-balance group-hover:underline" style={{ font: "var(--t-title)", textUnderlineOffset: 4, textDecorationThickness: 1 }}>
+          {story.label ?? story.hero_title}
+        </h2>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <CoverageBar outlets={[]} fallbackCount={story.source_count} width={200} className="p-covbar--mono max-w-full" />
+          <span className="p-count">
+            {plural(story.developments, "development", "developments")} · {plural(story.source_count, "outlet", "outlets")}
           </span>
-          <span className="ml-auto">
-            {verified ? <StatusPill status="verified" /> : <StatusPill status="provisional" label="Grouping under review" />}
-          </span>
-        </div>
+        </span>
       </Link>
     </li>
+  );
+}
+
+/** The list's own shape while it loads: pill and meta, a title line, the bar. */
+function ArcListSkeleton() {
+  return (
+    <div role="status" aria-busy="true" aria-label="Loading stories">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="grid gap-2.5 border-b py-4" style={{ borderColor: "var(--line)" }}>
+          <span className="p-skel h-5 w-40" />
+          <span className="p-skel h-5 w-[80%]" />
+          <span className="p-skel h-2 w-[200px] max-w-full" />
+        </div>
+      ))}
+    </div>
   );
 }

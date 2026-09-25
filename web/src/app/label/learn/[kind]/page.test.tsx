@@ -82,6 +82,16 @@ describe("learning a task, once you have applied", () => {
     expect(router.push).toHaveBeenCalledWith("/label");
   });
 
+  it("says in words when the guide does not come, and tries again", async () => {
+    useSession.mockReturnValue(SESSION);
+    fetchGuide.mockRejectedValueOnce(Object.assign(new Error("boom"), { status: 500 }));
+    await renderKind("event_identity");
+    expect(await screen.findByText("The guide could not be loaded")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to your workspace" })).toHaveAttribute("href", "/label");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("heading", { name: "Is this the same happening?" })).toBeInTheDocument();
+  });
+
   it("treats a kind with no guide as a page that does not exist", async () => {
     await expect(renderKind("made_up")).rejects.toThrow("NEXT_NOT_FOUND");
   });

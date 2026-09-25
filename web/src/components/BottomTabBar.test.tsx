@@ -76,7 +76,7 @@ describe("BottomTabBar — active tab", () => {
   });
 
   it("keeps You active across the routes that fold into it", () => {
-    for (const path of ["/you", "/account", "/interests"]) {
+    for (const path of ["/you", "/interests"]) {
       at(path);
       const { unmount } = render(<BottomTabBar />);
       expect(screen.getByRole("link", { name: /you/i })).toHaveAttribute("aria-current", "page");
@@ -96,8 +96,16 @@ describe("BottomTabBar — active tab", () => {
     }
   });
 
-  it("marks a detail route's parent tab", () => {
-    at("/trending/kerala-power-crisis");
+  // The flow boards draw a back bar and no tab bar on a detail page: a story
+  // arc returns to Stories, the account to You.
+  it("leaves a page with a back bar to its back bar", () => {
+    for (const path of ["/trending/kerala-power-crisis", "/account"]) {
+      at(path);
+      const { container, unmount } = render(<BottomTabBar />);
+      expect(container).toBeEmptyDOMElement();
+      unmount();
+    }
+    at("/trending");
     render(<BottomTabBar />);
     expect(screen.getByRole("link", { name: /stories/i })).toHaveAttribute("aria-current", "page");
   });

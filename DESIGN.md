@@ -89,8 +89,9 @@ Neutral warm paper and carbon ink; colour appears only where the prism "splits l
 - the **coverage bar** — outlet origin in the fixed slot order English national (navy) · international
   (blue-green) · Indian-language (orange) · wire (hatched grey); each ≥ 3:1 on paper, neighbours split by
   hue AND a 2px gap, always with its count beside it;
-- a **lens** — one discrete hue per lens (Markets green, Cyber violet; Health and Policy drafted; further
-  lenses take the next free slot `--lens-slot-5…8`); the Reader lens has no hue;
+- a **lens** — one discrete hue AND one shape per lens (Markets green circle, Cyber violet square; Health
+  magenta diamond and Policy ochre triangle drafted; further lenses take the next free slot
+  `--lens-slot-5…8`); the Reader lens has no hue;
 - **one interactive accent**, cobalt `#0B57D0` (dark `#8AB4F8`), for links, the primary action, focus and
   the current nav item.
 
@@ -105,7 +106,7 @@ grounds; tertiary ink `#5B6069` is 5.9:1; white on the accent fill 6.4:1.
   Nastaliq for Urdu: headlines, titles, quotes (italic 400) and hero figures, set 600 with −0.02em at
   display sizes. Never a button or a label.
 - **Reading/UI** — Anek (Ek Type), one Indic-first design across Latin, Devanagari, Kannada, Tamil, Telugu,
-  Bangla and Gujarati, plus Noto Naskh Arabic for Urdu: body, UI, labels, eyebrows (caps, 0.08em). Body
+  Bangla, Gujarati, Gurmukhi, Malayalam and Odia, plus Noto Naskh Arabic for Urdu: body, UI, labels, eyebrows (caps, 0.08em). Body
   floor 14.5px; inputs 16px (no iOS zoom).
 - **Provenance** — Geist Mono, tabular: only times, counts, [n], outlet codes, tickers and CVE ids. Floor
   11px. Never prose, never a heading.
@@ -113,8 +114,8 @@ grounds; tertiary ink `#5B6069` is 5.9:1; white on the accent fill 6.4:1.
 Scale (phone → desk ≥1024): display-xl 44/72, display-l 30/42, display-m 23/28, title 18/20, title-s 16.5,
 quote 18/19, body-l 17/18, body 16, body-s 14.5, ui 15, ui-s 13.5, label 12.5, mono 12, mono-s 11 —
 generated as `--t-*` font shorthands. All faces load through `next/font` on `<html>` (self-hosted; the
-Indic faces are unicode-ranged and fetched only when a glyph needs them). Not yet covered by a face:
-Gurmukhi, Malayalam and Odia (system fallback) — on the Claude Design missing list.
+Indic faces are unicode-ranged and fetched only when a glyph needs them). Every script Prism labels has a
+record face and a reading face.
 
 ## Layout
 
@@ -126,8 +127,8 @@ story's own Ask · Share bar so the two never overlap. No page scrolls sideways 
 
 ## Shape, rules and state
 
-Records are cut square (2px), controls are pressed (8px), sheets are held (16px); pills only for the chips
-that filter. Sections sit under a 3px ink rule, newspaper style; the lead row carries the same rule.
+Records are cut square (2px), controls are pressed (8px), sheets are held (16px). Chips draw at 36px and
+ticker chips at 26px, but each carries an invisible 44px tap area (`.p-chip::after`, `.p-hit`). Sections sit under a 3px ink rule, newspaper style; the lead row carries the same rule.
 State is line form: solid = verified; dashed = provisional or one source; faded (62%) = stale; dashed +
 hatched = not counted. Shadows are almost none: `--shadow-1` marks a selected segment, `--shadow-2` is
 for sheets, drawers, popovers and toasts. No card lift on hover.
@@ -140,7 +141,7 @@ ScopeChips, StepIndicator, ThemeToggle, SkipLink, the Footer in the root layout)
 StoryRow, `StoryCard`, `Coverage` = CoverageBar / Legend / OutletStack, `StatusPill`, MetaLine `.p-meta`,
 QuoteCard, ReportCard, ChangeTimeline, ImpactRow, EntityMark, LangTag, TickerChip, CveChips); lens
 (LensSwitch, LensBrief with the flip, BriefPlayer); ask (AskBar, AskAnswer, AskPanel, AskLimitNote,
-StoryActionBar, SelectionAskChip); media (PhotoDeck / PhotoPile, PodcastClip, XPostCard, `PhotoImg`);
+StoryActionBar, SelectionAskChip); media (PhotoDeck, PodcastClip, XPostCard, `PhotoImg`);
 structure (RouteMap, BranchTree, AttentionChart, MarketDigest, RelatedStories, RouteCard); money
 (PricingCard, BillingSwitch, CompareTable, FaqItem, TrustLine, PlanCard in 8 states, PaymentRow,
 CancelSheet, UpgradeSheet); label (TaskHeader, CandidateRow, AnswerButtons, BatchRow, QualifyRow, Verdict,
@@ -167,8 +168,8 @@ Quiet by default: micro 140ms, standard 220ms, ease `cubic-bezier(.2,.7,.2,1)`. 
 their edge. **Images:** a publisher photo fades in over its sunken placeholder (320ms) with the credit
 already on it; the story's photo deck advances in 480ms `cubic-bezier(.2,.8,.2,1)` — the front photo
 leaves sideways with a 5° tilt as the next rises from 94% — and follows a drag at 1° per 40px (past 60px
-advances, else springs back); a photo pile fans in once on a 480ms spring with a 60ms stagger and spreads
-on hover. **The lens flip** is the only signature motion: a 2px scan line in the lens hue sweeps the brief
+advances, else springs back). (The photo pile the design still ships is unused: the v3 Stories list draws
+no photographs, 2026-09-25.) **The lens flip** is the only signature motion: a 2px scan line in the lens hue sweeps the brief
 while a paper veil lifts on the same clock, paced by the block's height (900–1800ms); never a crossfade,
 and layout never moves. Reduced motion collapses everything to an instant change.
 
@@ -185,6 +186,7 @@ Historical entries were written under whichever name and world was current; the 
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-25 | Wave 2 from the Claude Design flow boards (Reading, Accounts, Money, Legal, Labeller, Admin, emails, share cards, icons): every remaining route built state by state; lens-mark shapes (circle · square · diamond · triangle) and Today's "Has a professional read" filter ADOPTED (the design adopted both on 25 Sep); Gurmukhi, Malayalam and Odia faces added; chips keep 36px but get a 44px tap area; the record's own 404 and error pages (SystemPage) replace Next's; the favicon is the design's adaptive SVG; Stories rows follow the v3 board — developing-story rows with a one-ink bar and no photo pile (reverses 2026-09-21). Still not built: the onboarding languages step and the offline page (PROPOSED in the design), and anything a board draws that the product has no data for | Founder asked for every unplaced design component used and the whole product designed; the design's own adoption log decided the two PROPOSED items that 2026-09-24 had left out |
 | 2026-09-24 | Design System v2 adopted from Claude Design: cobalt accent, Newsreader / Anek / Geist Mono, records 2px · controls 8px · sheets 16px, navy · blue-green · orange · grey coverage, the system's `.p-*` classes verbatim in globals.css; the header spectrum line and the ruled page ground removed; the design's ILLUSTRATION banners and sample data never ship; lens-mark shapes and the "Has a professional read" filter (both PROPOSED in the design) not adopted | Founder asked for the whole product redesigned on the Claude Design system, with anything the system lacks noted rather than invented (the gap list went back to Claude Design) |
 | 2026-09-18 | New world "Spectrum": Newsreader / Hind / JetBrains Mono, near-white ground, brand violet accent, soft radii, cards for rows | Founder brief: the chart read as dull and un-navigable; readers could not see what Prism does. The prism's own metaphor — white light in, spectrum out — now sets where colour appears |
 | 2026-09-18 | Colour rule widened: coverage hues + lens hues + one accent (was: lenses only) | The coverage bar makes "one story from many reports" visible on every row; the accent makes interaction legible in a mobile app |

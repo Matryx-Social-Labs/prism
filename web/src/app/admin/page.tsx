@@ -11,11 +11,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { AdminTitle, useAdmin } from "@/components/admin/AdminShell";
+import { AdminHead, useAdmin } from "@/components/admin/AdminShell";
 import { ArrowRight } from "@/components/icons";
 import { KpiTile } from "@/components/admin/charts/KpiTile";
 import { dayLabel } from "@/components/admin/charts/format";
 import { DashboardSection } from "@/components/admin/Dashboard";
+import { Alert } from "@/components/ui";
 import { downloadWeeklyCsv, fetchBatches, fetchLabellers, fetchMetrics, type MetricRow, type Metrics } from "@/lib/admin";
 
 const PERIODS = [7, 28, 90] as const;
@@ -45,6 +46,14 @@ function periodLine({ range, counting_since }: Metrics): string {
   const usage = counting_since.usage;
   const visits = usage ? `VISIT COUNTING BEGAN ${dayLabel(usage)}${year(usage) === year(end) ? "" : ` ${year(usage)}`}` : "NO VISITS COUNTED YET";
   return `${span} IST · ${visits}`.toUpperCase();
+}
+
+/** The visits section's provenance: from when visits were counted. */
+function visitsSub({ range, counting_since }: Metrics): string | undefined {
+  const u = counting_since.usage;
+  if (!u) return "NOT COUNTED YET";
+  if (u === range.end) return "COUNTING BEGAN TODAY";
+  return u > range.start ? `COUNTED FROM ${dayLabel(u).toUpperCase()} · EARLIER DAYS HATCHED` : undefined;
 }
 
 interface Need {
@@ -105,11 +114,7 @@ export default function AdminOverview() {
 
   return (
     <>
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1 basis-[280px]">
-          <AdminTitle>Overview</AdminTitle>
-          {data && <p className="p-count mt-1.5 whitespace-normal">{periodLine(data)}</p>}
-        </div>
+      <AdminHead title="Overview" line={data && periodLine(data)}>
         <div className="p-seg" role="tablist" aria-label="Period">
           {PERIODS.map((p) => (
             <button key={p} type="button" role="tab" aria-selected={days === p} onClick={() => setDays(p)}>
@@ -117,18 +122,14 @@ export default function AdminOverview() {
             </button>
           ))}
         </div>
-        <button type="button" className="p-btn p-btn--secondary p-btn--sm max-sm:min-h-[44px]" onClick={() => void csv()}>
+        <button type="button" className="p-btn p-btn--secondary p-btn--sm p-hit" onClick={() => void csv()}>
           Weekly CSV
         </button>
-      </div>
+      </AdminHead>
 
-      {error && (
-        <p role="alert" className="p-alert p-alert--error mt-5">
-          {error}
-        </p>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
-      <section className="mt-5" aria-labelledby="needs-you">
+      <section aria-labelledby="needs-you">
         <h2 id="needs-you" className="p-eyebrow mb-2">
           Needs you
         </h2>
@@ -136,7 +137,7 @@ export default function AdminOverview() {
       </section>
 
       {headline.length > 0 && (
-        <div className="mt-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
           {headline.map(({ row: r, since }) => (
             <KpiTile
               key={r.key}
@@ -153,7 +154,7 @@ export default function AdminOverview() {
         </div>
       )}
 
-      {data && sections.map((s) => <DashboardSection key={s.key} section={s} start={data.range.start} />)}
+      {data && sections.map((s) => <DashboardSection key={s.key} section={s} start={data.range.start} sub={s.key === "visits" ? visitsSub(data) : undefined} />)}
     </>
   );
 }

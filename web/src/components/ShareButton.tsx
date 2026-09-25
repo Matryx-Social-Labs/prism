@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { shareSurface, track } from "@/lib/analytics";
 
-export function ShareButton({ url, title, fill, compact }: { url: string; title: string; fill?: boolean; compact?: boolean }) {
+export function ShareButton({ url, title, fill, compact, label }: { url: string; title: string; fill?: boolean; compact?: boolean; /** What is shared, for screen readers; a compact button defaults to the quote it sits under. */ label?: string }) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
@@ -55,7 +55,7 @@ export function ShareButton({ url, title, fill, compact }: { url: string; title:
   if (compact) {
     // A text link in a meta row (a quote card's foot): the same behaviour, no chrome.
     return (
-      <button type="button" onClick={share} className="font-semibold hover:underline" style={{ color: "var(--ink-2)", textUnderlineOffset: 4 }} aria-label="Share this quote">
+      <button type="button" onClick={share} className="font-semibold hover:underline" style={{ color: "var(--ink-2)", textUnderlineOffset: 4 }} aria-label={label ?? "Share this quote"}>
         {copied ? "Link copied" : "Share"}
       </button>
     );
@@ -65,7 +65,7 @@ export function ShareButton({ url, title, fill, compact }: { url: string; title:
       type="button"
       onClick={share}
       className={`p-btn p-btn--secondary ${fill ? "w-full" : "p-btn--sm"}`}
-      aria-label="Share this story"
+      aria-label={label ?? "Share this story"}
     >
       <ShareIcon size={16} />
       {copied ? "Link copied" : "Share"}

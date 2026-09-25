@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import RoundReview from "@/app/admin/batches/[key]/page";
@@ -42,8 +42,20 @@ const page = () => render(<RoundReview params={Promise.resolve({ key: "k1" })} /
 describe("reviewing a round", () => {
   it("says why it cannot be published, and will not publish it", async () => {
     page();
-    expect(await screen.findByText("1 item(s) have no explanation")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    const check = within((await screen.findByRole("heading", { name: "Quality check" })).closest("aside")!);
+    expect(check.getByText(/1 of 2 · item 02 is missing one/)).toBeInTheDocument();
+    expect(check.getAllByText("Fails")).toHaveLength(1);
+    // Constant answers score 1 of 2 each: that check passes.
+    expect(check.getByText(/always yes: 1 of 2/)).toBeInTheDocument();
+    expect(screen.getByText("Missing. Labellers see this when they get it wrong.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish · fix 1 item first" })).toBeDisabled();
+  });
+
+  it("prints any other reason the API gives as a failed check, in its words", async () => {
+    fetchRound.mockResolvedValue({ items, check: { ...check(false, ["a test needs at least 15 items"]), missing: 0 } });
+    page();
+    expect(await screen.findByText("A test needs at least 15 items.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish · the check must pass" })).toBeDisabled();
   });
 
   it("saves only the explanations that changed", async () => {

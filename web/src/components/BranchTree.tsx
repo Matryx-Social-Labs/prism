@@ -42,7 +42,12 @@ type Row = {
   key: string;
   kind: "dev" | "branch";
   title: string;
-  meta: string;
+  /** The mono date column: a day ("16 SEP"), or a branch's span ("12-23 JUL"). */
+  date: string;
+  /** A reading-voice tag after the title: First, You are here, Also reported. */
+  tag: string | null;
+  /** The development's sources, when the payload counts them. */
+  sources: number | null;
   depth: number;
   /** Rail style for the left connector: none at depth 0, hairline for a branch. */
   rail: "none" | "solid" | "strong" | "dashed";
@@ -161,9 +166,9 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
       key: id,
       kind: "dev",
       title: dev?.title ?? "Untitled development",
-      meta: [stamp(dev?.occurred_at ?? null), isRoot ? "FIRST" : id === currentId ? "YOU ARE HERE" : ""]
-        .filter(Boolean)
-        .join(" · "),
+      date: stamp(dev?.occurred_at ?? null),
+      tag: isRoot ? "First" : id === currentId ? "You are here" : null,
+      sources: dev?.source_count ?? null,
       depth: 0,
       rail: "none",
       muted: false,
@@ -181,7 +186,9 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
         key: `${id}:branch`,
         kind: "branch",
         title: `${branch.length} development${branch.length === 1 ? "" : "s"}`,
-        meta: span(devs),
+        date: span(devs),
+        tag: null,
+        sources: null,
         depth: 1,
         rail: open ? "strong" : "solid",
         muted: !open,
@@ -198,7 +205,9 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
             key: child.id,
             kind: "dev",
             title: cd?.title ?? "Untitled development",
-            meta: [stamp(cd?.occurred_at ?? null), deep ? "DEPTH 2" : ""].filter(Boolean).join(" · "),
+            date: stamp(cd?.occurred_at ?? null),
+            tag: child.id === currentId ? "You are here" : null,
+            sources: cd?.source_count ?? null,
             // Depth 2 gets indent only, no connector — the design is explicit
             // that a second rail reads as a drawn tree, which mobile refuses.
             depth: deep ? 2 : 1,
@@ -220,7 +229,9 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
           key: sat.id,
           kind: "dev",
           title: sd?.title ?? "Untitled development",
-          meta: [stamp(sd?.occurred_at ?? null), "ALSO REPORTED"].filter(Boolean).join(" · "),
+          date: stamp(sd?.occurred_at ?? null),
+          tag: "Also reported",
+          sources: sd?.source_count ?? null,
           depth: 1,
           rail: "dashed",
           muted: true,
@@ -233,7 +244,6 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
     }
   }
 
-  const shown = rows.filter((r) => r.kind === "dev").length;
   const { developments: n, branches: b, satellites: sat } = tree.shape;
   // Counted, never summarised — the readout prints what the partitioner
   // recorded, plus the span in days from the developments' own dates. The
@@ -249,44 +259,21 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
 
   return (
     <section aria-label="Storyline structure">
-      {readout && (
-        <div
-          className="font-mono text-[11px] uppercase leading-[1.7] tracking-[0.06em]"
-          style={{ color: "var(--ink-muted)" }}
-        >
-          {shapeLine}
-        </div>
-      )}
+      {readout && <p className="p-count mb-3 whitespace-normal">{shapeLine}</p>}
 
-      <div
-        className="sticky top-0 z-20 mt-3 flex items-center gap-2.5 border-y px-1 py-2"
-        style={{ borderColor: "var(--line)", background: "var(--bg)" }}
-      >
-        <span className="font-mono text-[11px] tracking-[0.1em]" style={{ color: "var(--ink-faint)" }}>
-          {showAll ? `ALL · ${shown} SHOWN` : `MAIN STORY · ${onSpineCount}`}
-        </span>
-        <div className="ml-auto flex gap-4">
-          {([["MAIN", false], ["ALL", true]] as const).map(([label, all]) => (
-            <button
-              key={label}
-              onClick={() => setShowAll(all)}
-              aria-pressed={showAll === all}
-              className="flex h-11 items-center border-b-2 px-1 font-mono text-[11px] tracking-[0.1em]"
-              style={{
-                borderColor: showAll === all ? "var(--ink)" : "transparent",
-                color: showAll === all ? "var(--ink)" : "var(--ink-muted)",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Design System v2 · structure/BranchTree: the main line, or everything. */}
+      <div className="p-seg mb-2" role="tablist" aria-label="Show">
+        {([["Main line", false, onSpineCount], ["All", true, tree.nodes.length]] as const).map(([label, all, count]) => (
+          <button key={label} type="button" role="tab" aria-selected={showAll === all} onClick={() => setShowAll(all)}>
+            {label}{" "}
+            <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{count}</span>
+          </button>
+        ))}
       </div>
 
-      <div>
+      <ol className="border-b" style={{ borderColor: "var(--line)" }}>
         {rows.map((r) => {
-          const railColor =
-            r.rail === "strong" ? "var(--line-strong)" : r.rail === "dashed" ? "var(--line-strong)" : "var(--line)";
+          const railColor = r.rail === "solid" ? "var(--line)" : "var(--line-strong)";
           // A row is one of three tags — a link to its development, the branch
           // toggle, or an inert row for the one you're already on — so the body
           // is built once and each tag gets it as children. A single dynamic
@@ -294,70 +281,35 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
           // tag to `never`, and the escape hatch is a cast that would silence
           // real prop errors on all three.
           const shared = {
-            className: "flex w-full min-h-[44px] items-start gap-[11px] py-3 pr-1 text-left",
+            className: "flex w-full min-h-[44px] items-baseline gap-2.5 py-2.5 pr-1 text-left",
             style: {
-              paddingLeft: r.rail === "none" ? 0 : 14,
-              borderLeft:
-                r.rail === "none" ? undefined : `1px ${r.rail === "dashed" ? "dashed" : "solid"} ${railColor}`,
+              paddingLeft: r.rail === "none" ? 0 : 12,
+              borderLeft: r.rail === "none" ? undefined : `1.5px ${r.rail === "dashed" ? "dashed" : "solid"} ${railColor}`,
             },
           };
           const body = (
             <>
-                {r.kind === "dev" ? (
-                  <span
-                    aria-hidden
-                    className="mt-[5px] block h-[7px] w-[7px] flex-none"
-                    style={{
-                      background: r.current
-                        ? "var(--lens-general)"
-                        : r.satellite
-                          ? "var(--ink-faint)"
-                          : r.depth === 0
-                            ? "var(--ink)"
-                            : "var(--ink-muted)",
-                      boxShadow: r.current ? "0 0 0 3px var(--lens-general-bg)" : undefined,
-                    }}
-                  />
-                ) : null}
-                <span className="min-w-0 flex-1">
-                  <span
-                    className="block text-[13.5px] leading-[1.4]"
-                    style={{
-                      fontWeight: r.bold ? 600 : 400,
-                      color: r.muted ? "var(--ink-muted)" : "var(--ink)",
-                      textWrap: "pretty",
-                    }}
-                  >
-                    {r.kind === "branch" && (
-                      <span className="mr-1.5 inline-flex translate-y-[2px]" data-open={r.bold ? "true" : "false"}>
-                        {r.bold ? <ChevronDown /> : <Corner />}
-                      </span>
-                    )}
-                    {r.title}
+              <span className="w-[64px] shrink-0 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{r.date}</span>
+              <span className="min-w-0 flex-1" style={{ font: `${r.bold ? 600 : 500} 14.5px/1.4 var(--font-read)`, color: r.muted ? "var(--ink-2)" : "var(--ink)", textWrap: "pretty" }}>
+                {r.kind === "branch" && (
+                  <span className="mr-1.5 inline-flex translate-y-[2px]" data-open={r.bold ? "true" : "false"}>
+                    {r.bold ? <ChevronDown /> : <Corner />}
                   </span>
-                  {r.meta && (
-                    <span
-                      className="font-mono text-[11px] tracking-[0.06em]"
-                      style={{ color: "var(--ink-faint)" }}
-                    >
-                      {r.meta}
-                    </span>
-                  )}
-                </span>
+                )}
+                {r.title}
+                {r.tag && <span className="p-eyebrow ml-2 whitespace-nowrap">{r.tag}</span>}
+              </span>
+              {r.sources != null && <span className="p-count shrink-0">{r.sources} {r.sources === 1 ? "source" : "sources"}</span>}
             </>
           );
           return (
-            <div
+            <li
               key={r.key}
-              className="border-b"
+              className="border-t"
               style={{
                 borderColor: "var(--line)",
                 paddingLeft: r.depth === 0 ? 0 : r.depth === 2 ? 36 : 22,
-                background: r.current
-                  ? "var(--bg-sunken)"
-                  : r.kind === "branch" && r.bold
-                    ? "var(--bg-sunken)"
-                    : "transparent",
+                background: r.current || (r.kind === "branch" && r.bold) ? "var(--sunken)" : "transparent",
               }}
             >
               {r.href ? (
@@ -369,7 +321,7 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
                   type="button"
                   onClick={r.onTap}
                   // Without this the name concatenates to "2 developments12–23 JUL".
-                  aria-label={r.meta ? `${r.title}, ${r.meta}` : r.title}
+                  aria-label={r.date ? `${r.title}, ${r.date}` : r.title}
                   aria-expanded={r.bold}
                   {...shared}
                 >
@@ -378,15 +330,12 @@ export function BranchTree({ tree, developments, currentId = null, defaultAll = 
               ) : (
                 <div {...shared}>{body}</div>
               )}
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
-      <p
-        className="max-w-[44ch] px-1 pb-5 pt-3.5 text-[12.5px] leading-[1.6]"
-        style={{ color: "var(--ink-faint)" }}
-      >
+      <p className="max-w-[44ch] pb-2 pt-3" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
         The first row is the most-reported development; every other follows it in time
       </p>
     </section>

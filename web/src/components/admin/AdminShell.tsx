@@ -6,7 +6,10 @@
  * through context. The API checks again on every call (api/deps.
  * require_admin_user) — this is what the reader sees, not what protects the data.
  *
- * The chrome is AdminFrame (below); mono only for counts, times and the email.
+ * Until the API says yes the page is one of four access states on a bare bar
+ * (the brand, an "Admin" badge, the theme): checking, signed out, not on the
+ * founders' list, or the API could not be reached. The chrome after that is
+ * AdminFrame (below); mono only for counts, times, codes and the email.
  */
 
 import Link from "next/link";
@@ -15,9 +18,13 @@ import { createContext, useContext, useEffect, useId, useRef, useState } from "r
 
 import { Brand } from "@/components/Brand";
 import { SectionHead } from "@/components/SectionHead";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 import { AdminError, fetchAdminMe } from "@/lib/admin";
 import { useSession, type Session } from "@/lib/session";
+
+import { istClock } from "./AuditItem";
+import { dayLabel } from "./charts/format";
 
 interface Admin {
   session: Session;
@@ -44,7 +51,7 @@ export const ADMIN_NAV: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/admin/audit", label: "Audit" },
 ];
 
-type State = "checking" | "signed-out" | "forbidden" | "error" | "ok";
+export type AccessState = "checking" | "signed-out" | "forbidden" | "error";
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const session = useSession();
@@ -52,8 +59,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   // useSession reads storage in an effect, so its first value is null for
   // everyone; without this a founder would see "Sign in" flash first.
   const [mounted, setMounted] = useState(false);
-  const [state, setState] = useState<State>("checking");
+  const [state, setState] = useState<AccessState | "ok">("checking");
   const [email, setEmail] = useState("");
+  const [failure, setFailure] = useState<{ status: number; at: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => setMounted(true), []);
 
@@ -64,6 +73,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       return;
     }
     let live = true;
+    setState("checking");
     fetchAdminMe(session)
       .then((me) => {
         if (!live) return;
@@ -73,12 +83,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       .catch((e: unknown) => {
         if (!live) return;
         const status = e instanceof AdminError ? e.status : 0;
+        setFailure({ status, at: new Date().toISOString() });
         setState(status === 401 ? "signed-out" : status === 403 ? "forbidden" : "error");
       });
     return () => {
       live = false;
     };
-  }, [mounted, session]);
+  }, [mounted, session, attempt]);
 
   if (state === "ok" && session) {
     return (
@@ -87,18 +98,81 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </AdminFrame>
     );
   }
+  return <AdminAccess state={state === "ok" ? "checking" : state} email={session?.email} failure={failure} onRetry={() => setAttempt((n) => n + 1)} />;
+}
+
+const ACCESS: Record<AccessState, { title: string; body?: string }> = {
+  checking: { title: "Checking access…" },
+  "signed-out": { title: "Sign in with a founder account", body: "The admin opens for accounts on the founders' list." },
+  forbidden: { title: "This area is for Prism's founders" },
+  error: { title: "Prism's API could not be reached", body: "Nothing in the admin can load until it answers. Check the API status, then try again." },
+};
+
+/** The four ways in before the dashboard: each a title, a line, one way on. */
+export function AdminAccess({
+  state,
+  email,
+  failure,
+  onRetry,
+}: {
+  state: AccessState;
+  email?: string;
+  failure?: { status: number; at: string } | null;
+  onRetry: () => void;
+}) {
+  const { title, body } = ACCESS[state];
   return (
-    <div className="mx-auto w-full max-w-[640px] px-5 pb-24 pt-16">
-      {state === "checking" && <p className="sr-only">Checking your access</p>}
-      {state === "signed-out" && (
-        <Notice text="Sign in with a founder account to open the dashboard.">
-          <Link href="/signin?next=/admin" className="p-btn p-btn--primary mt-6">
-            Sign in
-          </Link>
-        </Notice>
-      )}
-      {state === "forbidden" && <Notice text="This area is for Prism's founders." />}
-      {state === "error" && <Notice text="The dashboard could not reach the API. Reload to try again." />}
+    <div className="min-h-dvh">
+      <header className="flex h-[var(--masthead)] items-center gap-2 border-b px-[var(--gutter)] lg:h-[var(--topbar)]" style={{ borderColor: "var(--line)" }}>
+        <Brand size={20} />
+        <span className="flex-1" />
+        <span className="p-badge p-badge--outline">Admin</span>
+        <ThemeToggle />
+      </header>
+      <div className="mx-auto grid max-w-[440px] gap-3.5 px-[var(--gutter)] py-[72px] lg:px-0 lg:py-[120px]" role={state === "checking" ? "status" : undefined}>
+        <span className="p-count">/ADMIN</span>
+        <h1 style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)", textWrap: "balance" }}>{title}</h1>
+        {state === "checking" && (
+          <div className="admin-checking" aria-hidden>
+            <i />
+          </div>
+        )}
+        {state === "forbidden" && (
+          <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
+            You&apos;re signed in as <span className="font-mono text-[14px] [overflow-wrap:anywhere]">{email}</span>, which isn&apos;t on the list. Nothing here
+            was shown to you.
+          </p>
+        )}
+        {body && <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>{body}</p>}
+        {state === "signed-out" && (
+          <div>
+            <Link href="/signin?next=/admin" className="p-btn p-btn--primary">
+              Sign in
+            </Link>
+          </div>
+        )}
+        {state === "forbidden" && (
+          <div>
+            <Link href="/" className="p-btn p-btn--secondary">
+              Back to Prism
+            </Link>
+          </div>
+        )}
+        {state === "error" && (
+          <>
+            <div>
+              <button type="button" className="p-btn p-btn--secondary" onClick={onRetry}>
+                Try again
+              </button>
+            </div>
+            {failure && (
+              <span className="p-count">
+                ERROR REF · {failure.status ? `API-${failure.status}` : "NO ANSWER"} · {dayLabel(failure.at).toUpperCase()} {istClock(failure.at)} IST
+              </span>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -106,8 +180,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 /**
  * The admin's chrome (Design System v2 · AdminShell): a 220px sticky sidebar —
  * the brand, an "Admin" badge, the pages, the founder's email in mono — beside
- * the page. On a phone the same sidebar folds into a top bar whose pages scroll
- * sideways, so every page stays one tap away. Hands the session down.
+ * the page. On a phone it is a 52px bar (brand, badge, email) over a tab strip
+ * of the pages that scrolls sideways, so every page stays one tap away.
  */
 export function AdminFrame({ session, email, path, children }: Admin & { path: string; children: React.ReactNode }) {
   const nav = useRef<HTMLElement>(null);
@@ -120,84 +194,81 @@ export function AdminFrame({ session, email, path, children }: Admin & { path: s
       <div className="min-h-dvh lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
         {/* The rule runs the page's full height; the sidebar sticks inside it. */}
         <div className="border-b lg:border-b-0 lg:border-r" style={{ borderColor: "var(--line)" }}>
-        <aside className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pb-1 pt-3 lg:sticky lg:top-0 lg:max-h-dvh lg:flex-col lg:flex-nowrap lg:items-stretch lg:gap-4 lg:overflow-y-auto lg:py-[18px]">
-          <div className="order-1 flex min-w-0 items-center gap-2 px-2">
-            <Brand size={20} />
-            <span className="p-badge p-badge--outline">Admin</span>
+          <div className="lg:sticky lg:top-0 lg:grid lg:max-h-dvh lg:content-start lg:gap-4 lg:overflow-y-auto lg:px-3 lg:py-[18px]">
+            <div className="flex h-[52px] min-w-0 items-center gap-2 px-[var(--gutter)] lg:h-auto lg:px-2">
+              <Brand size={20} />
+              <span className="p-badge p-badge--outline">Admin</span>
+              <span className="min-w-0 flex-1 truncate text-right font-mono text-[11px] lg:hidden" style={{ color: "var(--ink-3)" }}>
+                {email}
+              </span>
+            </div>
+            <nav ref={nav} aria-label="Admin" className="admin-nav p-hide-scroll flex overflow-x-auto px-[var(--gutter)] lg:grid lg:gap-0.5 lg:overflow-visible lg:px-0">
+              {ADMIN_NAV.map((item) => {
+                const current = item.href === "/admin" ? path === "/admin" : path.startsWith(item.href);
+                return (
+                  <Link key={item.href} href={item.href} aria-current={current ? "page" : undefined}>
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <span className="hidden truncate px-2.5 font-mono text-[11px] lg:block" style={{ color: "var(--ink-3)" }}>
+              {email}
+            </span>
           </div>
-          <span className="order-2 ml-auto min-w-0 truncate px-2 font-mono text-[11px] lg:order-3 lg:ml-0 lg:px-2.5" style={{ color: "var(--ink-3)" }}>
-            {email}
-          </span>
-          <nav ref={nav} aria-label="Admin" className="p-hide-scroll order-3 -mx-3 flex w-[calc(100%+24px)] gap-0.5 overflow-x-auto px-3 lg:order-2 lg:mx-0 lg:grid lg:w-auto lg:overflow-visible lg:px-0">
-            {ADMIN_NAV.map((item) => {
-              const current = item.href === "/admin" ? path === "/admin" : path.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={current ? "page" : undefined}
-                  className="flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-[var(--r-md)] px-2.5 no-underline hover:bg-[var(--sunken)] lg:min-h-0 lg:py-2.5"
-                  style={{
-                    font: `${current ? 600 : 500} 14.5px/1 var(--font-read)`,
-                    background: current ? "var(--accent-soft)" : undefined,
-                    color: current ? "var(--accent)" : "var(--ink-2)",
-                  }}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
         </div>
-        <div className="min-w-0 px-4 pb-12 pt-5 sm:px-6 lg:px-8 lg:pt-6">{children}</div>
+        <div className="grid min-w-0 content-start gap-5 px-[var(--gutter)] pb-8 pt-4 lg:gap-6 lg:px-8 lg:pb-14 lg:pt-7">{children}</div>
       </div>
     </AdminContext.Provider>
   );
 }
 
-function Notice({ text, children }: { text: string; children?: React.ReactNode }) {
+/** A page's name: display-m on a phone, display-l beside the sidebar. */
+export function AdminTitle({ children }: { children: React.ReactNode }) {
+  return <h1 className="admin-title">{children}</h1>;
+}
+
+/** A page's head: its name, a mono provenance line under it, controls at the right. */
+export function AdminHead({ title, line, children }: { title: string; line?: string | null; children?: React.ReactNode }) {
   return (
-    <div>
-      <h1 style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>Prism admin</h1>
-      <p className="mt-3 text-[15px]" style={{ color: "var(--ink-2)" }}>
-        {text}
-      </p>
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="min-w-0 flex-[1_1_280px]">
+        <AdminTitle>{title}</AdminTitle>
+        {line && <p className="p-count mt-1.5 whitespace-normal">{line}</p>}
+      </div>
       {children}
     </div>
   );
 }
 
-/** A page heading and its sections, shared by every admin page. */
-export function AdminTitle({ children }: { children: React.ReactNode }) {
-  return <h1 style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>{children}</h1>;
-}
-
 /** A section under the 3px ink rule (SectionHead): `sub` is a mono provenance
- *  strip ("3 of 5 on"), `hint` a line of prose. */
-export function AdminSection({ title, sub, hint, children }: { title: string; sub?: string; hint?: string; children: React.ReactNode }) {
+ *  strip ("3 of 5 on"), `hint` a line of prose, `right` sits at its end. */
+export function AdminSection({
+  title,
+  sub,
+  hint,
+  right,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  hint?: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const id = useId();
   return (
-    <section className="mt-8" aria-labelledby={id}>
-      <SectionHead id={id} title={title} sub={sub} hint={hint} />
+    <section className="grid min-w-0 content-start gap-2.5" aria-labelledby={id}>
+      <SectionHead id={id} title={title} sub={sub} hint={hint} right={right} />
       {children}
     </section>
   );
 }
 
-/** A row action: accent for the usual step, ink-2 for the one to think about. */
-export function TextButton({ onClick, muted, children }: { onClick: () => void; muted?: boolean; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className="p-btn p-btn--text" style={muted ? { color: "var(--ink-2)" } : undefined}>
-      {children}
-    </button>
-  );
-}
-
-/** An empty state: what would be here. */
+/** An empty list: what would be here. */
 export function Quiet({ children }: { children: React.ReactNode }) {
   return (
-    <p className="py-3 text-[15px]" style={{ color: "var(--ink-2)" }}>
+    <p className="py-2 text-[15px]" style={{ color: "var(--ink-2)" }}>
       {children}
     </p>
   );
