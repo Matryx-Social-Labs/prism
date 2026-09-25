@@ -4,7 +4,11 @@ Match cascade (strongest first), all persisted in the match trail:
   1. cve_id     — shared CVE identifier (the canonical key for the cyber beachhead)
   2. url_exact  — an article for the same URL already belongs to an event
   3. title_time — trigram title similarity within a time window (pg_trgm)
-  4. embedding  — cosine similarity to the event embedding (pgvector)
+  4. headline_xlang — extracted English headline vs Prism headlines (off: threshold 0)
+  5. embedding  — cosine similarity to the event embedding (pgvector)
+  6. entity_overlap — shared IDF-weighted actors inside a looser embedding band
+  7. verified   — gist-embedding candidates judged by Jev (correlation/verify.py),
+                  for an article every tier above refused; flag prism_event_verify
 
 Identity is never merged: matching links the article to the event; it never
 rewrites entities or inflates impact (EduThreat canonicalization rules).
@@ -19,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
 from common.text import detect_script
+from correlation.verify import Candidate, judge
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +77,16 @@ _SCALE = {
         "embed_far": 0.45, "story_max": 0.55,
         # DIFFERENT-EVENT MEDIAN, not a tuned cutoff — see the note below.
         "story_edge_max": 0.656,
+        # The verified tier's gist floor was measured on mE5 only: off here.
+        "gist_candidate": None,
     },
     "intfloat/multilingual-e5-base": {
         "embedding": 0.050, "entity_near": 0.079, "entity_loose": 0.106,
         "embed_far": 0.106, "story_max": 0.127, "story_edge_max": 0.145,
+        # Verified tier (correlation/verify.py): gist cosine >= 0.90 held every
+        # labelled same-happening pair from September (xl min 0.929, same-language
+        # min 0.898). A CANDIDATE floor, not a merge threshold — Jev decides.
+        "gist_candidate": 0.10,
     },
 }
 
@@ -199,6 +210,9 @@ async def find_event(
     entity_slugs: list[str] | None = None,
     cve_record: bool = False,
     english_title: str | None = None,
+    gist: list[float] | None = None,
+    verify_block: str | None = None,
+    article_id: uuid.UUID | None = None,
 ) -> Match | None:
     if cve_ids:
         match = await _match_by_cve(session, cve_ids)
@@ -255,6 +269,13 @@ async def find_event(
             allow_single_actor=trusted,
             title=title,
         )
+        if match:
+            return match
+
+    # Last: the verified tier, for an article every tier above refused. Nearest
+    # member articles by gist, then Jev decides (correlation/verify.py).
+    if gist is not None and verify_block and article_id is not None:
+        match = await _match_by_gist_verified(session, gist, verify_block, published_at, article_id)
         if match:
             return match
 
@@ -637,3 +658,63 @@ async def _match_by_embedding(
             event_id=row.id, match_type="embedding", match_score=1.0 - float(row.dist)
         )
     return None
+
+
+GIST_CANDIDATES = 5
+
+
+async def _match_by_gist_verified(
+    session: AsyncSession, gist: list[float], block: str, published_at, article_id: uuid.UUID
+) -> Match | None:
+    """The in-window events whose nearest member article's gist is within the
+    candidate floor, up to five, judged in one Jev call against each event's
+    founding headline and summary. `shadow` asks and records but never attaches.
+
+    Candidates come from MEMBER articles, not a per-event average: an average
+    drifts toward whatever a wrong merge brought in and then draws more of it —
+    the feedback loop that grew one Kannada event to 139 articles. The judge
+    reads the founder's text, which never moves."""
+    settings = get_settings()
+    mode = settings.prism_event_verify
+    max_dist = _scale().get("gist_candidate")
+    if mode not in ("shadow", "live") or max_dist is None:
+        return None
+    vector_literal = "[" + ",".join(f"{v:.6f}" for v in gist) + "]"
+    rows = (
+        await session.execute(
+            text(
+                f"""
+                SELECT m.event_id, min(a.gist_embedding <=> CAST(:vec AS vector)) AS dist
+                FROM events e
+                JOIN event_memberships m ON m.event_id = e.id
+                JOIN articles a ON a.id = m.article_id
+                WHERE a.gist_embedding IS NOT NULL
+                  AND (CAST(:published_at AS timestamptz) IS NULL
+                       OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
+                GROUP BY m.event_id
+                HAVING min(a.gist_embedding <=> CAST(:vec AS vector)) <= :max_dist
+                ORDER BY dist, m.event_id
+                LIMIT :k
+                """
+            ),
+            {"vec": vector_literal, "published_at": published_at, "max_dist": max_dist, "k": GIST_CANDIDATES},
+        )
+    ).all()
+    if not rows:
+        return None
+    candidates = [Candidate(event_id=r.event_id, distance=float(r.dist)) for r in rows]
+    try:
+        scored = await judge(session, article_id=article_id, block=block, candidates=candidates, mode=mode)
+    except Exception as exc:  # noqa: BLE001 — an unjudged article founds its own event, as it did before this tier
+        logger.warning("event_verify_failed article=%s error=%s", article_id, str(exc)[:160])
+        return None
+    if not scored:
+        return None
+    best, p = max(scored, key=lambda s: s[1])
+    if p < settings.prism_event_verify_min:
+        return None
+    if mode == "shadow":
+        logger.info("event_verify_shadow article=%s would_match=%s noul=%.3f dist=%.4f",
+                    article_id, best.event_id, p, best.distance)
+        return None
+    return Match(event_id=best.event_id, match_type="verified", match_score=p)

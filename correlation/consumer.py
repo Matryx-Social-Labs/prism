@@ -30,6 +30,7 @@ from common.models import (
     Impact,
     Perspective,
     RawItem,
+    Source,
 )
 from common.observability import fetch_prompt, observe
 from common.stream import get_redis
@@ -38,6 +39,7 @@ from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
 from correlation.threads import link_event_threads
+from correlation.verify import article_block
 
 logger = get_logger(__name__)
 
@@ -157,6 +159,8 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
     entity_names = [e["name"] for e in (shared.get("entities") or []) if e.get("name")]
     entity_slugs = [entity_slug(n) for n in await drop_source_names(session, entity_names)]
 
+    gist = article.gist_embedding
+    source = await session.get(Source, raw_item.source_id) if raw_item else None
     match = await find_event(
         session,
         cve_ids=cve_ids,
@@ -167,6 +171,14 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
         entity_slugs=entity_slugs or None,
         cve_record=cve_record,
         english_title=english_headline(shared),
+        gist=[float(v) for v in gist] if gist is not None else None,
+        verify_block=article_block(
+            source=source.slug if source else "unknown",
+            published_at=published_at,
+            headline=english_headline(shared) or title,
+            summary=enrichment.summary or "",
+        ),
+        article_id=article_id,
     )
 
     if match is not None:

@@ -103,6 +103,9 @@ class Article(TimestampMixin, Base):
     clean_text: Mapped[str] = mapped_column(Text, nullable=False)
     retrieval_tier: Mapped[str] = mapped_column(Text, default="direct", nullable=False)  # direct|proxy|archive|body
     word_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    # The extractor's English headline + summary, embedded: what the verified
+    # matching tier retrieves on (correlation/verify.py). Not the body — see there.
+    gist_embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBED_DIM))
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -197,7 +200,7 @@ class EventMembership(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id"), nullable=False)
     article_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("articles.id"), nullable=False)
-    match_type: Mapped[str] = mapped_column(Text, nullable=False)  # url_exact|resolved_url|title_time|entity_time|embedding|feed
+    match_type: Mapped[str] = mapped_column(Text, nullable=False)  # cve_id|url_exact|title_time|headline_xlang|embedding|entity_overlap|verified|new_event
     match_score: Mapped[float | None] = mapped_column(Float)
     is_survivor: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

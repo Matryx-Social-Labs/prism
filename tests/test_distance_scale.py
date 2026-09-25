@@ -45,6 +45,8 @@ def test_the_two_models_disagree_about_every_distance():
     been recalibrated — which is exactly how the four unscaled ones looked."""
     mp, e5 = clustering._SCALE[MPNET], clustering._SCALE[E5]
     for key in mp:
+        if mp[key] is None:
+            continue  # measured on E5 only; the tier is off on mpnet rather than guessed
         assert e5[key] < mp[key], f"{key}: E5 compresses the space, so it must be tighter"
 
 
