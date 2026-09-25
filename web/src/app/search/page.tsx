@@ -154,7 +154,7 @@ function SearchInner() {
           )}
           {!loading && !failed && searched && results.length === 0 && (
             <EmptyState title={<>No records match &ldquo;{term}&rdquo;</>}>
-              Search reads every record's headline, summary and the names in it. Try fewer words or a name.
+              Search reads every record&rsquo;s headline, summary and the names in it. Try fewer words or a name.
             </EmptyState>
           )}
           {!loading && !failed && searched && results.length > 0 && (
