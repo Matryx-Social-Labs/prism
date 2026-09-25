@@ -12,10 +12,13 @@
  * table (ChartPanel).
  */
 
+import { useState } from "react";
+
+import { SectionHead } from "@/components/SectionHead";
 import type { Breakdown, MetricRow, MetricSection } from "@/lib/admin";
 
 import { BarList, Funnel } from "./charts/Bars";
-import { ChartPanel, InfoTip } from "./charts/ChartPanel";
+import { ChartPanel, InfoButton } from "./charts/ChartPanel";
 import { CohortGrid } from "./charts/CohortGrid";
 import { DotPlot } from "./charts/DotPlot";
 import { figure } from "./charts/format";
@@ -81,26 +84,28 @@ function Split({ b, start }: { b: Breakdown; start: string }) {
 
 /** The measures a chart does not carry, as plain numbers against the period before. */
 function Figures({ rows }: { rows: MetricRow[] }) {
+  const [info, setInfo] = useState(false);
   return (
-    <section className="admin-panel" aria-label="In figures">
-      <header className="mb-2 flex items-start justify-between gap-3">
-        <h3 className="pt-3 text-[14px] font-semibold" style={{ color: "var(--ink)" }}>In figures</h3>
-        <InfoTip label="these figures">
-          <ul className="space-y-2">
-            {rows.map((r) => (
-              <li key={r.key}>
-                <strong style={{ color: "var(--ink)" }}>{r.label}.</strong> {r.note}
-                <span className="block font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{r.source}</span>
-              </li>
-            ))}
-          </ul>
-        </InfoTip>
+    <section className="admin-panel grid content-start gap-3" aria-label="In figures">
+      <header className="flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 text-[14.5px] font-semibold leading-[1.3]" style={{ color: "var(--ink)" }}>In figures</h3>
+        <InfoButton label="these figures" open={info} onToggle={() => setInfo((v) => !v)} />
       </header>
+      {info && (
+        <ul className="grid gap-2 rounded-[var(--r-md)] p-2.5 text-[13px] leading-[1.45]" style={{ background: "var(--sunken)", color: "var(--ink-2)" }}>
+          {rows.map((r) => (
+            <li key={r.key}>
+              <b className="font-semibold" style={{ color: "var(--ink)" }}>{r.label}.</b> {r.note}
+              <span className="block font-mono text-[11.5px] [overflow-wrap:anywhere]">Counted in: {r.source}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <dl>
         {rows.map((r) => (
           <div key={r.key} className="flex items-baseline justify-between gap-4 border-t py-2.5" style={{ borderColor: "var(--line)" }}>
-            <dt className="text-[13.5px]" style={{ color: "var(--ink-2)" }}>{r.label}</dt>
-            <dd className="text-right">
+            <dt className="min-w-0 text-[13.5px]" style={{ color: "var(--ink-2)" }}>{r.label}</dt>
+            <dd className="shrink-0 text-right">
               <span className="font-mono text-[15px] tabular-nums" style={{ color: r.current === null ? "var(--ink-3)" : "var(--ink)" }}>
                 {figure(r.current, r.unit)}
               </span>
@@ -121,11 +126,9 @@ export function DashboardSection({ section, start }: { section: MetricSection; s
   const trends = section.rows.filter((r) => r.series);
   const plain = section.rows.filter((r) => !r.series);
   return (
-    <section className="mt-12" aria-labelledby={`dash-${section.key}`}>
-      <h2 id={`dash-${section.key}`} className="text-[21px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-        {section.title}
-      </h2>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+    <section className="mt-8" aria-labelledby={`dash-${section.key}`}>
+      <SectionHead id={`dash-${section.key}`} title={section.title} />
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))]">
         {trends.map((r) => (
           <Trend key={r.key} row={r} start={start} />
         ))}

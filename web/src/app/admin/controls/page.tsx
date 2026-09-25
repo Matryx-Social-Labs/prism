@@ -1,25 +1,28 @@
 "use client";
 
 /**
- * The switches, read-only, and the one control: ask the worker to collect now.
+ * The switches, read-only, the one control — ask the worker to collect now —
+ * and today's changes from the audit log.
  * Founder decision D4 (2026-09-23): flags are shown, never set, from here —
  * setting them would move them out of the environment and change how a bad
  * change is rolled back. The values are this API's own view; the worker reads
  * its own environment, which is how a feature runs in shadow there first.
  *
- * Each switch is a state row (admin charts, phase 5): ON on a solid rule, OFF
- * on a dashed one — line form, a word beside it, and nothing that looks like
- * it could be flipped. Numbers are listed apart from the switches.
+ * Each switch is a SwitchRow: ON solid ink, OFF on a dashed edge — a word, and
+ * nothing that looks like it could be flipped. Numbers are listed apart.
  */
 
 import { useEffect, useState } from "react";
 
-import { AdminSection, AdminTitle, useAdmin } from "@/components/admin/AdminShell";
-import { fetchFlags, triggerCollection, type Flag } from "@/lib/admin";
+import { AdminSection, AdminTitle, Quiet, useAdmin } from "@/components/admin/AdminShell";
+import { AuditItem, istDay } from "@/components/admin/AuditItem";
+import { fetchAudit, fetchFlags, triggerCollection, type AuditEntry, type Flag } from "@/lib/admin";
 
 export default function ControlsPage() {
   const { session } = useAdmin();
   const [flags, setFlags] = useState<Flag[] | null>(null);
+  const [audit, setAudit] = useState<AuditEntry[] | null>(null);
+  const [auditFailed, setAuditFailed] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
@@ -30,9 +33,17 @@ export default function ControlsPage() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not load the switches"));
   }, [session]);
 
+  useEffect(() => {
+    fetchAudit(session, 50)
+      .then((r) => setAudit(r.entries))
+      .catch(() => setAuditFailed(true));
+  }, [session]);
+
   const collecting = flags?.find((f) => f.name === "PRISM_INGESTION_ENABLED")?.value;
   const switches = flags?.filter((f) => typeof f.value === "boolean") ?? [];
   const numbers = flags?.filter((f) => typeof f.value === "number") ?? [];
+  const today = istDay(new Date().toISOString());
+  const todays = audit?.filter((e) => istDay(e.created_at) === today) ?? [];
 
   const collect = async () => {
     if (!window.confirm("Ask the worker to collect new reports now? It is recorded against you.")) return;
@@ -49,41 +60,42 @@ export default function ControlsPage() {
   };
 
   return (
-    <>
+    <div className="max-w-[760px]">
       <AdminTitle>Controls</AdminTitle>
       {error && (
-        <p role="alert" className="mt-5 text-[14px]" style={{ color: "var(--danger)" }}>
+        <p role="alert" className="p-alert p-alert--error mt-5">
           {error}
         </p>
       )}
 
-      <AdminSection title="Collect now">
-        <p className="text-[15px]" style={{ color: "var(--ink-2)" }}>
-          Collection runs on its own schedule. This asks the worker to run it once now.
-        </p>
-        <button type="button" className="btn btn-primary mt-4" disabled={sending || collecting === undefined} onClick={() => void collect()}>
+      <div className="admin-panel mt-6 flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1 basis-[240px]">
+          <h2 className="text-[15px] font-semibold leading-[1.3]">Collect now</h2>
+          <p className="text-[14px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
+            Collection runs on its own schedule. This asks the worker to run it once now. Recorded in the audit log.
+          </p>
+          {note && (
+            <p aria-live="polite" className="mt-2 text-[14px]" style={{ color: "var(--ink)" }}>
+              {note}
+            </p>
+          )}
+        </div>
+        <button type="button" className="p-btn p-btn--secondary" disabled={sending || collecting === undefined} onClick={() => void collect()}>
           Collect now
         </button>
-        {note && (
-          <p aria-live="polite" className="mt-3 text-[14px]" style={{ color: "var(--ink-2)" }}>
-            {note}
-          </p>
-        )}
-      </AdminSection>
+      </div>
 
-      <AdminSection title={switches.length ? `Switches · ${switches.filter((f) => f.value).length} of ${switches.length} on` : "Switches"}>
-        <p className="mb-3 text-[14px]" style={{ color: "var(--ink-2)" }}>
-          As the API sees them. They are changed in Railway&apos;s environment, not here; the worker has its own copy.
-        </p>
-        <ul className="grid gap-x-6 sm:grid-cols-2">
+      <AdminSection
+        title="Switches"
+        sub={switches.length ? `${switches.filter((f) => f.value).length} of ${switches.length} on · read-only, as the API sees them` : undefined}
+        hint="Changed in Railway's environment, not here; the worker has its own copy."
+      >
+        <ul>
           {switches.map((f) => (
             <FlagRow key={f.name} f={f}>
               <span
-                className="inline-flex h-6 min-w-[3.25rem] items-center justify-center rounded-[var(--r-sm)] px-2 font-mono text-[12px] font-semibold"
-                style={{
-                  border: f.value ? "1.5px solid var(--ink)" : "1.5px dashed var(--line-strong)",
-                  color: f.value ? "var(--ink)" : "var(--ink-3)",
-                }}
+                className="p-tag-mono"
+                style={f.value ? { background: "var(--ink)", color: "var(--paper)", borderColor: "var(--ink)" } : { borderStyle: "dashed" }}
               >
                 {f.value ? "ON" : "OFF"}
               </span>
@@ -94,7 +106,7 @@ export default function ControlsPage() {
 
       {numbers.length > 0 && (
         <AdminSection title="Limits">
-          <ul className="grid gap-x-6 sm:grid-cols-2">
+          <ul>
             {numbers.map((f) => (
               <FlagRow key={f.name} f={f}>
                 <span className="font-mono text-[14px] tabular-nums" style={{ color: "var(--ink)" }}>
@@ -105,16 +117,27 @@ export default function ControlsPage() {
           </ul>
         </AdminSection>
       )}
-    </>
+
+      <AdminSection title="Audit · today" sub={audit ? `${todays.length} ${todays.length === 1 ? "change" : "changes"}` : undefined}>
+        {auditFailed && <p className="p-alert p-alert--error">Could not load today&apos;s changes. This is not the same as none.</p>}
+        {audit && todays.length === 0 && <Quiet>Nothing was changed from this dashboard today.</Quiet>}
+        <ul>
+          {todays.map((e, i) => (
+            <AuditItem key={`${e.created_at}-${i}`} entry={e} />
+          ))}
+        </ul>
+      </AdminSection>
+    </div>
   );
 }
 
+/** SwitchRow: what the setting does, its name in mono, its state at the end. */
 function FlagRow({ f, children }: { f: Flag; children: React.ReactNode }) {
   return (
-    <li className="flex items-center justify-between gap-4 border-t py-2.5" style={{ borderColor: "var(--line)" }}>
-      <span>
-        <span className="block text-[15px]" style={{ color: "var(--ink)" }}>{f.does}</span>
-        <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{f.name}</span>
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-3" style={{ borderColor: "var(--line)" }}>
+      <span className="min-w-0">
+        <span className="block text-[14.5px] font-medium leading-[1.35]" style={{ color: "var(--ink)" }}>{f.does}</span>
+        <span className="block font-mono text-[11.5px] [overflow-wrap:anywhere]" style={{ color: "var(--ink-3)" }}>{f.name}</span>
       </span>
       {children}
     </li>

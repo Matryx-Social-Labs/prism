@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check } from "@/components/icons";
-import { PLAN_LABEL } from "@/components/PlanCard";
+import { PLAN_LABEL, refundOpen } from "@/components/PlanCard";
+import { PrismMark } from "@/components/PrismMark";
 import { track } from "@/lib/analytics";
 import { fetchMySubscription, rupees, type MySubscription } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
@@ -14,7 +14,7 @@ import { useSession } from "@/lib/session";
 // Where a reader lands the moment they have paid: told plainly that Plus is
 // on, what changed, when the next charge is, that the receipt is in their
 // inbox — and one primary way back to what they were reading. No upsell, no
-// tour; the door they came in by.
+// tour; the door they came in by. Every fact is the subscription's own.
 export function PlusWelcome() {
   const session = useSession();
   const params = useSearchParams();
@@ -29,43 +29,39 @@ export function PlusWelcome() {
   }, [session]);
   const label = PLAN_LABEL[sub?.plan ?? ""] ?? "Plus";
   const renews = sub?.current_period_end ? billingDay(sub.current_period_end, { long: true }) : null;
+  const refundUntil = refundOpen(sub) ? billingDay(sub!.refundable_until!, { long: true }) : null;
+  const facts: [string, React.ReactNode][] = [
+    ...(sub?.price_paise ? [["Plan", `${label} · ${rupees(sub.price_paise)}`] as [string, string]] : []),
+    ["Next charge", renews ?? "Shown on your account shortly"],
+    ["Receipt", <>Razorpay has emailed it{session ? ` to ${session.email}` : ""}; it is also under Payments in <Link href="/account" className="p-link">your account</Link>.</>],
+    [
+      "Changing your mind",
+      refundUntil
+        ? `A full refund until ${refundUntil}, from your account. Or cancel in one click, any time; you keep Plus to the end of the period you paid for.`
+        : "Cancel in one click from your account, any time; you keep Plus to the end of the period you paid for.",
+    ],
+  ];
 
+  // Welcome (ui_kits/plus): the mark, the fact in one line, what changed, the
+  // facts on mono labels, and the door back to what they were reading.
   return (
-    <div className="mx-auto w-full max-w-[var(--reading)] px-5 pb-24 pt-12 sm:px-8 lg:pt-20">
-      <p className="meta-line"><span>Prism Plus</span>{sub?.price_paise ? <><span className="dot" /><span>{label} · {rupees(sub.price_paise)}</span></> : null}</p>
-      <h1 className="font-record mt-3 text-[36px] font-bold leading-[1.08] tracking-[-0.015em] text-balance sm:text-[44px]">You&rsquo;re on Plus.</h1>
-      <p className="mt-4 text-[17px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
-        Thank you. Everything below is on from this moment, on every story.
+    <div className="mx-auto grid w-full max-w-[var(--reading)] gap-4 px-[var(--gutter)] pb-24 pt-12 lg:pt-[72px]">
+      <PrismMark size={40} />
+      <h1 className="text-balance" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>You&rsquo;re on Plus.</h1>
+      <p style={{ font: "var(--t-body-l)", color: "var(--ink-2)" }}>
+        Thank you. From now on Ask answers 100 questions a day, drawn from the whole story on a larger model, and stays on when the free box rests.
       </p>
-      <ul className="mt-6 flex flex-col">
-        {[
-          <><b className="font-semibold">100 questions a day</b> — the box no longer rests for you.</>,
-          <>Answers from the <b className="font-semibold">whole story</b>, not one development, on a larger model.</>,
-          <>Ask <b className="font-semibold">stays on</b> when the free box rests.</>,
-        ].map((line, i) => (
-          <li key={i} className="flex items-start gap-2.5 border-t py-3 text-[16px] leading-[1.55]" style={{ borderColor: "var(--line)" }}>
-            <span className="mt-[4px] shrink-0" aria-hidden><Check size={16} /></span>
-            <span>{line}</span>
-          </li>
+      <dl className="grid gap-x-4 gap-y-2.5 pt-3.5 sm:grid-cols-[160px_minmax(0,1fr)]" style={{ borderTop: "1px solid var(--line)", font: "var(--t-body-s)" }}>
+        {facts.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="font-mono text-[11.5px] uppercase tracking-[0.04em] sm:pt-[3px]" style={{ color: "var(--ink-3)" }}>{k}</dt>
+            <dd className="m-0 mb-1.5 sm:mb-0">{v}</dd>
+          </div>
         ))}
-      </ul>
-      <dl className="mt-6 grid gap-x-8 gap-y-3 border-t pt-4 text-[14.5px] sm:grid-cols-2" style={{ borderColor: "var(--line)" }}>
-        <div>
-          <dt className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Next charge</dt>
-          <dd className="mt-1">{renews ?? "Shown on your account shortly"}</dd>
-        </div>
-        <div>
-          <dt className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Receipt</dt>
-          <dd className="mt-1">Razorpay has emailed it{session ? ` to ${session.email}` : ""}.</dd>
-        </div>
-        <div className="sm:col-span-2">
-          <dt className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Changing your mind</dt>
-          <dd className="mt-1">Cancel in one click from your account, any time; you keep Plus to the end of the period you paid for.</dd>
-        </div>
       </dl>
-      <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Link href={next} className="btn btn-primary btn-lg">{next.startsWith("/story/") ? "Back to the story" : "Continue reading"}</Link>
-        <Link href="/account" className="btn btn-ghost">Your account</Link>
+      <div className="mt-2 flex flex-wrap items-center gap-2.5">
+        <Link href={next} className="p-btn p-btn--primary">{next.startsWith("/story/") ? "Back to the story" : "Continue reading"}</Link>
+        <Link href="/account" className="p-btn p-btn--secondary">Your account</Link>
       </div>
     </div>
   );

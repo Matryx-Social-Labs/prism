@@ -1,333 +1,183 @@
 ---
 name: Prism
 description: "Follow the story, not the headlines."
-world: "Spectrum (v4 editorial, 2026-09-21 — tokens 4.0.0; v3 2026-09-18 replaced The Reservation Chart)"
+world: "Design System v2 (2026-09-24, tokens 5.0.0; replaces Spectrum v4). Source: Claude Design project 'Prism Design System' (95aedb30-fd57-40e7-9d01-029b95a54b61)"
 tokens: design/tokens.json
-board: design/board (uv run python design/board/build.py)
+generated: web/src/app/globals.css (uv run python design/gen_css.py; --check in CI)
 colors:
-  # Light (default). Full scale, dark values and roles live in design/tokens.json.
-  bg: "#F6F3EC"
-  surface: "#FCFBF7"
-  sunken: "#ECE9E0"
-  ink: "#171A18"
-  ink-2: "#4E5550"
-  ink-3: "#6C746F"
-  line: "#DCD8CE"
-  line-strong: "#BDB8AD"
-  accent: "#006B62"
-  accent-fill: "#006B62"
-  accent-soft: "#DCEDE9"
-  coverage-national: "#DC9412"
-  coverage-regional: "#E4573D"
-  coverage-intl: "#0E9FB8"
-  coverage-wire: "#68736D"
-  lens-markets: "#0F9D6A"
-  lens-cyber: "#2563EB"
-  lens-health: "#DB2777"
-  lens-policy: "#B7770D"
-  danger: "#D93A2B"
-  up: "#0F9D6A"
-  down: "#D93A2B"
-  bg-dark: "#111512"
-  surface-dark: "#181D19"
-  ink-dark: "#F1EFE8"
-  accent-dark: "#63C8B8"
+  # Light (default). Dark values, data palettes and roles live in design/tokens.json.
+  paper: "#F7F6F2"
+  surface: "#FFFFFF"
+  sunken: "#EEECE6"
+  elevated: "#FFFFFF"
+  ink: "#111317"
+  ink-2: "#3F434A"
+  ink-3: "#5B6069"
+  line: "#DFDDD6"
+  line-strong: "#8E8B82"
+  accent: "#0B57D0"
+  accent-strong: "#0842A0"
+  accent-soft: "#E3ECFB"
+  coverage-national: "#1E3A6E"
+  coverage-intl: "#1583A8"
+  coverage-regional: "#C4470F"
+  coverage-wire: "#767872"
+  lens-markets: "#117A48"
+  lens-cyber: "#7A3FC4"
+  lens-health: "#B8246B"
+  lens-policy: "#8A6100"
+  danger: "#B42318"
+  paper-dark: "#0F1114"
+  surface-dark: "#171A1F"
+  ink-dark: "#F2F1ED"
+  accent-dark: "#8AB4F8"
 typography:
-  display: { fontFamily: "Libre Baskerville, Tiro Devanagari Hindi, Noto Serif Kannada, Noto Serif Tamil, Noto Serif Telugu, serif", fontWeight: 700 }
-  sans: { fontFamily: "IBM Plex Sans, Hind, Hind Siliguri, Hind Vadodara, Hind Mysuru, Hind Madurai, Hind Guntur, system-ui, sans-serif", fontWeight: 400 }
-  mono: { fontFamily: "JetBrains Mono, ui-monospace, Menlo, monospace", fontWeight: 400 }
-rounded: { xs: "2px", sm: "3px", md: "4px", lg: "6px", xl: "8px", pill: "9999px" }
+  record: { fontFamily: "Newsreader, Noto Serif Devanagari/Kannada/Tamil/Telugu/Bengali/Gujarati, Noto Nastaliq Urdu, Georgia, serif", fontWeight: 600, quote: "italic 400" }
+  read: { fontFamily: "Anek Latin, Anek Devanagari/Kannada/Tamil/Telugu/Bangla/Gujarati, Noto Naskh Arabic, system-ui, sans-serif", fontWeight: 400 }
+  mono: { fontFamily: "Geist Mono, ui-monospace, Menlo, monospace", fontWeight: 400 }
+rounded: { record: "2px", control: "8px", sheet: "16px", pill: "9999px" }
 spacing: { 1: "4px", 2: "8px", 3: "12px", 4: "16px", 5: "20px", 6: "24px", 7: "32px", 8: "40px", 9: "48px", 10: "64px" }
 ---
 
-# Design System: Prism — Spectrum
+# Design System: Prism — v2
 
-> **2026-09-21 — tokens 4.0.0, the editorial redesign (Lovable, applied verbatim).**
-> The front matter above and `design/tokens.json` are the truth; the prose below
-> still names the v3 values where it quotes a hex or a face. What changed: accent
-> is deep teal `#006B62` / `#63C8B8` (was violet), the wire slot is grey, the
-> display face is Libre Baskerville 400/700 (headings set bold; there is no 500),
-> the reading face is IBM Plex Sans for Latin with Hind's siblings for Indic
-> glyphs, radii are 2–8px, rows are hairline-separated on a desk and cards on a
-> phone, the page ground is faintly ruled, and a spectrum line sits under the
-> header. Open against the named rules: light `ink-3` on `bg` is 4.34:1 and dark
-> white on `accent-fill` is 4.02:1 (The Floors say 4.5); the header line is a
-> second gradient (The One Gradient Rule); the sign-in and landing eyebrows are
-> set in mono (The Three Jobs Rule). Founder to rule on each.
-
-> The world changed on 2026-09-18. "The Reservation Chart" (Teko / Hind / Martian
-> Mono, monochrome stationery, hairlines-not-cards, 0-radius) is retired. The
-> founder's brief: the product read as dull, readers could not tell what Prism is
-> for, and the mobile web has to become a React Native app without a second design.
-> What survives is the brand, not the costume: the mark, the record-not-verdict
-> principle, verbatim-or-nothing, counted structure, the lens flip, the refusal to
-> enumerate lens names in prose, and the accessibility floors. The Decisions Log at
-> the end carries the whole history forward.
+> **2026-09-24 — Design System v2 (tokens 5.0.0).** Designed in Claude Design (project "Prism Design
+> System"). `design/tokens.json` and the generated block of `web/src/app/globals.css` are the truth for
+> values. The system's own component classes live verbatim in `globals.css` (`.p-*` from its
+> `components/prism.css`, `.sc-*` from its `screens/screens.css`); the older shared classes (`.btn`,
+> `.chip`, `.card`, `.row-card`, `.covbar`, `.status-*` …) are restyled onto the same shapes, so a
+> component not yet rebuilt still paints in v2. Pages designed in v2: Landing, Today, Story (Pages v3),
+> the phone tabs (Stories, Search, Watchlist, You), Plus / Welcome / Account, the labeller workspace and
+> its story-boundary task, and the admin Overview and Controls. Everything else inherits the tokens and
+> classes and is on the missing list sent back to Claude Design.
 
 ## Overview
 
-**Creative North Star: "White light in, spectrum out."**
+Prism reads Indian news from many outlets in many languages and keeps **one record per event**: every
+outlet that reported it, in every language, with **who said what, word for word**, each quote checked
+against its article. A reader can re-read any story through a **lens**. Prism shows the record, not a
+verdict. The product speaks to the reader as *you*; on record surfaces Prism refers to itself as
+*Prism*, never *we* ("we" is allowed in account, legal and email copy).
 
-The mark is a prism: many reports enter as white light and leave as a spectrum.
-That is now the visual grammar of the whole product. The page ground is white
-light — near-white, calm, uncoloured. The **record** (the story) is written in a
-serif on that ground, the way a paper of record would print it. Colour appears
-exactly where the prism does its work: when the coverage of a story is split into
-its parts (the **coverage bar**), when the same facts are re-read through a
-professional **lens**, and on the single brand accent that says "this is
-interactive". Nothing else is coloured. The result should feel like a serious
-newspaper that has been rebuilt as an instrument: quiet ground, confident type,
-and a small set of coloured glyphs that mean something every time they appear.
+## Content rules (binding)
 
-Three things a first-time reader must understand within one screen, without
-reading a manual:
-
-1. **This is one story from many reports** — the coverage bar and the outlet
-   monograms say so on every row.
-2. **Nothing here is invented** — quotes carry the speaker, the outlet, the time and
-   a link to the line; counts are printed as counts; provisional groupings say so.
-3. **I can read it for my work** — the lens control sits on the record, and a
-   locked lens still shows what it would add.
-
-**Key characteristics**
-- One ground, one ink, one accent (violet). Four coverage hues and the lens hues are semantic, discrete, never decorative.
-- Three voices: **Newsreader** for the record (headlines, titles, quotes), **Hind** for everything read or tapped in every Indian script, **JetBrains Mono** for provenance only.
-- Soft geometry: 10–20px radii on cards and sheets, pills for actions and chips, 1px lines for structure. No heavy shadows; one soft shadow for floating sheets.
-- Mobile is the product (bottom tabs, thumb-zone actions, 44px targets, safe areas). Desktop is the same components with room for evidence beside the record.
-- Two signature motions: the **lens flip** (scan line + re-ink behind it, 500–1100ms at a constant 0.9px/ms) and the **coverage bar drawing in** (segments grow left→right, 240ms, staggered 30ms). Reduced motion collapses both.
+- **Counts are counts:** "9 outlets · 2 languages", "4 developments". Below 30 a share is "3 of 4", never
+  "75%"; a change off a small base is "+3 from 4". A figure not yet counted is "—" with "Not counted yet",
+  never 0 and never "no change".
+- **Provisional says so:** "Provisional grouping", "Grouping under review", "One source so far".
+- **Verbatim or nothing:** a quote in its exact words with speaker, outlet, time and "Open at the quote ↗";
+  a translation says "translation"; no paraphrased quotes.
+- **Never list lens names** in generic copy; pickers render the lens API.
+- **No placeholders in the product:** everything on screen is live data or real product copy. The design
+  mocks' ILLUSTRATION banners and sample data never ship; a section with no live data is left out.
+- **Errors in words** ("Today's record could not load") with one way on; empty states worded per filter
+  ("No Politics records today"); busy states replace the words ("Sending…"); no spinners on the record.
+- Sentence case everywhere. CAPS only in mono provenance strips (`UPDATED 12M AGO`) and eyebrow labels.
+  No emoji. Unicode arrows (→ ↗ ←) only inside link text; UI icons come from `web/src/components/icons.tsx`.
+  A middle dot " · " separates facts.
 
 ## The mark
 
-A 24×24 box: an equilateral prism, fill only (no stroke — a stroke put every edge on a fraction and clipped the base), base 20 wide at y 19.5, apex at 2.18; the spectrum a band ATTACHED to the base — its top edge is the base line, no gap (a gap read as a split icon) — exactly the base's width, 2.75 tall, as one continuous spectrum with stops at the coverage bar's four hues (red → amber → cyan → violet). Geometry lives once in `web/src/lib/mark.ts`; the favicon, the share card and the PNG exports (`design/logo/build.py` → `design/logo/exports/`, shareable set at `/brand/*.png`) draw the same numbers. The triangle takes `currentColor`; the band is the only spectrum in the system. Fixed 2026-09-20 after the founder zoomed in on the old base.
+A 24×24 box: an equilateral prism, fill only, base 20 wide at y 19.5, apex at 2.18; the spectrum a band
+attached to the base, exactly its width, 2.75 tall, stops #EF4444 · #F59E0B · #06B6D4 · #8B5CF6. Geometry
+lives once in `web/src/lib/mark.ts`. The triangle takes `currentColor`; the band is the only gradient in
+the product — no background gradients, gradient text or gradient rules anywhere, the header included.
 
 ## Colour
 
-Roles, not hues, are the API. Every consumer reads a semantic token; the hex lives once in `design/tokens.json`.
+Neutral warm paper and carbon ink; colour appears only where the prism "splits light":
+- the **coverage bar** — outlet origin in the fixed slot order English national (navy) · international
+  (blue-green) · Indian-language (orange) · wire (hatched grey); each ≥ 3:1 on paper, neighbours split by
+  hue AND a 2px gap, always with its count beside it;
+- a **lens** — one discrete hue per lens (Markets green, Cyber violet; Health and Policy drafted; further
+  lenses take the next free slot `--lens-slot-5…8`); the Reader lens has no hue;
+- **one interactive accent**, cobalt `#0B57D0` (dark `#8AB4F8`), for links, the primary action, focus and
+  the current nav item.
 
-### Ground and ink
-- **bg** `#FAFAF7` / dark `#0F0F12` — the page. Faintly warm white: "white light".
-- **surface** `#FFFFFF` / `#16161B` — cards, rows, inputs, sheets.
-- **sunken** `#F1F1EC` / `#0B0B0E` — wells, segmented-control tracks, skeletons, monogram fills.
-- **ink** `#15151A` / `#F1F1EE` — headlines, body, primary icons, the Verified pill's fill.
-- **ink-2** `#4B4D57` / `#B3B4BC` — summaries, secondary text, inactive nav.
-- **ink-3** `#6C6F7A` / `#8E909A` — labels, provenance, tertiary text. 4.9:1 on surface; this is the floor for 11px mono.
-- **line** `#E6E6E1` / `#26262E` — card borders, dividers. **line-strong** `#CFCFC8` / `#36363F` — inputs, dashed provisional rules.
+Admin charts may use `--data-1…6` (Okabe–Ito, darkened) and the one-hue ramp `--seq-1…7`; an uncounted
+day or cell is hatched (`--data-uncounted`), never drawn as zero. Colour never carries meaning alone:
+every bar has its count, every pill its word, every dot its label. Floors: body text 4.5:1 on both
+grounds; tertiary ink `#5B6069` is 5.9:1; white on the accent fill 6.4:1.
 
-### Accent — brand violet
-- **accent** `#5B3FE6` / `#A08BF6` — links, active nav and tab, focus ring, selected states, the timeline's "now" dot.
-- **accent-fill** `#6B4EF6` / `#7C5CF0` — the primary button (white text, 4.6:1).
-- **accent-soft** `#EEEAFE` / `#241E45` — selected chip/nav fill, speaker avatars, the hero wash, the quote highlight (`<mark>`).
+## Typography — three voices, three jobs
 
-Violet is the far end of the mark's own spectrum. It is the *only* colour that means "you can act here", and it never appears in a coverage bar or a lens.
+- **Record** — Newsreader (drawn for news, optical sizes) with a Noto Serif per Indic script and Noto
+  Nastaliq for Urdu: headlines, titles, quotes (italic 400) and hero figures, set 600 with −0.02em at
+  display sizes. Never a button or a label.
+- **Reading/UI** — Anek (Ek Type), one Indic-first design across Latin, Devanagari, Kannada, Tamil, Telugu,
+  Bangla and Gujarati, plus Noto Naskh Arabic for Urdu: body, UI, labels, eyebrows (caps, 0.08em). Body
+  floor 14.5px; inputs 16px (no iOS zoom).
+- **Provenance** — Geist Mono, tabular: only times, counts, [n], outlet codes, tickers and CVE ids. Floor
+  11px. Never prose, never a heading.
 
-### Coverage — the prism's work
-A story's reporting is split by **outlet origin**, in this fixed order so adjacent segments never collide for colour-blind readers (validated with the dataviz palette checker, both modes, all six checks):
-
-| Slot | Meaning | Light | Dark |
-|---|---|---|---|
-| `coverage-national` | English-language national outlets | `#DC9412` | `#C48314` |
-| `coverage-intl` | International outlets | `#0E9FB8` | `#1A9DB6` |
-| `coverage-regional` | Indian-language outlets | `#E4573D` | `#E2573E` |
-| `coverage-wire` | Wire / agency (reserved — no agency sources yet) | `#8A6CF2` | `#8A6CF2` |
-
-The amber sits below 3:1 against the page on purpose (it is a fill, not text); every bar therefore carries its count in text beside it — the legend is never colour alone.
-
-### Lenses — the same facts, re-read
-| Lens | Hue | Soft |
-|---|---|---|
-| Reader | ink — the record is neutral, it has no colour | — |
-| Markets | `#0F9D6A` green / `#2CC08A` | `#E3F6EE` / `#12301F` |
-| Cyber | `#2563EB` blue / `#5B8DFF` | `#E6EEFE` / `#15213D` |
-| Health *(drafted)* | `#DB2777` rose / `#F472B6` | `#FCE7F1` / `#3B1528` |
-| Policy *(drafted)* | `#B7770D` amber / `#E0A030` | `#FBF0DC` / `#332611` |
-
-A lens hue appears only on: the selected lens tab's text, the flip's scan line, the small "Markets read" dot on a row, and the lens brief's heading rule. Never on chrome, never as a wash. New lenses take the next unused stop of the spectrum; the picker renders whatever `/api/v1/lenses` returns.
-
-### Status
-- **Verified record** — ink pill with a check. No colour: verification is the default, not an alarm.
-- **Provisional grouping** — dashed `line-strong` outline, `ink-3` text.
-- **Disputed** `#B7770D`, **Corrected** `#D93A2B` — text and a 12% tint; rare by design.
-- **danger / down** `#D93A2B`, **up** `#0F9D6A` — destructive confirms and price moves only.
-
-### Named rules
-**The Prism Rule.** Colour appears where light is split: the coverage bar, a lens, and the one accent. Anything else coloured is re-inked to the neutral scale.
-**The Legend Rule.** No coverage or status is conveyed by colour alone — every bar has its count, every pill has its word, every lens dot has its label.
-**The One Gradient Rule.** The mark's spectrum bar and the landing's dispersion figure are the only gradients. No gradient text, no gradient buttons, no tinted photos.
-
-## Typography
-
-**Display: Newsreader** (variable, optical sizes 6–72, weights 400–600, italics). Falls through per script to Tiro Devanagari Hindi, Noto Serif Kannada / Tamil / Telugu (loaded through next/font, unicode-ranged, not preloaded: fetched only when a glyph needs them), then Georgia. Bengali and Gujarati are not loaded yet — add their Noto Serif when a source in those scripts is added.
-**Sans: Hind** with Hind Siliguri (Bengali), Vadodara (Gujarati), Mysuru (Kannada), Madurai (Tamil), Guntur (Telugu), then `system-ui`.
-**Mono: JetBrains Mono** 400/500, `font-variant-numeric: tabular-nums` everywhere.
-
-**Character:** a paper of record set on an instrument. Newsreader was drawn for on-screen news reading and has real optical sizes, so a 60px promise and a 19px row headline come from one voice. Hind keeps five Indian scripts on one baseline so a Kannada row and an English row read as one page. JetBrains Mono is narrow enough for a time and a count to sit in a 26px monogram row without wrapping.
-
-### Scale (mobile → desktop)
-| Token | Voice | Size | Line | Weight | Where |
-|---|---|---|---|---|---|
-| display-xl | Newsreader | 40 → 60 | 1.05 | 500, −0.02em | landing promise |
-| display-l | Newsreader | 30 → 38 | 1.12 | 500, −0.015em | story title, measure 28ch so a 60–70 character headline sets in two lines of the 640 column |
-| display-m | Newsreader | 24 → 30 | 1.2 | 500 | lead row, section titles (Today, The record) |
-| title | Newsreader | 19 → 20 | 1.3 | 500 | every story row headline |
-| quote | Newsreader italic | 17 → 18 | 1.5 | 400 | verbatim quotes only |
-| body | Hind | 16 | 1.6 | 400 | record text, summaries on the story |
-| body-s | Hind | 14.5 | 1.55 | 400 | row summaries, hints, legends |
-| ui | Hind | 14 | 1.4 | 500–600 | buttons, tabs, chips, nav |
-| label | Hind | 12.5 | 1.4 | 500–600, +0.06em, caps | card headings, eyebrows |
-| mono | JetBrains Mono | 12 | 1.5 | 400, +0.02em | times, "5 outlets · 15 reports" |
-| mono-s | JetBrains Mono | 11 | 1.5 | 400, +0.03em, caps | row meta line — the floor |
-
-### Named rules
-**The Three Jobs Rule (kept).** Newsreader never sets a button, a label or running UI; JetBrains Mono never sets prose or a heading; Hind sets everything a reader taps or reads at length. A word in the wrong voice is a bug.
-**The Floors (kept).** 11px mono, 14.5px body, 16px in inputs (iOS zoom), 4.5:1 on both grounds, 44px targets.
-**The Measure Rule.** Reading copy 44–68 characters; the reading column is 640px and never grows with the viewport — width buys evidence beside the record, not longer lines.
+Scale (phone → desk ≥1024): display-xl 44/72, display-l 30/42, display-m 23/28, title 18/20, title-s 16.5,
+quote 18/19, body-l 17/18, body 16, body-s 14.5, ui 15, ui-s 13.5, label 12.5, mono 12, mono-s 11 —
+generated as `--t-*` font shorthands. All faces load through `next/font` on `<html>` (self-hosted; the
+Indic faces are unicode-ranged and fetched only when a glyph needs them). Not yet covered by a face:
+Gurmukhi, Malayalam and Odia (system fallback) — on the Claude Design missing list.
 
 ## Layout
 
-**Shell** 1360px, gutters 16 / 24 / 32px. **Breakpoints** are Tailwind's: the product switches from phone to desktop at `lg` (1024px); `sm` (640px) only widens type.
+4px spacing scale. The reading column is 640px and never grows; width buys evidence beside the record: a
+left rail (220 → 240 at ≥1536), an evidence rail (320 → 380), and two story columns on Today's desk. Top
+bar 60 (desk), masthead 52 and tab bar 58 (phone), touch targets 44+, gutter 16 / 24 / 32. Fixed chrome:
+the top bar or masthead (sticky, paper at 92% with a 12px blur) and the phone tab bar — or, on a story, the
+story's own Ask · Share bar so the two never overlap. No page scrolls sideways at any width.
 
-**Phone (the future app):** masthead 52px (mark + wordmark, dateline in mono, theme) · subject chips 34px in a horizontal rail · content · bottom tab bar 56px + safe-area inset. The story page swaps the masthead for a back bar and pins Follow · Ask · Share in the thumb zone above the tab bar.
+## Shape, rules and state
 
-**Rails scroll with the page**: a right rail that fits the viewport holds at the top; one taller than it (thirty reports) scrolls with the page until its own end is in view and holds there (`Rail`), so nothing in it waits for the column to run out. **Desktop:** top bar 60px (mark + wordmark, Today · Stories · Pulse · Watchlist, a visible 260px search field with `/`, theme, Sign in or the avatar; the primary pill appears only on the landing) · a three-column grid: left rail 220px (subjects on Today/Stories/Search; "On this story" on a record) · main column · right rail 300px (Developing over days on Today; Reports + Named entities on a record). Rails are sticky under the top bar. **The right rail waits for 1280px** (`xl`); from 1024 the grid is two columns, the record keeps its 640 measure and the rail's content sits inline as on the phone. At 1024 with three columns the reading column was 360px: a five-line headline and an 80px photo tile.
-
-**A wide desk (≥1536px)** grows the shell to 1600 (1760 at ≥1920) and the rails with it — left 240, evidence 360 (400) — and the chart runs in **two columns** with the lead across both; the reading measure stays 640. Width buys simultaneity, never longer lines (founder, 2026-09-20: the desktop was not using the screen).
-
-**Vertical rhythm** is the 4px scale: rows are 12px apart; cards pad 14–20px; sections on a record are 22px blocks separated by a `line`.
+Records are cut square (2px), controls are pressed (8px), sheets are held (16px); pills only for the chips
+that filter. Sections sit under a 3px ink rule, newspaper style; the lead row carries the same rule.
+State is line form: solid = verified; dashed = provisional or one source; faded (62%) = stale; dashed +
+hatched = not counted. Shadows are almost none: `--shadow-1` marks a selected segment, `--shadow-2` is
+for sheets, drawers, popovers and toasts. No card lift on hover.
 
 ## Components
 
-### Story row (`.row`)
-The unit of the product, identical on Today, Stories, Search, Watchlist and the landing's live proof. A `surface` card, `line` border, 10px radius, 14/16px padding; the lead row pads 20/18px and sets its title at 26–30px. Inside, top to bottom:
-1. **Meta** (mono-s caps): subject or region · time since last report · languages when more than one.
-2. **Title** (title voice).
-3. **What changed** (body-s, ink-2, two lines max).
-4. **Foot**: outlet monograms (max 3 + "+N") · **coverage bar** with its text ("9 outlets · 2 languages") · spacer · lens dot ("Markets read") when the story earns one.
-A single-source row has a dashed border. A row carries the report's photograph as a credited thumbnail when one exists (§ Images; Decisions, 2026-09-20).
+The system's components (Claude Design `components/<group>/`) and their app homes: chrome (TopBar =
+`SiteHeader` + `HeaderNav`, `Masthead`, `BottomTabBar`, `SectionHead` = `.p-sechead`, SubjectNav,
+ScopeChips, StepIndicator, ThemeToggle, SkipLink, the Footer in the root layout); record (`ChartRow` =
+StoryRow, `StoryCard`, `Coverage` = CoverageBar / Legend / OutletStack, `StatusPill`, MetaLine `.p-meta`,
+QuoteCard, ReportCard, ChangeTimeline, ImpactRow, EntityMark, LangTag, TickerChip, CveChips); lens
+(LensSwitch, LensBrief with the flip, BriefPlayer); ask (AskBar, AskAnswer, AskPanel, AskLimitNote,
+StoryActionBar, SelectionAskChip); media (PhotoDeck / PhotoPile, PodcastClip, XPostCard, `PhotoImg`);
+structure (RouteMap, BranchTree, AttentionChart, MarketDigest, RelatedStories, RouteCard); money
+(PricingCard, BillingSwitch, CompareTable, FaqItem, TrustLine, PlanCard in 8 states, PaymentRow,
+CancelSheet, UpgradeSheet); label (TaskHeader, CandidateRow, AnswerButtons, BatchRow, QualifyRow, Verdict,
+GuideInShort, QuoteInContext, ResultScreen); admin (KpiTile, ChartPanel, TrendChart, StackedBars,
+RankedBars, DotPlot, Funnel, CohortGrid, NeedsYou, SwitchRow, AuditItem, DataTable, FilterSwitch, KofNBar,
+NetworkFrame); ui (Button, Chip, Segmented, TextField, SelectField, Checkbox, ToggleRow, Alert, Toast,
+Sheet, Skeleton, EmptyState, OnThisPage, SystemPage for 404 / error / offline).
 
-### Coverage bar (`.covbar`)
-Segments in the fixed slot order, 2px gaps, 6px tall on rows and 8px on a record, rounded ends; total width 72px on rows, 120–240px on a record; each segment's width is proportional to its count, minimum 4px. Always followed by mono text with the count. Draws in left→right on first paint.
+### The story record (sections in this order)
 
-### Monogram (`.mono-av`)
-26px circle, `sunken` fill, 2px `surface` ring and 1px `line` halo, two-letter outlet code in Hind 600 9.5px. Stacks overlap by 7px. Codes come from the source registry, never from initials computed at render (The Hindu = TH, Hindustan Times = HT).
-
-### Status pill (`.status`)
-24px pill, 12px Hind 600. Verified: ink fill, check icon. Provisional: dashed outline. Corrected/Disputed: 12% tint of their hue.
-
-### Subject navigation
-Phone: pill chips in a scrolling rail, the active chip inverted (ink fill). Desktop: the left rail, 40px items with the mono code in a 28px column, active item `accent-soft` fill with `accent` text. One DOM per breakpoint, never both rendered.
-
-### Buttons
-- **Primary** pill, `accent-fill`, white text, 40px (48px `.btn-lg`). One per screen: Follow story on a record, Open today's record on the landing, Save on forms.
-- **Secondary** pill, `surface` fill, `line-strong` border. **Ghost** text only. **Icon** 38px round.
-- Hover: 5% darker or `sunken`; active: 1px down; all 160ms.
-
-### Lens control (`.seg`)
-A segmented control on a `sunken` track, 34px pills; the selected pill is `surface` with shadow-1 and the lens hue for its text; locked lenses show a 13px lock at 55% and still flip. Lives on the record header (desktop, right of the actions) and directly above the record text on the phone. Keyboard 1/2/3 on desktop.
-
-### Record header
-Status pill · updated time · subject, then the title (display-l), the summary (17px ink-2, 62ch), the monogram stack + large coverage bar + text ("5 of 27 monitored outlets · 15 reports · English · checked 4m ago" — the count out of the monitored set, linking `/sources`; an older payload without the set's size prints the bare count), a "Single source · not yet corroborated" provisional pill when one outlet has it, then the action row. Follow is the primary; Share is secondary; Ask has no button in the header — the bar rides the foot of the viewport on a desk and sits in the thumb zone on the phone.
-
-### Record sections (in this order, always)
-**The record** (the Reader brief, 16.5px, with "What to watch" bullets; its hint says it is written by software and that "why it matters" is Prism's reading) → **What changed** (timeline: accent "now" dot, then ink dots on a `line-strong` spine; mono time · outlet, serif headline) → **Who said what** (quote cards) → **Heard on** (podcast clips, when any) → **On X** (the official accounts' posts, when any) → **Coverage** (large bar, legend with counts, entities, the report list on the phone) → **Why it matters** (impacts) → **Corrections and versions** (each correction as a mono line of date · reason in words over its note; "Earlier versions of this record" loads every replaced headline and free brief on request; a corrected record also carries a `corrected` status pill in the header linking here) → **Something wrong?** (four structured reports as 44px text links on hairlines — a fact is wrong · a quote is not in the article · an outlet says something different · an outlet that covered this is missing — each a mailto carrying the record's address until a corrections queue exists; never comments) → **Ask** (input pill + suggested questions). The desktop left rail lists the same six with counts; the right rail holds Reports and Named in the reports.
-
-### Entity marks (`.ent`)
-The story's named entities, marked in the record's prose — the summary, the brief, the watch points. A mark is ink text with a 1.5px underline in the accent at 55%, lifting to `accent-soft` on hover and focus; never blue text, never bold. One mark per entity per passage (its first mention), longest name first, whole words, case-sensitive for names under four letters ("US" never marks "us"); the text is never altered. Hover or focus (desktop) and tap (touch) open a 260px card anchored under the mark: the name · its kind (Person, Government, Company…), "Quoted N times on this story ↓" when the entity spoke, and one action, "All stories about X →". A second tap follows the action; Escape and an outside tap close it. Quotes are never marked — verbatim text stays visually verbatim.
-
-### Report card (`.row-card`, compact)
-One report as the reader sees it: the outlet's icon (its own favicon, 20–28px in the monogram disc, the monogram as fallback) and name, when it published (relative time, mono), the headline the outlet wrote (Hind 500, three lines), and a foot of `[n]` · origin (English national, Indian-language, International) · funding label when known. The whole card opens the article. Cards stack in the desktop evidence rail (compact) and under Coverage on the phone (eight, then "All N reports"). The same reports appear in "What changed" as a timeline — the sequence view — with the outlet icon and time on each row.
-
-### Images (`ReportImages`, card thumbnails)
-Prism has no photographs of its own. An outlet's photograph appears only **credited** — the outlet's icon on the image, the alt text naming whose it is — and only as the report's own picture: (1) **on a story row** (founder, 2026-09-20: a picture is what makes a reader tap one story rather than read every line) as a thumbnail on the right of the row, across the top of the lead on the phone and beside it on a desk; (2) **on the record** as the **photo deck** under the header: one stage (16:10 on the phone, 2:1 on a desk, the reading measure wide) showing one outlet's picture with its credit bar and "Open report ↗", the others fanned behind it as a stack, a filmstrip of all of them on a desk, native swipe on the phone; prev/next arrows and the keyboard step it, a mono "2 / 5" counts it, and it never advances on its own; (3) **on a Stories row** as a **photo pile**: up to three of the story's developments' photographs, newest in front and credited; the pile *settles* into its fan as the row comes into view (480ms on a spring, staggered, once), a hover on a desk spreads it further, each photograph fades in as it loads, "+N" counts the rest; (3b) **on a story page** the same photo deck as the record, and a **Who reported it** rail of outlets with their report counts; (4) a 64px thumbnail on a report card. **Placeholders are not photographs**: an outlet's logo or a stock district shot (The Hindu's og-image on 363 reports in a fortnight, TOI's generic msid on 87) is recognised by repetition — the same hash on four or more reports in 14 days — and never shown as a story's picture (`common/images.placeholder_hashes`); a row with no real picture keeps its shape. Every tile opens the report it came from; the outlet's icon and "Photo: <outlet>" sit on the image itself (no badge: the tile is the link), and the alt text says whose photo it is. Images are hotlinked with `referrerpolicy=no-referrer`, never proxied or resized by us, never the share card, never the JSON-LD image, never a row's hero. `NEXT_PUBLIC_REPORT_IMAGES=0` removes every one of them: the right to even this much is not settled in India (legal note, 2026-09-18), and the design must survive without them.
-
-### Quote card (`.quote`)
-`surface`, 14px radius: speaker avatar (accent-soft, initials) + name + their role on a line under the name ("Vice President of the United States") + "quoted in N outlets"; the quote in Newsreader italic 17.5px; outlet pill · time · "Open at the quote ↗" (text fragment link); an "In the article" disclosure that prints the surrounding sentence with the quote in `accent-soft` `<mark>`.
-
-The role is printed only when the article's own words support it (`enrichment/claims.faithful_role`: every content word present, no brackets or clauses, title-length; an English role on a Hindi article is unverifiable). No role is better than a plausible one — same rule as the quotes: verbatim or absent.
-
-**The language belongs on the quote for the same reason the role does.** Verbatim is checked against the ARTICLE, not against the speaker, so an outlet writing in its own language prints a translation and it passes the check perfectly; speaker names are canonicalised to English, so that translation lands on the same card as the original. When a card holds more than one language, every quote carries its language beside the outlet in the provenance voice (`ಕನ್ನಡ · Prajavani`) and the sub-line counts them the way the coverage bar does ("4 quotes · 3 outlets · 2 languages"). The label says what was PRINTED and never which was spoken — Prism often holds neither original, as with an Italian prime minister read in English and Kannada. No language can be pushed out of the two-quote fold: the API rotates them, and a signed-in reader's own language leads that rotation with the other rendering beside it, never instead of it (founder, 2026-09-23). The share card's honesty line names it too: VERBATIM IN KANNADA · outlet · date.
-
-**One statement printed twice is one quote** (founder, 2026-09-23). When a statement appears in two languages the card shows it once — the reader's language leading — with the other rendering beside it on a `line-strong` left rule in the record voice at 15px, headed in the reading voice by the one thing Prism knows without asking anyone: "The same statement in 2 languages. At most one is the words as spoken." The fold counts statements. A quote shown to be the outlet's own translation carries `ಕನ್ನಡ translation` in the provenance voice even alone on its card, and its share card reads TRANSLATED INTO KANNADA BY <OUTLET> — the word VERBATIM is never printed over it. Prism never prints which language was spoken; a model may only take a claim away (D-quote-4).
-
-### Podcast clip (`.clip`)
-"Heard on", between *Who said what* and the route, only when a clip exists (the section never advertises absence). A `card` with one control — a 44px ink play disc — beside the show's art (24px, monogram-disc fallback with a headphones glyph), the show's name (Hind 600), its publisher, the episode's age (mono) and `TRANSCRIPT 2:00–3:00` (mono caps). The body is the transcript of that stretch alone in the reading voice at 16px: no written title, the first sentence is the headline, no cleanup beyond punctuation. Words sit in `ink-3` and ink to `ink` as they are spoken; a 2px ink progress rule runs under the text (clips are evidence, never a lens hue). The foot names the episode, links *Full episode ↗* to the publisher's page, and offers *Keep listening*, which lets the episode run on past the clip.
-
-One `<audio>` per section, playing the publisher's own file (`preload=none`, never proxied, never ours). Play seeks to the clip; at its end the queue advances to the next card after 400ms, across episodes, then stops. ← → move between clips. While something plays, a `glass` bar rides above the thumb zone on the phone (bottom of the reading column on desktop) with the art, the show and publisher, the clock, pause and next; the Media Session names the show and publisher on the lock screen. Hosts stitch ads in per request, so the player compares the loaded file's duration with the one we transcribed and shifts the seek and the read-along by the difference (`clipShift`). `NEXT_PUBLIC_PODCAST_CLIPS=0` removes the section and the row line.
-
-**On the record**, the clips are a rail of compact cards (show art 40, show name, publisher · time, the round play button, the episode title in two lines, a progress line with the clip's length in mono) and, under them, ONE **transcript window** for the clip in view — a few lines tall, scrolling on its own to keep the word being spoken in the middle, the whole transcript in ink and the words already said stepped back; a reader who scrolls it takes the wheel for four seconds. Never the whole transcript spilled down the page (founder, 2026-09-21). Feed rows carry `Heard on N shows` (mono, headphones glyph) after the coverage bar when a clip exists. Never the audio on a row, never a clip in the share card or JSON-LD. The **now-playing bar** floats above the thumb zone on the phone; on a desk it docks into the record's foot, above the Ask bar, riding the viewport with it — never over the Ask drawer.
-
-### X post
-"On X", after *Heard on*, only when an attached post exists (the section never advertises absence). What the official accounts — the ministry, the regulator, the exchange, the press office — said about this story, as written. Signal, not coverage: none of it is in the report list, none of it counts among the outlets, and it never reaches a feed row, the share card or JSON-LD.
-
-Each post is a unit on a hairline: the account's avatar (24px, greyscale — chrome is monochrome; an initial disc in `accent-soft` when there is none), the account's name (Hind 600, `ink-2`) and `@handle` (mono, `ink-3`), all three linking to the profile; the X mark from `icons.tsx` at the right; the post's words below, in the reading voice at 15px, never truncated, never "smartened", line breaks kept; a foot of the post's age (mono, linking to the post) and *View on X ↗* in the accent. That is X's own rule for a post shown off-platform (author, unaltered text, time → permalink, the logo, a way back) and it is also ours. When the earliest attached post precedes the earliest report's own clock, one mono line above the rows says so: `First on X · @handle · 4h ago` — the only place the record admits X was earlier, and never for a post that merely links a report we hold. `NEXT_PUBLIC_X_POSTS=0` removes the section; `PRISM_X_ENABLED` on the API removes the payload.
-
-### Ask
-One sheet, four ways in. **The bar**: a 44px input pill with a round ink send button, the last block of the record; on a desk it is `sticky` at the viewport's foot so it rides down the whole record and docks under "Ask this story" when the reader arrives — one input, never two, and it leaves while the sheet is open. The three suggested questions show as outline chips only while the bar is focused and empty. **A selection**: select a line of the brief or a quote and an ink "Ask about this" chip appears over it; the line is quoted into the question (`About this line: “…” —`). **A quote card**: "Ask about this quote" prefills the quote and speaker. **An entity card**: "Ask about {name} on this story". **The sheet** (`AskPanel`): on the phone a bottom sheet to 86% over a scrim; on a desk a 420px drawer on the right under the top bar, so the record stays readable beside the answer (220ms from its edge; reduced motion places it). **Every answer has the same anatomy**: the prose (2–5 sentences, each ending in its `[n]` mono chips, which open the cited report) · one table when the question asks for one (timeline · who said what · how outlets differ · numbers; hairline rows, figures and dates in mono, quotes in the record voice) · **Not in the reports**, one mono-labelled line naming what the question asked that the sources do not say · the reports used. Before the first question the sheet also shows **Dig deeper** — Timeline · Every quote · How outlets differ — three chips under a mono label, each answered as a table. Up to three follow-ups the sources can answer take the **suggestion row above the input** once an answer has landed — the row changes, the answer does not grow chips (founder, 2026-09-20). The table, the gap and the follow-ups arrive whole after the prose has streamed (`agent/structure.py`); a reader never watches JSON type. A refusal ("Not in sources") and a limit ("Limit", with the one action that helps: sign in, or wait) are first-class states, never an error colour. Nothing about the question ever reaches analytics.
-
-### Plus (pricing, `/plus`) and the upgrade sheet
-The one marketing page besides the landing, so it may use cards. The shape every subscription page a reader already knows, built from the product's own parts: a centred hero (mono meta line "Prism Plus · launch offer …", display-l headline, one-sentence lede), the `.seg` control for Monthly / Yearly with the saving computed from the API's two prices, three `.card`s side by side — Free · **Plus** (ink border, shadow-2, a mono "Recommended" tag; first on the phone, centre on a desk) · Founding member (dashed when the seats are gone) — each with the plan name as a caps label, the price in Newsreader 40px with the period in mono, one mono line of fine print, ONE action, then feature rows on hairlines with `Check` / `Dash` icons. Below: "Side by side" (a two-column table on hairlines), "Before you pay" (six `<details>` on hairlines), one repeat of the primary, and the trust line (Razorpay · GST included · cancel any time · Refund policy). Free is the only card whose action is secondary; Founding's is secondary; Plus carries the page's primary. States: a stranger's buttons read "Sign in to continue"; before the payment keys exist every action is the mono "Opens soon" (never a dead button); on Plus the actions become "Your plan" and the account is linked. Every figure is the API's or a cap the server enforces; the saving and the per-month figure are arithmetic on them.
-
-**The upgrade sheet** (`UpgradeSheet`) is how a limit is met: a bottom sheet on the phone, a 440px centred dialog on a desk (220ms from its edge; reduced motion places it), over a scrim, with Escape/scrim/close all working. Mono meta line with the count ("10 of 10 today"), a counted headline in the record voice ("You've asked today's 10."), three benefit rows with `Check`, the primary with the price of the day ("Get Plus · ₹149 a month" — paid in place for a signed-in reader, "Sign in to get Plus" for a stranger, with the way back), a ghost "All plans →", one line of small print. Entry points: Ask's limit note (free account at its cap; the daily rest), the header's quiet "Plus" ghost link for anyone not on Plus, the account page's plan row, the footer. `?from=` names the door for analytics; nothing about the reader goes with it.
-
-### Legal pages (`/privacy`, `/terms`, `/refunds`)
-A policy in the record's own shape, so it reads as part of the product rather than a wall of prose (founder, 2026-09-21). The story page's three columns: **On this page** in the left rail, the section being read marked in accent (the same scroll-spy as "On this story"); the text at the reading measure — mono meta line (`Policy · Last changed <date>`), display-l title, the lede, then each section on a hairline with its heading in the record voice and, under it, **In short**: the section in one plain sentence with a mono label, so a reader who will not read the paragraphs still leaves knowing the rule; the right rail holds the whole document in three or four plain lines ("In short", with `Check` marks), who is behind it with the contact in mono, and the other policies. On the phone the sections become a chip rail under the title and "In short" moves above the text. Lists are dots on hairlines, never cards in the column. Every date is mono; nothing is coloured but the active section and links.
-
-### Account and the subscription's life
-`/account`: the email in mono under the title, then **Your plan** first (it is why most people come), then **Payments** (only once there is a charge), then the record (profile, watchlist, theme) and the door out, as hairline-divided rows in one card each. The **plan card** (`PlanCard`) speaks every state in one line and offers one action: *Free* — "Get Plus"; *active* — the plan's name, its price in mono, "Renews <date>", **Cancel** (and **Refund** while the window is open, with a mono line naming the day it closes); *ending* — "Ends <date> · no further charges" (or "· then Plus · yearly from <date>" when one is scheduled), no action; *paused* — "Paused · Plus stays on until <paid date> · resumes <date> on its own" and **Resume now**; *past due* — "The last charge did not go through · Plus stays on until <date> while Razorpay retries", and "Check your email"; *halted* — paused after failed charges, reading stays free; *refunded* — the amount, the day Plus ended, when the money lands; *lapsed* — "Your Plus ended on <date>" and "Get Plus". Under it, in small print, where receipts come from. The same card, compact, sits in the account section of `/you`.
-
-**Cancelling** is never harder than subscribing was (India's CCPA dark-pattern guidelines, 2023, name the "subscription trap"; California's 2025 rule allows one retention offer, shown with the exit). A yearly plan confirms inline — one click, one confirmation naming the date access runs to, "Keep Plus" beside it. A monthly plan opens the **cancel sheet** (`CancelSheet`, the upgrade sheet's frame): the truth first ("Cancelling stops the next charge. You keep Plus until <date> — nothing is taken back"), an *optional* reason as four chips, then ONE offer matched to the reason — **Take a break instead?** (1 · 2 · 3 months on a `.seg`; Razorpay pauses at once, the paid month runs out, the worker resumes it on the day) for "not using it" and by default; **Yearly is ₹N a month** with the saving computed from the two prices, starting the day the month ends so nothing is charged twice, for "too expensive"; a one-line text box and no offer for "missing something" — and **Cancel anyway** on the same row at the same size as the offer's button, always enabled. Never two offers, never a hidden exit, never a discount (Razorpay cannot attach one to a UPI mandate, and the data says a pause keeps more readers anyway). The small print says so: "One click, any time · no calls, no forms".
-
-**The refund** (Refund policy: seven days from any yearly or founding charge) is the same one click: "Refund" on the card, one confirmation naming the amount, the method it returns to and that Plus ends now; Razorpay refunds the latest paid invoice's payment in full at normal speed (5–7 working days), the row records the `rfnd_…`, the subscription is cancelled at once, and the email carries the reference. Outside the window the button is simply absent; the policy page says the same thing in the same words.
-
-**Dates about money are the Indian calendar day.** Razorpay charges, invoices and retries on IST — a cycle ends at 00:00 IST — so "Renews", "Ends", "Paused until", "Refund open until", the payments list and every billing email print the IST date (`lib/dateline.billingDay`, `common/billing_emails._day`), the same words as the receipt in the reader's inbox; a device outside India sees the mono **IST** tag after the date (the founder paid from Berlin at 20:50 on the 20th, was charged on the 21st, and the card said the 20th, 2026-09-21). The product's other clock is the same one: datelines and story times are IST and say so. The Ask allowance is a rolling 24 hours, so it needs no calendar at all.
-
-**Payments** (`Payments`): every charge on hairlines — the date in mono, the plan, the amount in tabular mono, PAID or REFUNDED as a mono word, and "Invoice ↗" to Razorpay's hosted invoice (view, download as PDF). Read live from Razorpay so it never disagrees with the receipt in the reader's inbox; a reader who has never paid sees no section at all.
-
-**The moment of paying** (`/plus/welcome`): a stranger who signs in from `/plus` comes back to `/plus`; the payment happens in Razorpay's sheet over ours, with the account's email prefilled and **locked** (Razorpay builds its customer, and addresses every invoice, from what is typed there — an address changed in the sheet sent the receipts elsewhere, 2026-09-21); a declined card is said beside the plan and the sheet stays open — the flow ends only when the sheet is closed unpaid; the verified callback lands on **You're on Plus.** — the plan and price in the meta line, three lines of what changed, next charge · receipt · how to change your mind as a mono-labelled list, and one primary back to what they were reading. The row is kept true three ways — the verified callback, the webhook, an hourly reconcile against Razorpay — so a missed webhook never leaves a paying reader on Free.
-
-### Email
-Every email the product sends — the sign-in link, and the subscription's moments: welcome · a charge failed · cancel scheduled · paused · back on · yearly scheduled · ended / will not renew · refunded (`common/email_templates.shell`, `common/billing_emails`) — is one shape in the record's own voices, inline-styled for mail clients: a 520px card on the paper's ground, **masthead** (the mark as a PNG and "Prism" in Newsreader, the host in mono on the right, a hairline under), a **mono meta line** (plan · price · date, or "Sign in · one-time link · 15 min"), the **title** in Newsreader 500 at 28px, the paragraphs in Hind at 16px in ink-2, a **facts list** on hairlines with mono labels (Next charge · Receipt · Plus ends · Refund · Reaches you), **one** pill button in accent-fill, a hairline, and in mono why the reader got it, then "Prism · Prism Media Intelligence LLP · Follow the story, not the headlines." Web fonts are asked for once (`@import`; Apple Mail sets them, Gmail falls to Georgia / the system sans / the system mono); `color-scheme: light` asks clients not to invent a dark mode. The Prism Rule holds in the inbox: no colour but the one button and the spectrum in the mark — the old three-hue bar across the top was a gradient by another name and is gone. Plain text always travels with the HTML and says the same things in the same order. Razorpay sends the receipt and invoice for every charge; ours say what changed on Prism and what to do next, never a second receipt.
-
-### Share cards (OG images, 1200 × 630)
-The record's header at poster scale, in the record's own voices — Newsreader for the headline, Hind for the summary, JetBrains Mono for every label — on the paper's warm white: masthead (the mark and "Prism", the host in mono on the right) · a mono meta line (subject · date · N quotes) · the headline (60px, stepping down to 52/46 for long ones, at most three lines) · the summary (26px, ink-2) · a rule · the **coverage bar in the outlets' slot colours** with its count on the left and the headline's provenance ("Headline by Prism · from N reports") on the right. A story's card is the same shape with the kicker STORY, the developments and days in the meta line and the cast as the summary. **The quote card** (`/story/<id>/quote/<n>`, the Share on every quote) sets one verbatim sentence in Newsreader italic (52/44/38px by length), the speaker in Hind 600 with their role beside it, the record's headline small beneath, and the honesty line in mono at the foot: VERBATIM · outlet · date. The site card carries the promise and the coverage bar's three origins named. Never a photograph, never a colour but the bar and the mark; every glyph the card draws is in the font subset it fetches (`lib/ogFonts`).
-
-### Cards and rails (`.card`)
-`surface`, 14px radius, 16px padding, a 12.5px caps heading in `ink-3`. Used only in the desktop rails and on the landing; the main column is rows and blocks.
-
-### Forms (You, Onboarding, Sign in, Account, Interests)
-One shell, 640px: 14px 500 labels above 48px `surface` inputs with `line-strong` borders and 10px radius; hints 13.5px `ink-3`; the primary pill on the right of a sticky footer; errors in `danger` beside the field. Sector and lens pickers are chips; the lens picker is the one place a chip carries a lens hue.
-
-### Landing
-A product page built from the product's own components: the promise (display-xl) with the **dispersion figure** (outlet monograms → the mark → four spectrum strands → the real live story row), three proof cards each running a real component on real data (timeline, quote card, coverage bar), the lens flip on a real record, an honest **Available now / In validation / Next** grid, one final call. No device mockups, no stock photography, no numbers that are not counted.
-
-### Empty, loading, error
-Skeletons are `sunken` bars in the exact geometry of the row (no spinner on the chart). Empty states say what would be here and offer the one action that fills it. Errors are one sentence in `danger` with a retry.
+Header: status pill · updated · subject, the title (display-l), the summary with entity marks, the counted
+stats (outlets, languages, reports, quotes, developments — each jumps to its section), the hero coverage
+bar, the credited photo deck. Then **Brief** (lens switch "Read it as", the brief, Listen) → **What
+changed** → **Who said what** → **Heard on** → **On X** → **How it unfolded** (route map + attention) →
+**Why it matters** → **Coverage** → the record's own extras (corrections and versions, "Something
+wrong?", related stories) → **Ask**. A section with no data is absent, never empty. Desk: "On this story"
+left nav with scroll-spy and counts; evidence rail with Reports and Named in the reports. Phone: back bar,
+sticky section tabs, read-progress line, the Ask · Share bar in the thumb zone.
 
 ## Motion
 
-- **micro** 160ms, **standard** 240ms, easing `cubic-bezier(.2,.7,.2,1)`.
-- **The lens flip (kept):** a 2px scan line in the lens hue sweeps the lens block top→bottom while the text re-inks *behind* it (a veil in the ground colour lifts on the same clock, so line and ink never separate); the clock is the block's height at ~0.9px/ms, clamped 500–1100ms (`lib/motion.flipDuration`), so a five-point brief is swept at the same pace as a three-line locked box. Layout never moves. Reduced motion: instant swap.
-- **Coverage bar:** segments scale from 0 on first paint, 240ms, 30ms stagger. Once per page load, never on re-sort.
-- Rows print in with a 40ms stagger (kept). No parallax, no scroll-jacking, no looping animation anywhere.
+Quiet by default: micro 140ms, standard 220ms, ease `cubic-bezier(.2,.7,.2,1)`. Rows print in (200ms,
+40ms stagger); blocks reveal once on first view; the hero coverage bar draws in once; sheets arrive from
+their edge. **Images:** a publisher photo fades in over its sunken placeholder (320ms) with the credit
+already on it; the story's photo deck advances in 480ms `cubic-bezier(.2,.8,.2,1)` — the front photo
+leaves sideways with a 5° tilt as the next rises from 94% — and follows a drag at 1° per 40px (past 60px
+advances, else springs back); a photo pile fans in once on a 480ms spring with a 60ms stagger and spreads
+on hover. **The lens flip** is the only signature motion: a 2px scan line in the lens hue sweeps the brief
+while a paper veil lifts on the same clock, paced by the block's height (900–1800ms); never a crossfade,
+and layout never moves. Reduced motion collapses everything to an instant change.
 
 ## Do's and Don'ts
 
-### Do
-- **Do** put the coverage bar and its count on every story row; it is how a reader learns what Prism is without being told.
-- **Do** keep the record neutral: Reader is ink; colour arrives with a lens or a coverage split.
-- **Do** keep one primary pill per screen and give it the screen's one job (Follow, Open, Save).
-- **Do** print counts as counts, quote verbatim or not at all, and mark provisional groupings in words.
-- **Do** design every phone screen as an app screen: bottom tabs, thumb-zone actions, 44px targets, `100dvh`, safe-area insets.
-- **Do** identify an outlet by its own favicon (nominative — the way a byline names a paper) with the registry monogram as the fallback; never a publisher's photographs.
-- **Do** render whatever `/api/v1/lenses` returns and never name lenses in generic copy.
-
-### Don't
-- **Don't** present a publisher's photograph as Prism's: never on a row, a share card or in JSON-LD, never proxied. Only as a credited link preview of its own report (§ Images), and never as something the design depends on.
-- **Don't** colour chrome, tint the ground, or use a lens or coverage hue as decoration.
-- **Don't** set body or UI in Newsreader, or a heading in the mono.
-- **Don't** infinite-scroll Today; the day is the unit and yesterday is a link.
-- **Don't** put a marketing hero on Today; the landing is `/about` and `/` for a first visit only.
-- **Don't** use text glyphs as icons; the stroke set in `icons.tsx` (22px, 1.8 stroke) is the only icon set.
-- **Don't** invent a fact for a demo. Every number, quote and outlet on the landing is fetched.
+Do: print counts, keep quotes verbatim, mark provisional, use tokens for every colour so both themes hold,
+keep 44px targets, keep the reading column at 640. Don't: add a gradient, set prose, headings or labels in
+mono, colour-code without a word, invent a number or an example, list lens names in prose, put a card lift
+on hover, or ship a mock's placeholder.
 
 ## Decisions Log
 
@@ -335,6 +185,7 @@ Historical entries were written under whichever name and world was current; the 
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-24 | Design System v2 adopted from Claude Design: cobalt accent, Newsreader / Anek / Geist Mono, records 2px · controls 8px · sheets 16px, navy · blue-green · orange · grey coverage, the system's `.p-*` classes verbatim in globals.css; the header spectrum line and the ruled page ground removed; the design's ILLUSTRATION banners and sample data never ship; lens-mark shapes and the "Has a professional read" filter (both PROPOSED in the design) not adopted | Founder asked for the whole product redesigned on the Claude Design system, with anything the system lacks noted rather than invented (the gap list went back to Claude Design) |
 | 2026-09-18 | New world "Spectrum": Newsreader / Hind / JetBrains Mono, near-white ground, brand violet accent, soft radii, cards for rows | Founder brief: the chart read as dull and un-navigable; readers could not see what Prism does. The prism's own metaphor — white light in, spectrum out — now sets where colour appears |
 | 2026-09-18 | Colour rule widened: coverage hues + lens hues + one accent (was: lenses only) | The coverage bar makes "one story from many reports" visible on every row; the accent makes interaction legible in a mobile app |
 | 2026-09-18 | Coverage bar order national · international · regional · wire, palette validated in both modes | Red and amber are indistinguishable for deutan readers when adjacent; the order keeps them apart and the count text is the legend |

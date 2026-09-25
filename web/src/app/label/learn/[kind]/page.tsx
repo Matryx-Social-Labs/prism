@@ -14,7 +14,9 @@ import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+import { SectionHead } from "@/components/SectionHead";
 import { GuidePrimer } from "@/components/label/GuideView";
+import { LabelStrip } from "@/components/label/parts";
 import type { LabelGuide } from "@/lib/api";
 import { LEARNABLE, fetchGuide } from "@/lib/labeller";
 import { useSession } from "@/lib/session";
@@ -56,39 +58,39 @@ export default function LearnTask({ params }: { params: Promise<{ kind: string }
   }, [mounted, session, kind]);
 
   if (!LEARNABLE.includes(kind)) notFound();
+  // The layout already provides <main>; this is the column.
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[720px] px-5 pb-24 pt-6 sm:px-8">
+    <div className="mx-auto grid min-h-dvh w-full max-w-[720px] content-start gap-8 px-4 pb-12 pt-6">
+      <LabelStrip />
       {state === "ok" && guide && (
         <GuidePrimer guide={guide} onStart={() => router.push("/label")} action="Back to your workspace" />
       )}
       {state === "signed-out" && (
         <Gate text="The guides are for people who label for Prism. Sign in to read them.">
-          <Link href={`/signin?next=/label/learn/${kind}`} className="btn btn-primary mt-6">
+          <Link href={`/signin?next=/label/learn/${kind}`} className="p-btn p-btn--primary">
             Sign in
           </Link>
         </Gate>
       )}
       {state === "apply" && (
         <Gate text="The guides open once you have applied to label.">
-          <Link href="/label" className="btn btn-primary mt-6">
+          <Link href="/label" className="p-btn p-btn--primary">
             Apply to label
           </Link>
         </Gate>
       )}
       {state === "error" && <Gate text="The guide could not be loaded. Reload to try again." />}
-    </main>
+    </div>
   );
 }
 
 function Gate({ text, children }: { text: string; children?: React.ReactNode }) {
   return (
-    <div className="mt-10">
-      <h1 className="text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-        Label for Prism
-      </h1>
-      <p className="mt-3 text-[15px]" style={{ color: "var(--ink-2)" }}>
-        {text}
-      </p>
+    <div className="grid justify-items-start gap-4">
+      <div className="w-full">
+        <SectionHead id="h-label" as="h1" title="Label for Prism" />
+        <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>{text}</p>
+      </div>
       {children}
     </div>
   );

@@ -1,13 +1,14 @@
 "use client";
 
+import { Ago } from "@/components/Ago";
 import { useRef } from "react";
 import type { SourceRef } from "@/lib/api";
 import { fallbackCode, indexSources } from "@/lib/sources";
 
 export { fallbackCode, indexSources };
 import { ORIGIN_LABEL, OutletIcon, type Origin } from "@/components/Coverage";
-import { relativeTime } from "@/lib/dateline";
-import { ArrowLeft, ArrowRight } from "@/components/icons";
+import { ArrowLeft, ArrowRight, ArrowUpRight } from "@/components/icons";
+import { PhotoImg } from "@/components/PhotoImg";
 
 /** One photo tile: wide enough for "Photo: The Times of India" and a time on one line. */
 const TILE_W = 232;
@@ -38,39 +39,39 @@ export function ReportCard({ source, n, compact = false }: { source: SourceRef; 
   const origin = s.origin ? ORIGIN_LABEL[s.origin as Origin] : null;
   const funding = s.funding ? FUNDING_LABEL[s.funding] : null;
   const inner = (
-    <>
-      <span className="flex items-center gap-2">
-        <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={compact ? 24 : 28} />
-        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold" style={{ color: "var(--ink-2)" }}>{s.source_name}</span>
+    <span className="grid min-w-0 flex-1 gap-1.5">
+      <span className="flex min-w-0 items-center gap-2">
+        <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} />
+        <span className="min-w-0 truncate text-[13px] font-semibold leading-[1.2]" style={{ color: "var(--ink)" }}>{s.source_name}</span>
         {s.published_at && (
-          <time dateTime={s.published_at} className="shrink-0 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-            {relativeTime(s.published_at)}
-          </time>
+          <Ago iso={s.published_at} className="p-count shrink-0" />
         )}
+        {n != null && <span className="p-count ml-auto shrink-0 font-mono">[{n}]</span>}
       </span>
-      <span className={`mt-2 block font-medium leading-[1.35] [display:-webkit-box] [-webkit-box-orient:vertical] overflow-hidden ${compact ? "text-[13.5px] [-webkit-line-clamp:3]" : "text-[15px] [-webkit-line-clamp:3]"}`} style={{ color: "var(--ink)" }}>
+      <span
+        className="p-row__title block [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden"
+        style={{ font: compact ? "500 14px/1.35 var(--font-read)" : "var(--t-title-s)", color: "var(--ink)", overflowWrap: "anywhere" }}
+      >
         {s.title}
+        {s.url && <ArrowUpRight size={13} className="ml-1 inline align-[-1px]" />}
       </span>
-      {(n != null || origin || funding) && (
-        <span className="mt-2 flex items-center gap-2 text-[11.5px]" style={{ color: "var(--ink-3)" }}>
-          {n != null && <span className="font-mono text-[11px]">[{n}]</span>}
-          {origin && <span>{origin}</span>}
-          {funding && <span>· {funding}</span>}
+      {!compact && (origin || funding) && (
+        <span className="text-[12px]" style={{ color: "var(--ink-3)" }}>
+          {origin}
+          {funding && <>{origin ? " · " : ""}{funding}</>}
         </span>
       )}
-    </>
+    </span>
   );
-  // The outlet's own photo, badged with the outlet's icon so it never reads as
-  // ours; the alt says whose it is.
+  // The outlet's own photo, credited by the outlet's name beside it, so it
+  // never reads as ours; the alt says whose it is.
   const thumb = REPORT_IMAGES && s.image_url && !compact ? (
-    <span className="relative h-16 w-16 shrink-0">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={s.image_url} alt={`Photo from ${s.source_name}`} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-16 w-16 rounded-[var(--r-sm)] object-cover" style={{ background: "var(--sunken)" }} onError={(e) => { ((e.currentTarget as HTMLImageElement).parentElement as HTMLElement).style.display = "none"; }} />
-      <span className="absolute -bottom-1 -right-1"><OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} /></span>
+    <span className="p-thumb h-[72px] w-24 shrink-0" onErrorCapture={(e) => { (e.currentTarget as HTMLElement).style.display = "none"; }}>
+      <PhotoImg src={s.image_url} alt={`Photo from ${s.source_name}`} />
     </span>
   ) : null;
-  const cls = `row-card ${thumb ? "flex items-start gap-3" : "block"} ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`;
-  const body = thumb ? (<><span className="min-w-0 flex-1">{inner}</span>{thumb}</>) : inner;
+  const cls = `p-row ${thumb ? "!flex-row items-start gap-3" : "gap-1.5"} ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`;
+  const body = <>{inner}{thumb}</>;
   return s.url ? (
     <a href={s.url} target="_blank" rel="noopener noreferrer" className={cls} aria-label={`${s.source_name}: ${s.title}`}>
       {body}
@@ -94,7 +95,7 @@ export function SourceList({
   compact?: boolean;
 }) {
   return (
-    <ul className={`flex flex-col ${compact ? "gap-2" : "gap-2.5"}`}>
+    <ul className={`p-print grid ${compact ? "gap-2" : "gap-2.5"}`}>
       {sources.map((s, i) => (
         <li key={s.article_id ?? `${s.source_name}-${i}`}>
           <ReportCard source={s} n={sourceIndex.get(s.article_id)} compact={compact} />
@@ -164,7 +165,7 @@ export function ReportImages({ sources, limit = 8 }: { sources: SourceRef[]; lim
               <span className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 px-2.5 pb-2 pt-8 text-[12px] font-semibold text-white" style={{ background: "linear-gradient(to top, rgba(0,0,0,.78) 0%, rgba(0,0,0,.5) 55%, rgba(0,0,0,0) 100%)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
                 <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} />
                 <span className="truncate">Photo: {s.source_name}</span>
-                {s.published_at && <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10.5px] font-normal opacity-90">{relativeTime(s.published_at)}</span>}
+                {s.published_at && <Ago iso={s.published_at} className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10.5px] font-normal opacity-90" />}
               </span>
             </a>
           </li>

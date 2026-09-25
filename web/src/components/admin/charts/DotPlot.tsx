@@ -26,7 +26,7 @@ export function DotPlot({ rows }: { rows: LagRow[] }) {
         <span />
         <div className="relative h-5 font-mono text-[11px]" style={{ color: "var(--viz-axis)" }} aria-hidden>
           {ticks.map((t, i) => (
-            <span key={i} className="absolute top-0" style={{ left: `${(t / max) * 100}%`, transform: i === 0 ? "none" : i === 2 ? "translateX(-100%)" : "translateX(-50%)" }}>
+            <span key={i} className="absolute top-0 whitespace-nowrap" style={{ left: `${(t / max) * 100}%`, transform: i === 0 ? "none" : i === 2 ? "translateX(-100%)" : "translateX(-50%)" }}>
               {hours(t)}
             </span>
           ))}

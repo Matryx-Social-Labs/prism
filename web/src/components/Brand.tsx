@@ -9,9 +9,9 @@ import { PrismMark } from "@/components/PrismMark";
  */
 export function Brand({ href = "/", size = 26, label = "Prism" }: { href?: string; size?: number; label?: string }) {
   return (
-    <Link href={href} className="flex items-center gap-2.5" style={{ color: "var(--ink)" }} aria-label={label}>
+    <Link href={href} className="flex items-center no-underline" style={{ color: "var(--ink)", gap: Math.round(size * 0.42) }} aria-label={label}>
       <PrismMark size={size} />
-      <span className="font-record font-semibold leading-none tracking-[-0.01em]" style={{ fontSize: Math.round(size * 0.92) }}>
+      <span className="font-record font-semibold leading-none tracking-[-0.01em]" style={{ fontSize: Math.round(size * 0.95) }}>
         Prism
       </span>
     </Link>

@@ -48,7 +48,7 @@ export function CoverageLegend({ outlets, withCounts = true }: { outlets: Outlet
     <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px]" style={{ color: "var(--ink-2)" }}>
       {ORIGINS.filter((k) => counts[k] > 0).map((k) => (
         <span key={k} className="inline-flex items-center gap-1.5">
-          <i className={`cov-${k} inline-block h-2.5 w-2.5 rounded-[3px]`} />
+          <i className={`cov-${k} inline-block h-2.5 w-2.5 rounded-[2px]`} />
           {ORIGIN_LABEL[k]}
           {withCounts && <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{counts[k]}</span>}
         </span>

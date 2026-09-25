@@ -25,7 +25,7 @@ export function Attention({ tree, developments }: { tree: BranchTreeData; develo
         type="button"
         onClick={() => setOn((v) => !v)}
         aria-pressed={on}
-        className="flex h-11 items-center border-b-2 font-mono text-[11px]"
+        className="flex h-11 items-center border-b-2 text-[13px] font-semibold"
         style={{ borderColor: on ? "var(--ink)" : "transparent", color: on ? "var(--ink)" : "var(--ink-muted)" }}
       >
         Attention · sources per day

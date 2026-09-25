@@ -95,7 +95,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
               <h2 id={`${id}-title`} className="font-record text-[24px] font-bold leading-[1.2] tracking-[-0.01em]">{s.heading}</h2>
               {s.short && (
                 <p className="mt-1.5 text-[15px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
-                  <span className="mr-2 font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>In short</span>
+                  <span className="p-eyebrow mr-2">In short</span>
                   {s.short}
                 </p>
               )}

@@ -2,19 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { OutletIcon } from "@/components/Coverage";
+import { PhotoImg } from "@/components/PhotoImg";
 import { REPORT_IMAGES } from "@/lib/images";
 import type { StoryPhoto } from "@/lib/api";
 
-// A story is many reports, so its picture is many pictures: up to three of
-// them as a small pile on the row, the newest in front, each the outlet's own
-// and credited (the front photo carries the icon; every alt names its outlet).
-// Motion, two beats and no loop (DESIGN.md § Motion): the pile SETTLES when
-// the row comes into view — the cards behind slide out from under the front
-// one into their fan, 480ms on a spring, staggered — and on a desk a hover
-// spreads it a little further so the pictures behind show. Each photo fades
-// in as it loads. Reduced motion places everything at once. A "+N" counts the
+// Design System v2 · PhotoPile (media/PhotoDeck.jsx; guidelines/motion.html
+// "Pile · fan-in"): a story is many reports, so its picture is up to three of
+// their photographs, each the outlet's own and credited (the front one carries
+// the outlet's icon; every alt names its outlet). The cards start squared under
+// the front one and settle into a fan ONCE, when the row is 40% in view — 480ms
+// on a spring, 60ms stagger — and a hover on the row spreads the fan ×1.9
+// (globals.css .photo-stack). Each photo fades in over its sunken placeholder
+// (PhotoImg). Reduced motion draws the pile already fanned. A "+N" counts the
 // rest. The whole row is the link; the pile is not a second one.
-export function PhotoStack({ photos, size = "row" }: { photos: StoryPhoto[]; size?: "row" | "lead" }) {
+const FAN = [
+  { x: 0, y: 0, r: -4 },
+  { x: 8, y: 3, r: 2 },
+  { x: 16, y: 6, r: 6 },
+];
+
+export function PhotoStack({ photos }: { photos: StoryPhoto[] }) {
   const ref = useRef<HTMLElement>(null);
   const [inView, setInView] = useState(false);
   useEffect(() => {
@@ -24,61 +31,52 @@ export function PhotoStack({ photos, size = "row" }: { photos: StoryPhoto[]; siz
       setInView(true);
       return;
     }
-    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setInView(true); io.disconnect(); } }, { rootMargin: "0px 0px -10% 0px" });
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setInView(true); io.disconnect(); } }, { threshold: 0.4 });
     io.observe(el);
     return () => io.disconnect();
   }, []);
   if (!REPORT_IMAGES || photos.length === 0) return null;
   const shown = photos.slice(0, 3);
   const rest = photos.length - shown.length;
-  const w = size === "lead" ? 180 : 96;
-  const h = size === "lead" ? 128 : 70;
   return (
-    <figure ref={ref} className={`photo-stack relative shrink-0 ${inView ? "is-in" : ""}`} style={{ width: w + 18, height: h + 12 }} aria-label={`${photos.length} ${photos.length === 1 ? "photograph" : "photographs"} from the reports`}>
-      {shown.map((p, i) => {
-        // Front = index 0; the others peek out behind, up and to the right.
-        const depth = shown.length - 1 - i;
-        return (
-          <span
-            key={p.url}
-            className="photo-stack__card absolute overflow-hidden rounded-[8px] border"
-            style={{
-              width: w,
-              height: h,
-              left: 0,
-              bottom: 0,
-              zIndex: 10 - depth,
-              // The fan, as variables the stylesheet animates to.
-              ["--fan-x" as string]: `${depth * 9}px`,
-              ["--fan-y" as string]: `${-depth * 5}px`,
-              ["--fan-r" as string]: `${depth === 0 ? 0 : depth === 1 ? -4 : 4}deg`,
-              transitionDelay: `${depth * 70}ms`,
-              borderColor: "var(--surface)",
-              boxShadow: "var(--shadow-1)",
-              background: "var(--sunken)",
-            }}
-          >
-            <Photo src={p.url} alt={p.outlet ? `Photo: ${p.outlet.name}` : "Photo from a report"} />
-            {depth === 0 && p.outlet && (
-              <span className="absolute bottom-1 left-1 rounded-full" style={{ boxShadow: "0 0 0 1.5px var(--surface)" }} title={`Photo: ${p.outlet.name}`}>
-                <OutletIcon domain={p.outlet.domain} code={p.outlet.code} name={p.outlet.name} size={18} />
-              </span>
-            )}
-            {depth === 0 && rest > 0 && (
-              <span className="absolute bottom-1 right-1 rounded-full px-1.5 py-0.5 font-mono text-[10.5px] tabular-nums text-white" style={{ background: "rgba(0,0,0,.6)" }} aria-hidden>+{rest}</span>
-            )}
-          </span>
-        );
-      })}
+    <figure
+      ref={ref}
+      className={`photo-stack relative shrink-0 ${inView ? "is-in" : ""}`}
+      style={{ width: 124, height: 88 }}
+      aria-label={`${photos.length} ${photos.length === 1 ? "photograph" : "photographs"} from the reports`}
+    >
+      {shown.map((p, i) => (
+        <span
+          key={p.url}
+          className="p-thumb photo-stack__card"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: 96,
+            height: 68,
+            zIndex: 3 - i,
+            border: "2px solid var(--surface)",
+            boxShadow: "var(--shadow-1)",
+            ["--fan-x" as string]: `${FAN[i].x}px`,
+            ["--fan-y" as string]: `${FAN[i].y}px`,
+            ["--fan-r" as string]: `${FAN[i].r}deg`,
+            transitionDelay: `${i * 60}ms`,
+          }}
+        >
+          <PhotoImg src={p.url} alt={p.outlet ? `Photo: ${p.outlet.name}` : "Photo from a report"} />
+          {i === 0 && p.outlet && (
+            <span className="p-thumb__credit" title={`Photo: ${p.outlet.name}`}>
+              <OutletIcon domain={p.outlet.domain} code={p.outlet.code} name={p.outlet.name} size={16} />
+            </span>
+          )}
+          {i === 0 && rest > 0 && (
+            <span className="p-thumb__credit p-mono" style={{ left: "auto", right: 4, padding: "2px 6px", fontSize: 10.5 }} aria-hidden>
+              +{rest}
+            </span>
+          )}
+        </span>
+      ))}
     </figure>
-  );
-}
-
-/** A photograph that fades in when its bytes land, instead of popping. */
-function Photo({ src, alt }: { src: string; alt: string }) {
-  const [ready, setReady] = useState(false);
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setReady(true)} className={`photo-fade h-full w-full object-cover ${ready ? "is-ready" : ""}`} />
   );
 }

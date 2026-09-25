@@ -1,54 +1,52 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 import { NavMemory } from "@/components/NavMemory";
 import { UsageBeacon } from "@/components/UsageBeacon";
-import { Hind, Hind_Guntur, Hind_Madurai, Hind_Mysuru, IBM_Plex_Sans, JetBrains_Mono, Libre_Baskerville, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu, Tiro_Devanagari_Hindi } from "next/font/google";
+import { Anek_Bangla, Anek_Devanagari, Anek_Gujarati, Anek_Kannada, Anek_Latin, Anek_Tamil, Anek_Telugu, Geist_Mono, Newsreader, Noto_Naskh_Arabic, Noto_Nastaliq_Urdu, Noto_Serif_Bengali, Noto_Serif_Devanagari, Noto_Serif_Gujarati, Noto_Serif_Kannada, Noto_Serif_Tamil, Noto_Serif_Telugu } from "next/font/google";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { jsonLd, siteGraph } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-// THREE VOICES (DESIGN.md § Typography — the Spectrum world, 2026-09-18). The
-// rule is the commitment — a record voice, a reading voice, a provenance voice.
+// THREE VOICES (Design System v2, tokens/typography.css). A word in the wrong
+// voice is a bug. Every family sets a variable named --font-<family> on <html>;
+// the voice stacks (--font-record, --font-read, --font-mono) are generated onto
+// :root from design/tokens.json, the same element, so they resolve.
 //
-// The record: Libre Baskerville gives headlines, story titles, section titles
-// and quotes a durable editorial voice. Never a button or label.
-const display = Libre_Baskerville({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
-});
-// The record voice per script: Newsreader has no Indic glyphs, so without these
-// a Hindi outlet headline in "What changed" or a Kannada quote fell to the
-// system sans inside a serif row. Not preloaded: each face is unicode-ranged to
-// its script and the browser fetches it only when a glyph needs it.
-// (next/font reads these calls statically, so the options are spelled out.)
-const recordHi = Tiro_Devanagari_Hindi({ subsets: ["devanagari"], weight: "400", style: ["normal", "italic"], variable: "--font-record-hi", preload: false, adjustFontFallback: false });
-const recordKn = Noto_Serif_Kannada({ subsets: ["kannada"], weight: "variable", variable: "--font-record-kn", preload: false, adjustFontFallback: false });
-const recordTa = Noto_Serif_Tamil({ subsets: ["tamil"], weight: "variable", style: ["normal", "italic"], variable: "--font-record-ta", preload: false, adjustFontFallback: false });
-const recordTe = Noto_Serif_Telugu({ subsets: ["telugu"], weight: "variable", variable: "--font-record-te", preload: false, adjustFontFallback: false });
+// The record — headlines, titles, quotes, hero figures: Newsreader (drawn for
+// news, optical sizes), then a Noto Serif per Indic script and Nastaliq for Urdu.
+const newsreader = Newsreader({ subsets: ["latin"], weight: "variable", style: ["normal", "italic"], axes: ["opsz"], variable: "--font-newsreader" });
+// The Indic faces are unicode-ranged to their script and not preloaded: the
+// browser fetches one only when a glyph needs it. next/font has no metrics for
+// them, so it cannot size a fallback (adjustFontFallback off, as before).
+// next/font reads these calls statically, so the options are spelled out.
+const recordHi = Noto_Serif_Devanagari({ subsets: ["devanagari"], weight: "variable", variable: "--font-noto-serif-devanagari", preload: false, adjustFontFallback: false });
+const recordKn = Noto_Serif_Kannada({ subsets: ["kannada"], weight: "variable", variable: "--font-noto-serif-kannada", preload: false, adjustFontFallback: false });
+const recordTa = Noto_Serif_Tamil({ subsets: ["tamil"], weight: "variable", variable: "--font-noto-serif-tamil", preload: false, adjustFontFallback: false });
+const recordTe = Noto_Serif_Telugu({ subsets: ["telugu"], weight: "variable", variable: "--font-noto-serif-telugu", preload: false, adjustFontFallback: false });
+const recordBn = Noto_Serif_Bengali({ subsets: ["bengali"], weight: "variable", variable: "--font-noto-serif-bengali", preload: false, adjustFontFallback: false });
+const recordGu = Noto_Serif_Gujarati({ subsets: ["gujarati"], weight: "variable", variable: "--font-noto-serif-gujarati", preload: false, adjustFontFallback: false });
+const recordUr = Noto_Nastaliq_Urdu({ subsets: ["arabic"], weight: "variable", variable: "--font-noto-nastaliq-urdu", preload: false, adjustFontFallback: false });
 
-// Reading and UI: IBM Plex Sans for Latin, with Hind and its script siblings for
-// Devanagari, Kannada, Tamil and Telugu. The browser falls through per glyph.
-const ui = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-ui-latin" });
-const uiDevanagari = Hind({ subsets: ["devanagari"], weight: ["400", "500", "600", "700"], variable: "--font-hind" });
-// next/font has no metrics table for the Indic siblings, so it cannot size a
-// fallback face to them and logs "Failed to find font override values" on
-// every build. Off explicitly: these families only ever set a line or two of
-// a non-Latin headline, so the shift a sized fallback prevents is negligible.
-const uiKannada = Hind_Mysuru({ subsets: ["kannada"], weight: ["400", "500", "600"], variable: "--font-hind-kn", adjustFontFallback: false });
-const uiTamil = Hind_Madurai({ subsets: ["tamil"], weight: ["400", "500", "600"], variable: "--font-hind-ta", adjustFontFallback: false });
-const uiTelugu = Hind_Guntur({ subsets: ["telugu"], weight: ["400", "500", "600"], variable: "--font-hind-te", adjustFontFallback: false });
+// Reading and UI — everything read or tapped: Anek (Ek Type), one Indic-first
+// design across Latin, Devanagari, Kannada, Tamil, Telugu, Bangla and Gujarati;
+// Noto Naskh Arabic for Urdu.
+const readLatin = Anek_Latin({ subsets: ["latin"], weight: "variable", variable: "--font-anek-latin" });
+const readHi = Anek_Devanagari({ subsets: ["devanagari"], weight: "variable", variable: "--font-anek-devanagari", preload: false, adjustFontFallback: false });
+const readKn = Anek_Kannada({ subsets: ["kannada"], weight: "variable", variable: "--font-anek-kannada", preload: false, adjustFontFallback: false });
+const readTa = Anek_Tamil({ subsets: ["tamil"], weight: "variable", variable: "--font-anek-tamil", preload: false, adjustFontFallback: false });
+const readTe = Anek_Telugu({ subsets: ["telugu"], weight: "variable", variable: "--font-anek-telugu", preload: false, adjustFontFallback: false });
+const readBn = Anek_Bangla({ subsets: ["bengali"], weight: "variable", variable: "--font-anek-bangla", preload: false, adjustFontFallback: false });
+const readGu = Anek_Gujarati({ subsets: ["gujarati"], weight: "variable", variable: "--font-anek-gujarati", preload: false, adjustFontFallback: false });
+const readUr = Noto_Naskh_Arabic({ subsets: ["arabic"], weight: "variable", variable: "--font-noto-naskh-arabic", preload: false, adjustFontFallback: false });
 
-// Provenance ONLY: times, counts, codes, [n], tickers, CVE ids. Tabular by
-// design, narrow enough for a time and a count beside a 26px monogram.
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-mono",
-});
+// Provenance ONLY: times, counts, [n], outlet codes, tickers, CVE ids. Tabular.
+const mono = Geist_Mono({ subsets: ["latin"], weight: "variable", variable: "--font-geist-mono" });
+
+const FONT_VARIABLES = [newsreader, recordHi, recordKn, recordTa, recordTe, recordBn, recordGu, recordUr, readLatin, readHi, readKn, readTa, readTe, readBn, readGu, readUr, mono]
+  .map((f) => f.variable)
+  .join(" ");
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -82,8 +80,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FAFAF7" },
-    { media: "(prefers-color-scheme: dark)", color: "#0F0F12" },
+    { media: "(prefers-color-scheme: light)", color: "#F7F6F2" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F1114" },
   ],
 };
 
@@ -94,21 +92,18 @@ const themeInit = `(function(){document.documentElement.classList.add("js");try{
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={FONT_VARIABLES} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         {/* Who publishes this and how to search it — the same on every page (lib/seo). */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(siteGraph()) }} />
       </head>
-      <body
-        className={`${display.variable} ${recordHi.variable} ${recordKn.variable} ${recordTa.variable} ${recordTe.variable} ${ui.variable} ${uiDevanagari.variable} ${uiKannada.variable} ${uiTamil.variable} ${uiTelugu.variable} ${mono.variable} flex min-h-dvh flex-col antialiased`}
-        style={{ fontFamily: "var(--font-ui), system-ui, sans-serif" }}
-      >
+      <body className="flex min-h-dvh flex-col antialiased">
         <a
           href="#main-content"
-          className="btn btn-secondary fixed left-3 top-3 z-[100] -translate-y-20 focus:translate-y-0"
+          className="btn btn-primary btn-sm fixed left-3 top-3 z-[100] -translate-y-20 focus:translate-y-0"
         >
-          Skip to content
+          Skip to the record
         </a>
         {/* Aggregate counts only, cookieless (lib/analytics.ts); absent until the domain is configured. */}
         <UsageBeacon />
@@ -116,26 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SiteHeader />
         <main id="main-content" tabIndex={-1} className="w-full flex-1 outline-none">{children}</main>
         <BottomTabBar />
-        {/* Footer is desktop-only — on mobile the bottom tab bar is the chrome,
-            and the marketing footer would just hide behind it. */}
-        <footer className="site-footer mt-auto hidden border-t lg:block" style={{ borderColor: "var(--line)" }}>
-          <div
-            className="mx-auto flex max-w-[var(--shell)] flex-wrap items-center justify-between gap-2.5 px-5 py-6 text-[13px] sm:px-8 xl:px-10"
-            style={{ color: "var(--ink-3)" }}
-          >
-            <span>Prism · Prism Media Intelligence LLP · built with Matrix Social Labs</span>
-            <span className="flex items-center gap-4">
-              <Link href="/about" className="hover:underline underline-offset-[3px]">About</Link>
-              <Link href="/about#status" className="hover:underline underline-offset-[3px]">What&rsquo;s live</Link>
-              <Link href="/sources" className="hover:underline underline-offset-[3px]">Sources</Link>
-              <Link href="/corrections" className="hover:underline underline-offset-[3px]">Corrections</Link>
-              <Link href="/plus" className="hover:underline underline-offset-[3px]">Plus</Link>
-              <Link href="/privacy" className="hover:underline underline-offset-[3px]">Privacy</Link>
-              <Link href="/terms" className="hover:underline underline-offset-[3px]">Terms</Link>
-              <Link href="/refunds" className="hover:underline underline-offset-[3px]">Refunds</Link>
-            </span>
-          </div>
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );

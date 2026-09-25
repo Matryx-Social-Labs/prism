@@ -8,26 +8,14 @@
 import { useEffect, useState } from "react";
 
 import { AdminSection, AdminTitle, useAdmin } from "@/components/admin/AdminShell";
+import { ACTION_WORD, istClock, istDay } from "@/components/admin/AuditItem";
 import { dayLabel } from "@/components/admin/charts/format";
 import { FilterSeg } from "@/components/admin/ui";
 import { fetchAudit, type AuditEntry } from "@/lib/admin";
 
-const ACTION_WORD: Record<string, string> = {
-  "batch.explanations": "Edited a round's explanations",
-  "batch.languages": "Filled in a batch's languages",
-  "batch.list": "Changed a batch's listing",
-  "batch.open": "Opened or closed a batch",
-  "labeller.add": "Added a labeller",
-  "labeller.grant": "Changed a qualification",
-  "labeller.status": "Changed a labeller's status",
-  "pipeline.run": "Asked the worker to collect",
-};
-
 type Area = "all" | "labeller" | "batch" | "pipeline";
 const AREA_WORD: Record<Area, string> = { all: "All", labeller: "Labellers", batch: "Batches", pipeline: "Collection" };
 
-const istDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-const istClock = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
 const shown = (v: unknown) => (v !== null && typeof v === "object" ? JSON.stringify(v) : String(v));
 
 export default function AuditPage() {

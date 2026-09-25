@@ -42,7 +42,7 @@ describe("the overview", () => {
 
   it("shows the period and when counting began, and re-reads on a new period", async () => {
     render(<AdminOverview />);
-    expect(await screen.findByText(/VISITS COUNTED SINCE 30 JAN/)).toBeInTheDocument();
+    expect(await screen.findByText(/4 JAN – 31 JAN 2031 IST · VISIT COUNTING BEGAN 30 JAN/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Visits" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "90 days" }));
     expect(fetchMetrics).toHaveBeenLastCalledWith(ADMIN.session, 90);
@@ -89,8 +89,8 @@ describe("the overview", () => {
     render(<AdminOverview />);
     await userEvent.click(await screen.findByRole("tab", { name: "90 days" }));
     await userEvent.click(screen.getByRole("tab", { name: "7 days" }));
-    expect(await screen.findByText(/VISITS COUNTED SINCE/)).toBeInTheDocument();
-    const shown = () => screen.getByText(/· IST/).textContent;
+    expect(await screen.findByText(/VISIT COUNTING BEGAN/)).toBeInTheDocument();
+    const shown = () => screen.getByText(/ IST ·/).textContent;
     const seven = shown();
     answer90({ ...metrics(90), range: { ...metrics(90).range, start: "2030-11-03" } });
     await new Promise((r) => setTimeout(r, 0));

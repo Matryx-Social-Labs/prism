@@ -27,11 +27,11 @@ export function CohortGrid({ rows }: { rows: CohortRow[] }) {
     <div className="overflow-x-auto">
       <table className="w-full border-separate text-center font-mono text-[12px] tabular-nums" style={{ borderSpacing: 3 }}>
         <thead>
-          <tr style={{ color: "var(--ink-3)" }}>
-            <th scope="col" className="pb-1 text-left font-normal">WEEK OF</th>
-            <th scope="col" className="pb-1 pr-2 text-right font-normal">SIGNED UP</th>
+          <tr className="whitespace-nowrap uppercase" style={{ font: "var(--t-label)", letterSpacing: "var(--track-label)", color: "var(--ink-3)" }}>
+            <th scope="col" className="pb-1 text-left">Week of</th>
+            <th scope="col" className="pb-1 pr-2 text-right">Signed up</th>
             {Array.from({ length: cols }, (_, k) => (
-              <th key={k} scope="col" className="pb-1 font-normal">+{k + 1}w</th>
+              <th key={k} scope="col" className="pb-1 font-mono normal-case">+{k + 1}w</th>
             ))}
           </tr>
         </thead>
@@ -47,14 +47,14 @@ export function CohortGrid({ rows }: { rows: CohortRow[] }) {
                   v === null ? `Week ${k + 1} after: no record yet` : r.accounts ? `Week ${k + 1} after: ${share(v, r.accounts)} came back` : "No sign-ups that week";
                 if (v === null)
                   return (
-                    <td key={k} title={title} aria-label={title} className="h-8 min-w-[36px] rounded-[var(--r-sm)]" style={{ border: "1px dashed var(--line-strong)" }} />
+                    <td key={k} title={title} aria-label={title} className="h-8 min-w-[36px]" style={{ border: "1px dashed var(--line-strong)", background: "var(--data-uncounted)" }} />
                   );
                 const s = r.accounts ? step(v, r.accounts) : 0;
                 return (
                   <td
                     key={k}
                     title={title}
-                    className="h-8 min-w-[36px] rounded-[var(--r-sm)]"
+                    className="h-8 min-w-[36px]"
                     style={{
                       background: s ? `var(--viz-seq-${s})` : "var(--sunken)",
                       color: s >= 4 ? `var(--viz-seq-on-${s})` : r.accounts ? "var(--ink)" : "var(--ink-3)",
@@ -70,7 +70,7 @@ export function CohortGrid({ rows }: { rows: CohortRow[] }) {
       </table>
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]" style={{ color: "var(--ink-2)" }}>
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden className="inline-block h-3 w-3 rounded-[3px]" style={{ border: "1px dashed var(--line-strong)" }} />
+          <span aria-hidden className="inline-block h-3 w-3" style={{ border: "1px dashed var(--line-strong)", background: "var(--data-uncounted)" }} />
           no record: not over, or before counting began
         </span>
         <span className="inline-flex items-center gap-1.5">

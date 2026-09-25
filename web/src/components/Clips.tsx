@@ -1,9 +1,9 @@
 "use client";
 
+import { Ago } from "@/components/Ago";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ClipOut } from "@/lib/api";
-import { relativeTime } from "@/lib/dateline";
 import { Headphones, Pause, Play, SkipNext } from "@/components/icons";
 
 /**
@@ -159,7 +159,7 @@ export function Clips({ clips }: { clips: ClipOut[] }) {
       />
       {/* The clips as a rail of compact cards; one transcript window under
           them for the clip that is playing (or the first, until one is). */}
-      <ol className="hide-scroll -mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-1 sm:-mx-8 sm:px-8 lg:mx-0 lg:px-0" aria-label="Podcast clips">
+      <ol className="sc-rail lg:mx-0 lg:px-0" aria-label="Podcast clips">
         {clips.map((c, i) => (
           <ClipCard
             key={`${c.audio_url}-${c.start_s}`}
@@ -196,22 +196,22 @@ function ClipCard({ clip, active, playing, progress, onToggle }: { clip: ClipOut
   const label = `${playing ? "Pause" : "Play"} the clip from ${clip.show.name}`;
   const secs = Math.max(0, Math.round(clip.end_s - clip.start_s));
   return (
-    <li className="clip card flex w-[260px] flex-none snap-start flex-col gap-3 p-3.5 sm:w-[280px]" data-active={active || undefined}>
-      <div className="flex items-center gap-2.5">
-        <ShowArt show={clip.show} size={40} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-semibold">{clip.show.name}</p>
-          <p className="truncate text-[12px]" style={{ color: "var(--ink-3)" }}>{clip.show.publisher} · {relativeTime(clip.published_at)}</p>
-        </div>
+    <li className="clip p-card flex w-[272px] flex-none snap-start flex-col gap-3 sm:w-[296px]" data-active={active || undefined} style={active ? { borderColor: "var(--line-strong)" } : undefined}>
+      <div className="flex items-center gap-3">
         <button type="button" onClick={onToggle} aria-label={label} aria-pressed={playing} className="clip-play">
           {playing ? <Pause size={16} /> : <Play size={16} />}
         </button>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[14.5px] font-semibold leading-[1.3]">
+            <ShowArt show={clip.show} size={18} />
+            <span className="truncate">{clip.show.name}</span>
+          </p>
+          <p className="truncate text-[13px] leading-[1.3]" style={{ color: "var(--ink-3)" }}>{clip.show.publisher} · <Ago iso={clip.published_at} /></p>
+        </div>
+        <span className="p-count">{mmss(secs)}</span>
       </div>
       <p className="line-clamp-2 text-[14px] leading-[1.45]" style={{ color: "var(--ink-2)" }}>{clip.episode_title}</p>
-      <div className="mt-auto flex items-center gap-3">
-        <div className="clip-progress flex-1" aria-hidden><span style={{ width: `${progress * 100}%` }} /></div>
-        <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--ink-3)" }}>{mmss(secs)}</span>
-      </div>
+      <div className="clip-progress mt-auto" aria-hidden><span style={{ width: `${progress * 100}%` }} /></div>
     </li>
   );
 }
@@ -247,10 +247,10 @@ function Transcript({ clip, time, playing, freeRun, onKeepListening }: { clip: C
   }, [said]);
 
   return (
-    <div className="card mt-3 p-0">
+    <div className="p-card mt-3 !p-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2.5 text-[12.5px]" style={{ borderColor: "var(--line)", color: "var(--ink-3)" }}>
         <span className="font-semibold" style={{ color: "var(--ink-2)" }}>{clip.show.name}</span>
-        <span className="font-mono text-[11px] uppercase tracking-[0.04em]">Transcript {mmss(clip.start_s)}–{mmss(clip.end_s)}</span>
+        <span className="font-mono text-[11px]">Transcript {mmss(clip.start_s)}–{mmss(clip.end_s)}</span>
         <span className="ml-auto flex items-center gap-3">
           {clip.episode_url && (
             <a href={clip.episode_url} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>Full episode ↗</a>
@@ -265,7 +265,7 @@ function Transcript({ clip, time, playing, freeRun, onKeepListening }: { clip: C
         ref={box}
         onWheel={() => { handsOff.current = Date.now() + HANDS_OFF_MS; }}
         onTouchMove={() => { handsOff.current = Date.now() + HANDS_OFF_MS; }}
-        className="clip-window relative max-h-[168px] overflow-y-auto px-4 py-3 text-[16px] leading-[1.7]"
+        className="clip-window relative max-h-[150px] overflow-y-auto px-4 py-3 text-[15px] leading-[1.55]"
         style={{ color: time != null ? "var(--ink)" : "var(--ink-2)" }}
         aria-live="off"
       >

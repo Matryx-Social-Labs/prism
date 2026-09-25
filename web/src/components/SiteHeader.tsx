@@ -14,16 +14,21 @@ import { HeaderNav } from "@/components/HeaderNav";
 // leave in the middle of a judgement.
 const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you", "/account", "/interests", "/watchlist", "/story", "/label"];
 
+// The founders' admin is a tool with its own chrome (the sidebar, Design System v2 ·
+// AdminShell): no reader top bar over it, no reader footer under it.
+export const OWN_CHROME = ["/admin"];
+
 export function SiteHeader() {
   const pathname = usePathname();
+  if (OWN_CHROME.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
   const isApp = APP_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return (
     <header
-      className={`${isApp ? "hidden lg:block" : ""} site-header glass sticky top-0 z-40 border-b`}
+      className={`${isApp ? "hidden lg:block" : ""} glass sticky top-0 z-40 border-b`}
       style={{ borderColor: "var(--line)", height: "var(--topbar)" }}
     >
-      <div className="mx-auto grid h-full max-w-[var(--shell)] grid-cols-[auto_minmax(0,1fr)] items-center gap-8 px-5 sm:px-8 xl:px-10">
-        <Brand />
+      <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-5 px-[var(--gutter)]">
+        <Brand size={24} />
         <HeaderNav />
       </div>
     </header>

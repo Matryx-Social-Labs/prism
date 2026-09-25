@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUp, Close } from "@/components/icons";
+import { Close } from "@/components/icons";
 import type { AskCitation, AskLimit, AskStructure } from "@/lib/api";
-import type { KeyboardEvent, RefObject } from "react";
+import type { FormEvent, KeyboardEvent, RefObject } from "react";
 
-// The Ask panel's body, one markup for the ticket's live panel and the
-// landing's scripted one: header, the exchange (Q and A lines on rules, a
-// refusal as a first-class state, citations in mono), suggestions, input.
+// The Ask panel's body, one markup for the record's live sheet and the
+// landing's scripted one (Design System v2 · AskAnswer, AskPanel, AskBar,
+// AskLimitNote): the question as a bubble, the answer in the reading voice
+// with its [n] chips, the table and "Not in the reports" after the prose, the
+// sources it cited, then the questions it can answer next; a refusal and a
+// limit are first-class states. The input and the grounding line are the foot.
 
 export interface Turn {
   role: "u" | "a";
@@ -21,37 +24,39 @@ export interface Turn {
   streaming: boolean;
 }
 
-/** The answer's anatomy after the prose: table · what the reports don't say. (Its follow-ups take the suggestion row.) */
+/** The answer's anatomy after the prose: table · what the reports don't say. (Its follow-ups take the question row.) */
 export function AnswerStructure({ s, citations }: { s: AskStructure; citations: AskCitation[] }) {
   const [left, right] = s.columns.length === 2 ? s.columns : ["", ""];
+  const numeric = s.kind === "timeline" || s.kind === "numbers";
   return (
-    <div className="mt-3 flex flex-col gap-3">
+    <div className="grid gap-3">
       {s.rows.length > 0 && (
-        <table className="w-full border-collapse text-[13px] leading-[1.5]" aria-label={s.kind ?? "table"}>
-          {(left || right) && (
-            <thead>
-              <tr className="text-left text-[11.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
-                <th scope="col" className="border-b py-1.5 pr-3 font-semibold" style={{ borderColor: "var(--line-strong)" }}>{left}</th>
-                <th scope="col" className="border-b py-1.5 font-semibold" style={{ borderColor: "var(--line-strong)" }}>{right}</th>
-              </tr>
-            </thead>
-          )}
-          <tbody>
-            {s.rows.map((r, i) => (
-              <tr key={i} className="align-top">
-                <td className={`border-b py-2 pr-3 ${s.kind === "who_said" ? "font-semibold" : ""} ${s.kind === "timeline" || s.kind === "numbers" ? "whitespace-nowrap font-mono text-[12px]" : ""}`} style={{ borderColor: "var(--line)", color: "var(--ink)" }}>{r.a}</td>
-                <td className={`border-b py-2 ${s.kind === "who_said" ? "font-record italic" : ""}`} style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
-                  {s.kind === "who_said" ? <>“{r.b}”</> : r.b} {r.n && <AnswerText text={r.n} citations={citations} />}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="p-hide-scroll overflow-x-auto">
+          <table className="p-table" aria-label={s.kind ?? "table"}>
+            {(left || right) && (
+              <thead>
+                <tr>
+                  <th scope="col">{left}</th>
+                  <th scope="col">{right}</th>
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {s.rows.map((r, i) => (
+                <tr key={i}>
+                  <td className={`${s.kind === "who_said" ? "font-semibold" : ""} ${numeric ? "whitespace-nowrap font-mono text-[12px]" : ""}`}>{r.a}</td>
+                  <td className={s.kind === "who_said" ? "font-record italic" : ""}>
+                    {s.kind === "who_said" ? <>“{r.b}”</> : r.b} {r.n && <AnswerText text={r.n} citations={citations} />}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {s.gaps && (
-        <p className="text-[13px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
-          <span className="mr-2 font-mono text-[11px]" style={{ color: "var(--ink)" }}>Not in the reports</span>
-          {s.gaps}
+        <p className="border-l-2 pl-2.5 text-[13.5px] leading-[1.45]" style={{ borderColor: "var(--line-strong)", color: "var(--ink-3)" }}>
+          <span>Not in the reports:</span> <span>{s.gaps}</span>
         </p>
       )}
     </div>
@@ -69,11 +74,10 @@ export function AnswerText({ text, citations }: { text: string; citations: AskCi
         if (!m) return <span key={i}>{part}</span>;
         const n = Number(m[1]);
         const c = citations.find((x) => x.number === n || x.numbers?.includes(n));
-        const chip = "mx-px inline-block rounded-[4px] px-1 align-baseline font-mono text-[11px] leading-[1.6]";
         return c?.url ? (
-          <a key={i} href={c.url} target="_blank" rel="noopener noreferrer" title={c.source_name} className={`${chip} underline-offset-2 hover:underline`} style={{ background: "var(--sunken)", color: "var(--ink)" }}>{part}</a>
+          <a key={i} href={c.url} target="_blank" rel="noopener noreferrer" title={c.source_name} className="p-cite">{part}</a>
         ) : (
-          <span key={i} className={chip} style={{ background: "var(--sunken)", color: "var(--ink-2)" }}>{part}</span>
+          <span key={i} className="p-cite">{part}</span>
         );
       })}
     </>
@@ -84,34 +88,41 @@ export type UpgradeAsk = { reason: "ask-limit" | "ask-rest"; used?: number; limi
 
 /** What a refused question tells the reader, and the one action that helps. */
 export function LimitNote({ limit, next, onUpgrade }: { limit: AskLimit; next: string; onUpgrade?: (o: UpgradeAsk) => void }) {
+  const action = "font-semibold";
   const plusLink = (label: string, o: UpgradeAsk) =>
     onUpgrade ? (
-      <button type="button" onClick={() => onUpgrade(o)} className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>{label}</button>
+      <button type="button" onClick={() => onUpgrade(o)} className={action} style={{ color: "var(--accent)" }}>{label}</button>
     ) : (
-      <Link href="/plus" className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>{label}</Link>
+      <Link href="/plus" className={action} style={{ color: "var(--accent)" }}>{label}</Link>
     );
-  if (limit.retry_after_s) return <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>One question at a time — try again in a minute.</p>;
-  if (limit.status === 503) {
-    return (
-      <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
-        Ask is resting for today for free readers. It is back at midnight UTC.{" "}
+  let body: React.ReactNode;
+  if (limit.retry_after_s) body = <span>One question at a time — try again in a minute.</span>;
+  else if (limit.status === 503) {
+    body = (
+      <>
+        <span>Ask is resting for today for free readers. It is back at midnight UTC.</span>
         {limit.plus_helps && plusLink("Plus stays on →", { reason: "ask-rest" })}
-      </p>
+      </>
     );
-  }
-  if (limit.signin_helps) {
-    return (
-      <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
-        That was your last free question here.{" "}
-        <Link href={`/signin?next=${encodeURIComponent(next)}`} className="font-semibold underline underline-offset-4" style={{ color: "var(--accent)" }}>Sign in for 10 a day →</Link>
-      </p>
+  } else if (limit.signin_helps) {
+    body = (
+      <>
+        <span>That was your last free question here.</span>
+        <Link href={`/signin?next=${encodeURIComponent(next)}`} className={action} style={{ color: "var(--accent)" }}>Sign in for 10 a day →</Link>
+      </>
+    );
+  } else {
+    body = (
+      <>
+        <span>You have asked {limit.used ?? limit.limit} of {limit.limit} questions today.</span>
+        {limit.plus_helps && plusLink("Plus is 100 a day →", { reason: "ask-limit", used: limit.used, limit: limit.limit })}
+      </>
     );
   }
   return (
-    <p className="text-[13.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
-      You have asked {limit.used ?? limit.limit} of {limit.limit} questions today.
-      {limit.plus_helps && <> {plusLink("Plus is 100 a day →", { reason: "ask-limit", used: limit.used, limit: limit.limit })}</>}
-    </p>
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[var(--r-md)] px-3 py-2.5 text-[13.5px] leading-[1.45]" style={{ background: "var(--sunken)", color: "var(--ink-2)" }}>
+      {body}
+    </div>
   );
 }
 
@@ -127,6 +138,57 @@ export function isRefusal(turn: Turn): boolean {
   return !turn.streaming && turn.citations.length === 0 && /don'?t cover|do not say|not in sources|refus/i.test(turn.text);
 }
 
+function Answer({ t, onUpgrade, titleOf }: { t: Turn; onUpgrade?: (o: UpgradeAsk) => void; titleOf?: (articleId: string) => string | undefined }) {
+  if (t.limit) {
+    return (
+      <div className="grid gap-1.5">
+        <span className="p-badge p-badge--dashed justify-self-start">Limit</span>
+        <LimitNote limit={t.limit} next={typeof window === "undefined" ? "/" : window.location.pathname} onUpgrade={onUpgrade} />
+      </div>
+    );
+  }
+  if (t.error) return <div className="p-alert p-alert--error" role="alert">{t.error}</div>;
+  if (isRefusal(t)) {
+    return (
+      <div className="grid gap-1.5 rounded-[var(--r-md)] border border-dashed p-3.5" style={{ borderColor: "var(--line-strong)" }}>
+        <span className="p-badge p-badge--dashed justify-self-start">Not in sources</span>
+        <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}><AnswerText text={t.text} citations={[]} /></p>
+      </div>
+    );
+  }
+  // Nothing written yet: the panel's "Reading the sources…" says so.
+  if (t.streaming && !t.text) return null;
+  return (
+    <div className="grid gap-3">
+      <p style={{ font: "var(--t-body)", color: "var(--ink)", overflowWrap: "anywhere" }}>
+        <AnswerText text={t.text} citations={t.streaming ? [] : t.citations} />
+        {t.streaming && <span className="p-caret" aria-hidden />}
+      </p>
+      {!t.streaming && t.structure && <AnswerStructure s={t.structure} citations={t.citations} />}
+      {!t.streaming && t.citations.length > 0 && (
+        <ol className="grid gap-1" aria-label="Sources">
+          {t.citations.map((c) => {
+            const title = titleOf?.(c.article_id);
+            return (
+              <li key={c.number} className="grid grid-cols-[28px_minmax(0,1fr)] gap-1.5 text-[13px] leading-[1.4]" style={{ color: "var(--ink-2)" }}>
+                <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>[{c.number}]</span>
+                <span style={{ overflowWrap: "anywhere" }}>
+                  {c.url ? (
+                    <a href={c.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline" style={{ color: "var(--ink)" }}>{c.source_name}</a>
+                  ) : (
+                    <b className="font-semibold" style={{ color: "var(--ink)" }}>{c.source_name}</b>
+                  )}
+                  {title && <> · {title}</>}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 export function AskShell({
   sourceCount,
   turns,
@@ -140,6 +202,8 @@ export function AskShell({
   onClose,
   inputRef,
   scrollRef,
+  titleOf,
+  chrome = true,
   className = "",
   style,
 }: {
@@ -158,6 +222,10 @@ export function AskShell({
   onClose?: () => void;
   inputRef?: RefObject<HTMLInputElement | null>;
   scrollRef?: RefObject<HTMLDivElement | null>;
+  /** A cited report's own headline, printed beside its outlet. */
+  titleOf?: (articleId: string) => string | undefined;
+  /** False inside a Sheet, which carries the title, the close and the dialog role. */
+  chrome?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -166,146 +234,86 @@ export function AskShell({
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     // isComposing: for Devanagari/Tamil/Telugu IMEs, Enter confirms the
     // candidate. Submitting on it sends a half-composed question.
-    if (e.key === "Enter" && !e.nativeEvent.isComposing) onSubmit(input);
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      onSubmit(input);
+    }
   };
-  return (
-    <section
-role="dialog"
-aria-label="Ask this story"
-className={`flex flex-col overflow-hidden ${className}`}
-style={{ borderColor: "var(--line-strong)", background: "var(--bg-elevated)", ...style }}
-    >
-      <div className="flex items-baseline gap-3 border-b px-4 py-3.5" style={{ borderColor: "var(--line)" }}>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-[20px] font-medium uppercase leading-none tracking-[0.03em]">Ask this story</p>
-          <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            Answers only from this story&apos;s {sourceCount} source{sourceCount === 1 ? "" : "s"}, with citations, or say they cannot.
-          </p>
+  const onForm = (e: FormEvent) => e.preventDefault();
+
+  const body = (
+    <>
+      <div ref={scrollRef} className="grid min-h-0 flex-1 content-start gap-3.5 overflow-y-auto px-5 pb-4 pt-1" aria-live="polite">
+        {turns.length === 0 && onFollowUp && (
+          <div aria-label="Dig deeper">
+            <p className="p-eyebrow mb-2">Dig deeper</p>
+            <div className="flex flex-wrap gap-1.5">
+              {DIG_DEEPER.map((d) => (
+                <button key={d.label} type="button" onClick={() => onFollowUp(d.question)} className="p-chip min-h-[44px] lg:min-h-[36px]">{d.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {turns.map((t, i) =>
+          t.role === "u" ? (
+            <p key={i} className="max-w-[88%] justify-self-end rounded-[var(--r-lg)] px-3.5 py-2.5 text-[15px] font-medium leading-[1.45]" style={{ background: "var(--sunken)", color: "var(--ink)", overflowWrap: "anywhere" }}>
+              {t.text}
+            </p>
+          ) : (
+            <Answer key={i} t={t} onUpgrade={onUpgrade} titleOf={titleOf} />
+          ),
+        )}
+        {thinking && <p className="p-count">Reading the sources…</p>}
+        {/* One row of questions: the story's suggestions before the first
+            answer, then the last answer's follow-ups (founder: the row
+            changes, rather than the answer growing chips). Nothing while an
+            answer is still streaming. */}
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5" aria-label={turns.length ? "Follow-up questions" : "Suggested questions"}>
+            {chips.map((q) => (
+              <button key={q} type="button" onClick={() => (turns.length && onFollowUp ? onFollowUp(q) : onSubmit(q))} className="p-chip p-chip--q min-h-[44px] lg:min-h-[36px]">
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={onForm} className="grid gap-2 border-t px-5 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3" style={{ borderColor: "var(--line)" }}>
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => onInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Ask anything about this story"
+            aria-label="Ask"
+            className="p-input min-w-0 flex-1"
+          />
+          <button type="button" onClick={() => onSubmit(input)} aria-label="Ask (send)" className="p-btn p-btn--primary">
+            Ask
+          </button>
         </div>
+        <p className="text-[13px] leading-[1.4]" style={{ color: "var(--ink-3)" }}>
+          Answers only from this story&apos;s {sourceCount} {sourceCount === 1 ? "source" : "sources"}, with citations, or say they can&apos;t.
+        </p>
+      </form>
+    </>
+  );
+
+  if (!chrome) return <div className="flex min-h-0 flex-1 flex-col">{body}</div>;
+  return (
+    <section role="dialog" aria-label="Ask this story" className={`flex flex-col overflow-hidden ${className}`} style={{ background: "var(--elevated)", borderColor: "var(--line)", borderRadius: "var(--r-lg)", ...style }}>
+      <div className="flex items-center gap-2 pb-1.5 pl-5 pr-3 pt-2.5">
+        <span className="min-w-0 flex-1" style={{ font: "var(--t-title-s)" }}>Ask this story</span>
+        <span className="p-count">answers cite the reports</span>
         {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="grid h-11 w-11 flex-none place-items-center border"
-            style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-          >
-            <Close />
+          <button type="button" onClick={onClose} aria-label="Close" className="p-iconbtn">
+            <Close size={16} />
           </button>
         )}
       </div>
-
-      {/* No hollow frame before the first question: the line under the title
-          already says what this is, and the exchange grows as it happens. */}
-      <div ref={scrollRef} className={`flex flex-1 flex-col gap-3.5 overflow-y-auto px-4 ${turns.length ? "min-h-[160px] pb-1 pt-3" : "min-h-0"}`} aria-live="polite">
-        {turns.map((t, i) =>
-          t.role === "u" ? (
-            <div key={i} className="rule-live grid grid-cols-[20px_1fr] gap-x-2 pt-3">
-              <span className="font-mono text-[11px] leading-[1.9]" style={{ color: "var(--ink-faint)" }}>Q</span>
-              <p className="text-[13.5px] leading-[1.55]" style={{ color: "var(--ink)" }}>{t.text}</p>
-            </div>
-          ) : (
-            <div key={i} className="grid grid-cols-[20px_1fr] gap-x-2 pt-1">
-              <span className="font-mono text-[11px] leading-[1.9]" style={{ color: "var(--ink-faint)" }}>A</span>
-              <div className="min-w-0">
-                {(isRefusal(t) || t.limit) && (
-                  <span className="mb-1 block font-mono text-[11px]" style={{ color: "var(--ink)" }}>
-                    {t.limit ? "Limit" : "Not in sources"}
-                  </span>
-                )}
-                {t.limit ? (
-                  <LimitNote limit={t.limit} next={typeof window === "undefined" ? "/" : window.location.pathname} onUpgrade={onUpgrade} />
-                ) : (
-                <p
-                  className="text-[13.5px] leading-[1.65]"
-                  style={{ color: t.error ? "var(--danger)" : isRefusal(t) ? "var(--ink)" : "var(--ink-muted)" }}
-                >
-                  {t.error ?? <AnswerText text={t.text} citations={t.streaming ? [] : t.citations} />}
-                  {t.streaming && (
-                    <span
-                      className="blink-caret ml-0.5 inline-block h-3.5 w-[7px] align-text-bottom"
-                      style={{ background: "var(--ink-muted)" }}
-                    />
-                  )}
-                </p>
-                )}
-                {!t.streaming && t.structure && <AnswerStructure s={t.structure} citations={t.citations} />}
-                {!t.streaming && t.citations.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-[5px]">
-                    {t.citations.map((c) => (
-                      <a
-                        key={c.number}
-                        href={c.url ?? undefined}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-[11px] underline-offset-4 hover:underline"
-                        style={{ color: "var(--ink-muted)" }}
-                      >
-                        [{c.number}] {c.source_name}
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        )}
-        {thinking && (
-          <p className="pulse-skel text-xs" style={{ color: "var(--ink-faint)" }}>
-            Reading the sources…
-          </p>
-        )}
-      </div>
-
-      {turns.length === 0 && onFollowUp && (
-        <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2" aria-label="Dig deeper">
-          <span className="mr-1 font-mono text-[11px] uppercase tracking-[0.03em]" style={{ color: "var(--ink-faint)" }}>Dig deeper</span>
-          {DIG_DEEPER.map((d) => (
-            <button key={d.label} type="button" onClick={() => onFollowUp(d.question)} className="chip h-8 px-3 text-[12.5px]">{d.label}</button>
-          ))}
-        </div>
-      )}
-      {/* One row of questions above the input: the story's suggestions before
-          the first answer, then the last answer's follow-ups (founder: the row
-          changes, rather than the answer growing chips). Nothing while an
-          answer is still streaming. */}
-      {chips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-2.5 pt-2" aria-label={turns.length ? "Follow-up questions" : "Suggested questions"}>
-          {chips.map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => (turns.length && onFollowUp ? onFollowUp(q) : onSubmit(q))}
-              className="min-h-11 border px-3 py-2 text-left text-[12.5px] transition hover:opacity-75"
-              style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="flex gap-2 border-t px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2.5" style={{ borderColor: "var(--line)" }}>
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => onInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Ask anything about this story…"
-          aria-label="Ask"
-          className="h-11 min-w-0 flex-1 border px-3 text-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
-          style={{ borderColor: "var(--line-strong)", background: "var(--bg)", color: "var(--ink)" }}
-        />
-        <button
-          type="button"
-          onClick={() => onSubmit(input)}
-          aria-label="Send"
-          className="grid h-11 w-11 flex-none place-items-center border"
-          style={{ borderColor: "var(--ink)", color: "var(--ink)" }}
-        >
-          <ArrowUp size={15} />
-        </button>
-      </div>
+      {body}
     </section>
   );
 }

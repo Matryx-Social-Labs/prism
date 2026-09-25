@@ -1,10 +1,11 @@
 import { Check } from "@/components/icons";
 
-export type RecordStatus = "verified" | "provisional" | "corrected" | "disputed";
+export type RecordStatus = "verified" | "provisional" | "single" | "corrected" | "disputed";
 
 const LABEL: Record<RecordStatus, string> = {
   verified: "Verified record",
   provisional: "Provisional grouping",
+  single: "One source so far",
   corrected: "Corrected",
   disputed: "Disputed",
 };

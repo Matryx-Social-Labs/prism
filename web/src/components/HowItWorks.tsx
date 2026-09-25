@@ -1,36 +1,32 @@
-import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
-import { sentences } from "@/lib/sentences";
 import Link from "next/link";
-import { AskDemo } from "@/components/AskDemo";
-import { ChartRow } from "@/components/ChartRow";
 import { CoverageBar, CoverageLegend, MonogramStack, OutletIcon } from "@/components/Coverage";
 import { EntityText } from "@/components/EntityText";
-import { HeroLensDemo } from "@/components/HeroLensDemo";
 import { LensRegistry } from "@/components/LensRegistry";
-import { PrismFigure } from "@/components/PrismFigure";
 import { ReportCard } from "@/components/SourceList";
 import { ReportProblem } from "@/components/ReportProblem";
 import { Reveal } from "@/components/Reveal";
 import { Said } from "@/components/Said";
 import { StepRail } from "@/components/StepRail";
-import { AVAILABLE, FREE_LINE, NEXT, StatusColumn, VALIDATION } from "@/components/StatusGrid";
-import { ArrowRight } from "@/components/icons";
-import { fetchEvent, fetchFeed, type EventDetail, type FeedItem, type OutletRef } from "@/lib/api";
-import { coverageText, languageNames, languagesOf, publishers, type Origin } from "@/lib/coverage";
-import { relativeTime } from "@/lib/dateline";
+import { FREE_LINE, StatusColumns } from "@/components/StatusGrid";
+import { LensFlip } from "@/components/landing/LensFlip";
+import { LiveLead, outletsOf } from "@/components/landing/parts";
+import { fetchEvent, fetchFeed, fetchQuestions, type EventDetail, type FeedItem, type OutletRef } from "@/lib/api";
+import { coverageText, languageNames, languagesOf, publishers } from "@/lib/coverage";
+import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
+import { sentences } from "@/lib/sentences";
 import { indexSources } from "@/lib/sources";
+import { Ago } from "@/components/Ago";
 
 /**
  * How Prism works (/about): one real story from today's record, followed
- * through the product step by step — the reports as they came in, the one
+ * through the product step by step: the reports as they came in, the one
  * record they became, who covered it, who said what, the brief written from
- * them, the same facts read through a lens, and a question answered from the
- * reports. Every example is live and counted; the two illustrations are
- * labelled. Then what Prism refuses to do, where it stands, and the door in.
- * Steps print in as they are reached (Reveal); reduced motion shows them.
+ * them, the same facts read through a lens, and the question box. Every
+ * example is live and counted; nothing is written for the page. Then what
+ * Prism refuses to do, where it stands, and the door in. Built from the
+ * landing's sections and the system's classes (Design System v2); steps print
+ * in as they are reached (Reveal), and reduced motion shows them.
  */
-const SHELL = "mx-auto w-full max-w-[var(--shell)] px-5 sm:px-8 xl:px-10";
-
 const STEPS = [
   { id: "reports", n: "01", label: "Reports come in" },
   { id: "record", n: "02", label: "One record" },
@@ -79,13 +75,6 @@ const ACCOUNTABILITY: [string, string][] = [
 
 type Example = { row: FeedItem; event: EventDetail; outlets: OutletRef[] };
 
-/** Registered-source facts from a record's own report list. */
-function outletsOf(event: EventDetail): OutletRef[] {
-  return event.sources
-    .filter((s) => s.code && s.origin)
-    .map((s) => ({ slug: s.source_slug, publisher: s.publisher ?? s.source_slug, name: s.source_name, code: s.code!, origin: s.origin as Origin, language: s.language ?? null, domain: s.domain ?? null }));
-}
-
 /** The story that shows the most: many outlets, a verified quote, a brief. Falls back gracefully. */
 async function pickExample(): Promise<Example | null> {
   try {
@@ -102,16 +91,15 @@ async function pickExample(): Promise<Example | null> {
   }
 }
 
-
 function Step({ id, n, title, rule, children, example }: { id: string; n: string; title: string; rule: string; children: React.ReactNode; example: React.ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-24 grid gap-6 border-t py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-12 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby={`${id}-title`}>
-      <div>
-        <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP {n}</p>
-        <h2 id={`${id}-title`} className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">{title}</h2>
-        <div className="mt-3 flex max-w-[46ch] flex-col gap-3 text-[16px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>{children}</div>
-        <p className="mt-4 inline-flex items-center gap-2 rounded-[var(--r-sm)] border px-2.5 py-1.5 font-mono text-[11px] tracking-[0.04em]" style={{ borderColor: "var(--line-strong)", color: "var(--ink-2)" }}>
-          <span style={{ color: "var(--accent)" }}>RULE</span> {rule}
+    <section id={id} className="grid scroll-mt-24 gap-6 border-t py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-12 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby={`${id}-title`}>
+      <div className="min-w-0">
+        <p className="p-eyebrow">Step {n}</p>
+        <h2 id={`${id}-title`} className="mt-2" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>{title}</h2>
+        <div className="mt-3 flex max-w-[46ch] flex-col gap-3" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>{children}</div>
+        <p className="mt-4 max-w-[46ch] border-l-2 pl-3" style={{ borderColor: "var(--ink)", font: "var(--t-body-s)", color: "var(--ink)" }}>
+          <span className="font-semibold">The rule: </span>{rule}
         </p>
       </div>
       <Reveal className="min-w-0">{example}</Reveal>
@@ -120,7 +108,34 @@ function Step({ id, n, title, rule, children, example }: { id: string; n: string
 }
 
 function Unavailable({ what }: { what: string }) {
-  return <p className="card text-[14px]" style={{ color: "var(--ink-3)" }}>{what} is not available in the current window.</p>;
+  return <p className="p-card" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>{what} is not available in the current window.</p>;
+}
+
+/** A closing section with its own head (08 to 10, status): the landing's hairline-and-display-m shape. */
+function Closing({ id, n, title, children }: { id: string; n?: string; title: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby={`${id}-title`}>
+      {n && <p className="p-eyebrow">Step {n}</p>}
+      <h2 id={`${id}-title`} className={n ? "mt-2" : ""} style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+/** Heads and bodies on top rules, two columns on a desk: refusals, accountability. */
+function RuledList({ items }: { items: [string, string][] }) {
+  return (
+    <ul className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
+      {items.map(([head, body], i) => (
+        <li key={head} className="border-t pt-4" style={{ borderColor: "var(--line)" }}>
+          <Reveal delay={i * 40}>
+            <p style={{ font: "var(--t-title)" }}>{head}</p>
+            <p className="mt-1.5" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>{body}</p>
+          </Reveal>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export async function HowItWorks() {
@@ -133,66 +148,64 @@ export async function HowItWorks() {
   const points = brief ? sentences(brief) : [];
   const watch = event?.lens_points?.reader ?? [];
   const langs = languagesOf(outlets);
+  const questions = event ? await fetchQuestions(event.id).catch(() => [] as string[]) : [];
 
   return (
-    <div className="pb-24 lg:pb-20">
+    <div className="pb-20">
       {/* ── The walk-through's opening: what it is, on which story ── */}
-      <section className={`${SHELL} grid gap-8 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:py-16`}>
-        <div>
-          <h1 className="font-record max-w-[16ch] text-[38px] font-bold leading-[1.06] tracking-[-0.02em] text-balance sm:text-[48px] lg:text-[56px]">How Prism works</h1>
-          <p className="mt-5 max-w-[46ch] text-[17px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
+      <section className="sc-shell grid items-center gap-8 pb-9 pt-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-16 lg:pb-14 lg:pt-[72px]">
+        <div className="min-w-0">
+          <h1 className="max-w-[16ch] text-balance" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>How Prism works</h1>
+          <p className="mt-3 max-w-[46ch]" style={{ font: "var(--t-body-l)", color: "var(--ink-2)" }}>
             Prism reads the day&rsquo;s reports from the outlets it monitors and keeps one record per story: what each outlet reported, who said what in their exact words, and a brief written only from those reports. Below, one story from today&rsquo;s record goes through it, step by step.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-2.5">
-            <a href="#reports" className="btn btn-primary btn-lg">Start with the reports <ArrowRight /></a>
-            <Link href="/feed" className="btn btn-ghost btn-lg">Open today&rsquo;s record</Link>
+          <div className="mt-[22px] flex flex-col gap-2.5 lg:flex-row">
+            <a href="#reports" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">Start with the reports</a>
+            <Link href="/feed" className="p-btn p-btn--secondary p-btn--lg w-full lg:w-auto">Open today&rsquo;s record</Link>
           </div>
         </div>
-        <div>
-          <PrismFigure className="mx-auto mb-5 block w-full max-w-[480px]" />
+        <Reveal delay={120} className="min-w-0">
           {ex ? (
-            <div className="card">
-              <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Today&rsquo;s example · live</p>
-              <Link href={`/story/${event!.id}`} className="font-record mt-2 block text-[22px] font-bold leading-[1.25] text-balance underline-offset-4 hover:underline">{event!.title}</Link>
-              <p className="mt-2 font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>
-                {coverageText(outlets, event!.sources.length)} · {event!.sources.length} {event!.sources.length === 1 ? "report" : "reports"}{langs.length ? ` · ${languageNames(langs)}` : ""} · updated {relativeTime(event!.last_updated_at)}
+            <div className="p-card" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
+              <p className="p-eyebrow">Today&rsquo;s example</p>
+              <Link href={`/story/${event!.id}`} className="mt-2 block text-balance underline-offset-4 hover:underline" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>{event!.title}</Link>
+              <p className="p-count mt-2 whitespace-normal">
+                {coverageText(outlets, event!.sources.length)} · {event!.sources.length} {event!.sources.length === 1 ? "report" : "reports"}{langs.length ? ` · ${languageNames(langs)}` : ""} · updated <Ago iso={event!.last_updated_at} />
               </p>
             </div>
           ) : (
-            <div className="card" role="status">
-              <p className="font-record text-[20px] font-bold leading-[1.25]">The live record is unavailable right now.</p>
-              <p className="mt-2 text-[14.5px]" style={{ color: "var(--ink-2)" }}>The steps below still explain how it works; the examples return when the monitored feed reconnects.</p>
+            <div className="p-card" role="status">
+              <p style={{ font: "var(--t-title)" }}>The live record is unavailable right now.</p>
+              <p className="mt-2" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>The steps below still explain how it works; the examples return when the monitored feed reconnects.</p>
             </div>
           )}
-        </div>
+        </Reveal>
       </section>
 
-      <div className={`${SHELL} lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10`}>
+      <div className="sc-shell lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10">
         <StepRail steps={STEPS} />
         <div className="min-w-0">
           <Step id="reports" n="01" title="Reports come in, and stay as they were." rule="A report is kept as published, with its outlet and time."
             example={<ReportsExample reports={reports} outlets={outlets} />}>
-            <p>Prism watches a fixed, <Link href="/sources" className="underline underline-offset-4">public list of outlets</Link>: English national papers, Indian-language papers, the international press and the wires. Every report keeps its own headline, its outlet and the minute it published.</p>
+            <p>Prism watches a fixed, <Link href="/sources" className="p-link">public list of outlets</Link>: English national papers, Indian-language papers, the international press and the wires. Every report keeps its own headline, its outlet and the minute it published.</p>
             {event && <p>This story arrived as {event.sources.length} {event.sources.length === 1 ? "report" : "reports"} from {publishers(outlets).length || event.sources.length} {publishers(outlets).length === 1 ? "outlet" : "outlets"}{langs.length > 1 ? ` in ${langs.length} languages` : ""}.</p>}
           </Step>
 
           <Step id="record" n="02" title="Many reports become one record." rule="One row per story; the counts are counted, never typed."
-            example={ex ? (
-              <ol className="chart-print flex flex-col" aria-label="The story as one row on today's record"><ChartRow item={{ ...ex.row, outlets: ex.row.outlets?.length ? ex.row.outlets : outlets }} lead /></ol>
-            ) : <Unavailable what="A live row" />}>
+            example={ex ? <LiveLead row={ex.row} outlets={outlets} /> : <Unavailable what="A live row" />}>
             <p>Reports of the same happening are matched into one record. The row you see on Today carries a headline written from the reports (or the first report&rsquo;s own), the outlets behind it, and a coverage bar. Open it and every report is one tap away.</p>
           </Step>
 
           <Step id="coverage" n="03" title="See who covered it, not who to trust." rule="By outlet origin, a fact of the source. Never left, right or centre."
             example={outlets.length > 0 ? (
-              <div className="card">
-                <p className="flex flex-wrap items-center gap-3">
+              <div className="p-card grid gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <MonogramStack outlets={outlets} limit={6} />
-                  <CoverageBar outlets={outlets} size="lg" width={220} draw />
-                  <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>{coverageText(outlets)}</span>
-                </p>
-                <div className="mt-4"><CoverageLegend outlets={outlets} /></div>
-                <p className="mt-3 text-[13px]" style={{ color: "var(--ink-3)" }}>{publishers(outlets).map((o) => o.name).join(" · ")}</p>
+                  <CoverageBar outlets={outlets} size="lg" width={220} draw className="max-w-full" />
+                  <span className="p-count">{coverageText(outlets)}</span>
+                </div>
+                <CoverageLegend outlets={outlets} />
+                <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>{publishers(outlets).map((o) => o.name).join(" · ")}</p>
               </div>
             ) : <Unavailable what="Coverage" />}>
             <p>The bar splits the reporting by where each outlet comes from: English national, Indian-language, international, wire. It answers &ldquo;who has this story?&rdquo; at a glance. The count beside it is out of the outlets Prism monitors, and a story only one of them carries is drawn dashed and marked <em>not yet corroborated</em>.</p>
@@ -201,9 +214,7 @@ export async function HowItWorks() {
 
           <Step id="said" n="04" title="Who said what, in their exact words." rule="Verbatim or absent. Every quote links to the line in the article."
             example={event && quote ? (
-              <div className="[&_.card]:border-0 [&_.card]:p-0 card">
-                <Said claims={[{ ...quote, claims: quote.claims.slice(0, 2) }]} sourceIndex={indexSources(event.sources)} />
-              </div>
+              <Said claims={[{ ...quote, claims: quote.claims.slice(0, 2) }]} sourceIndex={indexSources(event.sources)} />
             ) : <Unavailable what="A verified quote" />}>
             <p>Prism pulls out what named people and bodies said, and keeps a quote only if the same words are in the article. Each one names the speaker and their office as the article gave it, the outlet that carried it, and opens the article at that line.</p>
             {quote?.role && <p>Here: {quote.speaker}, {quote.role}.</p>}
@@ -211,108 +222,93 @@ export async function HowItWorks() {
 
           <Step id="brief" n="05" title="A brief written from the reports below it." rule="Written by software from the reports. Why it matters is Prism's reading."
             example={event && points.length > 0 ? (
-              <div className="card">
-                <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>The record · written from {event.sources.length} {event.sources.length === 1 ? "report" : "reports"}</p>
-                <ul className="mt-3 flex flex-col gap-2.5 text-[16px] leading-[1.6]">
+              <div className="grid gap-3" style={{ borderTop: "2px solid var(--ink)", background: "var(--surface)", padding: "14px 18px 18px", borderRadius: "0 0 var(--r-lg) var(--r-lg)" }}>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-[13px] font-semibold">The brief</span>
+                  <span className="p-count ml-auto">{event.sources.length} {event.sources.length === 1 ? "report" : "reports"}</span>
+                </p>
+                <ul className="grid gap-2.5" style={{ font: "var(--t-body)" }}>
                   {points.slice(0, 5).map((p, i) => (
                     <li key={i} className="grid grid-cols-[14px_1fr] gap-x-2">
-                      <span aria-hidden className="mt-[11px] h-1.5 w-1.5 rounded-full" style={{ background: "var(--ink-3)" }} />
+                      <span aria-hidden className="mt-[11px] h-1.5 w-1.5" style={{ background: "var(--ink)" }} />
                       <EntityText text={p} entities={event.entities} claims={event.claims ?? []} />
                     </li>
                   ))}
                 </ul>
-                {watch.length > 0 && (
-                  <p className="mt-4 text-[13.5px]" style={{ color: "var(--ink-3)" }}>What to watch: {watch[0]}</p>
-                )}
+                {watch.length > 0 && <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>What to watch: {watch[0]}</p>}
               </div>
             ) : <Unavailable what="A brief" />}>
             <p>Each point is one fact from the reports, written to stand on its own. The last says why it matters: that one is Prism&rsquo;s reading of the reports, not something an outlet reported. Underlined names are the people and bodies in the story: hover or tap one for who they are and what they said here.</p>
           </Step>
 
           <Step id="lens" n="06" title="Read the same facts for your work." rule="The record never changes. Only the reading does."
-            example={<div className="flex flex-col gap-3"><HeroLensDemo /><p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Illustration · the flip on a sample story</p></div>}>
+            example={event && brief ? (
+              <LensFlip story={{ id: event.id, title: event.title, reports: event.sources.length, brief, points: watch, available: event.available_lenses ?? [] }} />
+            ) : <Unavailable what="A brief to read through a lens" />}>
             <p>A lens is a professional reading of the record: what a story means for markets, or for security teams. Flip it and a scan line re-inks the block; the facts beneath stay exactly where they were.</p>
             <div className="mt-1"><LensRegistry /></div>
           </Step>
 
           <Step id="ask" n="07" title="Ask, and the answer cites the reports." rule="An answer names its sources or says it cannot tell."
-            example={<div className="flex flex-col gap-3"><AskDemo /><p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Illustration</p></div>}>
+            example={event ? (
+              <div className="p-card grid justify-items-start gap-3">
+                <p style={{ font: "var(--t-title-s)" }}>Ask this story</p>
+                {questions.length > 0 && (
+                  <>
+                    <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>The questions its page suggests:</p>
+                    <ul className="flex flex-wrap gap-1.5" aria-label="Suggested questions">
+                      {questions.map((q) => <li key={q} className="p-chip p-chip--q">{q}</li>)}
+                    </ul>
+                  </>
+                )}
+                <Link href={`/story/${event.id}`} className="p-btn p-btn--secondary">Ask on the story</Link>
+              </div>
+            ) : <Unavailable what="A story to ask" />}>
             <p>Every record has a question box. The answer is written only from that story&rsquo;s own reports and cites them by number; when the reports do not say, it says so instead of guessing.</p>
           </Step>
 
-          <section id="refuses" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="refuses-title">
-            <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 08</p>
-            <h2 id="refuses-title" className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">What Prism refuses to do.</h2>
-            <ul className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
-              {REFUSALS.map(([head, body], i) => (
-                <li key={head} className="border-t pt-4" style={{ borderColor: "var(--line)" }}>
-                  <Reveal delay={i * 40}>
-                    <p className="font-record text-[20px] font-bold leading-[1.25]">{head}</p>
-                    <p className="mt-1.5 text-[15px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>{body}</p>
-                  </Reveal>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <Closing id="refuses" n="08" title="What Prism refuses to do.">
+            <RuledList items={REFUSALS} />
+          </Closing>
 
-          <section id="words" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="words-title">
-            <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 09</p>
-            <h2 id="words-title" className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">The words on a record.</h2>
+          <Closing id="words" n="09" title="The words on a record.">
             <dl className="mt-6 grid gap-x-10 md:grid-cols-2">
               {WORDS.map(([term, meaning]) => (
                 <div key={term} className="border-t py-4" style={{ borderColor: "var(--line)" }}>
-                  <dt className="font-record text-[19px] font-bold leading-[1.25]">{term}</dt>
-                  <dd className="mt-1 text-[15px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>{meaning}</dd>
+                  <dt style={{ font: "var(--t-title)" }}>{term}</dt>
+                  <dd className="mt-1" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>{meaning}</dd>
                 </div>
               ))}
             </dl>
-          </section>
+          </Closing>
 
           {/* The address `correctionsPolicy` and `publishingPrinciples` point at
-              (lib/seo.ts). It carried no `id`, so the schema's /about#status
-              resolved to the page and to no anchor on it — and a machine-written
-              byline is exactly what a news policy review reads a page like this
-              to understand. */}
-          <section id="accountability" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="accountability-title">
-            <p className="font-mono text-[11px] tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>STEP 10</p>
-            <h2 id="accountability-title" className="font-record mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">Who writes this, and how to correct it.</h2>
-            <div className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
-              {ACCOUNTABILITY.map(([head, body], i) => (
-                <div key={head} className="border-t pt-4" style={{ borderColor: "var(--line)" }}>
-                  <Reveal delay={i * 40}>
-                    <p className="font-record text-[20px] font-bold leading-[1.25]">{head}</p>
-                    <p className="mt-1.5 text-[15px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>{body}</p>
-                  </Reveal>
-                </div>
-              ))}
-            </div>
-            <p className="mt-5 max-w-[64ch] text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
+              (lib/seo.ts): a machine-written byline is exactly what a news
+              policy review reads a page like this to understand. */}
+          <Closing id="accountability" n="10" title="Who writes this, and how to correct it.">
+            <RuledList items={ACCOUNTABILITY} />
+            <p className="mt-5 max-w-[64ch]" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
               Something wrong in a record is a correction we want: a quote that is not in the article, a
               headline that misreads it, an outlet credited for a photograph that is not theirs. Every record
               has these links at its foot, with its address filled in; or write to{" "}
-              <a className="underline underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>{" "}
+              <a className="p-link" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>{" "}
               with the record&rsquo;s link. {LEGAL_ENTITY} publishes Prism and is answerable for it.
             </p>
             <div className="mt-4 max-w-[420px]"><ReportProblem /></div>
-          </section>
+          </Closing>
 
-          <section id="status" className="scroll-mt-24 border-t py-10 lg:py-14" style={{ borderColor: "var(--line)" }} aria-labelledby="status-title">
-            <h2 id="status-title" className="font-record text-[28px] font-bold leading-[1.15] tracking-[-0.015em] lg:text-[34px]">Where Prism stands today.</h2>
-            <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <StatusColumn tone="now" label="Available now" items={AVAILABLE} />
-              <StatusColumn tone="val" label="In validation" items={VALIDATION} />
-              <StatusColumn tone="next" label="Next" items={NEXT} />
-            </div>
-            <p className="mt-5 max-w-[64ch] text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>{FREE_LINE}</p>
-          </section>
+          <Closing id="status" title="Where Prism stands today.">
+            <StatusColumns />
+            <p className="mt-6 max-w-[64ch]" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>{FREE_LINE}</p>
+          </Closing>
 
-          <section className="border-t py-12 text-center" style={{ borderColor: "var(--line)" }}>
-            <h2 className="font-record text-[30px] font-bold leading-[1.1] tracking-[-0.015em]">Now read one for yourself.</h2>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
-              {event ? <Link href={`/story/${event.id}`} className="btn btn-primary btn-lg">Open the example story <ArrowRight /></Link> : <Link href="/feed" className="btn btn-primary btn-lg">Open today&rsquo;s record <ArrowRight /></Link>}
-              <Link href="/onboarding" className="btn btn-ghost btn-lg">Set up my feed</Link>
+          <section className="grid justify-items-start gap-3.5 border-t pb-6 pt-12" style={{ borderColor: "var(--line)" }} aria-labelledby="final-title">
+            <h2 id="final-title" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>Now read one for yourself.</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {event ? <Link href={`/story/${event.id}`} className="p-btn p-btn--primary p-btn--lg">Open the example story</Link> : <Link href="/feed" className="p-btn p-btn--primary p-btn--lg">Open today&rsquo;s record</Link>}
+              <Link href="/onboarding" className="p-btn p-btn--secondary p-btn--lg">Set up my feed</Link>
             </div>
-            <p className="mt-3 text-[14px]" style={{ color: "var(--ink-3)" }}>Free. No account needed to read.</p>
+            <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>Free. No account needed to read.</p>
           </section>
         </div>
       </div>
@@ -332,7 +328,7 @@ export function ReportsExample({ reports, outlets }: { reports: EventDetail["sou
         </li>
       ))}
       {reports.length > 4 && (
-        <li className="flex items-center gap-2 px-1 text-[13px]" style={{ color: "var(--ink-3)" }}>
+        <li className="flex items-center gap-2 px-1" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
           <span className="inline-flex -space-x-1">{reports.slice(4, 8).map((s) => <OutletIcon key={s.article_id} domain={s.domain} code={s.code ?? "?"} name={s.source_name} size={20} />)}</span>
           and {reports.length - 4} more{outlets.length ? ` from ${publishers(outlets).length} outlets` : ""}
         </li>

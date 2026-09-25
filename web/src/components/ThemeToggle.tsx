@@ -24,11 +24,16 @@ export function ThemeToggle() {
     document.documentElement.dataset.theme = next;
   }
 
-  const effectiveDark = mode ? mode === "dark" : systemPrefersDark();
+  // Known only after mount: the server cannot see the reader's preference, so the first
+  // client render must match it (no hydration mismatch) and the icon settles in an effect.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const effectiveDark = mounted && (mode ? mode === "dark" : systemPrefersDark());
 
   return (
-    <button onClick={toggle} aria-label="Toggle color theme" className="icon-btn">
-      {effectiveDark ? <MoonIcon /> : <SunIcon />}
+    // The icon shows where a tap takes you (Design System v2 · ThemeToggle): a moon on paper, a sun in the dark.
+    <button type="button" onClick={toggle} aria-label={effectiveDark ? "Use light theme" : "Use dark theme"} className="icon-btn">
+      {effectiveDark ? <SunIcon /> : <MoonIcon />}
     </button>
   );
 }

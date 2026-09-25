@@ -136,7 +136,8 @@ describe("AskPanel — submitting", () => {
       s.cb().onDone();
     });
     expect(await screen.findByText(/Because of the contracts\./)).toBeInTheDocument();
-    expect(await screen.findByText(/\[1\] The Hindu/)).toBeInTheDocument();
+    // The cited sources under the answer: [n] then the outlet (v2 · AskAnswer).
+    expect(await screen.findByRole("list", { name: "Sources" })).toHaveTextContent(/\[1\]\s*The Hindu/);
   });
 
   // REGRESSION: `busy` was read from a render closure, so two taps in one React

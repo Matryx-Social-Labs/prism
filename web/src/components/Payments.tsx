@@ -26,26 +26,27 @@ export function Payments({ session }: { session: Session }) {
 
   if (rows === undefined || (rows && rows.length === 0)) return null;
   return (
-    <section className="mt-8" aria-labelledby="payments-title">
+    <section aria-labelledby="payments-title">
       <SectionHead id="payments-title" title="Payments" count={rows?.length} hint="Each invoice is Razorpay's; open it to download the PDF." />
       {rows === null ? (
-        <div className="card" role="status">
-          <p className="text-[14.5px]" style={{ color: "var(--ink-2)" }}>Razorpay could not be reached just now. The receipts in your inbox are the same documents; try again in a minute.</p>
-        </div>
+        <p className="p-alert" role="status">Razorpay could not be reached just now. The receipts in your inbox are the same documents; try again in a minute.</p>
       ) : (
-        <ol className="card divide-y p-0" style={{ borderColor: "var(--line)" }}>
+        <ol>
+          {/* money/PaymentRow: date · plan · amount + state · invoice on a desk; plan and amount lead on the phone. */}
           {rows.map((p) => (
-            <li key={p.invoice_id ?? `${p.paid_at}-${p.amount_paise}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3" style={{ borderColor: "var(--line)" }}>
-              <span className="font-mono text-[12px] tabular-nums" style={{ color: "var(--ink-3)" }}>{when(p.paid_at)}</span>
-              <span className="min-w-0 flex-1 text-[14.5px]">{PLAN_LABEL[p.plan] ?? "Plus"}</span>
-              <span className="font-mono text-[12.5px] tabular-nums">{rupees(p.amount_paise)}</span>
-              <span className="font-mono text-[11px] uppercase tracking-[0.03em]" style={{ color: p.status === "refunded" ? "var(--ink)" : "var(--ink-3)" }}>{p.status}</span>
+            <li key={p.invoice_id ?? `${p.paid_at}-${p.amount_paise}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-3 sm:grid-cols-[124px_minmax(0,1fr)_auto_auto]" style={{ borderTop: "1px solid var(--line)", font: "400 14px/1.3 var(--font-read)" }}>
+              <span className="order-3 font-mono text-[12px] tabular-nums sm:order-none" style={{ color: "var(--ink-2)" }}>{when(p.paid_at)}</span>
+              <span className="order-1 min-w-0 sm:order-none">{PLAN_LABEL[p.plan] ?? "Plus"}</span>
+              <span className="order-2 flex items-center gap-1.5 justify-self-end font-mono text-[12.5px] tabular-nums sm:order-none">
+                {rupees(p.amount_paise)}
+                <span className="p-tag-mono uppercase" style={{ borderStyle: p.status === "refunded" ? "dashed" : "solid" }}>{p.status}</span>
+              </span>
               {p.invoice_url ? (
-                <a href={p.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13.5px] font-semibold underline-offset-[3px] hover:underline" style={{ color: "var(--accent)" }}>
+                <a href={p.invoice_url} target="_blank" rel="noopener noreferrer" className="p-link order-4 inline-flex min-h-[44px] items-center gap-1 justify-self-end text-[13px] sm:order-none sm:min-h-0">
                   Invoice <ArrowUpRight size={13} />
                 </a>
               ) : (
-                <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>—</span>
+                <span className="order-4 justify-self-end font-mono text-[11px] sm:order-none" style={{ color: "var(--ink-3)" }}>—</span>
               )}
             </li>
           ))}

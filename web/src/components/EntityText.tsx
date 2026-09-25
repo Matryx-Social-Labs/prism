@@ -17,6 +17,7 @@ import { entityKind, markEntities, type Segment } from "@/lib/entities";
  * never altered: the mark wraps the words the article used.
  */
 const CLOSE_MS = 120;
+const CARD_W = 280;
 
 export function EntityText({
   text,
@@ -54,11 +55,19 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
   const wrap = useRef<HTMLSpanElement>(null);
   const timer = useRef<number | null>(null);
   const said = claims.find((sp) => norm(sp.speaker) === norm(entity.name));
-  const href = `/search?q=${encodeURIComponent(entity.name)}`;
+  // The actor's page when the server has one (identity is the server's), else search.
+  const href = entity.slug ? `/entity/${entity.slug}` : `/search?q=${encodeURIComponent(entity.name)}`;
+  // The card opens under the mark, nudged left just enough to stay on screen.
+  const [dx, setDx] = useState(0);
   const kind = entityKind(entity);
 
   const show = () => {
     if (timer.current) window.clearTimeout(timer.current);
+    const r = wrap.current?.getBoundingClientRect();
+    if (r) {
+      const w = Math.min(CARD_W, window.innerWidth - 32);
+      setDx(Math.max(16 - r.left, Math.min(0, window.innerWidth - 16 - w - r.left)));
+    }
     setOpen(true);
   };
   const hide = () => {
@@ -84,13 +93,13 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
     <span ref={wrap} className="relative inline" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
       <Link
         href={href}
-        className="ent"
+        className="p-ent"
         aria-describedby={open ? id : undefined}
         onClick={(e) => {
           // On touch, the first tap opens the card; the card's own link follows.
           if (window.matchMedia("(hover: none)").matches && !open) {
             e.preventDefault();
-            setOpen(true);
+            show();
           }
         }}
       >
@@ -100,34 +109,31 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
         <span
           id={id}
           role="tooltip"
-          className="card absolute left-0 top-full z-30 mt-1.5 flex w-[260px] flex-col gap-2 p-3 text-left not-italic"
-          style={{ boxShadow: "var(--shadow-2)", font: "400 14px/1.5 var(--font-ui)", letterSpacing: 0 }}
+          className="absolute top-[calc(100%+6px)] z-30 grid gap-2 p-3.5 text-left not-italic"
+          style={{ left: dx, width: CARD_W, maxWidth: "calc(100vw - 32px)", background: "var(--elevated)", border: "1px solid var(--line-strong)", borderRadius: "var(--r-lg)", boxShadow: "var(--shadow-2)", font: "var(--t-body-s)", color: "var(--ink)", letterSpacing: 0 }}
         >
-          <span className="flex items-baseline justify-between gap-3">
-            <b className="text-[15px] font-semibold" style={{ color: "var(--ink)" }}>{entity.name}</b>
-            <span className="text-[11.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>{kind}</span>
+          <span className="grid gap-0.5">
+            <b style={{ font: "var(--t-title-s)" }}>{entity.name}</b>
+            <span className="text-[12.5px] font-medium leading-[1.3]" style={{ color: "var(--ink-3)" }}>
+              {[kind, said?.role ?? (entity.role ? entity.role.replace(/_/g, " ") : null)].filter(Boolean).join(" · ")}
+            </span>
           </span>
-          {said?.role && <span className="text-[13px]" style={{ color: "var(--ink-2)" }}>{said.role}</span>}
-          {said ? (
-            <a href="#said" className="text-[13.5px]" style={{ color: "var(--ink-2)" }} onClick={() => setOpen(false)}>
+          {said && (
+            <a href="#said" className="font-semibold" style={{ color: "var(--accent)" }} onClick={() => setOpen(false)}>
               Quoted {said.claims.length} {said.claims.length === 1 ? "time" : "times"} on this story ↓
             </a>
-          ) : (
-            <span className="text-[13.5px]" style={{ color: "var(--ink-2)" }}>
-              Named in the reports{entity.role ? ` · ${entity.role.replace(/_/g, " ")}` : ""}.
-            </span>
           )}
           {ask && (
             <button
               type="button"
               onClick={() => { setOpen(false); ask({ prefill: `What do the reports say about ${entity.name} on this story?`, via: "entity" }); }}
-              className="text-left text-[13.5px] font-semibold"
+              className="text-left font-semibold"
               style={{ color: "var(--ink-2)" }}
             >
               Ask about {entity.name} on this story
             </button>
           )}
-          <Link href={href} className="text-[13.5px] font-semibold" style={{ color: "var(--accent)" }}>
+          <Link href={href} className="font-semibold" style={{ color: "var(--ink-2)" }}>
             All stories about {entity.name} →
           </Link>
         </span>

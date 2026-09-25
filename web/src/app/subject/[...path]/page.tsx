@@ -69,7 +69,7 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
       <main className="mx-auto w-full max-w-[860px] px-4 pb-20 pt-4">
         <header className="border-t pt-3" style={{ borderColor: "var(--rule)" }}>
           {ancestors.length > 0 && (
-            <nav aria-label="Breadcrumb" className="font-mono text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--ink-3)" }}>
+            <nav aria-label="Breadcrumb" className="p-eyebrow">
               {ancestors.map((a) => (
                 <Link key={a.path} href={href(a.path)} className="underline-offset-4 hover:underline">
                   {a.label}
@@ -93,11 +93,11 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
         {stories.length === 0 ? (
           <p className="mt-6 text-[15px]" style={{ color: "var(--ink-2)" }}>No stories here yet.</p>
         ) : (
-          <div className="mt-4">
+          <ol className="p-print mt-4 grid gap-3">
             {stories.map((item, i) => (
               <ChartRow key={item.id} item={item} lead={i === 0} />
             ))}
-          </div>
+          </ol>
         )}
       </main>
     </>

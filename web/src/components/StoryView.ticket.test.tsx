@@ -157,7 +157,8 @@ describe("the record — the route", () => {
     const route = await screen.findByRole("region", { name: /how this story unfolded/i });
     expect(within(route).getByText(/2 DEVELOPMENTS · 0 BRANCHED OFF · 0 ALSO REPORTED · 4 DAYS/)).toBeInTheDocument();
     expect(within(route).getByRole("link", { name: /How it started/ })).toHaveAttribute("href", "/story/e0");
-    expect(screen.getByRole("link", { name: "How it unfolded" })).toHaveAttribute("href", "#route");
+    // Scoped to the desk column (the phone's tab row repeats it); the count is the developments.
+    expect(within(screen.getByRole("complementary", { name: "On this story" })).getByRole("link", { name: /^How it unfolded/ })).toHaveAttribute("href", "#route");
   });
 
   it("shows no route section and no Route anchor when the ticket carries no slug", async () => {
@@ -183,7 +184,7 @@ describe("the record — the route", () => {
     const coverage = await screen.findByRole("region", { name: /^related reporting$/i });
     expect(within(coverage).getByText(/under human review\. No chronology is implied/i)).toBeInTheDocument();
     expect(within(coverage).queryByLabelText("Storyline structure")).toBeNull();
-    expect(screen.getByRole("link", { name: "Related reporting" })).toHaveAttribute("href", "#route");
+    expect(within(screen.getByRole("complementary", { name: "On this story" })).getByRole("link", { name: "Related reporting" })).toHaveAttribute("href", "#route");
   });
 });
 

@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { Reveal } from "@/components/Reveal";
+
 /** Where Prism stands: what is live, what is being validated, what is next. Shared by the landing and the walkthrough. */
 export const AVAILABLE = [
   "One record per story from monitored outlets, across languages",
@@ -23,22 +26,52 @@ export const NEXT = [
 ];
 
 /** The truth layer is never the premium feature (strategy report, 2026-09-24). */
-export const FREE_LINE =
-  "The evidence is free and stays free: every record, every report behind it, every verified quote, the coverage and its count, and the story status, for every reader, with or without an account. What can be paid for is depth and convenience: more questions, professional readings, watchlists and alerts.";
+export const FREE_EVIDENCE =
+  "The evidence is free and stays free: every record, every report behind it, every verified quote, the coverage and its count, and the story status, for every reader, with or without an account.";
+export const FREE_LINE = `${FREE_EVIDENCE} What can be paid for is depth and convenience: more questions, professional readings, watchlists and alerts.`;
+/** What Plus carries today, as the pricing page lists it (components/PlusPage.tsx). */
+const PLUS_LINE = "More questions a day, answers drawn from the whole story, and a larger model on every answer.";
 
-export function StatusColumn({ tone, label, items }: { tone: "now" | "val" | "next"; label: string; items: string[] }) {
-  const color = tone === "now" ? "var(--lens-markets)" : tone === "val" ? "var(--status-disputed)" : "var(--ink-3)";
+// State is line form (Design System v2): solid is live, dashed is being
+// validated, dotted is not built yet. The label says it too; the rule never
+// carries the meaning alone.
+const RULE = { now: "solid", val: "dashed", next: "dotted" } as const;
+
+export function StatusColumn({ tone, label, items }: { tone: keyof typeof RULE; label: string; items: string[] }) {
   return (
-    <div className="card">
-      <h3 className="mb-3 text-[12.5px] font-semibold uppercase tracking-[0.08em]" style={{ color }}>{label}</h3>
-      <ul className="flex flex-col gap-2 text-[14.5px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
-        {items.map((item) => (
-          <li key={item} className="flex gap-2.5">
-            <span aria-hidden className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color, opacity: 0.6 }} />
-            <span>{item}</span>
-          </li>
-        ))}
+    <div className="pt-3" style={{ borderTop: `3px ${RULE[tone]} var(--ink)` }}>
+      <h3 className="p-eyebrow">{label}</h3>
+      <ul className="mt-2 grid gap-1.5">
+        {items.map((item) => <li key={item} style={{ font: "var(--t-body-s)" }}>{item}</li>)}
       </ul>
+    </div>
+  );
+}
+
+/** Available now · In validation · Next, each printing in as it is reached. */
+export function StatusColumns() {
+  const cols = [["now", "Available now", AVAILABLE], ["val", "In validation", VALIDATION], ["next", "Next", NEXT]] as const;
+  return (
+    <div className="mt-[18px] grid gap-5 lg:grid-cols-3">
+      {cols.map(([tone, label, items], i) => (
+        <Reveal key={tone} delay={i * 90}><StatusColumn tone={tone} label={label} items={[...items]} /></Reveal>
+      ))}
+    </div>
+  );
+}
+
+/** Free and Plus, side by side. The price is the pricing source's own (`plusFrom`), or not printed. */
+export function PlanCards({ plusFrom }: { plusFrom: string | null }) {
+  return (
+    <div className="mt-7 grid gap-3 lg:grid-cols-2">
+      <div className="p-card">
+        <h3 className="p-eyebrow">Free</h3>
+        <p className="mt-1.5" style={{ font: "var(--t-body-s)" }}>{FREE_EVIDENCE}</p>
+      </div>
+      <div className="p-card" style={{ borderTop: "3px solid var(--accent)" }}>
+        <h3 className="p-eyebrow" style={{ color: "var(--accent)" }}>Prism Plus{plusFrom ? ` · from ${plusFrom} a month` : ""}</h3>
+        <p className="mt-1.5" style={{ font: "var(--t-body-s)" }}>{PLUS_LINE} <Link href="/plus" className="p-link">See Plus</Link></p>
+      </div>
     </div>
   );
 }

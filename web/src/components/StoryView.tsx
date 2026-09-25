@@ -1,25 +1,24 @@
 "use client";
 
+import { Ago } from "@/components/Ago";
 import Link from "next/link";
 import { track } from "@/lib/analytics";
 import { cameFromInside } from "@/lib/nav";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchBrief, fetchQuestions, type EventDetail, type OutletRef, type TrendingStoryDetail } from "@/lib/api";
 import { headlineByline } from "@/lib/headline";
 import { useStateNames } from "@/lib/useStateName";
 import { useRouter } from "next/navigation";
 
 import { lensMeta, useLenses } from "@/lib/lenses";
-import { flipDuration } from "@/lib/motion";
-import { ArrowDown, ArrowLeft, ArrowUp, Dash, Lock, Speech } from "@/components/icons";
+import { ArrowDown, ArrowLeft, ArrowUp, Dash } from "@/components/icons";
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
 import { AskBar } from "@/components/AskBar";
 import { AskContext, type AskOpen } from "@/components/AskContext";
 import { SelectionAsk } from "@/components/SelectionAsk";
-import { Brand } from "@/components/Brand";
-import { CoverageBar, CoverageLegend, MonogramStack, OutletIcon, languageNames, languagesOf, publishers } from "@/components/Coverage";
+import { CoverageBar, CoverageLegend, MonogramStack, coverageText, languageNames, languagesOf, publishers } from "@/components/Coverage";
 import { monitoredText } from "@/lib/coverage";
 import { EntityText } from "@/components/EntityText";
 import { ShareButton } from "@/components/ShareButton";
@@ -32,23 +31,31 @@ import { Said } from "@/components/Said";
 import { Clips } from "@/components/Clips";
 import { X_POSTS, XPosts } from "@/components/XPosts";
 import { SectionHead as Head } from "@/components/SectionHead";
-import { SourceList, fallbackCode, indexSources } from "@/components/SourceList";
+import { SourceList, indexSources } from "@/components/SourceList";
 import { PhotoDeck } from "@/components/PhotoDeck";
 import { Rail } from "@/components/Rail";
-import { BriefPlayer } from "@/components/BriefPlayer";
+import { Reveal } from "@/components/Reveal";
+import { BriefText, ListenBox, useNarration } from "@/components/BriefPlayer";
 import { FollowSignals } from "@/components/FollowSignals";
-import { relativeTime, shortDate } from "@/lib/dateline";
+import { ChangeTimeline } from "@/components/story/ChangeTimeline";
+import { Impacts } from "@/components/story/Impacts";
+import { LensBrief, LensLocked, LensSwitch, LensUsed, LensWriting } from "@/components/story/LensBrief";
+import { ReadProgress, SectionRail, SectionTabs, jumpTo, type NavItem } from "@/components/story/StoryNav";
+import { StoryActionBar } from "@/components/story/StoryActionBar";
+import { shortDate } from "@/lib/dateline";
 import { sectorGroup } from "@/lib/sectors";
+import { sentences } from "@/lib/sentences";
 
 /**
- * The story record (DESIGN.md § Record). Six sections in one order at every
- * width — The record · What changed · Who said what · Story (or the coverage
- * grouping under review) · Why it matters · Coverage — then Ask, subordinate
- * to the evidence. The header answers what happened, how current it is and
- * how well supported before anything else. The lens flip keeps its mechanics
- * (the locked flip, the gate, keys 1/2/3); its control is one segmented
- * switch, on the header at desktop widths and above the record text on the
- * phone. No publisher photograph anywhere on the page.
+ * The story record (Design System v2 · Pages v3 · Story). One order at every
+ * width — Brief · What changed · Who said what · Heard on · On X · How it
+ * unfolded · Why it matters · Coverage · Ask — each section only when the
+ * record has its data, the nav counting what is there. The header answers
+ * what happened, how current it is and how well supported before anything
+ * else, with counted stats that jump to their section. The lens flip keeps its
+ * mechanics (the locked flip, the gate, keys 1/2/3). Phone: back bar, sticky
+ * section tabs, the photo deck above the header, the Ask/Share thumb bar.
+ * Desk: "On this story" beside the record, the reports and the named beside it.
  */
 
 function regionName(code: string): string {
@@ -60,7 +67,6 @@ function regionName(code: string): string {
 }
 
 const SOURCES_FOLD = 8;
-const CHANGED_FOLD = 5;
 
 /** Registered-source facts from the event's own report list (one per report). */
 function outletsOf(event: EventDetail): OutletRef[] {
@@ -84,12 +90,8 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   const [lens, setLens] = useState("reader");
   const [briefs, setBriefs] = useState<Record<string, string>>(event.lens_briefs ?? {});
+  // Every block after the first the reader picks flips in (LensBrief).
   const [flipped, setFlipped] = useState(false);
-  // The flip's clock is the new block's height, measured before it paints.
-  const flipRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (flipped && flipRef.current) flipRef.current.style.setProperty("--flip-ms", `${flipDuration(flipRef.current.offsetHeight)}ms`);
-  }, [flipped, lens]);
   const [points, setPoints] = useState<Record<string, string[]>>(event.lens_points ?? {});
   const [briefLoading, setBriefLoading] = useState(false);
   // Which paywall wall this lens hit, if any. Null means the lens is readable.
@@ -203,22 +205,21 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Gated here, not inside the component: a section head with nothing under it
   // would advertise the kill switch.
   const xposts = X_POSTS ? (event.x_posts ?? []) : [];
-  const navItems: { id: string; label: string; count?: number }[] = [
-    { id: "lens-brief", label: "The record" },
+  const developments = boundaryVerified ? (routeStory?.developments.length ?? 0) : 0;
+  const navItems: NavItem[] = [
+    { id: "lens-brief", label: "Brief" },
     ...(reports.length > 1 ? [{ id: "changed", label: "What changed", count: reports.length }] : []),
     // Only when there is something to jump to: 55% of stories have no attributed
     // quote, and a permanent "0" would advertise absence on every other page.
     ...(quoteCount > 0 ? [{ id: "said", label: "Who said what", count: quoteCount }] : []),
     ...(clips.length > 0 ? [{ id: "heard", label: "Heard on", count: clips.length }] : []),
     ...(xposts.length > 0 ? [{ id: "on-x", label: "On X", count: xposts.length }] : []),
-    ...(event.story_slug ? [{ id: "route", label: boundaryVerified ? "How it unfolded" : "Related reporting" }] : []),
+    ...(event.story_slug ? [{ id: "route", label: boundaryVerified ? "How it unfolded" : "Related reporting", count: developments > 1 ? developments : undefined }] : []),
     ...(event.impacts.length > 0 ? [{ id: "so-what", label: "Why it matters", count: event.impacts.length }] : []),
     { id: "sources", label: "Coverage", count: outletCount },
     { id: "ask", label: "Ask" },
   ];
 
-  // Lightweight scroll-spy so the rail nav highlights the section in view.
-  const [activeSection, setActiveSection] = useState("lens-brief");
   const [askOpen, setAskOpen] = useState(false);
   // What opened Ask and with what (AskContext); the nonce makes a repeat new.
   const [askRequest, setAskRequest] = useState<(AskOpen & { nonce: number }) | null>(null);
@@ -227,7 +228,6 @@ export function StoryView({ event }: { event: EventDetail }) {
     setAskOpen(true);
   }, []);
   const [allSources, setAllSources] = useState(false);
-  const [allReports, setAllReports] = useState(false);
 
   // Picking a lens must SHOW the result: on the phone the record text can be
   // off-screen, so the flip happens where nobody can see it and the tap reads
@@ -261,47 +261,11 @@ export function StoryView({ event }: { event: EventDetail }) {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offered]);
-  useEffect(() => {
-    const els = navItems
-      .map((n) => document.getElementById(n.id))
-      .filter((el): el is HTMLElement => el != null);
-    if (els.length === 0) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]) setActiveSection(visible[0].target.id);
-      },
-      { rootMargin: "-15% 0px -75% 0px" }
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id]);
-
-  const lensControl = (
-    <div className="seg" role="tablist" aria-label="Read it as">
-      {offered.map((slug) => {
-        const m = lensMeta(slug);
-        const selected = slug === lens;
-        const locked = isLocked(slug);
-        return (
-          <button
-            key={slug}
-            role="tab"
-            aria-selected={selected}
-            onClick={() => pickLens(slug)}
-            aria-label={locked ? `${m.short} lens, sign in to unlock, free` : undefined}
-            style={selected ? { color: m.color } : undefined}
-          >
-            {locked && <Lock className="opacity-60" />}
-            {m.short}
-          </button>
-        );
-      })}
-    </div>
-  );
+  // The brief's lines, read aloud one at a time; another lens stops the voice.
+  const lensPointsRaw = points[lens];
+  const briefSentences = useMemo(() => (brief ? sentences(brief) : []), [brief]);
+  const narrationBlocks = useMemo(() => [...briefSentences, ...(lensPointsRaw ?? [])], [briefSentences, lensPointsRaw]);
+  const narration = useNarration(narrationBlocks, `${lens}|${brief ?? ""}`);
 
   // Region labels are places on the chart, not actors with a page; only the
   // cast links out (audit H29 — these chips used to point at /search, which is
@@ -319,22 +283,144 @@ export function StoryView({ event }: { event: EventDetail }) {
         </span>
       )}
       {gapText && <span className="inline-flex items-center gap-2"><Dash /> {gapText}</span>}
-      {event.coverage?.single_origin && <span className="font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-3)" }}>Single origin</span>}
+      {event.coverage?.single_origin && <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>Single origin</span>}
     </>
   );
 
+  // The header's counted stats: only what the record has, each a way to its section.
+  const langCount = outlets.length ? languagesOf(outlets).length : 0;
+  const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+  const stats: { n: number; label: string; to: string }[] = [
+    { n: outletCount, label: plural(outletCount, "outlet", "outlets"), to: "sources" },
+    ...(langCount > 0 ? [{ n: langCount, label: plural(langCount, "language", "languages"), to: "sources" }] : []),
+    { n: sourceCount, label: plural(sourceCount, "report", "reports"), to: reports.length > 1 ? "changed" : "sources" },
+    ...(quoteCount > 0 ? [{ n: quoteCount, label: plural(quoteCount, "quote", "quotes"), to: "said" }] : []),
+    ...(developments > 1 ? [{ n: developments, label: "developments", to: "route" }] : []),
+  ];
+  const reportWord = plural(sourceCount, "report", "reports");
+  const saidOutlets = new Set(claims.flatMap((sp) => sp.claims.map((c) => c.source_name))).size;
+  const saidLangs = new Set(claims.flatMap((sp) => sp.claims.map((c) => c.lang)).filter(Boolean)).size;
+
+  // Facts first — they are the record; the brief beneath is a reading of it.
+  const lensFacts = (
+    <>
+      {lens === "cyber" && cyber && !isLocked(lens) && (
+        <div className="grid gap-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {cvss.score != null && <span className="p-badge font-mono" style={{ background: "var(--lens-soft)", color: "var(--lens)" }}>CVSS {cvss.score.toFixed(1)}</span>}
+            {exploitation.kev_listed && <span className="p-badge font-mono" style={{ background: "var(--lens-soft)", color: "var(--lens)" }}>KEV listed</span>}
+            {exploitation.poc_public && <span className="p-badge font-mono" style={{ background: "var(--lens-soft)", color: "var(--lens)" }}>PoC public</span>}
+            {cvss.vector && <span className="p-count" style={{ overflowWrap: "anywhere" }}>{cvss.vector}</span>}
+          </div>
+          {(cyber.affected ?? []).length > 0 && (
+            <div>
+              <h3 className="p-eyebrow mb-1.5">Affected products</h3>
+              <ul className="grid gap-1" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+                {(cyber.affected ?? []).map((a, i) => (
+                  <li key={i}>
+                    {a.vendor} {a.product}{" "}
+                    {a.versions && <span className="font-mono text-xs">({a.versions})</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {cyber.remediation?.action && (
+            <div className="rounded-[var(--r-md)] px-4 py-3" style={{ background: "var(--lens-soft)", color: "var(--ink)", font: "var(--t-body-s)" }}>
+              <strong>Required action:</strong> {cyber.remediation.action}
+            </div>
+          )}
+          {(cyber.control_mapping ?? []).length > 0 && (
+            <div className="p-hide-scroll overflow-x-auto">
+              <table className="p-table">
+                <thead>
+                  <tr><th>Framework</th><th>Control</th><th>Why it matters here</th></tr>
+                </thead>
+                <tbody>
+                  {(cyber.control_mapping ?? []).map((cm, i) => (
+                    <tr key={i}>
+                      <td className="font-mono text-xs">{cm.framework}</td>
+                      <td className="font-semibold">{cm.control}</td>
+                      <td style={{ color: "var(--ink-2)" }}>{cm.relevance}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+      {lens === "markets" && finance && !isLocked(lens) && (
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-2 font-mono text-[11.5px]" style={{ color: "var(--ink-2)" }}>
+            {(finance.tickers ?? []).map((t) => <span key={t} className="p-badge font-mono" style={{ background: "var(--lens-soft)", color: "var(--lens)" }}>{t}</span>)}
+            {finance.catalyst && <span>catalyst · {finance.catalyst.replaceAll("_", " ")}</span>}
+            {finance.price_impact?.direction && (
+              <span className="inline-flex items-center gap-1">
+                · price read
+                <span className="inline-flex" aria-label={finance.price_impact.direction}>
+                  {finance.price_impact.direction === "up" ? <ArrowUp /> : finance.price_impact.direction === "down" ? <ArrowDown /> : <Dash />}
+                </span>
+                {finance.price_impact.magnitude ?? ""}
+                {finance.price_impact.confidence != null && ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
+              </span>
+            )}
+          </div>
+          <FollowSignals tickers={finance.tickers ?? []} sector={finance.sector ?? null} />
+        </div>
+      )}
+    </>
+  );
+
+  // The lens block's body, by state. OUT OF SAMPLES is a different wall from
+  // NOT SIGNED IN, and the reader needs a different next step for each; `null`
+  // remaining means no quota row was ever granted, which is not "0 left".
+  const ready = !(gateState?.lens === lens) && !isLocked(lens) && !!brief;
+  const lensBody =
+    gateState?.lens === lens && gateState.kind === "no_samples" ? (
+      <LensUsed meta={meta} remaining={gateState.remaining} onReader={() => setLens("reader")} />
+    ) : isLocked(lens) || gateState?.lens === lens ? (
+      <LensLocked meta={meta} onSignIn={() => router.push(`/signin?next=/story/${event.id}`)} />
+    ) : briefLoading && !brief ? (
+      <LensWriting meta={meta} />
+    ) : brief ? (
+      <>
+        {lensFacts}
+        <BriefText sentences={briefSentences} points={lensPoints} active={narration.active} meta={meta} pointsHeading={pointsHeading} entities={event.entities} claims={claims} />
+        {lens === "reader" && lensPoints.length > 0 && (
+          <p className="text-[13px] leading-[1.4]" style={{ color: "var(--ink-3)" }}>The points restate the reports; where one says why it matters, that is Prism&apos;s reading, not a reported fact.</p>
+        )}
+      </>
+    ) : (
+      <>
+        {lensFacts}
+        <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>No {meta.short} read of this story yet.</p>
+      </>
+    );
+  const lensIntro =
+    lens === "reader"
+      ? `Written by software from the ${sourceCount} ${reportWord} below.`
+      : `The same reports, read for ${meta.plain ?? meta.short.toLowerCase()}.`;
+
+  const lensOffered = offered.map((slug) => lensMeta(slug));
+  // A section: its head under the 3px rule, then the body.
+  const sec = "scroll-mt-[110px] pt-8 lg:pt-11";
+
   return (
     <AskContext.Provider value={openAsk}>
-      {/* Phone back bar: the way back, the mark, Share. The thumb bar below
-          carries Share and Ask; the tab bar is hidden on the record. */}
-      {/* Full-bleed by being OUTSIDE the padded shell, not by negative margins:
-          -mx-5 here pushed the bar 20px past the viewport and gave the whole
-          record page a sideways scroll on every phone (2026-09-21). */}
-      <div className="glass sticky top-0 z-30 flex h-[52px] items-center justify-between border-b px-3 sm:px-6 lg:hidden" style={{ borderColor: "var(--line)" }}>
+      <ReadProgress />
+      {/* Phone back bar: the way back. The thumb bar carries Ask and Share;
+          the tab bar is hidden on the record. Full-bleed by being OUTSIDE the
+          padded shell, never by negative margins (a sideways scroll, 2026-09-21). */}
+      <div
+        className="sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 border-b px-2 lg:hidden"
+        style={{ borderColor: "var(--line)", background: "color-mix(in srgb, var(--paper) 92%, transparent)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
+      >
         <Link
           href="/feed"
           scroll={false}
-          className="btn btn-ghost btn-sm gap-1.5"
+          className="inline-flex min-h-[44px] items-center gap-1.5 px-2 text-[15px] font-semibold"
+          style={{ color: "var(--ink)" }}
           aria-label="Back to today"
           onClick={(e) => {
             // Came here from inside Prism: real back, so the list they left is
@@ -345,452 +431,246 @@ export function StoryView({ event }: { event: EventDetail }) {
             }
           }}
         >
-          <ArrowLeft /> Today
+          <ArrowLeft size={18} /> Today
         </Link>
-        <Brand size={22} label="Prism, today" />
-        <span className="w-[76px]" aria-hidden />
       </div>
+      <SectionTabs items={navItems} />
 
-      <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+40px)] pt-4 sm:px-8 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-8 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)] xl:gap-x-10 lg:pb-20 lg:pt-7 xl:px-10">
-        {/* ── On this story (desktop rail) ─────────────────────── */}
-        <aside className="hidden lg:block lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start" aria-label="On this story">
-          <p className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>On this story</p>
-          <ul>
-            {navItems.map((n, i) => (
-              <li key={n.id} className={i > 0 ? "border-t" : ""} style={i > 0 ? { borderColor: "var(--line)" } : undefined}>
-                <a
-                  href={`#${n.id}`}
-                  className="flex items-center justify-between py-2.5 text-[14px] underline-offset-4 hover:underline"
-                  style={{ color: activeSection === n.id ? "var(--accent)" : "var(--ink-2)", fontWeight: activeSection === n.id ? 600 : 500 }}
-                  aria-current={activeSection === n.id ? "true" : undefined}
-                >
-                  <span>{n.label}</span>
-                  {n.count != null && <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{n.count}</span>}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </aside>
+      <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(env(safe-area-inset-bottom)+96px)] pt-3.5 lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10 lg:pb-16 lg:pt-7 xl:grid-cols-[var(--rail)_minmax(0,var(--reading))_var(--evidence)] xl:justify-between">
+        <SectionRail items={navItems} />
 
-        <div className="min-w-0">
-          {/* ── The header ─────────────────────────────────────── */}
-          <header className="border-b pb-5 lg:max-w-[var(--reading)]" style={{ borderColor: "var(--line)" }}>
-            <div className="meta-line flex-wrap">
+        <article className="flex min-w-0 flex-col lg:max-w-[var(--reading)]">
+          {/* ── The header: what happened, how current, how well supported ── */}
+          <header>
+            <div className="meta-line p-meta flex-wrap normal-case">
+              {single && <StatusPill status="single" label="Single source · not yet corroborated" />}
               {routeStory && event.story_slug && (
                 <StatusPill status={boundaryVerified ? "verified" : "provisional"} title={boundaryVerified ? "Story boundary verified; developments below are in sequence." : "Grouping provisional; related reporting is shown without implying chronology."} />
               )}
               {(event.corrections?.length ?? 0) > 0 && (
                 <a href="#history"><StatusPill status="corrected" label={`Corrected ${shortDate(event.corrections![0].created_at)}`} /></a>
               )}
-              <span>Updated <time dateTime={event.last_updated_at}>{relativeTime(event.last_updated_at)}</time></span>
+              <span className="p-meta__prov">Updated <Ago iso={event.last_updated_at} /></span>
               {group && (
                 <>
-                  <span className="dot" />
-                  <span>{group.name}</span>
+                  <span className="p-meta__sep" />
+                  <span className="p-meta__subject">{group.name}</span>
                 </>
               )}
               {(cyber?.cve_ids ?? []).slice(0, 3).map((cve) => (
-                <span key={cve} style={{ color: "var(--ink)" }}>{cve}</span>
+                <span key={cve} className="p-meta__prov" style={{ color: "var(--ink)" }}>{cve}</span>
               ))}
             </div>
-            <h1 className="font-record mt-3 max-w-[24ch] text-[30px] font-bold leading-[1.22] text-balance sm:text-[38px]">
+            <h1 className="mt-3 text-balance" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)", overflowWrap: "anywhere" }}>
               {event.title}
             </h1>
-            <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{headlineByline(event)}</p>
+            <p className="mt-2 text-[13px] font-medium leading-[1.3]" style={{ color: "var(--ink-3)" }}>{headlineByline(event)}</p>
             {event.summary && (
-              <EntityText as="p" text={event.summary} entities={event.entities} claims={claims} className="mt-3 max-w-[62ch] text-[17px] leading-[1.55]" style={{ color: "var(--ink-2)", textWrap: "pretty" }} />
+              <EntityText as="p" text={event.summary} entities={event.entities} claims={claims} className="mt-3" style={{ font: "var(--t-body-l)", color: "var(--ink)", textWrap: "pretty" }} />
             )}
-            {/* Icons and bar are one unit; on a narrow screen the text and the
-                status pill wrap beneath them rather than the icons standing alone. */}
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="inline-flex items-center gap-3">
-                <MonogramStack outlets={outlets} limit={5} />
-                <CoverageBar outlets={outlets} fallbackCount={sourceCount} size="lg" draw />
-              </span>
-              {/* How sure: the count out of the monitored set, never out of
-                  everyone who covered it, and when the outlets were last read. */}
-              <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>
-                <Link href="/sources" className="underline-offset-4 hover:underline">{monitoredText(outletCount, event.monitored_outlets)}</Link> · {sourceCount} {sourceCount === 1 ? "report" : "reports"}
-                {outlets.length > 0 && ` · ${languageNames(languagesOf(outlets))}`}
-                {event.monitored_checked_at && ` · checked ${relativeTime(event.monitored_checked_at)}`}
-              </span>
-              {single && <StatusPill status="provisional" label="Single source · not yet corroborated" />}
+            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(92px,1fr))] gap-2">
+              {stats.map((st, i) => (
+                <Reveal key={st.label} delay={i * 50}>
+                  <button type="button" className="sc-stat w-full" onClick={() => jumpTo(st.to)}>
+                    <b>{st.n}</b>
+                    <span>{st.label}</span>
+                  </button>
+                </Reveal>
+              ))}
             </div>
-            <div className="mt-6"><PhotoDeck sources={event.sources} /></div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {/* No Ask button here: on a desk the bar rides the foot of the
-                  viewport the whole way down (AskBar); on the phone it is in
-                  the thumb zone. One affordance, always in reach. */}
-              <span className="hidden lg:inline-flex"><ShareButton url={`/story/${event.id}`} title={event.title} /></span>
-              <span className="flex-1" />
-              {lensControl}
+            {/* How sure: the count out of the monitored set, never out of
+                everyone who covered it, and when the outlets were last read. */}
+            <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <MonogramStack outlets={outlets} limit={4} size={24} />
+              <CoverageBar outlets={outlets} fallbackCount={sourceCount} size="lg" width={220} draw className="lg:!hidden" />
+              <CoverageBar outlets={outlets} fallbackCount={sourceCount} size="lg" width={360} draw className="!hidden lg:!inline-flex" />
+              <span className="font-mono text-[12px] leading-[1.5]" style={{ color: "var(--ink-3)" }}>
+                <Link href="/sources" className="hover:underline">{monitoredText(outletCount, event.monitored_outlets)}</Link> · {sourceCount} {reportWord}
+                {outlets.length > 0 && ` · ${languageNames(languagesOf(outlets))}`}
+                {event.monitored_checked_at && <> · checked <Ago iso={event.monitored_checked_at} /></>}
+              </span>
             </div>
           </header>
 
-          <article className="min-w-0 lg:max-w-[var(--reading)]">
-            {/* ── The record — the lens block, the product moment ─────
-                Mechanics unchanged: the locked flip, the gate, the keys. */}
-            <section id="lens-brief" data-askable className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }}>
-              <Head
-                id="record-title"
-                title="The record"
-                hint={lens === "reader" ? `Written by software from the ${sourceCount} ${sourceCount === 1 ? "report" : "reports"} below. The points restate them; where one says why it matters, that is Prism's reading, not a reported fact.` : `The same reports, read for ${meta.plain ?? meta.short.toLowerCase()}.`}
-                right={
-                  <span className="hidden items-center gap-2 font-mono text-[11px] lg:inline-flex" style={{ color: "var(--ink-3)" }} aria-hidden>
-                    {offered.length > 1 && <>Press {offered.map((_, i) => i + 1).join(" · ")}</>}
-                  </span>
-                }
-              />
-              <div
-                key={lens}
-                ref={flipRef}
-                className={`${flipped ? "flip-body" : ""} relative flex flex-col gap-[18px] overflow-hidden`}
-              >
-                {flipped && <span aria-hidden className="flip-scanline" style={{ background: meta.color }} />}
-                {lens !== "reader" && !isLocked(lens) && (
-                  <p className="lensdot" style={{ color: meta.color }}><i /> {meta.short} read</p>
-                )}
-                {/* Facts first — they are the record; the brief beneath is a reading of it. */}
-                {lens === "cyber" && cyber && !isLocked(lens) && (
-                  <div className="flex flex-col gap-3.5">
-                    <div className="flex flex-wrap gap-2 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--lens-cyber)" }}>
-                      {cvss.score != null && <span className="chip h-7 px-2.5" style={{ color: "inherit", background: "var(--lens-cyber-soft)", borderColor: "transparent" }}>CVSS {cvss.score.toFixed(1)}</span>}
-                      {exploitation.kev_listed && <span className="chip h-7 px-2.5" style={{ color: "inherit", background: "var(--lens-cyber-soft)", borderColor: "transparent" }}>KEV listed</span>}
-                      {exploitation.poc_public && <span className="chip h-7 px-2.5" style={{ color: "inherit", background: "var(--lens-cyber-soft)", borderColor: "transparent" }}>PoC public</span>}
-                      {cvss.vector && <span className="normal-case" style={{ color: "var(--ink-3)" }}>{cvss.vector}</span>}
-                    </div>
-                    {(cyber.affected ?? []).length > 0 && (
-                      <div>
-                        <h3 className="mb-1.5 text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
-                          Affected products
-                        </h3>
-                        <ul className="text-[14px] leading-[1.7]" style={{ color: "var(--ink-2)" }}>
-                          {(cyber.affected ?? []).map((a, i) => (
-                            <li key={i}>
-                              {a.vendor} {a.product}{" "}
-                              {a.versions && <span className="font-mono text-xs">({a.versions})</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {cyber.remediation?.action && (
-                      <div className="rounded-[var(--r-md)] px-4 py-3 text-[14px] leading-[1.6]" style={{ background: "var(--lens-cyber-soft)", color: "var(--ink)" }}>
-                        <strong>Required action:</strong> {cyber.remediation.action}
-                      </div>
-                    )}
-                    {(cyber.control_mapping ?? []).length > 0 && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse text-left text-[13px]">
-                          <thead>
-                            <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--ink-3)" }}>
-                              <th className="border-b py-1.5 pr-3.5 font-semibold" style={{ borderColor: "var(--line)" }}>Framework</th>
-                              <th className="border-b py-1.5 pr-3.5 font-semibold" style={{ borderColor: "var(--line)" }}>Control</th>
-                              <th className="border-b py-1.5 font-semibold" style={{ borderColor: "var(--line)" }}>Why it matters here</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(cyber.control_mapping ?? []).map((cm, i) => (
-                              <tr key={i}>
-                                <td className="border-b py-2 pr-3.5 font-mono text-xs" style={{ borderColor: "var(--line)" }}>{cm.framework}</td>
-                                <td className="border-b py-2 pr-3.5 font-semibold" style={{ borderColor: "var(--line)" }}>{cm.control}</td>
-                                <td className="border-b py-2" style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}>{cm.relevance}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
+          {/* The deck: above the header on the phone, under it on a desk. */}
+          <div className="-order-1 mb-4 empty:hidden lg:order-none lg:mb-0 lg:mt-[18px]">
+            <PhotoDeck sources={event.sources} />
+          </div>
 
-                {lens === "markets" && finance && !isLocked(lens) && (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--lens-markets)" }}>
-                      {(finance.tickers ?? []).map((t) => <span key={t} className="chip h-7 px-2.5" style={{ color: "inherit", background: "var(--lens-markets-soft)", borderColor: "transparent" }}>{t}</span>)}
-                      {finance.catalyst && <span>catalyst · {finance.catalyst.replaceAll("_", " ")}</span>}
-                      {finance.price_impact?.direction && (
-                        <span className="inline-flex items-center gap-1">
-                          · price read
-                          <span className="inline-flex" aria-label={finance.price_impact.direction}>
-                            {finance.price_impact.direction === "up" ? <ArrowUp /> : finance.price_impact.direction === "down" ? <ArrowDown /> : <Dash />}
-                          </span>
-                          {finance.price_impact.magnitude ?? ""}
-                          {finance.price_impact.confidence != null && ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
-                        </span>
-                      )}
-                    </div>
-                    <FollowSignals tickers={finance.tickers ?? []} sector={finance.sector ?? null} />
-                  </div>
-                )}
-                {gateState?.lens === lens && gateState.kind === "no_samples" ? (
-                  // OUT OF SAMPLES is a different wall from NOT SIGNED IN, and the
-                  // reader needs a different next step for each. `null` means no
-                  // quota row was ever granted, which is not "0 left".
-                  <div className="card flex flex-col items-start gap-3">
-                    <p className="text-[15px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
-                      You&apos;ve used your free{" "}
-                      <span className="font-semibold" style={{ color: meta.color }}>{meta.short}</span>{" "}
-                      reads{typeof gateState.remaining === "number" ? `, ${gateState.remaining} left` : ""}. The reader view of this story stays open.
-                    </p>
-                    <button onClick={() => setLens("reader")} className="btn btn-secondary">Back to the reader view</button>
-                  </div>
-                ) : isLocked(lens) || gateState?.lens === lens ? (
-                  <div className="card flex flex-col items-start gap-3">
-                    <p className="text-[15px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
-                      Read this story through the{" "}
-                      <span className="font-semibold" style={{ color: meta.color }}>{meta.short} lens</span>
-                      : {meta.plain ?? meta.tagline}. Free with an account.
-                    </p>
-                    <button onClick={() => router.push(`/signin?next=/story/${event.id}`)} className="btn btn-primary">Sign in to unlock</button>
-                  </div>
-                ) : briefLoading && !brief ? (
-                  <div aria-label="Generating lens brief">
-                    <div className="pulse-skel h-[14px] rounded" style={{ background: "var(--sunken)" }} />
-                    <div className="pulse-skel mt-2.5 h-[14px] w-[92%] rounded" style={{ background: "var(--sunken)" }} />
-                    <div className="pulse-skel mt-2.5 h-[14px] w-[78%] rounded" style={{ background: "var(--sunken)" }} />
-                    <p className="mt-3 text-[13px]" style={{ color: "var(--ink-3)" }}>Writing the {meta.short} read of this story…</p>
-                  </div>
-                ) : brief ? (
-                  <BriefPlayer brief={brief} points={lensPoints} meta={meta} pointsHeading={pointsHeading} entities={event.entities} claims={claims} />
-                ) : (
-                  <p className="text-[14px]" style={{ color: "var(--ink-3)" }}>No {meta.short} read of this story yet.</p>
-                )}
+          {/* ── Brief: the lens switch, the lens block, the player ── */}
+          <section id="lens-brief" data-askable className="scroll-mt-[110px] pt-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <LensSwitch lenses={lensOffered} value={lens} isLocked={isLocked} onPick={(slug) => pickLens(slug)} />
+              <span className="ml-auto hidden lg:inline-flex"><ShareButton url={`/story/${event.id}`} title={event.title} /></span>
+            </div>
+            <div className="mt-2.5">
+              <LensBrief key={lens} meta={meta} flip={flipped} intro={lensIntro}>
+                {lensBody}
+              </LensBrief>
+              {ready && <ListenBox narration={narration} />}
+            </div>
+          </section>
+
+          {/* ── What changed: every report, newest first ── */}
+          {reports.length > 1 && (
+            <section id="changed" className={sec} aria-labelledby="changed-title">
+              <Head id="changed-title" title="What changed" hint="Every report on this story, newest first. Times are when each outlet published." />
+              <div className="mt-3"><ChangeTimeline reports={reports} sourceIndex={sourceIndex} /></div>
+            </section>
+          )}
+
+          {/* ── Who said what ── */}
+          {claims.length > 0 && (
+            <section id="said" data-askable className={sec} aria-labelledby="said-title">
+              <Head
+                id="said-title"
+                title="Who said what"
+                // One speaker's card already counts the same; the strip is for the section.
+                sub={claims.length > 1 ? `${quoteCount} ${plural(quoteCount, "quote", "quotes")} · ${saidOutlets} ${plural(saidOutlets, "outlet", "outlets")}${saidLangs > 1 ? ` · ${saidLangs} languages` : ""}` : undefined}
+                hint="Only words found exactly in the article are shown, attributed and linked to the line they came from."
+              />
+              <div className="mt-3">
+                <Said claims={claims} sourceIndex={sourceIndex} outletOf={(id) => event.sources.find((x) => x.article_id === id)} eventId={event.id} />
               </div>
             </section>
+          )}
 
-            {/* ── What changed: every report, newest first ─────────── */}
-            {reports.length > 1 && (
-              <section id="changed" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="changed-title">
-                <Head id="changed-title" title="What changed" count={reports.length} hint="Every report on this story, newest first. Times are when each outlet published." />
-                <ol className="relative">
-                  <span aria-hidden className="absolute bottom-2 left-[5px] top-2 w-px" style={{ background: "var(--line-strong)" }} />
-                  {(allReports ? reports : reports.slice(0, CHANGED_FOLD)).map((s, i) => (
-                    <li key={s.article_id ?? i} className="relative pb-4 pl-6 last:pb-0">
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-[7px] h-[11px] w-[11px] rounded-full border-2"
-                        style={i === 0 ? { background: "var(--accent)", borderColor: "var(--accent)", boxShadow: "0 0 0 4px var(--accent-soft)" } : { background: "var(--surface)", borderColor: "var(--ink)" }}
-                      />
-                      <p className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
-                        <OutletIcon domain={s.domain} code={s.code ?? fallbackCode(s.source_name)} name={s.source_name} size={20} />
-                        <span className="font-semibold" style={{ color: "var(--ink-2)" }}>{s.source_name}</span>
-                        <span className="font-mono text-[11px]">{s.published_at ? <time dateTime={s.published_at}>{relativeTime(s.published_at)}</time> : "time unknown"}</span>
-                        {sourceIndex.get(s.article_id) != null && <span className="font-mono text-[11px]">[{sourceIndex.get(s.article_id)}]</span>}
-                      </p>
-                      {s.url ? (
-                        <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-record mt-0.5 block text-[17px] font-bold leading-[1.35] underline-offset-4 hover:underline">{s.title}</a>
-                      ) : (
-                        <p className="font-record mt-0.5 text-[17px] font-bold leading-[1.35]">{s.title}</p>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-                {!allReports && reports.length > CHANGED_FOLD && (
-                  <button type="button" onClick={() => setAllReports(true)} className="btn btn-secondary btn-sm mt-4">
-                    Show all {reports.length}
-                  </button>
-                )}
-              </section>
-            )}
+          {/* ── Heard on: what the news podcasts said, in their words ── */}
+          {clips.length > 0 && (
+            <section id="heard" className={sec} aria-labelledby="heard-title">
+              <Head
+                id="heard-title"
+                title="Heard on"
+                sub={`${new Set(clips.map((c) => c.show.name)).size} ${plural(new Set(clips.map((c) => c.show.name)).size, "show", "shows")}`}
+                hint="News podcasts that discussed this story, in the hosts' own words. Plays the publisher's audio from the clip; the transcript is of that stretch only."
+              />
+              <div className="mt-3"><Clips clips={clips} /></div>
+            </section>
+          )}
 
-            {/* ── Who said what ─────────────────────────────────── */}
-            {claims.length > 0 && (
-              <section id="said" data-askable className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="said-title">
-                <Head
-                  id="said-title"
-                  title="Who said what"
-                  count={quoteCount}
-                  hint="Only words found exactly in the article are shown, attributed and linked to the line they came from."
-                />
-                <Said claims={claims} sourceIndex={sourceIndex} outletOf={(id) => event.sources.find((x) => x.article_id === id)} eventId={event.id} />
-              </section>
-            )}
+          {/* ── On X: what the official accounts said, as written ── */}
+          {xposts.length > 0 && (
+            <section id="on-x" className={sec} aria-labelledby="on-x-title">
+              <Head id="on-x-title" title="On X" hint="Posts from the official accounts named in this story, as written. Signal, not coverage: never counted among the outlets." />
+              <div className="mt-3"><XPosts posts={xposts} sources={event.sources} /></div>
+            </section>
+          )}
 
-            {/* ── Heard on: what the news podcasts said, in their words ── */}
-            {clips.length > 0 && (
-              <section id="heard" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="heard-title">
-                <Head
-                  id="heard-title"
-                  title="Heard on"
-                  count={clips.length}
-                  hint="News podcasts that discussed this story, in the hosts' own words. Plays the publisher's audio from the clip; the transcript is of that stretch only."
-                />
-                <Clips clips={clips} />
-              </section>
-            )}
+          {/* ── How it unfolded: the story this event belongs to ── */}
+          {event.story_slug && (
+            <section id="route" className={sec} aria-labelledby="route-title">
+              <Head
+                id="route-title"
+                title={boundaryVerified ? "How this story unfolded" : "Related reporting"}
+                sub={developments > 1 ? `verified · ${developments} developments` : undefined}
+                hint={boundaryVerified
+                  ? "Every development in this story, counted: what came first, what followed, what branched off."
+                  : "Grouped by subject or cast while the story boundary is under human review. No chronology is implied."}
+              />
+              <div className="mt-3"><StoryRoute slug={event.story_slug} currentId={event.id} onLoad={setRouteStory} /></div>
+            </section>
+          )}
 
-            {/* ── On X: what the official accounts said, as written ──── */}
-            {xposts.length > 0 && (
-              <section id="on-x" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="on-x-title">
-                <Head
-                  id="on-x-title"
-                  title="On X"
-                  count={xposts.length}
-                  hint="Posts from the official accounts named in this story, as written. Signal, not coverage: never counted among the outlets."
-                />
-                <XPosts posts={xposts} sources={event.sources} />
-              </section>
-            )}
+          {/* ── Why it matters ── */}
+          {event.impacts.length > 0 && (
+            <section id="so-what" className={sec} aria-labelledby="sowhat-title">
+              <Head id="sowhat-title" title="Why it matters" hint="Who is affected first and what likely follows, with a direction and a horizon. Extracted from the reports, never invented." />
+              <div className="mt-2"><Impacts impacts={event.impacts} /></div>
+            </section>
+          )}
 
-            {/* ── The route: the story this event belongs to ───────── */}
-            {event.story_slug && (
-              <section id="route" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="route-title">
-                <Head
-                  id="route-title"
-                  title={boundaryVerified ? "How this story unfolded" : "Related reporting"}
-                  hint={boundaryVerified
-                    ? "Every development in this story, counted: what came first, what followed, what branched off."
-                    : "Grouped by subject or cast while the story boundary is under human review. No chronology is implied."}
-                />
-                <StoryRoute slug={event.story_slug} currentId={event.id} onLoad={setRouteStory} />
-              </section>
-            )}
-
-            {/* ── Why it matters ────────────────────────────────── */}
-            {event.impacts.length > 0 && (
-              <section id="so-what" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="sowhat-title">
-                <Head id="sowhat-title" title="Why it matters" count={event.impacts.length} hint="Who is affected first and what likely follows, with a direction and a horizon. Extracted from the reports, never invented." />
-                <ul className="flex flex-col gap-2">
-                  {event.impacts.map((imp) => (
-                    <li key={imp.id} className={`grid grid-cols-[18px_1fr] gap-x-2.5 text-[15px] leading-[1.55] ${imp.parent_impact_id ? "ml-7" : ""}`}>
-                      <span className="mt-[5px]" style={{ color: "var(--ink-3)" }} aria-label={imp.direction ?? "direction unknown"}>
-                        {imp.direction === "negative" ? <ArrowDown /> : imp.direction === "positive" ? <ArrowUp /> : <Dash />}
-                      </span>
-                      <span>
-                        <b className="font-semibold">{imp.entity_name ?? "Affected party"}</b>{" "}
-                        <span style={{ color: "var(--ink-2)" }}>{imp.effect.replaceAll("_", " ")}</span>
-                        {imp.horizon && <span className="ml-1.5 font-mono text-[11px] uppercase tracking-[0.03em]" style={{ color: "var(--ink-3)" }}>· {imp.horizon}</span>}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {/* ── Coverage: the bar, the legend, who is named, the reports ── */}
-            <section id="sources" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="sources-title">
-              <Head id="sources-title" title="Coverage" count={outletCount} />
-              {outlets.length > 0 && (
-                <div className="mb-4 flex flex-col gap-2.5">
-                  <span className="inline-flex items-center gap-3">
-                    <CoverageBar outlets={outlets} size="lg" width={240} />
-                    <span className="font-mono text-[12px]" style={{ color: "var(--ink-3)" }}>{sourceCount} {sourceCount === 1 ? "report" : "reports"}</span>
-                  </span>
-                  <CoverageLegend outlets={outlets} />
-                </div>
+          {/* ── Coverage: the legend, where it was filed from, who is named, the reports ── */}
+          <section id="sources" className={sec} aria-labelledby="sources-title">
+            <Head id="sources-title" title="Coverage" sub={coverageText(outlets, outletCount)} />
+            <div className="mt-3 grid gap-3">
+              {outlets.length > 0 && <CoverageLegend outlets={outlets} />}
+              {(coverageEntries.length > 0 || gapText || event.coverage?.single_origin) && (
+                <p className="flex flex-wrap gap-x-4 gap-y-1" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>{coverageLine}</p>
               )}
-              {(coverageEntries.length > 0 || namedIn.length > 0) && (
-                <div className="mb-4 flex flex-col gap-2 text-[14px]" style={{ color: "var(--ink-2)" }}>
-                  <p className="flex flex-wrap gap-x-4 gap-y-1">{coverageLine}</p>
-                  {namedIn.length > 0 && (
-                    <p>
-                      <span className="text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Named</span>{" "}
-                      {namedIn.map((n) => n.label).join(" · ")}
-                    </p>
-                  )}
-                </div>
+              {namedIn.length > 0 && (
+                <p className="xl:hidden" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+                  <span className="p-eyebrow mr-1.5">Named</span>
+                  {namedIn.map((n) => n.label).join(" · ")}
+                </p>
               )}
               <div className="xl:hidden">
-                <SourceList sources={allSources ? event.sources : event.sources.slice(0, SOURCES_FOLD)} sourceIndex={sourceIndex} />
+                <SourceList sources={allSources ? event.sources : event.sources.slice(0, SOURCES_FOLD)} sourceIndex={sourceIndex} compact />
                 {!allSources && event.sources.length > SOURCES_FOLD && (
-                  <button type="button" onClick={() => setAllSources(true)} className="btn btn-secondary btn-sm mt-3">
+                  <button type="button" onClick={() => setAllSources(true)} className="p-btn p-btn--secondary p-btn--sm mt-3">
                     All {event.sources.length} reports
                   </button>
                 )}
               </div>
-              <p className="hidden text-[13.5px] xl:block" style={{ color: "var(--ink-3)" }}>The {sourceCount} {sourceCount === 1 ? "report is" : "reports are"} listed beside the record.</p>
-            </section>
-
-            {/* ── Related stories: different stories that touch this one ── */}
-            {(routeStory?.related?.length ?? 0) > 0 && (
-              <section className="border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="related-title">
-                <Head id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
-                <RelatedRoutes related={routeStory!.related} />
-              </section>
-            )}
-
-            {/* ── Corrections and every earlier version, kept ─────────── */}
-            <section id="history" className="scroll-mt-24 border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="history-title">
-              <Head id="history-title" title="Corrections and versions" hint="A correction says what was wrong and why. Every earlier headline and brief of this record is kept." />
-              <RecordHistory eventId={event.id} corrections={event.corrections ?? []} />
-            </section>
-
-            {/* ── Something wrong: structured reports, never comments ─── */}
-            <section id="report" className="border-b py-6" style={{ borderColor: "var(--line)" }} aria-labelledby="report-title">
-              <Head id="report-title" title="Something wrong?" hint="Say what, and it arrives with this record's address filled in. A correction is welcome." />
-              <div className="max-w-[420px]"><ReportProblem path={`/story/${event.id}`} /></div>
-            </section>
-
-            {/* ── Ask: the heading here, the bar below it. The bar is a direct
-                child of the article (not of this section) so `sticky` can hold
-                it at the viewport's foot all the way down the record, and it
-                docks here when the reader arrives — one input, never two. */}
-            <section id="ask" className="scroll-mt-24 pt-6" aria-labelledby="ask-title">
-              <Head id="ask-title" title="Ask this story" hint="Answers cite the reports above, or say they can't." />
-            </section>
-            {/* The foot of the reading column, riding the viewport on a desk:
-                the clip that is playing (Clips portals its bar here, so it
-                never lies over the Ask drawer or under the Ask bar) above the
-                Ask bar. The bar leaves while the sheet is open — one input on
-                screen at a time; the player stays. */}
-            <div className="z-20 flex flex-col gap-2 pb-6 lg:sticky lg:bottom-4">
-              <div id="story-foot-slot" className="hidden lg:block empty:hidden" />
-              {!askOpen && <AskBar suggestions={questions} sourceCount={sourceCount} />}
+              <p className="hidden xl:block" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>The {sourceCount} {sourceCount === 1 ? "report is" : "reports are"} listed beside the record.</p>
             </div>
+          </section>
 
-            <p className="flex justify-between gap-4 border-t pt-4 text-[13.5px] font-medium" style={{ borderColor: "var(--line)" }}>
-              <Link href="/feed" className="underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>← Today&rsquo;s record</Link>
-              {event.story_slug && (
-                <Link href={`/trending/${event.story_slug}`} className="underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>{boundaryVerified ? "The whole story" : "Open the grouping"} →</Link>
-              )}
-            </p>
-          </article>
-        </div>
+          {/* ── Related stories: different stories that touch this one ── */}
+          {(routeStory?.related?.length ?? 0) > 0 && (
+            <section className={sec} aria-labelledby="related-title">
+              <Head id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
+              <div className="mt-2"><RelatedRoutes related={routeStory!.related} /></div>
+            </section>
+          )}
 
-        {/* ── Beside the record (desktop): the reports, who is named ── */}
-        <Rail className="hidden xl:flex xl:flex-col xl:gap-4" label="Evidence">
-          {/* The whole list, no inner scroll: the rail itself scrolls with the page (Rail). */}
-          <div className="card">
-            <h3 className="card-h">Reports · {sourceCount}</h3>
+          {/* ── Corrections and every earlier version, kept ── */}
+          <section id="history" className={sec} aria-labelledby="history-title">
+            <Head id="history-title" title="Corrections and versions" hint="A correction says what was wrong and why. Every earlier headline and brief of this record is kept." />
+            <div className="mt-3"><RecordHistory eventId={event.id} corrections={event.corrections ?? []} /></div>
+          </section>
+
+          {/* ── Something wrong: structured reports, never comments ── */}
+          <section id="report" className={sec} aria-labelledby="report-title">
+            <Head id="report-title" title="Something wrong?" hint="Say what, and it arrives with this record's address filled in. A correction is welcome." />
+            <div className="mt-2 max-w-[420px]"><ReportProblem path={`/story/${event.id}`} /></div>
+          </section>
+
+          {/* ── Ask: the heading, the bar, the story's questions ── */}
+          <section id="ask" className={sec} aria-labelledby="ask-title">
+            <Head id="ask-title" title="Ask this story" />
+            <div className="mt-3"><AskBar suggestions={questions} sourceCount={sourceCount} /></div>
+          </section>
+          {/* The clip that is playing docks here on a desk (Clips portals its
+              bar into this slot), riding the foot of the viewport. */}
+          <div id="story-foot-slot" className="z-20 hidden pt-3 empty:hidden lg:sticky lg:bottom-4 lg:block" />
+
+          <p className="flex flex-wrap justify-between gap-4 pb-6 pt-7 text-[14.5px] font-semibold">
+            <Link href="/feed" style={{ color: "var(--accent)" }}>← Today&rsquo;s record</Link>
+            {event.story_slug && (
+              <Link href={`/trending/${event.story_slug}`} style={{ color: "var(--accent)" }}>{boundaryVerified ? "The whole story" : "Open the grouping"} →</Link>
+            )}
+          </p>
+        </article>
+
+        {/* ── Beside the record (desk): the reports, who is named ── */}
+        <Rail className="hidden xl:grid xl:content-start xl:gap-7" label="Evidence">
+          <section>
+            <h2 className="p-eyebrow mb-2.5 border-b-[3px] pb-2" style={{ borderColor: "var(--ink)" }}>
+              Reports · <span className="font-mono">{sourceCount}</span>
+            </h2>
+            {/* The whole list, no inner scroll: the rail scrolls with the page (Rail). */}
             <SourceList sources={event.sources} sourceIndex={sourceIndex} compact />
-          </div>
+          </section>
           {namedIn.length > 0 && (
-            <div className="card">
-              <h3 className="card-h">Named in the reports</h3>
+            <section>
+              <h2 className="p-eyebrow mb-2.5 border-b-[3px] pb-2" style={{ borderColor: "var(--ink)" }}>Named in the reports</h2>
               <div className="flex flex-wrap gap-1.5">
                 {namedIn.slice(0, 12).map((n) =>
                   n.href ? (
-                    <Link key={n.label} href={n.href} className="chip h-[30px] px-2.5 text-[13px]">{n.label}</Link>
+                    <Link key={n.label} href={n.href} className="p-chip">{n.label}</Link>
                   ) : (
-                    <span key={n.label} className="chip h-[30px] px-2.5 text-[13px]">{n.label}</span>
+                    <span key={n.label} className="p-chip">{n.label}</span>
                   ),
                 )}
               </div>
-            </div>
+            </section>
           )}
         </Rail>
       </div>
 
-      {/* ── Thumb zone (phone): Share and Ask, above the safe area ── */}
-      <div
-        className="glass fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t px-4 pt-2.5 lg:hidden"
-        style={{ borderColor: "var(--line)", paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
-      >
-        <button
-          type="button"
-          onClick={() => openAsk({ via: "thumb" })}
-          className="btn btn-primary flex-[1.4]"
-        >
-          <Speech /> Ask
-          <span className="font-mono text-[11px] font-normal opacity-80">{sourceCount} {sourceCount === 1 ? "report" : "reports"}</span>
-        </button>
-        <div className="flex-1">
-          <ShareButton url={`/story/${event.id}`} title={event.title} fill />
-        </div>
-      </div>
+      <StoryActionBar reports={sourceCount} onAsk={() => openAsk({ via: "thumb" })} url={`/story/${event.id}`} title={event.title} />
 
-      {/* ── Ask — one panel at every width. */}
+      {/* ── Ask — one sheet at every width. */}
       <AskPanel
         eventId={event.id}
         sourceCount={sourceCount}
@@ -799,6 +679,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         onOpenChange={setAskOpen}
         launcher={false}
         request={askRequest}
+        sources={event.sources}
       />
       <SelectionAsk />
     </AskContext.Provider>

@@ -100,8 +100,7 @@ export function TrendChart({
             name={label}
             stroke="var(--viz-1)"
             strokeWidth={2}
-            fill="var(--viz-1)"
-            fillOpacity={0.12}
+            fill="none"
             isAnimationActive={false}
             // A day with no neighbour on record draws no line; mark it so it is seen.
             dot={(d: { index: number; cx?: number; cy?: number }) =>

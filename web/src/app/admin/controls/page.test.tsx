@@ -6,9 +6,10 @@ import ControlsPage from "@/app/admin/controls/page";
 
 const fetchFlags = vi.hoisted(() => vi.fn());
 const triggerCollection = vi.hoisted(() => vi.fn());
+const fetchAudit = vi.hoisted(() => vi.fn());
 const ADMIN = vi.hoisted(() => ({ session: { token: "t", userId: "u", email: "f@example.test" }, email: "f@example.test" }));
 vi.mock("@/components/admin/AdminShell", async (orig) => ({ ...(await orig<typeof import("@/components/admin/AdminShell")>()), useAdmin: () => ADMIN }));
-vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchFlags, triggerCollection }));
+vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchFlags, triggerCollection, fetchAudit }));
 
 const flags = (collecting: boolean) => ({
   seen_by: "api",
@@ -21,6 +22,7 @@ const flags = (collecting: boolean) => ({
 beforeEach(() => {
   fetchFlags.mockReset().mockResolvedValue(flags(true));
   triggerCollection.mockReset().mockResolvedValue({ status: "ok", collecting: true });
+  fetchAudit.mockReset().mockResolvedValue({ entries: [] });
   vi.stubGlobal("confirm", vi.fn(() => true));
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -54,9 +56,29 @@ describe("controls", () => {
   it("counts the switches that are on, and draws off on a dashed rule, numbers apart", async () => {
     fetchFlags.mockResolvedValue(flags(false));
     render(<ControlsPage />);
-    expect(await screen.findByRole("heading", { name: "Switches · 0 of 1 on" })).toBeInTheDocument();
-    expect(screen.getByText("OFF").style.border).toContain("dashed");
+    expect(await screen.findByRole("heading", { name: "Switches" })).toBeInTheDocument();
+    expect(await screen.findByText(/^0 of 1 on/)).toBeInTheDocument();
+    expect(screen.getByText("OFF").style.borderStyle).toBe("dashed");
     const limits = within(screen.getByRole("heading", { name: "Limits" }).closest("section")!);
     expect(limits.getByText("Match stories across languages by headline (0: off)")).toBeInTheDocument();
+  });
+
+  it("lists today's changes from the audit log, and says when it could not look", async () => {
+    const now = new Date().toISOString();
+    fetchAudit.mockResolvedValue({
+      entries: [
+        { actor: "f@example.test", action: "pipeline.run", target: "ingestion", detail: {}, created_at: now },
+        { actor: "f@example.test", action: "batch.open", target: "old", detail: {}, created_at: "2020-01-01T10:00:00Z" },
+      ],
+    });
+    const { unmount } = render(<ControlsPage />);
+    expect(await screen.findByText("Asked the worker to collect")).toBeInTheDocument();
+    expect(screen.getByText("1 change")).toBeInTheDocument();
+    expect(screen.queryByText("Opened or closed a batch")).not.toBeInTheDocument();
+    unmount();
+    fetchAudit.mockRejectedValue(new Error("offline"));
+    render(<ControlsPage />);
+    expect(await screen.findByText(/Could not load today's changes/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing was changed/)).not.toBeInTheDocument();
   });
 });

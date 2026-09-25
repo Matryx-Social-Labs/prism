@@ -1,24 +1,21 @@
 "use client";
 
 /**
- * Story-boundary labelling — one judgement per screen, for people without a checkout.
+ * Labelling — one judgement per screen, for people without a checkout.
  *
  * The gold set decides every story-layer question, and it was 45 stories written by
  * hand into a Python file. This page is how it grows: a shareable link, a first
  * name, and a stack of one-question screens.
  *
- * DESIGN.md compliance, and the one place it constrains the obvious solution:
- * "Chrome is monochrome. Color only ever means a lens is speaking." A labelling UI
- * wants to paint chosen rows green — and that would be the only colour on the page,
- * spending the product's strongest signal on a checkbox. Selection is therefore
- * carried by a left rule, a filled marker and an ink-weight shift, which is the same
- * "status by line style, not colour" rule the Storyline Map already follows. Rules
- * and type, no cards (DESIGN.md, 2026-07-25). Mono is provenance only: dates, outlet
- * counts, and which proposer suggested a row.
+ * Design System v2 · labeller Task: a sticky task header (the way back, the batch,
+ * this labeller's count), the question as the eyebrow, the task, and a sticky
+ * answer footer. Every kind of task — story, claim, quote rendering, brief line —
+ * uses the same parts (components/label/parts). Selection and verdicts are rule
+ * weight, a filled mark and a word, never colour alone; mono is provenance only.
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   fetchLabelBatch,
@@ -31,13 +28,14 @@ import {
   type LabelFeedback,
   type LabelGuide,
   type LabelResult,
-  type LabelEvent,
   type LabelTask,
 } from "@/lib/api";
 import { GuidePrimer, HowToDecide } from "@/components/label/GuideView";
-import { PracticeFeedback, RoundResult } from "@/components/label/rounds";
+import { AnswerButtons, LabelStrip, QuoteInContext, TaskHeader } from "@/components/label/parts";
+import { DoneScreen, PracticeFeedback, RoundResult } from "@/components/label/rounds";
 import { QuoteRenderingTask } from "@/components/label/QuoteRenderingTask";
 import { BriefLineTask } from "@/components/label/BriefLineTask";
+import { StoryTask } from "@/components/label/StoryTask";
 
 const WHO_KEY = "prism.labeller";
 // Per batch, because one person may be invited to several and each carries its own
@@ -48,17 +46,7 @@ const TOKEN_KEY = (batch: string) => `prism.label.token.${batch}`;
 // the claim task, and the two ask for opposite kinds of judgement.
 const PRIMER_KEY = (batch: string) => `prism.label.primer.${batch}`;
 
-function provenance(e: LabelEvent): string {
-  const bits = [
-    // IST, the product's one clock: in the same-happening task the day a report
-    // appeared is on the screen, and a browser elsewhere would move it.
-    e.at ? new Date(e.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" }) : "—",
-    `${e.source_count} ${e.source_count === 1 ? "outlet" : "outlets"}`,
-  ];
-  if (e.actors.length) bits.push(e.actors.slice(0, 3).join(" · "));
-  return bits.join("  ·  ");
-}
-
+type Verdict = "yes" | "no" | "unsure" | "skip";
 
 /** The claim task: a quote, where it sits in the article, and who the extractor
  *  says said it.
@@ -78,96 +66,40 @@ function ClaimTask({
   claim: LabelClaim;
   position: number;
   saving: boolean;
-  onAnswer: (verdict: "yes" | "no" | "unsure" | "skip") => void;
+  onAnswer: (verdict: Verdict) => void;
   decide?: LabelGuide["decide"];
 }) {
   return (
     <>
-      <p className="font-mono text-[11px] uppercase" style={{ color: "var(--ink-faint)" }}>
-        {claim.source} · question {position + 1}
-      </p>
-      <h1
-        className="mt-2 text-[19px] leading-[1.35]"
-        style={{ fontFamily: "var(--font-display), serif", textWrap: "pretty" }}
-      >
-        {claim.title}
-      </h1>
+      <h1 className="p-eyebrow">Who said this?</h1>
+      <div className="p-card grid gap-1.5">
+        <h2 style={{ font: "var(--t-title)", textWrap: "pretty", overflowWrap: "anywhere" }}>{claim.title}</h2>
+        <p className="p-count">{claim.source}</p>
+      </div>
 
-      <p className="mt-8 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        Does this article attribute the highlighted words to{" "}
-        <strong style={{ color: "var(--ink)" }}>{claim.speaker}</strong>?
+      <p style={{ font: "var(--t-body)" }}>
+        Does this article attribute the highlighted words to <strong>{claim.speaker}</strong>?
       </p>
 
       {claim.lead ? (
-        <p
-          className="mt-4 text-[13.5px] leading-[1.6]"
-          style={{ color: "var(--ink-muted)" }}
-        >
-          <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            HOW THE ARTICLE OPENS ·{" "}
-          </span>
-          {claim.lead}…
-        </p>
+        <div className="grid gap-1">
+          <h2 className="p-eyebrow">How the article opens</h2>
+          <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>{claim.lead}…</p>
+        </div>
       ) : null}
 
-      <div
-        className="mt-4 border-l-2 pl-4 text-[15px] leading-[1.65]"
-        style={{ borderColor: "var(--ink)" }}
-      >
-        <span style={{ color: "var(--ink-faint)" }}>…{claim.context_before}</span>
-        <mark style={{ background: "var(--bg-sunken)", color: "var(--ink)", fontWeight: 500 }}>
-          {claim.quote_text}
-        </mark>
-        <span style={{ color: "var(--ink-faint)" }}>{claim.context_after}…</span>
-      </div>
+      <QuoteInContext before={claim.context_before} quote={claim.quote_text} after={claim.context_after} />
 
       {claim.article_text ? (
-        <details className="mt-4">
-          <summary className="cursor-pointer text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+        <details>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center text-[14px] font-semibold [&::-webkit-details-marker]:hidden" style={{ color: "var(--accent)" }}>
             Read the whole article
           </summary>
-          <p
-            className="mt-3 max-h-[420px] overflow-y-auto whitespace-pre-line text-[14px] leading-[1.7]"
-            style={{ color: "var(--ink-muted)" }}
-          >
+          <p className="max-h-[420px] overflow-y-auto whitespace-pre-line" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
             {claim.article_text}
           </p>
         </details>
       ) : null}
-
-      <div
-        className="mt-6 flex flex-wrap items-center gap-3 border-t pt-5"
-        style={{ borderColor: "var(--line)" }}
-      >
-        <button
-          type="button" disabled={saving} onClick={() => onAnswer("yes")}
-          className="h-11 rounded-full px-5 text-[14.5px] font-medium disabled:opacity-50"
-          style={{ background: "var(--ink)", color: "var(--bg)" }}
-        >
-          Yes — {claim.speaker.slice(0, 24)} said it
-        </button>
-        <button
-          type="button" disabled={saving} onClick={() => onAnswer("no")}
-          className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
-          style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
-        >
-          No — someone else, or nobody
-        </button>
-        <button
-          type="button" disabled={saving} onClick={() => onAnswer("unsure")}
-          className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
-          style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-        >
-          Not sure
-        </button>
-        <button
-          type="button" disabled={saving} onClick={() => onAnswer("skip")}
-          className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
-          style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}
-        >
-          Can&apos;t read this
-        </button>
-      </div>
 
       {/* Open on the FIRST question only. A claims labeller arrives with an
           invite token, which skips the landing screen where the story flow
@@ -175,11 +107,20 @@ function ClaimTask({
           in front of anyone. The point of it is being read BEFORE the first
           judgement, not after a wrong one. */}
       {decide && <HowToDecide blocks={decide.blocks} closing={decide.closing} open={position === 0} />}
+
+      <AnswerButtons
+        yes={`Yes — ${claim.speaker.slice(0, 24)} said it`}
+        no="No — someone else, or nobody"
+        cantRead="Can't read this"
+        saving={saving}
+        onYes={() => onAnswer("yes")}
+        onNo={() => onAnswer("no")}
+        onUnsure={() => onAnswer("unsure")}
+        onCantRead={() => onAnswer("skip")}
+      />
     </>
   );
 }
-
-
 
 export default function LabelPage({ params }: { params: Promise<{ key: string }> }) {
   const [batchKey, setBatchKey] = useState("");
@@ -188,10 +129,6 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   const [draftWho, setDraftWho] = useState("");
   const [joinError, setJoinError] = useState("");
   const [batch, setBatch] = useState<LabelBatch | null>(null);
-  // The same-happening task (article -> event) is narrower than the story task:
-  // the copy on screen says so at every step.
-  const sameEvent = batch?.kind === "event_identity";
-  const sameTopic = batch?.kind === "topic_relation";
   // Null until read from storage, so the first paint does not flash the primer at
   // someone who has already dismissed it.
   const [primed, setPrimed] = useState<boolean | null>(null);
@@ -308,7 +245,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   }, [load]);
 
   const submit = useCallback(
-    async (unsure: boolean, skipped = false, agreed = false) => {
+    async (unsure: boolean, skipped = false, agreed = false, none = false) => {
       if (!task || saving) return;
       setSaving(true);
       try {
@@ -316,11 +253,12 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           task_id: task.id,
           token,
           // A skip carries no opinion, so whatever was ticked is discarded rather
-          // than filed as a judgement nobody meant to give.
+          // than filed as a judgement nobody meant to give. "None of these" is an
+          // explicit empty answer, whatever was ticked before it was pressed.
           // A claim answer has no candidate ids. "The article does attribute this
           // quote to this speaker" is carried as a single sentinel selection, so
           // the same responses table and the same agreement maths serve both kinds.
-          selected: skipped ? [] : task.claim || task.rendering || task.line ? (agreed ? [task.id] : []) : [...picked],
+          selected: skipped || none ? [] : task.claim || task.rendering || task.line ? (agreed ? [task.id] : []) : [...picked],
           unsure,
           skipped,
           ms_spent: Date.now() - startedAt.current,
@@ -382,24 +320,22 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
     return () => window.removeEventListener("keydown", onKey);
   }, [candidateTask, task, submit, toggle]);
 
-  const pct = useMemo(
-    () => (batch && batch.total ? Math.round((batch.done / batch.total) * 100) : 0),
-    [batch]
-  );
+  const answer = (verdict: Verdict) => void submit(verdict === "unsure", verdict === "skip", verdict === "yes");
 
   if (!token) {
     return (
-      <Shell>
-        <h1 className="text-[30px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
+      <Shell padded>
+        <LabelStrip />
+        <h1 className="mt-8" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>
           Help us teach Prism what one story is
         </h1>
-        <p className="mt-3 max-w-[52ch] text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
+        <p className="mt-3 max-w-[52ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
           You&apos;ll see a headline, then a few others from around the same time. Tick the
-          ones covering the <strong>same unfolding story</strong>. It takes about a minute
+          ones covering the <strong style={{ color: "var(--ink)" }}>same unfolding story</strong>. It takes about a minute
           each, and you can stop whenever you like.
         </p>
         <form
-          className="mt-8 flex flex-wrap items-center gap-3"
+          className="mt-8 flex max-w-[480px] flex-wrap items-end gap-3"
           onSubmit={async (e) => {
             e.preventDefault();
             const name = draftWho.trim();
@@ -424,30 +360,27 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             }
           }}
         >
-          <input
-            value={draftWho}
-            onChange={(e) => setDraftWho(e.target.value)}
-            placeholder="Your first name"
-            maxLength={60}
-            aria-label="Your first name"
-            className="h-11 rounded-full border bg-transparent px-4 text-[14.5px] outline-none"
-            style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
-          />
-          <button
-            type="submit"
-            className="h-11 rounded-full px-5 text-[14.5px] font-medium"
-            style={{ background: "var(--ink)", color: "var(--bg)" }}
-          >
+          <label className="p-field min-w-0 flex-[1_1_220px]">
+            <span className="p-field__label">Your first name</span>
+            <input
+              value={draftWho}
+              onChange={(e) => setDraftWho(e.target.value)}
+              maxLength={60}
+              autoComplete="given-name"
+              className="p-input"
+            />
+          </label>
+          <button type="submit" className="p-btn p-btn--primary" style={{ minHeight: 48 }}>
             Start
           </button>
         </form>
         {joinError && (
-          <p role="alert" className="mt-4 text-[14.5px]" style={{ color: "var(--danger)" }}>
+          <p role="alert" className="p-field__error mt-3">
             {joinError}
           </p>
         )}
-        <p className="mt-4 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-          YOUR NAME IS ONLY USED TO REMEMBER WHERE YOU GOT TO
+        <p className="mt-3" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+          Your name is only used to remember where you got to.
         </p>
         {/* No guide here any more: this screen is reached by anyone holding the
             batch link, before they have a credential, and the guide goes only
@@ -457,277 +390,113 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
     );
   }
 
+  // The end of a batch and the end of a round stand alone, with their own way back.
+  if (state === "done") {
+    return (
+      <Shell padded>
+        <DoneScreen total={batch?.total ?? 0} who={who} />
+      </Shell>
+    );
+  }
+  if (state === "result" && result) {
+    return (
+      <Shell padded>
+        <RoundResult result={result} />
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
-      <header
-        // NOT sticky. It was, and on a phone it sat underneath the global brand
-        // header — the progress rule showed through while the batch name and count
-        // were hidden behind it. Stickiness bought nothing here anyway: a task is
-        // one screen, and submitting returns to the top, so the count is in view at
-        // the start of every question regardless.
-        className="-mx-5 mb-8 border-b px-5 py-3 sm:-mx-8 sm:px-8"
-        style={{ borderColor: "var(--line)" }}
-      >
-        <div className="flex items-baseline justify-between gap-4">
-          <span className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-            {batch?.name ?? "Labelling"}
-          </span>
-          <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            {batch ? `${String(batch.done).padStart(3, "0")} / ${batch.total}` : "—"}
-          </span>
-        </div>
-        <div className="mt-2 h-px w-full" style={{ background: "var(--line)" }}>
-          <div
-            className="h-px motion-reduce:transition-none"
-            style={{ width: `${pct}%`, background: "var(--ink)", transition: "width 250ms ease-out" }}
-          />
-        </div>
-      </header>
-
-      {state === "loading" && <Note>Loading…</Note>}
-      {state === "error" && (
-        <Note>
-          Something went wrong.{" "}
-          <button className="underline" onClick={() => void load()}>
-            Try again
-          </button>
-        </Note>
-      )}
-      {state === "closed" && <Note>This batch is closed. Thank you.</Note>}
-      {state === "result" && result && <RoundResult result={result} />}
-      {state === "requalify" && (
-        <Note>
-          You can&apos;t label this batch right now. Either your recent answers on the check questions hidden in the
-          work fell below 80% — take this task&apos;s test again — or your labelling was paused.{" "}
-          <Link className="underline" href="/label">Open your workspace</Link>
-        </Note>
-      )}
-      {state === "ready" && task && feedback && (
-        <PracticeFeedback task={task} feedback={feedback} onNext={() => void load()} />
-      )}
-      {state === "done" && (
-        <Note>
-          That&apos;s everything — {batch?.total ?? 0} judgements. Thank you, {who}.
-        </Note>
-      )}
-
-      {state === "ready" && task && primed === false && !guide && !guideFailed && (
-        <Note>Loading the guide for this task.</Note>
-      )}
-      {state === "ready" && task && primed === false && !guide && guideFailed && (
-        <div>
-          <Note>The guide for this task could not be loaded. Read it before you start.</Note>
-          <button type="button" className="btn btn-secondary mt-4" onClick={() => setGuideTry((n) => n + 1)}>
-            Try again
-          </button>
-        </div>
-      )}
-      {state === "ready" && task && primed === false && guide && (
-        <GuidePrimer
-          guide={guide}
-          onStart={() => {
-            try {
-              window.localStorage.setItem(PRIMER_KEY(batchKey), "1");
-            } catch {
-              // Storage denied — still let them through; the primer has been read.
-            }
-            setPrimed(true);
-          }}
-        />
-      )}
-
-      {state === "ready" && task && primed !== false && !feedback && (
-        task.line ? (
-          <BriefLineTask
-            line={task.line}
-            position={task.position}
-            saving={saving}
-            onAnswer={(verdict) => void submit(verdict === "unsure", verdict === "skip", verdict === "yes")}
-          />
-        ) : task.rendering ? (
-          <QuoteRenderingTask
-            rendering={task.rendering}
-            position={task.position}
-            saving={saving}
-            onAnswer={(verdict) => void submit(verdict === "unsure", verdict === "skip", verdict === "yes")}
-          />
-        ) : task.claim ? (
-          <ClaimTask
-            claim={task.claim}
-            position={task.position}
-            saving={saving}
-            decide={guide?.decide}
-            onAnswer={(verdict) => void submit(verdict === "unsure", verdict === "skip",
-                                              verdict === "yes")}
-          />
-        ) : (
-        <>
-          <p className="font-mono text-[11px] uppercase" style={{ color: "var(--ink-faint)" }}>
-            {task.sector ?? "news"} · question {task.position + 1}
-          </p>
-          <h1
-            className="mt-2 text-[23px] leading-[1.3]"
-            style={{ fontFamily: "var(--font-display), serif", textWrap: "pretty" }}
-          >
-            {task.seed?.title}
-          </h1>
-          {sameEvent && task.seed?.native_title && task.seed.native_title !== task.seed.title && (
-            <p className="mt-2 text-[15px] leading-[1.5]" style={{ color: "var(--ink)" }} lang={task.seed.language || undefined}>
-              {task.seed.native_title}
-            </p>
-          )}
-          <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            {task.seed ? provenance(task.seed) : ""}
-          </p>
-
-          <p className="mt-8 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-            {sameEvent
-              ? "Which of these report the same happening — the same incident, whatever day it was reported?"
-              : sameTopic
-                ? "Which of these are genuinely useful context about the same issue?"
-                : "Which of these are part of the same unfolding story?"}
-          </p>
-
-          <ul className="mt-3">
-            {(task.candidates ?? []).map((c, i) => {
-              const on = picked.has(c.id);
-              return (
-                <li key={c.id} style={{ borderTop: "1px solid var(--line)" }}>
-                  <button
-                    type="button"
-                    data-candidate
-                    onClick={() => toggle(c.id)}
-                    aria-pressed={on}
-                    className="flex w-full items-start gap-3 py-3 text-left motion-reduce:transition-none"
-                    style={{
-                      // Selection is a RULE and ink weight, never a colour fill —
-                      // colour is reserved for lenses (DESIGN.md, the colour rule).
-                      boxShadow: on ? "inset 2px 0 0 0 var(--ink)" : "none",
-                      paddingLeft: on ? 12 : 0,
-                      transition: "padding-left 150ms ease-out",
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      className="mt-[3px] inline-block h-3 w-3 shrink-0 rounded-full border"
-                      style={{
-                        borderColor: on ? "var(--ink)" : "var(--line-strong)",
-                        background: on ? "var(--ink)" : "transparent",
-                      }}
-                    />
-                    <span className="min-w-0">
-                      <span
-                        className="block text-[15.5px] leading-snug"
-                        style={{
-                          color: on ? "var(--ink)" : "var(--ink-muted)",
-                          fontWeight: on ? 600 : 400,
-                        }}
-                      >
-                        {c.title}
-                      </span>
-                      <span
-                        className="mt-1 block font-mono text-[11px]"
-                        style={{ color: "var(--ink-faint)" }}
-                      >
-                        {provenance(c)}
-                        {/* Provenance, never a score: a number on the line would
-                            anchor the judgement this set exists to collect. */}
-                        {c.signals.length ? `  ·  ${c.signals.map((x) => x.split(":")[0]).join("+")}` : ""}
-                      </span>
-                    </span>
-                    <span
-                      aria-hidden
-                      className="ml-auto shrink-0 font-mono text-[11px]"
-                      style={{ color: "var(--ink-faint)" }}
-                    >
-                      {i + 1}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-
-          <div
-            className="mt-6 flex flex-wrap items-center gap-3 border-t pt-5"
-            style={{ borderColor: "var(--line)" }}
-          >
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void submit(false)}
-              className="h-11 rounded-full px-5 text-[14.5px] font-medium disabled:opacity-50"
-              style={{ background: "var(--ink)", color: "var(--bg)" }}
-            >
-              {picked.size
-                ? `${sameTopic ? "Related" : "Yes"} — ${picked.size} selected`
-                : "None of these"}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void submit(true)}
-              className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
-              style={{ borderColor: "var(--line-strong)", color: "var(--ink-muted)" }}
-            >
-              Not sure
-            </button>
-            {/* Distinct from "Not sure" on purpose. "Not sure" says the STORY is
-                ambiguous and is read as a signal about the boundary; this says the
-                READER cannot assess it, and routes the task to someone else. 72 of
-                this batch's 123 tasks carry a Kannada, Devanagari or Tamil
-                headline, so without it the only exits were to guess or to mislabel
-                a language barrier as ambiguity. */}
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void submit(false, true)}
-              className="h-11 rounded-full border px-5 text-[14.5px] disabled:opacity-50"
-              style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}
-            >
-              Can&apos;t read this
-            </button>
-            <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-              KEYS 1–{(task.candidates?.length ?? 0)} TOGGLE · ENTER SUBMITS
+      <TaskHeader batch={batch?.name ?? "Labelling"} done={batch?.done} total={batch?.total} />
+      <div className="flex flex-1 flex-col gap-4 px-4 pt-5">
+        {state === "loading" && <Note>Loading…</Note>}
+        {state === "error" && (
+          <div role="alert" className="p-alert p-alert--error mt-6">
+            <span>
+              Something went wrong.{" "}
+              <button type="button" className="p-link" onClick={() => void load()}>
+                Try again
+              </button>
             </span>
           </div>
+        )}
+        {state === "closed" && <Note>This batch is closed. Thank you.</Note>}
+        {state === "requalify" && (
+          <div className="p-alert p-alert--info mt-6">
+            <p>
+              You can&apos;t label this batch right now. Either your recent answers on the check questions hidden in the
+              work fell below 80% — take this task&apos;s test again — or your labelling was paused.{" "}
+              <Link className="p-link" href="/label">Open your workspace</Link>
+            </p>
+          </div>
+        )}
+        {state === "ready" && task && feedback && (
+          <PracticeFeedback task={task} feedback={feedback} onNext={() => void load()} />
+        )}
 
-          <p className="mt-6 text-[13.5px]" style={{ color: "var(--ink-faint)" }}>
-            {sameEvent ? (
-              <>The follow-up is a different happening here; a different incident of the same kind is too. <strong>Not sure</strong> is a real answer.</>
-            ) : sameTopic ? (
-              <>These are already different stories. Tick only useful context about the same issue; a shared name, place, or sector is not enough.</>
-            ) : (
-              <>Same topic isn&apos;t enough — two different court cases about one law are two
-              stories. <strong>Not sure</strong> is a real answer; it keeps genuinely hard
-              calls out of the training data rather than guessing at them.</>
-            )}
-          </p>
+        {state === "ready" && task && primed === false && !guide && !guideFailed && (
+          <Note>Loading the guide for this task.</Note>
+        )}
+        {state === "ready" && task && primed === false && !guide && guideFailed && (
+          <div className="grid justify-items-start gap-4">
+            <Note>The guide for this task could not be loaded. Read it before you start.</Note>
+            <button type="button" className="p-btn p-btn--secondary" onClick={() => setGuideTry((n) => n + 1)}>
+              Try again
+            </button>
+          </div>
+        )}
+        {state === "ready" && task && primed === false && guide && (
+          <GuidePrimer
+            guide={guide}
+            onStart={() => {
+              try {
+                window.localStorage.setItem(PRIMER_KEY(batchKey), "1");
+              } catch {
+                // Storage denied — still let them through; the primer has been read.
+              }
+              setPrimed(true);
+            }}
+          />
+        )}
 
-          {/* An INVITED labeller never sees the join screen, so this is the only
-              route the worked example has to them. Collapsed, because it is
-              reference rather than instruction once you are going. */}
-          {guide?.decide && <HowToDecide blocks={guide.decide.blocks} closing={guide.decide.closing} />}
-        </>
-        )
-      )}
+        {state === "ready" && task && primed !== false && !feedback && (
+          task.line ? (
+            <BriefLineTask line={task.line} saving={saving} onAnswer={answer} />
+          ) : task.rendering ? (
+            <QuoteRenderingTask rendering={task.rendering} saving={saving} onAnswer={answer} />
+          ) : task.claim ? (
+            <ClaimTask claim={task.claim} position={task.position} saving={saving} decide={guide?.decide} onAnswer={answer} />
+          ) : (
+            <StoryTask
+              task={task}
+              kind={batch?.kind}
+              picked={picked}
+              saving={saving}
+              decide={guide?.decide}
+              onToggle={toggle}
+              onAnswer={(a) => void submit(a === "unsure", a === "skip", false, a === "none")}
+            />
+          )
+        )}
+      </div>
     </Shell>
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  // 720px is DESIGN.md's onboarding/interests measure. This is a focused
-  // single-decision surface, not a reading river.
+function Shell({ children, padded = false }: { children: React.ReactNode; padded?: boolean }) {
+  // 720px: a focused single-decision surface, not a reading river. The layout
+  // already provides <main>; this is the column.
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[720px] px-5 pb-24 pt-6 sm:px-8">
+    <div className={`mx-auto flex min-h-dvh w-full max-w-[720px] flex-col ${padded ? "px-4 pb-24 pt-6" : ""}`}>
       {children}
-    </main>
+    </div>
   );
 }
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-16 text-[15.5px]" style={{ color: "var(--ink-muted)" }}>
+    <p className="mt-10" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
       {children}
     </p>
   );

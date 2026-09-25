@@ -41,17 +41,20 @@ export function Chart({
   }, []);
 
   if (ordered.length === 0) {
+    // Design System v2 · EmptyState: a dashed box, the title names what is missing.
     return (
-      <div className="card py-8 text-center">
-        <p className="text-[15px]" style={{ color: "var(--ink-2)" }}>{emptyLabel}</p>
+      <div className="px-5 py-8" style={{ border: "1px dashed var(--line-strong)", borderRadius: "var(--r-lg)" }}>
+        <p style={{ font: "var(--t-title-s)" }}>{emptyLabel}</p>
       </div>
     );
   }
 
+  // One column on the phone; two from sm, the lead spanning both (ChartRow's
+  // `sm:col-span-2`). Rows print in (.p-print).
   return (
     <div>
       <ol
-        className="chart-print grid grid-cols-1 gap-3 2xl:grid-cols-2"
+        className="p-print grid grid-cols-1 gap-3 sm:grid-cols-2"
         onClickCapture={(e) => {
           const a = (e.target as HTMLElement).closest("a[href^='/story/']");
           const id = a?.getAttribute("href")?.split("/story/")[1];

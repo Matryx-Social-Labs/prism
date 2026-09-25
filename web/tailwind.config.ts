@@ -5,10 +5,12 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        // .font-display = the structural voice: masthead labels, the strip, section heads, big numbers
-        display: ["var(--font-display)", "sans-serif"],
-        // .font-mono everywhere = the provenance voice (DESIGN.md)
-        mono: ["var(--font-mono)", "ui-monospace", "Menlo", "monospace"],
+        // .font-display = the record voice (Newsreader + per-script serifs), tokens --font-record
+        display: ["var(--font-record)"],
+        // .font-mono everywhere = the provenance voice, tokens --font-mono (Geist Mono)
+        mono: ["var(--font-mono)"],
+        // .font-read = the reading voice (Anek), tokens --font-read
+        read: ["var(--font-read)"],
       },
       colors: {
         severity: {

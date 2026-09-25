@@ -5,16 +5,16 @@
  * not: after each PRACTICE answer, whether it was right and why; at the end of
  * either, the score and the reasons for the ones missed (labeller workspace,
  * phase 3). A test shows nothing until it is over — the server never sends an
- * answer before then, so there is nothing here to hide.
+ * answer before then, so there is nothing here to hide. And the end of a batch.
  *
- * Styled as the task page is: rules and type, no colour for right and wrong.
- * "Right" and "Not quite" are words, carried by the rule's weight — the Legend
- * Rule (DESIGN.md) says no state is conveyed by colour alone.
+ * Design System v2 · label/Verdict + label/ResultScreen: "Right" and "Not
+ * quite" are words, with an icon, on a solid or a dashed rule — no state is
+ * conveyed by colour alone (the Legend Rule).
  */
 
 import Link from "next/link";
 
-import { Check, Dash } from "@/components/icons";
+import { Verdict } from "@/components/label/parts";
 import type { LabelFeedback, LabelResult, LabelTask } from "@/lib/api";
 
 export function PracticeFeedback({ task, feedback, onNext }: { task: LabelTask; feedback: LabelFeedback; onNext: () => void }) {
@@ -39,72 +39,89 @@ export function PracticeFeedback({ task, feedback, onNext }: { task: LabelTask; 
           : `No — ${rendering.a.outlet} translated it.`
       : (task.candidates ?? []).filter((c) => expected.has(c.id)).map((c) => c.title);
   return (
-    <section
-      aria-live="polite"
-      className="mt-8 pl-4"
-      style={{ borderLeft: `${feedback.correct ? 2 : 4}px solid var(--ink)` }}
-    >
-      {/* The word carries it; the mark repeats it, as the guides' verdicts do. */}
-      <p className="flex items-center gap-2 text-[17px] font-semibold">
-        <span aria-hidden className="inline-flex">{feedback.correct ? <Check size={15} /> : <Dash size={15} />}</span>
-        {feedback.correct ? "Right." : "Not quite."}
-      </p>
-      {typeof answer === "string" ? (
-        <p className="mt-2 text-[15px]">{answer}</p>
-      ) : answer.length ? (
-        <div className="mt-2 text-[15px]">
-          <p>The ones to tick:</p>
-          <ul className="mt-1 list-disc pl-5">{answer.map((t) => <li key={t}>{t}</li>)}</ul>
-        </div>
-      ) : (
-        <p className="mt-2 text-[15px]">Nothing here should be ticked.</p>
-      )}
-      {feedback.explanation && (
-        <p className="mt-3 text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>{feedback.explanation}</p>
-      )}
-      <button type="button" onClick={onNext} className="btn btn-primary mt-5">
-        Next question
-      </button>
+    <section aria-live="polite" className="grid gap-4 pt-2">
+      <Verdict kind={feedback.correct ? "right" : "wrong"} word={feedback.correct ? "Right." : "Not quite."}>
+        {typeof answer === "string" ? (
+          <p style={{ color: "var(--ink)" }}>{answer}</p>
+        ) : answer.length ? (
+          <div style={{ color: "var(--ink)" }}>
+            <p>The ones to tick:</p>
+            <ul className="mt-1 list-disc pl-5">{answer.map((t) => <li key={t}>{t}</li>)}</ul>
+          </div>
+        ) : (
+          <p style={{ color: "var(--ink)" }}>Nothing here should be ticked.</p>
+        )}
+        {feedback.explanation && <p style={{ color: "var(--ink-2)" }}>{feedback.explanation}</p>}
+      </Verdict>
+      <div>
+        <button type="button" onClick={onNext} className="p-btn p-btn--primary p-btn--lg">
+          Next question
+        </button>
+      </div>
     </section>
   );
 }
 
+/** The score at the end of a round: a solid rule for a pass, dashed for a miss.
+ *  Counted as "k of n": a round is too few questions for a percent. */
 export function RoundResult({ result }: { result: LabelResult }) {
-  const pct = Math.round(result.score * 100);
   const need = Math.round(result.pass_mark * 100);
   const test = result.purpose === "qualify";
+  const solid = result.passed || !test;
   return (
-    <section className="mt-10">
-      <h1 className="text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-        {test ? (result.passed ? "You passed." : "Not this time.") : "Practice round done."}
-      </h1>
-      <p className="mt-3 text-[16px]">
-        {result.right} of {result.total} right{" "}
-        <span className="font-mono text-[13px]" style={{ color: "var(--ink-muted)" }}>({pct}%)</span>
-      </p>
-      <p className="mt-2 text-[15px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>
-        {test
-          ? result.passed
-            ? "Work of this kind is now on your dashboard."
-            : `You need ${need}%. You can take it again in 24 hours, with different questions.`
-          : "Practise again as often as you like; the test is scored the same way."}
-      </p>
+    <section className="grid gap-6 pt-8">
+      <div className="pt-3.5" style={{ borderTop: `var(--rule-section) ${solid ? "solid" : "dashed"} var(--ink)` }}>
+        <h1 style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>
+          {test ? (result.passed ? "You passed." : "Not this time.") : "Practice round done."}
+        </h1>
+        <p className="mt-2" style={{ font: "var(--t-body-l)" }}>
+          <span className="font-mono">{result.right} of {result.total}</span> right · pass mark {need}%
+        </p>
+        <p className="mt-1.5" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+          {test
+            ? result.passed
+              ? "Work of this kind is now on your dashboard."
+              : `You need ${need}%. You can take it again in 24 hours, with different questions.`
+            : "Practise again as often as you like; the test is scored the same way."}
+        </p>
+      </div>
       {result.missed.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-[17px] font-semibold">The ones you missed, and why</h2>
-          <ul className="mt-2">
+        <div>
+          <h2 className="p-eyebrow mb-1.5">The ones you missed, and why</h2>
+          <ul>
             {result.missed.map((m) => (
-              <li key={m.position} className="border-t py-3" style={{ borderColor: "var(--line)" }}>
-                {m.about && <p className="text-[15px] font-medium">{m.about}</p>}
-                <p className="mt-1 text-[14.5px] leading-[1.6]" style={{ color: "var(--ink-muted)" }}>{m.explanation}</p>
+              <li key={m.position} className="border-t py-2.5" style={{ borderColor: "var(--line)", font: "var(--t-body-s)" }}>
+                {m.about && <p className="font-semibold" style={{ color: "var(--ink)" }}>{m.about}</p>}
+                <p style={{ color: "var(--ink-2)" }}>{m.explanation}</p>
               </li>
             ))}
           </ul>
         </div>
       )}
-      <Link href="/label" className="btn btn-secondary mt-8 inline-flex">
-        Back to your workspace
-      </Link>
+      <div>
+        <Link href="/label" className="p-btn p-btn--primary">
+          Back to your workspace
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/** The end of a work batch. The hidden-check score is deliberately not shown:
+ *  the API never says which tasks were checks (api/routes/label.answer). */
+export function DoneScreen({ total, who }: { total: number; who: string }) {
+  return (
+    <section className="grid gap-4 pt-16">
+      <h1 style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>That&apos;s everything.</h1>
+      <p style={{ font: "var(--t-body-l)", color: "var(--ink-2)" }}>
+        <span className="font-mono">{total}</span> {total === 1 ? "judgement" : "judgements"} in this batch. Thank you
+        {who ? `, ${who}` : ""}.
+      </p>
+      <div>
+        <Link href="/label" className="p-btn p-btn--primary">
+          Back to your workspace
+        </Link>
+      </div>
     </section>
   );
 }
