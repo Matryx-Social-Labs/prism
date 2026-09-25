@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
 from common.text import detect_script
-from correlation.verify import Candidate, judge
+from correlation.verify import Candidate, event_blocks, judge, record
 
 logger = logging.getLogger(__name__)
 
@@ -703,11 +703,16 @@ async def _match_by_gist_verified(
     if not rows:
         return None
     candidates = [Candidate(event_id=r.event_id, distance=float(r.dist)) for r in rows]
+    blocks = await event_blocks(session, [c.event_id for c in candidates])
+    # Only the network call falls back. A database error inside this try would
+    # be swallowed as "no match" with the transaction already aborted, and the
+    # attach that follows would fail on it — so reads and writes stay outside.
     try:
-        scored = await judge(session, article_id=article_id, block=block, candidates=candidates, mode=mode)
+        scored, model = await judge(article_id=article_id, block=block, candidates=candidates, blocks=blocks)
     except Exception as exc:  # noqa: BLE001 — an unjudged article founds its own event, as it did before this tier
         logger.warning("event_verify_failed article=%s error=%s", article_id, str(exc)[:160])
         return None
+    await record(session, article_id=article_id, scored=scored, model=model, mode=mode)
     if not scored:
         return None
     best, p = max(scored, key=lambda s: s[1])
