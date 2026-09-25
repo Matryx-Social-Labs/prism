@@ -7,9 +7,15 @@ Gold sets + Langfuse experiments for the pipeline stages that gate quality
 
 | File | Dataset name in Langfuse | Measures |
 |---|---|---|
-| `relevance.jsonl` (20 items) | `prism-relevance` | Relevance-gate binary accuracy |
-| `classification.jsonl` (16 items) | `prism-classification` | Sector + role-interest accuracy |
+| `relevance.jsonl` (27 items) | `prism-relevance` | Relevance-gate binary accuracy |
+| `classification.jsonl` (32 items) | `prism-classification` | Sector + role-interest accuracy |
 | `agent_groundedness.jsonl` (10 items) | `prism-agent-groundedness` | Groundedness, citation quality, correct refusal (LLM-as-judge) |
+| `event_links.jsonl` (8 items) | — | causal / follow-up links between events |
+| `story_veto.jsonl` (9 items) | — | the storyline veto's keep / drop calls |
+
+Counts are lines in the file (2026-09-25); the larger labelled sets — event identity,
+story boundaries, claims, clips, X posts — live in `tools/gold_*.py` and are scored by
+`tools/score_*.py` ([docs/ML-EVALUATION.md](../docs/ML-EVALUATION.md)).
 
 These are starter sets. Grow them from real ingested items: pull borderline
 cases from Langfuse traces (Traces → filter by `stage`), label them, and

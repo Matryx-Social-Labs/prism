@@ -1,5 +1,7 @@
 # Per-Story Agent
 
+> **Design (2026-07-14).** The Ask agent's intent and guardrails. Current wiring — models, rate limits, the plan allowance, streaming — is in [PIPELINE §8](./PIPELINE.md#8-side-channels) and [API](./API.md).
+
 Every story carries an agent that answers a reader's follow-up questions. The defining constraint
 is that it answers from that one event's clustered sources, with citations, and does not assert
 beyond them. This is what makes it trustworthy in a market where trust in news is the core problem,

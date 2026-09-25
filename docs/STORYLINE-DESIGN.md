@@ -1,5 +1,7 @@
 # Design: the storyline graph (events → stories → branches)
 
+> **Historical proposal (2026-07-24)** — it became the story layer, with changes: the partitioner shipped as `CPMVertexPartition` (not `RBConfigurationVertexPartition`, which has the resolution limit), and the branch tree is served as provisional. Current behaviour: [PIPELINE §7](./PIPELINE.md#7-story-layer).
+
 Status: proposal. Supersedes the on-read story graph in
 [STORY-GRAPH.md](./STORY-GRAPH.md) once staged in. Author: correlation redesign,
 2026-07-24.

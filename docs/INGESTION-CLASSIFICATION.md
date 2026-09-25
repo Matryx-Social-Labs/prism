@@ -1,5 +1,7 @@
 # Ingestion and Classification
 
+> **Historical (2026-07-14).** The design as first ported. Since then: GDELT was removed, classification can run as one typed Jev decision (`PRISM_DECISIONS_MODE`, live in production), and several fields below were never built. Current behaviour: [PIPELINE §3–4](./PIPELINE.md#3-ingestion).
+
 This covers phases 1 and 2 of the pipeline: getting observations in, and deciding what they are and
 where they go. Phase 3 onward is in [ENRICHMENT-SCHEMA.md](./ENRICHMENT-SCHEMA.md) and
 [ARCHITECTURE.md](./ARCHITECTURE.md).

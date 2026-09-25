@@ -1,8 +1,14 @@
 # db/
 
-Database schema and migrations (Alembic or equivalent) for the PostgreSQL canonical and served
-store with pgvector. The schema is additive: new role lenses add columns, JSONB keys, and dimension
-rows rather than destructive rewrites, so existing data and served projections stay valid as roles
-are added.
+Alembic migrations (`db/versions/`), written by hand — each one's docstring says why
+the change exists and what was measured. The API container runs `alembic upgrade head`
+before it starts serving (`Dockerfile`), so a migration ships with the deploy that
+needs it; keep heavy backfills out of migrations (see
+[docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md) troubleshooting) and in `tools/backfill_*`.
 
-The full table design and the stream topics are in [../docs/DB-SCHEMA.md](../docs/DB-SCHEMA.md).
+```bash
+uv run alembic upgrade head      # local
+uv run alembic heads             # must be exactly one
+```
+
+Every table: [docs/DB-SCHEMA.md](../docs/DB-SCHEMA.md).
