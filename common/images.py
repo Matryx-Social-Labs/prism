@@ -41,14 +41,51 @@ def hi_res(url: str | None) -> str | None:
 # A photograph OF a story is not shared by a dozen unrelated ones, so a hash
 # seen on PLACEHOLDER_REPEATS reports within PLACEHOLDER_WINDOW is treated as
 # furniture and never shown as the story's picture.
+#
+# The URL counts too. 16% of reports carry no hash — the fetch failed — and a
+# fallback served that way walked straight past the hash rule: TOI's generic
+# msid-47529300 on 16 articles, HT's generic logo, Prajavani's horoscope art
+# (prod, 2026-09-25). By URL the repeat is counted over distinct ARTICLES, since
+# one article carried by four edition feeds is one use of its photo, not four.
 PLACEHOLDER_REPEATS = 4
 PLACEHOLDER_WINDOW = "14 days"
 _PLACEHOLDER_TTL_S = 300.0
 _placeholders: tuple[float, frozenset[str]] = (0.0, frozenset())
 
+# The one test every route applies to a report's photo (`ri` is raw_items): its
+# hash and its URL are both checked against placeholders(). A hash never looks
+# like a URL, so one set carries both.
+REAL_PHOTO_SQL = (
+    "NOT (coalesce(ri.image_phash, '') = ANY(CAST(:placeholders AS text[])) "
+    "OR ri.image_url = ANY(CAST(:placeholders AS text[])))"
+)
 
-async def placeholder_hashes(session) -> frozenset[str]:
-    """The current set of placeholder image hashes, refreshed every five minutes."""
+
+def report_photo_join(alias: str) -> str:
+    """The row's picture as `img.image_url` / `img.slug`: a report's own
+    photograph OF this story, with the outlet that took it for the credit —
+    never an outlet's logo or stock shot. The event's first image wins when it
+    is a real one, else the earliest real one. `alias` names the outer events
+    row; it is a constant at every call site, never input. Needs :placeholders."""
+    return f"""
+        LEFT JOIN LATERAL (
+            SELECT ri.image_url, s.slug FROM event_memberships m
+            JOIN articles a ON a.id = m.article_id
+            JOIN raw_items ri ON ri.id = a.raw_item_id
+            JOIN sources s ON s.id = ri.source_id
+            WHERE m.event_id = {alias}.id AND ri.image_url IS NOT NULL AND {REAL_PHOTO_SQL}
+            ORDER BY (ri.image_url = {alias}.image_url) DESC, ri.published_at ASC NULLS LAST
+            LIMIT 1
+        ) img ON true
+    """
+
+
+def is_placeholder(phash: str | None, url: str | None, keys: frozenset[str]) -> bool:
+    return bool((phash and phash in keys) or (url and url in keys))
+
+
+async def placeholders(session) -> frozenset[str]:
+    """Hashes and URLs of the current placeholder pictures, refreshed every five minutes."""
     global _placeholders
     import time
 
@@ -65,6 +102,10 @@ async def placeholder_hashes(session) -> frozenset[str]:
                 SELECT image_phash FROM raw_items
                 WHERE image_phash IS NOT NULL AND created_at > now() - interval '{PLACEHOLDER_WINDOW}'
                 GROUP BY image_phash HAVING count(*) >= :n
+                UNION
+                SELECT image_url FROM raw_items
+                WHERE image_url IS NOT NULL AND created_at > now() - interval '{PLACEHOLDER_WINDOW}'
+                GROUP BY image_url HAVING count(DISTINCT coalesce(url_canonical, url)) >= :n
                 """
             ),
             {"n": PLACEHOLDER_REPEATS},

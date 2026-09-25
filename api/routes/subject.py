@@ -16,7 +16,7 @@ from api.routes.serialization import build_feed_item
 from api.schemas import SubjectNode, SubjectPage, SubjectTree
 from common import outlets, subjects
 from common.db import get_db
-from common.images import placeholder_hashes
+from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
 
 router = APIRouter()
@@ -90,21 +90,12 @@ async def get_subject(
     rows = (
         await db.execute(
             text(
-                """
+                f"""
                 SELECT e.id, e.title, e.summary, e.sector, e.subsector, e.regions,
                        img.image_url AS image_url, e.projection, e.last_updated_at,
                        e.occurred_at, img.slug AS image_source_slug
                 FROM events e
-                LEFT JOIN LATERAL (
-                    SELECT ri.image_url, s.slug FROM event_memberships m
-                    JOIN articles a ON a.id = m.article_id
-                    JOIN raw_items ri ON ri.id = a.raw_item_id
-                    JOIN sources s ON s.id = ri.source_id
-                    WHERE m.event_id = e.id AND ri.image_url IS NOT NULL
-                      AND (ri.image_phash IS NULL OR NOT (ri.image_phash = ANY(CAST(:placeholders AS text[]))))
-                    ORDER BY (ri.image_url = e.image_url) DESC, ri.published_at ASC NULLS LAST
-                    LIMIT 1
-                ) img ON true
+                {report_photo_join("e")}
                 -- The node AND everything under it: `civic.crime` is the violent,
                 -- the property and the ones we could not split.
                 WHERE (e.subject_path = :path OR e.subject_path LIKE :prefix)
@@ -114,7 +105,7 @@ async def get_subject(
                 """
             ),
             {"path": path, "prefix": f"{path}.%", "limit": limit,
-             "placeholders": list(await placeholder_hashes(db))},
+             "placeholders": list(await placeholders(db))},
         )
     ).mappings().all()
 

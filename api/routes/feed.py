@@ -11,7 +11,7 @@ from api.schemas import FeedItem, FeedResponse
 from common import outlets
 from common.config import get_settings
 from common.db import get_db
-from common.images import placeholder_hashes
+from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
 from common.taxonomy import TAXONOMY
 
@@ -103,7 +103,7 @@ async def get_feed(
     rows = (
         await db.execute(
             text(
-                """
+                f"""
                 SELECT id, title, summary, sector, subsector, regions,
                        img.image_url AS image_url,
                        projection, last_updated_at, occurred_at, img.slug AS image_source_slug
@@ -125,20 +125,7 @@ async def get_feed(
                       ))
                       AND (NOT :world OR NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r = 'IN' OR r LIKE 'IN-%'))
                 ) windowed
-                -- The row's picture: a report's own photograph OF this story, never
-                -- an outlet's logo or stock shot (common/images.placeholder_hashes),
-                -- with the outlet that took it for the credit. The event's first
-                -- image wins when it is a real one; else the earliest real one.
-                LEFT JOIN LATERAL (
-                    SELECT ri.image_url, s.slug FROM event_memberships m
-                    JOIN articles a ON a.id = m.article_id
-                    JOIN raw_items ri ON ri.id = a.raw_item_id
-                    JOIN sources s ON s.id = ri.source_id
-                    WHERE m.event_id = windowed.id AND ri.image_url IS NOT NULL
-                      AND (ri.image_phash IS NULL OR NOT (ri.image_phash = ANY(CAST(:placeholders AS text[]))))
-                    ORDER BY (ri.image_url = windowed.image_url) DESC, ri.published_at ASC NULLS LAST
-                    LIMIT 1
-                ) img ON true
+                {report_photo_join("windowed")}
                 WHERE rn <= 120
                 """
             ),
@@ -148,7 +135,7 @@ async def get_feed(
                 "state_only": state if scope == "region" and state else None,
                 "national": scope == "national",
                 "world": scope == "world",
-                "placeholders": list(await placeholder_hashes(db)),
+                "placeholders": list(await placeholders(db)),
             },
         )
     ).mappings().all()
