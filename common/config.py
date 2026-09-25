@@ -129,6 +129,12 @@ class Settings(BaseSettings):
     # in-window events' Prism headlines. 0 = off. The threshold is a labelled
     # decision — tools/gold_crosslingual, batch MGDmtLPZOdjy — not an eyeballed one.
     prism_headline_tier_threshold: float = 0.0
+    # The verified tier (correlation/verify.py): gist-embedding candidates, one
+    # Jev call, attach at >= the floor. off | shadow (ask, record, never attach) |
+    # live. 0.85 held precision 1.00 on the hard same-language labels and 20/20
+    # in a week of production pairs (2026-09-25); lower it only on labels.
+    prism_event_verify: str = "off"
+    prism_event_verify_min: float = 0.85
     prism_ingest_max_articles: int = 0
     # Stop COLLECTING when the recorded OpenRouter balance is under this many
     # dollars, so a stalled enrichment never grows a backlog that becomes a bill

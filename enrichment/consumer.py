@@ -27,6 +27,7 @@ from common.observability import fetch_prompt, observe
 from common.schemas import EnrichedItemMessage
 from common.securities import validated
 from common.text import chunk_text
+from correlation.verify import gist_text
 from enrichment.claims import verify_claims
 from enrichment.cve_lens import extract_from_kev, extract_from_nvd
 from enrichment.fulltext import retrieve_fulltext
@@ -141,9 +142,14 @@ async def handle_classified_item(payload: dict) -> None:
         model_used = f"{settings.llm_provider}:{extract_model}"
         raw_model_output = extraction.model_dump()
 
-    # 3. Chunk + embed
+    # 3. Chunk + embed. The gist — the extractor's English headline + summary —
+    # rides the same call: it is what the verified matching tier retrieves on
+    # (correlation/verify.py), because the body's first chunk separates
+    # same-happening pairs at AUC 0.46 where the gist reaches 0.91–0.99.
     chunks = chunk_text(clean_text)
-    embeddings = await embed_texts(chunks)
+    gist = gist_text(extraction.shared.model_dump(), title)
+    vectors = await embed_texts(chunks + ([gist] if gist else []))
+    embeddings, gist_vector = (vectors[:-1], vectors[-1]) if gist else (vectors, None)
 
     # 4. Persist article, chunks, enrichment, provenance
     article_id = uuid.uuid4()
@@ -168,6 +174,7 @@ async def handle_classified_item(payload: dict) -> None:
                 clean_text=clean_text,
                 retrieval_tier=tier,
                 word_count=len(clean_text.split()),
+                gist_embedding=gist_vector,
             )
         )
         for idx, (text, vector) in enumerate(zip(chunks, embeddings, strict=True)):
