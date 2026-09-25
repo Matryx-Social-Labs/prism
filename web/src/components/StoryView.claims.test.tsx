@@ -124,7 +124,9 @@ describe("What was said", () => {
       { speaker: "A", claims: [{ quote_text: QUOTE, quote_start: 0, quote_end: 0, article_id: "a1", source_name: "Mint", url: "u", published_at: null }] },
       { speaker: "B", claims: [{ quote_text: QUOTE + "!", quote_start: 0, quote_end: 0, article_id: "a2", source_name: "H", url: "u", published_at: null }] },
     ])} />);
-    const item = screen.getByRole("link", { name: /^Who said what/ });
+    // The desk's "On this story" column; the phone's tab row carries the same links.
+    const nav = screen.getByRole("complementary", { name: "On this story" });
+    const item = within(nav).getByRole("link", { name: /^Who said what/ });
     expect(item).toHaveTextContent("2");
     expect(item).toHaveAttribute("href", "#said");
   });

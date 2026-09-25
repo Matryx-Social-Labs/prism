@@ -36,9 +36,11 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
 
   if (story === undefined) {
     return (
-      <p className="font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-faint)" }} aria-busy="true">
-        Loading the story…
-      </p>
+      <div className="grid gap-2" aria-busy="true">
+        <span className="p-count">Loading the story…</span>
+        <span className="p-skel h-3 w-[70%]" />
+        <span className="p-skel h-3 w-[55%]" />
+      </div>
     );
   }
   if (!story || story.developments.length < 2) return null;
@@ -47,7 +49,7 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
     return (
       <div>
         <StoryTimeline story={{ developments: story.developments, cast: [] }} mode="related" />
-        <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
+        <a href={`/trending/${story.canonical_slug ?? slug}`} className="mt-2.5 inline-flex min-h-[44px] items-center text-[14.5px] font-semibold hover:underline" style={{ color: "var(--accent)", textUnderlineOffset: 4 }}>
           Open this coverage group →
         </a>
       </div>
@@ -59,15 +61,15 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
   return (
     <div>
       <RouteMap tree={story.branches} developments={story.developments} currentId={currentId} compact />
-      <details className="rule-live mt-2 group">
-        <summary className="flex cursor-pointer list-none items-center gap-2 py-3 font-mono text-[11px]" style={{ color: "var(--ink-muted)" }}>
+      <details className="group mt-2 border-t" style={{ borderColor: "var(--line)" }}>
+        <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-[13.5px] font-semibold" style={{ color: "var(--ink-2)" }}>
           <ChevronDown className="transition-transform group-open:rotate-180" />
           All developments
         </summary>
         <BranchTree tree={story.branches} developments={story.developments} currentId={currentId} />
       </details>
-      <a href={`/trending/${story.canonical_slug ?? slug}`} className="rule-live block py-3 font-mono text-[11px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
-        The whole story, every development →
+      <a href={`/trending/${story.canonical_slug ?? slug}`} className="inline-flex min-h-[44px] items-center text-[14.5px] font-semibold hover:underline" style={{ color: "var(--accent)", textUnderlineOffset: 4 }}>
+        The whole story →
       </a>
     </div>
   );

@@ -55,7 +55,7 @@ describe("the desktop story page", () => {
   // them. The whole web suite stayed green because these tests were scoped to
   // the mobile tree. (Perspectives and What to expect were retired in the
   // redesign — D4 — so Sources is the evidence section that remains here.)
-  it.each(["Coverage", "The record"])(
+  it.each(["Coverage", "The brief"])(
     "renders %s outside the mobile-only tree, so desktop can see it",
     (heading) => {
       render(<StoryView event={EVENT} />);

@@ -51,7 +51,7 @@ export function CancelSheet({
   const [busy, setBusy] = useState<"pause" | "cancel" | "switch" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [pauseGone, setPauseGone] = useState(false);
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{ title: string; body: string } | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export function CancelSheet({
     try {
       const r = await pauseSubscription(session.token, months);
       track("Subscribe", { stage: "paused", months });
-      setDone(`Paused. Plus stays on until ${until ?? "the end of this month"}, then rests and comes back on ${when(r.paused_until)}. Resume sooner from this page any time.`);
+      setDone({ title: `Paused for ${months} ${months === 1 ? "month" : "months"}`, body: `Plus stays on until ${until ?? "the end of this month"}, then rests and comes back on ${when(r.paused_until)}. Resume sooner from this page any time.` });
       onPaused(r.paused_until);
     } catch (e) {
       if (e instanceof Error && e.message === "unavailable") {
@@ -99,7 +99,7 @@ export function CancelSheet({
     try {
       const r = await cancelSubscription(session.token, { reason: reason ?? undefined, comment: comment || undefined });
       track("Subscribe", { stage: "cancelled", reason: reason ?? "none" });
-      setDone(`Done. Nothing more is charged; Plus stays on until ${when(r.access_until) ?? until ?? "the end of this month"}.`);
+      setDone({ title: "Cancelled", body: `Nothing more is charged; Plus stays on until ${when(r.access_until) ?? until ?? "the end of this month"}.` });
       onCancelled(r.access_until);
     } catch {
       setNote("We could not reach the payment provider. Try again in a minute, or write to us.");
@@ -114,7 +114,7 @@ export function CancelSheet({
     try {
       await subscribe(yearly.plan, session.token, session.email, (_k, d) => setNote(`${d}. The sheet is still open — try UPI or another card.`), { startAfterCurrent: true });
       track("Subscribe", { stage: "switched-yearly" });
-      setDone(`Yearly Plus starts ${until ?? "when this month ends"} — nothing changes until then, and nothing is charged twice.`);
+      setDone({ title: "Switched to yearly", body: `Yearly Plus starts ${until ?? "when this month ends"} — nothing changes until then, and nothing is charged twice.` });
       onSwitched({ plan: yearly.plan, starts_at: sub.current_period_end ?? null, price_paise: yearly.amount_paise });
     } catch (e) {
       const m = e instanceof Error ? e.message : "";
@@ -124,102 +124,117 @@ export function CancelSheet({
     }
   }
 
+  const btn = "p-btn p-btn--sm max-sm:min-h-[44px]";
+  const cancelAnyway = <button type="button" disabled={busy !== null} onClick={cancelNow} className={`${btn} p-btn--secondary`}>{busy === "cancel" ? "Cancelling…" : "Cancel anyway"}</button>;
+  const footnote = <span style={{ font: "400 12px/1.3 var(--font-read)", color: "var(--ink-3)" }}>One click, any time · no calls, no forms</span>;
+
+  // The Sheet (ui/Sheet): a bottom sheet on the phone, a dialog on a desk. The
+  // scrim is the positioner, so the sheet never needs a transform to centre.
   return (
-    <>
-      <div className="fixed inset-0 z-[60]" style={{ background: "rgba(20,22,19,.35)" }} onClick={onClose} aria-hidden />
+    <div className="p-scrim flex items-end justify-center lg:items-center lg:p-6" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="cancel-title"
-        className="upgrade-sheet fixed inset-x-0 bottom-0 z-[61] flex max-h-[88vh] flex-col overflow-y-auto rounded-t-[16px] border-t p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[460px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[16px] lg:border lg:p-6"
-        style={{ background: "var(--bg-elevated)", borderColor: "var(--line-strong)", boxShadow: "var(--shadow-2)" }}
+        className="p-sheet p-sheet--bottom max-h-[88vh] w-full pb-[env(safe-area-inset-bottom)] lg:max-h-[85vh] lg:w-[520px] lg:rounded-[var(--r-xl)]"
       >
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="meta-line"><span>Plus · monthly</span>{until && <><span className="dot" /><span>renews {until}</span></>}</p>
-            <h2 id="cancel-title" className="font-record mt-2 text-[26px] font-bold leading-[1.15] tracking-[-0.01em] text-balance">{done ? "Done" : "Before you go"}</h2>
-          </div>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close" className="grid h-10 w-10 flex-none place-items-center rounded-full border" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
-            <Close />
-          </button>
+        <div className="p-sheet__grab lg:hidden" aria-hidden />
+        <div className="flex items-center gap-2 pb-1.5 pl-5 pr-3 pt-2.5">
+          <p className="min-w-0 flex-1" style={{ font: "var(--t-title-s)" }}>Cancel Plus</p>
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close" className="p-iconbtn"><Close size={16} /></button>
         </div>
 
-        {done ? (
-          <>
-            <p className="mt-4 text-[15px] leading-[1.6]" role="status">{done}</p>
-            <div className="mt-5"><button type="button" onClick={onClose} className="btn btn-secondary">Close</button></div>
-          </>
-        ) : (
-          <>
-            <p className="mt-3 text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
-              Cancelling stops the next charge. You keep Plus until {until ?? "the end of the month you paid for"} — nothing is taken back.
-            </p>
-
-            <p className="mt-5 text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Why are you leaving? <span className="font-normal normal-case tracking-normal">(optional)</span></p>
-            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Reason">
-              {REASONS.map(([k, label]) => (
-                <button key={k} type="button" onClick={() => setReason(reason === k ? null : k)} aria-pressed={reason === k} className="chip h-8 px-3 text-[13px]">{label}</button>
-              ))}
+        <div className="flex-1 overflow-auto px-5 pb-5 pt-1">
+          {done ? (
+            <div className="grid gap-2">
+              <h2 id="cancel-title" className="text-balance" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>{done.title}</h2>
+              <p role="status" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>{done.body}</p>
+              <div className="mt-2"><button type="button" onClick={onClose} className="p-btn p-btn--secondary">Close</button></div>
             </div>
-            {reason === "missing-something" && (
-              <label className="mt-3 block">
-                <span className="sr-only">What was missing?</span>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value.slice(0, 280))}
-                  placeholder="What was missing? One line helps us more than you'd think."
-                  rows={2}
-                  className="w-full rounded-[10px] border px-3 py-2 text-[16px] leading-[1.5]"
-                  style={{ borderColor: "var(--line-strong)", background: "var(--surface)", color: "var(--ink)" }}
-                />
-              </label>
-            )}
-
-            {offer === "pause" && (
-              <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--line)" }}>
-                <p className="text-[16px] font-semibold">Take a break instead?</p>
-                <p className="mt-1 text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
-                  No charges for a while. Plus keeps running until {until ?? "the end of this month"}, then rests and comes back on its own.
+          ) : (
+            <div className="grid gap-4">
+              <div>
+                <h2 id="cancel-title" className="text-balance" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>Before you go</h2>
+                <p className="mt-1" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+                  Cancelling stops the next charge. You keep Plus until {until ?? "the end of the month you paid for"} — nothing is taken back.
                 </p>
-                <div role="radiogroup" aria-label="How long" className="seg mt-3 inline-flex">
-                  {([1, 2, 3] as const).map((m) => (
-                    <button key={m} role="radio" aria-checked={months === m} onClick={() => setMonths(m)} type="button">{m} {m === 1 ? "month" : "months"}</button>
-                  ))}
-                </div>
               </div>
-            )}
-            {offer === "yearly" && yearly && (
-              <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--line)" }}>
-                <p className="text-[16px] font-semibold">Yearly is {rupees(perMonth)} a month</p>
-                <ul className="mt-2 flex flex-col">
-                  {[
-                    `${rupees(yearly.amount_paise)} a year${saving ? ` — ${rupees(saving)} less than twelve months` : ""}`,
-                    `Starts ${until ?? "when this month ends"}; nothing changes today, nothing is charged twice`,
-                    "Seven days from any yearly charge to take it all back",
-                  ].map((line) => (
-                    <li key={line} className="flex items-start gap-2.5 border-t py-2 text-[14.5px] leading-[1.5]" style={{ borderColor: "var(--line)" }}>
-                      <span className="mt-[3px] shrink-0" aria-hidden><Check size={16} /></span>
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              {offer === "pause" && (
-                <button type="button" disabled={busy !== null} onClick={pause} className="btn btn-primary">{busy === "pause" ? "Pausing…" : `Pause for ${months} ${months === 1 ? "month" : "months"}`}</button>
+              <fieldset className="m-0 grid gap-1.5 border-0 p-0">
+                <legend className="p-eyebrow mb-1.5">Why are you leaving? (optional)</legend>
+                {REASONS.map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => setReason(reason === k ? null : k)} aria-pressed={reason === k} className="p-chip w-full justify-start max-sm:min-h-[44px]">{label}</button>
+                ))}
+                {reason === "missing-something" && (
+                  <label className="mt-1 block">
+                    <span className="sr-only">What was missing?</span>
+                    <textarea
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value.slice(0, 280))}
+                      placeholder="What was missing? One line helps us more than you'd think."
+                      rows={2}
+                      className="p-input py-2.5"
+                    />
+                  </label>
+                )}
+              </fieldset>
+
+              {offer ? (
+                <div className="grid gap-3 p-3.5" style={{ border: "1px solid var(--line)", borderRadius: "var(--r-md)" }}>
+                  <div className="grid min-w-0 gap-2">
+                    {offer === "pause" && (
+                      <>
+                        <p style={{ font: "600 15px/1.3 var(--font-read)" }}>Take a break instead?</p>
+                        <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+                          No charges for a while. Plus keeps running until {until ?? "the end of this month"}, then rests and comes back on its own.
+                        </p>
+                        <div role="radiogroup" aria-label="How long" className="p-seg justify-self-start">
+                          {([1, 2, 3] as const).map((m) => (
+                            <button key={m} role="radio" aria-checked={months === m} onClick={() => setMonths(m)} type="button" className="whitespace-nowrap max-sm:min-h-[44px]" style={months === m ? { background: "var(--surface)", color: "var(--ink)", boxShadow: "var(--shadow-1), 0 0 0 1px var(--line)" } : undefined}>
+                              {m} {m === 1 ? "month" : "months"}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {offer === "yearly" && yearly && (
+                      <>
+                        <p style={{ font: "600 15px/1.3 var(--font-read)" }}>Yearly is {rupees(perMonth)} a month</p>
+                        <ul className="grid gap-1.5">
+                          {[
+                            `${rupees(yearly.amount_paise)} a year${saving ? ` — ${rupees(saving)} less than twelve months` : ""}`,
+                            `Starts ${until ?? "when this month ends"}; nothing changes today, nothing is charged twice`,
+                            "Seven days from any yearly charge to take it all back",
+                          ].map((line) => (
+                            <li key={line} className="grid grid-cols-[18px_minmax(0,1fr)] gap-2" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+                              <span className="mt-[5px]" aria-hidden><Check size={14} /></span>
+                              <span>{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </div>
+                  {/* The one offer and the exit on the same row, at the same size. */}
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                    {offer === "pause" && (
+                      <button type="button" disabled={busy !== null} onClick={pause} className={`${btn} p-btn--primary`}>{busy === "pause" ? "Pausing…" : `Pause for ${months} ${months === 1 ? "month" : "months"}`}</button>
+                    )}
+                    {offer === "yearly" && yearly && (
+                      <button type="button" disabled={busy !== null} onClick={switchToYearly} className={`${btn} p-btn--primary`}>{busy === "switch" ? "Opening…" : `Switch to yearly · ${rupees(yearly.amount_paise)}`}</button>
+                    )}
+                    {cancelAnyway}
+                    <span className="basis-full sm:ml-auto sm:basis-auto">{footnote}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">{footnote}{cancelAnyway}</div>
               )}
-              {offer === "yearly" && yearly && (
-                <button type="button" disabled={busy !== null} onClick={switchToYearly} className="btn btn-primary">{busy === "switch" ? "Opening…" : `Switch to yearly · ${rupees(yearly.amount_paise)}`}</button>
-              )}
-              <button type="button" disabled={busy !== null} onClick={cancelNow} className="btn btn-secondary">{busy === "cancel" ? "Cancelling…" : "Cancel anyway"}</button>
+              {note && <p role="status" style={{ font: "500 13.5px/1.45 var(--font-read)", color: "var(--danger)" }}>{note}</p>}
             </div>
-            {note && <p className="mt-3 text-[13px]" role="status" style={{ color: "var(--danger)" }}>{note}</p>}
-            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.03em]" style={{ color: "var(--ink-3)" }}>One click, any time · no calls, no forms</p>
-          </>
-        )}
+          )}
+        </div>
       </section>
-    </>
+    </div>
   );
 }

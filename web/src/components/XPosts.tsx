@@ -1,7 +1,7 @@
 "use client";
 
+import { Ago } from "@/components/Ago";
 import type { SourceRef, XPostOut } from "@/lib/api";
-import { relativeTime } from "@/lib/dateline";
 import { XIcon } from "@/components/icons";
 
 /**
@@ -31,52 +31,56 @@ export function firstOnX(posts: XPostOut[], sources: SourceRef[]): XPostOut | nu
 function Avatar({ post }: { post: XPostOut }) {
   if (post.profile_image_url) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={post.profile_image_url} alt="" width={24} height={24} className="h-6 w-6 rounded-full grayscale" loading="lazy" />;
+    return <img src={post.profile_image_url} alt="" width={32} height={32} className="h-8 w-8 rounded-full grayscale" loading="lazy" referrerPolicy="no-referrer" />;
   }
   return (
-    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full font-mono text-[10px]" style={{ background: "var(--accent-soft)", color: "var(--ink-2)" }} aria-hidden>
-      {post.name.slice(0, 1)}
+    <span className="p-monogram" style={{ width: 32, height: 32, fontSize: 10 }} aria-hidden>
+      {post.handle.slice(0, 2).toUpperCase()}
     </span>
   );
 }
 
+/** One post as X's display rules and the record agree on (Design System v2 · XPostCard). */
 export function XPosts({ posts, sources }: { posts: XPostOut[]; sources: SourceRef[] }) {
   if (posts.length === 0) return null;
   const first = firstOnX(posts, sources);
   return (
-    <div className="border-l-2 pl-4 sm:pl-5" style={{ borderColor: "var(--line-strong)" }}>
+    <div className="grid gap-3">
       {first && (
-        <p className="mb-3 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-          First on X · @{first.handle} · {relativeTime(first.created_at)}
+        <p className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
+          First on X · @{first.handle} · <a href={first.url} target="_blank" rel="noopener noreferrer"><Ago iso={first.created_at} /></a>
         </p>
       )}
-      <ol className="divide-y" style={{ borderColor: "var(--line)" }}>
+      <ol className="grid gap-3">
         {posts.map((p) => {
           const profile = `https://x.com/${p.handle}`;
           return (
-            <li key={p.post_id} className="py-5" data-testid="x-post">
-              <div className="flex items-center gap-2">
+            <li key={p.post_id} className="p-card grid gap-2.5" data-testid="x-post">
+              <div className="flex items-center gap-2.5">
                 <a href={profile} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0" aria-label={`${p.name} on X`}>
                   <Avatar post={p} />
                 </a>
-                <a href={profile} target="_blank" rel="noopener noreferrer" className="text-[12.5px] font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>
-                  {p.name}
-                </a>
-                <a href={profile} target="_blank" rel="noopener noreferrer" className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-                  @{p.handle}
-                </a>
-                <span className="ml-auto inline-flex" style={{ color: "var(--ink-3)" }} aria-label="X">
+                <div className="min-w-0 flex-1">
+                  <a href={profile} target="_blank" rel="noopener noreferrer" className="block truncate text-[14px] font-semibold leading-[1.25] hover:underline" style={{ color: "var(--ink)" }}>
+                    {p.name}
+                  </a>
+                  <a href={profile} target="_blank" rel="noopener noreferrer" className="block font-mono text-[11.5px]" style={{ color: "var(--ink-3)" }}>
+                    @{p.handle}
+                  </a>
+                </div>
+                <span className="inline-flex shrink-0" style={{ color: "var(--ink-2)" }} aria-label="X">
                   <XIcon size={14} />
                 </span>
               </div>
-              <p className="mt-2 whitespace-pre-wrap text-[15.5px] leading-[1.65]" style={{ color: "var(--ink)", textWrap: "pretty" }}>
+              <p className="whitespace-pre-wrap" style={{ font: "var(--t-body)", color: "var(--ink)", textWrap: "pretty", overflowWrap: "anywhere" }}>
                 {p.text}
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
-                <a href={p.url} target="_blank" rel="noopener noreferrer" className="font-mono text-[11px]">
-                  <time dateTime={p.created_at}>{relativeTime(p.created_at)}</time>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <a href={p.url} target="_blank" rel="noopener noreferrer" className="p-count">
+                  <Ago iso={p.created_at} />
                 </a>
-                <a href={p.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+                {first?.post_id === p.post_id && <span className="p-badge p-badge--outline">First on X</span>}
+                <a href={p.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex min-h-[44px] items-center text-[13px] font-semibold lg:min-h-[32px]" style={{ color: "var(--accent)" }}>
                   View on X ↗
                 </a>
               </div>

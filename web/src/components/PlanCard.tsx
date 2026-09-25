@@ -47,7 +47,7 @@ export function PlanCard({ session, compact = false }: { session: Session; compa
   }, [session.token]);
 
   if (sub === undefined) {
-    return <div className={compact ? "px-4 py-4" : "card p-5"}><span className="pulse-skel block h-5 w-40 rounded" style={{ background: "var(--sunken)" }} aria-label="Loading your plan" /></div>;
+    return <div className={compact ? "py-3.5" : "p-card"} style={compact ? undefined : { padding: 18 }}><span className="p-skel h-5 w-40" aria-label="Loading your plan" /></div>;
   }
   const state = planState(sub);
   const label = PLAN_LABEL[sub?.plan ?? ""] ?? "Plus";
@@ -97,50 +97,51 @@ export function PlanCard({ session, compact = false }: { session: Session; compa
   }[state];
   const showPrice = !["free", "lapsed", "refunded"].includes(state) && sub?.price_paise;
 
+  const btn = "p-btn p-btn--sm max-sm:min-h-[44px]";
+  const confirmRow = (text: React.ReactNode, yes: string, busyLabel: string, act: () => void) => (
+    <div className="mt-3 flex flex-wrap items-center gap-2.5 pt-3" style={{ borderTop: "1px solid var(--line)", font: "400 13.5px/1.5 var(--font-read)", color: "var(--ink-2)" }}>
+      <span className="min-w-0 flex-[1_1_240px]">{text}</span>
+      <button type="button" disabled={busy} onClick={act} className={`${btn} p-btn--secondary`}>{busy ? busyLabel : yes}</button>
+      <button type="button" onClick={() => setConfirm(null)} className={`${btn} p-btn--ghost`}>Keep Plus</button>
+    </div>
+  );
+
   return (
-    <div className={compact ? "px-4 py-4" : "card p-5"} aria-label="Your plan">
+    <div className={compact ? "py-3.5" : "p-card"} style={compact ? undefined : { padding: 18 }} aria-label="Your plan">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
-          {!compact && <p className="text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>Plan</p>}
-          <p className={`${compact ? "text-[15px]" : "mt-1 text-[18px]"} font-semibold`}>
+          {!compact && <p className="p-eyebrow">Your plan</p>}
+          <p className={compact ? "" : "mt-1"} style={{ font: `600 ${compact ? 15 : 18}px/1.3 var(--font-read)` }}>
             {headline}
             {showPrice ? <span className="ml-2 font-mono text-[12px] font-normal" style={{ color: "var(--ink-3)" }}>{rupees(sub!.price_paise!)}</span> : null}
           </p>
-          <p className="mt-0.5 text-[13.5px] leading-[1.5]" style={{ color: state === "past_due" ? "var(--ink)" : "var(--ink-3)" }}>{line}</p>
+          <p className="mt-0.5" style={{ font: "400 13.5px/1.5 var(--font-read)", color: state === "past_due" ? "var(--ink)" : "var(--ink-3)" }}>{line}</p>
           {canRefund && (
             <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.03em]" style={{ color: "var(--ink-3)" }}>Full refund open until {when(sub?.refundable_until)}</p>
           )}
         </div>
-        {(state === "free" || state === "lapsed" || state === "refunded") && <Link href="/plus?from=account" className="btn btn-primary btn-sm">Get Plus</Link>}
-        {state === "past_due" && <span className="font-mono text-[11px] uppercase tracking-[0.03em]" style={{ color: "var(--ink-3)" }}>Check your email</span>}
-        {state === "paused" && <button type="button" disabled={busy} onClick={resume} className="btn btn-secondary btn-sm">{busy ? "Resuming…" : "Resume now"}</button>}
+        {(state === "free" || state === "lapsed" || state === "refunded") && <Link href="/plus?from=account" className={`${btn} p-btn--primary`}>Get Plus</Link>}
+        {state === "past_due" && <span className="p-tag-mono">Check your email</span>}
+        {state === "paused" && <button type="button" disabled={busy} onClick={resume} className={`${btn} p-btn--secondary`}>{busy ? "Resuming…" : "Resume now"}</button>}
         {state === "active" && !confirm && (
           <span className="flex items-center gap-1">
-            {canRefund && <button type="button" onClick={() => setConfirm("refund")} className="btn btn-ghost btn-sm" style={{ color: "var(--ink-2)" }}>Refund</button>}
-            <button type="button" onClick={() => (monthly ? setSheet(true) : setConfirm("cancel"))} className="btn btn-ghost btn-sm" style={{ color: "var(--ink-2)" }}>Cancel</button>
+            {canRefund && <button type="button" onClick={() => setConfirm("refund")} className={`${btn} p-btn--ghost`}>Refund</button>}
+            <button type="button" onClick={() => (monthly ? setSheet(true) : setConfirm("cancel"))} className={`${btn} p-btn--ghost`}>Cancel</button>
           </span>
         )}
       </div>
-      {confirm === "cancel" && (
-        <div className="mt-3 flex flex-wrap items-center gap-3 border-t pt-3 text-[13.5px]" style={{ borderColor: "var(--line)" }}>
-          <span style={{ color: "var(--ink-2)" }}>Stop the next charge? You keep Plus until {when(sub?.current_period_end) ?? "the period ends"}.</span>
-          <button type="button" disabled={busy} onClick={stop} className="btn btn-secondary btn-sm">{busy ? "Stopping…" : "Yes, cancel"}</button>
-          <button type="button" onClick={() => setConfirm(null)} className="btn btn-ghost btn-sm">Keep Plus</button>
-        </div>
-      )}
-      {confirm === "refund" && (
-        <div className="mt-3 flex flex-wrap items-center gap-3 border-t pt-3 text-[13.5px]" style={{ borderColor: "var(--line)" }}>
-          <span style={{ color: "var(--ink-2)" }}>
-            Refund {sub?.price_paise ? rupees(sub.price_paise) : "this charge"} in full to the method you paid with? Plus ends now; the money shows in 5–7 working days.
-          </span>
-          <button type="button" disabled={busy} onClick={refund} className="btn btn-secondary btn-sm">{busy ? "Refunding…" : "Yes, refund"}</button>
-          <button type="button" onClick={() => setConfirm(null)} className="btn btn-ghost btn-sm">Keep Plus</button>
-        </div>
-      )}
-      {note && <p className="mt-2 text-[13px]" role="status" style={{ color: "var(--danger)" }}>{note}</p>}
+      {confirm === "cancel" && confirmRow(<>Stop the next charge? You keep Plus until {when(sub?.current_period_end) ?? "the period ends"}.</>, "Yes, cancel", "Stopping…", stop)}
+      {confirm === "refund" &&
+        confirmRow(
+          <>Refund {sub?.price_paise ? rupees(sub.price_paise) : "this charge"} in full to the method you paid with? Plus ends now; the money shows in 5–7 working days.</>,
+          "Yes, refund",
+          "Refunding…",
+          refund,
+        )}
+      {note && <p className="mt-2" role="status" style={{ font: "500 13.5px/1.45 var(--font-read)", color: "var(--danger)" }}>{note}</p>}
       {!compact && state !== "free" && (
-        <p className="mt-3 border-t pt-3 text-[12.5px] leading-[1.5]" style={{ borderColor: "var(--line)", color: "var(--ink-3)" }}>
-          Receipts: Razorpay emails one for every charge to {session.email}; each is also under Payments below. Questions about a charge: <Link href="/refunds" className="underline underline-offset-[3px]">Refund policy</Link>.
+        <p className="mt-3 pt-3" style={{ borderTop: "1px solid var(--line)", font: "400 12.5px/1.5 var(--font-read)", color: "var(--ink-3)" }}>
+          Receipts: Razorpay emails one for every charge to {session.email}; each is also under Payments below. Questions about a charge: <Link href="/refunds" className="p-link">Refund policy</Link>.
         </p>
       )}
       {sub && (

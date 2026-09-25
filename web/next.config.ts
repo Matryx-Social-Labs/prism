@@ -21,7 +21,9 @@ export const CSP = [
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",
-  `report-uri ${API}/api/v1/csp-report`,
+  // `next dev` evaluates code (React refresh) and would report every page load;
+  // a dev server pointed at the production API must not fill its report log.
+  ...(process.env.NODE_ENV === "development" ? [] : [`report-uri ${API}/api/v1/csp-report`]),
 ].join("; ");
 
 const nextConfig: NextConfig = {

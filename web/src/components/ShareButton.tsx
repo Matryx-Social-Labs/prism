@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight } from "@/components/icons";
+import { ShareIcon } from "@/components/icons";
 
 // Web Share API on mobile (native WhatsApp/Instagram sheet — the India growth
 // path); copy-link fallback on desktop. Shares the shareable /trending/<slug> URL.
@@ -55,7 +55,7 @@ export function ShareButton({ url, title, fill, compact }: { url: string; title:
   if (compact) {
     // A text link in a meta row (a quote card's foot): the same behaviour, no chrome.
     return (
-      <button type="button" onClick={share} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }} aria-label="Share this quote">
+      <button type="button" onClick={share} className="font-semibold hover:underline" style={{ color: "var(--ink-2)", textUnderlineOffset: 4 }} aria-label="Share this quote">
         {copied ? "Link copied" : "Share"}
       </button>
     );
@@ -64,15 +64,10 @@ export function ShareButton({ url, title, fill, compact }: { url: string; title:
     <button
       type="button"
       onClick={share}
-      className={
-        fill
-          ? "flex h-11 w-full items-center justify-center gap-1.5 rounded-full border text-[13.5px] font-semibold transition hover:opacity-80"
-          : "inline-flex h-11 items-center gap-1.5 border px-3 text-[13px] font-medium transition hover:opacity-80"
-      }
-      style={{ borderColor: "var(--line-strong)", color: "var(--ink)", background: fill ? "var(--bg-elevated)" : "transparent" }}
+      className={`p-btn p-btn--secondary ${fill ? "w-full" : "p-btn--sm"}`}
       aria-label="Share this story"
     >
-      <ArrowUpRight />
+      <ShareIcon size={16} />
       {copied ? "Link copied" : "Share"}
     </button>
   );

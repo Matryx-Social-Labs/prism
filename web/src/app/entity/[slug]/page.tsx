@@ -67,11 +67,11 @@ export default async function EntityHubPage({ params }: { params: Promise<{ slug
         {records.length === 0 ? (
           <p className="mt-6 text-[15px]" style={{ color: "var(--ink-2)" }}>No records name this actor yet.</p>
         ) : (
-          <div className="mt-4">
+          <ol className="p-print mt-4 grid gap-3">
             {records.map((item, i) => (
               <ChartRow key={item.id} item={item} lead={i === 0} />
             ))}
-          </div>
+          </ol>
         )}
       </main>
     </>

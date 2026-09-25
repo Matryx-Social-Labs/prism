@@ -13,16 +13,17 @@
 
 // The paper of record's grounds and inks (DESIGN.md § Colour, light): a share
 // card is the record's header at poster scale.
+// Design System v2 light tokens (design/tokens.json): share cards are light only.
 const DESIGN = {
-  ground: "#F6F3EC",
-  surface: "#FCFBF7",
-  ink: "#171A18",
-  inkMuted: "#4E5550",
-  inkFaint: "#6C746F",
-  line: "#DCD8CE",
-  lineStrong: "#BDB8AD",
-  accent: "#006B62",
-  coverage: { national: "#DC9412", intl: "#0E9FB8", regional: "#E4573D", wire: "#68736D" },
+  ground: "#F7F6F2",
+  surface: "#FFFFFF",
+  ink: "#111317",
+  inkMuted: "#3F434A",
+  inkFaint: "#5B6069",
+  line: "#DFDDD6",
+  lineStrong: "#8E8B82",
+  accent: "#0B57D0",
+  coverage: { national: "#1E3A6E", intl: "#1583A8", regional: "#C4470F", wire: "#767872" },
 } as const;
 
 export const OG_COLORS = DESIGN;
@@ -78,9 +79,9 @@ async function fetchFont(family: string, weight: number, text: string, italic = 
 type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 600 | 700; style: "normal" | "italic" };
 
 /**
- * Fonts for one card, the three voices DESIGN.md assigns: Libre Baskerville for
- * the headline (and its italic for a verbatim quote), IBM Plex Sans for the reading text,
- * JetBrains Mono for provenance. An Indic family is added only when the text
+ * Fonts for one card, the three voices of Design System v2: Newsreader for the
+ * headline (and its italic for a verbatim quote), Anek Latin for the reading text,
+ * Geist Mono for provenance. An Indic family is added only when the text
  * needs one.
  *
  * Pass EVERY string the card draws. The subset contains exactly the glyphs you
@@ -96,11 +97,11 @@ export async function ogFonts(...text: string[]): Promise<OgFont[]> {
   const all = [...new Set((joined + joined.toUpperCase() + joined.toLowerCase() + "0123456789·—–’“”").split(""))].join("");
   const indic = indicFamilyFor(all);
   const wanted: [string, number, boolean][] = [
-    ["Libre Baskerville", 700, false],
-    ["Libre Baskerville", 400, true],
-    ["IBM Plex Sans", 400, false],
-    ["IBM Plex Sans", 600, false],
-    ["JetBrains Mono", 400, false],
+    ["Newsreader", 600, false],
+    ["Newsreader", 400, true],
+    ["Anek Latin", 400, false],
+    ["Anek Latin", 600, false],
+    ["Geist Mono", 400, false],
     ...(indic ? ([[indic, 700, false]] as [string, number, boolean][]) : []),
   ];
   const loaded = await Promise.all(
@@ -115,13 +116,13 @@ export async function ogFonts(...text: string[]): Promise<OgFont[]> {
 /** font-family stack for the record voice, Indic first so it wins for those glyphs. */
 export function displayStack(text: string): string {
   const indic = indicFamilyFor(text);
-  return [indic, "Libre Baskerville", "Georgia", "serif"].filter(Boolean).join(", ");
+  return [indic, "Newsreader", "Georgia", "serif"].filter(Boolean).join(", ");
 }
 export function bodyStack(text: string): string {
   const indic = indicFamilyFor(text);
-  return [indic, "IBM Plex Sans", "sans-serif"].filter(Boolean).join(", ");
+  return [indic, "Anek Latin", "sans-serif"].filter(Boolean).join(", ");
 }
 
-export const OG_MONO = "JetBrains Mono, monospace";
-export const OG_DISPLAY = "Libre Baskerville, Georgia, serif";
-export const OG_SANS = "IBM Plex Sans, sans-serif";
+export const OG_MONO = "Geist Mono, monospace";
+export const OG_DISPLAY = "Newsreader, Georgia, serif";
+export const OG_SANS = "Anek Latin, sans-serif";

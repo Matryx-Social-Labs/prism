@@ -26,13 +26,20 @@ describe("Ask entry points", () => {
     expect(input).toHaveValue("");
   });
 
-  it("the bar shows the suggested questions only while focused and empty", async () => {
-    render(<AskContext.Provider value={vi.fn()}><AskBar suggestions={["Why now?"]} sourceCount={3} /></AskContext.Provider>);
-    expect(screen.queryByRole("button", { name: "Why now?" })).toBeNull();
-    await userEvent.click(screen.getByRole("textbox"));
-    expect(screen.getByRole("button", { name: "Why now?" })).toBeInTheDocument();
-    await userEvent.keyboard("x");
-    expect(screen.queryByRole("button", { name: "Why now?" })).toBeNull();
+  // The design (v2 · AskBar) prints the story's questions under the bar at
+  // the foot of the record; one tap sends it, marked as a chip.
+  it("the bar offers the story's suggested questions and sends one as a chip", async () => {
+    const open = vi.fn();
+    render(<AskContext.Provider value={open}><AskBar suggestions={["Why now?"]} sourceCount={3} /></AskContext.Provider>);
+    await userEvent.click(screen.getByRole("button", { name: "Why now?" }));
+    expect(open).toHaveBeenCalledWith({ prefill: "Why now?", submit: true, via: "chip" });
+  });
+
+  it("the bar sends nothing for an empty question", async () => {
+    const open = vi.fn();
+    render(<AskContext.Provider value={open}><AskBar suggestions={[]} sourceCount={3} /></AskContext.Provider>);
+    await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("a quote card offers to ask about the quote, with the quote and speaker in the question", async () => {

@@ -167,6 +167,18 @@ describe("label page", () => {
     expect(body.unsure).toBe(false);
   });
 
+  it("files 'none of these' as empty even with a row ticked, and offers no yes with nothing ticked", async () => {
+    // Two buttons now: "Yes — n selected" and "None of these". Pressing None
+    // after ticking must not file the ticked rows as a yes.
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
+    render(<LabelPage params={params} />);
+    expect(await screen.findByRole("button", { name: "Yes — 0 selected" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /Shan Masood/ }));
+    await userEvent.click(screen.getByRole("button", { name: "None of these" }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
+    expect(postLabelAnswer.mock.calls[0][1]).toMatchObject({ selected: [], unsure: false, skipped: false });
+  });
+
   it("keeps 'not sure' distinct from 'none of these'", async () => {
     // Collapsing them would file coin-flips as confident negatives, which is what
     // the gold set's AMBIGUOUS list exists to prevent.
@@ -479,7 +491,7 @@ describe("the article opening", () => {
     render(<LabelPage params={params} />);
 
     await screen.findByText(/the Collector said/);
-    expect(screen.queryByText(/HOW THE ARTICLE OPENS/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/how the article opens/i)).not.toBeInTheDocument();
   });
 });
 
@@ -698,7 +710,8 @@ describe("practice rounds and tests (labeller workspace, phase 3)", () => {
     });
     render(<LabelPage params={params} />);
     expect(await screen.findByText("Not this time.")).toBeInTheDocument();
-    expect(screen.getByText(/13 of 15 right/)).toBeInTheDocument();
+    // The count is set in mono on its own; the sentence around it reads on.
+    expect(screen.getByText("13 of 15").parentElement).toHaveTextContent("13 of 15 right · pass mark 90%");
     expect(screen.getByText(/You need 90%/)).toBeInTheDocument();
     expect(screen.getByText("Somebody else is named before the quote.")).toBeInTheDocument();
   });

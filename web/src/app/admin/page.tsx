@@ -5,13 +5,14 @@
  * drawn as charts — supply first (it has the longest record), then visits,
  * sign-ups, engagement, money and demand, each against the period before
  * (common/metrics.py; founder decisions V1–V5, 2026-09-24). Where a number was
- * counted sits behind its ⓘ; every chart turns into its table.
+ * counted opens under its ⓘ; every chart turns into its table.
  */
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AdminTitle, useAdmin } from "@/components/admin/AdminShell";
+import { ArrowRight } from "@/components/icons";
 import { KpiTile } from "@/components/admin/charts/KpiTile";
 import { dayLabel } from "@/components/admin/charts/format";
 import { DashboardSection } from "@/components/admin/Dashboard";
@@ -19,20 +20,32 @@ import { downloadWeeklyCsv, fetchBatches, fetchLabellers, fetchMetrics, type Met
 
 const PERIODS = [7, 28, 90] as const;
 
-/** The headline row: [section, measure]. */
-const HEADLINE: ReadonlyArray<[string, string]> = [
-  ["visits", "visitor_days"],
-  ["signups", "new_accounts"],
-  ["engagement", "active_accounts"],
-  ["engagement", "questions"],
-  ["money", "paying"],
-  ["money", "mrr"],
-  ["supply", "reports"],
-  ["supply", "events"],
+/** The headline row: [section, measure, the counting start that explains a
+ *  missing period before]. Money keeps no history, so it has none to explain. */
+const HEADLINE: ReadonlyArray<[string, string, keyof Metrics["counting_since"] | null]> = [
+  ["visits", "visitor_days", "usage"],
+  ["signups", "new_accounts", null],
+  ["engagement", "active_accounts", "active"],
+  ["engagement", "questions", null],
+  ["money", "paying", null],
+  ["money", "mrr", null],
+  ["supply", "reports", null],
+  ["supply", "events", null],
 ];
 
 /** Supply first: it is counted since launch, so it is the fullest picture. */
 const ORDER = ["supply", "visits", "signups", "engagement", "money", "demand"];
+
+const year = (iso: string) => iso.slice(0, 4);
+
+/** "28 AUG – 24 SEP 2026 IST · VISIT COUNTING BEGAN 12 SEP": real dates only. */
+function periodLine({ range, counting_since }: Metrics): string {
+  const { start, end } = range;
+  const span = year(start) === year(end) ? `${dayLabel(start)} – ${dayLabel(end)} ${year(end)}` : `${dayLabel(start)} ${year(start)} – ${dayLabel(end)} ${year(end)}`;
+  const usage = counting_since.usage;
+  const visits = usage ? `VISIT COUNTING BEGAN ${dayLabel(usage)}${year(usage) === year(end) ? "" : ` ${year(usage)}`}` : "NO VISITS COUNTED YET";
+  return `${span} IST · ${visits}`.toUpperCase();
+}
 
 interface Need {
   href: string;
@@ -82,71 +95,49 @@ export default function AdminOverview() {
     }
   };
 
-  const open = needs?.filter((n) => n.count > 0) ?? [];
   const find = (section: string, key: string): MetricRow | undefined =>
     data?.sections.find((x) => x.key === section)?.rows.find((r) => r.key === key);
-  const headline = HEADLINE.map(([sec, key]) => find(sec, key)).filter((r): r is MetricRow => !!r);
+  const headline = HEADLINE.flatMap(([sec, key, since]) => {
+    const row = find(sec, key);
+    return row ? [{ row, since: since && data ? data.counting_since[since] : null }] : [];
+  });
   const sections = data ? [...data.sections].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key)) : [];
 
   return (
     <>
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1 basis-[280px]">
           <AdminTitle>Overview</AdminTitle>
-          {data && (
-            <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-              {dayLabel(data.range.start).toUpperCase()} – {dayLabel(data.range.end).toUpperCase()} · IST
-              {data.counting_since.usage
-                ? ` · VISITS COUNTED SINCE ${dayLabel(data.counting_since.usage).toUpperCase()}`
-                : " · NO VISITS COUNTED YET"}
-            </p>
-          )}
+          {data && <p className="p-count mt-1.5 whitespace-normal">{periodLine(data)}</p>}
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="seg" role="tablist" aria-label="Period">
-            {PERIODS.map((p) => (
-              <button key={p} type="button" role="tab" aria-selected={days === p} onClick={() => setDays(p)}>
-                {p} days
-              </button>
-            ))}
-          </div>
-          <button type="button" className="btn btn-secondary" onClick={() => void csv()}>
-            Weekly CSV
-          </button>
+        <div className="p-seg" role="tablist" aria-label="Period">
+          {PERIODS.map((p) => (
+            <button key={p} type="button" role="tab" aria-selected={days === p} onClick={() => setDays(p)}>
+              {p} days
+            </button>
+          ))}
         </div>
+        <button type="button" className="p-btn p-btn--secondary p-btn--sm max-sm:min-h-[44px]" onClick={() => void csv()}>
+          Weekly CSV
+        </button>
       </div>
 
       {error && (
-        <p role="alert" className="mt-5 text-[14px]" style={{ color: "var(--danger)" }}>
+        <p role="alert" className="p-alert p-alert--error mt-5">
           {error}
         </p>
       )}
 
-      <section className="mt-8 border-t pt-4" style={{ borderColor: "var(--line-strong)" }} aria-labelledby="needs-you">
-        <h2 id="needs-you" className="text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
+      <section className="mt-5" aria-labelledby="needs-you">
+        <h2 id="needs-you" className="p-eyebrow mb-2">
           Needs you
         </h2>
-        {needsFailed && (
-          <p className="mt-2 text-[15px]" style={{ color: "var(--danger)" }}>Could not check what is waiting. Reload to try again.</p>
-        )}
-        {needs && open.length === 0 && (
-          <p className="mt-2 text-[15px]" style={{ color: "var(--ink-2)" }}>Nothing is waiting on you.</p>
-        )}
-        <ul className="mt-1 flex flex-wrap gap-x-8 gap-y-2">
-          {open.map((n) => (
-            <li key={n.text}>
-              <Link href={n.href} className="inline-flex min-h-[44px] items-baseline gap-2 underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
-                <span className="font-mono text-[17px] tabular-nums">{n.count}</span>{" "}
-                <span className="text-[15px]">{n.text}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <NeedsYou needs={needs} failed={needsFailed} />
       </section>
 
       {headline.length > 0 && (
-        <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {headline.map((r) => (
+        <div className="mt-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          {headline.map(({ row: r, since }) => (
             <KpiTile
               key={r.key}
               label={r.label}
@@ -156,6 +147,7 @@ export default function AdminOverview() {
               unit={r.unit}
               source={r.source}
               note={r.note}
+              countedSince={since}
             />
           ))}
         </div>
@@ -163,5 +155,35 @@ export default function AdminOverview() {
 
       {data && sections.map((s) => <DashboardSection key={s.key} section={s} start={data.range.start} />)}
     </>
+  );
+}
+
+/** What is waiting on a founder, each a link to where it is done. Could not
+ *  look is never "nothing": it says so, apart from an empty list. */
+function NeedsYou({ needs, failed }: { needs: Need[] | null; failed: boolean }) {
+  if (failed) {
+    return (
+      <p className="p-alert p-alert--error">Could not check what is waiting on you. This is not the same as nothing. Reload to try again.</p>
+    );
+  }
+  if (!needs) return null;
+  const open = needs.filter((n) => n.count > 0);
+  if (!open.length) return <p className="p-alert p-alert--info">Nothing is waiting on you.</p>;
+  return (
+    <ul className="grid gap-1.5">
+      {open.map((n) => (
+        <li key={n.text}>
+          <Link
+            href={n.href}
+            className="flex min-h-[44px] items-baseline gap-2.5 rounded-[var(--r-md)] border px-3 py-2.5 no-underline hover:bg-[var(--sunken)]"
+            style={{ borderColor: "var(--line-strong)", color: "var(--ink)" }}
+          >
+            <span className="font-mono text-[13px] font-medium tabular-nums">{n.count}</span>{" "}
+            <span className="min-w-0 flex-1 text-[14px] font-medium leading-[1.35]">{n.text}</span>
+            <ArrowRight size={14} className="shrink-0 self-center text-[var(--accent)]" />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -50,8 +50,11 @@ function item(over: Partial<FeedItem> = {}): FeedItem {
   };
 }
 
+/** The mono strip that marks the start screen: what can be searched. */
+const START = "Stories · people · tickers · CVE ids";
+
 function input() {
-  return screen.getByRole("textbox", { name: "Search stories, entities and sources" });
+  return screen.getByRole("searchbox", { name: "Search stories, entities and sources" });
 }
 
 beforeEach(() => {
@@ -81,7 +84,7 @@ describe("Search — querying", () => {
     await new Promise((r) => setTimeout(r, DEBOUNCE_SETTLED));
     expect(searchEvents).not.toHaveBeenCalled();
     // Still on the start screen, not a half-committed search.
-    expect(screen.getByText("In the news now")).toBeInTheDocument();
+    expect(screen.getByText(START)).toBeInTheDocument();
   });
 
   it("writes the query back to the URL, escaped", async () => {
@@ -133,7 +136,7 @@ describe("Search — results", () => {
     searchEvents.mockResolvedValue([]);
     render(<SearchPage />);
     await userEvent.type(input(), "zzzqqq");
-    const msg = await screen.findByText(/No stories match/);
+    const msg = await screen.findByText(/Nothing matches/);
     expect(msg).toHaveTextContent("zzzqqq");
   });
 
@@ -166,10 +169,16 @@ describe("Search — start screen", () => {
     await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("Adani Group"));
   });
 
-  it("still offers the canned suggestions when trending is down", async () => {
+  // No invented suggestions (Design System v2 honesty rule): with trending down
+  // there is nothing real to offer, so the start screen offers nothing — no
+  // empty "In the news now" heading, no canned queries — and the box still works.
+  it("offers no suggestions when trending is down, and the box still searches", async () => {
     fetchTrending.mockRejectedValue(new Error("unreachable"));
     render(<SearchPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "RELIANCE" }));
+    await waitFor(() => expect(fetchTrending).toHaveBeenCalled());
+    expect(screen.queryByText("In the news now")).toBeNull();
+    expect(screen.queryByRole("button", { name: "RELIANCE" })).toBeNull();
+    await userEvent.type(input(), "RELIANCE");
     await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("RELIANCE"));
   });
 });
@@ -182,19 +191,19 @@ describe("Search — a failed request", () => {
   it("tells the reader the search failed instead of going blank", async () => {
     searchEvents.mockRejectedValue(new Error("offline"));
     render(<SearchPage />);
-    await userEvent.type(screen.getByRole("textbox"), "reliance");
+    await userEvent.type(screen.getByRole("searchbox"), "reliance");
 
     expect(await screen.findByText(/Search is unreachable right now/i)).toBeInTheDocument();
     // And it must NOT claim the query simply had no matches — that's a lie.
-    expect(screen.queryByText(/No stories match/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument();
   });
 
   it("still says 'no match' when the search genuinely returned nothing", async () => {
     searchEvents.mockResolvedValue([]);
     render(<SearchPage />);
-    await userEvent.type(screen.getByRole("textbox"), "zzzz");
+    await userEvent.type(screen.getByRole("searchbox"), "zzzz");
 
-    expect(await screen.findByText(/No stories match/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nothing matches/)).toBeInTheDocument();
     expect(screen.queryByText(/unreachable/i)).not.toBeInTheDocument();
   });
 
@@ -204,7 +213,7 @@ describe("Search — a failed request", () => {
     // first passes even with the reset on the search path deleted.
     searchEvents.mockRejectedValueOnce(new Error("offline")).mockResolvedValue([]);
     render(<SearchPage />);
-    const box = screen.getByRole("textbox");
+    const box = screen.getByRole("searchbox");
     await userEvent.type(box, "reliance");
     await screen.findByText(/unreachable/i);
 
@@ -212,7 +221,7 @@ describe("Search — a failed request", () => {
     // Wait for the SETTLED result first. Asserting "no error" directly races the
     // loading state: while `loading` is true the error is hidden anyway, so
     // waitFor passes on that instant and the test guards nothing.
-    expect(await screen.findByText(/No stories match/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nothing matches/)).toBeInTheDocument();
     expect(screen.queryByText(/unreachable/i)).not.toBeInTheDocument();
   });
 });
@@ -240,7 +249,7 @@ describe("Search — the masthead counts the results", () => {
 
     await userEvent.type(input(), "{Escape}");
     expect(input()).toHaveValue("");
-    expect(await screen.findByText("In the news now")).toBeInTheDocument();
+    expect(await screen.findByText(START)).toBeInTheDocument();
   });
 
   // The strip filters what came back; the API searched everything.
@@ -273,7 +282,7 @@ describe("Search — clearing the box", () => {
     searchEvents.mockImplementation(() => new Promise((res) => (release = res)));
 
     render(<SearchPage />);
-    const box = screen.getByRole("textbox");
+    const box = screen.getByRole("searchbox");
     await userEvent.type(box, "kerala");
     expect(await screen.findByText(/Searching/i)).toBeInTheDocument();
     // Wait past the 250ms debounce so the request is genuinely OPEN — clearing
@@ -284,11 +293,11 @@ describe("Search — clearing the box", () => {
     await userEvent.clear(box);
 
     await waitFor(() => expect(screen.queryByText(/Searching/i)).not.toBeInTheDocument());
-    expect(screen.getByText(/In the news now/i)).toBeInTheDocument();
+    expect(screen.getByText(START)).toBeInTheDocument();
 
     // The abandoned response landing later must not resurrect anything.
     release([]);
-    await waitFor(() => expect(screen.getByText(/In the news now/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(START)).toBeInTheDocument());
     expect(screen.queryByText(/Searching/i)).not.toBeInTheDocument();
   });
 });

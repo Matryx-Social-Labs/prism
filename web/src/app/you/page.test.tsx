@@ -77,7 +77,7 @@ describe("You — round-trip", () => {
     render(<YouPage />);
     await settled();
     await userEvent.selectOptions(stateSelect(), "IN-KA");
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Your profession" }), "trader");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "What you do" }), "trader");
     await userEvent.click(screen.getByRole("button", { name: /Politics/ }));
     await save();
     // The trader's default subject was pre-set because the reader had none; then Politics was added.

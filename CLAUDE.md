@@ -6,14 +6,14 @@ All font choices, colors, spacing, and aesthetic direction are defined there.
 Do not deviate without explicit user approval.
 In QA mode, flag any code that doesn't match DESIGN.md.
 
-Core rules worth restating (the world is "The Reservation Chart", 2026-09-15; PRODUCT.md holds
-the product truth and the founder decisions D1–D6):
+Core rules worth restating (the system is Design System v2, 2026-09-24, from the Claude Design project
+"Prism Design System"; PRODUCT.md holds the product truth and the founder decisions D1–D6):
 - Product promise is "Follow the story, not the headlines." Never enumerate lens names in generic/marketing copy — the lens set grows (pickers render whatever /api/v1/lenses returns).
-- Chrome is monochrome; color only ever means a lens is speaking (lens hues: general amber, cyber cyan, markets violet — discrete, never gradients; the mark's own base is the only spectrum).
-- Three type voices: Teko (structure: masthead, sector codes, section heads, big counts — never running text), Hind and its Indic siblings (everything read), Martian Mono (provenance only: counts, times, origins, codes, citations, tickers, CVE ids — never prose or a heading). 11px floor for mono labels; 4.5:1 on both grounds.
-- Structure is hairlines, never cards: every unit sits on a top rule. State is line form — solid live, dashed single-source, half-weight stale — never hue. No eyebrow or kicker above a heading. No text glyphs as icons (use `web/src/components/icons.tsx`). Pills only for lens tabs and one primary action per page.
-- Counted structure is printed as counts; quotes are verbatim or absent; written examples say ILLUSTRATION; no invented numbers anywhere.
-- The signature motion is the re-typeset lens flip (scan line + re-ink, 500ms, reduced-motion collapses to instant swap). Never a crossfade. Rows print in (180ms, 40ms stagger), never a spinner on the chart.
+- Chrome is neutral warm paper and carbon ink with ONE interactive accent (cobalt). Other colour appears only where the prism splits light: the coverage bar (navy · blue-green · orange · hatched grey, fixed slot order, always with its count) and a lens (one discrete hue each; Reader has none). The mark's band is the only gradient.
+- Three type voices: Newsreader + per-script Noto Serif (the record: headlines, titles, quotes, hero figures), Anek (everything read or tapped, eyebrows included), Geist Mono (provenance only: counts, times, codes, [n], tickers, CVE ids — never prose, a heading or a label). 11px floor for mono; 4.5:1 on both grounds.
+- Records are cut square (2px), controls pressed (8px), sheets held (16px); sections sit under a 3px ink rule. State is line form — solid verified, dashed provisional/one source, faded stale, hatched not counted — never hue alone. Icons from `web/src/components/icons.tsx`, never text glyphs.
+- Counted structure is printed as counts ("k of n" below 30); quotes are verbatim or absent; no invented numbers or examples anywhere — the design mocks' ILLUSTRATION banners and sample data never ship.
+- The signature motion is the lens flip (scan line + re-ink, paced by block height, reduced-motion = instant swap). Never a crossfade. Rows print in; publisher photos fade in (320ms); the story's photo deck advances with a 5° tilt.
 - Routing: `/` is the landing for a first visitor and redirects returning readers (cookie `prism.returning`) to `/feed`, which is always the chart; `/about` is the landing's permanent address.
 
 ## Web tests

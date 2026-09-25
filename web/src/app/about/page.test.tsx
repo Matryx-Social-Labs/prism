@@ -5,9 +5,10 @@ import type { EventDetail, FeedItem } from "@/lib/api";
 
 const fetchFeed = vi.hoisted(() => vi.fn());
 const fetchEvent = vi.hoisted(() => vi.fn());
+const fetchQuestions = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, fetchFeed, fetchEvent };
+  return { ...actual, fetchFeed, fetchEvent, fetchQuestions, fetchLenses: async () => [] };
 });
 
 const item = (id: string, source_count: number, sector = "politics"): FeedItem =>
@@ -36,6 +37,7 @@ const quoted = () =>
 beforeEach(() => {
   fetchFeed.mockReset();
   fetchEvent.mockReset();
+  fetchQuestions.mockReset().mockResolvedValue(["What led to this?"]);
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -54,8 +56,15 @@ describe("/about — how Prism works, on one live story", () => {
     expect(screen.getByText("“We were receiving proposals from every ward”")).toBeInTheDocument();
     expect(screen.getAllByText("Karnataka Urban Development Minister").length).toBeGreaterThan(0);
     // Step 05: the brief as points, the why-it-matters line among them.
-    expect(screen.getByText(/reopens a 2019 plan/)).toBeInTheDocument();
-    expect(screen.getByText(/What to watch: Whether the plan is notified/)).toBeInTheDocument();
+    const brief = within(document.getElementById("brief")!);
+    expect(brief.getByText(/reopens a 2019 plan/)).toBeInTheDocument();
+    expect(brief.getByText(/What to watch: Whether the plan is notified/)).toBeInTheDocument();
+    // Step 06: the flip runs on the same record's brief, not on a written sample.
+    expect(within(document.getElementById("lens")!).getByText(/The council voted to widen the road. Traders said they were not consulted./)).toBeInTheDocument();
+    // Step 07: the questions the story's own page suggests, and the way to ask them; no scripted answer.
+    expect(within(screen.getByRole("list", { name: "Suggested questions" })).getByText("What led to this?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ask on the story" })).toHaveAttribute("href", "/story/rich");
+    expect(screen.queryByText(/illustration/i)).toBeNull();
     // Eight steps, in order, in the rail.
     const rail = screen.getByRole("navigation", { name: "Steps" });
     expect(within(rail).getAllByRole("link").map((a) => a.textContent?.replace(/^\d+/, ""))).toEqual([

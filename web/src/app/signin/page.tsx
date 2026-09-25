@@ -48,7 +48,7 @@ function SignIn() {
     <div className="mx-auto flex min-h-[calc(100dvh-var(--topbar))] w-full max-w-[520px] flex-col justify-center px-5 py-14">
       <div className="mb-6 lg:hidden"><Brand size={26} /></div>
       <div className="border-y py-8 sm:border sm:p-8" style={{ borderColor: "var(--line-strong)", background: "var(--surface)" }}>
-        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--accent)" }}>Reader access</p>
+        <p className="p-eyebrow mb-3" style={{ color: "var(--accent)" }}>Reader access</p>
         <h1 className="font-record text-[30px] font-bold leading-[1.25] text-balance">Sign in to Prism</h1>
         <p className="mt-2 text-[15px] leading-[1.6]" style={{ color: "var(--ink-2)" }}>
           Enter your email and we&apos;ll send a one-time sign-in link. No password.

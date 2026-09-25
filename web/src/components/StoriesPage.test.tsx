@@ -124,9 +124,9 @@ describe("Trending — the chart of arcs", () => {
     render(<TrendingPage />);
     await screen.findByRole("list");
     expect(row(/One outlet/).className).toContain("single");
-    expect(row(/Old arc/).style.opacity).toBe("0.75");
+    expect(row(/Old arc/).className).toContain("p-row--stale");
     expect(row(/Live arc/).className).not.toContain("single");
-    expect(row(/Live arc/).style.opacity).toBe("");
+    expect(row(/Live arc/).className).not.toContain("p-row--stale");
   });
 
   it("says so when nothing is moving, and when the API is down", async () => {
@@ -162,5 +162,21 @@ describe("Stories — the photo pile", () => {
     render(<TrendingPage />);
     await screen.findAllByText(/CPI\(M\)/);
     expect(screen.queryByRole("figure")).toBeNull();
+  });
+});
+
+describe("Stories — the counted line is honest about the capped page", () => {
+  // The API serves a ranked page of 24. Ranked by new reporting, the moving ones
+  // come first, so a full page of them may hide more: "24+", like the total.
+  it("prints a full page of moving stories as 24+, not 24", async () => {
+    fetchTrending.mockResolvedValue(Array.from({ length: 24 }, (_, i) => story({ slug: `s-${i}`, hero_event_id: `e-${i}`, velocity: 2 })));
+    render(<TrendingPage />);
+    expect(await screen.findByText(/24\+ developing stories · 24\+ moving now/)).toBeInTheDocument();
+  });
+
+  it("prints fewer moving stories exactly", async () => {
+    fetchTrending.mockResolvedValue([story({ slug: "a", hero_event_id: "a", velocity: 2 }), story({ slug: "b", hero_event_id: "b", velocity: 0 })]);
+    render(<TrendingPage />);
+    expect(await screen.findByText(/2 developing stories · 1 moving now/)).toBeInTheDocument();
   });
 });

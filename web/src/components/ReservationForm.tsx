@@ -111,7 +111,7 @@ export function SectorsField({ taxonomy, picks, onPicks }: { taxonomy: TaxonomyS
               <button type="button" onClick={() => toggleGroup(g.sectors)} aria-pressed={on}
                 className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2.5 text-left">
                 <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border" style={{ borderColor: on ? "var(--accent)" : "var(--line-strong)", background: on ? "var(--accent)" : "transparent" }} aria-hidden>
-                  {on && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>}
+                  {on && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="var(--on-accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>}
                 </span>
                 <span className="text-[15px] font-medium" style={{ color: on ? "var(--ink)" : "var(--ink-2)" }}>{g.name}</span>
                 <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-3)" }}>

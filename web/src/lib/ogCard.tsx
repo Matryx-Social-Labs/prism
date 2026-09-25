@@ -28,7 +28,7 @@ function Masthead({ host, kicker }: { host: string; kicker?: string }) {
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <PrismMarkSvg size={34} ink={c.ink} />
-        <span style={{ fontFamily: OG_DISPLAY, fontSize: 34, fontWeight: 700, letterSpacing: -0.5, lineHeight: 1 }}>Prism</span>
+        <span style={{ fontFamily: OG_DISPLAY, fontSize: 34, fontWeight: 600, letterSpacing: -0.5, lineHeight: 1 }}>Prism</span>
         {kicker && <span style={{ marginLeft: 8, fontFamily: OG_MONO, fontSize: 16, color: c.inkFaint, letterSpacing: 1, textTransform: "uppercase" }}>{kicker}</span>}
       </div>
       <span style={{ fontFamily: OG_MONO, fontSize: 16, color: c.inkFaint }}>{host}</span>
@@ -49,7 +49,7 @@ export function CoverageBarSvg({ counts, width = 260, height = 10 }: { counts: {
     <svg width={width} height={height}>
       {parts.map(([k, n]) => {
         const w = Math.max(6, Math.round((n / total) * usable));
-        const el = <rect key={k} x={x} y={0} width={w} height={height} rx={height / 2} fill={c.coverage[k]} />;
+        const el = <rect key={k} x={x} y={0} width={w} height={height} fill={c.coverage[k]} />;
         x += w + gap;
         return el;
       })}
@@ -90,7 +90,7 @@ export function OgCard({ meta, headline, summary, coverage, coverageText, foot, 
             ))}
           </div>
         )}
-        <div style={{ marginTop: 14, fontFamily: displayStack(title), fontSize: size, fontWeight: 700, lineHeight: 1.12, letterSpacing: -1, maxWidth: 1040, display: "flex" }}>{title}</div>
+        <div style={{ marginTop: 14, fontFamily: displayStack(title), fontSize: size, fontWeight: 600, lineHeight: 1.12, letterSpacing: -1, maxWidth: 1040, display: "flex" }}>{title}</div>
         {lede && <div style={{ marginTop: 16, fontFamily: bodyStack(lede), fontSize: 26, lineHeight: 1.45, color: c.inkMuted, maxWidth: 980, display: "flex" }}>{lede}</div>}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${c.line}`, paddingTop: 20 }}>
@@ -157,7 +157,7 @@ export function SiteCard({ headline, line, host }: { headline: string; line: str
     <div style={{ width: W, height: H, display: "flex", flexDirection: "column", background: c.ground, color: c.ink, padding: `${PAD - 8}px ${PAD}px ${PAD - 12}px` }}>
       <Masthead host={host} />
       <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" }}>
-        <div style={{ fontFamily: OG_DISPLAY, fontSize: 72, fontWeight: 700, lineHeight: 1.05, letterSpacing: -2, maxWidth: 1000, display: "flex" }}>{headline}</div>
+        <div style={{ fontFamily: OG_DISPLAY, fontSize: 72, fontWeight: 600, lineHeight: 1.05, letterSpacing: -2, maxWidth: 1000, display: "flex" }}>{headline}</div>
         <div style={{ marginTop: 22, fontFamily: OG_SANS, fontSize: 28, lineHeight: 1.45, color: c.inkMuted, maxWidth: 900, display: "flex" }}>{line}</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, borderTop: `1px solid ${c.line}`, paddingTop: 20 }}>

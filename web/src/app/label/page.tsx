@@ -9,16 +9,19 @@
  * they said they read. Starting a batch hands over the same per-batch
  * credential a founder's invite link carries, so /label/<key> is unchanged.
  *
- * Styled as the task page is: rules and type, no cards; mono only for counts;
- * one primary action on the page (Apply), text actions on rows. A labeller
- * never sees another labeller's answers here — only how many people are on a
- * batch, the anti-anchoring rule the task routes already keep.
+ * Design System v2 · labeller Workspace: the brand strip, "Your workspace" under
+ * the section rule with the languages as its provenance line, then the
+ * sections in components/label/Workspace. Everyone else — a stranger, an
+ * applicant, a paused labeller — gets the same shell and the pitch.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { SectionHead } from "@/components/SectionHead";
+import { LabelStrip } from "@/components/label/parts";
+import { ActiveWorkspace, Languages, Section } from "@/components/label/Workspace";
 import {
   KIND_QUESTION,
   LEARNABLE,
@@ -29,9 +32,7 @@ import {
   startBatch,
   startPractice,
   startTest,
-  type LabellerBatch,
   type LabellerBatches,
-  type LabellerKind,
   type LabellerMe,
 } from "@/lib/labeller";
 import { useSession } from "@/lib/session";
@@ -79,25 +80,36 @@ export default function LabellerWorkspace() {
 
   if (!mounted) return <Shell />;
 
+  const active = !!session && me?.status === "active";
+
   return (
     <Shell>
-      <h1 className="text-[27px] leading-tight" style={{ fontFamily: "var(--font-display), serif" }}>
-        Label for Prism
-      </h1>
-      <p className="mt-3 text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-        Every quality check in Prism is measured against answers people give here: whether two reports are the same
-        happening, who really said a quote, whether a quote is the speaker&apos;s words or an outlet&apos;s translation.
-        Each task is one question, and takes about a minute.
-      </p>
+      {active ? (
+        <div className="p-sechead">
+          <div className="min-w-0">
+            <h1 className="p-sechead__title">Your workspace</h1>
+            {!editing && me && <Languages me={me} onEdit={() => setEditing(true)} />}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <SectionHead id="h-label" as="h1" title="Label for Prism" />
+          <p className="max-w-[60ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
+            Every quality check in Prism is measured against answers people give here: whether two reports are the same
+            happening, who really said a quote, whether a quote is the speaker&apos;s words or an outlet&apos;s translation.
+            Each task is one question, and takes about a minute.
+          </p>
+        </div>
+      )}
       {error && (
-        <p role="alert" className="mt-5 border-l-2 pl-3 text-[14px]" style={{ borderColor: "var(--ink)" }}>
+        <p role="alert" className="p-alert p-alert--error">
           {error}
         </p>
       )}
 
       {!session && (
-        <div className="mt-8">
-          <Link href="/signin?next=/label" className="btn btn-primary">
+        <div>
+          <Link href="/signin?next=/label" className="p-btn p-btn--primary">
             Sign in to apply
           </Link>
         </div>
@@ -121,50 +133,26 @@ export default function LabellerWorkspace() {
 
       {session && me && me.status === "applied" && !editing && (
         <Section title="Your application is in">
-          <p className="text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
+          <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
             A founder reads every application. Once you are approved, the batches in your languages appear here.
           </p>
-          <Languages me={me} onEdit={() => setEditing(true)} />
+          <div className="mt-3">
+            <Languages me={me} onEdit={() => setEditing(true)} />
+          </div>
         </Section>
       )}
 
       {session && me && (me.status === "paused" || me.status === "removed") && (
         <Section title={me.status === "paused" ? "Your labelling is paused" : "Your labelling has ended"}>
-          <p className="text-[15px] leading-[1.65]" style={{ color: "var(--ink-muted)" }}>
-            Write to <a className="underline" href="mailto:hello@readprism.news">hello@readprism.news</a> and we will
+          <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
+            Write to <a className="p-link" href="mailto:hello@readprism.news">hello@readprism.news</a> and we will
             tell you why.
           </p>
         </Section>
       )}
 
-      {session && me && me.status === "active" && batches && !editing && (
-        <>
-          <Languages me={me} onEdit={() => setEditing(true)} />
-          <NeedsYou batches={batches} />
-          <Section title="Ready to label" id="ready">
-            {batches.ready.length === 0 ? (
-              <p className="text-[15px]" style={{ color: "var(--ink-muted)" }}>
-                Nothing waiting in your languages right now.
-              </p>
-            ) : (
-              <ul>{batches.ready.map((b) => <BatchRow key={b.key} batch={b} onStart={start} />)}</ul>
-            )}
-          </Section>
-          {batches.done.length > 0 && (
-            <Section title="Done">
-              <ul>{batches.done.map((b) => <BatchRow key={b.key} batch={b} />)}</ul>
-            </Section>
-          )}
-        </>
-      )}
-
-      {session && me?.status === "active" && batches?.kinds && batches.kinds.length > 0 && !editing && (
-        <Section title="Learn and qualify" id="learn">
-          <p className="mb-3 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            Each kind of task has a short test. Pass it (90%) and that kind of work appears above.
-          </p>
-          <ul>{batches.kinds.map((k) => <KindRow key={k.kind} k={k} onPractise={practise} onTest={test} />)}</ul>
-        </Section>
+      {active && batches && !editing && (
+        <ActiveWorkspace batches={batches} onStart={start} onPractise={practise} onTest={test} />
       )}
 
       {/* For anyone who has applied, approved or not — waiting for approval is
@@ -172,20 +160,20 @@ export default function LabellerWorkspace() {
           judge the work, so a stranger does not get them (founder, 2026-09-23;
           the API enforces the same rule, this only stops offering the links). */}
       {me && READS_GUIDES.includes(me.status) && (
-      <Section title="Learn the tasks">
-        <ul>
-          {LEARNABLE.map((kind) => (
-            <li key={kind} className="border-t py-3" style={{ borderColor: "var(--line)" }}>
-              <Link href={`/label/learn/${kind}`} className="text-[15px] font-semibold underline-offset-4 hover:underline">
-                {KIND_QUESTION[kind]}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Section>
+        <Section title="Learn the tasks">
+          <ul>
+            {LEARNABLE.map((kind) => (
+              <li key={kind} className="border-t" style={{ borderColor: "var(--line)" }}>
+                <Link href={`/label/learn/${kind}`} className="p-link flex min-h-11 items-center text-[15px]">
+                  {KIND_QUESTION[kind]}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
       )}
       {session && me?.status === "none" && (
-        <p className="mt-10 text-[14px]" style={{ color: "var(--ink-2)" }}>
+        <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
           A short guide to each kind of task opens once you have applied.
         </p>
       )}
@@ -201,7 +189,7 @@ function ApplyForm({ me, onDone }: { me: LabellerMe; onDone: (languages: string[
     setChosen((c) => (c.includes(code) ? c.filter((x) => x !== code) : [...c, code]));
   return (
     <form
-      className="mt-8"
+      className="grid gap-6"
       onSubmit={async (e) => {
         e.preventDefault();
         setSending(true);
@@ -210,157 +198,44 @@ function ApplyForm({ me, onDone }: { me: LabellerMe; onDone: (languages: string[
       }}
     >
       <fieldset>
-        <legend className="text-[17px] font-semibold">Which languages do you read well?</legend>
-        <p className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          You will only be given tasks in these. Most tasks also need English.
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+        <legend className="p-field__label" style={{ fontSize: 17 }}>Which languages do you read well?</legend>
+        <p className="p-field__hint mt-1">You will only be given tasks in these. Most tasks also need English.</p>
+        <div className="mt-2 grid grid-cols-2 gap-x-6 sm:grid-cols-3">
           {me.languages_available.map((l) => (
-            <label key={l.code} className="flex min-h-[44px] items-center gap-2.5 text-[15px]">
+            <label key={l.code} className="p-check items-center">
               <input type="checkbox" checked={chosen.includes(l.code)} onChange={() => toggle(l.code)} />
               <span>{l.name}</span>
-              {l.native !== l.name && <span style={{ color: "var(--ink-muted)" }}>{l.native}</span>}
+              {l.native !== l.name && <span style={{ color: "var(--ink-3)" }}>{l.native}</span>}
             </label>
           ))}
         </div>
       </fieldset>
-      <label className="mt-6 block">
-        <span className="text-[15px] font-semibold">Anything we should know? (optional)</span>
+      <label className="p-field">
+        <span className="p-field__label">Anything we should know? (optional)</span>
         <textarea
-          className="mt-2 w-full rounded-[8px] border p-3 text-[15px]"
-          style={{ borderColor: "var(--line-strong)", background: "var(--surface)" }}
+          className="p-input py-3"
           rows={3}
           maxLength={500}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn btn-primary mt-6" disabled={sending || chosen.length === 0}>
-        {me.status === "none" ? "Apply" : "Save my languages"}
-      </button>
+      <div>
+        <button type="submit" className="p-btn p-btn--primary" disabled={sending || chosen.length === 0}>
+          {me.status === "none" ? "Apply" : "Save my languages"}
+        </button>
+      </div>
     </form>
   );
 }
 
-function Languages({ me, onEdit }: { me: LabellerMe; onEdit: () => void }) {
-  const names = me.languages_available.filter((l) => me.languages_read.includes(l.code)).map((l) => l.name);
-  return (
-    <p className="mt-4 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-      You read: {names.join(", ")} ·{" "}
-      <button type="button" className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }} onClick={onEdit}>
-        Change
-      </button>
-    </p>
-  );
-}
-
-function BatchRow({ batch, onStart }: { batch: LabellerBatch; onStart?: (key: string) => void }) {
-  return (
-    <li className="border-t py-4" style={{ borderColor: "var(--line)" }}>
-      <p className="text-[16px] font-semibold">{batch.name}</p>
-      <p className="mt-0.5 text-[14.5px]" style={{ color: "var(--ink-muted)" }}>
-        {KIND_QUESTION[batch.kind] ?? batch.kind}
-      </p>
-      {batch.notes && <p className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>{batch.notes}</p>}
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-          {batch.answered} of {batch.eligible} done · {batch.labellers} {batch.labellers === 1 ? "labeller" : "labellers"}
-        </span>
-        {LEARNABLE.includes(batch.kind) && (
-          <Link href={`/label/learn/${batch.kind}`} className="text-[14px] underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
-            How this task works
-          </Link>
-        )}
-        {onStart && (
-          <button
-            type="button"
-            onClick={() => onStart(batch.key)}
-            className="text-[14px] font-semibold underline-offset-4 hover:underline"
-            style={{ color: "var(--accent)" }}
-          >
-            {batch.answered > 0 ? "Continue" : "Start"}
-          </button>
-        )}
-      </div>
-    </li>
-  );
-}
-
-function KindRow({ k, onPractise, onTest }: { k: LabellerKind; onPractise: (kind: string) => void; onTest: (kind: string) => void }) {
-  const status = k.qualified
-    ? "Passed"
-    : k.retake_at
-      ? `Best so far ${Math.round((k.best_score ?? 0) * 100)}% · you can retake it after ${new Date(k.retake_at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
-      : k.can_test
-        ? k.attempts > 0 ? "Not passed yet" : "Not taken yet"
-        : "Test coming soon";
-  return (
-    <li className="border-t py-4" style={{ borderColor: "var(--line)" }}>
-      <p className="text-[16px] font-semibold">{KIND_QUESTION[k.kind] ?? k.kind}</p>
-      <p className="mt-0.5 text-[14px]" style={{ color: "var(--ink-muted)" }}>{status}</p>
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px]">
-        {LEARNABLE.includes(k.kind) && (
-          <Link href={`/label/learn/${k.kind}`} className="underline-offset-4 hover:underline" style={{ color: "var(--ink-muted)" }}>
-            Read the guide
-          </Link>
-        )}
-        {k.can_practise && (
-          <button type="button" onClick={() => onPractise(k.kind)} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
-            Practise
-          </button>
-        )}
-        {k.can_test && (
-          <button type="button" onClick={() => onTest(k.kind)} className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
-            Take the test
-          </button>
-        )}
-      </div>
-    </li>
-  );
-}
-
-/** What is waiting for this labeller, counted — the same row the founders'
- *  dashboard opens with ("The ledger", DESIGN.md). Counts, never a percentage. */
-function NeedsYou({ batches }: { batches: LabellerBatches }) {
-  const tasks = batches.ready.reduce((n, b) => n + Math.max(0, b.eligible - b.answered), 0);
-  const tests = (batches.kinds ?? []).filter((k) => k.can_test && !k.qualified).length;
-  const items = [
-    { href: "#ready", count: tasks, text: tasks === 1 ? "task ready in your languages" : "tasks ready in your languages" },
-    { href: "#learn", count: tests, text: tests === 1 ? "test you can take" : "tests you can take" },
-  ].filter((i) => i.count > 0);
-  return (
-    <section className="mt-8 border-t pt-4" style={{ borderColor: "var(--line-strong)" }} aria-labelledby="needs-you">
-      <h2 id="needs-you" className="text-[12.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--ink-3)" }}>
-        Waiting for you
-      </h2>
-      {items.length === 0 ? (
-        <p className="mt-2 text-[15px]" style={{ color: "var(--ink-muted)" }}>Nothing right now. New batches in your languages appear here.</p>
-      ) : (
-        <ul className="mt-1 flex flex-wrap gap-x-8 gap-y-1">
-          {items.map((i) => (
-            <li key={i.href}>
-              <a href={i.href} className="inline-flex min-h-[44px] items-baseline gap-2 underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
-                <span className="font-mono text-[17px] tabular-nums">{i.count}</span>{" "}
-                <span className="text-[15px]">{i.text}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-10 scroll-mt-20" id={id}>
-      <h2 className="mb-3 text-[17px] font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
 function Shell({ children }: { children?: React.ReactNode }) {
-  // The task page's measure: a focused surface, not a reading river.
-  return <main className="mx-auto min-h-dvh w-full max-w-[720px] px-5 pb-24 pt-6 sm:px-8">{children}</main>;
+  // The task page's measure: a focused surface, not a reading river. The
+  // layout already provides <main>; this is the column.
+  return (
+    <div className="mx-auto grid min-h-dvh w-full max-w-[720px] content-start gap-7 px-4 pb-12 pt-6">
+      <LabelStrip />
+      {children}
+    </div>
+  );
 }

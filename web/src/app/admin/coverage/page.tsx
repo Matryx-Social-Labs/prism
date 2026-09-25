@@ -60,7 +60,7 @@ export default function CoveragePage() {
 
   return (
     <>
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <AdminTitle>Coverage</AdminTitle>
           {data && (

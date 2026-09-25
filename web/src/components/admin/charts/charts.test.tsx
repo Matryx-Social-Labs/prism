@@ -118,6 +118,8 @@ describe("the panel", () => {
         <p>chart</p>
       </ChartPanel>,
     );
+    await userEvent.click(screen.getByRole("button", { name: "Where Views is counted" }));
+    expect(screen.getByText("Counted in:")).toBeInTheDocument();
     expect(screen.getByText("usage_daily · counting since 28 Jan")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Table" }));
     expect(screen.queryByText("chart")).not.toBeInTheDocument();
@@ -136,7 +138,19 @@ describe("the headline tile", () => {
   it("says how it moved in words", () => {
     render(<KpiTile label="New accounts" current={7} previous={4} source="users" />);
     expect(screen.getByText("+3 from 4")).toBeInTheDocument();
-    expect(screen.getByText("vs the period before")).toBeInTheDocument();
+    expect(screen.getByText("+3 from 4").parentElement).toHaveTextContent(/^up\+3 from 4$/);
+  });
+
+  it("claims no change only against a period that was counted", () => {
+    // Nothing before to compare with is not "no change" (the design's KpiTile bug).
+    const { rerender } = render(<KpiTile label="MRR" current={2086} previous={null} source="subscriptions" />);
+    expect(screen.queryByText(/no change/)).not.toBeInTheDocument();
+    rerender(<KpiTile label="Visitor-days" current={1284} previous={null} source="usage_daily" countedSince="2031-01-12" />);
+    expect(screen.getByText("Not counted before 12 Jan")).toBeInTheDocument();
+    expect(screen.queryByText(/no change/)).not.toBeInTheDocument();
+    rerender(<KpiTile label="Visitor-days" current={40} previous={40} source="usage_daily" countedSince="2031-01-12" />);
+    expect(screen.getByText("no change")).toBeInTheDocument();
+    expect(screen.queryByText(/Not counted before/)).not.toBeInTheDocument();
   });
 
   it("breaks the sparkline where there is no record rather than dipping to zero", () => {

@@ -44,7 +44,9 @@ beforeEach(() => {
 describe("Onboarding — three steps of the reservation form", () => {
   it("collects state, then profession, then subjects, and saves them as one profile", async () => {
     render(<OnboardingPage />);
-    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Your state" }), "IN-KL");
+    // The states arrive from /regions after mount: wait for the option, not just the select.
+    await screen.findByRole("option", { name: "Kerala" });
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Your state" }), "IN-KL");
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Your profession" }), "trader");

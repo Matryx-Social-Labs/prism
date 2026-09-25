@@ -33,6 +33,9 @@ type Props = {
 };
 
 const GAP = { full: 230, compact: 190 };
+// Labels on the map ("First", "Branched off · 2 developments") are the reading
+// voice; mono stays for provenance — the dates (.rm-lab) and the facts strip.
+const LABEL: React.CSSProperties = { fontFamily: "var(--font-read)", letterSpacing: 0, textTransform: "none", fontWeight: 600, fontSize: 12 };
 // Five satellites and their labels fit the route page's 860px column.
 const SAT_GAP = 150;
 
@@ -124,13 +127,13 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
   const facts = (s: Station) => `${s.occurred_at ? shortDate(s.occurred_at) : ""} · ${s.source_count ?? 1} ${(s.source_count ?? 1) === 1 ? "source" : "sources"}${s.why ? " · " + s.why : ""}`;
   const card = (p: Station) => (
     <div className="rm-card" role="dialog" aria-label={p.title}>
-      <span className="font-display text-[40px] leading-[0.9]">{p.source_count ?? 1}</span>
-      <span className="mt-2 block font-mono text-[11px] uppercase tracking-[0.04em]" style={{ color: "var(--ink-faint)" }}>{facts(p)}{p.id === currentId ? " · you are here" : ""}</span>
-      <b className="mt-1.5 block text-[16px] font-medium leading-[1.35]">{p.title}</b>
+      <span className="block leading-[0.9]" style={{ font: "600 40px/0.9 var(--font-record)" }}>{p.source_count ?? 1}</span>
+      <span className="mt-2 block font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{facts(p)}</span>
+      <b className="mt-1.5 block leading-[1.35]" style={{ font: "var(--t-title-s)" }}>{p.title}</b>
       {p.id === currentId ? (
-        <span className="mt-3 block font-mono text-[11px] uppercase tracking-[0.06em]" style={{ color: "var(--ink-muted)" }}>You are reading this one</span>
+        <span className="p-eyebrow mt-3 block">You are reading this one</span>
       ) : (
-        <Link href={href(p)} className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.06em] underline underline-offset-4">Read this development →</Link>
+        <Link href={href(p)} className="p-link mt-3 inline-flex min-h-[44px] items-center text-[14px]">Read this development →</Link>
       )}
       <button type="button" className="rm-close" aria-label="Close" onClick={() => setPicked(null)}><Close /></button>
     </div>
@@ -148,7 +151,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
       const tag = s.id === shape.trunk[0]?.id ? "First" : s.id === shape.trunk.at(-1)?.id ? "Latest" : here ? "You are here" : null;
       rows.push(
         <g key={s.id}>
-          <text x={LX} y={y - 8} className="rm-lab">{s.occurred_at ? shortDate(s.occurred_at) : ""}{tag ? ` · ${tag}` : ""}</text>
+          <text x={LX} y={y - 8} className="rm-lab">{s.occurred_at ? shortDate(s.occurred_at) : ""}{tag && <tspan style={LABEL}> · {tag}</tspan>}</text>
           <text x={LX} y={y + 6} className={`rm-ttl${here ? " rm-ttl-here" : ""}`}>
             {short(s.title, MAXW).map((ln, k) => <tspan key={k} x={LX} dy={k ? 13 : 0}>{ln}</tspan>)}
           </text>
@@ -159,12 +162,12 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
       for (const l of lines.filter((l) => l.from === s.id)) {
         const up = l.kind === "branch", bx = X + 26, by0 = y + dy;
         rows.push(<path key={`${l.stations[0].id}-rail`} d={`M${X} ${y} C${X} ${y + 14}, ${bx} ${y + 12}, ${bx} ${by0 - 10} V${by0 + (l.stations.length - 1) * 44}`} className={up ? "rm-branch" : "rm-bline"} />);
-        rows.push(<text key={`${l.stations[0].id}-k`} x={bx + 16} y={by0 - 18} className="rm-k">Branched off · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>);
+        rows.push(<text key={`${l.stations[0].id}-k`} x={bx + 16} y={by0 - 18} className="rm-k" style={LABEL}>Branched off · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>);
         l.stations.forEach((bs, i) => {
           const by = by0 + i * 44;
           rows.push(
             <g key={bs.id}>
-              <text x={bx + 16} y={by - 6} className={`rm-lab${bs.id === currentId ? " rm-k-here" : ""}`}>{bs.occurred_at ? shortDate(bs.occurred_at) : ""}{bs.id === currentId ? " · You are here" : ""}</text>
+              <text x={bx + 16} y={by - 6} className={`rm-lab${bs.id === currentId ? " rm-k-here" : ""}`}>{bs.occurred_at ? shortDate(bs.occurred_at) : ""}{bs.id === currentId && <tspan style={LABEL}> · You are here</tspan>}</text>
               <text x={bx + 16} y={by + 7} className="rm-ttl">{short(bs.title, MAXW - 3, 1)[0]}</text>
               {station(bs, bx, by, up ? "rm-dashed" : "")}
             </g>,
@@ -178,7 +181,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
     let ySatV = y + 6;
     const sats: React.ReactNode[] = [];
     if (!compact && shape.satellites.length) {
-      sats.push(<text key="sk" x={LX - 24} y={ySatV} className="rm-k rm-k-lc">Also reported, not on the main story</text>);
+      sats.push(<text key="sk" x={LX - 24} y={ySatV} className="rm-k rm-k-lc" style={LABEL}>Also reported, not on the main story</text>);
       ySatV += 22;
       for (const s of shape.satellites.slice(0, 5)) {
         sats.push(
@@ -190,7 +193,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
         );
         ySatV += 40;
       }
-      if (shape.satellites.length > 5) { sats.push(<text key="sm" x={LX} y={ySatV - 8} className="rm-k rm-k-lc">+{shape.satellites.length - 5} more, in the list below</text>); ySatV += 16; }
+      if (shape.satellites.length > 5) { sats.push(<text key="sm" x={LX} y={ySatV - 8} className="rm-k rm-k-lc" style={LABEL}>+{shape.satellites.length - 5} more, in the list below</text>); ySatV += 16; }
     }
     const HV = (compact || !shape.satellites.length ? y : ySatV) + 8, WV = 360;
     return (
@@ -226,18 +229,18 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
                 <path d={`M${fx} ${yMain} C${fx + 16} ${yMain}, ${fx + 14} ${y}, ${fx + 40} ${y} H${bx.at(-1)}`} className={up ? "rm-branch" : "rm-bline"} />
                 {l.stations.map((s, i) => (
                   <g key={s.id}>
-                    <text x={bx[i] + 11} y={y + 4} className={`rm-lab${s.id === currentId ? " rm-k-here" : ""}`}>{s.occurred_at ? shortDate(s.occurred_at) : ""}{s.id === currentId ? " · You are here" : ""}</text>
+                    <text x={bx[i] + 11} y={y + 4} className={`rm-lab${s.id === currentId ? " rm-k-here" : ""}`}>{s.occurred_at ? shortDate(s.occurred_at) : ""}{s.id === currentId && <tspan style={LABEL}> · You are here</tspan>}</text>
                     {station(s, bx[i], y, up ? "rm-dashed" : "")}
                   </g>
                 ))}
-                <text x={bx[0] - 6} y={y + (up ? -16 : 24)} className="rm-k">Branched off · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>
+                <text x={bx[0] - 6} y={y + (up ? -16 : 24)} className="rm-k" style={LABEL}>Branched off · {l.stations.length} {l.stations.length === 1 ? "development" : "developments"}</text>
               </g>
             );
           })}
           {/* satellites */}
           {!compact && shape.satellites.length > 0 && (
             <g>
-              <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc">Also reported, not on the main story{shape.satellites.length > 5 ? ` · ${shape.satellites.length - 5} more in the list` : ""}</text>
+              <text x={x0 - 40} y={ySat - 14} className="rm-k rm-k-lc" style={LABEL}>Also reported, not on the main story{shape.satellites.length > 5 ? ` · ${shape.satellites.length - 5} more in the list` : ""}</text>
               {shape.satellites.slice(0, 5).map((s, i) => {
                 const cx = x0 + i * SAT_GAP;
                 return (
@@ -256,7 +259,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
             const tag = i === 0 && s.id === shape.trunk[0]?.id ? "First" : s.id === shape.trunk.at(-1)?.id ? "Latest" : here ? "You are here" : null;
             return (
               <g key={s.id}>
-                {tag && <text x={x - 12} y={yMain + 4} textAnchor="end" className={`rm-k${here ? " rm-k-here" : ""}`}>{tag}</text>}
+                {tag && <text x={x - 12} y={yMain + 4} textAnchor="end" className={`rm-k${here ? " rm-k-here" : ""}`} style={LABEL}>{tag}</text>}
                 <text x={x} y={yMain + 24} textAnchor="middle" className="rm-lab">{s.occurred_at ? shortDate(s.occurred_at) : ""}</text>
                 <text x={x} y={yMain + 38} textAnchor="middle" className={`rm-ttl${here ? " rm-ttl-here" : ""}`}>
                   {short(s.title).map((ln, k) => <tspan key={k} x={x} dy={k ? 13 : 0}>{ln}</tspan>)}

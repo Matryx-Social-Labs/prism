@@ -5,18 +5,19 @@ import { Speech } from "@/components/icons";
 import { AskShell, type Turn, type UpgradeAsk } from "@/components/AskShell";
 import { UpgradeSheet } from "@/components/UpgradeSheet";
 import type { AskOpen } from "@/components/AskContext";
+import { Sheet } from "@/components/story/Sheet";
 import { useSession } from "@/lib/session";
 
-// The grounded per-story agent as one sheet at every width: a bottom sheet
-// over a scrim on the phone, a right-side drawer under the top bar on a desk
-// so the record stays readable beside the answer (founder, 2026-09-20; it was
+// The grounded per-story agent as one sheet at every width (Design System v2 ·
+// Sheet): a bottom sheet on the phone, a 420px drawer from the right on a desk
+// so the record stays in view beside the answer (founder, 2026-09-20; it was
 // a 400px box bottom-right). Opened by the persistent bar, the thumb-zone
 // button, a selection, a quote or an entity (AskContext), which may hand it a
 // question to show or to send. Answers stream from the story's own sources
 // with numbered citations; a refusal and a limit are first-class states.
 
 import { useEffect, useRef, useState } from "react";
-import { askQuestion } from "@/lib/api";
+import { askQuestion, type SourceRef } from "@/lib/api";
 
 export function AskPanel({
   eventId,
@@ -26,6 +27,7 @@ export function AskPanel({
   onOpenChange,
   launcher = true,
   request = null,
+  sources,
 }: {
   eventId: string;
   sourceCount: number;
@@ -37,6 +39,8 @@ export function AskPanel({
   launcher?: boolean;
   // What an entry point opened us with; `nonce` makes the same text twice a new request.
   request?: (AskOpen & { nonce: number }) | null;
+  /** The story's reports, so a cited source prints its own headline. */
+  sources?: SourceRef[];
 }) {
   const session = useSession();
   const [openState, setOpenState] = useState(false);
@@ -162,8 +166,7 @@ export function AskPanel({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-[45] hidden h-12 items-center gap-2 rounded-full pl-4 pr-5 text-[14.5px] font-semibold transition hover:opacity-90 lg:inline-flex"
-          style={{ background: "var(--ink)", color: "var(--bg)" }}
+          className="p-btn p-btn--primary fixed bottom-5 right-5 z-[45] hidden lg:inline-flex"
         >
           <Speech />
           Ask this story
@@ -171,9 +174,14 @@ export function AskPanel({
         </button>
       )}
       {open && (
-        <>
-          <div className="fixed inset-0 z-[45] lg:hidden" style={{ background: "rgba(20,22,19,.35)" }} onClick={() => setOpen(false)} aria-hidden />
+        <Sheet
+          variant="drawer"
+          label="Ask this story"
+          title={<span style={{ font: "var(--t-title-s)" }}>Ask this story</span>}
+          onClose={() => setOpen(false)}
+        >
           <AskShell
+            chrome={false}
             sourceCount={sourceCount}
             turns={turns}
             thinking={thinking}
@@ -183,12 +191,11 @@ export function AskPanel({
             onFollowUp={(q) => { viaRef.current = "chip"; void submit(q); }}
             onUpgrade={setUpgrade}
             suggestions={suggestedQuestions}
-            onClose={() => setOpen(false)}
             inputRef={inputRef}
             scrollRef={scrollRef}
-            className="ask-sheet fixed inset-x-0 bottom-0 z-[46] max-h-[86vh] border-t lg:inset-auto lg:bottom-0 lg:right-0 lg:top-[var(--topbar)] lg:max-h-none lg:w-[420px] lg:border-l lg:border-t-0"
+            titleOf={sources ? (id) => sources.find((s) => s.article_id === id)?.title : undefined}
           />
-        </>
+        </Sheet>
       )}
       <UpgradeSheet open={upgrade !== null} onClose={() => setUpgrade(null)} reason={upgrade?.reason} used={upgrade?.used} limit={upgrade?.limit} />
     </>

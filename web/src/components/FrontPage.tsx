@@ -1,16 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Chart } from "@/components/Chart";
-import { CoverageBar, CoverageLegend } from "@/components/Coverage";
 import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
-import { StatusPill } from "@/components/StatusPill";
+import { TodayAside } from "@/components/today/TodayAside";
+import { TopOfRecord } from "@/components/today/TopOfRecord";
 import { fetchFeed, fetchTrending, type FeedItem, type TrendingStory } from "@/lib/api";
+import { chartOrder } from "@/lib/chart";
 import { staleSince } from "@/lib/staleness";
-import { istTime, relativeTime, shortDate } from "@/lib/dateline";
+import { istTime, shortDate } from "@/lib/dateline";
 import { loadProfile, type Profile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope } from "@/lib/scope";
 import { markReturning } from "@/lib/returning";
@@ -27,8 +27,10 @@ import { useStateName } from "@/lib/useStateName";
  * tagged, so ALL is identical for every reader.
  *
  * A subject chip re-sorts the list in place; the URL follows (/sector/<slug>).
- * Desktop uses its width for simultaneity: the subject rail on the left, the
- * developing stories and the legend on the right — never longer lines.
+ * Pages v3 · Today: on the phone, the day's multi-outlet stories lead as a card
+ * rail (All + Today only). Desktop uses its width for simultaneity: the subject
+ * rail on the left, the list in two columns, the developing stories and the
+ * legend on the right — never longer lines.
  *
  * `initial` is the ALL list the server already fetched, so the rows are in the
  * HTML a crawler receives (Google renders JS late; GPTBot, ClaudeBot and
@@ -104,13 +106,14 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
   const scoped = useMemo(() => items ?? [], [items]);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: scoped.length };
+    // On a subject page the list IS that subject, so "All stories" gets no count.
+    const c: Record<string, number> = group ? {} : { all: scoped.length };
     for (const i of scoped) {
       const g = sectorGroup(i.sector);
       if (g) c[g.slug] = (c[g.slug] ?? 0) + 1;
     }
     return c;
-  }, [scoped]);
+  }, [scoped, group]);
 
   const dateline = useMemo(() => {
     const d = new Date();
@@ -120,15 +123,19 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
     return quiet ? `${day} · quiet since ${shortDate(quiet)} ${istTime(quiet)}` : day;
   }, [items]);
 
-  const subline = useMemo(() => {
+  // The counts under the head and at the end of the list. The list is ordered by
+  // chartOrder (most outlets first, ties by recency), so the strip says that.
+  const tally = useMemo(() => {
     if (!items) return null;
     const n = scoped.length >= WINDOW ? `${WINDOW}+` : String(scoped.length);
     const outlets = new Set(scoped.flatMap((i) => (i.outlets ?? []).map((o) => o.publisher)));
     const parts = [`${n} ${scoped.length === 1 ? "record" : "records"}`];
-    if (outlets.size) parts.push(`${outlets.size} outlets`);
-    parts.push("newest reporting first");
+    if (outlets.size) parts.push(`${outlets.size} ${outlets.size === 1 ? "outlet" : "outlets"}`);
     return parts.join(" · ");
   }, [items, scoped]);
+
+  // Top of the record: the most-reported multi-outlet stories, on All + Today only.
+  const top = useMemo(() => (group || tab !== "today" ? [] : chartOrder(scoped).filter((i) => i.source_count > 1).slice(0, 5)), [group, tab, scoped]);
 
   const primaryLang = profile?.languages?.[0] ?? "en";
   const emptyLabel = group
@@ -149,97 +156,65 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
   ];
   const pick = (s: Scope) => { setScope(s); saveScope(s); };
 
+  const list = error ? (
+    <div className="p-alert p-alert--error" role="status">
+      <div>
+        <p className="p-alert__title">Today&rsquo;s record could not load.</p>
+        <p style={{ color: "var(--ink-2)" }}>{error}</p>
+      </div>
+    </div>
+  ) : items === null ? (
+    <RowListSkeleton n={7} label="Loading today's record" />
+  ) : (
+    <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} />
+  );
+
   return (
-    <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
+    <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
       <Masthead dateline={dateline} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-7 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)] xl:gap-10">
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)]">
         <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
 
         <div className="min-w-0">
-          {(
-            <div className="flex flex-wrap gap-2 pt-2 lg:pt-0" role="group" aria-label="Scope">
+          <TopOfRecord stories={top} />
+          <div className="grid gap-3 pt-5 lg:pt-0">
+            <SectionHead
+              id="chart-title"
+              as="h1"
+              title={group ? group.name : tab === "foryou" ? "For you" : "Today"}
+              sub={tally ? `${tally} · most-reported first` : undefined}
+              right={
+                hasInterests && !group ? (
+                  <div role="tablist" aria-label="Which record" className="p-seg">
+                    {(["today", "foryou"] as Tab[]).map((t) => (
+                      <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
+                        {t === "today" ? "Today" : "For you"}
+                      </button>
+                    ))}
+                  </div>
+                ) : undefined
+              }
+            />
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
               {scopes.map(([s, l]) => (
-                <button key={s} onClick={() => pick(s)} aria-pressed={scope === s} className="chip h-8 px-3 text-[13px]">
+                <button key={s} onClick={() => pick(s)} aria-pressed={scope === s} className="p-chip min-h-8 px-3 text-[13px]">
                   {l}
                 </button>
               ))}
             </div>
-          )}
-          <SectionHead
-            id="chart-title"
-            as="h1"
-            title={group ? group.name : tab === "foryou" ? "For you" : "Today"}
-            hint={subline ?? undefined}
-            right={
-              hasInterests && !group ? (
-                <div role="tablist" className="seg">
-                  {(["today", "foryou"] as Tab[]).map((t) => (
-                    <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
-                      {t === "today" ? "Today" : "For you"}
-                    </button>
-                  ))}
-                </div>
-              ) : undefined
-            }
-          />
-          <section aria-labelledby="chart-title" className="border-t" style={{ borderColor: "var(--line)" }}>
-            {error ? (
-              <div className="card" role="status">
-                <p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>Today&rsquo;s record could not load.</p>
-                <p className="mt-1 text-[14px]" style={{ color: "var(--ink-2)" }}>{error}</p>
-              </div>
-            ) : items === null ? (
-              <RowListSkeleton n={7} label="Loading today's record" />
-            ) : (
-              <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} />
-            )}
+          </div>
+          <section aria-labelledby="chart-title" className="pt-2 lg:pt-3.5">
+            {list}
           </section>
+          {tally && !error && scoped.length > 0 && (
+            <div className="mt-7 flex flex-wrap items-baseline gap-3 py-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
+              <p style={{ font: "var(--t-title)" }}>That&rsquo;s today&rsquo;s record.</p>
+              <span className="p-count">{tally}</span>
+            </div>
+          )}
         </div>
 
-        <aside className="hidden xl:sticky xl:top-[calc(var(--topbar)+24px)] xl:flex xl:flex-col xl:gap-4 xl:self-start">
-          {developing.length > 0 && (
-            <div className="card">
-              <h3 className="card-h">Developing over days</h3>
-              <ol className="flex flex-col">
-                {developing.map((s) => (
-                  <li key={s.slug} className="border-t py-3 first:border-t-0 first:pt-0 last:pb-0" style={{ borderColor: "var(--line)" }}>
-                    <Link href={`/trending/${s.slug}`} className="group block">
-                      <p className="font-record text-[15.5px] font-bold leading-[1.35] group-hover:underline underline-offset-4">
-                        {s.hero_title ?? s.label}
-                      </p>
-                      <p className="mt-1.5 flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-                        <CoverageBar outlets={[]} fallbackCount={s.source_count} width={56} />
-                        {s.developments} developments · {s.source_count} outlets
-                        {s.last_updated_at && <> · {relativeTime(s.last_updated_at)}</>}
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-              <Link href="/trending" className="mt-3 inline-block text-[13.5px] font-semibold hover:underline underline-offset-4" style={{ color: "var(--accent)" }}>
-                All developing stories →
-              </Link>
-            </div>
-          )}
-          <div className="card">
-            <h3 className="card-h">How to read a record</h3>
-            <div className="flex flex-col gap-3 text-[13.5px]" style={{ color: "var(--ink-2)" }}>
-              <p className="flex items-center gap-2.5">
-                <CoverageBar outlets={[{ slug: "a", publisher: "a", name: "", code: "", origin: "national", language: "en" }, { slug: "b", publisher: "b", name: "", code: "", origin: "intl", language: "en" }, { slug: "c", publisher: "c", name: "", code: "", origin: "regional", language: "hi" }]} width={56} />
-                Coverage bar — who reported it
-              </p>
-              <CoverageLegend
-                withCounts={false}
-                outlets={[{ slug: "a", publisher: "a", name: "", code: "", origin: "national", language: "en" }, { slug: "b", publisher: "b", name: "", code: "", origin: "intl", language: "en" }, { slug: "c", publisher: "c", name: "", code: "", origin: "regional", language: "hi" }]}
-              />
-              <p className="flex flex-wrap items-center gap-2">
-                <StatusPill status="verified" label="Verified" />
-                <StatusPill status="provisional" label="Provisional" />
-              </p>
-              <p>A dashed row has one source so far.</p>
-            </div>
-          </div>
-        </aside>
+        <TodayAside developing={developing} />
       </div>
     </div>
   );

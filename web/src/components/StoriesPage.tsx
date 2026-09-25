@@ -11,13 +11,14 @@ import { fetchTrending, type TrendingStory } from "@/lib/api";
 import { PhotoStack } from "@/components/PhotoStack";
 import { RowListSkeleton } from "@/components/Skeletons";
 import { arcHref, isStale, spanDays } from "@/lib/arc";
-import { relativeTime } from "@/lib/dateline";
+import { istTime, relativeTime } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
 import { sectorGroup, sectorParam } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 import { RouteGlyph } from "@/components/RouteGlyph";
+import { EmptyState } from "@/components/tabs/EmptyState";
 
 /**
  * Stories: what is developing over days (the URL stays /trending). Rows are
@@ -35,6 +36,9 @@ import { RouteGlyph } from "@/components/RouteGlyph";
  */
 type Scope = Extract<SharedScope, "region" | "national">;
 
+/** The API serves a ranked page, not the whole set: a full page prints "24+". */
+const LIMIT = 24;
+
 export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | null }) {
   const [state, setState] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("national");
@@ -45,6 +49,9 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
   // The profile is a client-only read: wait for it rather than fetch national
   // and then again scoped.
   const [ready, setReady] = useState(false);
+  // The masthead's clock is the reader's, read after mount: the server's would
+  // be minutes stale in the cached HTML and would not hydrate.
+  const [clock, setClock] = useState<string | null>(null);
   const stateName = useStateName(state);
 
   useEffect(() => {
@@ -54,6 +61,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
     if (saved) setScope(saved === "region" ? "region" : "national");
     else if (p?.state) setScope("region");
     setReady(true);
+    setClock(istTime(new Date().toISOString()));
   }, []);
 
   const pickScope = (next: Scope) => {
@@ -71,7 +79,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
     setError(null);
     let cancelled = false;
     const g = sectorGroup(group);
-    fetchTrending({ state: scope === "region" ? state : null, sector: g ? sectorParam(g) : null, limit: 24 })
+    fetchTrending({ state: scope === "region" ? state : null, sector: g ? sectorParam(g) : null, limit: LIMIT })
       .then((s) => { if (!cancelled) setStories(s); })
       .catch(() => { if (!cancelled) setError("The Prism API is unreachable right now."); });
     return () => { cancelled = true; };
@@ -79,43 +87,46 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
 
   useScrollRestore("trending:scrollY", stories !== null);
 
-  const dateline = useMemo(() => {
-    const day = new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
-    return day;
-  }, []);
+  // Only what the API gives: how many came back (a full page is "24+", the
+  // list is capped), how many gained a new outlet in the last six hours, and
+  // the order the API ranks them in.
   const subline = useMemo(() => {
     if (!stories) return undefined;
-    const moving = stories.filter((s) => s.velocity > 0).length;
-    return `${stories.length} developing ${stories.length === 1 ? "story" : "stories"}${moving ? ` · ${moving} moving now` : ""} · ranked by new reporting`;
+    const n = stories.length >= LIMIT ? `${LIMIT}+` : String(stories.length);
+    // Ranked by new reporting, so the moving ones come first: fewer than a full
+    // page is the exact count; a full page of them may hide more ("24+").
+    const movingN = stories.filter((s) => s.velocity > 0).length;
+    const moving = movingN >= LIMIT ? `${LIMIT}+` : movingN ? String(movingN) : null;
+    return `${n} developing ${stories.length === 1 ? "story" : "stories"}${moving ? ` · ${moving} moving now` : ""} · ranked by new reporting`;
   }, [stories]);
 
   const scopes: [Scope, string][] = [["region", stateName ?? "Your state"], ["national", "National"]];
   const subject = sectorGroup(group)?.name ?? "all sectors";
 
   return (
-    <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
-      <Masthead dateline={dateline} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-10 lg:pt-6">
+    <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
+      <Masthead dateline={clock ? `Stories · ${clock} IST` : "Stories"} />
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6">
         <SectorStrip active={group} onPick={setGroup} allHref="/trending" allLabel="All stories" responsiveRail />
-        <div className="min-w-0">
+        <div className="grid min-w-0 content-start gap-3 pt-4 lg:pt-0">
+          <SectionHead id="stories-title" as="h1" title="Stories" sub={subline} />
           {state && (
-            <div className="flex gap-2 pt-2 lg:pt-0" role="group" aria-label="Scope">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
               {scopes.map(([s, l]) => (
-                <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s} className="chip h-8 px-3 text-[13px]">{l}</button>
+                <button key={s} onClick={() => pickScope(s)} aria-pressed={scope === s} className="p-chip min-h-8 px-3 text-[13px]">{l}</button>
               ))}
             </div>
           )}
-          <SectionHead id="stories-title" as="h1" title="Stories" hint={subline} />
           <section aria-label={`Stories, ${subject}`}>
             {error ? (
-              <div className="card" role="status"><p className="text-[15px] font-medium" style={{ color: "var(--danger)" }}>{error}</p></div>
+              <div className="p-alert p-alert--error" role="status"><p>{error}</p></div>
             ) : stories === null ? (
               <RowListSkeleton n={5} label="Loading stories" />
             ) : stories.length === 0 ? (
-              <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>No story is developing in {subject} right now.</p></div>
+              <EmptyState title={`No story is developing in ${subject} right now.`} />
             ) : (
-              <ol className="chart-print flex flex-col gap-3 lg:gap-0 lg:border-t" style={{ borderColor: "var(--line)" }}>
-                {stories.map((s, i) => <ArcRow key={s.slug} story={s} lead={i === 0} />)}
+              <ol className="p-print grid gap-2.5">
+                {stories.map((s) => <ArcRow key={s.slug} story={s} />)}
               </ol>
             )}
           </section>
@@ -126,12 +137,14 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
 }
 
 /**
- * One developing story, on the story row grammar. The counted line says what
- * the row is made of — developments and outlets — and the status pill says
- * whether the chronology is verified or the grouping is still under review
- * (fail-closed: a provisional route is never drawn as one).
+ * One developing story, on the story row grammar (Design System v2 · StoryRow,
+ * reader-phone PhoneStories): meta (subject · last moved · span), the story's
+ * name, a counted line with who is named, the photo pile on the right; the foot
+ * under both — the bar and its count, then whether the chronology is verified
+ * or the grouping is still under review (fail-closed: a provisional route is
+ * never drawn as one). Single-outlet rows are dashed, stale ones half-weight.
  */
-function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean }) {
+function ArcRow({ story }: { story: TrendingStory }) {
   const single = story.source_count <= 1;
   const stale = isStale(story);
   const span = spanDays(story);
@@ -142,54 +155,40 @@ function ArcRow({ story, lead = false }: { story: TrendingStory; lead?: boolean 
     : `${story.developments} related ${story.developments === 1 ? "report" : "reports"}`;
   const outlets = `${story.source_count} ${story.source_count === 1 ? "outlet" : "outlets"}`;
   const cast = story.cast?.length ? story.cast.slice(0, 4).join(", ") : null;
+  const moved = story.velocity > 0 ? "moving now" : story.last_updated_at ? `moved ${relativeTime(story.last_updated_at)}` : null;
+  const clockLine = [moved, span != null && span > 0 ? `${span} ${span === 1 ? "day" : "days"}` : null].filter(Boolean).join(" · ");
 
   return (
     <li>
-      <Link href={arcHref(story)} className={`story-row row-card group ${single ? "single" : ""} ${lead ? "story-row-lead px-[18px] py-5" : "px-4 py-3.5"}`} style={stale ? { opacity: 0.75 } : undefined}>
-        {/* The words beside the pile; the foot under both, so the bar, its count
-            and the status pill have the whole card's width on a phone. */}
-        <div className={story.photos?.length ? (lead ? "flex flex-col gap-4 lg:flex-row-reverse lg:items-start" : "flex items-start gap-4") : ""}>
-        {/* The lead's pile sits above the words on a phone, beside them on a desk. */}
-        {lead && story.photos?.length ? <PhotoStack photos={story.photos} size="lead" /> : null}
-        <div className="min-w-0 flex-1">
-        <div className="meta-line">
-          {group && <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{group.name}</span>}
-          {group && <span className="dot" />}
-          {story.velocity > 0 ? (
-            <span style={{ color: "var(--accent)", fontWeight: 600 }}>moving now</span>
-          ) : story.last_updated_at ? (
-            <span>moved {relativeTime(story.last_updated_at)}</span>
-          ) : null}
-          {span != null && span > 0 && (
-            <>
-              <span className="dot" />
-              <span>{span} {span === 1 ? "day" : "days"}</span>
-            </>
-          )}
+      <Link
+        href={arcHref(story)}
+        className={`p-row group ${single ? "p-row--single" : ""} ${stale ? "p-row--stale" : ""}`}
+        style={{ padding: "14px 16px", gap: 8 }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            <div className="p-meta">
+              {group && <span className="p-meta__subject">{group.name}</span>}
+              {group && clockLine && <span className="p-meta__sep" />}
+              {clockLine && <span className="p-meta__prov">{clockLine}</span>}
+            </div>
+            <h2 className="p-row__title">{story.label ?? story.hero_title}</h2>
+            <p className="p-row__sum">{memberLabel} across {outlets}.{cast ? ` Named: ${cast}.` : ""}</p>
+            <RouteGlyph route={verified ? story.route : null} />
+          </div>
+          {story.photos?.length ? <PhotoStack photos={story.photos} /> : null}
         </div>
-        <h2
-          className={`font-record font-bold text-balance ${lead ? "mt-2 text-[26px] leading-[1.22] sm:text-[30px]" : "mt-1.5 text-[18px] leading-[1.4]"} group-hover:underline group-focus-visible:underline underline-offset-4 decoration-1`}
-          style={{ color: "var(--ink)" }}
-        >
-          {story.label ?? story.hero_title}
-        </h2>
-        <p className="mt-1 text-[14.5px] leading-[1.5]" style={{ color: "var(--ink-2)" }}>
-          {memberLabel} across {outlets}.{cast ? ` Named: ${cast}.` : ""}
-        </p>
-        <RouteGlyph route={verified ? story.route : null} />
-        </div>
-        {!lead && story.photos?.length ? <PhotoStack photos={story.photos} size="row" /> : null}
-        </div>
-        {/* The foot wraps and sits under the whole card: a pill that cannot
-            shrink beside the pile widened the page on a phone (2026-09-21). */}
-        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        {/* The foot wraps under the whole card: a pill that cannot shrink beside
+            the pile widened the page on a phone (2026-09-21). The list API has
+            no origin split, so the bar is drawn neutral; its count is the legend. */}
+        <div className="p-row__foot">
           <span className="inline-flex min-w-0 items-center gap-2.5">
-            <CoverageBar outlets={[]} fallbackCount={story.source_count} />
-            <span className="whitespace-nowrap font-mono text-[11px] tracking-[0.02em]" style={{ color: "var(--ink-3)" }}>
-              {outlets} · {story.developments} {story.developments === 1 ? "report" : "reports"}
-            </span>
+            <CoverageBar outlets={[]} fallbackCount={story.source_count} className="p-covbar--mono" />
+            <span className="p-count">{outlets} · {story.developments} {story.developments === 1 ? "report" : "reports"}</span>
           </span>
-          <span className="ml-auto"><StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : "Grouping under review"} /></span>
+          <span className="ml-auto">
+            {verified ? <StatusPill status="verified" /> : <StatusPill status="provisional" label="Grouping under review" />}
+          </span>
         </div>
       </Link>
     </li>

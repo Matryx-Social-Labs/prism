@@ -39,7 +39,7 @@ export function BottomTabBar() {
 
   return (
     <nav
-      className="mobile-tabs glass fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidden"
+      className="glass fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidden"
       style={{
         borderColor: "var(--line)",
         height: "calc(var(--tabbar) + env(safe-area-inset-bottom))",
@@ -54,12 +54,12 @@ export function BottomTabBar() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className="mobile-tab flex touch-manipulation flex-col items-center justify-center gap-[3px] text-[10.5px] transition-opacity active:opacity-65"
-            style={{ color: active ? "var(--accent)" : "var(--ink-3)", fontWeight: active ? 600 : 500 }}
+            className="relative flex touch-manipulation flex-col items-center justify-center gap-[3px] text-[11px] leading-none no-underline transition-opacity active:opacity-65"
+            style={{ color: active ? "var(--ink)" : "var(--ink-3)", fontWeight: active ? 600 : 500 }}
           >
-            <Icon />
+            <span aria-hidden className="absolute top-0 h-[2px] w-6" style={{ background: active ? "var(--accent)" : "transparent" }} />
+            <Icon size={22} />
             {label}
-            <span aria-hidden className="mt-px h-[2px] w-4" style={{ background: active ? "var(--accent)" : "transparent" }} />
           </Link>
         );
       })}

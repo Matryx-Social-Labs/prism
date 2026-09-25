@@ -49,7 +49,7 @@ describe("ChartRow — the meta line", () => {
   // finance prints its six-subject group, not the pipeline's ten.
   it("prints the subject group, then the time, then the languages", () => {
     row(item());
-    const meta = document.querySelector(".meta-line")!;
+    const meta = document.querySelector(".p-meta")!;
     const texts = [...meta.querySelectorAll("span, time")].map((s) => s.textContent).filter((t) => t && t.trim());
     expect(texts[0]).toBe("Business & Markets");
     expect(meta.querySelector("time")).toHaveAttribute("dateTime", "2026-09-05T16:05:00Z");
@@ -98,8 +98,8 @@ describe("ChartRow — the coverage bar is the row's weight", () => {
 
   it("sets a single-source story on a dashed card", () => {
     const { container } = row(item({ source_count: 1, outlets: [outlet("th", "national")] }));
-    expect(container.querySelector("a")!.className).toContain("single");
-    expect(screen.getByText("1 outlet")).toBeInTheDocument();
+    expect(container.querySelector("a")!.className).toContain("p-row--single");
+    expect(screen.getByText("1 outlet · one source so far")).toBeInTheDocument();
   });
 
   it("marks the row the reader last opened", () => {
@@ -146,9 +146,11 @@ describe("ChartRow — the photograph, credited (founder, 2026-09-20)", () => {
   });
 
   it("prints what changed on every row, larger on the lead", () => {
+    // The lead's summary is set larger by .p-row--lead .p-row__sum (Design System v2).
     row(item({ summary: "The summary." }), { lead: true });
-    expect(screen.getByText("The summary.").className).toContain("text-[16px]");
+    expect(screen.getByText("The summary.").closest(".p-row--lead")).not.toBeNull();
     row(item({ id: "e2", summary: "Also shown." }));
-    expect(screen.getByText("Also shown.").className).toContain("text-[14.5px]");
+    expect(screen.getByText("Also shown.").className).toContain("p-row__sum");
+    expect(screen.getByText("Also shown.").closest(".p-row--lead")).toBeNull();
   });
 });

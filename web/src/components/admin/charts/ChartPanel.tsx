@@ -2,11 +2,12 @@
 
 /**
  * The dashboard's unit (admin charts, founder decision V2): a titled panel
- * holding one chart. Where the number comes from lives behind the ⓘ — no
- * prose under every figure — and every chart can turn into the table of the
- * numbers it draws (its "table twin": identity never by colour alone, and
- * every value reachable without hovering). A panel with nothing counted yet
- * says so in the space the chart would take, rather than drawing a flat zero.
+ * holding one chart. Where the number comes from opens under the ⓘ as
+ * "Counted in: <source>" — no prose under every figure — and every chart can
+ * turn into the table of the numbers it draws (its "table twin": identity
+ * never by colour alone, and every value reachable without hovering). A panel
+ * with nothing counted yet says so, hatched, in the space the chart would
+ * take, rather than drawing a flat zero.
  */
 
 import { useState } from "react";
@@ -18,23 +19,45 @@ export interface TableData {
   rows: Array<Array<string | number | null>>;
 }
 
-export function InfoTip({ label, children }: { label: string; children: React.ReactNode }) {
+/** The ⓘ: opens "Counted in" under the panel's header. */
+export function InfoButton({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
   return (
-    <details className="relative">
-      <summary
-        aria-label={`Where ${label} comes from`}
-        className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full hover:bg-[var(--sunken)] [&::-webkit-details-marker]:hidden"
-        style={{ color: "var(--ink-3)" }}
-      >
-        <InfoIcon />
-      </summary>
-      <div
-        className="absolute right-0 z-20 mt-1 w-72 rounded-[var(--r-md)] border p-3 text-[13px] leading-[1.5] shadow-[var(--shadow-pop)]"
-        style={{ background: "var(--surface)", borderColor: "var(--line-strong)", color: "var(--ink-2)" }}
-      >
-        {children}
-      </div>
-    </details>
+    <button
+      type="button"
+      className="p-iconbtn -my-2 shrink-0"
+      aria-expanded={open}
+      aria-label={`Where ${label} is counted`}
+      onClick={onToggle}
+    >
+      <InfoIcon size={15} />
+    </button>
+  );
+}
+
+export function CountedIn({ source, note }: { source: string; note?: string | null }) {
+  return (
+    <p className="rounded-[var(--r-md)] p-2.5 text-[13px] leading-[1.45]" style={{ background: "var(--sunken)", color: "var(--ink-2)" }}>
+      <b className="font-semibold">Counted in:</b>{" "}
+      <span className="font-mono text-[11.5px] [overflow-wrap:anywhere]">{source}</span>
+      {note && (
+        <>
+          <br />
+          {note}
+        </>
+      )}
+    </p>
+  );
+}
+
+/** Nothing to draw: the reason, on a hatched ground with a dashed edge. */
+export function Uncounted({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="flex min-h-[96px] items-center justify-center rounded-[var(--r-md)] px-4 py-5 text-center text-[13.5px] leading-[1.5]"
+      style={{ border: "1px dashed var(--line-strong)", background: "var(--data-uncounted)", color: "var(--ink-3)" }}
+    >
+      {children}
+    </p>
   );
 }
 
@@ -59,53 +82,50 @@ export function ChartPanel({
   children: React.ReactNode;
 }) {
   const [asTable, setAsTable] = useState(false);
+  const [info, setInfo] = useState(false);
   return (
-    <section className={`admin-panel ${className}`} aria-label={title}>
-      <header className="mb-3 flex items-start justify-between gap-3">
-        <h3 className="pt-3 text-[14px] font-semibold leading-snug" style={{ color: "var(--ink)" }}>
+    <section className={`admin-panel grid grid-cols-[minmax(0,1fr)] content-start gap-3 ${className}`} aria-label={title}>
+      <header className="flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 text-[14.5px] font-semibold leading-[1.3]" style={{ color: "var(--ink)" }}>
           {title}
         </h3>
-        <div className="flex shrink-0 items-center gap-1">
-          {table && !empty && (
-            <button
-              type="button"
-              aria-pressed={asTable}
-              onClick={() => setAsTable((v) => !v)}
-              className="h-11 rounded-full px-3 text-[12.5px] font-semibold hover:bg-[var(--sunken)]"
-              style={{ color: "var(--ink-2)" }}
-            >
-              {asTable ? "Chart" : "Table"}
-            </button>
-          )}
-          <InfoTip label={title}>
-            {note && <p className="mb-2">{note}</p>}
-            <p className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-              {source}
-            </p>
-          </InfoTip>
-        </div>
+        <InfoButton label={title} open={info} onToggle={() => setInfo((v) => !v)} />
+        {table && !empty && (
+          <button
+            type="button"
+            className="p-chip max-sm:min-h-[44px]"
+            aria-pressed={asTable}
+            onClick={() => setAsTable((v) => !v)}
+            style={{ minHeight: 30, padding: "0 10px", fontSize: 12.5 }}
+          >
+            Table
+          </button>
+        )}
       </header>
-      {empty ? (
-        <p className="flex min-h-[120px] items-center justify-center rounded-[var(--r-md)] px-4 text-center text-[14px]" style={{ background: "var(--sunken)", color: "var(--ink-2)" }}>
-          {empty}
-        </p>
-      ) : asTable && table ? (
-        <DataTable table={table} />
-      ) : (
-        children
-      )}
+      {info && <CountedIn source={source} note={note} />}
+      {empty ? <Uncounted>{empty}</Uncounted> : asTable && table ? <DataTable table={table} /> : <div className="min-w-0">{children}</div>}
     </section>
   );
 }
 
+/** A row's name reads as a cell, not as the column heads' caps. */
+const ROW_HEAD: React.CSSProperties = {
+  font: "var(--t-body-s)",
+  textTransform: "none",
+  letterSpacing: 0,
+  color: "var(--ink)",
+  padding: 10,
+  borderBottom: "1px solid var(--line)",
+};
+
 export function DataTable({ table }: { table: TableData }) {
   return (
     <div className="max-h-[320px] overflow-auto">
-      <table className="w-full border-collapse text-left font-mono text-[12px] tabular-nums">
+      <table className="p-table">
         <thead className="sticky top-0" style={{ background: "var(--surface)" }}>
-          <tr style={{ color: "var(--ink-3)" }}>
+          <tr>
             {table.columns.map((c, i) => (
-              <th key={c} scope="col" className={`py-1.5 pr-3 font-normal ${i ? "text-right" : ""}`}>
+              <th key={c} scope="col" className={i ? "num" : undefined}>
                 {c}
               </th>
             ))}
@@ -113,14 +133,14 @@ export function DataTable({ table }: { table: TableData }) {
         </thead>
         <tbody>
           {table.rows.map((r, i) => (
-            <tr key={i} className="border-t" style={{ borderColor: "var(--line)" }}>
+            <tr key={i}>
               {r.map((v, j) =>
                 j === 0 ? (
-                  <th key={j} scope="row" className="py-1.5 pr-3 text-left font-normal" style={{ color: "var(--ink-2)" }}>
+                  <th key={j} scope="row" className="[overflow-wrap:anywhere]" style={ROW_HEAD}>
                     {v ?? "—"}
                   </th>
                 ) : (
-                  <td key={j} className="py-1.5 pr-3 text-right" style={{ color: "var(--ink)" }}>
+                  <td key={j} className="num" style={{ color: "var(--ink)" }}>
                     {v === null || v === undefined ? "—" : typeof v === "number" ? v.toLocaleString("en-IN") : v}
                   </td>
                 ),
@@ -137,14 +157,14 @@ export function DataTable({ table }: { table: TableData }) {
  *  never carried by colour alone. `dashed` draws the period before. */
 export function SeriesKey({ items }: { items: Array<{ label: string; color: string; dashed?: boolean; total?: string }> }) {
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px]" style={{ color: "var(--ink-2)" }}>
+    <ul className="mt-3 flex flex-wrap gap-x-3.5 gap-y-1" style={{ font: "500 12.5px/1.3 var(--font-read)", color: "var(--ink-2)" }}>
       {items.map((it) => (
         <li key={it.label} className="inline-flex items-center gap-1.5">
-          <svg width="14" height="8" aria-hidden className="shrink-0">
+          <svg width={it.dashed ? 14 : 10} height="10" aria-hidden className="shrink-0">
             {it.dashed ? (
-              <line x1="0" x2="14" y1="4" y2="4" stroke={it.color} strokeWidth="2" strokeDasharray="3 2" />
+              <line x1="0" x2="14" y1="5" y2="5" stroke={it.color} strokeWidth="2" strokeDasharray="3 2" />
             ) : (
-              <rect width="14" height="8" rx="2" fill={it.color} />
+              <rect width="10" height="10" rx="2" fill={it.color} />
             )}
           </svg>
           <span>{it.label}</span>
@@ -159,8 +179,8 @@ export function SeriesKey({ items }: { items: Array<{ label: string; color: stri
 export function TipBox({ title, rows }: { title: string; rows: Array<{ label: string; value: string; color: string; dashed?: boolean }> }) {
   return (
     <div
-      className="min-w-[150px] rounded-[var(--r-md)] border px-3 py-2 shadow-[var(--shadow-pop)]"
-      style={{ background: "var(--surface)", borderColor: "var(--line-strong)" }}
+      className="min-w-[150px] rounded-[var(--r-md)] border px-3 py-2"
+      style={{ background: "var(--elevated)", borderColor: "var(--line-strong)", boxShadow: "var(--shadow-2)" }}
     >
       <p className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{title}</p>
       {rows.map((r) => (

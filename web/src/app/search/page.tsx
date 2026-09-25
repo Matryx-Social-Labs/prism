@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
 import { Masthead } from "@/components/Masthead";
 import { SectorStrip } from "@/components/SectorStrip";
-import { SearchIcon } from "@/components/icons";
+import { EmptyState } from "@/components/tabs/EmptyState";
 import { fetchTrending, searchEvents, type FeedItem } from "@/lib/api";
 import { chartOrder } from "@/lib/chart";
 import { loadProfile } from "@/lib/profile";
@@ -13,14 +13,14 @@ import { sectorGroup } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
 /**
- * Search: the query field first, then results on the story row grammar,
- * most-corroborated first; the subject nav filters them in place. A failed
- * request says so, in its own line — never "no matches" for an error.
+ * Search (Design System v2 · reader-phone PhoneSearch): the query field first,
+ * a mono strip under it that says what can be searched or counts what came
+ * back, then results on the story row grammar, most-corroborated first; the
+ * subject nav filters them in place. The start screen offers only what is in
+ * the news now — real names off the live stories — and nothing when that list
+ * is empty. A failed request says so, in its own line — never "no matches"
+ * for an error.
  */
-const LABEL = "text-[12.5px] font-semibold uppercase tracking-[0.06em]";
-const HINT = "font-mono text-[12px] tracking-[0.02em]";
-const TRY = ["RELIANCE", "CVE-2026-62144", "Kerala"];
-
 function SearchInner() {
   const params = useSearchParams();
   const router = useRouter();
@@ -103,70 +103,62 @@ function SearchInner() {
 
   const count = searched && !loading && !failed ? `${shown.length} ${shown.length === 1 ? "result" : "results"}` : null;
   const outlets = new Set(shown.flatMap((i) => (i.outlets ?? []).map((o) => o.publisher)));
-  const dateline = count ? `${count}${outlets.size ? ` · ${outlets.size} ${outlets.size === 1 ? "outlet" : "outlets"}` : ""}` : null;
-
-  const chip = (label: string, mono = false) => (
-    <button key={label} onClick={() => setQ(label)} className={`chip ${mono ? "font-mono text-[12px]" : ""}`}>
-      {label}
-    </button>
-  );
+  const strip = count ? `${count}${outlets.size ? ` · ${outlets.size} ${outlets.size === 1 ? "outlet" : "outlets"}` : ""}` : null;
 
   return (
-    <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
-      <Masthead dateline={null} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-10 lg:pt-6">
+    <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
+      <Masthead dateline="Search" />
+      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6">
         <SectorStrip active={group} onPick={setGroup} allHref="/search" allLabel="All stories" responsiveRail />
-        <div className="min-w-0">
-          {/* The query is the headline of this screen: a large field, its own row. */}
-          <label className="mt-2 flex h-14 items-center gap-3 rounded-full border px-5 lg:mt-0" style={{ borderColor: "var(--line-strong)", background: "var(--surface)" }}>
-            <SearchIcon size={20} className="shrink-0" />
+        <div className="grid min-w-0 content-start gap-2.5 pt-4 lg:pt-0">
+          {/* Design System v2 · TextField, type=search, with its Clear button. */}
+          <div className="relative">
             <input
               ref={box}
+              type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && setQ("")}
               placeholder="Search stories, people, places"
               aria-label="Search stories, entities and sources"
-              className="w-full bg-transparent text-[18px] font-medium outline-none placeholder:font-normal placeholder:text-[var(--ink-3)]"
-              style={{ color: "var(--ink)" }}
+              className={`p-input [&::-webkit-search-cancel-button]:appearance-none ${q ? "pr-20" : ""}`}
             />
             {q && (
-              <button type="button" onClick={() => setQ("")} className="btn btn-ghost btn-sm -mr-2" aria-label="Clear search">Clear</button>
-            )}
-          </label>
-          <p className={`${HINT} mt-2 pb-2`} style={{ color: "var(--ink-3)" }}>
-            {dateline ?? <>Stories · people · tickers · CVE ids</>}
-          </p>
-          {term.length < 2 && !loading && (
-            <div className="grid gap-8 pt-4 lg:grid-cols-2 lg:gap-14">
-              <div>
-                <p className={LABEL} style={{ color: "var(--ink-3)" }}>In the news now</p>
-                <div className="mt-3 flex flex-wrap gap-2">{entities.map((e) => chip(e))}</div>
+              <div className="absolute inset-y-0.5 right-1.5 flex items-center">
+                <button type="button" onClick={() => setQ("")} className="p-btn p-btn--ghost p-btn--sm" aria-label="Clear search">Clear</button>
               </div>
-              <div>
-                <p className={LABEL} style={{ color: "var(--ink-3)" }}>Try</p>
-                <div className="mt-3 flex flex-wrap gap-2">{TRY.map((t) => chip(t, true))}</div>
+            )}
+          </div>
+          <p className="p-count">{strip ?? "Stories · people · tickers · CVE ids"}</p>
+
+          {term.length < 2 && !loading && entities.length > 0 && (
+            <div className="mt-2 grid gap-2.5">
+              <p className="p-eyebrow">In the news now</p>
+              <div className="flex flex-wrap gap-1.5">
+                {entities.map((e) => (
+                  <button key={e} type="button" onClick={() => setQ(e)} className="p-chip">{e}</button>
+                ))}
               </div>
             </div>
           )}
 
-          <section aria-label="Results" className="pt-3">
-            {loading && (
-              <p className={`${HINT} py-6`} style={{ color: "var(--ink-3)" }}>Searching…</p>
-            )}
+          <section aria-label="Results" className="pt-1">
+            {loading && <p className="p-count py-6">Searching…</p>}
             {!loading && failed && (
-              <div className="card" role="status">
-                <p className="text-[14.5px] font-medium" style={{ color: "var(--danger)" }}>Search is unreachable right now: check your connection and try again.</p>
+              <div className="p-alert p-alert--error" role="status">
+                <p>Search is unreachable right now: check your connection and try again.</p>
               </div>
             )}
             {!loading && !failed && searched && results.length === 0 && (
-              <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>No stories match &ldquo;{term}&rdquo;.</p></div>
+              <EmptyState title={<>Nothing matches &ldquo;{term}&rdquo;</>}>
+                Search reads the headline and summary of every record, newest first.
+              </EmptyState>
             )}
             {!loading && !failed && searched && results.length > 0 && shown.length === 0 && (
-              <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.</p></div>
+              <EmptyState title={<>None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.</>} />
             )}
             {shown.length > 0 && (
-              <ol className="chart-print flex flex-col gap-3">
+              <ol className="p-print grid gap-2.5">
                 {shown.map((item) => <ChartRow key={item.id} item={item} primaryLang={primaryLang} />)}
               </ol>
             )}

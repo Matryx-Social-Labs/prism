@@ -7,12 +7,13 @@ import { Payments } from "@/components/Payments";
 import { PlanCard } from "@/components/PlanCard";
 import { SectionHead } from "@/components/SectionHead";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CONTACT_EMAIL } from "@/lib/legal";
 import { clearSession, useSession } from "@/lib/session";
 
-// The account: who you are, what you pay for, what you have paid, and the
-// door out — the same hairline sections as every other page (DESIGN.md
-// § Account). The plan is first because it is why most people come here;
-// Payments appears only once there is a charge to show.
+// The account (ui_kits/plus · Account): who you are, what you pay for, what
+// you have paid, and the door out, on the same ruled sections as every other
+// page. The plan is first because it is why most people come here; Payments
+// appears only once there is a charge to show.
 export default function AccountPage() {
   const session = useSession();
   const router = useRouter();
@@ -28,50 +29,42 @@ export default function AccountPage() {
 
   if (!session) return null;
 
+  const link = "p-link inline-flex min-h-[44px] items-center underline underline-offset-[3px]";
   return (
-    <div className="mx-auto w-full max-w-[var(--reading)] px-5 pb-20 pt-8 sm:px-8">
-      <h1 className="font-record text-[32px] font-bold leading-[1.1] tracking-[-0.015em]">Account</h1>
-      <p className="mt-1.5 font-mono text-[12.5px]" style={{ color: "var(--ink-3)" }}>{session.email}</p>
-
-      <section className="mt-8" aria-labelledby="plan-title">
-        <SectionHead id="plan-title" title="Your plan" />
-        <PlanCard session={session} />
-      </section>
+    <div className="mx-auto grid w-full max-w-[720px] gap-7 px-[var(--gutter)] pb-20 pt-8 lg:pt-12">
+      <SectionHead id="account-title" as="h1" title="Account" sub={session.email} />
+      <PlanCard session={session} />
       <Payments session={session} />
 
-      <section className="mt-8" aria-labelledby="profile-title">
+      <section aria-labelledby="profile-title">
         <SectionHead id="profile-title" title="Your record" hint="Your state, profession and the subjects you follow shape Today." />
-        <div className="card divide-y p-0" style={{ borderColor: "var(--line)" }}>
-          <Link href="/you" className="flex min-h-[56px] items-center px-4 text-[15px] font-medium" style={{ borderColor: "var(--line)" }}>Profile, state and subjects →</Link>
-          <Link href="/watchlist" className="flex min-h-[56px] items-center px-4 text-[15px] font-medium" style={{ borderColor: "var(--line)" }}>Watchlist →</Link>
-          <div className="flex min-h-[56px] items-center px-4" style={{ borderColor: "var(--line)" }}>
-            <span className="text-[15px]">Theme</span>
-            <span className="ml-auto"><ThemeToggle /></span>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-5" style={{ font: "600 14.5px/1 var(--font-read)" }}>
+          <Link href="/you" className={link}>Profile</Link>
+          <Link href="/watchlist" className={link}>Watchlist</Link>
+          <span className="ml-auto"><ThemeToggle /></span>
         </div>
       </section>
 
-      <section className="mt-8" aria-labelledby="signout-title">
-        <SectionHead id="signout-title" title="Sign out" />
-        <div className="card divide-y p-0" style={{ borderColor: "var(--line)" }}>
+      <div className="grid gap-1 pt-3" style={{ borderTop: "1px solid var(--line)" }}>
+        <p className="flex flex-wrap items-center gap-x-1.5" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+          <span>
+            To delete your account and everything we hold, write to <a href={`mailto:${CONTACT_EMAIL}`} className="underline underline-offset-[3px]" style={{ color: "var(--ink-2)" }}>{CONTACT_EMAIL}</a> from this address — see the <Link href="/privacy" className="underline underline-offset-[3px]" style={{ color: "var(--ink-2)" }}>privacy policy</Link>.
+          </span>
           <button
+            type="button"
             onClick={() => { clearSession(); router.replace("/feed"); }}
-            className="flex min-h-[56px] w-full items-center px-4 text-left text-[15px] font-semibold"
-            style={{ color: "var(--danger)" }}
+            className="inline-flex min-h-[44px] items-center font-semibold underline underline-offset-[3px]"
+            style={{ color: "var(--ink-2)" }}
           >
-            Sign out of Prism
+            Sign out
           </button>
-        </div>
-        <p className="mt-3 text-[13px] leading-[1.5]" style={{ color: "var(--ink-3)" }}>
-          To delete your account and everything we hold, write to us from this address — see the <Link href="/privacy" className="underline underline-offset-[3px]">privacy policy</Link>.
         </p>
-      </section>
-
-      <p className="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: "var(--ink-3)" }}>
-        <Link href="/privacy" className="underline-offset-[3px] hover:underline">Privacy</Link>
-        <Link href="/terms" className="underline-offset-[3px] hover:underline">Terms</Link>
-        <Link href="/refunds" className="underline-offset-[3px] hover:underline">Refunds</Link>
-      </p>
+        <p className="flex flex-wrap gap-x-4" style={{ font: "400 13px/1.5 var(--font-read)", color: "var(--ink-3)" }}>
+          <Link href="/privacy" className="inline-flex min-h-[44px] items-center underline-offset-[3px] hover:underline">Privacy</Link>
+          <Link href="/terms" className="inline-flex min-h-[44px] items-center underline-offset-[3px] hover:underline">Terms</Link>
+          <Link href="/refunds" className="inline-flex min-h-[44px] items-center underline-offset-[3px] hover:underline">Refunds</Link>
+        </p>
+      </div>
     </div>
   );
 }

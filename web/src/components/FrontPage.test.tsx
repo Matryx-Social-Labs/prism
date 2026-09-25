@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FrontPage } from "@/components/FrontPage";
 import type { FeedItem } from "@/lib/api";
@@ -70,7 +70,7 @@ describe("FrontPage — one chart for everyone (D2)", () => {
 
   it("offers FOR YOU only once the reader has picked interests, and only that tab sends them", async () => {
     render(<FrontPage />);
-    await screen.findByText("A story on the chart");
+    await screen.findAllByText("A story on the chart");
     expect(screen.queryByRole("tab", { name: "For you" })).toBeNull();
 
     loadProfile.mockReturnValue({ state: "IN-KA", interests: ["sports"], languages: ["en"] });
@@ -115,7 +115,7 @@ describe("FrontPage — scope", () => {
   it("offers no state pill to a reader with no state, and forgets a saved state scope", async () => {
     localStorage.setItem("parse.scope.v2", "region");
     render(<FrontPage />);
-    await screen.findByText("A story on the chart");
+    await screen.findAllByText("A story on the chart");
     expect(screen.queryByRole("button", { name: /Your state/ })).toBeNull();
     // National and World are absolute slices; everyone gets them.
     expect(screen.getByRole("button", { name: "National" })).toBeInTheDocument();
@@ -125,7 +125,7 @@ describe("FrontPage — scope", () => {
 
   it("World is what does not involve India, for any reader", async () => {
     render(<FrontPage />);
-    await screen.findByText("A story on the chart");
+    await screen.findAllByText("A story on the chart");
     await userEvent.click(screen.getByRole("button", { name: "World" }));
     await waitFor(() => expect(lastQuery().scope).toBe("world"));
   });
@@ -143,7 +143,7 @@ describe("FrontPage — scope", () => {
   it("asks the API for each slice instead of filtering one page", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<FrontPage />);
-    await screen.findByText("A story on the chart");
+    await screen.findAllByText("A story on the chart");
     expect(lastQuery().scope).toBe("all");
     await userEvent.click(screen.getByRole("button", { name: /Your state|Kerala/ }));
     await waitFor(() => expect(lastQuery().scope).toBe("region"));
@@ -156,6 +156,24 @@ describe("FrontPage — scope", () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
     render(<FrontPage />);
     expect(await screen.findByRole("button", { name: "Kerala" })).toBeInTheDocument();
+  });
+});
+
+// Pages v3 · Today: the phone leads with a rail of the day's multi-outlet
+// stories — on All + Today only, never a single-source story.
+describe("FrontPage — top of the record", () => {
+  it("rails the multi-outlet stories on All, most-reported first, and leaves single-source ones to the list", async () => {
+    fetchFeed.mockResolvedValue([item({ id: "a", title: "Two outlets", source_count: 2 }), item({ id: "b", title: "Nine outlets", source_count: 9 }), item({ id: "c", title: "One outlet", source_count: 1 })]);
+    render(<FrontPage />);
+    const rail = (await screen.findByRole("heading", { name: "Top of the record" })).closest("section")!;
+    expect(within(rail).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Nine outlets", "Two outlets"]);
+    expect(within(rail).getByText("1 / 2")).toBeInTheDocument();
+  });
+
+  it("is not on a subject page", async () => {
+    render(<FrontPage sector="politics" />);
+    await screen.findAllByText("A story on the chart");
+    expect(screen.queryByRole("heading", { name: "Top of the record" })).toBeNull();
   });
 });
 
