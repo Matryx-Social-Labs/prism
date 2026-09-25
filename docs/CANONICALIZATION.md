@@ -113,7 +113,21 @@ almost everything else:
 
 | Cascade | Pairs | TP | FP | FN | Precision | Recall | F1 |
 |---|---|---|---|---|---|---|---|
-| current (no verified tier) | 794 | 30 | 3 | 136 | 0.909 | **0.181** | 0.302 | Linking the same pairs **transitively** (union-find) instead chained
+| current (no verified tier) | 794 | 30 | 3 | 136 | 0.909 | **0.181** | 0.302 |
+| + verified tier at 0.85 | 794 | 89 | 5 | 77 | **0.947** | **0.536** | **0.685** |
+
+By set — the gain is not one set's:
+
+| Set | Current P / R | With the verified tier P / R |
+|---|---|---|
+| July gold (398 pairs) | 0.964 / 0.458 | 0.969 / 0.525 |
+| batch 3, cross-language (268) | — / **0.000** | 0.875 / **0.488** |
+| silver, same-language (128) | 0.750 / 0.047 | 0.974 / 0.578 |
+
+711 Jev calls for the whole replay (about $0.03). Read the silver row with care:
+its labels are Claude's and unratified, and the 0.85 floor was chosen partly on
+it; July gold is the cleanest held-out evidence, and it moved in the same
+direction without losing precision. Linking the same pairs **transitively** (union-find) instead chained
 a week of Trump–Xi coverage (itinerary, airport arrival, the meeting) into one
 46-event group at 0.7 — which is why an article is only ever judged against an
 event's founder.
@@ -246,7 +260,8 @@ For scale, extraction is the dominant spend (`docs/ML-EVALUATION.md`).
 2. **Backfill gists** for the window: `DATABASE_URL=<prod> uv run python -m tools.backfill_gist --days 14 --apply`
    (no LLM spend).
 3. **Replay** the cascade with the tier on (`tools.score_cascade --verify 0.85 --sets gold,batch3,silver`)
-   — ship only if it beats the current cascade.
+   — ship only if it beats the current cascade. **Done 2026-09-25: F1 0.302 → 0.685,
+   precision 0.909 → 0.947** (table above).
 4. **Shadow for ≥ 3 days** (`PRISM_EVENT_VERIFY=shadow` on the worker): every
    would-be attachment is recorded (`event_match_verdicts.mode = 'shadow'`,
    log line `event_verify_shadow`). A founder reads 50 sampled would-be merges.
