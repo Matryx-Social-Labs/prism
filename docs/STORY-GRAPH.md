@@ -1,5 +1,7 @@
 # How stories form and stay coherent
 
+> **Historical (2026-07-30).** This describes the on-read story graph as it was built in July. The story layer now runs Leiden (CPM) over a mutual-kNN graph in `correlation/partition.py` and reconciles stories in `correlation/trending.py`; the trending same-story rule is an IDF-weighted cast sum, not "≥ 3 shared cast members". Current behaviour: [PIPELINE §7](./PIPELINE.md#7-story-layer). Measurements: [ML-EVALUATION §4.1](./ML-EVALUATION.md).
+
 Prism's core claim is "one story, every perspective." That only works if the
 system reliably decides **what is one story** — collapsing fifty duplicate
 headlines about one real event into a single canonical event, then stitching the

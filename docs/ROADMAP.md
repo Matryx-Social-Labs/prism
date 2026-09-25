@@ -1,5 +1,7 @@
 # Roadmap
 
+> **Historical phasing (2026-07-27).** Milestones below predate the India-only reset, the removal of GDELT and the paid launch plan. For what shipped, read [`../CHANGELOG.md`](../CHANGELOG.md).
+
 The strategy is a vertical beachhead first, then horizontal expansion by adding role lenses on the
 same backbone. This keeps scope tight (the lesson from Artifact's failure) while building toward the
 full multi-role vision.

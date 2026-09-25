@@ -1,5 +1,7 @@
 # Enrichment Schema and Role Lenses
 
+> **Intent, not the field list (2026-07-14).** The live extraction schema is `enrichment/schemas.py` (`SharedExtraction`: English headline, one-line summary, reader brief, entities, regions, verbatim-checked claims, lens fields); see [PIPELINE §5](./PIPELINE.md#5-enrichment). The multi-source provenance maps described below were not built as written.
+
 Phase 3 turns a classified item into a structured, measurable record. Extraction is
 schema-constrained: the model receives a typed schema and returns valid JSON, with fields the
 article does not evidence returned as explicit nulls rather than omitted, so unknown and absent are
