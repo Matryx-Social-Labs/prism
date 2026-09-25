@@ -51,7 +51,7 @@ function item(over: Partial<FeedItem> = {}): FeedItem {
 }
 
 /** The line that marks the start screen: what can be searched. */
-const START = "Search the headline and summary of every record: a story, a person, a place, a ticker or a CVE id.";
+const START = "Search every record by its headline, its summary and the people and organisations it names: a story, a person, a place, a ticker or a CVE id.";
 
 function input() {
   return screen.getByRole("searchbox", { name: "Search the record" });

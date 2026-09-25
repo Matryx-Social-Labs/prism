@@ -17,7 +17,7 @@ from api.routes.serialization import outlet_refs
 from api.schemas import TrendingResponse, TrendingStoryDetail
 from common import outlets
 from common.db import get_db
-from common.images import hi_res, placeholder_hashes
+from common.images import REAL_PHOTO_SQL, hi_res, placeholders
 from common.taxonomy import TAXONOMY
 
 router = APIRouter()
@@ -133,7 +133,7 @@ async def story_photos(db: AsyncSession, member_ids_per_story: list[list], limit
     """Up to STORY_PHOTOS distinct photographs per story, across its developments.
 
     One query for the page: every member report with a real picture (no
-    placeholder — common/images.placeholder_hashes), newest first. Then per
+    placeholder — common/images.placeholders), newest first. Then per
     story: one per publisher first (BBC's language editions upload the same
     picture under new ids), near-identical hashes dropped, credited with the
     outlet that took it."""
@@ -142,23 +142,23 @@ async def story_photos(db: AsyncSession, member_ids_per_story: list[list], limit
     all_ids = sorted({str(e) for ids in member_ids_per_story for e in ids})
     if not all_ids:
         return [[] for _ in member_ids_per_story]
-    placeholders = list(await placeholder_hashes(db))
+    furniture = list(await placeholders(db))
     reg = await outlets.registry(db)
     rows = (
         await db.execute(
             text(
-                """
+                f"""
                 SELECT m.event_id, ri.image_url, ri.image_phash, ri.url, s.slug AS source_slug, ri.published_at
                 FROM event_memberships m
                 JOIN articles a ON a.id = m.article_id
                 JOIN raw_items ri ON ri.id = a.raw_item_id
                 JOIN sources s ON s.id = ri.source_id
                 WHERE m.event_id = ANY(CAST(:ids AS uuid[])) AND ri.image_url IS NOT NULL
-                  AND (ri.image_phash IS NULL OR NOT (ri.image_phash = ANY(CAST(:placeholders AS text[]))))
+                  AND {REAL_PHOTO_SQL}
                 ORDER BY ri.published_at DESC NULLS LAST
                 """
             ),
-            {"ids": all_ids, "placeholders": placeholders},
+            {"ids": all_ids, "placeholders": furniture},
         )
     ).mappings().all()
     by_event: dict[str, list] = {}
@@ -377,14 +377,15 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
     photos = (await story_photos(db, [members], limit=8))[0]
     who = await story_outlets(db, members)
     # A development's own picture, never a placeholder (the timeline shows it).
-    placeholders = await placeholder_hashes(db)
+    furniture = await placeholders(db)
     devs = timeline.get("developments", [])
-    if devs and placeholders:
-        bad = set(
+    if devs and furniture:
+        urls = [d.get("image_url") for d in devs if d.get("image_url")]
+        bad = {u for u in urls if u in furniture} | set(
             (
                 await db.execute(
                     text("SELECT DISTINCT image_url FROM raw_items WHERE image_phash = ANY(CAST(:h AS text[])) AND image_url = ANY(CAST(:u AS text[]))"),
-                    {"h": list(placeholders), "u": [d.get("image_url") for d in devs if d.get("image_url")]},
+                    {"h": list(furniture), "u": urls},
                 )
             ).scalars().all()
         )

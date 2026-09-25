@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 // query, and thin); the records they link to are.
 export const metadata: Metadata = {
   title: "Search",
-  description: "Search Prism's live records by story, entity, ticker or CVE id.",
+  description: "Search Prism's live records by story, person, organisation, ticker or CVE id.",
   robots: { index: false, follow: true },
 };
 

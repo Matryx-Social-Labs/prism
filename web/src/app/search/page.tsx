@@ -24,8 +24,8 @@ import { useScrollRestore } from "@/lib/useScrollRestore";
  * failed request says so, in its own line — never "no matches" for an error.
  */
 const FIELD_ID = "search-q";
-/** What is searched, on the start screen: the API matches headline and summary text. */
-const START = "Search the headline and summary of every record: a story, a person, a place, a ticker or a CVE id.";
+/** What is searched, on the start screen: the API matches headline, summary and cast. */
+const START = "Search every record by its headline, its summary and the people and organisations it names: a story, a person, a place, a ticker or a CVE id.";
 /** The API's page (api/routes/search.py, limit 30): a full page may hide more, so it prints "30+". */
 const SEARCH_CAP = 30;
 function SearchInner() {
@@ -154,7 +154,7 @@ function SearchInner() {
           )}
           {!loading && !failed && searched && results.length === 0 && (
             <EmptyState title={<>No records match &ldquo;{term}&rdquo;</>}>
-              Search reads the headline and summary of every record. Try fewer words or a name.
+              Search reads every record's headline, summary and the names in it. Try fewer words or a name.
             </EmptyState>
           )}
           {!loading && !failed && searched && results.length > 0 && (

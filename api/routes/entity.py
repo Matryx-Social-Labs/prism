@@ -19,7 +19,7 @@ from api.routes.serialization import build_feed_item
 from api.schemas import EntityPage, EntityRef
 from common import outlets
 from common.db import get_db
-from common.images import placeholder_hashes
+from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
 
 router = APIRouter()
@@ -86,30 +86,20 @@ async def get_entity(
     rows = (
         await db.execute(
             text(
-                """
+                f"""
                 SELECT e.id, e.title, e.summary, e.sector, e.subsector, e.regions,
                        img.image_url AS image_url, e.projection, e.last_updated_at,
                        e.occurred_at, img.slug AS image_source_slug
                 FROM event_entities ee
                 JOIN events e ON e.id = ee.event_id
-                -- The record's own picture, as the feed picks it (api/routes/feed.py).
-                LEFT JOIN LATERAL (
-                    SELECT ri.image_url, s.slug FROM event_memberships m
-                    JOIN articles a ON a.id = m.article_id
-                    JOIN raw_items ri ON ri.id = a.raw_item_id
-                    JOIN sources s ON s.id = ri.source_id
-                    WHERE m.event_id = e.id AND ri.image_url IS NOT NULL
-                      AND (ri.image_phash IS NULL OR NOT (ri.image_phash = ANY(CAST(:placeholders AS text[]))))
-                    ORDER BY (ri.image_url = e.image_url) DESC, ri.published_at ASC NULLS LAST
-                    LIMIT 1
-                ) img ON true
+                {report_photo_join("e")}
                 WHERE ee.entity_id = :eid
                   AND COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
                 ORDER BY e.last_updated_at DESC
                 LIMIT :limit
                 """
             ),
-            {"eid": entity["id"], "limit": limit, "placeholders": list(await placeholder_hashes(db))},
+            {"eid": entity["id"], "limit": limit, "placeholders": list(await placeholders(db))},
         )
     ).mappings().all()
 

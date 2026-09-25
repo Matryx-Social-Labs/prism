@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.96.0] - 2026-09-25
+
+### Fixed — search shows what the story shows, and finds the names it offers
+- **No outlet fallback art on a search row.** The feed, entity and subject pages
+  filtered placeholder pictures and search and the markets digest did not, so a
+  search row could show Prajavani's `prajavani_fallback_image.webp` (on 141
+  reports) that the opened story, which filters, never showed. Every route now
+  picks a row's photograph through one join (`common/images.report_photo_join`)
+  instead of three copies of it and two omissions.
+- **A fallback with no fingerprint is still a fallback.** 16% of reports carry
+  no image hash (the fetch failed), and those walked past the hash rule: TOI's
+  generic image on 16 articles, HT's generic logo, Prajavani's horoscope art. A
+  picture URL on four or more different articles in a fortnight is now furniture
+  too.
+- **"In the news now" finds its own names.** The chips are the cast of the
+  trending stories, and search read only headlines and summaries, so 4 of the 6
+  names offered on 2026-09-25 returned nothing. Search now also matches the
+  people and organisations a record names, on a trigram index over
+  `entities.name` (migration `d4b7e2a9c1f3`).
+
 ## [0.0.95.0] - 2026-09-24
 
 ### Changed — the product claims what it can show

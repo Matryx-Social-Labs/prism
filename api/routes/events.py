@@ -36,7 +36,7 @@ from common import outlets, usage
 from common.billing import plan_for
 from common.config import get_settings
 from common.db import get_db
-from common.images import hi_res, placeholder_hashes
+from common.images import hi_res, is_placeholder, placeholders
 from common.lenses import LENSES, PAID_LENS_FIELDS
 from common.locks import single_flight
 from common.logging import get_logger
@@ -463,7 +463,7 @@ async def get_event(
 
     reg = await outlets.registry(db)
     mon = await outlets.monitored(db)
-    placeholders = await placeholder_hashes(db)
+    furniture = await placeholders(db)
     return EventDetail(
         id=str(event["id"]),
         title=event["title"],
@@ -501,7 +501,7 @@ async def get_event(
                 language=reg[s["source_slug"]].language if s["source_slug"] in reg else None,
                 publisher=reg[s["source_slug"]].publisher if s["source_slug"] in reg else None,
                 domain=reg[s["source_slug"]].domain if s["source_slug"] in reg else None,
-                image_url=None if s.get("image_phash") in placeholders else hi_res(s.get("image_url")),
+                image_url=None if is_placeholder(s.get("image_phash"), s.get("image_url"), furniture) else hi_res(s.get("image_url")),
                 image_phash=s.get("image_phash"),
             )
             for s in sources

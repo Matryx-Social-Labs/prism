@@ -8,6 +8,7 @@ from api.routes.serialization import build_feed_item
 from api.schemas import DigestResponse
 from common import outlets
 from common.db import get_db
+from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
 from correlation.digest import get_market_digest
 
@@ -28,13 +29,16 @@ async def market_digest(db: AsyncSession = Depends(get_db)):
         rows = (
             await db.execute(
                 text(
-                    """
-                    SELECT id, title, summary, sector, subsector, regions, image_url,
-                           projection, last_updated_at, occurred_at
-                    FROM events WHERE id = ANY(CAST(:ids AS uuid[]))
+                    f"""
+                    SELECT e.id, e.title, e.summary, e.sector, e.subsector, e.regions,
+                           img.image_url AS image_url, img.slug AS image_source_slug,
+                           e.projection, e.last_updated_at, e.occurred_at
+                    FROM events e
+                    {report_photo_join("e")}
+                    WHERE e.id = ANY(CAST(:ids AS uuid[]))
                     """
                 ),
-                {"ids": ids},
+                {"ids": ids, "placeholders": list(await placeholders(db))},
             )
         ).mappings().all()
         by_id = {str(r["id"]): r for r in rows}
