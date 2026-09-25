@@ -44,7 +44,7 @@ describe("GoogleSignIn", () => {
   it("is our own button, and a click asks Google for a token scoped to email", async () => {
     render(<GoogleSignIn />);
     const btn = screen.getByRole("button", { name: "Continue with Google" });
-    expect(btn.className).toContain("btn-secondary");
+    expect(btn.className).toContain("p-btn--secondary");
     await userEvent.click(btn);
     await waitFor(() => expect(gis.requested).toBe(1));
     expect(gis.inits[0].client_id).toBe("test-client.apps.googleusercontent.com");
@@ -73,5 +73,17 @@ describe("GoogleSignIn", () => {
     await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
     await act(async () => { gis.cb!({ access_token: "ya29.y" }); });
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/plus?from=ask-limit"));
+  });
+
+  it("says what went wrong and one way on when the API refuses Google's token", async () => {
+    session.signInWithGoogle.mockRejectedValue(new Error("token rejected by google"));
+    render(<GoogleSignIn />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    await waitFor(() => expect(gis.cb).not.toBeNull());
+    await act(async () => { gis.cb!({ access_token: "ya29.z" }); });
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Google sign-in did not finish");
+    expect(alert).toHaveTextContent("Token rejected by google. Try again, or use your email.");
+    expect(screen.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
   });
 });

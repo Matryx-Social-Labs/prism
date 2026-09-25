@@ -11,7 +11,7 @@ describe("the 3D coverage view", () => {
   it("says so in words when the browser cannot draw WebGL, instead of an empty box", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     render(<CoverageGraph outlets={[{ id: "a", name: "The Hindu", language: "en", stories: 4, color: "var(--viz-1)" }]} links={[]} label="1 outlet" />);
-    expect(await screen.findByText(/This browser cannot draw 3D here/)).toBeInTheDocument();
+    expect(await screen.findByText(/This browser can't draw the 3D network/)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "1 outlet" })).toBeInTheDocument();
   });
 
@@ -23,7 +23,7 @@ describe("the 3D coverage view", () => {
       { id: "b", name: "B", language: "en", stories: 2, color: "var(--viz-1)" },
     ];
     const { unmount } = render(<CoverageGraph outlets={outlets} links={[{ a: "a", b: "b", shared: 2 }]} label="2 outlets" />);
-    await screen.findByText(/This browser cannot draw 3D here/);
+    await screen.findByText(/This browser can't draw the 3D network/);
     unmount();
     expect(dispose).toHaveBeenCalled();
   });

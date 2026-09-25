@@ -48,3 +48,42 @@
   padding: 16px;
   min-width: 0;
 }
+
+/* The page's name: display-m on a phone, display-l from the sidebar up. */
+.admin-title { font: var(--t-display-m); letter-spacing: var(--track-display); text-wrap: balance; }
+@media (min-width: 1024px) { .admin-title { font: var(--t-display-l); letter-spacing: var(--track-display); } }
+
+/* The pages: a tab strip under the bar on a phone (ink underline on the
+   current one), the 220px sidebar's list from lg up (accent wash). */
+.admin-nav a { flex: none; display: flex; align-items: center; min-height: 44px; padding: 0 10px; margin-bottom: -1px; border-bottom: 2px solid transparent; font: 600 14px/1 var(--font-read); color: var(--ink-3); white-space: nowrap; text-decoration: none; }
+.admin-nav a[aria-current="page"] { color: var(--ink); border-color: var(--ink); }
+@media (min-width: 1024px) {
+  .admin-nav a { min-height: 0; padding: 10px; margin: 0; border: 0; border-radius: var(--r-md); font: 500 14.5px/1 var(--font-read); color: var(--ink-2); }
+  .admin-nav a:hover { background: var(--sunken); }
+  .admin-nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+}
+
+/* FilterSwitch: a radiogroup of chips; the chosen one inks in (the chip's own
+   pressed look, keyed to aria-checked, which a radio carries). */
+.admin-viz .p-chip[aria-checked="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* Checking access: a hairline with an ink run that crosses it — no amount is
+   claimed. Reduced motion stops it (the global rule). */
+.admin-checking { height: 2px; background: var(--line); overflow: hidden; }
+.admin-checking > i { display: block; width: 38%; height: 2px; background: var(--ink); animation: admin-checking 1.2s var(--ease) infinite; }
+@keyframes admin-checking { from { transform: translateX(-100%); } to { transform: translateX(265%); } }
+@media (prefers-reduced-motion: reduce) { .admin-checking > i { animation: none; } }
+
+/* People: a table beside the sidebar; below it each row folds into a card —
+   the email and plan, what they told us, the 28-day strip, then the counts. */
+@media (max-width: 1023.98px) {
+  .admin-people thead { display: none; }
+  .admin-people table, .admin-people tbody { display: block; }
+  .admin-people tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .admin-people tr > th, .admin-people tr > td { display: block; padding: 0 !important; border: 0 !important; text-align: left !important; }
+  .admin-people .c-email { order: 1; flex: 1 1 60%; min-width: 0; }
+  .admin-people .c-plan { order: 2; margin-left: auto; text-align: right !important; }
+  .admin-people .c-told { order: 3; flex-basis: 100%; }
+  .admin-people .c-act { order: 4; flex-basis: 100%; }
+  .admin-people .c-meta { order: 5; }
+}

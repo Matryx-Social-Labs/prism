@@ -1,26 +1,29 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChartRow } from "@/components/ChartRow";
 import { Masthead } from "@/components/Masthead";
+import { PulseRail } from "@/components/reading/PulseRail";
 import { SectionHead } from "@/components/SectionHead";
-import { fetchDigest, type MarketDigest } from "@/lib/api";
+import { MarketDigest, MoversList } from "@/components/tabs/Markets";
+import { EmptyState } from "@/components/ui";
+import { fetchDigest, type MarketDigest as Digest } from "@/lib/api";
 import { chartOrder } from "@/lib/chart";
 import { istTime } from "@/lib/dateline";
 import { useSession } from "@/lib/session";
 
 /**
- * Market Pulse: the day's markets digest as a reading with its record under
- * it — every story it was written from, on the story row grammar. Every ticker
- * opens that ticker's watchlist rows (or a search, for a reader with no
- * watchlist yet). Free: the paid surface is the Markets lens on a story. The
- * markets lens IS speaking here, so its hue marks the reading.
+ * Market Pulse (Design System v2 · Reading board, flow 03): the day's markets
+ * reading in the Markets lens panel, the tickers it names with its one line on
+ * each, and the Business & Markets stories it was written from, on the story
+ * row grammar — so the page never shows a verdict alone. Beside it, the
+ * reader's own tickers, or the way in. Never a price. Every ticker opens that
+ * ticker's watchlist rows (or a search, for a reader with no account). Free:
+ * the paid surface is the Markets lens on a story.
  */
-
 export default function PulsePage() {
   const session = useSession();
-  const [digest, setDigest] = useState<MarketDigest | null>(null);
+  const [digest, setDigest] = useState<Digest | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,61 +37,73 @@ export default function PulsePage() {
   const stamp = digest?.generated_at ? `updated ${istTime(digest.generated_at)}` : null;
   const day = new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
   const dateline = [day, stamp].filter(Boolean).join(" · ");
+  const stories = digest?.stories ?? [];
+  const n = digest?.event_ids.length ?? 0;
+  const movers = digest?.movers ?? [];
 
   return (
-    <div className="mx-auto max-w-[var(--shell)] px-5 pb-[calc(var(--tabbar)+24px)] sm:px-8 lg:pb-16 xl:px-10">
+    <div className="mx-auto max-w-[1020px] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-16">
       <Masthead dateline={dateline} />
-      <div className="mx-auto max-w-[720px] lg:pt-6">
-        <SectionHead id="pulse-title" title="Market Pulse" hint="One reading of the day's market-moving stories, written from the record beneath it." right={<Link href="/watchlist" className="btn btn-secondary btn-sm">Watchlist</Link>} />
+      <div className="grid gap-8 pt-4 lg:grid-cols-[minmax(0,640px)_340px] lg:justify-center lg:gap-10 lg:pt-8">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
+          <header className="grid gap-1.5">
+            <h1 id="pulse-title" className="[font:var(--t-display-m)] lg:[font:var(--t-display-l)]" style={{ letterSpacing: "var(--track-display)" }}>Market Pulse</h1>
+            <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+              What the day&rsquo;s business reporting says about markets and listed companies. Written from the reports; no prices, no advice.
+            </p>
+          </header>
 
-        {loading ? (
-          <div className="card" aria-busy="true"><span className="pulse-skel block h-4 w-3/4 rounded" style={{ background: "var(--sunken)" }} /><span className="pulse-skel mt-3 block h-3 w-full rounded" style={{ background: "var(--sunken)" }} /><span className="pulse-skel mt-2 block h-3 w-5/6 rounded" style={{ background: "var(--sunken)" }} /></div>
-        ) : !digest ? (
-          <div className="card py-8 text-center"><p className="text-[15px]" style={{ color: "var(--ink-2)" }}>The market pulse isn&rsquo;t available right now.</p></div>
-        ) : (
-          <div>
-            <article className="card p-5 sm:p-6" style={{ borderTop: "3px solid var(--lens-markets)" }}>
-              <p className="lensdot l-markets"><i /> Markets read <span className="font-mono text-[11px] font-normal" style={{ color: "var(--ink-3)" }}>· written from {digest.event_ids.length} {digest.event_ids.length === 1 ? "story" : "stories"}{stamp ? ` · ${stamp}` : ""}</span></p>
-              <h1 className="font-record mt-3 text-[26px] font-bold leading-[1.2] text-balance sm:text-[30px]" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>
-                {digest.headline}
-              </h1>
-              <div className="mt-4 flex max-w-[64ch] flex-col gap-4">
-                {digest.narrative.split(/\n{2,}/).map((para, i) => (
-                  <p key={i} className="text-[16px] leading-[1.7]" style={{ color: "var(--ink-2)" }}>{para}</p>
-                ))}
-              </div>
-            </article>
+          {loading ? (
+            <div className="grid gap-3 p-5" aria-busy="true" aria-label="Loading the market pulse" style={{ background: "var(--lens-markets-soft)", borderTop: "3px solid var(--lens-markets)", borderRadius: "0 0 var(--r-lg) var(--r-lg)" }}>
+              <span className="p-skel h-4 w-40" />
+              <span className="p-skel h-6 w-[85%]" />
+              <span className="p-skel h-3 w-full" />
+              <span className="p-skel h-3 w-[70%]" />
+            </div>
+          ) : !digest ? (
+            <EmptyState title="The market pulse isn’t available right now" />
+          ) : (
+            <>
+              <MarketDigest digest={digest} full />
 
-            {digest.movers.length > 0 && (
-              <section className="mt-8" aria-labelledby="movers-title">
-                <SectionHead id="movers-title" title="Movers" count={digest.movers.length} />
-                <ul className="card divide-y p-0" style={{ borderColor: "var(--line)" }}>
-                  {digest.movers.map((m) => (
-                    <li key={m.ticker} className="grid grid-cols-[104px_1fr] gap-x-4 px-4 py-3" style={{ borderColor: "var(--line)" }}>
-                      <Link href={tickerHref(m.ticker)} className="chip h-7 self-start px-2.5 font-mono text-[11.5px] l-markets" style={{ borderColor: "var(--lens-markets-soft)", background: "var(--lens-markets-soft)" }}>
-                        {m.ticker}
-                      </Link>
-                      <span className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>{m.note}</span>
-                    </li>
-                  ))}
-                </ul>
+              <section aria-labelledby="movers-title">
+                <SectionHead
+                  id="movers-title"
+                  title="Named in the reports"
+                  sub={`${movers.length} ${movers.length === 1 ? "ticker" : "tickers"} · from ${n} ${n === 1 ? "story" : "stories"}`}
+                />
+                {movers.length > 0 ? (
+                  <MoversList movers={movers} tickerHref={tickerHref} />
+                ) : (
+                  <p className="border-t pt-3" style={{ borderColor: "var(--line)", font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+                    Today&rsquo;s reading names no listed company.
+                  </p>
+                )}
               </section>
-            )}
 
-            {/* The record under the reading: every story the digest was written
-                from, so the page never shows a verdict alone. */}
-            {(digest.stories?.length ?? 0) > 0 && (
-              <section className="mt-8" aria-labelledby="from-title">
-                <SectionHead id="from-title" title="Written from" count={digest.stories!.length} hint="The stories the pulse was written from, most-corroborated first." />
-                <ol className="flex flex-col gap-3">
-                  {chartOrder(digest.stories!).map((it) => (
-                    <ChartRow key={it.id} item={it} />
-                  ))}
-                </ol>
-              </section>
-            )}
-          </div>
-        )}
+              {/* The record under the reading: every story the digest was written
+                  from (the API selects them from business and finance). */}
+              {stories.length > 0 && (
+                <section aria-labelledby="from-title">
+                  <SectionHead
+                    id="from-title"
+                    title="Business & Markets stories"
+                    sub={`${stories.length} ${stories.length === 1 ? "record" : "records"}`}
+                    hint="The stories the reading was written from, most-corroborated first."
+                  />
+                  <ol className="p-print mt-3 flex flex-col gap-3">
+                    {chartOrder(stories).map((it) => (
+                      <ChartRow key={it.id} item={it} />
+                    ))}
+                  </ol>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+        <aside className="grid min-w-0 content-start gap-6 lg:sticky lg:top-[calc(var(--topbar)+24px)] lg:self-start" aria-label="Your tickers">
+          <PulseRail session={session} named={digest ? movers.map((m) => m.ticker) : null} />
+        </aside>
       </div>
     </div>
   );

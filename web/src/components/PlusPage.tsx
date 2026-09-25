@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Dash } from "@/components/icons";
 import { Reveal } from "@/components/Reveal";
 import { SectionHead } from "@/components/SectionHead";
+import { Alert } from "@/components/ui";
 import { track } from "@/lib/analytics";
 import { fetchPlans, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
@@ -27,6 +28,7 @@ const FAQ: { q: string; a: string }[] = [
   { q: "What if I change my mind?", a: "A yearly or founding charge is refunded in full if you ask within 7 days — no questions. Monthly charges are not refunded; cancelling stops the next one." },
   { q: "Who charges me, and how?", a: "Razorpay processes the payment (UPI Autopay, cards, net banking). It is collected by Matryx Social Labs Private Limited on behalf of Prism Media Intelligence LLP until the LLP's own merchant account is live, so that is the name you may see on your statement." },
   { q: "Are the prices final?", a: "Yes. Every price on this page includes GST, and each charge comes with an invoice by email." },
+  { q: "What if a charge fails?", a: "Plus stays on for three days while Razorpay tries again, and we email you. If it still fails, Plus pauses and reading stays free." },
   { q: "What does Plus not change?", a: "Reading. Every record, source, quote, coverage split and clip stays free for everyone, with or without an account. Plus changes how much you can ask of it." },
 ];
 
@@ -101,7 +103,8 @@ export function PlusPage() {
   const [myPlan, setMyPlan] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("year");
   const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [declined, setDeclined] = useState<string | null>(null);
+  const [failed, setFailed] = useState<{ plan: string; message: string } | null>(null);
 
   const loadPlans = () => {
     setPlansFailed(false);
@@ -112,7 +115,8 @@ export function PlusPage() {
     track("Subscribe", { stage: "page", from: from ?? "direct" });
   }, [from]);
   useEffect(() => {
-    if (!session) return setMyPlan(null);
+    setMyPlan(null);
+    if (!session) return;
     fetchMe(session).then((m) => setMyPlan(m.plan ?? "free")).catch(() => setMyPlan("free"));
   }, [session]);
 
@@ -129,28 +133,30 @@ export function PlusPage() {
   const ready = !!plans?.checkout_ready;
   const offerEnds = plans?.offer_ends ? billingDay(plans.offer_ends, { long: true }) : null;
   const plusPlan = period === "year" ? "plus_yearly" : "plus_monthly";
+  const plusCta = period === "year" ? "Get Plus yearly" : "Get Plus monthly";
 
   async function buy(plan: string) {
     if (!session) return;
     setBusy(plan);
-    setNote(null);
+    setDeclined(null);
+    setFailed(null);
     try {
-      await subscribe(plan, session.token, session.email, (_kind, detail) => setNote(`${detail}. The sheet is still open — try UPI or another card.`));
+      await subscribe(plan, session.token, session.email, (_kind, detail) => setDeclined(detail));
       setMyPlan("plus");
       router.push(`/plus/welcome${from ? `?next=${encodeURIComponent(from.startsWith("/") ? from : "/feed")}` : ""}`);
     } catch (e) {
       const m = e instanceof Error ? e.message : "";
-      if (m !== "dismissed") setNote(m || "Payment did not go through.");
+      if (m !== "dismissed") setFailed({ plan, message: m || "Nothing was charged." });
     } finally {
       setBusy(null);
     }
   }
 
-  /** The one action a plan card carries, by who is looking. */
-  function Action({ plan, primary, label }: { plan: string; primary: boolean; label: string }) {
-    const cls = `p-btn p-btn--block ${primary ? "p-btn--primary" : "p-btn--secondary"}`;
+  /** The one action a plan card carries, by who is looking. Busy words replace the label. */
+  function Action({ plan, primary, label, cls: extra = "p-btn--block" }: { plan: string; primary: boolean; label: string; cls?: string }) {
+    const cls = `p-btn ${extra} ${primary ? "p-btn--primary" : "p-btn--secondary"}`;
     if (onPlus) return <StateBox>Your plan</StateBox>;
-    if (!plans) return <span className="p-skel h-11 w-full" aria-hidden />;
+    if (!plans || (session && myPlan === null)) return <button type="button" disabled className={cls}>Loading…</button>;
     if (!ready) return <StateBox dashed>Opens soon</StateBox>;
     if (!session) return <Link href="/signin?next=/plus" className={cls}>Sign in to continue</Link>;
     return (
@@ -160,33 +166,44 @@ export function PlusPage() {
     );
   }
 
-  const strip = ["Prism Plus", ...(plans?.offer ? ["Launch offer", offerEnds ? `until ${offerEnds}` : "first 1,000 readers"] : [])].join(" · ");
+  const offerBadge = plans?.offer ? `Launch offer · ${offerEnds ? `until ${offerEnds}` : "first 1,000 readers"}` : null;
+  // Founding memberships are sold only on the launch offer and only while seats remain
+  // (common/billing.prices): gone because they are taken is said; gone because the offer closed is left out.
+  const foundingGone = !founding && !!plans && plans.founding_left <= 0;
 
   return (
-    <div className="mx-auto w-full max-w-[1080px] px-[var(--gutter)] pb-24 pt-10 lg:pt-12">
+    <div className="mx-auto w-full max-w-[1120px] px-[var(--gutter)] pb-24 pt-5 lg:pb-16 lg:pt-12">
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <header>
-        <p className="p-count whitespace-normal uppercase">{strip}</p>
-        <h1 className="mt-2.5 text-balance lg:!text-[56px]" style={{ font: "var(--t-display-xl)", letterSpacing: "var(--track-display)" }}>Ask more of every story.</h1>
-        <p className="mt-3 max-w-[56ch]" style={{ font: "var(--t-body-l)", color: "var(--ink-2)" }}>
-          The evidence stays free for everyone. Plus is for the reader who asks more of it: answers drawn from the whole story, a hundred questions a day.
+      <header className="max-w-[720px]">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="p-eyebrow">Prism Plus</p>
+          {offerBadge && <span className="p-badge p-badge--accent">{offerBadge}</span>}
+        </div>
+        <h1 className="mt-2.5 text-balance [font:var(--t-display-l)] lg:[font:var(--t-display-xl)]" style={{ letterSpacing: "var(--track-display)" }}>Ask more of every story.</h1>
+        <p className="mt-3 max-w-[60ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
+          The record stays free for everyone. Plus is for the reader who asks more of it: answers drawn from the whole story, a hundred questions a day.
         </p>
-        <div className="mt-6 p-seg" role="tablist" aria-label="Billing period">
-          <button type="button" role="tab" aria-selected={period === "month"} onClick={() => setPeriod("month")}>Monthly</button>
-          <button type="button" role="tab" aria-selected={period === "year"} onClick={() => setPeriod("year")}>
-            Yearly{yearlySaving && yearlySaving > 0 ? <span style={{ font: "500 11px/1 var(--font-mono)", color: "var(--accent)" }}>save {rupees(yearlySaving)}</span> : null}
-          </button>
+        <div className="mt-6 flex flex-wrap items-center gap-3.5">
+          <div className="p-seg" role="tablist" aria-label="Billing period">
+            <button type="button" role="tab" aria-selected={period === "month"} onClick={() => setPeriod("month")}>Monthly</button>
+            <button type="button" role="tab" aria-selected={period === "year"} onClick={() => setPeriod("year")}>
+              Yearly{yearlySaving && yearlySaving > 0 ? <span style={{ font: "500 11px/1 var(--font-mono)", color: "var(--accent)" }}>save {rupees(yearlySaving)}</span> : null}
+            </button>
+          </div>
+          <span className="p-mono uppercase" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>Prices include GST</span>
         </div>
       </header>
 
       {plansFailed && (
-        <p className="p-alert p-alert--error mt-6">
-          <span>The plans could not be loaded. <button type="button" onClick={loadPlans} className="font-semibold underline underline-offset-4">Retry</button></span>
-        </p>
+        <div className="mt-6">
+          <Alert tone="error" title="The plans could not be loaded" action={<button type="button" onClick={loadPlans} className="p-btn p-btn--sm p-btn--secondary max-sm:min-h-[44px]">Try again</button>}>
+            Nothing on this page can be bought until they do.
+          </Alert>
+        </div>
       )}
 
       {/* ── Plans ─────────────────────────────────────────────────── */}
-      <section aria-label="Plans" className="mt-5 grid gap-3.5 lg:grid-cols-[1.15fr_1fr_1fr]">
+      <section aria-label="Plans" className={`mt-5 grid gap-3.5 ${founding || foundingGone || !plans ? "lg:grid-cols-[1.15fr_1fr_1fr]" : "lg:grid-cols-[1.15fr_1fr]"}`}>
         <Reveal className="min-w-0">
           <PlanColumn
             kind="plus"
@@ -194,7 +211,7 @@ export function PlusPage() {
             price={plus ? rupees(plus.amount_paise) : <span className="p-skel inline-block h-9 w-28 align-middle" aria-hidden />}
             per={period === "year" ? "/ year" : "/ month"}
             note={plus ? [period === "year" && perMonth ? `≈ ${rupees(perMonth)} a month, GST included.` : "GST included; cancel any time.", plans?.offer ? "The price you join at is yours for 12 months." : ""].join(" ").trim() : null}
-            action={<Action plan={plusPlan} primary label="Get Plus" />}
+            action={<Action plan={plusPlan} primary label={plusCta} />}
           >
             <Feature>Answers from the <b className="font-semibold">whole story</b> — every development&rsquo;s reports</Feature>
             <Feature><b className="font-semibold">{ASK.plus} questions a day</b> on any story</Feature>
@@ -211,7 +228,7 @@ export function PlusPage() {
             price="₹0"
             per="forever"
             note="No card, no trial clock."
-            action={session ? <StateBox>{onPlus ? "Included" : "Your plan"}</StateBox> : <Link href="/signin?next=/feed" className="p-btn p-btn--secondary p-btn--block">Sign in free</Link>}
+            action={session ? <StateBox>{onPlus ? "Included" : "Your plan"}</StateBox> : <Link href="/feed" className="p-btn p-btn--secondary p-btn--block">Keep reading free</Link>}
           >
             <Feature>Every record, source, verified quote, coverage count and clip, forever</Feature>
             <Feature><b className="font-semibold">{ASK.free} questions a day</b> with an account, {ASK.anon} without</Feature>
@@ -221,7 +238,7 @@ export function PlusPage() {
           </PlanColumn>
         </Reveal>
 
-        <Reveal className="min-w-0" delay={80}>
+        {(founding || foundingGone || !plans) && <Reveal className="min-w-0" delay={80}>
           {founding ? (
             <PlanColumn
               kind="founding"
@@ -229,7 +246,7 @@ export function PlusPage() {
               price={rupees(founding.amount_paise)}
               per="/ year"
               sub={`${plans!.founding_left} of ${FOUNDING_SEATS} seats · price locked 3 years`}
-              action={<Action plan="founding" primary={false} label="Become a founding member" />}
+              action={onPlus ? null : <Action plan="founding" primary={false} label="Become a founding member" />}
             >
               <Feature>Everything in Plus</Feature>
               <Feature>{rupees(founding.amount_paise)} a year, <b className="font-semibold">held for three years</b></Feature>
@@ -238,13 +255,27 @@ export function PlusPage() {
           ) : (
             <PlanColumn kind="founding" name="Founding member" soldOut note={plans ? "All seats are taken. Thank you." : null} />
           )}
-        </Reveal>
+        </Reveal>}
       </section>
 
-      {note && <p className="mt-4 text-[14px]" role="status" style={{ color: "var(--danger)" }}>{note}</p>}
+      {/* Razorpay draws the checkout; Prism says what went wrong and what to do. */}
+      {declined && (
+        <div className="mt-4">
+          <Alert tone="error" title="The payment did not go through">
+            {declined}. Nothing was charged; Razorpay&rsquo;s sheet is still open — try UPI or another card.
+          </Alert>
+        </div>
+      )}
+      {failed && (
+        <div className="mt-4">
+          <Alert tone="error" title="The payment did not go through" action={<button type="button" onClick={() => buy(failed.plan)} className="p-btn p-btn--sm p-btn--secondary max-sm:min-h-[44px]">Try again</button>}>
+            {failed.message}
+          </Alert>
+        </div>
+      )}
       {onPlus && (
         <p className="mt-5 text-[15px]" role="status">
-          You&rsquo;re on Plus. Manage it from <Link href="/you" className="p-link">your account</Link>.
+          You&rsquo;re on Plus. Manage it from <Link href="/account" className="p-link">your account</Link>.
         </p>
       )}
 
@@ -303,9 +334,11 @@ export function PlusPage() {
 
       {/* ── One more time ─────────────────────────────────────────── */}
       {!onPlus && (
-        <section className="mt-16 flex flex-col items-start gap-4 pt-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
-          <p style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>A hundred questions a day, from the whole story.</p>
-          <div className="w-full sm:w-auto sm:min-w-[280px]"><Action plan={plusPlan} primary label={plus ? `Get Plus · ${rupees(plus.amount_paise)} ${period === "year" ? "a year" : "a month"}` : "Get Plus"} /></div>
+        <section className="mt-16 flex flex-wrap items-center gap-4 pt-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
+          <p className="min-w-0 flex-[1_1_280px]" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>
+            {monthly && yearly ? `${rupees(yearly.amount_paise)} a year, or ${rupees(monthly.amount_paise)} a month.` : "A hundred questions a day, from the whole story."}
+          </p>
+          <div className="w-full sm:w-auto"><Action plan={plusPlan} primary label={plusCta} cls="p-btn--lg max-sm:w-full" /></div>
         </section>
       )}
     </div>

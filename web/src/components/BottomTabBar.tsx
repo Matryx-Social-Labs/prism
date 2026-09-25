@@ -23,12 +23,15 @@ const TABS: Tab[] = [
 const YOU_ROUTES = ["/you", "/account", "/interests"];
 const TODAY_ROUTES = ["/feed", "/sector"];
 const WATCH_ROUTES = ["/watchlist", "/pulse"];
-const SHOW_ON = ["/trending", "/search", ...TODAY_ROUTES, ...YOU_ROUTES, ...WATCH_ROUTES];
+const SHOW_ON = ["/search", ...TODAY_ROUTES, "/you", "/interests", ...WATCH_ROUTES];
+// A page with a back bar has no tab bar (the flow boards' chrome): a story arc
+// under Stories, and the account under You.
+const SHOW_EXACT = ["/trending"];
 
 export function BottomTabBar() {
   const pathname = usePathname();
   const under = (prefixes: string[]) => prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (!under(SHOW_ON)) return null;
+  if (!under(SHOW_ON) && !SHOW_EXACT.includes(pathname)) return null;
 
   const isActive = (href: string) => {
     if (href === "/feed") return under(TODAY_ROUTES);

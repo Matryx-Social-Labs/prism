@@ -15,18 +15,30 @@ const TICKER_STYLE: React.CSSProperties = {
   color: "var(--lens-markets)",
 };
 
-/** A ticker in mono on the Markets tint; a link when it has somewhere to go. */
-export function TickerChip({ symbol, href }: { symbol: string; href?: string }) {
-  if (!href) return <span className="p-tag-mono" style={TICKER_STYLE}>{symbol}</span>;
-  return <Link href={href} className="p-tag-mono" style={TICKER_STYLE}>{symbol}</Link>;
+/** A ticker in mono on the Markets tint; a link when it has somewhere to go (with a
+ *  ≥44px tap area, .p-hit). With `onToggle` it carries its Follow / Following button. */
+export function TickerChip({ symbol, href, following, onToggle, busy }: { symbol: string; href?: string; following?: boolean; onToggle?: () => void; busy?: boolean }) {
+  const chip = href
+    ? <Link href={href} className="p-tag-mono p-hit" style={TICKER_STYLE}>{symbol}</Link>
+    : <span className="p-tag-mono" style={TICKER_STYLE}>{symbol}</span>;
+  if (!onToggle) return chip;
+  return (
+    <span className="inline-flex items-center gap-2">
+      {chip}
+      <button type="button" className="p-btn p-btn--sm p-btn--secondary p-hit" aria-pressed={Boolean(following)} onClick={onToggle} disabled={busy} style={{ minHeight: 32 }}>
+        {following ? `Following ${symbol}` : `Follow ${symbol}`}
+      </button>
+    </span>
+  );
 }
 
-/** The day's markets reading, as the API wrote it: headline, the first paragraph,
- *  and what it was written from — a count and a time, both from the payload. */
-export function MarketDigest({ digest }: { digest: Digest }) {
+/** The day's markets reading, as the API wrote it: headline, the first paragraph
+ *  (every paragraph with `full`, on Market Pulse), and what it was written from —
+ *  a count and a time, both from the payload. */
+export function MarketDigest({ digest, full = false }: { digest: Digest; full?: boolean }) {
   const n = digest.event_ids.length;
   const prov = [`written from ${n} ${n === 1 ? "story" : "stories"}`, digest.generated_at ? `updated ${istTime(digest.generated_at)} IST` : null].filter(Boolean).join(" · ");
-  const lede = digest.narrative.split(/\n{2,}/)[0];
+  const paras = digest.narrative.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   return (
     <article
       className="grid gap-2.5 p-5"
@@ -37,8 +49,10 @@ export function MarketDigest({ digest }: { digest: Digest }) {
         <span className="p-count">{prov}</span>
       </div>
       <h2 className="text-balance" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>{digest.headline}</h2>
-      {/* The rest of the reading is one tap away on Market Pulse. */}
-      {lede && <p className="line-clamp-4" style={{ font: "var(--t-body)" }}>{lede}</p>}
+      {full
+        ? paras.map((p, i) => <p key={i} className="max-w-[64ch]" style={{ font: "var(--t-body)" }}>{p}</p>)
+        : /* The rest of the reading is one tap away on Market Pulse. */
+          paras[0] && <p className="line-clamp-4" style={{ font: "var(--t-body)" }}>{paras[0]}</p>}
     </article>
   );
 }

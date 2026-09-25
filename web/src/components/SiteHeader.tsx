@@ -8,20 +8,38 @@
 import { usePathname } from "next/navigation";
 import { Brand } from "@/components/Brand";
 import { HeaderNav } from "@/components/HeaderNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-// "/label" is a single-purpose task page opened from an unguessable link, often
-// by someone who does not use Prism at all; the product nav is an invitation to
-// leave in the middle of a judgement.
-const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you", "/account", "/interests", "/watchlist", "/story", "/label"];
+// On the phone these draw their own top: the masthead with the tab bar, or a back bar.
+const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you", "/account", "/interests", "/watchlist", "/story", "/entity", "/subject", "/corrections", "/sources", "/privacy", "/terms", "/refunds"];
 
-// The founders' admin is a tool with its own chrome (the sidebar, Design System v2 ·
-// AdminShell): no reader top bar over it, no reader footer under it.
-export const OWN_CHROME = ["/admin"];
+// Signing in and setting up a feed get the brand-only bar (Design System v2 ·
+// Accounts board): no nav to wander off through, no "Sign in" on the sign-in page.
+const BARE_ROUTES = ["/signin", "/auth", "/onboarding"];
+
+// Tools with their own chrome: the founders' admin (the sidebar, Design System v2 ·
+// AdminShell) and the labeller (its own bar: brand · Label · email). "/label" is a
+// single-purpose task page opened from an unguessable link, often by someone who
+// does not use Prism at all; the product nav is an invitation to leave in the
+// middle of a judgement. No reader top bar over them, no reader footer under them.
+export const OWN_CHROME = ["/admin", "/label"];
 
 export function SiteHeader() {
   const pathname = usePathname();
   if (OWN_CHROME.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
-  const isApp = APP_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const under = (routes: string[]) => routes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (under(BARE_ROUTES)) {
+    return (
+      <header className="glass sticky top-0 z-40 h-[var(--masthead)] border-b lg:h-[var(--topbar)]" style={{ borderColor: "var(--line)" }}>
+        <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-2 px-[var(--gutter)]">
+          <Brand size={22} />
+          <span className="flex-1" />
+          <ThemeToggle />
+        </div>
+      </header>
+    );
+  }
+  const isApp = under(APP_ROUTES);
   return (
     <header
       className={`${isApp ? "hidden lg:block" : ""} glass sticky top-0 z-40 border-b`}

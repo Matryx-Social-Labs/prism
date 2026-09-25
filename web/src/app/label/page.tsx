@@ -9,19 +9,22 @@
  * they said they read. Starting a batch hands over the same per-batch
  * credential a founder's invite link carries, so /label/<key> is unchanged.
  *
- * Design System v2 · labeller Workspace: the brand strip, "Your workspace" under
- * the section rule with the languages as its provenance line, then the
- * sections in components/label/Workspace. Everyone else — a stranger, an
- * applicant, a paused labeller — gets the same shell and the pitch.
+ * Design System v2 · Label flow board: signed out (the pitch, one button),
+ * apply (languages with their own names; Apply waits for one), applied and
+ * waiting (the guides open now, and only now), the workspace (what is waiting,
+ * counted; batches; each kind's standing in words; refusals in words), and the
+ * end states for a paused or removed labeller.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { ArrowRight } from "@/components/icons";
 import { SectionHead } from "@/components/SectionHead";
-import { LabelStrip } from "@/components/label/parts";
-import { ActiveWorkspace, Languages, Section } from "@/components/label/Workspace";
+import { Alert, Checkbox, TextField } from "@/components/ui";
+import { Column, EndScreen, LabelStrip, Lede, Small, Title } from "@/components/label/parts";
+import { ActiveWorkspace, Section, explain, languageNames, type Explained } from "@/components/label/Workspace";
 import {
   KIND_QUESTION,
   LEARNABLE,
@@ -37,6 +40,13 @@ import {
 } from "@/lib/labeller";
 import { useSession } from "@/lib/session";
 
+const STEPS = [
+  "Apply with the languages you read well",
+  "A founder reads your application",
+  "Read a short guide, practise, pass a test",
+  "Work through batches, one question at a time",
+];
+
 export default function LabellerWorkspace() {
   const session = useSession();
   const router = useRouter();
@@ -46,18 +56,20 @@ export default function LabellerWorkspace() {
   const [me, setMe] = useState<LabellerMe | null>(null);
   const [batches, setBatches] = useState<LabellerBatches | null>(null);
   const [editing, setEditing] = useState(false);
-  const [error, setError] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [refused, setRefused] = useState<Explained | null>(null);
 
   useEffect(() => setMounted(true), []);
 
   const load = useCallback(async () => {
     if (!session) return;
+    setLoadFailed(false);
     try {
       const who = await fetchLabellerMe(session);
       setMe(who);
       setBatches(who.status === "active" ? await fetchLabellerBatches(session) : null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load your workspace");
+    } catch {
+      setLoadFailed(true);
     }
   }, [session]);
 
@@ -67,175 +79,250 @@ export default function LabellerWorkspace() {
 
   // Every way into a task page: a work batch, a practice round, a test.
   const go = async (open: () => Promise<string>, failed: string) => {
-    setError("");
+    setRefused(null);
     try {
       router.push(await open());
     } catch (e) {
-      setError(e instanceof Error ? e.message : failed);
+      setRefused(explain(e instanceof Error ? e.message : failed));
     }
   };
   const start = (key: string) => session && go(() => startBatch(session, key), "Could not start that batch");
   const practise = (kind: string) => session && go(() => startPractice(session, kind), "Could not start practice");
   const test = (kind: string) => session && go(() => startTest(session, kind), "Could not start the test");
+  const apply = async (languages: string[], note: string) => {
+    if (!session) return;
+    await applyAsLabeller(session, languages, note);
+    setEditing(false);
+    await load();
+  };
 
   if (!mounted) return <Shell />;
 
-  const active = !!session && me?.status === "active";
-
-  return (
-    <Shell>
-      {active ? (
-        <div className="p-sechead">
-          <div className="min-w-0">
-            <h1 className="p-sechead__title">Your workspace</h1>
-            {!editing && me && <Languages me={me} onEdit={() => setEditing(true)} />}
-          </div>
-        </div>
-      ) : (
+  if (!session) {
+    return (
+      <Shell>
+        <Title big>Label for Prism</Title>
+        <Lede>
+          Prism groups reports from many outlets and languages into one record per story. Labellers check that work by
+          hand. Each task is one question, about a minute, in the languages you read.
+        </Lede>
+        <ol className="grid" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
+          {STEPS.map((step, i) => (
+            <li key={step} className="grid grid-cols-[32px_minmax(0,1fr)] border-b py-3" style={{ borderColor: "var(--line)", font: "var(--t-body-s)" }}>
+              <span className="p-mono text-[12px]" style={{ color: "var(--ink)" }}>{String(i + 1).padStart(2, "0")}</span>
+              {step}
+            </li>
+          ))}
+        </ol>
         <div>
-          <SectionHead id="h-label" as="h1" title="Label for Prism" />
-          <p className="max-w-[60ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-            Every quality check in Prism is measured against answers people give here: whether two reports are the same
-            happening, who really said a quote, whether a quote is the speaker&apos;s words or an outlet&apos;s translation.
-            Each task is one question, and takes about a minute.
-          </p>
-        </div>
-      )}
-      {error && (
-        <p role="alert" className="p-alert p-alert--error">
-          {error}
-        </p>
-      )}
-
-      {!session && (
-        <div>
-          <Link href="/signin?next=/label" className="p-btn p-btn--primary">
+          <Link href="/signin?next=/label" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">
             Sign in to apply
           </Link>
         </div>
-      )}
+        <Small>The guides open after you sign in and apply.</Small>
+      </Shell>
+    );
+  }
 
-      {session && me && (me.status === "none" || editing) && (
-        <ApplyForm
-          me={me}
-          onDone={async (languages, note) => {
-            setError("");
-            try {
-              await applyAsLabeller(session, languages, note);
-              setEditing(false);
-              await load();
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Could not send your application");
-            }
-          }}
-        />
-      )}
+  const email = session.email;
 
-      {session && me && me.status === "applied" && !editing && (
-        <Section title="Your application is in">
-          <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-            A founder reads every application. Once you are approved, the batches in your languages appear here.
-          </p>
-          <div className="mt-3">
-            <Languages me={me} onEdit={() => setEditing(true)} />
-          </div>
-        </Section>
-      )}
+  if (loadFailed) {
+    return (
+      <Shell email={email}>
+        <Alert
+          tone="error"
+          title="Your workspace could not load"
+          action={<button type="button" className="p-btn p-btn--secondary p-btn--sm min-h-11 lg:min-h-9" onClick={() => void load()}>Try again</button>}
+        >
+          Prism did not answer. Nothing you&apos;ve done is lost.
+        </Alert>
+      </Shell>
+    );
+  }
 
-      {session && me && (me.status === "paused" || me.status === "removed") && (
-        <Section title={me.status === "paused" ? "Your labelling is paused" : "Your labelling has ended"}>
-          <p style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-            Write to <a className="p-link" href="mailto:hello@readprism.news">hello@readprism.news</a> and we will
-            tell you why.
-          </p>
-        </Section>
-      )}
+  if (!me) {
+    return (
+      <Shell email={email}>
+        <div className="grid gap-3" role="status" aria-busy="true">
+          <span className="p-skel h-[34px] w-[60%]" />
+          <span className="p-skel h-3.5 w-[40%]" />
+          <span className="p-skel h-24" />
+          <span className="sr-only">Loading your workspace…</span>
+        </div>
+      </Shell>
+    );
+  }
 
-      {active && batches && !editing && (
-        <ActiveWorkspace batches={batches} onStart={start} onPractise={practise} onTest={test} />
-      )}
+  const guides = READS_GUIDES.includes(me.status) && (
+    <Section title="Learn the tasks">
+      <ul>
+        {LEARNABLE.map((kind) => (
+          <li key={kind} className="border-b" style={{ borderColor: "var(--line)" }}>
+            <Link href={`/label/learn/${kind}`} className="flex min-h-[52px] items-center gap-2.5" style={{ color: "var(--ink)", font: "var(--t-title-s)" }}>
+              <span className="min-w-0 flex-1">{KIND_QUESTION[kind]}</span>
+              <ArrowRight size={16} />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
 
-      {/* For anyone who has applied, approved or not — waiting for approval is
-          a good time to read them — and for nobody else: the guides are how we
-          judge the work, so a stranger does not get them (founder, 2026-09-23;
-          the API enforces the same rule, this only stops offering the links). */}
-      {me && READS_GUIDES.includes(me.status) && (
-        <Section title="Learn the tasks">
-          <ul>
-            {LEARNABLE.map((kind) => (
-              <li key={kind} className="border-t" style={{ borderColor: "var(--line)" }}>
-                <Link href={`/label/learn/${kind}`} className="p-link flex min-h-11 items-center text-[15px]">
-                  {KIND_QUESTION[kind]}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-      {session && me?.status === "none" && (
-        <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
-          A short guide to each kind of task opens once you have applied.
+  if (me.status === "none" || (editing && me.status === "applied")) {
+    return (
+      <Shell email={email}>
+        <ApplyForm me={me} onApply={apply} onCancel={editing ? () => setEditing(false) : undefined} />
+        {me.status === "none" && <Small>A short guide to each kind of task opens once you have applied.</Small>}
+      </Shell>
+    );
+  }
+
+  if (me.status === "applied") {
+    return (
+      <Shell email={email}>
+        <Title>Your application is in</Title>
+        <Lede>A founder reads every application. Once you are approved, the batches in your languages appear here.</Lede>
+        <p style={{ font: "var(--t-body-s)" }}>
+          You read: {languageNames(me, true).join(", ")} · <ChangeButton onClick={() => setEditing(true)} />
         </p>
+        {guides}
+      </Shell>
+    );
+  }
+
+  if (me.status === "paused" || me.status === "removed") {
+    return (
+      <Shell email={email}>
+        <EndScreen title={me.status === "paused" ? "Your labelling is paused" : "Your labelling has ended"} action={null}>
+          <Lede>
+            {me.status === "removed" && "Your answers are kept. "}
+            Write to <a className="p-link" href="mailto:hello@readprism.news">hello@readprism.news</a> and we will tell you why.
+          </Lede>
+        </EndScreen>
+        {guides}
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell email={email} wide>
+      <SectionHead
+        id="h-label"
+        as="h1"
+        title="Your workspace"
+        sub={`You read: ${languageNames(me).join(", ")}`}
+        right={!editing && <ChangeButton onClick={() => setEditing(true)} />}
+      />
+      {refused && (
+        <Alert
+          tone={refused.tone}
+          title={refused.title}
+          action={
+            refused.action === "languages" ? (
+              <button type="button" className="p-btn p-btn--secondary p-btn--sm min-h-11 lg:min-h-9" onClick={() => { setRefused(null); setEditing(true); }}>
+                Change languages
+              </button>
+            ) : refused.action === "learn" ? (
+              <a href="#learn" className="p-btn p-btn--secondary p-btn--sm min-h-11 lg:min-h-9">Take the test</a>
+            ) : undefined
+          }
+        >
+          {refused.body}
+        </Alert>
       )}
+      {editing && <ApplyForm me={me} onApply={apply} onCancel={() => setEditing(false)} />}
+      {batches && !editing && <ActiveWorkspace batches={batches} onStart={start} onPractise={practise} onTest={test} />}
+      {!editing && guides}
     </Shell>
   );
 }
 
-function ApplyForm({ me, onDone }: { me: LabellerMe; onDone: (languages: string[], note: string) => Promise<void> }) {
+function ChangeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="p-link text-[13.5px]" style={{ padding: "12px 4px", margin: "-12px -4px" }} onClick={onClick}>
+      Change
+    </button>
+  );
+}
+
+function ApplyForm({
+  me, onApply, onCancel,
+}: {
+  me: LabellerMe;
+  onApply: (languages: string[], note: string) => Promise<void>;
+  onCancel?: () => void;
+}) {
   const [chosen, setChosen] = useState<string[]>(me.languages_read);
   const [note, setNote] = useState(me.note);
   const [sending, setSending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const first = me.status === "none";
   const toggle = (code: string) =>
     setChosen((c) => (c.includes(code) ? c.filter((x) => x !== code) : [...c, code]));
   return (
     <form
-      className="grid gap-6"
+      className="grid gap-5"
       onSubmit={async (e) => {
         e.preventDefault();
         setSending(true);
-        await onDone(chosen, note);
-        setSending(false);
+        setFailed(false);
+        try {
+          await onApply(chosen, note);
+        } catch {
+          setFailed(true);
+        } finally {
+          setSending(false);
+        }
       }}
     >
-      <fieldset>
-        <legend className="p-field__label" style={{ fontSize: 17 }}>Which languages do you read well?</legend>
-        <p className="p-field__hint mt-1">You will only be given tasks in these. Most tasks also need English.</p>
-        <div className="mt-2 grid grid-cols-2 gap-x-6 sm:grid-cols-3">
-          {me.languages_available.map((l) => (
-            <label key={l.code} className="p-check items-center">
-              <input type="checkbox" checked={chosen.includes(l.code)} onChange={() => toggle(l.code)} />
-              <span>{l.name}</span>
-              {l.native !== l.name && <span style={{ color: "var(--ink-3)" }}>{l.native}</span>}
-            </label>
-          ))}
-        </div>
+      <div className="grid gap-1.5">
+        <Title as={me.status === "active" ? "h2" : "h1"}>Which languages do you read well?</Title>
+        <Lede>You will only be given tasks in these. Most tasks also need English.</Lede>
+      </div>
+      {failed && (
+        <Alert tone="error" title={first ? "Your application did not send" : "Your languages did not save"}>
+          Your answers are still here; try again.
+        </Alert>
+      )}
+      <fieldset className="grid grid-cols-1 gap-x-4 border-t sm:grid-cols-2" style={{ borderColor: "var(--line)" }}>
+        <legend className="sr-only">Languages</legend>
+        {me.languages_available.map((l) => (
+          <div key={l.code} className="border-b" style={{ borderColor: "var(--line)" }}>
+            <Checkbox checked={chosen.includes(l.code)} onChange={() => toggle(l.code)} native={l.native !== l.name ? l.native : null}>
+              {l.name}
+            </Checkbox>
+          </div>
+        ))}
       </fieldset>
-      <label className="p-field">
-        <span className="p-field__label">Anything we should know? (optional)</span>
-        <textarea
-          className="p-input py-3"
-          rows={3}
-          maxLength={500}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </label>
-      <div>
-        <button type="submit" className="p-btn p-btn--primary" disabled={sending || chosen.length === 0}>
-          {me.status === "none" ? "Apply" : "Save my languages"}
-        </button>
+      <TextField multiline rows={3} maxLength={500} label="Anything we should know? (optional)" value={note} onChange={setNote} />
+      <div className="grid gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto"
+            disabled={sending || chosen.length === 0}
+            aria-busy={sending || undefined}
+          >
+            {sending ? (first ? "Applying…" : "Saving…") : first ? "Apply" : "Save my languages"}
+          </button>
+          {onCancel && (
+            <button type="button" className="p-btn p-btn--ghost p-btn--lg w-full lg:w-auto" onClick={onCancel} disabled={sending}>
+              Cancel
+            </button>
+          )}
+        </div>
+        {chosen.length === 0 && <Small>Tick at least one language to {first ? "apply" : "save"}.</Small>}
       </div>
     </form>
   );
 }
 
-function Shell({ children }: { children?: React.ReactNode }) {
-  // The task page's measure: a focused surface, not a reading river. The
-  // layout already provides <main>; this is the column.
+function Shell({ children, email, wide = false }: { children?: React.ReactNode; email?: string; wide?: boolean }) {
+  // The layout already provides <main>; this is the label bar and the column.
   return (
-    <div className="mx-auto grid min-h-dvh w-full max-w-[720px] content-start gap-7 px-4 pb-12 pt-6">
-      <LabelStrip />
-      {children}
+    <div className="flex min-h-dvh w-full flex-col">
+      <LabelStrip email={email} />
+      <Column wide={wide}>{children}</Column>
     </div>
   );
 }

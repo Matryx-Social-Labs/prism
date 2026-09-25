@@ -12,7 +12,7 @@ import { Bar, BarChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Toolt
 
 import { SeriesKey, TipBox } from "./ChartPanel";
 import { SERIES, compact, dayLabel, days, figure } from "./format";
-import { AXIS_TICK, CHART_H, CHART_MARGIN, uncountedSpan } from "./TrendChart";
+import { AXIS_TICK, CHART_H, CHART_MARGIN, UNCOUNTED_KEY, hatchDefs, uncountedSpan, useHatchId } from "./TrendChart";
 
 const OTHER = "Other";
 
@@ -56,10 +56,12 @@ export function StackedBars({
     ...Object.fromEntries(keys.map((k) => [k, drawn[k][i]])),
   }));
   const gap = uncountedSpan(points);
+  const hatch = useHatchId();
   return (
     <div>
       <ResponsiveContainer width="100%" height={CHART_H}>
         <BarChart data={points} margin={CHART_MARGIN} barCategoryGap={2} maxBarSize={24} accessibilityLayer>
+          {hatchDefs(hatch)}
           <CartesianGrid vertical={false} stroke="var(--viz-grid)" />
           <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: "var(--viz-grid)" }} interval="preserveStartEnd" minTickGap={28} />
           <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={40} allowDecimals={false} tickFormatter={(v: number) => compact(v)} />
@@ -67,9 +69,8 @@ export function StackedBars({
             <ReferenceArea
               x1={gap[0]}
               x2={gap[1]}
-              fill="var(--viz-uncounted)"
+              fill={`url(#${hatch})`}
               fillOpacity={1}
-              label={{ value: "not counted", position: "insideTop", fill: "var(--ink-3)", fontSize: 11 }}
             />
           )}
           <Tooltip
@@ -94,7 +95,7 @@ export function StackedBars({
           ))}
         </BarChart>
       </ResponsiveContainer>
-      <SeriesKey items={keys.map((k, i) => ({ label: name(k), color: SERIES[i], total: compact(total(k)) }))} />
+      <SeriesKey items={[...keys.map((k, i) => ({ label: name(k), color: SERIES[i], total: compact(total(k)) })), ...(gap ? [UNCOUNTED_KEY] : [])]} />
     </div>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { SectionHead } from "@/components/SectionHead";
 import { ChartRow } from "@/components/ChartRow";
 import { Masthead } from "@/components/Masthead";
 import { SectorStrip } from "@/components/SectorStrip";
-import { EmptyState } from "@/components/tabs/EmptyState";
+import { Alert, EmptyState, TextField } from "@/components/ui";
 import { fetchTrending, searchEvents, type FeedItem } from "@/lib/api";
 import { chartOrder } from "@/lib/chart";
 import { loadProfile } from "@/lib/profile";
@@ -13,14 +14,20 @@ import { sectorGroup } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
 /**
- * Search (Design System v2 · reader-phone PhoneSearch): the query field first,
- * a mono strip under it that says what can be searched or counts what came
- * back, then results on the story row grammar, most-corroborated first; the
- * subject nav filters them in place. The start screen offers only what is in
- * the news now — real names off the live stories — and nothing when that list
- * is empty. A failed request says so, in its own line — never "no matches"
- * for an error.
+ * Search (Design System v2 · Reading board, flow 04): the query field first;
+ * before typing, one line on what is searched and the names in the news now
+ * (real names off the live stories — nothing when that list is empty, never a
+ * canned query); then "Records", counted, on the story row grammar,
+ * most-corroborated first, which the subject chips filter in place; a query
+ * with nothing behind it says so. The board draws a "People and organisations"
+ * section first: /api/v1/search returns records only, so it is not drawn. A
+ * failed request says so, in its own line — never "no matches" for an error.
  */
+const FIELD_ID = "search-q";
+/** What is searched, on the start screen: the API matches headline and summary text. */
+const START = "Search the headline and summary of every record: a story, a person, a place, a ticker or a CVE id.";
+/** The API's page (api/routes/search.py, limit 30): a full page may hide more, so it prints "30+". */
+const SEARCH_CAP = 30;
 function SearchInner() {
   const params = useSearchParams();
   const router = useRouter();
@@ -39,12 +46,10 @@ function SearchInner() {
   // Real entities off the live trending cast: a hardcoded list would go stale
   // and, on a product that sells provenance, would be quietly dishonest.
   const [entities, setEntities] = useState<string[]>([]);
-  const box = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     // Focus without the browser's scroll-into-view: autoFocus slid the query
     // and the masthead under the sticky header on load.
-    box.current?.focus({ preventScroll: true });
+    document.getElementById(FIELD_ID)?.focus({ preventScroll: true });
     setPrimaryLang(loadProfile()?.languages?.[0] ?? "en");
     fetchTrending({ limit: 6 })
       .then((s) => setEntities([...new Set(s.flatMap((x) => x.cast ?? []))].slice(0, 6)))
@@ -101,69 +106,72 @@ function SearchInner() {
     return chartOrder(rows);
   }, [results, group]);
 
-  const count = searched && !loading && !failed ? `${shown.length} ${shown.length === 1 ? "result" : "results"}` : null;
+  const more = !group && results.length >= SEARCH_CAP ? "+" : "";
+  const count = searched && !loading && !failed ? `${shown.length}${more} ${shown.length === 1 && !more ? "result" : "results"}` : null;
   const outlets = new Set(shown.flatMap((i) => (i.outlets ?? []).map((o) => o.publisher)));
   const strip = count ? `${count}${outlets.size ? ` · ${outlets.size} ${outlets.size === 1 ? "outlet" : "outlets"}` : ""}` : null;
 
   return (
-    <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
+    <div className="mx-auto max-w-[720px] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
       <Masthead dateline="Search" />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6">
-        <SectorStrip active={group} onPick={setGroup} allHref="/search" allLabel="All stories" responsiveRail />
-        <div className="grid min-w-0 content-start gap-2.5 pt-4 lg:pt-0">
-          {/* Design System v2 · TextField, type=search, with its Clear button. */}
-          <div className="relative">
-            <input
-              ref={box}
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && setQ("")}
-              placeholder="Search stories, people, places"
-              aria-label="Search stories, entities and sources"
-              className={`p-input [&::-webkit-search-cancel-button]:appearance-none ${q ? "pr-20" : ""}`}
-            />
-            {q && (
-              <div className="absolute inset-y-0.5 right-1.5 flex items-center">
-                <button type="button" onClick={() => setQ("")} className="p-btn p-btn--ghost p-btn--sm" aria-label="Clear search">Clear</button>
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 pt-4 lg:pt-8">
+        {/* A text field in the searchbox role, so the browser adds no second clear control beside Clear. */}
+        <TextField
+          id={FIELD_ID}
+          type="text"
+          role="searchbox"
+          inputMode="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          label="Search the record"
+          value={q}
+          onChange={setQ}
+          onKeyDown={(e) => e.key === "Escape" && setQ("")}
+          placeholder="A story, a person, a place"
+          trailing={q ? <button type="button" onClick={() => setQ("")} className="p-btn p-btn--ghost p-btn--sm" aria-label="Clear search">Clear</button> : undefined}
+        />
+
+        {term.length < 2 && !loading && (
+          <div className="grid gap-3">
+            <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>{START}</p>
+            {entities.length > 0 && (
+              <div className="grid gap-2.5">
+                <p className="p-eyebrow">In the news now</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {entities.map((e) => (
+                    <button key={e} type="button" onClick={() => setQ(e)} className="p-chip">{e}</button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-          <p className="p-count">{strip ?? "Stories · people · tickers · CVE ids"}</p>
+        )}
 
-          {term.length < 2 && !loading && entities.length > 0 && (
-            <div className="mt-2 grid gap-2.5">
-              <p className="p-eyebrow">In the news now</p>
-              <div className="flex flex-wrap gap-1.5">
-                {entities.map((e) => (
-                  <button key={e} type="button" onClick={() => setQ(e)} className="p-chip">{e}</button>
-                ))}
-              </div>
-            </div>
+        <section aria-label="Results" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+          {loading && <p className="p-count py-6" role="status">Searching…</p>}
+          {!loading && failed && (
+            <Alert tone="error">Search is unreachable right now: check your connection and try again.</Alert>
           )}
-
-          <section aria-label="Results" className="pt-1">
-            {loading && <p className="p-count py-6">Searching…</p>}
-            {!loading && failed && (
-              <div className="p-alert p-alert--error" role="status">
-                <p>Search is unreachable right now: check your connection and try again.</p>
-              </div>
-            )}
-            {!loading && !failed && searched && results.length === 0 && (
-              <EmptyState title={<>Nothing matches &ldquo;{term}&rdquo;</>}>
-                Search reads the headline and summary of every record, newest first.
-              </EmptyState>
-            )}
-            {!loading && !failed && searched && results.length > 0 && shown.length === 0 && (
-              <EmptyState title={<>None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.</>} />
-            )}
-            {shown.length > 0 && (
-              <ol className="p-print grid gap-2.5">
-                {shown.map((item) => <ChartRow key={item.id} item={item} primaryLang={primaryLang} />)}
-              </ol>
-            )}
-          </section>
-        </div>
+          {!loading && !failed && searched && results.length === 0 && (
+            <EmptyState title={<>No records match &ldquo;{term}&rdquo;</>}>
+              Search reads the headline and summary of every record. Try fewer words or a name.
+            </EmptyState>
+          )}
+          {!loading && !failed && searched && results.length > 0 && (
+            <>
+              <SectionHead id="records-title" title="Records" sub={strip ?? undefined} />
+              <SectorStrip active={group} onPick={setGroup} allHref="/search" allLabel="All stories" />
+              {shown.length === 0 && (
+                <EmptyState title={<>None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.</>} />
+              )}
+            </>
+          )}
+          {shown.length > 0 && (
+            <ol className="p-print grid gap-2.5">
+              {shown.map((item) => <ChartRow key={item.id} item={item} primaryLang={primaryLang} />)}
+            </ol>
+          )}
+        </section>
       </div>
     </div>
   );

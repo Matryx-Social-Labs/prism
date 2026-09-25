@@ -14,8 +14,9 @@ const fetchTaxonomy = vi.hoisted(() => vi.fn());
 const fetchProfessions = vi.hoisted(() => vi.fn());
 const fetchLenses = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ push: vi.fn() }));
+const setProfile = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/session", () => ({ useSession, fetchLanguages, setProfile: vi.fn() }));
+vi.mock("@/lib/session", () => ({ useSession, fetchLanguages, setProfile }));
 vi.mock("@/lib/api", () => ({ fetchRegions, fetchTaxonomy, fetchProfessions, fetchLenses }));
 vi.mock("next/navigation", () => ({ useRouter: () => router, useSearchParams: () => new URLSearchParams("") }));
 
@@ -26,6 +27,7 @@ beforeEach(() => {
   localStorage.clear();
   useSession.mockReset().mockReturnValue(null);
   router.push.mockReset();
+  setProfile.mockReset().mockResolvedValue(undefined);
   fetchRegions.mockReset().mockResolvedValue([{ code: "IN-KL", name: "Kerala", covered: true }]);
   fetchTaxonomy.mockReset().mockResolvedValue([
     { slug: "finance", name: "Finance", subsectors: [{ slug: "markets", name: "Stock market" }] },
@@ -44,19 +46,22 @@ beforeEach(() => {
 describe("Onboarding — three steps of the reservation form", () => {
   it("collects state, then profession, then subjects, and saves them as one profile", async () => {
     render(<OnboardingPage />);
-    // The states arrive from /regions after mount: wait for the option, not just the select.
-    await screen.findByRole("option", { name: "Kerala" });
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Your state" }), "IN-KL");
+    // Covered states arrive from /regions after mount, as chips.
+    await userEvent.click(await screen.findByRole("button", { name: "Kerala" }));
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Your profession" }), "trader");
-    expect(screen.getByText(/Reads as/)).toHaveTextContent("Finance / Trader");
+    await screen.findByRole("option", { name: "Trader" });
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Profession" }), "trader");
+    expect(screen.getByText(/Reads as/)).toHaveTextContent("Reads as Markets");
+    expect(screen.getByText(/ticked for you in the next step/)).toHaveTextContent("Business & Markets is ticked for you in the next step.");
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     // Pre-set from the profession, then narrowed to a beat and widened by a subject.
-    expect(await screen.findByRole("button", { name: /Business & Markets/ })).toHaveAttribute("aria-pressed", "true");
+    const biz = await screen.findByRole("switch", { name: /Business & Markets/ });
+    expect(biz).toHaveAttribute("aria-checked", "true");
+    expect(biz).toHaveTextContent("Pre-set from your profession");
     await userEvent.click(screen.getByRole("button", { name: "Stock market" }));
-    await userEvent.click(screen.getByRole("button", { name: /^Sports/ }));
+    await userEvent.click(screen.getByRole("switch", { name: /^Sports/ }));
     await userEvent.click(screen.getByRole("button", { name: "Build my feed" }));
 
     expect(saved()).toEqual({ lens: "markets", region: "IN", state: "IN-KL", interests: ["finance:markets", "sports"], languages: ["en"] });
@@ -67,6 +72,38 @@ describe("Onboarding — three steps of the reservation form", () => {
     render(<OnboardingPage />);
     await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
     expect(saved()).toBeNull();
+    expect(router.push).toHaveBeenCalledWith("/feed");
+  });
+
+  it("goes back to an earlier step from the indicator, keeping the answer", async () => {
+    render(<OnboardingPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Kerala" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: /Where you are/ }));
+    expect(screen.getByRole("button", { name: "Kerala" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  // Signed in, the account is saved too. When that fails the reader stays with
+  // their answers and a way on — the old code swallowed the failure silently.
+  it("keeps the answers and says so when the account could not be saved, then saves on a retry", async () => {
+    useSession.mockReturnValue({ userId: "u", email: "asha@example.in" });
+    setProfile.mockRejectedValueOnce(new Error("down"));
+    render(<OnboardingPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Your name" }), "Asha");
+    await screen.findByRole("option", { name: "Trader" });
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Profession" }), "trader");
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("button", { name: "Build my feed" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Build my feed" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your account could not be saved");
+    expect(router.push).not.toHaveBeenCalled();
+    expect(saved()?.lens).toBe("markets");
+
+    await userEvent.click(screen.getByRole("button", { name: "Build my feed" }));
+    expect(setProfile).toHaveBeenLastCalledWith(expect.anything(), { name: "Asha", profession: "trader", state: null, languages: ["en"], consent: true });
     expect(router.push).toHaveBeenCalledWith("/feed");
   });
 });

@@ -42,12 +42,12 @@ describe("batches", () => {
     expect(hindi.getByText("Tasks answered").parentElement).toHaveTextContent("3 of 10");
     expect(hindi.getByText("Tasks with a language gate").parentElement).toHaveTextContent("6 of 10");
 
-    await userEvent.click(screen.getByRole("tab", { name: /Closed/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /Closed/ }));
     expect(screen.queryByText("Hindi pairs")).not.toBeInTheDocument();
     expect(screen.getByText("Kannada pairs")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Work · 1 of 2" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("tab", { name: /All/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /All/ }));
     await userEvent.type(screen.getByRole("searchbox"), "hi-20");
     expect(screen.getByText("Hindi pairs")).toBeInTheDocument();
     expect(screen.queryByText("Kannada pairs")).not.toBeInTheDocument();

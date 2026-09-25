@@ -11,9 +11,8 @@
 // cached per (family, weight, text) for the life of the server process, which
 // covers the repeat scrapes that follow a share.
 
-// The paper of record's grounds and inks (DESIGN.md § Colour, light): a share
-// card is the record's header at poster scale.
-// Design System v2 light tokens (design/tokens.json): share cards are light only.
+// Design System v2 light tokens (design/tokens.json): share cards are light,
+// except the site card, which keeps the ink ground (outside/ShareCards.html v3).
 const DESIGN = {
   ground: "#F7F6F2",
   surface: "#FFFFFF",
@@ -24,26 +23,41 @@ const DESIGN = {
   lineStrong: "#8E8B82",
   accent: "#0B57D0",
   coverage: { national: "#1E3A6E", intl: "#1583A8", regional: "#C4470F", wire: "#767872" },
+  // The ink ground and the slot colours that hold 4.5:1 on it (dark tokens).
+  inkGround: "#111317",
+  onInk: "#F2F1ED",
+  onInkMuted: "#C3C6CC",
+  coverageOnInk: { national: "#A9B6F5", intl: "#2FA8C9", regional: "#F0914F", wire: "#767872" },
 } as const;
 
 export const OG_COLORS = DESIGN;
 
-// Script → the Noto family that covers it. Ordered by reach in the launch
-// markets; the first hit wins, and a headline that mixes scripts is rare enough
-// that one extra family is the right trade against fetching seven.
-const SCRIPTS: [RegExp, string][] = [
-  [/[ऀ-ॿ]/, "Noto Sans Devanagari"], // Hindi, Marathi
-  [/[஀-௿]/, "Noto Sans Tamil"],
-  [/[ఀ-౿]/, "Noto Sans Telugu"],
-  [/[ঀ-৿]/, "Noto Sans Bengali"],
-  [/[઀-૿]/, "Noto Sans Gujarati"],
-  [/[ಀ-೿]/, "Noto Sans Kannada"],
-  [/[ഀ-ൿ]/, "Noto Sans Malayalam"],
+// Script → the record voice's Noto Serif and the reading voice's Anek for it
+// (tokens/typography.css --font-record / --font-read). Ordered by reach in the
+// launch markets; the first hit wins, and a card that mixes two Indic scripts
+// is rare enough that one extra pair is the right trade against fetching nine.
+const SCRIPTS: [RegExp, string, string][] = [
+  [/[\u0900-\u097F]/, "Noto Serif Devanagari", "Anek Devanagari"], // Hindi, Marathi
+  [/[\u0B80-\u0BFF]/, "Noto Serif Tamil", "Anek Tamil"],
+  [/[\u0C00-\u0C7F]/, "Noto Serif Telugu", "Anek Telugu"],
+  [/[\u0980-\u09FF]/, "Noto Serif Bengali", "Anek Bangla"],
+  [/[\u0A80-\u0AFF]/, "Noto Serif Gujarati", "Anek Gujarati"],
+  [/[\u0C80-\u0CFF]/, "Noto Serif Kannada", "Anek Kannada"],
+  [/[\u0D00-\u0D7F]/, "Noto Serif Malayalam", "Anek Malayalam"],
+  [/[\u0A00-\u0A7F]/, "Noto Serif Gurmukhi", "Anek Gurmukhi"],
+  [/[\u0B00-\u0B7F]/, "Noto Serif Oriya", "Anek Odia"],
 ];
 
-/** The Noto family needed for this text, or null when it is plain Latin. */
+const scriptOf = (text: string) => SCRIPTS.find(([re]) => re.test(text));
+
+/** The record voice's family for this text's script, or null when it is plain Latin. */
 export function indicFamilyFor(text: string): string | null {
-  return SCRIPTS.find(([re]) => re.test(text))?.[1] ?? null;
+  return scriptOf(text)?.[1] ?? null;
+}
+
+/** The reading voice's family for this text's script, or null when it is plain Latin. */
+export function indicBodyFamilyFor(text: string): string | null {
+  return scriptOf(text)?.[2] ?? null;
 }
 
 const cache = new Map<string, ArrayBuffer | null>();
@@ -76,13 +90,13 @@ async function fetchFont(family: string, weight: number, text: string, italic = 
   return data;
 }
 
-type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 600 | 700; style: "normal" | "italic" };
+type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 600; style: "normal" | "italic" };
 
 /**
  * Fonts for one card, the three voices of Design System v2: Newsreader for the
  * headline (and its italic for a verbatim quote), Anek Latin for the reading text,
- * Geist Mono for provenance. An Indic family is added only when the text
- * needs one.
+ * Geist Mono for provenance (600 for the counts). An Indic script adds its Noto
+ * Serif (record) and Anek (reading) only when the text needs them.
  *
  * Pass EVERY string the card draws. The subset contains exactly the glyphs you
  * ask for, so anything omitted silently disappears from the render — the first
@@ -94,20 +108,23 @@ type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 600 | 700; style:
  */
 export async function ogFonts(...text: string[]): Promise<OgFont[]> {
   const joined = text.join(" ");
-  const all = [...new Set((joined + joined.toUpperCase() + joined.toLowerCase() + "0123456789·—–’“”").split(""))].join("");
-  const indic = indicFamilyFor(all);
-  const wanted: [string, number, boolean][] = [
+  const all = [...new Set((joined + joined.toUpperCase() + joined.toLowerCase() + "0123456789·—–’“”[]").split(""))].join("");
+  const script = scriptOf(all);
+  const wanted: [string, 400 | 600, boolean][] = [
     ["Newsreader", 600, false],
     ["Newsreader", 400, true],
     ["Anek Latin", 400, false],
     ["Anek Latin", 600, false],
     ["Geist Mono", 400, false],
-    ...(indic ? ([[indic, 700, false]] as [string, number, boolean][]) : []),
+    ["Geist Mono", 600, false],
+    ...(script
+      ? ([[script[1], 600, false], [script[1], 400, false], [script[2], 400, false], [script[2], 600, false]] as [string, 400 | 600, boolean][])
+      : []),
   ];
   const loaded = await Promise.all(
     wanted.map(async ([family, weight, italic]) => {
       const data = await fetchFont(family, weight, all, italic);
-      return data ? ({ name: family, data, weight: (weight as 400 | 600 | 700), style: italic ? "italic" : "normal" } as OgFont) : null;
+      return data ? ({ name: family, data, weight, style: italic ? "italic" : "normal" } as OgFont) : null;
     }),
   );
   return loaded.filter((f): f is OgFont => f !== null);
@@ -115,12 +132,11 @@ export async function ogFonts(...text: string[]): Promise<OgFont[]> {
 
 /** font-family stack for the record voice, Indic first so it wins for those glyphs. */
 export function displayStack(text: string): string {
-  const indic = indicFamilyFor(text);
-  return [indic, "Newsreader", "Georgia", "serif"].filter(Boolean).join(", ");
+  return [indicFamilyFor(text), "Newsreader", "Georgia", "serif"].filter(Boolean).join(", ");
 }
+/** font-family stack for the reading voice, Indic first. */
 export function bodyStack(text: string): string {
-  const indic = indicFamilyFor(text);
-  return [indic, "Anek Latin", "sans-serif"].filter(Boolean).join(", ");
+  return [indicBodyFamilyFor(text), "Anek Latin", "sans-serif"].filter(Boolean).join(", ");
 }
 
 export const OG_MONO = "Geist Mono, monospace";

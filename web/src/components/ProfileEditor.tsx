@@ -1,12 +1,13 @@
 "use client";
 
-// The profile's shape and the pieces shared by /you and onboarding that are
-// not fields of the reservation form (components/ReservationForm.tsx): the
-// picks codec (and its toggles) and the state select. Picks: { [sector]: null (whole sector) |
+// The pieces /you and onboarding share: the picks codec (and its toggles), the
+// state select, and the six subjects as toggle rows. Picks: { [sector]: null (whole sector) |
 // string[] (subsectors) } in the pipeline's ten sectors.
 
 import { useEffect, useState } from "react";
-import { fetchRegions, fetchTaxonomy, type RegionState, type TaxonomySector } from "@/lib/api";
+import { SelectField, ToggleRow } from "@/components/ui";
+import { fetchProfessions, fetchRegions, fetchTaxonomy, type ProfessionGroup, type RegionState, type TaxonomySector } from "@/lib/api";
+import { SECTOR_GROUPS, type SectorGroup } from "@/lib/sectors";
 
 export type Picks = Record<string, string[] | null>;
 
@@ -61,50 +62,76 @@ export function useTaxonomy(): TaxonomySector[] {
   return taxonomy;
 }
 
-export function StateSelect({ value, onChange, id }: { value: string; onChange: (code: string) => void; /** For a visible <label htmlFor>. */ id?: string }) {
-  const [states, setStates] = useState<RegionState[]>([]);
+/** The states from /regions. A down API is an empty list, never an unhandled rejection. */
+/** The professions, grouped, from the API; empty until they arrive (or if they cannot). */
+export function useProfessionGroups(): ProfessionGroup[] {
+  const [groups, setGroups] = useState<ProfessionGroup[]>([]);
   useEffect(() => {
-    // .catch matters as much here as on useTaxonomy above: without it a down
-    // /api/v1/regions is an unhandled rejection AND the dropdown silently shows
-    // nothing but its disabled placeholder, with no hint that anything failed.
-    fetchRegions()
-      .then(setStates)
-      .catch(() => setStates([]));
+    fetchProfessions().then(setGroups).catch(() => setGroups([]));
   }, []);
-  // Covered states (we have a local edition) first and marked, then the rest.
-  const covered = states.filter((s) => s.covered);
-  const rest = states.filter((s) => !s.covered);
-  return (
-    <select
-      id={id}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      // The language select beside it is labelled; this one had no accessible
-      // name at all, so a screen reader announced an unlabelled combobox.
-      aria-label="Your state"
-      className="input"
-      style={{ color: value ? "var(--ink)" : "var(--ink-3)" }}
-    >
-      <option value="" disabled>
-        Select your state…
-      </option>
-      {covered.length > 0 && (
-        <optgroup label="Local coverage available">
-          {covered.map((s) => (
-            <option key={s.code} value={s.code} style={{ color: "var(--ink)" }}>
-              {s.name}
-            </option>
-          ))}
-        </optgroup>
-      )}
-      <optgroup label="All states & UTs">
-        {rest.map((s) => (
-          <option key={s.code} value={s.code} style={{ color: "var(--ink)" }}>
-            {s.name}
-          </option>
-        ))}
-      </optgroup>
-    </select>
-  );
+  return groups;
 }
 
+export function useRegions(): RegionState[] {
+  const [states, setStates] = useState<RegionState[]>([]);
+  useEffect(() => {
+    fetchRegions().then(setStates).catch(() => setStates([]));
+  }, []);
+  return states;
+}
+
+const byName = (a: RegionState, b: RegionState) => a.name.localeCompare(b.name);
+
+/** Every state and UT in one labelled select, "Not set" first so an empty value never shows as a state. */
+export function StateSelect({ value, onChange, id, label = "State" }: { value: string; onChange: (code: string) => void; id?: string; label?: string }) {
+  const list = [...useRegions()].sort(byName);
+  return <SelectField id={id} label={label} value={value} onChange={onChange} options={[{ value: "", label: "Not set" }, ...list.map((s) => ({ value: s.code, label: s.name }))]} />;
+}
+
+/** The subjects a picks object follows, with how many of their beats are narrowed ("Business & Markets · 2 topics"). */
+export function followedSubjects(picks: Picks): { group: SectorGroup; topics: number }[] {
+  return SECTOR_GROUPS.filter((g) => groupOn(picks, g.sectors)).map((g) => ({
+    group: g,
+    topics: g.sectors.reduce((n, s) => n + (Array.isArray(picks[s]) ? (picks[s] as string[]).length : 0), 0),
+  }));
+}
+
+/**
+ * The six subjects as ToggleRows (Design System v2): turning one on follows every
+ * sector it groups and opens its beats as chips; a chip narrows to that beat.
+ * `preset` marks the subjects a profession ticked ("Pre-set from your profession").
+ */
+export function SubjectToggles({ taxonomy, picks, onPicks, preset = [] }: { taxonomy: TaxonomySector[]; picks: Picks; onPicks: (p: Picks) => void; preset?: readonly string[] }) {
+  return (
+    <div className="border-b" style={{ borderColor: "var(--line)" }}>
+      {SECTOR_GROUPS.map((g) => {
+        const subs = g.sectors.flatMap((s) => (taxonomy.find((t) => t.slug === s)?.subsectors ?? []).map((sub) => ({ sector: s, ...sub })));
+        return (
+          <ToggleRow
+            key={g.slug}
+            label={g.name}
+            sub={preset.includes(g.slug) ? "Pre-set from your profession" : undefined}
+            on={groupOn(picks, g.sectors)}
+            onChange={() => onPicks(toggleGroup(picks, g.sectors))}
+          >
+            {subs.length > 0 &&
+              subs.map((sub) => {
+                const cur = picks[sub.sector];
+                return (
+                  <button
+                    key={`${sub.sector}:${sub.slug}`}
+                    type="button"
+                    className="p-chip"
+                    aria-pressed={Array.isArray(cur) && cur.includes(sub.slug)}
+                    onClick={() => onPicks(toggleSub(picks, sub.sector, sub.slug))}
+                  >
+                    {sub.name}
+                  </button>
+                );
+              })}
+          </ToggleRow>
+        );
+      })}
+    </div>
+  );
+}

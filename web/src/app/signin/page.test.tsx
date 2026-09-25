@@ -27,9 +27,15 @@ beforeEach(() => {
 });
 
 describe("Sign in — sending the link", () => {
-  it("cannot be submitted without an email", () => {
+  it("sends nothing without a usable address, and says what is wrong in words", async () => {
     render(<SignInPage />);
-    expect(submitButton()).toBeDisabled();
+    await userEvent.click(submitButton());
+    expect(screen.getByText("Enter your email address.")).toBeInTheDocument();
+    await userEvent.type(emailField(), "r.k@example");
+    await userEvent.click(submitButton());
+    expect(screen.getByText("That address is missing its ending, like .com or .in.")).toBeInTheDocument();
+    expect(emailField()).toHaveAttribute("aria-invalid", "true");
+    expect(requestMagicLink).not.toHaveBeenCalled();
   });
 
   it("asks for a link for the address the reader entered", async () => {
@@ -53,7 +59,7 @@ describe("Sign in — sending the link", () => {
     expect(requestMagicLink).toHaveBeenCalledTimes(1);
 
     await act(async () => deliver());
-    expect(await screen.findByText("Check your inbox.")).toBeInTheDocument();
+    expect(await screen.findByText("Check your inbox")).toBeInTheDocument();
   });
 });
 
@@ -62,10 +68,40 @@ describe("Sign in — confirmation", () => {
     render(<SignInPage />);
     await submit();
 
-    expect(await screen.findByText("Check your inbox.")).toBeInTheDocument();
+    expect(await screen.findByText("Check your inbox")).toBeInTheDocument();
     expect(screen.getByText(EMAIL)).toBeInTheDocument();
     // The form is gone — no second send, no confusion about whether it worked.
     expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Sign in — link sent", () => {
+  // The API silently drops a second request inside 30 seconds, so "Send it
+  // again" must not promise a link before then.
+  it("holds Send it again for the server's 30-second cooldown, then sends another", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<SignInPage />);
+      await submit();
+      const again = await screen.findByRole("button", { name: /Send it again/ });
+      expect(again).toBeDisabled();
+      expect(again).toHaveTextContent("0:30");
+      // One tick a second, each scheduled after the last renders.
+      for (let i = 0; i < 30; i++) await act(async () => { vi.advanceTimersByTime(1000); });
+      expect(again).toBeEnabled();
+      await userEvent.click(again);
+      expect(requestMagicLink).toHaveBeenCalledTimes(2);
+      expect(await screen.findByText(/Another link is on its way/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("goes back to the form, address kept, to use a different email", async () => {
+    render(<SignInPage />);
+    await submit();
+    await userEvent.click(await screen.findByRole("button", { name: "Use a different email" }));
+    expect(emailField()).toHaveValue(EMAIL);
   });
 });
 
@@ -75,8 +111,9 @@ describe("Sign in — failure", () => {
     render(<SignInPage />);
     await submit();
 
-    expect(await screen.findByText("Too many sign-in attempts. Try in an hour.")).toBeInTheDocument();
-    expect(screen.queryByText("Check your inbox.")).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("The link could not be sent");
+    expect(screen.getByText("Too many sign-in attempts. Try in an hour.")).toBeInTheDocument();
+    expect(screen.queryByText("Check your inbox")).not.toBeInTheDocument();
     expect(emailField()).toHaveValue(EMAIL);
     expect(submitButton()).toBeEnabled();
   });
@@ -92,7 +129,7 @@ describe("Sign in — failure", () => {
     await userEvent.click(submitButton());
 
     expect(requestMagicLink).toHaveBeenCalledTimes(2);
-    expect(await screen.findByText("Check your inbox.")).toBeInTheDocument();
+    expect(await screen.findByText("Check your inbox")).toBeInTheDocument();
   });
 });
 

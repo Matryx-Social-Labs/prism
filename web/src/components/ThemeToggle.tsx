@@ -12,8 +12,12 @@ function systemPrefersDark(): boolean {
 export function ThemeToggle() {
   const [mode, setMode] = useState<Mode>(null);
 
+  // Re-read when the theme setting on You changes it (it fires "prism-theme").
   useEffect(() => {
-    setMode((localStorage.getItem("prism.theme") as Mode) ?? null);
+    const read = () => setMode((localStorage.getItem("prism.theme") as Mode) ?? null);
+    read();
+    window.addEventListener("prism-theme", read);
+    return () => window.removeEventListener("prism-theme", read);
   }, []);
 
   function toggle() {

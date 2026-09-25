@@ -23,9 +23,9 @@ beforeEach(() => {
 describe("UpgradeSheet", () => {
   it("says what happened in counted words and sends a stranger to sign in with the way back", async () => {
     render(<UpgradeSheet open onClose={() => {}} reason="ask-limit" used={10} limit={10} />);
-    expect(screen.getByRole("dialog", { name: "You’ve asked today’s 10." })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Keep asking with an account" })).toBeInTheDocument();
     expect(screen.getByText("10 of 10 today")).toBeInTheDocument();
-    const cta = await screen.findByRole("link", { name: /Sign in to get Plus · ₹149 a month/ });
+    const cta = await screen.findByRole("link", { name: "Sign in to get Plus" });
     expect(cta).toHaveAttribute("href", "/signin?next=%2Fplus%3Ffrom%3Dask-limit");
     expect(screen.getByRole("link", { name: "All plans →" })).toHaveAttribute("href", "/plus?from=ask-limit");
   });
@@ -52,12 +52,26 @@ describe("UpgradeSheet", () => {
   });
 
   it("opens from Ask's limit note for a free account at its cap", async () => {
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
     let cb: AskCallbacks | undefined;
     askQuestion.mockImplementation(async (_id, _q, _s, callbacks: AskCallbacks) => { cb = callbacks; });
     render(<AskPanel eventId="e1" sourceCount={3} suggestedQuestions={[]} open onOpenChange={() => {}} launcher={false} />);
     await userEvent.type(screen.getByPlaceholderText(/ask anything/i), "why?{Enter}");
     act(() => cb!.onError("question limit reached", { status: 429, used: 10, limit: 10, plus_helps: true }));
     await userEvent.click(await screen.findByRole("button", { name: "Plus is 100 a day →" }));
-    expect(screen.getByRole("dialog", { name: "You’ve asked today’s 10." })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Ask more of this story" })).toBeInTheDocument();
+    expect(screen.getByText("10 of 10 today")).toBeInTheDocument();
+  });
+
+  it("a declined payment is said inside the sheet, and the purchase waits for the next try", async () => {
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.subscribe.mockImplementation(async (_p: string, _t: string, _e: string, onEvent?: (k: string, d: string) => void) => {
+      onEvent?.("payment_failed", "Card declined");
+      await new Promise(() => {});
+    });
+    render(<UpgradeSheet open onClose={() => {}} reason="ask-limit" used={10} limit={10} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Get Plus · ₹149 a month/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/The payment did not go through.*Card declined\. Nothing was charged/);
+    expect(screen.getByRole("button", { name: "Opening…" })).toBeDisabled();
   });
 });

@@ -49,7 +49,7 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
     return (
       <div>
         <StoryTimeline story={{ developments: story.developments, cast: [] }} mode="related" />
-        <a href={`/trending/${story.canonical_slug ?? slug}`} className="mt-2.5 inline-flex min-h-[44px] items-center text-[14.5px] font-semibold hover:underline" style={{ color: "var(--accent)", textUnderlineOffset: 4 }}>
+        <a href={`/trending/${story.canonical_slug ?? slug}`} className="p-link mt-2.5 inline-flex min-h-[44px] items-center text-[14.5px]">
           Open this coverage group →
         </a>
       </div>
@@ -62,13 +62,13 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
     <div>
       <RouteMap tree={story.branches} developments={story.developments} currentId={currentId} compact />
       <details className="group mt-2 border-t" style={{ borderColor: "var(--line)" }}>
-        <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-[13.5px] font-semibold" style={{ color: "var(--ink-2)" }}>
+        <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2" style={{ font: "600 13.5px/1.3 var(--font-read)", color: "var(--ink-2)" }}>
           <ChevronDown className="transition-transform group-open:rotate-180" />
           All developments
         </summary>
         <BranchTree tree={story.branches} developments={story.developments} currentId={currentId} />
       </details>
-      <a href={`/trending/${story.canonical_slug ?? slug}`} className="inline-flex min-h-[44px] items-center text-[14.5px] font-semibold hover:underline" style={{ color: "var(--accent)", textUnderlineOffset: 4 }}>
+      <a href={`/trending/${story.canonical_slug ?? slug}`} className="p-link inline-flex min-h-[44px] items-center text-[14.5px]">
         The whole story →
       </a>
     </div>

@@ -11,24 +11,22 @@ import { shortDate } from "@/lib/dateline";
 export function RelatedRoutes({ related }: { related: RelatedStory[] }) {
   if (!related.length) return null;
   return (
-    <div>
-      <ul>
-        {related.map((r) => {
-          const how = [
-            r.causal ? "linked by a causal note" : null,
-            r.shared_cast.length ? `shares ${r.shared_cast.slice(0, 3).join(" · ")}` : null,
-          ].filter(Boolean).join(" · ");
-          return (
-            <li key={r.slug} className="rule-live py-2.5">
-              <Link href={`/trending/${r.slug}`} className="text-[15px] leading-[1.4] underline-offset-4 hover:underline">{r.label}</Link>
-              <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ink-faint)" }}>
-                {how} · {r.developments} related {r.developments === 1 ? "event" : "events"} ·{" "}
-                {r.velocity > 0 ? <span style={{ color: "var(--ink)" }}>moving</span> : r.last_updated_at ? `quiet since ${shortDate(r.last_updated_at)}` : "quiet"}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <ul>
+      {related.map((r) => {
+        const how = [
+          r.causal ? "linked by a causal note" : null,
+          r.shared_cast.length ? `shares ${r.shared_cast.slice(0, 3).join(" · ")}` : null,
+        ].filter(Boolean).join(" · ");
+        return (
+          <li key={r.slug} className="grid gap-1 border-t py-3" style={{ borderColor: "var(--line)" }}>
+            <Link href={`/trending/${r.slug}`} className="underline-offset-4 hover:underline" style={{ font: "var(--t-title-s)", color: "var(--ink)" }}>{r.label}</Link>
+            <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+              {how} · {r.developments} related {r.developments === 1 ? "event" : "events"} ·{" "}
+              {r.velocity > 0 ? <span style={{ color: "var(--ink)", fontWeight: 600 }}>moving</span> : r.last_updated_at ? `quiet since ${shortDate(r.last_updated_at)}` : "quiet"}
+            </p>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

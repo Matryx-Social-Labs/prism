@@ -7,11 +7,15 @@
  * hand into a Python file. This page is how it grows: a shareable link, a first
  * name, and a stack of one-question screens.
  *
- * Design System v2 · labeller Task: a sticky task header (the way back, the batch,
- * this labeller's count), the question as the eyebrow, the task, and a sticky
- * answer footer. Every kind of task — story, claim, quote rendering, brief line —
- * uses the same parts (components/label/parts). Selection and verdicts are rule
- * weight, a filled mark and a word, never colour alone; mono is provenance only.
+ * Design System v2 · Label flow board: a sticky task header (the way back, the
+ * batch, which question this is), the question as the eyebrow, the material, and
+ * the answers — in a bar at the thumb on a phone, beside the material with their
+ * keys on desktop. Every kind of task — story, claim, quote rendering, brief line
+ * — sits in the same frame (components/label/parts.TaskFrame). The guide before
+ * the first task, the named-invite greeting, the self-join form and every end
+ * state stand alone under the label bar, each with a way back to the workspace.
+ * Selection and verdicts are rule weight, a filled mark and a word, never colour
+ * alone; mono is provenance only.
  */
 
 import Link from "next/link";
@@ -24,18 +28,22 @@ import {
   joinLabelBatch,
   postLabelAnswer,
   type LabelBatch,
-  type LabelClaim,
   type LabelFeedback,
   type LabelGuide,
   type LabelResult,
   type LabelTask,
 } from "@/lib/api";
-import { GuidePrimer, HowToDecide } from "@/components/label/GuideView";
-import { AnswerButtons, LabelStrip, QuoteInContext, TaskHeader } from "@/components/label/parts";
+import { Alert, TextField } from "@/components/ui";
+import { GuideFailed, GuideLoading, GuidePrimer } from "@/components/label/GuideView";
+import {
+  BackToWorkspace, Column, EndScreen, LabelStrip, Lede, Small, TaskHeader, Title, type Answer,
+} from "@/components/label/parts";
 import { DoneScreen, PracticeFeedback, RoundResult } from "@/components/label/rounds";
+import { ClaimTask } from "@/components/label/ClaimTask";
 import { QuoteRenderingTask } from "@/components/label/QuoteRenderingTask";
 import { BriefLineTask } from "@/components/label/BriefLineTask";
 import { StoryTask } from "@/components/label/StoryTask";
+import { KIND_QUESTION } from "@/lib/labeller";
 
 const WHO_KEY = "prism.labeller";
 // Per batch, because one person may be invited to several and each carries its own
@@ -46,81 +54,7 @@ const TOKEN_KEY = (batch: string) => `prism.label.token.${batch}`;
 // the claim task, and the two ask for opposite kinds of judgement.
 const PRIMER_KEY = (batch: string) => `prism.label.primer.${batch}`;
 
-type Verdict = "yes" | "no" | "unsure" | "skip";
-
-/** The claim task: a quote, where it sits in the article, and who the extractor
- *  says said it.
- *
- *  THE VERBATIM CHECK CANNOT DECIDE THIS. A sentence can be copied exactly from
- *  the article and still be put in the wrong mouth — the quote matches, the
- *  attribution is a lie, and nothing downstream can tell. That is why a person
- *  reads it.
- *
- *  The quote is shown INSIDE its surrounding sentences rather than alone,
- *  because the attribution usually lives in the words either side of it ("said
- *  the minister", "according to Kaspersky"). Shown alone the question would be
- *  unanswerable and the labeller would be guessing. */
-function ClaimTask({
-  claim, position, saving, onAnswer, decide,
-}: {
-  claim: LabelClaim;
-  position: number;
-  saving: boolean;
-  onAnswer: (verdict: Verdict) => void;
-  decide?: LabelGuide["decide"];
-}) {
-  return (
-    <>
-      <h1 className="p-eyebrow">Who said this?</h1>
-      <div className="p-card grid gap-1.5">
-        <h2 style={{ font: "var(--t-title)", textWrap: "pretty", overflowWrap: "anywhere" }}>{claim.title}</h2>
-        <p className="p-count">{claim.source}</p>
-      </div>
-
-      <p style={{ font: "var(--t-body)" }}>
-        Does this article attribute the highlighted words to <strong>{claim.speaker}</strong>?
-      </p>
-
-      {claim.lead ? (
-        <div className="grid gap-1">
-          <h2 className="p-eyebrow">How the article opens</h2>
-          <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>{claim.lead}…</p>
-        </div>
-      ) : null}
-
-      <QuoteInContext before={claim.context_before} quote={claim.quote_text} after={claim.context_after} />
-
-      {claim.article_text ? (
-        <details>
-          <summary className="flex min-h-11 cursor-pointer list-none items-center text-[14px] font-semibold [&::-webkit-details-marker]:hidden" style={{ color: "var(--accent)" }}>
-            Read the whole article
-          </summary>
-          <p className="max-h-[420px] overflow-y-auto whitespace-pre-line" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
-            {claim.article_text}
-          </p>
-        </details>
-      ) : null}
-
-      {/* Open on the FIRST question only. A claims labeller arrives with an
-          invite token, which skips the landing screen where the story flow
-          shows its guide open — so collapsed here meant the guide was never put
-          in front of anyone. The point of it is being read BEFORE the first
-          judgement, not after a wrong one. */}
-      {decide && <HowToDecide blocks={decide.blocks} closing={decide.closing} open={position === 0} />}
-
-      <AnswerButtons
-        yes={`Yes — ${claim.speaker.slice(0, 24)} said it`}
-        no="No — someone else, or nobody"
-        cantRead="Can't read this"
-        saving={saving}
-        onYes={() => onAnswer("yes")}
-        onNo={() => onAnswer("no")}
-        onUnsure={() => onAnswer("unsure")}
-        onCantRead={() => onAnswer("skip")}
-      />
-    </>
-  );
-}
+type State = "loading" | "ready" | "done" | "closed" | "result" | "requalify" | "blocked" | "error";
 
 export default function LabelPage({ params }: { params: Promise<{ key: string }> }) {
   const [batchKey, setBatchKey] = useState("");
@@ -139,12 +73,18 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   const [guideFailed, setGuideFailed] = useState(false);
   const [guideTry, setGuideTry] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [state, setState] = useState<"loading" | "ready" | "done" | "closed" | "result" | "requalify" | "error">("loading");
+  const [state, setState] = useState<State>("loading");
   // Practice only: the answer to the question just answered, shown until "Next".
   const [feedback, setFeedback] = useState<LabelFeedback | null>(null);
   // Practice or test: the score, once every question in the round is answered.
   const [result, setResult] = useState<LabelResult | null>(null);
   const [saving, setSaving] = useState(false);
+  // Which answer is being saved: that button says so.
+  const [pending, setPending] = useState<Answer | null>(null);
+  // Arrived this visit on a founder's named link (/label/<key>#token): greeted
+  // by name before the first question.
+  const [invited, setInvited] = useState(false);
+  const [greeted, setGreeted] = useState(false);
   const startedAt = useRef<number>(Date.now());
 
   useEffect(() => {
@@ -173,6 +113,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         window.localStorage.setItem(TOKEN_KEY(batchKey), invited);
         window.history.replaceState(null, "", window.location.pathname);
         setToken(invited);
+        setInvited(true);
       }
       try {
         setPrimed(window.localStorage.getItem(PRIMER_KEY(batchKey)) === "1");
@@ -236,7 +177,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
     } catch (e) {
       // 403 on a work batch: this account no longer holds the kind (live
       // checks withdrew it) or was paused — a reason to go back, not a glitch.
-      setState(e instanceof Error && e.message === "403" ? "requalify" : "error");
+      setState(e instanceof Error && e.message === "403" ? "blocked" : "error");
     }
   }, [batchKey, token]);
 
@@ -271,7 +212,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       } catch (e) {
         // The same reading as load(): a 403 here means the kind was withdrawn
         // or the labeller paused between fetching this task and answering it.
-        setState(e instanceof Error && e.message === "403" ? "requalify" : "error");
+        setState(e instanceof Error && e.message === "403" ? "blocked" : "error");
       } finally {
         setSaving(false);
       }
@@ -296,7 +237,8 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   // control — a window-wide Enter used to cancel "Yes" and file "No", and file
   // the ticked rows for a focused "Not sure" (2026-09-24). A candidate row is
   // the exception: Enter there submits, rather than unticking what was ticked.
-  const candidateTask = state === "ready" && !!task && !task.claim && !task.rendering && !task.line && primed !== false && !feedback;
+  const greeting = invited && !greeted && state === "ready";
+  const candidateTask = state === "ready" && !!task && !task.claim && !task.rendering && !task.line && primed !== false && !feedback && !greeting;
   useEffect(() => {
     if (!candidateTask || !task) return;
     const onKey = (ev: KeyboardEvent) => {
@@ -306,7 +248,10 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
       if (ev.key === "Enter") {
         const control = target?.closest("button, a, summary");
         if (control && !control.hasAttribute("data-candidate")) return;
+        // Yes waits for a tick: with nothing ticked, Enter is not "None".
+        if (picked.size === 0) return;
         ev.preventDefault();
+        setPending("yes");
         void submit(false);
         return;
       }
@@ -318,28 +263,35 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [candidateTask, task, submit, toggle]);
+  }, [candidateTask, task, picked, submit, toggle]);
 
-  const answer = (verdict: Verdict) => void submit(verdict === "unsure", verdict === "skip", verdict === "yes");
+
+  const answer = (a: Answer) => {
+    setPending(a);
+    void submit(a === "unsure", a === "cant", a === "yes");
+  };
+  // The tick tasks: "yes" files the ticked rows, "no" is an explicit None.
+  const answerStory = (a: Answer) => {
+    setPending(a);
+    void submit(a === "unsure", a === "cant", false, a === "no");
+  };
 
   if (!token) {
     return (
-      <Shell padded>
-        <LabelStrip />
-        <h1 className="mt-8" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>
-          Help us teach Prism what one story is
-        </h1>
-        <p className="mt-3 max-w-[52ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
+      <Screen>
+        <Title>Help us teach Prism what one story is</Title>
+        <Lede>
           You&apos;ll see a headline, then a few others from around the same time. Tick the
           ones covering the <strong style={{ color: "var(--ink)" }}>same unfolding story</strong>. It takes about a minute
-          each, and you can stop whenever you like.
-        </p>
+          each, you can stop whenever you like, and no account is needed.
+        </Lede>
         <form
-          className="mt-8 flex max-w-[480px] flex-wrap items-end gap-3"
+          className="grid gap-4"
           onSubmit={async (e) => {
             e.preventDefault();
             const name = draftWho.trim();
             if (!name) return;
+            setJoinError("");
             try {
               // The credential is minted here, once. The name is only a caption —
               // two labellers may share one and stay separate identities.
@@ -360,95 +312,112 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
             }
           }}
         >
-          <label className="p-field min-w-0 flex-[1_1_220px]">
-            <span className="p-field__label">Your first name</span>
-            <input
-              value={draftWho}
-              onChange={(e) => setDraftWho(e.target.value)}
-              maxLength={60}
-              autoComplete="given-name"
-              className="p-input"
-            />
-          </label>
-          <button type="submit" className="p-btn p-btn--primary" style={{ minHeight: 48 }}>
-            Start
-          </button>
+          <TextField
+            label="Your first name"
+            hint="Your name is only used to remember where you got to."
+            value={draftWho}
+            onChange={setDraftWho}
+            maxLength={60}
+            autoComplete="given-name"
+          />
+          {joinError && <Alert tone="error">{joinError}</Alert>}
+          <div>
+            <button type="submit" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto" disabled={!draftWho.trim()}>
+              Start
+            </button>
+          </div>
         </form>
-        {joinError && (
-          <p role="alert" className="p-field__error mt-3">
-            {joinError}
-          </p>
-        )}
-        <p className="mt-3" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
-          Your name is only used to remember where you got to.
-        </p>
-        {/* No guide here any more: this screen is reached by anyone holding the
-            batch link, before they have a credential, and the guide goes only
-            to a credential (founder, 2026-09-23). It is the first thing shown
-            once they have joined. */}
-      </Shell>
+        {/* No guide here: this screen is reached by anyone holding the batch
+            link, before they have a credential, and the guide goes only to a
+            credential (founder, 2026-09-23). It is the first thing shown once
+            they have joined. */}
+      </Screen>
     );
   }
 
-  // The end of a batch and the end of a round stand alone, with their own way back.
+  // The end of a batch, of a round, or of being let in: each stands alone, with
+  // its own way back.
   if (state === "done") {
     return (
-      <Shell padded>
-        <DoneScreen total={batch?.total ?? 0} who={who} />
-      </Shell>
+      <Screen>
+        <DoneScreen total={batch?.total ?? 0} batch={batch?.name} who={who} />
+      </Screen>
     );
   }
   if (state === "result" && result) {
     return (
-      <Shell padded>
-        <RoundResult result={result} />
-      </Shell>
+      <Screen>
+        <RoundResult result={result} kind={batch?.kind} />
+      </Screen>
+    );
+  }
+  if (state === "closed") {
+    const done = batch?.done ?? 0;
+    return (
+      <Screen>
+        <EndScreen title="This batch has closed.">
+          <Lede>
+            It no longer takes answers.
+            {done > 0 && <> Your <span className="font-mono">{done}</span> {done === 1 ? "judgement is" : "judgements are"} kept.</>}
+          </Lede>
+        </EndScreen>
+      </Screen>
+    );
+  }
+  if (state === "requalify" || state === "blocked") {
+    return (
+      <Screen>
+        <EndScreen
+          dashed
+          title="You can't label this batch right now."
+          action={<div><BackButton /></div>}
+        >
+          <Lede>
+            {state === "requalify"
+              ? "Your recent answers on the checks hidden in the work fell below the bar, so this kind of task is closed to you for now. To work on it again, take this task's test again from your workspace."
+              : "Either your recent answers on the checks hidden in the work fell below the bar — take this task's test again from your workspace — or your labelling was paused."}
+          </Lede>
+        </EndScreen>
+      </Screen>
     );
   }
 
-  return (
-    <Shell>
-      <TaskHeader batch={batch?.name ?? "Labelling"} done={batch?.done} total={batch?.total} />
-      <div className="flex flex-1 flex-col gap-4 px-4 pt-5">
-        {state === "loading" && <Note>Loading…</Note>}
-        {state === "error" && (
-          <div role="alert" className="p-alert p-alert--error mt-6">
-            <span>
-              Something went wrong.{" "}
-              <button type="button" className="p-link" onClick={() => void load()}>
-                Try again
-              </button>
-            </span>
+  // A founder's named invite: no account, no language gate — greeted by the name
+  // on the invite, told how many questions, then on.
+  if (greeting && batch) {
+    const n = Math.min(batch.done + 1, batch.total);
+    return (
+      <Screen>
+        <Title>{batch.labeller ? `Hello, ${batch.labeller}.` : "Hello."}</Title>
+        <Lede>
+          A founder asked you to answer <span className="font-mono">{batch.total}</span>{" "}
+          {batch.total === 1 ? "question" : "questions"} in “{batch.name}”.
+          {batch.done > 0 && <> You have answered <span className="font-mono">{batch.done}</span>.</>}
+        </Lede>
+        {batch.kind && KIND_QUESTION[batch.kind] && (
+          <div className="p-card grid gap-1">
+            <p style={{ font: "600 15px/1.3 var(--font-read)" }}>{KIND_QUESTION[batch.kind]}</p>
+            <Small>One question at a time, about a minute each. You can stop and come back to this link.</Small>
           </div>
         )}
-        {state === "closed" && <Note>This batch is closed. Thank you.</Note>}
-        {state === "requalify" && (
-          <div className="p-alert p-alert--info mt-6">
-            <p>
-              You can&apos;t label this batch right now. Either your recent answers on the check questions hidden in the
-              work fell below 80% — take this task&apos;s test again — or your labelling was paused.{" "}
-              <Link className="p-link" href="/label">Open your workspace</Link>
-            </p>
-          </div>
-        )}
-        {state === "ready" && task && feedback && (
-          <PracticeFeedback task={task} feedback={feedback} onNext={() => void load()} />
-        )}
+        <div>
+          <button type="button" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto" onClick={() => setGreeted(true)}>
+            {batch.done > 0 ? "Continue" : "Start"} · question {n} of {batch.total}
+          </button>
+        </div>
+      </Screen>
+    );
+  }
 
-        {state === "ready" && task && primed === false && !guide && !guideFailed && (
-          <Note>Loading the guide for this task.</Note>
-        )}
-        {state === "ready" && task && primed === false && !guide && guideFailed && (
-          <div className="grid justify-items-start gap-4">
-            <Note>The guide for this task could not be loaded. Read it before you start.</Note>
-            <button type="button" className="p-btn p-btn--secondary" onClick={() => setGuideTry((n) => n + 1)}>
-              Try again
-            </button>
-          </div>
-        )}
-        {state === "ready" && task && primed === false && guide && (
+  // The guide, read before the first task of this batch.
+  if (state === "ready" && task && primed === false) {
+    return (
+      <Screen>
+        {guide ? (
           <GuidePrimer
             guide={guide}
+            context={batch?.name ? <p className="p-eyebrow">Before your first task in {batch.name}</p> : undefined}
+            back={<BackToWorkspace />}
             onStart={() => {
               try {
                 window.localStorage.setItem(PRIMER_KEY(batchKey), "1");
@@ -458,46 +427,95 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
               setPrimed(true);
             }}
           />
+        ) : guideFailed ? (
+          <GuideFailed onRetry={() => setGuideTry((n) => n + 1)} />
+        ) : (
+          <GuideLoading />
         )}
+      </Screen>
+    );
+  }
 
-        {state === "ready" && task && primed !== false && !feedback && (
-          task.line ? (
-            <BriefLineTask line={task.line} saving={saving} onAnswer={answer} />
-          ) : task.rendering ? (
-            <QuoteRenderingTask rendering={task.rendering} saving={saving} onAnswer={answer} />
-          ) : task.claim ? (
-            <ClaimTask claim={task.claim} position={task.position} saving={saving} decide={guide?.decide} onAnswer={answer} />
-          ) : (
-            <StoryTask
-              task={task}
-              kind={batch?.kind}
-              picked={picked}
-              saving={saving}
-              decide={guide?.decide}
-              onToggle={toggle}
-              onAnswer={(a) => void submit(a === "unsure", a === "skip", false, a === "none")}
-            />
-          )
-        )}
-      </div>
-    </Shell>
-  );
-}
+  const tag = batch?.purpose === "practice" ? "Practice" : batch?.purpose === "qualify" ? "Test" : undefined;
+  const busy = saving ? pending : null;
+  const shown = state === "ready" && task && primed !== false ? task : null;
+  const practice = shown && feedback ? <PracticeFeedback task={shown} feedback={feedback} onNext={() => void load()} /> : undefined;
 
-function Shell({ children, padded = false }: { children: React.ReactNode; padded?: boolean }) {
-  // 720px: a focused single-decision surface, not a reading river. The layout
-  // already provides <main>; this is the column.
   return (
-    <div className={`mx-auto flex min-h-dvh w-full max-w-[720px] flex-col ${padded ? "px-4 pb-24 pt-6" : ""}`}>
-      {children}
+    <div className="flex min-h-dvh w-full flex-col">
+      <TaskHeader batch={batch?.name ?? "Labelling"} done={batch?.done} total={batch?.total} />
+      {state === "loading" && (
+        <div className="mx-auto grid w-full max-w-[680px] gap-3 px-4 pt-6" role="status" aria-busy="true">
+          <span className="p-skel h-3 w-40" />
+          <span className="p-skel h-[120px]" />
+          <span className="p-skel h-16" />
+          <span className="p-skel h-16" />
+          <span className="sr-only">Loading…</span>
+        </div>
+      )}
+      {state === "error" && (
+        <div className="mx-auto w-full max-w-[680px] px-4 pt-6">
+          <Alert
+            tone="error"
+            title="Something went wrong."
+            action={
+              <button type="button" className="p-btn p-btn--secondary p-btn--sm min-h-11 lg:min-h-9" onClick={() => void load()}>
+                Try again
+              </button>
+            }
+          >
+            Prism did not answer. Your earlier answers are saved.
+          </Alert>
+        </div>
+      )}
+      {shown &&
+        (shown.line ? (
+          <BriefLineTask line={shown.line} tag={tag} saving={saving} pending={busy} feedback={practice} onAnswer={answer} />
+        ) : shown.rendering ? (
+          <QuoteRenderingTask rendering={shown.rendering} tag={tag} saving={saving} pending={busy} feedback={practice} onAnswer={answer} />
+        ) : shown.claim ? (
+          <ClaimTask
+            claim={shown.claim}
+            position={shown.position}
+            tag={tag}
+            saving={saving}
+            pending={busy}
+            decide={guide?.decide}
+            feedback={practice}
+            onAnswer={answer}
+          />
+        ) : (
+          <StoryTask
+            task={shown}
+            kind={batch?.kind}
+            tag={tag}
+            picked={picked}
+            saving={saving}
+            pending={busy}
+            decide={guide?.decide}
+            feedback={practice}
+            onToggle={toggle}
+            onAnswer={answerStory}
+          />
+        ))}
     </div>
   );
 }
 
-function Note({ children }: { children: React.ReactNode }) {
+/** A label screen that is not a task: the label bar, then the column. */
+function Screen({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-10" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-      {children}
-    </p>
+    <div className="flex min-h-dvh w-full flex-col">
+      <LabelStrip />
+      <Column>{children}</Column>
+    </div>
+  );
+}
+
+function BackButton() {
+  return (
+    <Link href="/label" className="p-btn p-btn--ghost p-btn--lg w-full lg:w-auto">
+      Back to your workspace
+    </Link>
   );
 }

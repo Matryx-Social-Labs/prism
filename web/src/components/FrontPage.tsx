@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Chart } from "@/components/Chart";
+import { lensMarkers } from "@/components/ChartRow";
+import { EmptyState } from "@/components/ui";
 import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
@@ -32,6 +34,10 @@ import { useStateName } from "@/lib/useStateName";
  * rail on the left, the list in two columns, the developing stories and the
  * legend on the right — never longer lines.
  *
+ * "Has a professional read" (adopted in the design 25 Sep) keeps only the rows
+ * that earn a lens — the same test that draws their lens mark — and says so
+ * when none do.
+ *
  * `initial` is the ALL list the server already fetched, so the rows are in the
  * HTML a crawler receives (Google renders JS late; GPTBot, ClaudeBot and
  * PerplexityBot never do — the day's record was invisible to all of them,
@@ -47,6 +53,7 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
   const [ready, setReady] = useState(false);
   const [scope, setScope] = useState<Scope>("all");
   const [tab, setTab] = useState<Tab>("today");
+  const [lensOnly, setLensOnly] = useState(false);
   const [items, setItems] = useState<FeedItem[] | null>(initial);
   const seeded = useRef(initial !== null);
   const [developing, setDeveloping] = useState<TrendingStory[]>([]);
@@ -104,6 +111,7 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
 
   // The scope is a server-side slice (see /feed `scope`); the page IS the slice.
   const scoped = useMemo(() => items ?? [], [items]);
+  const shown = useMemo(() => (lensOnly ? scoped.filter((i) => lensMarkers(i).length > 0) : scoped), [scoped, lensOnly]);
 
   const counts = useMemo(() => {
     // On a subject page the list IS that subject, so "All stories" gets no count.
@@ -127,12 +135,15 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
   // chartOrder (most outlets first, ties by recency), so the strip says that.
   const tally = useMemo(() => {
     if (!items) return null;
-    const n = scoped.length >= WINDOW ? `${WINDOW}+` : String(scoped.length);
-    const outlets = new Set(scoped.flatMap((i) => (i.outlets ?? []).map((o) => o.publisher)));
-    const parts = [`${n} ${scoped.length === 1 ? "record" : "records"}`];
+    // A full window means more exist than were loaded: "24+", and a filtered
+    // count says which window it was taken from ("3 of 24+ records").
+    const capped = scoped.length >= WINDOW;
+    const n = lensOnly ? `${shown.length} of ${capped ? `${WINDOW}+` : scoped.length}` : capped ? `${WINDOW}+` : String(shown.length);
+    const outlets = new Set(shown.flatMap((i) => (i.outlets ?? []).map((o) => o.publisher)));
+    const parts = [`${n} ${(lensOnly ? scoped.length : shown.length) === 1 ? "record" : "records"}`];
     if (outlets.size) parts.push(`${outlets.size} ${outlets.size === 1 ? "outlet" : "outlets"}`);
     return parts.join(" · ");
-  }, [items, scoped]);
+  }, [items, scoped, shown, lensOnly]);
 
   // Top of the record: the most-reported multi-outlet stories, on All + Today only.
   const top = useMemo(() => (group || tab !== "today" ? [] : chartOrder(scoped).filter((i) => i.source_count > 1).slice(0, 5)), [group, tab, scoped]);
@@ -165,8 +176,13 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
     </div>
   ) : items === null ? (
     <RowListSkeleton n={7} label="Loading today's record" />
+  ) : lensOnly && shown.length === 0 && scoped.length > 0 ? (
+    <EmptyState
+      title={`No stories with a professional read ${group ? `in ${group.name} ` : ""}today`}
+      action={<button type="button" className="p-btn p-btn--text" onClick={() => setLensOnly(false)}>Show every story</button>}
+    />
   ) : (
-    <Chart items={scoped} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} />
+    <Chart items={shown} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} />
   );
 
   return (
@@ -195,18 +211,24 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
                 ) : undefined
               }
             />
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
-              {scopes.map(([s, l]) => (
-                <button key={s} onClick={() => pick(s)} aria-pressed={scope === s} className="p-chip min-h-8 px-3 text-[13px]">
-                  {l}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
+                {scopes.map(([s, l]) => (
+                  <button key={s} onClick={() => pick(s)} aria-pressed={scope === s} className="p-chip min-h-8 px-3 text-[13px]">
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => setLensOnly((v) => !v)} aria-pressed={lensOnly} className="p-chip min-h-8 px-3 text-[13px]">
+                <i aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: lensOnly ? "var(--paper)" : "var(--lens-markets)" }} />
+                Has a professional read
+              </button>
             </div>
           </div>
           <section aria-labelledby="chart-title" className="pt-2 lg:pt-3.5">
             {list}
           </section>
-          {tally && !error && scoped.length > 0 && (
+          {tally && !error && shown.length > 0 && (
             <div className="mt-7 flex flex-wrap items-baseline gap-3 py-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
               <p style={{ font: "var(--t-title)" }}>That&rsquo;s today&rsquo;s record.</p>
               <span className="p-count">{tally}</span>

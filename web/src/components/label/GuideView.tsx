@@ -6,16 +6,19 @@
  * account or a batch's own invite, never the site's public JavaScript
  * (founder, 2026-09-23; CI checks with web/scripts/check-no-guides.mjs).
  *
- * Design System v2 · label/GuideInShort + label/Verdict: the question as the
- * title, "In short" first so a reader who will not read the rest still leaves
- * with the rule, then DO / DO NOT, then worked examples as verdicts. A verdict
+ * Design System v2 · label/GuideInShort + label/Verdict (Label board, "The
+ * guide"): the question as the title, "In short" first so a reader who will not
+ * read the rest still leaves with the rule, then DO / DO NOT, then worked
+ * examples as verdicts, then How to decide told apart by rule weight. A verdict
  * is always a word with its icon on a rule — never colour, never an icon alone.
  */
 
 import type { ReactNode } from "react";
 
 import { Check, Dash } from "@/components/icons";
-import { MARK, Verdict, markKind } from "@/components/label/parts";
+import { BackToWorkspace, MARK, Small, Title, Verdict, markKind } from "@/components/label/parts";
+import { SectionHead } from "@/components/SectionHead";
+import { Alert } from "@/components/ui";
 import type { GuideBlock, LabelGuide } from "@/lib/api";
 
 /** **strong**, *emphasis* and ==highlight==, and nothing else. */
@@ -75,21 +78,65 @@ export function GuideInShort({ rule, dos, donts, children }: { rule: string; dos
   );
 }
 
-/** The whole guide: read before the first task, and on /label/learn/<kind>. */
+/** How to decide, on the guide itself: each block told apart by rule weight —
+ *  the tick on 2px ink, the leave on a hairline — and its word, never colour. */
+function DecideBlocks({ blocks, closing }: { blocks: GuideBlock[]; closing: string }) {
+  return (
+    <div className="grid gap-2.5">
+      {blocks.map((b) => {
+        const Icon = b.mark === "yes" ? Check : Dash;
+        return (
+          <div
+            key={b.label}
+            className="grid gap-1 pt-2.5"
+            style={{ borderTop: b.mark === "yes" ? "2px solid var(--ink)" : "1px solid var(--line-strong)" }}
+          >
+            <h3 className="flex items-center gap-2" style={{ font: "600 15px/1.3 var(--font-read)" }}>
+              <span aria-hidden className="inline-flex shrink-0"><Icon size={16} /></span>
+              {b.label}
+            </h3>
+            {b.lines.map((line) => (
+              <p key={line} style={{ font: "var(--t-body-s)", color: "var(--ink)", overflowWrap: "anywhere" }}>
+                <Rich text={line} />
+              </p>
+            ))}
+            <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+              <Rich text={b.body} />
+            </p>
+          </div>
+        );
+      })}
+      <p className="border-t pt-3" style={{ borderColor: "var(--line)", font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+        <Rich text={closing} />
+      </p>
+    </div>
+  );
+}
+
+/** The whole guide: read before the first task, and on /label/learn/<kind>.
+ *  The question is the title; In short, Do and Do not; the guide's own
+ *  examples as verdicts; How to decide; then the one way on. */
 export function GuidePrimer({
   guide,
   onStart,
   action,
+  context,
+  back,
 }: {
   guide: LabelGuide;
   onStart: () => void;
   action?: string;
+  /** What this guide is for, above the title: the batch it opens, or its kind. */
+  context?: ReactNode;
+  /** A way out under the button, where the button is not already one. */
+  back?: ReactNode;
 }) {
   return (
-    <article className="grid max-w-[640px] gap-6 pb-8">
-      <header>
-        <h1 style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>{guide.question}</h1>
-        <p className="p-count mt-2">
+    <article className="grid gap-6">
+      <header className="grid gap-1.5">
+        {context}
+        <Title>{guide.question}</Title>
+        <p className="p-count">
           About {guide.minutes} {guide.minutes === 1 ? "minute" : "minutes"} to read
         </p>
       </header>
@@ -104,14 +151,14 @@ export function GuidePrimer({
 
       {guide.examples.length > 0 && (
         <section>
-          {guide.examples_label && <h2 className="p-eyebrow mb-1.5">{guide.examples_label}</h2>}
+          <SectionHead id="h-guide-examples" title={guide.examples_label ?? "Examples"} />
           {guide.examples.map((ex) => {
             const [word, about] = splitHead(ex.head);
             return (
               <Verdict key={ex.head} kind={markKind(ex.mark)} word={word}>
                 {/* Written by us rather than seen in the corpus: it says so. */}
                 {ex.illustration && <span className="p-badge p-badge--dashed justify-self-start">ILLUSTRATION</span>}
-                <p className="font-semibold" style={{ color: "var(--ink)" }}><Rich text={about} /></p>
+                <p className="font-semibold" style={{ color: "var(--ink)", overflowWrap: "anywhere" }}><Rich text={about} /></p>
                 <p style={{ color: "var(--ink-2)" }}><Rich text={ex.body} /></p>
               </Verdict>
             );
@@ -119,19 +166,56 @@ export function GuidePrimer({
         </section>
       )}
 
-      {guide.decide && <HowToDecide blocks={guide.decide.blocks} closing={guide.decide.closing} open />}
+      {guide.decide && (
+        <section>
+          <SectionHead id="h-guide-decide" title="How to decide" />
+          <DecideBlocks blocks={guide.decide.blocks} closing={guide.decide.closing} />
+        </section>
+      )}
 
-      <div>
-        <button type="button" onClick={onStart} className="p-btn p-btn--primary p-btn--lg">
-          {action ?? guide.start}
-        </button>
-        {guide.after && (
-          <p className="mt-3" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
-            {guide.after}
-          </p>
-        )}
+      <div className="grid gap-2 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+        <div>
+          <button type="button" onClick={onStart} className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">
+            {action ?? guide.start}
+          </button>
+        </div>
+        {guide.after && <Small>{guide.after}</Small>}
+        {back}
       </div>
     </article>
+  );
+}
+
+/** The guide on its way: bars in the shape of what is coming. */
+export function GuideLoading() {
+  return (
+    <div className="grid gap-4" role="status" aria-busy="true">
+      <span className="p-skel h-[34px] w-[70%]" />
+      <span className="p-skel h-3.5 w-[30%]" />
+      <span className="p-skel h-[90px]" />
+      <span className="p-skel h-[160px]" />
+      <Small>Opening the guide…</Small>
+    </div>
+  );
+}
+
+/** The guide did not come: say so, offer another try, keep the way back. */
+export function GuideFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="grid gap-4">
+      <Alert
+        tone="error"
+        title="The guide could not be loaded"
+        action={
+          <button type="button" className="p-btn p-btn--secondary p-btn--sm min-h-11 lg:min-h-9" onClick={onRetry}>
+            Try again
+          </button>
+        }
+      >
+        Nothing you&apos;ve done is lost.
+      </Alert>
+      <BackToWorkspace />
+    </div>
   );
 }
 

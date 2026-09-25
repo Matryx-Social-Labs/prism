@@ -34,6 +34,10 @@ const NAMES: Record<string, Record<string, string>> = {
 };
 
 const NOT_YET = "Not counted yet: counting begins with the first visit.";
+/** What an empty breakdown is waiting for, where "nothing in this period" undersells it. */
+const EMPTY: Record<string, string> = {
+  plans: "No one is paying yet. This fills in with the first charge.",
+};
 
 function Trend({ row, start }: { row: MetricRow; start: string }) {
   const series = row.series!;
@@ -76,7 +80,7 @@ function Split({ b, start }: { b: Breakdown; start: string }) {
     );
   }
   return (
-    <ChartPanel title={b.title} source={b.source} table={table} empty={rows.length ? null : "Nothing in this period."}>
+    <ChartPanel title={b.title} source={b.source} table={table} empty={rows.length ? null : (EMPTY[b.key] ?? "Nothing in this period.")}>
       <BarList rows={rows} names={names} />
     </ChartPanel>
   );
@@ -106,7 +110,7 @@ function Figures({ rows }: { rows: MetricRow[] }) {
           <div key={r.key} className="flex items-baseline justify-between gap-4 border-t py-2.5" style={{ borderColor: "var(--line)" }}>
             <dt className="min-w-0 text-[13.5px]" style={{ color: "var(--ink-2)" }}>{r.label}</dt>
             <dd className="shrink-0 text-right">
-              <span className="font-mono text-[15px] tabular-nums" style={{ color: r.current === null ? "var(--ink-3)" : "var(--ink)" }}>
+              <span className="tabular-nums" style={{ font: "600 18px/1 var(--font-record)", color: r.current === null ? "var(--ink-3)" : "var(--ink)" }}>
                 {figure(r.current, r.unit)}
               </span>
               {r.previous !== null && r.current !== null && (
@@ -122,13 +126,19 @@ function Figures({ rows }: { rows: MetricRow[] }) {
   );
 }
 
-export function DashboardSection({ section, start }: { section: MetricSection; start: string }) {
+/** What a section is for, in a line, where the title alone does not say. */
+const HINT: Record<string, string> = {
+  supply: "What Prism read and formed.",
+  demand: "Where readers hit a wall.",
+};
+
+export function DashboardSection({ section, start, sub }: { section: MetricSection; start: string; sub?: string }) {
   const trends = section.rows.filter((r) => r.series);
   const plain = section.rows.filter((r) => !r.series);
   return (
-    <section className="mt-8" aria-labelledby={`dash-${section.key}`}>
-      <SectionHead id={`dash-${section.key}`} title={section.title} />
-      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))]">
+    <section className="grid min-w-0 gap-3" aria-labelledby={`dash-${section.key}`}>
+      <SectionHead id={`dash-${section.key}`} title={section.title} sub={sub} hint={HINT[section.key]} />
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 xl:grid-cols-3">
         {trends.map((r) => (
           <Trend key={r.key} row={r} start={start} />
         ))}
@@ -140,7 +150,7 @@ export function DashboardSection({ section, start }: { section: MetricSection; s
           <ChartPanel
             title={section.retention.title}
             source={section.retention.source}
-            className="lg:col-span-2"
+            className="col-span-full"
             empty={section.retention.rows.some((r) => r.by_week.some((v) => v !== null)) ? null : "No week after a sign-up has a full record yet: sign-ins are counted from the first signed-in visit, by whole weeks."}
           >
             <CohortGrid rows={section.retention.rows} />
@@ -150,7 +160,7 @@ export function DashboardSection({ section, start }: { section: MetricSection; s
           <ChartPanel
             title={section.lag.title}
             source={section.lag.source}
-            className="lg:col-span-2"
+            className="col-span-full"
             note={`Each outlet's first report of a story against the first report of anyone, by the time the outlet printed. Listed once an outlet shares ${section.lag.min_stories} stories with others; a report a week after the first is a new story and is left out.`}
             empty={section.lag.rows.length ? null : `No outlet has shared ${section.lag.min_stories} stories with another in this period.`}
             table={{

@@ -80,23 +80,25 @@ describe("Trending — the sector strip", () => {
   it("asks for the whole group, comma-separated, and ALL clears it", async () => {
     render(<TrendingPage />);
     await screen.findByRole("list");
-    await userEvent.click(screen.getByRole("button", { name: /BIZ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Business & Markets/ }));
     await waitFor(() => expect(lastQuery()).toMatchObject({ sector: "business,finance" }));
-    await userEvent.click(screen.getByRole("button", { name: /ALL/ }));
+    await userEvent.click(screen.getByRole("button", { name: /All stories/ }));
     await waitFor(() => expect(lastQuery()).toMatchObject({ sector: null }));
   });
 });
 
 describe("Trending — the chart of arcs", () => {
-  it("fails a provisional boundary closed to related events and opens its honest group page", async () => {
+  // The Reading board's ArcRow: status first, subject · span · last update,
+  // the name, and the one-ink bar labelled "k developments · n outlets".
+  it("says a provisional boundary is a provisional grouping and opens its honest group page", async () => {
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(r).toHaveAttribute("href", "/trending/kerala-power");
-    expect(r.textContent).toMatch(/5 related reports/);
-    expect(r.textContent).toMatch(/4 outlets/);
+    expect(r.textContent).toMatch(/5 developments · 4 outlets/);
     expect(r.textContent).toMatch(/5 days/); // 6 days less two hours, floored
-    expect(r.textContent).toMatch(/moving now/);
-    expect(r.textContent).toMatch(/Grouping under review/);
+    expect(r.textContent).toMatch(/updated 2h ago/);
+    expect(r.textContent).toMatch(/Provisional grouping/);
+    expect(r.textContent).not.toMatch(/Verified/);
   });
 
   it("shows a route and opens its hero only after the boundary is verified", async () => {
@@ -132,7 +134,7 @@ describe("Trending — the chart of arcs", () => {
   it("says so when nothing is moving, and when the API is down", async () => {
     fetchTrending.mockResolvedValue([]);
     const { unmount } = render(<TrendingPage />);
-    expect(await screen.findByText(/No story is developing in all sectors/)).toBeInTheDocument();
+    expect(await screen.findByText("No developing stories right now")).toBeInTheDocument();
     unmount();
     fetchTrending.mockRejectedValue(new Error("down"));
     render(<TrendingPage />);
@@ -140,28 +142,28 @@ describe("Trending — the chart of arcs", () => {
   });
 });
 
-// The story's picture is many pictures (founder, 2026-09-21): up to three of
-// the developments' photographs, credited, fanned on the row; a "+N" counts
-// the rest; nothing when there are none.
-describe("Stories — the photo pile", () => {
-  const outlet = { slug: "thehindu", publisher: "thehindu", name: "The Hindu", code: "TH", origin: "national", language: "en", domain: "thehindu.com" };
-  const pics = (n: number) => Array.from({ length: n }, (_, i) => ({ url: `https://x/${i}.jpg`, article_url: `https://h/${i}`, outlet }));
-
-  it("shows at most three photographs, the front one credited, and counts the rest", async () => {
-    fetchTrending.mockResolvedValue([story({ photos: pics(4) })]);
-    render(<TrendingPage />);
-    const pile = await screen.findByRole("figure", { name: "4 photographs from the reports" });
-    // Three photographs (the fourth image is the outlet's favicon on the front card).
-    expect(pile.querySelectorAll('img[alt^="Photo:"]')).toHaveLength(3);
-    expect(pile.querySelector('img[alt^="Photo:"]')).toHaveAttribute("alt", "Photo: The Hindu");
-    expect(pile).toHaveTextContent("+1");
-  });
-
-  it("a story without photographs has no pile", async () => {
-    fetchTrending.mockResolvedValue([story({ photos: [] })]);
+// The Reading board draws no photographs on the Stories list: a row is its
+// status, its counts and its name.
+describe("Stories — no photographs on the list", () => {
+  it("draws no photograph even when the story has some", async () => {
+    const outlet = { slug: "thehindu", publisher: "thehindu", name: "The Hindu", code: "TH", origin: "national", language: "en", domain: "thehindu.com" };
+    fetchTrending.mockResolvedValue([story({ photos: [{ url: "https://x/0.jpg", article_url: null, outlet }] })]);
     render(<TrendingPage />);
     await screen.findAllByText(/CPI\(M\)/);
+    expect(screen.queryByRole("img")).toBeNull();
     expect(screen.queryByRole("figure")).toBeNull();
+  });
+});
+
+describe("Stories — an empty subject", () => {
+  it("names the subject and offers every subject back", async () => {
+    render(<TrendingPage />);
+    await screen.findByRole("list");
+    fetchTrending.mockResolvedValue([]);
+    await userEvent.click(screen.getByRole("button", { name: /Sports/ }));
+    expect(await screen.findByText("No developing Sports stories right now")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "All subjects →" }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sector: null }));
   });
 });
 

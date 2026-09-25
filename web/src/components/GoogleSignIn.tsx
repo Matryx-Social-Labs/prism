@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Alert } from "@/components/ui";
 import { afterSignIn, takeNext } from "@/lib/next";
 import { saveSession, signInWithGoogle } from "@/lib/session";
 
@@ -15,7 +16,9 @@ import { saveSession, signInWithGoogle } from "@/lib/session";
  * calls `requestAccessToken()`, Google's account chooser opens, and the access
  * token goes to /api/v1/auth/google, which asks Google whose it is and checks
  * it was minted for our client id. Same session, same account, as a magic link.
- * Renders nothing until NEXT_PUBLIC_GOOGLE_CLIENT_ID is set.
+ * Renders nothing — not even the "or" rule above it — until
+ * NEXT_PUBLIC_GOOGLE_CLIENT_ID is set. A closed chooser is not an error: the
+ * button simply comes back. Anything else says what happened and one way on.
  */
 declare global {
   interface Window {
@@ -111,12 +114,27 @@ export function GoogleSignIn() {
 
   if (!CLIENT_ID) return null;
   return (
-    <div className="flex flex-col gap-2">
-      <button type="button" onClick={start} disabled={busy} className="btn btn-secondary btn-lg w-full">
-        <GoogleG />
+    <>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3" aria-hidden style={{ font: "500 13px/1 var(--font-read)", color: "var(--ink-3)" }}>
+        <span className="h-px" style={{ background: "var(--line)" }} />
+        or
+        <span className="h-px" style={{ background: "var(--line)" }} />
+      </div>
+      <button type="button" onClick={start} disabled={busy} aria-busy={busy || undefined} className="p-btn p-btn--secondary p-btn--lg p-btn--block">
+        {!busy && <GoogleG />}
         {busy ? "Opening Google…" : "Continue with Google"}
       </button>
-      {error && <p className="text-[13px]" style={{ color: "var(--danger)" }}>{error}</p>}
-    </div>
+      {error && (
+        <Alert tone="error" title="Google sign-in did not finish">
+          {sentence(error)} Try again, or use your email.
+        </Alert>
+      )}
+    </>
   );
+}
+
+/** Google's and the API's messages arrive lower-case and unpunctuated ("token rejected by google"). */
+function sentence(s: string): string {
+  const t = s.trim();
+  return t.charAt(0).toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".");
 }

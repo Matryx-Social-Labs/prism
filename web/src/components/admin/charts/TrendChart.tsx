@@ -3,10 +3,13 @@
 /**
  * One measure over the period, day by day (IST), with the period before laid
  * over it as a dashed line — the comparison is in the picture, not in a
- * second number to hold in your head. Days before counting began are shaded
- * and left undrawn: an empty stretch is "no record", never a zero.
+ * second number to hold in your head. Days before counting began are hatched
+ * and left undrawn (the key says so): an empty stretch is "no record", never a
+ * zero. The last counted day carries a dot; hovering reads out the day, its
+ * value and the same day of the period before.
  */
 
+import { useId } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { SeriesKey, TipBox } from "./ChartPanel";
@@ -23,6 +26,19 @@ interface Point {
   now: number | null;
   before: number | null;
 }
+
+/** Days with no record are hatched, never drawn as zero; the key says so. */
+export const UNCOUNTED_KEY = { label: "Hatched: not counted yet, never zero", color: "", hatched: true };
+export const useHatchId = () => `hatch${useId().replace(/:/g, "")}`;
+/** An SVG hatch for a chart's <defs> (the token hatch is a CSS gradient, which SVG cannot fill with). */
+export const hatchDefs = (id: string) => (
+  <defs>
+    <pattern id={id} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="var(--viz-uncounted)" />
+      <line x1="0" y1="0" x2="0" y2="8" stroke="var(--line-strong)" strokeWidth="1" />
+    </pattern>
+  </defs>
+);
 
 /** The leading run of days with no record, as [first, last] labels. */
 export function uncountedSpan(points: Array<{ label: string; now: number | null }>): [string, string] | null {
@@ -59,10 +75,22 @@ export function TrendChart({
   }));
   const hasPrev = !cumulative && !!prev && prev.some((v) => v !== null);
   const gap = uncountedSpan(points);
+  const last = series.reduce<number>((at, v, i) => (v === null ? at : i), -1);
+  const hatch = useHatchId();
+  const key = [
+    ...(hasPrev
+      ? [
+          { label: "This period", color: "var(--viz-1)" },
+          { label: "Period before", color: "var(--viz-prev)", dashed: true },
+        ]
+      : []),
+    ...(gap ? [UNCOUNTED_KEY] : []),
+  ];
   return (
     <div>
       <ResponsiveContainer width="100%" height={CHART_H}>
         <ComposedChart data={points} margin={CHART_MARGIN} accessibilityLayer>
+          {hatchDefs(hatch)}
           <CartesianGrid vertical={false} stroke="var(--viz-grid)" />
           <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: "var(--viz-grid)" }} interval="preserveStartEnd" minTickGap={28} />
           <YAxis
@@ -78,10 +106,9 @@ export function TrendChart({
             <ReferenceArea
               x1={gap[0]}
               x2={gap[1]}
-              fill="var(--viz-uncounted)"
+              fill={`url(#${hatch})`}
               fillOpacity={1}
               ifOverflow="extendDomain"
-              label={{ value: "not counted", position: "insideTop", fill: "var(--ink-3)", fontSize: 11 }}
             />
           )}
           <Tooltip
@@ -102,10 +129,11 @@ export function TrendChart({
             strokeWidth={2}
             fill="none"
             isAnimationActive={false}
-            // A day with no neighbour on record draws no line; mark it so it is seen.
+            // The last counted day, and a day with no neighbour on record (no
+            // line would show it), carry a dot so they are seen.
             dot={(d: { index: number; cx?: number; cy?: number }) =>
-              isolated(series, d.index) && d.cx !== undefined && d.cy !== undefined ? (
-                <circle key={d.index} cx={d.cx} cy={d.cy} r={3} fill="var(--viz-1)" />
+              (d.index === last || isolated(series, d.index)) && d.cx !== undefined && d.cy !== undefined ? (
+                <circle key={d.index} cx={d.cx} cy={d.cy} r={d.index === last ? 4 : 3} fill="var(--viz-1)" stroke="var(--surface)" strokeWidth={2} />
               ) : (
                 <g key={d.index} />
               )
@@ -127,14 +155,7 @@ export function TrendChart({
           )}
         </ComposedChart>
       </ResponsiveContainer>
-      {hasPrev && (
-        <SeriesKey
-          items={[
-            { label: "This period", color: "var(--viz-1)" },
-            { label: "Period before", color: "var(--viz-prev)", dashed: true },
-          ]}
-        />
-      )}
+      {key.length > 0 && <SeriesKey items={key} />}
     </div>
   );
 }

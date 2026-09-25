@@ -35,13 +35,23 @@ describe("the numbers' rules", () => {
   it("gives a change off a small base as a count, off a large one as a percentage", () => {
     expect(change(7, 4)).toEqual({ text: "+3 from 4", dir: "up" });
     expect(change(88, 100)).toEqual({ text: "−12%", dir: "down" });
-    expect(change(5, 5)?.dir).toBe("flat");
+    expect(change(5, 5)).toEqual({ text: "±0 from 5", dir: "flat" });
+    expect(change(40, 40)).toEqual({ text: "±0%", dir: "flat" });
     // Nothing counted before: no change to claim.
     expect(change(5, null)).toBeNull();
   });
 });
 
 describe("the trend", () => {
+  it("hatches the days before counting began and says so in the key", () => {
+    const { container } = render(<TrendChart series={[null, null, 3, 4]} start="2031-01-27" label="Views" />);
+    expect(screen.getByText("Hatched: not counted yet, never zero")).toBeInTheDocument();
+    expect(container.querySelector("pattern")).not.toBeNull();
+    // Counted from the first day: nothing hatched, nothing in the key about it.
+    render(<TrendChart series={[1, 2, 3, 4]} start="2031-01-27" label="Clicks" />);
+    expect(screen.getAllByText("Hatched: not counted yet, never zero")).toHaveLength(1);
+  });
+
   it("shades only the leading days with no record, and none once counting began", () => {
     const pts = (xs: Array<number | null>) => xs.map((now, i) => ({ label: `d${i}`, now }));
     expect(uncountedSpan(pts([null, null, 0, 3]))).toEqual(["d0", "d1"]);
@@ -141,16 +151,20 @@ describe("the headline tile", () => {
     expect(screen.getByText("+3 from 4").parentElement).toHaveTextContent(/^up\+3 from 4$/);
   });
 
-  it("claims no change only against a period that was counted", () => {
+  it("claims no change only against a period that was counted", async () => {
     // Nothing before to compare with is not "no change" (the design's KpiTile bug).
     const { rerender } = render(<KpiTile label="MRR" current={2086} previous={null} source="subscriptions" />);
     expect(screen.queryByText(/no change/)).not.toBeInTheDocument();
+    expect(screen.getByText("Earlier period not counted yet")).toBeInTheDocument();
     rerender(<KpiTile label="Visitor-days" current={1284} previous={null} source="usage_daily" countedSince="2031-01-12" />);
-    expect(screen.getByText("Not counted before 12 Jan")).toBeInTheDocument();
+    expect(screen.getByText("Earlier period not counted yet")).toBeInTheDocument();
     expect(screen.queryByText(/no change/)).not.toBeInTheDocument();
+    // When counting began is behind the ⓘ, with the source.
+    await userEvent.click(screen.getByRole("button", { name: "Where Visitor-days is counted" }));
+    expect(screen.getByText(/Counting began 12 Jan/)).toBeInTheDocument();
     rerender(<KpiTile label="Visitor-days" current={40} previous={40} source="usage_daily" countedSince="2031-01-12" />);
-    expect(screen.getByText("no change")).toBeInTheDocument();
-    expect(screen.queryByText(/Not counted before/)).not.toBeInTheDocument();
+    expect(screen.getByText("±0%").parentElement).toHaveTextContent(/^no change±0%$/);
+    expect(screen.queryByText("Earlier period not counted yet")).not.toBeInTheDocument();
   });
 
   it("breaks the sparkline where there is no record rather than dipping to zero", () => {

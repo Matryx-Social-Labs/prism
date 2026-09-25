@@ -49,8 +49,7 @@ export function change(now: number | null, before: number | null): { text: strin
   if (now === null || before === null) return null;
   const d = now - before;
   const dir = d > 0 ? "up" : d < 0 ? "down" : "flat";
-  if (d === 0) return { text: "same as before", dir };
-  const sign = d > 0 ? "+" : "−";
+  const sign = d > 0 ? "+" : d < 0 ? "−" : "±";
   const size = before >= SMALL_N ? `${Math.round((Math.abs(d) / before) * 100)}%` : `${compact(Math.abs(d))} from ${compact(before)}`;
   return { text: `${sign}${size}`, dir };
 }

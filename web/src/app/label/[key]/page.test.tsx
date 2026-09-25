@@ -169,10 +169,11 @@ describe("label page", () => {
 
   it("files 'none of these' as empty even with a row ticked, and offers no yes with nothing ticked", async () => {
     // Two buttons now: "Yes — n selected" and "None of these". Pressing None
-    // after ticking must not file the ticked rows as a yes.
+    // after ticking must not file the ticked rows as a yes. With nothing ticked
+    // Yes says what it is waiting for (Design System v2 · AnswerButtons).
     stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     render(<LabelPage params={params} />);
-    expect(await screen.findByRole("button", { name: "Yes — 0 selected" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Tick one, or choose None" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: /Shan Masood/ }));
     await userEvent.click(screen.getByRole("button", { name: "None of these" }));
     await waitFor(() => expect(postLabelAnswer).toHaveBeenCalled());
@@ -223,7 +224,29 @@ describe("label page", () => {
     stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
     fetchLabelTask.mockResolvedValue({ task: null, closed: true });
     render(<LabelPage params={params} />);
-    expect(await screen.findByText(/batch is closed/)).toBeInTheDocument();
+    expect(await screen.findByText(/batch has closed/)).toBeInTheDocument();
+    // The labeller's own answers are counted back to them, with the way back.
+    expect(screen.getByText(/are kept/)).toHaveTextContent("Your 3 judgements are kept.");
+    expect(screen.getByRole("link", { name: "Back to your workspace" })).toHaveAttribute("href", "/label");
+  });
+
+  it("files nothing when Enter is pressed with nothing ticked — Yes waits for a tick", async () => {
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
+    render(<LabelPage params={params} />);
+    await screen.findByText(/Babar returns to captaincy/);
+    await userEvent.keyboard("{Enter}");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(postLabelAnswer).not.toHaveBeenCalled();
+  });
+
+  it("says Saving… on the answer that was pressed, and on no other", async () => {
+    stubStorage({ "prism.label.token.batch-key": "tok-abc", "prism.labeller": "ana" });
+    postLabelAnswer.mockReturnValue(new Promise(() => {}));
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "Saving…" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Not sure" })).toBeDisabled();
   });
 
   it("mints a credential on first visit and stores it per batch", async () => {
@@ -297,6 +320,22 @@ describe("an invited labeller's link", () => {
     // A working session gets screenshotted and shared; the URL on screen must not
     // be enough for someone else to label as this person.
     expect(window.location.hash).toBe("");
+  });
+
+  it("greets a named invite before the first question, and answers nothing until they start", async () => {
+    stubStorage();
+    withHash("#invited-token");
+    fetchLabelBatch.mockResolvedValue({
+      name: "Story boundaries", notes: null, open: true, self_join: false, labeller: "Priya",
+      kind: "story_boundary", total: 10, done: 0,
+    });
+    render(<LabelPage params={params} />);
+    expect(await screen.findByRole("heading", { name: "Hello, Priya." })).toBeInTheDocument();
+    expect(screen.queryByText(/Babar returns to captaincy/)).not.toBeInTheDocument();
+    await userEvent.keyboard("1{Enter}");
+    await userEvent.click(screen.getByRole("button", { name: "Start · question 1 of 10" }));
+    expect(await screen.findByText(/Babar returns to captaincy/)).toBeInTheDocument();
+    expect(postLabelAnswer).not.toHaveBeenCalled();
   });
 
   it("greets the invited labeller by the name bound to their invite", async () => {
@@ -805,7 +844,7 @@ describe("live checks (phase 5)", () => {
     render(<LabelPage params={params} />);
     await userEvent.click(await screen.findByRole("button", { name: /Yes —/ }));
     expect(await screen.findByText(/take this task's test again/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open your workspace" })).toHaveAttribute("href", "/label");
+    expect(screen.getByRole("link", { name: "Back to your workspace" })).toHaveAttribute("href", "/label");
   });
 
   it("explains a 403 rather than calling it an error", async () => {

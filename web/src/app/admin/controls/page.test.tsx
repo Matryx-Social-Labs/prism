@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -23,9 +23,7 @@ beforeEach(() => {
   fetchFlags.mockReset().mockResolvedValue(flags(true));
   triggerCollection.mockReset().mockResolvedValue({ status: "ok", collecting: true });
   fetchAudit.mockReset().mockResolvedValue({ entries: [] });
-  vi.stubGlobal("confirm", vi.fn(() => true));
 });
-afterEach(() => vi.unstubAllGlobals());
 
 describe("controls", () => {
   it("shows every switch as a word or a number, never as a control", async () => {
@@ -37,11 +35,21 @@ describe("controls", () => {
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
-  it("asks before collecting, and does nothing if the founder backs out", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => false));
+  it("asks in place before collecting, and does nothing if the founder backs out", async () => {
     render(<ControlsPage />);
     await userEvent.click(await screen.findByRole("button", { name: "Collect now" }));
+    expect(screen.getByText(/Ask the worker to collect new reports now\?/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Not now" }));
     expect(triggerCollection).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Collect now" })).toBeInTheDocument();
+  });
+
+  it("says when it asked and what it was recorded as", async () => {
+    render(<ControlsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Collect now" }));
+    await userEvent.click(screen.getByRole("button", { name: "Yes, collect" }));
+    expect(triggerCollection).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/ASKED AT \d\d:\d\d IST · RECORDED AS pipeline\.run BY f@example\.test/)).toBeInTheDocument();
   });
 
   it("says so when collection is switched off, rather than promising a run", async () => {
@@ -50,14 +58,16 @@ describe("controls", () => {
     render(<ControlsPage />);
     await screen.findByText("OFF");
     await userEvent.click(screen.getByRole("button", { name: "Collect now" }));
-    expect(await screen.findByText(/collection is switched off/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Yes, collect" }));
+    expect(await screen.findByText("Collection is switched off")).toBeInTheDocument();
+    expect(screen.queryByText(/ASKED AT/)).not.toBeInTheDocument();
   });
 
   it("counts the switches that are on, and draws off on a dashed rule, numbers apart", async () => {
     fetchFlags.mockResolvedValue(flags(false));
     render(<ControlsPage />);
     expect(await screen.findByRole("heading", { name: "Switches" })).toBeInTheDocument();
-    expect(await screen.findByText(/^0 of 1 on/)).toBeInTheDocument();
+    expect(await screen.findByText(/^0 OF 1 ON/)).toBeInTheDocument();
     expect(screen.getByText("OFF").style.borderStyle).toBe("dashed");
     const limits = within(screen.getByRole("heading", { name: "Limits" }).closest("section")!);
     expect(limits.getByText("Match stories across languages by headline (0: off)")).toBeInTheDocument();
@@ -73,7 +83,7 @@ describe("controls", () => {
     });
     const { unmount } = render(<ControlsPage />);
     expect(await screen.findByText("Asked the worker to collect")).toBeInTheDocument();
-    expect(screen.getByText("1 change")).toBeInTheDocument();
+    expect(screen.getByText("1 CHANGE")).toBeInTheDocument();
     expect(screen.queryByText("Opened or closed a batch")).not.toBeInTheDocument();
     unmount();
     fetchAudit.mockRejectedValue(new Error("offline"));

@@ -30,60 +30,95 @@ beforeEach(() => {
   billing.fetchPlans.mockResolvedValue(PLANS);
 });
 
-describe("CancelSheet — one screen, the truth first, one offer, the exit beside it", () => {
-  it("says what cancelling does, offers a pause by default, and keeps Cancel anyway on the same row", async () => {
-    render(<CancelSheet open onClose={() => {}} session={session} sub={MONTHLY} onPaused={() => {}} onCancelled={() => {}} onSwitched={() => {}} />);
+describe("CancelSheet — the truth first, one offer matched to the reason, the exit always beside it", () => {
+  const sheet = (props: Partial<React.ComponentProps<typeof CancelSheet>> = {}) =>
+    render(<CancelSheet open onClose={() => {}} session={session} sub={MONTHLY} onPaused={() => {}} onCancelled={() => {}} onSwitched={() => {}} {...props} />);
+
+  it("says what cancelling does and offers nothing until a reason is given; Cancel anyway is there from the start", async () => {
+    sheet();
     expect(screen.getByRole("dialog", { name: "Before you go" })).toBeInTheDocument();
-    expect(screen.getByText(/You keep Plus until 20 Oct 2026/)).toBeInTheDocument();
-    expect(screen.getByText("Take a break instead?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause for 2 months" })).toBeInTheDocument();
+    expect(screen.getByText(/You keep Plus until 20 Oct 2026\. Paid time is never taken back/)).toBeInTheDocument();
+    expect(screen.queryByText("Pause instead")).toBeNull();
     expect(screen.getByRole("button", { name: "Cancel anyway" })).toBeEnabled();
-    // Never two offers at once (one retention offer, shown with the exit).
-    expect(screen.queryByText(/Yearly is/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Not using it enough" }));
+    expect(screen.getByText("Pause instead")).toBeInTheDocument();
+    // Never two offers at once.
+    expect(screen.queryByText(/Switch to yearly/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Cancel anyway" })).toBeEnabled();
   });
 
-  it("matches the one offer to the reason: the yearly saving for price, nothing for a missing feature", async () => {
-    render(<CancelSheet open onClose={() => {}} session={session} sub={MONTHLY} onPaused={() => {}} onCancelled={() => {}} onSwitched={() => {}} />);
-    await screen.findByText("Take a break instead?");
+  it("matches the one offer to the reason: the yearly plan for price, a pause otherwise", async () => {
+    sheet();
     await userEvent.click(screen.getByRole("button", { name: "Too expensive" }));
-    expect(await screen.findByText("Yearly is ₹125 a month")).toBeInTheDocument();
-    expect(screen.getByText(/₹1,499 a year — ₹289 less than twelve months/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Switch to yearly · ₹1,499/ })).toBeInTheDocument();
-    expect(screen.queryByText("Take a break instead?")).toBeNull();
+    // 12 × 149 − 1,499 = 289: arithmetic on the API's own prices.
+    expect(await screen.findByText("Switch to yearly · ₹1,499")).toBeInTheDocument();
+    expect(screen.getByText(/Save ₹289 a year against monthly\. Starts 20 Oct 2026, nothing charged twice/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch to yearly" })).toBeInTheDocument();
+    expect(screen.queryByText("Pause instead")).toBeNull();
     expect(screen.getByRole("button", { name: "Cancel anyway" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Missing something" }));
-    expect(screen.queryByText(/Yearly is/)).toBeNull();
-    expect(screen.queryByText("Take a break instead?")).toBeNull();
-    expect(screen.getByPlaceholderText(/What was missing/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Cancel anyway" })).toBeEnabled();
+    expect(screen.queryByText(/Switch to yearly/)).toBeNull();
+    expect(screen.getByText("Pause instead")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/What's missing/)).toBeInTheDocument();
   });
 
-  it("a pause pauses for the chosen months and reports when Plus returns; cancel anyway sends the reason", async () => {
+  it("a pause shows when Plus returns before it is taken, pauses for the months chosen, and says so", async () => {
     billing.pauseSubscription.mockResolvedValue({ paused_until: "2026-12-19T00:00:00Z", paid_until: "2026-10-20T00:00:00Z" });
     const onPaused = vi.fn();
-    render(<CancelSheet open onClose={() => {}} session={session} sub={MONTHLY} onPaused={onPaused} onCancelled={() => {}} onSwitched={() => {}} />);
-    await userEvent.click(await screen.findByRole("radio", { name: "3 months" }));
+    sheet({ onPaused });
+    await userEvent.click(screen.getByRole("button", { name: "Not using it enough" }));
+    expect(screen.queryByRole("button", { name: /Pause for/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "3 months" }));
+    expect(screen.getByRole("button", { name: "3 months" })).toHaveAttribute("aria-pressed", "true");
+    // The route's rule: the paid period's end + 30 days a month.
+    expect(screen.getByText(/Plus until 20 Oct 2026 · resumes 18 Jan 2027/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Pause for 3 months" }));
     expect(billing.pauseSubscription).toHaveBeenCalledWith("t", 3);
-    expect(await screen.findByRole("status")).toHaveTextContent(/Plus stays on until 20 Oct 2026.*comes back on 19 Dec 2026/);
+    expect(await screen.findByRole("status")).toHaveTextContent(/Plus is paused.*Plus stays on until 20 Oct 2026, then pauses.*resumes on 19 Dec 2026/);
     expect(onPaused).toHaveBeenCalledWith("2026-12-19T00:00:00Z");
+  });
 
+  it("cancel anyway sends the reason and the one line, and says when Plus ends", async () => {
     billing.cancelSubscription.mockResolvedValue({ access_until: "2026-10-20T00:00:00Z" });
     const onCancelled = vi.fn();
-    render(<CancelSheet open onClose={() => {}} session={session} sub={MONTHLY} onPaused={() => {}} onCancelled={onCancelled} onSwitched={() => {}} />);
-    await userEvent.click((await screen.findAllByRole("button", { name: "Not using it enough" }))[0]);
-    await userEvent.click(screen.getAllByRole("button", { name: "Cancel anyway" })[0]);
-    expect(billing.cancelSubscription).toHaveBeenCalledWith("t", { reason: "not-using", comment: undefined });
+    sheet({ onCancelled });
+    await userEvent.click(screen.getByRole("button", { name: "Missing something" }));
+    await userEvent.type(screen.getByPlaceholderText(/What's missing/), "  Hindi sources  ");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel anyway" }));
+    expect(billing.cancelSubscription).toHaveBeenCalledWith("t", { reason: "missing-something", comment: "Hindi sources" });
+    expect(await screen.findByRole("status")).toHaveTextContent(/Plus will end on 20 Oct 2026.*No further charges/);
     expect(onCancelled).toHaveBeenCalledWith("2026-10-20T00:00:00Z");
   });
 
   it("when Razorpay cannot pause, the sheet says so and the exit stays", async () => {
     billing.pauseSubscription.mockRejectedValue(new Error("unavailable"));
-    render(<CancelSheet open onClose={() => {}} session={session} sub={MONTHLY} onPaused={() => {}} onCancelled={() => {}} onSwitched={() => {}} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Pause for 2 months" }));
+    sheet();
+    await userEvent.click(screen.getByRole("button", { name: "Something else" }));
+    await userEvent.click(screen.getByRole("button", { name: "2 months" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pause for 2 months" }));
     expect(await screen.findByRole("status")).toHaveTextContent(/not available on this plan yet/);
     expect(screen.queryByRole("button", { name: /Pause for/ })).toBeNull();
     expect(screen.getByRole("button", { name: "Cancel anyway" })).toBeEnabled();
+  });
+
+  it("the yearly switch starts when the month ends; a decline is said at the top and the exit stays", async () => {
+    billing.subscribe.mockImplementation(async (_p: string, _t: string, _e: string, onEvent?: (k: string, d: string) => void) => {
+      onEvent?.("payment_failed", "Card declined");
+      await new Promise(() => {});
+    });
+    sheet();
+    await userEvent.click(screen.getByRole("button", { name: "Too expensive" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Switch to yearly" }));
+    expect(billing.subscribe).toHaveBeenCalledWith("plus_yearly", "t", "a@b.c", expect.any(Function), { startAfterCurrent: true });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/The payment did not go through.*Card declined\. Nothing was charged/);
+    expect(screen.getByRole("button", { name: "Opening…" })).toBeDisabled();
+  });
+
+  it("a Razorpay outage is said in words: nothing changed, try again", async () => {
+    billing.cancelSubscription.mockRejectedValue(new Error("cancel 502"));
+    sheet();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel anyway" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Couldn't cancel: Razorpay did not answer and nothing changed. Try again in a minute.");
   });
 });
 
@@ -122,7 +157,11 @@ describe("PlanCard — every state in one line, one action", () => {
   it("a paused plan says when it returns and offers Resume now", async () => {
     billing.fetchMySubscription.mockResolvedValue({ ...MONTHLY, status: "paused", paused_until: "2026-12-19T00:00:00Z" });
     render(<PlanCard session={session} />);
-    expect(await screen.findByText(/Paused · Plus stays on until 20 Oct 2026 · resumes 19 Dec 2026 on its own/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Resume now" })).toBeInTheDocument();
+    expect(await screen.findByText(/Plus stays on until 20 Oct 2026 · resumes 19 Dec 2026/)).toBeInTheDocument();
+    billing.resumeSubscription.mockResolvedValue({ status: "active" });
+    billing.fetchMySubscription.mockResolvedValue({ ...MONTHLY, current_period_end: "2026-11-20T00:00:00Z" });
+    await userEvent.click(screen.getByRole("button", { name: "Resume now" }));
+    expect(await screen.findByText("Plus is back on · renews 20 Nov 2026")).toBeInTheDocument();
+    expect(screen.getByText("Renews 20 Nov 2026")).toBeInTheDocument();
   });
 });

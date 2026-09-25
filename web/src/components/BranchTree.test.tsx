@@ -56,7 +56,7 @@ describe("BranchTree — TRUNK is the flat timeline", () => {
     // Counted, never summarised — the partitioner's numbers, then the span the
     // developments' own dates make (12th to 20th inclusive is nine days).
     expect(screen.getByText(/14 DEVELOPMENTS · 3 BRANCHED OFF · 1 ALSO REPORTED · 9 DAYS/)).toBeInTheDocument();
-    expect(screen.getByText(/FIRST/)).toBeInTheDocument();
+    expect(screen.getByText("First")).toBeInTheDocument();
   });
 
   it("follows the LONGEST on-spine chain, not the first child", () => {
@@ -120,24 +120,24 @@ describe("BranchTree — satellites are a deliberate detour", () => {
   it("hides satellites in TRUNK", () => {
     render(<BranchTree tree={t} developments={devs} />);
     expect(screen.queryByText("Loosely attached")).not.toBeInTheDocument();
-    expect(screen.getByText(/MAIN STORY · \d+/)).toBeInTheDocument();
+    // The main line is the view it opens on, counted on its tab (root + one on the spine).
+    expect(screen.getByRole("tab", { name: "Main line 2" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("adds them in ALL, tagged so the reader is told they are loose", async () => {
     render(<BranchTree tree={t} developments={devs} />);
-    await userEvent.click(screen.getByRole("button", { name: "ALL" }));
-    expect(screen.getByText("Loosely attached")).toBeInTheDocument();
-    // The shape readout also says "1 SATELLITE" — assert the ROW's own tag.
-    expect(screen.getByText(/^\d{2} [A-Z]{3,4} · ALSO REPORTED$/)).toBeInTheDocument();
-    expect(screen.getByText(/ALL · \d+ SHOWN/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /^All/ }));
+    // The ROW carries its own tag (the shape readout says "also reported" too).
+    expect(screen.getByRole("link", { name: /Loosely attached/ })).toHaveTextContent("Also reported");
+    expect(screen.getByRole("tab", { name: "All 3" })).toBeInTheDocument();
   });
 
   it("keeps the pressed state on the active view", async () => {
     render(<BranchTree tree={t} developments={devs} />);
-    expect(screen.getByRole("button", { name: "MAIN" })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(screen.getByRole("button", { name: "ALL" }));
-    expect(screen.getByRole("button", { name: "ALL" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "MAIN" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("tab", { name: /^Main line/ })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(screen.getByRole("tab", { name: /^All/ }));
+    expect(screen.getByRole("tab", { name: /^All/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Main line/ })).toHaveAttribute("aria-selected", "false");
   });
 });
 

@@ -100,21 +100,21 @@ export function LimitNote({ limit, next, onUpgrade }: { limit: AskLimit; next: s
   else if (limit.status === 503) {
     body = (
       <>
-        <span>Ask is resting for today for free readers. It is back at midnight UTC.</span>
+        <span>Ask is resting for free readers today. Back at midnight UTC{limit.plus_helps ? " —" : "."}</span>
         {limit.plus_helps && plusLink("Plus stays on →", { reason: "ask-rest" })}
       </>
     );
   } else if (limit.signin_helps) {
     body = (
       <>
-        <span>That was your last free question here.</span>
+        <span>That was your last free question here —</span>
         <Link href={`/signin?next=${encodeURIComponent(next)}`} className={action} style={{ color: "var(--accent)" }}>Sign in for 10 a day →</Link>
       </>
     );
   } else {
     body = (
       <>
-        <span>You have asked {limit.used ?? limit.limit} of {limit.limit} questions today.</span>
+        <span>You have asked {limit.used ?? limit.limit} of {limit.limit} questions today{limit.plus_helps ? " —" : "."}</span>
         {limit.plus_helps && plusLink("Plus is 100 a day →", { reason: "ask-limit", used: limit.used, limit: limit.limit })}
       </>
     );
