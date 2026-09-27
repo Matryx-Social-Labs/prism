@@ -18,7 +18,7 @@ Reconciliation state machine (why /trending/<slug> URLs don't silently change me
     A story not refreshed by any community this pass, older than DORMANT_AFTER → status='dormant'
     (never deleted, so shared links keep resolving). Slug is frozen; only the label refines.
 
-No LLM. Labels are extractive — the hero event's own headline (see _label). Persistence is EARNED: a community must clear the
+No LLM. Labels are the hero record's own (Prism) headline (see _label). Persistence is EARNED: a community must clear the
 min-support gate (>= news sources + members) before it gets a durable story.
 """
 
@@ -335,16 +335,18 @@ def _label(cast: list[str], hero_title: str | None, hero_en_title: str | None = 
     cast names who is involved and never says what happened, and the fallback was
     effectively dead: 0 of 27 active stories had an empty cast.
 
-    English is preferred over the hero's own title because 5 of the 10 most
-    trending heroes carried Devanagari or Kannada headlines, and the trending page
-    is English-only — a reader there cannot read them. Cast survives as the last
-    resort for the 3-of-24 case where the hero has neither an English headline nor
-    a Latin-script title, since three readable names beat an unreadable sentence.
+    The hero's own title is Prism's headline and leads when it is readable. The
+    English headline in the projection is an OUTLET's, clickbait and all ("…Here's
+    all you need to know", audit 2026-09-27), so it is only the fallback for a
+    title in a script the English-only page cannot show: 5 of the 10 most
+    trending heroes once carried Devanagari or Kannada titles. Cast survives as
+    the last resort for the 3-of-24 case where the hero has neither, since three
+    readable names beat an unreadable sentence.
     """
-    if hero_en_title:
-        return hero_en_title
     if hero_title and detect_script(hero_title) == "latin":
         return hero_title
+    if hero_en_title:
+        return hero_en_title
     return " · ".join(cast[:3]) if cast else (hero_title or "Developing story")
 
 

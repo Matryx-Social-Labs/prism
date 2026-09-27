@@ -101,6 +101,20 @@ describe("/about — how Prism works, on one live story", () => {
     expect(document.body.textContent).not.toMatch(/\\u20/);
   });
 
+  // Audit 2026-09-27: /sources has no international or wire outlet, a lens is
+  // never named in generic copy (DESIGN.md), the watchlist is free and alerts
+  // do not exist, and Plus sells no model.
+  it("promises no outlet group Prism does not read, names no lens, and sells nothing that is free or unbuilt", async () => {
+    fetchFeed.mockResolvedValue([]);
+    render(await AboutPage());
+    const text = document.body.textContent!;
+    expect(text).not.toMatch(/international press|the wires/);
+    // The prose names none; the registry beside it renders whatever the lens API returns.
+    expect(screen.getByText(/A lens is a professional reading of the record/).textContent).not.toMatch(/markets|security/i);
+    expect(text).not.toMatch(/watchlists|alerts|model/i);
+    expect(text).toMatch(/What can be paid for is depth and convenience: every lens on every story and more questions\./);
+  });
+
   it("defines the words a record uses, and offers the structured ways to report a problem", async () => {
     fetchFeed.mockResolvedValue([]);
     render(await AboutPage());

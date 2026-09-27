@@ -193,6 +193,47 @@ async def test_serving_scope_and_merge_redirect():
             await s.execute(text("DELETE FROM stories WHERE id = ANY(:ids)"), {"ids": [str(canonical), str(merged)]})
 
 
+async def test_subject_scope_reads_the_hero_records_subject_path():
+    """Education and Civic & Safety are subject roots, not sectors (their records
+    are sector `other`), so ?sector= cannot reach them: the Stories page lit the
+    EDU and CIV chips and listed everything. ?subject= filters on the hero
+    record's subject_path, the node and everything under it."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:8]
+    edu_ev, civ_ev, edu, civ = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    try:
+        async with session_scope() as s:
+            for ev, path in ((edu_ev, "education.exams"), (civ_ev, "civic")):
+                await s.execute(
+                    text("INSERT INTO events (id, title, sector, subject_path) VALUES (:i, 't', 'other', :p)"),
+                    {"i": str(ev), "p": path},
+                )
+            for sid, slug, hero in ((edu, f"edu-{tag}", edu_ev), (civ, f"civ-{tag}", civ_ev)):
+                await s.execute(
+                    text(
+                        'INSERT INTO stories (id,slug,label,"cast",member_event_ids,hero_event_id,sector,source_count,velocity,status) '
+                        "VALUES (:i,:sl,'x','[]'::jsonb,'[]'::jsonb,:h,'other',4,1,'active')"
+                    ),
+                    {"i": str(sid), "sl": slug, "h": str(hero)},
+                )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+            async def slugs(**p):
+                r = await ac.get("/api/v1/trending", params={"limit": 50, **p})
+                return {x["slug"] for x in r.json()["stories"]}
+
+            assert f"edu-{tag}" in await slugs(subject="education")
+            assert f"civ-{tag}" not in await slugs(subject="education")
+            assert f"civ-{tag}" in await slugs(subject="civic")
+            assert f"edu-{tag}" not in await slugs(subject="civic")
+            # A prefix of a name is not its parent: `edu` is not `education`.
+            assert f"edu-{tag}" not in await slugs(subject="edu")
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM stories WHERE id = ANY(:ids)"), {"ids": [str(edu), str(civ)]})
+            await s.execute(text("DELETE FROM events WHERE id = ANY(:ids)"), {"ids": [str(edu_ev), str(civ_ev)]})
+
+
 async def test_two_communities_of_one_story_fold_instead_of_minting_duplicates(monkeypatch):
     """REGRESSION: trending fragmented without bound — a merge/re-create treadmill.
 
@@ -286,6 +327,14 @@ def test_english_headline_beats_the_heros_own_non_latin_title():
     """5 of the 10 most-trending heroes carried Devanagari or Kannada titles while
     an English headline sat unused in the same event's projection."""
     assert _label(ASSAM_CAST, HINDI_HEADLINE, ASSAM_HEADLINE) == ASSAM_HEADLINE
+
+
+def test_prisms_headline_beats_the_outlets_english_headline():
+    """The hero's title is Prism's own headline; the English headline in the
+    projection is an outlet's, clickbait included (audit 2026-09-27: arcs titled
+    "…Here's all you need to know"). A readable Prism headline wins."""
+    outlet = "Assam floods: Here's all you need to know"
+    assert _label(ASSAM_CAST, ASSAM_HEADLINE, outlet) == ASSAM_HEADLINE
 
 
 def test_a_latin_headline_is_used_without_a_translation():

@@ -113,6 +113,14 @@ describe("Landing", () => {
     expect(screen.getByRole("heading", { name: "Prism Plus · from ₹149 a month" })).toBeInTheDocument();
   });
 
+  // Founder decision #2 (27 Sep): Plus sells the lenses and Ask, never a model.
+  it("says Plus opens every lens, and sells no model", async () => {
+    render(await Landing());
+    const card = screen.getByRole("heading", { name: "Prism Plus" }).parentElement!;
+    expect(card).toHaveTextContent(/Every lens on every story/);
+    expect(card.textContent).not.toMatch(/model/i);
+  });
+
   it("falls back to the live lens registry when no record carries a brief", async () => {
     render(await Landing());
     expect(screen.getByText("General reader")).toBeInTheDocument();

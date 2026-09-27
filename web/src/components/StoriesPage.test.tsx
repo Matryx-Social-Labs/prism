@@ -85,20 +85,44 @@ describe("Trending — the sector strip", () => {
     await userEvent.click(screen.getByRole("button", { name: /All stories/ }));
     await waitFor(() => expect(lastQuery()).toMatchObject({ sector: null }));
   });
+
+  // REGRESSION (audit 2026-09-27): Education and Civic & Safety have no sector
+  // group, so the chip lit up and the list stayed unfiltered.
+  it("asks for Education and Civic & Safety by subject, not by sector", async () => {
+    render(<TrendingPage />);
+    await screen.findByRole("list");
+    await userEvent.click(screen.getByRole("button", { name: /Education/ }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sector: null, subject: "education" }));
+    await userEvent.click(screen.getByRole("button", { name: /Civic & Safety/ }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sector: null, subject: "civic" }));
+    await userEvent.click(screen.getByRole("button", { name: /Politics/ }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ sector: "politics", subject: null }));
+  });
 });
 
 describe("Trending — the chart of arcs", () => {
-  // The Reading board's ArcRow: status first, subject · span · last update,
-  // the name, and the one-ink bar labelled "k developments · n outlets".
-  it("says a provisional boundary is a provisional grouping and opens its honest group page", async () => {
+  // The Reading board's ArcRow: subject · span · last update, the name, and the
+  // one-ink bar labelled with what it counts. Founder decision (27 Sep): stories
+  // are related coverage — a provisional grouping counts records, not
+  // "developments", and says "provisional" once for the page, not per row.
+  it("counts a provisional grouping's records and opens its honest group page", async () => {
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(r).toHaveAttribute("href", "/trending/kerala-power");
-    expect(r.textContent).toMatch(/5 developments · 4 outlets/);
+    expect(r.textContent).toMatch(/5 records · 4 outlets/);
+    expect(r.textContent).not.toMatch(/development/);
     expect(r.textContent).toMatch(/5 days/); // 6 days less two hours, floored
     expect(r.textContent).toMatch(/updated 2h ago/);
-    expect(r.textContent).toMatch(/Provisional grouping/);
-    expect(r.textContent).not.toMatch(/Verified/);
+    expect(r.textContent).not.toMatch(/Provisional|Verified/);
+  });
+
+  it("says provisional once for the page, promises no order, and prints no developer note", async () => {
+    fetchTrending.mockResolvedValue([story({ slug: "a", hero_event_id: "a" }), story({ slug: "b", hero_event_id: "b" })]);
+    const { container } = render(<TrendingPage />);
+    await screen.findAllByRole("link", { name: /CPI\(M\)/ });
+    expect(container.textContent!.match(/provisional/gi)).toHaveLength(1);
+    expect(container.textContent).not.toMatch(/in order|how it unfolded/i);
+    expect(container.textContent).not.toMatch(/drawn in one ink|outlet-origin split/);
   });
 
   it("shows a route and opens its hero only after the boundary is verified", async () => {
@@ -108,6 +132,8 @@ describe("Trending — the chart of arcs", () => {
     expect(r).toHaveAttribute("href", "/story/ev-1#route");
     expect(r.textContent).toMatch(/5 developments/);
     expect(r.textContent).toMatch(/Verified/);
+    // Nothing on a page of verified stories is called provisional.
+    expect(screen.queryByText(/provisional/i)).toBeNull();
   });
 
   it("opens the arc page when a story has no hero event, and falls back to the hero headline without a label", async () => {

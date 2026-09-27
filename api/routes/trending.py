@@ -32,6 +32,10 @@ _MAX_MERGE_HOPS = 8
 async def trending(
     state: str | None = None,  # ISO 3166-2, e.g. IN-KA — reuses the feed's geo axis
     sector: str | None = None,
+    # A subject node (`education`, `civic.crime`): the hero record's
+    # subject_path is the node or under it. Education and Civic & Safety are
+    # records of sector `other`, so ?sector= cannot reach them.
+    subject: str | None = None,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
 ):
@@ -56,11 +60,12 @@ async def trending(
                 WHERE st.status = 'active' AND st.merged_into IS NULL
                   AND (CAST(:state AS text) IS NULL OR :state = ANY(st.regions))
                   AND (CAST(:sectors AS text[]) IS NULL OR st.sector = ANY(:sectors))
+                  AND (CAST(:subject AS text) IS NULL OR e.subject_path = :subject OR e.subject_path LIKE :subject_under)
                 ORDER BY st.velocity DESC, st.source_count DESC, st.last_updated_at DESC
                 LIMIT :lim
                 """
             ),
-            {"state": state, "sectors": sectors, "lim": limit},
+            {"state": state, "sectors": sectors, "subject": subject, "subject_under": f"{subject}.%", "lim": limit},
         )
     ).mappings().all()
     routes = (

@@ -187,7 +187,7 @@ export async function HowItWorks() {
         <div className="min-w-0">
           <Step id="reports" n="01" title="Reports come in, and stay as they were." rule="A report is kept as published, with its outlet and time."
             example={<ReportsExample reports={reports} outlets={outlets} />}>
-            <p>Prism watches a fixed, <Link href="/sources" className="p-link">public list of outlets</Link>: English national papers, Indian-language papers, the international press and the wires. Every report keeps its own headline, its outlet and the minute it published.</p>
+            <p>Prism watches a fixed, <Link href="/sources" className="p-link">public list of outlets</Link>: English national papers and Indian-language papers and broadcasters. Every report keeps its own headline, its outlet and the minute it published.</p>
             {event && <p>This story arrived as {event.sources.length} {event.sources.length === 1 ? "report" : "reports"} from {publishers(outlets).length || event.sources.length} {publishers(outlets).length === 1 ? "outlet" : "outlets"}{langs.length > 1 ? ` in ${langs.length} languages` : ""}.</p>}
           </Step>
 
@@ -245,7 +245,7 @@ export async function HowItWorks() {
             example={event && brief ? (
               <LensFlip story={{ id: event.id, title: event.title, reports: event.sources.length, brief, points: watch, available: event.available_lenses ?? [] }} />
             ) : <Unavailable what="A brief to read through a lens" />}>
-            <p>A lens is a professional reading of the record: what a story means for markets, or for security teams. Flip it and a scan line re-inks the block; the facts beneath stay exactly where they were.</p>
+            <p>A lens is a professional reading of the record: what a story means for a line of work. Flip it and a scan line re-inks the block; the facts beneath stay exactly where they were.</p>
             <div className="mt-1"><LensRegistry /></div>
           </Step>
 

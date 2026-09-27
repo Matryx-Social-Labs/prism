@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CancelSheet, couldNot } from "@/components/CancelSheet";
 import { Alert, Toast } from "@/components/ui";
-import { cancelSubscription, fetchMySubscription, refundSubscription, resumeSubscription, rupees, type MySubscription } from "@/lib/billing";
+import { cancelSubscription, fetchMySubscription, LENS_READS, refundSubscription, resumeSubscription, rupees, type MySubscription } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
 import type { Session } from "@/lib/session";
 
@@ -94,7 +94,7 @@ export function PlanCard({ session, compact = false }: { session: Session; compa
   const headline = { free: "Free", active: label, ending: label, paused: label, past_due: label, halted: label, refunded: "Free", lapsed: "Free" }[state];
   const graceUntil = when(sub?.current_period_end) ?? "the grace period ends";
   const line = {
-    free: "Every record, source, quote and clip. 10 questions a day.",
+    free: `Every record, source, quote and clip. ${LENS_READS.free} lens readings and 10 questions a day.`,
     active: sub?.current_period_end ? `Renews ${when(sub.current_period_end)}` : "Active",
     ending: sub?.next
       ? `Ends ${when(sub.cancel_at)} · then ${PLAN_LABEL[sub.next.plan] ?? "Plus"} from ${when(sub.next.starts_at) ?? "that day"}`

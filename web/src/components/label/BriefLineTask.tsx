@@ -15,6 +15,7 @@
 
 import type { ReactNode } from "react";
 
+import { ArrowUpRight } from "@/components/icons";
 import { AnswerButtons, TaskFrame, type Answer } from "@/components/label/parts";
 import type { LabelBriefLine } from "@/lib/api";
 import { KIND_QUESTION } from "@/lib/labeller";
@@ -50,8 +51,8 @@ export function BriefLineTask({
           </summary>
           <p className="whitespace-pre-line" style={{ font: "var(--t-body)", color: "var(--ink-2)", overflowWrap: "anywhere" }} lang={r.code || undefined}>{r.text}</p>
           {r.url && (
-            <a href={r.url} target="_blank" rel="noopener noreferrer" className="p-link mt-2 inline-flex min-h-11 items-center text-[13.5px]">
-              Open it on {r.outlet} ↗
+            <a href={r.url} target="_blank" rel="noopener noreferrer" className="p-link mt-2 inline-flex min-h-11 items-center gap-1 text-[13.5px]">
+              Open it on {r.outlet} <ArrowUpRight size={13} />
             </a>
           )}
         </details>

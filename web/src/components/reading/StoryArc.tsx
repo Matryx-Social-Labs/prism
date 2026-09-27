@@ -63,7 +63,10 @@ export function StoryArc({ s }: { s: TrendingStoryDetail }) {
   // No development is "here" on the story's own page: that mark belongs to a record.
   const developments = s.developments.map((d) => (d.is_current ? { ...d, is_current: false } : d));
   const nDev = s.developments.length;
-  const meta = [days ? plural(days, "day", "days") : null, plural(nDev, "development", "developments"), plural(outletN, "outlet", "outlets")].filter((x): x is string => Boolean(x));
+  // A provisional grouping is related coverage: its members are counted as
+  // records, never as developments of one story (founder, 27 Sep).
+  const members = verified ? plural(nDev, "development", "developments") : plural(nDev, "record", "records");
+  const meta = [days ? plural(days, "day", "days") : null, members, plural(outletN, "outlet", "outlets")].filter((x): x is string => Boolean(x));
   // A main line of one or two stations has nothing to fold: open the list on everything.
   const openAll = !tree || spineLength(tree) < 3;
   const latest = latestOf(s.developments);

@@ -32,7 +32,7 @@ export function TodayAside({ developing }: { developing: TrendingStory[] }) {
                       {/* /trending carries no outlet origins, so the bar is drawn mono, never a guessed split. */}
                       <CoverageBar outlets={[]} fallbackCount={s.source_count} width={48} className="p-covbar--mono" />
                       <span className="p-count">
-                        {plural(s.developments, "development")} · {plural(s.source_count, "outlet")}
+                        {plural(s.developments, s.boundary_status === "verified" ? "development" : "record")} · {plural(s.source_count, "outlet")}
                         {s.last_updated_at && <> · <Ago iso={s.last_updated_at} /></>}
                       </span>
                     </span>

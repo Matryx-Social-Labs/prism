@@ -26,7 +26,7 @@ const KEY = "prism.profile.v1";
 const SAVED = { lens: "markets", region: "IN", state: "IN-KL", interests: ["politics:elections"], languages: ["hi", "en"] };
 const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");
 const stateSelect = () => screen.getByRole("combobox", { name: "State" });
-const save = () => userEvent.click(screen.getByRole("button", { name: /Save and re-sort my record/ }));
+const save = () => userEvent.click(screen.getByRole("button", { name: "Save my profile" }));
 // Everything the form pulls has landed, otherwise a click races the taxonomy.
 const settled = async () => {
   await screen.findByRole("option", { name: "Karnataka" });
@@ -62,13 +62,16 @@ beforeEach(() => {
 });
 
 describe("You — round-trip", () => {
-  it("re-saves a stored profile unchanged, and says the record is re-sorted", async () => {
+  // D2: Today is one front page for everyone. The profile drives For you and the
+  // state scope, and the page says that — never that it re-sorts the record.
+  it("re-saves a stored profile unchanged, and says what it changed without claiming a re-sort", async () => {
     localStorage.setItem(KEY, JSON.stringify(SAVED));
-    render(<YouPage />);
+    const { container } = render(<YouPage />);
     await settled();
     await save();
     expect(saved()).toEqual(SAVED);
-    expect(await screen.findByText("Saved · your record is re-sorted")).toBeInTheDocument();
+    expect(await screen.findByText("Saved · For you and your state scope are updated")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/re-sort|sorts your record/);
   });
 
   it("starts from the defaults when nothing is stored", async () => {

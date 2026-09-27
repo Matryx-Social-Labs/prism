@@ -27,16 +27,20 @@ describe("/sources — the monitored set, in public", () => {
     });
     render(await SourcesPage());
     const heads = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent ?? "");
-    expect(heads.slice(0, 4)).toEqual(["English national", "International", "Indian-language", "Wire / agency"]);
+    // An origin with no outlet is not a group: "International — None read yet"
+    // and "Wire / agency — 0 outlets" read as a promise (audit 2026-09-27).
+    expect(heads.slice(0, 2)).toEqual(["English national", "Indian-language"]);
+    expect(heads).not.toContain("International");
+    expect(heads).not.toContain("Wire / agency");
+    expect(screen.queryByText("None read yet.")).toBeNull();
     // The denominator the story pages print is this page's own count.
     expect(document.body.textContent).toMatch(/2 of 3 monitored outlets/);
     // The age is its own <time> (components/Ago), so match the whole line.
     expect(document.body.textContent).toMatch(/3 outlets · 4 feeds · 3 languages · checked 3m ago/);
     expect(screen.getByText("Kerala desk")).toBeInTheDocument();
-    // Two feeds from one masthead count once; an origin with none says so.
+    // Two feeds from one masthead count once.
     const national = screen.getByRole("heading", { name: "English national" }).closest("section")!;
     expect(national.textContent).toMatch(/1 outlet · 2 feeds/);
-    expect(within(screen.getByRole("heading", { name: "International" }).closest("section")!).getByText("None read yet.")).toBeInTheDocument();
     const indian = screen.getByRole("heading", { name: "Indian-language" }).closest("section")!;
     expect(indian.textContent).toMatch(/Not reached since 2d ago/);
     expect(within(indian).getByText("KN")).toBeInTheDocument();

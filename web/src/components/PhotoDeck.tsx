@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { OutletIcon } from "@/components/Coverage";
 import { PhotoImg } from "@/components/PhotoImg";
-import { ArrowLeft, ArrowRight } from "@/components/icons";
+import { ArrowLeft, ArrowRight, ArrowUpRight } from "@/components/icons";
 import { fallbackCode } from "@/lib/sources";
 import type { SourceRef } from "@/lib/api";
 import { REPORT_IMAGES } from "@/lib/images";
@@ -155,8 +155,8 @@ export function PhotoDeck({ sources, frames }: { sources?: SourceRef[]; frames?:
       </div>
       <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] leading-[1.35]" style={{ color: "var(--ink-3)" }}>
         <span className="min-w-0">Photo: <b className="font-semibold" style={{ color: "var(--ink-2)" }}>{cur.source_name}</b> — a preview of their report</span>
-        <a href={cur.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex min-h-[44px] items-center font-semibold lg:min-h-[32px]" style={{ color: "var(--accent)" }}>
-          Their report ↗
+        <a href={cur.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex min-h-[44px] items-center gap-1 font-semibold lg:min-h-[32px]" style={{ color: "var(--accent)" }}>
+          Their report <ArrowUpRight size={13} />
         </a>
       </figcaption>
       {n > 1 && (

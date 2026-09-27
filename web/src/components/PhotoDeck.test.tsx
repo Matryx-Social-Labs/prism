@@ -10,7 +10,9 @@ describe("PhotoDeck", () => {
   it("credits the photo on the stage and opens that outlet's report", () => {
     render(<PhotoDeck frames={FRAMES} />);
     expect(screen.getByRole("group", { name: "Photo 1 of 3: The Hindu" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Their report ↗" })).toHaveAttribute("href", "https://news.test/a");
+    const link = screen.getByRole("link", { name: "Their report" });
+    expect(link).toHaveAttribute("href", "https://news.test/a");
+    expect(link.querySelector("svg")).not.toBeNull(); // the icon, not a ↗ glyph
   });
 
   it("steps with the arrow keys and the thumbnails, wrapping at the end", () => {

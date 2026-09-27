@@ -37,7 +37,8 @@ class Price:
 OFFER = {
     "plus_monthly": Price("plus_monthly", "Plus · monthly", 14900, "month"),
     "plus_yearly": Price("plus_yearly", "Plus · yearly", 119900, "year"),
-    "founding": Price("founding", "Founding member · yearly, price locked 3 years", 99900, "year"),
+    # The label is printed at checkout; it promises no renewal price (D-b).
+    "founding": Price("founding", "Founding member · yearly", 99900, "year"),
 }
 REGULAR = {
     "plus_monthly": Price("plus_monthly", "Plus · monthly", 19900, "month"),

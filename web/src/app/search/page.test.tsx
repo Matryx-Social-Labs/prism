@@ -277,6 +277,42 @@ describe("Search — the Records head counts the results", () => {
     await userEvent.click(screen.getByRole("button", { name: /Sports/ }));
     expect(screen.getByText(/None of the 2 matches for “result” are in Sports/)).toBeInTheDocument();
   });
+
+  // REGRESSION (audit 2026-09-27): Education and Civic & Safety records are
+  // sector `other`; with no sector group behind the key the chip lit up and the
+  // list stayed unfiltered. They filter on the subject root.
+  it("filters by the Education and Civic & Safety chips too, on the subject root", async () => {
+    searchEvents.mockResolvedValue([
+      item({ id: "a", title: "Board exam postponed", sector: "other", subject_path: "education.exams" }),
+      item({ id: "b", title: "Bus overturns on highway", sector: "other", subject_path: "civic" }),
+    ]);
+    render(<SearchPage />);
+    await userEvent.type(input(), "board");
+    await screen.findByRole("link", { name: /Board exam postponed/ });
+    await userEvent.click(screen.getByRole("button", { name: /Education/ }));
+    expect(screen.getByRole("link", { name: /Board exam postponed/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Bus overturns/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Civic & Safety/ }));
+    expect(screen.getByRole("link", { name: /Bus overturns/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Board exam postponed/ })).toBeNull();
+  });
+});
+
+describe("Search — order", () => {
+  // REGRESSION (audit 2026-09-27): the page re-sorted results most-outlets-first,
+  // so the exact "Sun Pharma" record sank below market stories that merely
+  // mention it. A search list keeps the order the API returned.
+  it("keeps the API's order rather than re-sorting by outlet count", async () => {
+    searchEvents.mockResolvedValue([
+      item({ id: "exact", title: "Sun Pharma Chengalpattu expansion not yet implemented", source_count: 1 }),
+      item({ id: "broad", title: "Pharma stocks lead the index", source_count: 6 }),
+    ]);
+    render(<SearchPage />);
+    await userEvent.type(input(), "Sun Pharma");
+    await screen.findByRole("link", { name: /Pharma stocks lead/ });
+    const titles = screen.getAllByRole("link").map((a) => a.getAttribute("href")).filter((h) => h?.startsWith("/story/"));
+    expect(titles).toEqual(["/story/exact", "/story/broad"]);
+  });
 });
 
 describe("Search — clearing the box", () => {

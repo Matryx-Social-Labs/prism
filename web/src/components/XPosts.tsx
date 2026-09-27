@@ -2,7 +2,7 @@
 
 import { Ago } from "@/components/Ago";
 import type { SourceRef, XPostOut } from "@/lib/api";
-import { XIcon } from "@/components/icons";
+import { ArrowUpRight, XIcon } from "@/components/icons";
 
 /**
  * "On X": what the official accounts said about this story, as written.
@@ -80,8 +80,8 @@ export function XPosts({ posts, sources }: { posts: XPostOut[]; sources: SourceR
                   <Ago iso={p.created_at} />
                 </a>
                 {first?.post_id === p.post_id && <span className="p-badge p-badge--outline">First on X</span>}
-                <a href={p.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex min-h-[44px] items-center text-[13px] font-semibold lg:min-h-[32px]" style={{ color: "var(--accent)" }}>
-                  View on X ↗
+                <a href={p.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold lg:min-h-[32px]" style={{ color: "var(--accent)" }}>
+                  View on X <ArrowUpRight size={13} />
                 </a>
               </div>
             </li>

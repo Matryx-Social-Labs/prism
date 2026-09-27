@@ -68,6 +68,18 @@ describe("Onboarding — three steps of the reservation form", () => {
     expect(router.push).toHaveBeenCalledWith("/feed");
   });
 
+  // D2: Today is one front page for everyone. The profile makes the For you tab
+  // and a state scope; it re-sorts nothing, so no step may say it "leads".
+  it("promises For you and a state scope, never a re-sorted Today", async () => {
+    render(<OnboardingPage />);
+    expect(await screen.findByText(/Your state becomes a scope on Today/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/leads with/);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    expect(await screen.findByText(/They make your For you tab/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/leads with/);
+  });
+
   it("lets the reader skip from any step without saving anything", async () => {
     render(<OnboardingPage />);
     await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));

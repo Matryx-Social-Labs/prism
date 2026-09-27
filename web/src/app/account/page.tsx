@@ -44,7 +44,7 @@ export default function AccountPage() {
         <Payments session={session} />
 
         <section aria-labelledby="profile-title" className="grid gap-3">
-          <SectionHead id="profile-title" title="Your record" hint="Your state, profession and the subjects you follow shape Today." />
+          <SectionHead id="profile-title" title="Your profile" hint="Your subjects make the For you tab, your state a scope on Today, and your profession the reading a story opens in. Today is the same for everyone." />
           <div className="flex flex-wrap items-center gap-x-5" style={{ font: "600 14.5px/1 var(--font-read)" }}>
             <Link href="/you" className={link}>Profile</Link>
             <Link href="/watchlist" className={link}>Watchlist</Link>

@@ -29,6 +29,8 @@ export interface FeedItem {
   summary: string | null;
   sector: string | null;
   subsector: string | null;
+  /** The subject node (`education.exams`); only search sends it, for its Education and Civic chips. */
+  subject_path?: string | null;
   regions: string[];
   image_url: string | null;
   /** Whose photograph `image_url` is — the outlet is credited on the thumbnail. */
@@ -421,12 +423,13 @@ export interface RouteData {
 }
 
 export async function fetchTrending(
-  opts: { state?: string | null; sector?: string | null; limit?: number } = {},
+  opts: { state?: string | null; sector?: string | null; subject?: string | null; limit?: number } = {},
   revalidate = 120,
 ): Promise<TrendingStory[]> {
   const p = new URLSearchParams();
   if (opts.state) p.set("state", opts.state);
   if (opts.sector) p.set("sector", opts.sector);
+  if (opts.subject) p.set("subject", opts.subject);
   if (opts.limit) p.set("limit", String(opts.limit));
   const res = await fetch(`${API_URL}/api/v1/trending?${p}`, { next: { revalidate } });
   if (!res.ok) return [];

@@ -13,7 +13,7 @@ import { Ago } from "@/components/Ago";
 import { istTime } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
-import { sectorGroup, sectorParam } from "@/lib/sectors";
+import { navFilter, navItem, sectorGroup } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 
@@ -21,10 +21,12 @@ import { useStateName } from "@/lib/useStateName";
  * Stories: what is developing over days (the URL stays /trending). Design
  * System v2 · Reading board, flow 01: a title and one line on what the page
  * is, the subject chips (no counts: the list is one capped page), then one
- * ArcRow per story — status, subject · span · last update, the story's name in
- * the record voice, and a bar in one ink with its counts. The list API carries
- * no outlet-origin split, so the bar cannot be split by origin; the page says
- * so under the list rather than draw a split it does not know.
+ * ArcRow per story — subject · span · last update, the story's name in the
+ * record voice, and a bar in one ink with its counts. Stories are related
+ * coverage while their boundaries are unverified (founder, 27 Sep): the page
+ * says "provisional" once above the list, and a row counts records, not
+ * developments. The list API carries no outlet-origin split, so the bar is
+ * drawn in one ink rather than split by origins it does not know.
  *
  * Trending has no "all" tier — National IS everything here — so the shared
  * scope is narrowed at this one call site, and writing it back never narrows
@@ -78,8 +80,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
     setStories(null);
     setError(null);
     let cancelled = false;
-    const g = sectorGroup(group);
-    fetchTrending({ state: scope === "region" ? state : null, sector: g ? sectorParam(g) : null, limit: LIMIT })
+    fetchTrending({ state: scope === "region" ? state : null, ...navFilter(group), limit: LIMIT })
       .then((s) => { if (!cancelled) setStories(s); })
       .catch(() => { if (!cancelled) setError("The Prism API is unreachable right now."); });
     return () => { cancelled = true; };
@@ -101,7 +102,10 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
   }, [stories]);
 
   const scopes: [Scope, string][] = [["region", stateName ?? "Your state"], ["national", "National"]];
-  const subject = sectorGroup(group)?.name ?? null;
+  const subject = navItem(group)?.name ?? null;
+  // Said once for the page, not on every row (founder, 27 Sep: stories are
+  // related coverage while their boundaries are unverified).
+  const provisional = Boolean(stories?.some((s) => s.boundary_status !== "verified"));
 
   return (
     <div className="mx-auto max-w-[760px] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-16">
@@ -112,7 +116,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
             Developing stories
           </h1>
           <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
-            Stories that run over days, each with its developments in order. Provisional groupings say so.
+            Stories that run over days, each with the records that report it, grouped as related coverage.
           </p>
         </div>
         {state && (
@@ -133,20 +137,23 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
               title={subject ? `No developing ${subject} stories right now` : "No developing stories right now"}
               action={subject ? <button type="button" onClick={() => setGroup(null)} className="p-link inline-flex min-h-11 items-center">All subjects →</button> : undefined}
             >
-              A story appears here once two or more outlets have reported two or more developments.
+              A story appears here once two or more outlets have reported it across two or more records.
             </EmptyState>
           ) : (
             <>
               {subline && <p className="p-count whitespace-normal">{subline}</p>}
+              {provisional && (
+                <p className="flex flex-wrap items-center gap-2" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+                  <StatusPill status="provisional" />
+                  <span>Grouped automatically and under review. No order of events is implied.</span>
+                </p>
+              )}
               <ol className="p-print">
                 {stories.map((s) => <ArcRow key={s.slug} story={s} />)}
               </ol>
             </>
           )}
         </section>
-        <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
-          Coverage bars are drawn in one ink until the list carries the outlet-origin split.
-        </p>
       </div>
     </div>
   );
@@ -155,8 +162,8 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
- * One developing story (Reading board · ArcRow): the status first — verified,
- * or a provisional grouping that says so — then subject · span · last update,
+ * One developing story (Reading board · ArcRow): "Verified" first when it is
+ * (provisional is said once for the page), then subject · span · last update,
  * the story's name, and the one-ink bar labelled with its counts. State is line
  * form: a single-outlet story sits on a dashed rule, one that has not moved in
  * three days at reduced weight. Verified arcs open on their hero's route;
@@ -184,7 +191,7 @@ function ArcRow({ story }: { story: TrendingStory }) {
         style={{ borderColor: single ? "var(--line-strong)" : "var(--line)", color: "var(--ink)" }}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : "Provisional grouping"} />
+          {verified && <StatusPill status="verified" label="Verified" />}
           {parts.length > 0 && (
             <span className="p-meta">
               {parts.map((p, i) => (
@@ -202,7 +209,7 @@ function ArcRow({ story }: { story: TrendingStory }) {
         <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5">
           <CoverageBar outlets={[]} fallbackCount={story.source_count} width={200} className="p-covbar--mono max-w-full" />
           <span className="p-count">
-            {plural(story.developments, "development", "developments")} · {plural(story.source_count, "outlet", "outlets")}
+            {verified ? plural(story.developments, "development", "developments") : plural(story.developments, "record", "records")} · {plural(story.source_count, "outlet", "outlets")}
           </span>
         </span>
       </Link>

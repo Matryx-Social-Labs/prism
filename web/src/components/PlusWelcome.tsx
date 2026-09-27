@@ -47,7 +47,7 @@ export function PlusWelcome() {
       {sub?.plan && sub.plan !== "free" && <p className="p-mono uppercase" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{sub.plan === "founding" ? "Founding member" : "Plus is on"}</p>}
       <h1 className="text-balance [font:var(--t-display-l)] lg:[font:var(--t-display-xl)]" style={{ letterSpacing: "var(--track-display)" }}>You&rsquo;re on Plus.</h1>
       <p className="max-w-[60ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-        Ask is on at 100 questions a day, answered from the whole story, and it stays on when the free tier rests.
+        Every lens is open on every story, and Ask is on at 100 questions a day, answered from the whole story. It stays on when the free tier rests.
       </p>
       <dl className="m-0 grid gap-0.5 pt-3.5 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-3" style={{ borderTop: "1px solid var(--line)" }}>
         {facts.map(([k, v]) => (

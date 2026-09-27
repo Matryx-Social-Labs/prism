@@ -42,7 +42,7 @@ async def search(
         await db.execute(
             text(
                 f"""
-                SELECT e.id, e.title, e.summary, e.sector, e.subsector, e.regions,
+                SELECT e.id, e.title, e.summary, e.sector, e.subsector, e.subject_path, e.regions,
                        img.image_url AS image_url, img.slug AS image_source_slug,
                        e.projection, e.last_updated_at, e.occurred_at
                 FROM events e

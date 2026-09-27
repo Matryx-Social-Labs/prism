@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { entity, record_count, indexable } = page;
   return {
     title: `${entity.name} — every record`,
-    description: `Every Prism record naming ${entity.name}: ${record_count} ${record_count === 1 ? "story" : "stories"} from monitored Indian and international outlets, each with its reports, what changed and who said what.`,
+    description: `Every Prism record naming ${entity.name}: ${record_count} ${record_count === 1 ? "story" : "stories"} from monitored Indian outlets, each with its reports, what changed and who said what.`,
     alternates: { canonical: `/entity/${entity.slug}` },
     // A stub still resolves for the reader and still passes its links on; it
     // simply does not ask for the crawl budget the records need.

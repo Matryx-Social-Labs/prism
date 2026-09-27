@@ -87,6 +87,30 @@ export function sectorParam(group: SectorGroup): string {
   return group.sectors.join(",");
 }
 
+/** The nav item for a strip key (its name for headings), or null. */
+export function navItem(key: string | null): NavItem | null {
+  return NAV_ITEMS.find((n) => n.key === key) ?? null;
+}
+
+/**
+ * What a strip key filters on. The six groups are unions of pipeline sectors;
+ * Education and Civic & Safety are subject roots whose records are sector
+ * `other`, so they filter on the subject path. Without this the EDU and CIV
+ * chips lit up and filtered nothing (audit 2026-09-27).
+ */
+export function navFilter(key: string | null): { sector: string | null; subject: string | null } {
+  const g = sectorGroup(key);
+  return { sector: g ? sectorParam(g) : null, subject: key && !g ? key : null };
+}
+
+/** Whether a record already fetched falls under a strip key (null: everything). */
+export function underNav(key: string | null, item: { sector: string | null; subject_path?: string | null }): boolean {
+  const { sector, subject } = navFilter(key);
+  if (sector) return sector.split(",").includes(item.sector ?? "");
+  if (subject) return item.subject_path === subject || (item.subject_path ?? "").startsWith(`${subject}.`);
+  return true;
+}
+
 /** The code printed on a row for a story's pipeline sector; "" for "other" so nothing is printed. */
 export function sectorCode(pipelineSector: string | null | undefined): string {
   return BY_PIPELINE.get(pipelineSector ?? "")?.code ?? "";

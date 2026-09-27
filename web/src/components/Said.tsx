@@ -4,7 +4,7 @@ import { Ago } from "@/components/Ago";
 import { useEffect, useState } from "react";
 import { useAsk } from "@/components/AskContext";
 import type { ClaimOut, SpeakerClaims } from "@/lib/api";
-import { ChevronDown } from "@/components/icons";
+import { ArrowUpRight, ChevronDown } from "@/components/icons";
 import { OutletIcon } from "@/components/Coverage";
 import { fallbackCode } from "@/components/SourceList";
 import { quoteLink } from "@/lib/quoteLink";
@@ -151,10 +151,10 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`Source ${n}: ${c.source_name}`}
-                  className="inline-flex min-h-[44px] items-center font-semibold lg:min-h-[32px]"
+                  className="inline-flex min-h-[44px] items-center gap-1 font-semibold lg:min-h-[32px]"
                   style={{ color: "var(--accent)" }}
                 >
-                  Open at the quote ↗
+                  Open at the quote <ArrowUpRight size={13} />
                 </a>
               )}
               {eventId && (
@@ -211,8 +211,8 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                         {a.lang && <LangLabel claim={a} />}
                         <span style={{ color: "var(--ink-2)" }}>{a.source_name}</span>
                         {a.url && an != null && (
-                          <a href={quoteLink(a.url, a.quote_text)} target="_blank" rel="noopener noreferrer" aria-label={`Source ${an}: ${a.source_name}`} className="inline-flex min-h-[44px] items-center font-semibold lg:min-h-[32px]" style={{ color: "var(--accent)" }}>
-                            Open at the quote ↗
+                          <a href={quoteLink(a.url, a.quote_text)} target="_blank" rel="noopener noreferrer" aria-label={`Source ${an}: ${a.source_name}`} className="inline-flex min-h-[44px] items-center gap-1 font-semibold lg:min-h-[32px]" style={{ color: "var(--accent)" }}>
+                            Open at the quote <ArrowUpRight size={13} />
                           </a>
                         )}
                       </div>

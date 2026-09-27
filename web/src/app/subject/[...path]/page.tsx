@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ path: str
   const trail = [...ancestors.map((a) => a.label), node.label].join(" · ");
   return {
     title: `${node.label} — today's record`,
-    description: `${story_count} ${story_count === 1 ? "story" : "stories"} in ${trail}, from monitored Indian and international outlets, one record per story: who reported it, what changed, who said what.`,
+    description: `${story_count} ${story_count === 1 ? "story" : "stories"} in ${trail}, from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`,
     alternates: { canonical: sectorPageFor(node.path) ?? `/subject/${node.path.split(".").join("/")}` },
     // A node nobody has reached yet is not a page worth indexing. It stays
     // readable, and comes back when the corpus fills it.
