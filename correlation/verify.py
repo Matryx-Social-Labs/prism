@@ -98,14 +98,15 @@ async def event_blocks(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid
 
 async def judge(
     *, article_id: uuid.UUID, block: str, candidates: list[Candidate], blocks: dict[uuid.UUID, str]
-) -> tuple[list[tuple[Candidate, float]], str]:
+) -> tuple[list[tuple[Candidate, float]], str, float]:
     """Jev's probability, per candidate, that the article reports the event's
-    happening, and the model that answered. The network call only — no database:
-    a Jev failure or timeout raises, and the caller treats that as no match,
-    which is only safe because nothing here can leave the transaction aborted."""
+    happening, the model that answered, and what the call cost (USD). The network
+    call only — no database: a Jev failure or timeout raises, and the caller
+    treats that as no match, which is only safe because nothing here can leave
+    the transaction aborted."""
     asked = [c for c in candidates if c.event_id in blocks]
     if not asked:
-        return [], ""
+        return [], "", 0.0
     state = {"ARTICLE": block, **{f"EVENT_{k}": blocks[c.event_id] for k, c in enumerate(asked, 1)}}
     questions = {f"same_{k}": Noul(instructions=SAME_HAPPENING.format(a="ARTICLE", b=f"EVENT_{k}"))
                  for k in range(1, len(asked) + 1)}
@@ -118,7 +119,7 @@ async def judge(
         answer = d.answers[f"same_{k}"]
         assert isinstance(answer, NoulAnswer)
         scored.append((c, answer.noul))
-    return scored, d.model or get_settings().prism_model_decide
+    return scored, d.model or get_settings().prism_model_decide, d.usage.cost
 
 
 async def record(
