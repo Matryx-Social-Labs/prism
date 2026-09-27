@@ -310,6 +310,23 @@ thresholds move with the embedding model; calibrate Jev floors on labels, not 0.
   2026-09-27 on production: 591 merges into 409 survivors (108 through a copy, chains
   up to 4 deep), 158 skipped (175 entity_overlap, 73 embedding, 45 title_time members
   never judged). Dry run by default; `--apply --limit 20` first.
+- **Duplicate records built from several articles** — `tools/merge_duplicates --events`
+  (`merge.plan_events`). The shadow verdicts cannot reach them, so the records are
+  judged record to record: every served record of the last `--days` (7) is paired
+  with its five nearest by the FOUNDERS' gists (cosine >= 0.90, first seen within
+  72h), and Jev judges the two founding headlines + summaries, batched as the live
+  tier batches. Groups are stars (`merge.stars`): survivor = most publishers, then
+  earliest; a record joins only on its own verdict against the survivor (>= 0.85);
+  a record reached only through another is judged against the survivor directly
+  (one extra call) or left out. It moves whole. Answers already on file in any mode
+  are reused; `--apply` keeps this run's as `event_match_verdicts.mode = 'pair'`
+  (article = one record's founder, event = the other). Dry run 2026-09-27 on
+  production: 14,664 records, 21,255 gist pairs (6,464 answered before), 14,865
+  pairs judged in 6,042 calls for $0.22; 1,045 merges into 664 survivors (the
+  Parvesh Verma slap 6 → 1, a Yamuna Expressway bus fire 23 → 1). The 0.85–0.87
+  band (161 merges) holds the doubtful ones: a follow-up ("CCTV footage reveals…")
+  and a repeat daily RBI auction 57h apart, both at exactly 0.850 — tighten a run
+  with `PRISM_EVENT_VERIFY_MIN=0.87`.
 - **Ratify silver**: push it as an `event_identity` label batch for two labellers.
 - **The title tier compares unlike things** (outlet title vs Prism headline) — test
   outlet-title-vs-founder-title in replay, or retire it if the verified tier

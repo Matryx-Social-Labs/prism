@@ -767,7 +767,7 @@ async def _match_by_gist_verified(
     # be swallowed as "no match" with the transaction already aborted, and the
     # attach that follows would fail on it — so reads and writes stay outside.
     try:
-        scored, model = await judge(article_id=article_id, block=block, candidates=candidates, blocks=blocks)
+        scored, model, _ = await judge(article_id=article_id, block=block, candidates=candidates, blocks=blocks)
     except Exception as exc:  # noqa: BLE001 — an unjudged article founds its own event, as it did before this tier
         logger.warning("event_verify_failed article=%s error=%s", article_id, str(exc)[:160])
         return None
