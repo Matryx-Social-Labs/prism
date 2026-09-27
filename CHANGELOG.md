@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.106.0] - 2026-09-27
+
+### Fixed — indexable pages lost the site's Google directives
+Found while verifying 0.0.105.0 live: a page whose metadata said
+`robots: undefined` did not fall back to the layout's robots. Next erases them,
+so every indexable record, actor page and subject page shipped with **no robots
+meta at all**. They were still indexable, since no tag means indexable, but
+without `max-image-preview:large` and `max-snippet:-1`, which govern large
+images and full snippets in results and Discover. Actor and subject pages had
+been this way since they shipped.
+
+- `robotsUnless(indexable)` (`lib/seo.ts`) returns `{ robots: noindex, follow }`
+  or nothing at all, and all five pages use it. Checked on a production build:
+  indexable pages carry `index, follow` plus the googlebot directives, and the
+  rest `noindex, follow`.
+- The indexing tests now require the key to be absent, not merely undefined.
+
 ## [0.0.105.0] - 2026-09-27
 
 ### Changed — search engines are offered the records and stories worth indexing

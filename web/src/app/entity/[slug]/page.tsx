@@ -5,7 +5,7 @@ import { MetaLine, PageTitle, ReadingColumns } from "@/components/reading/parts"
 import { SectionHead } from "@/components/SectionHead";
 import { BackBar, EmptyState } from "@/components/ui";
 import { fetchEntity, type EntityPage as EntityPayload } from "@/lib/api";
-import { entityLd, feedListItems, itemListLd, jsonLd } from "@/lib/seo";
+import { entityLd, feedListItems, itemListLd, jsonLd, robotsUnless } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // An actor and every record it appears in. The cast of a record was already
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     alternates: { canonical: `/entity/${entity.slug}` },
     // A stub still resolves for the reader and still passes its links on; it
     // simply does not ask for the crawl budget the records need.
-    robots: indexable ? undefined : { index: false, follow: true },
+    ...robotsUnless(indexable),
   };
 }
 

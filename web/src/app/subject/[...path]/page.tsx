@@ -9,7 +9,7 @@ import { TickerChip } from "@/components/tabs/Markets";
 import { BackBar, EmptyState } from "@/components/ui";
 import { fetchSubject, fetchSubjects, fetchTrending, type SubjectPage as SubjectPayload } from "@/lib/api";
 import { sectorGroup, sectorPageFor, sectorParam } from "@/lib/sectors";
-import { breadcrumbLd, feedListItems, itemListLd, jsonLd } from "@/lib/seo";
+import { breadcrumbLd, feedListItems, itemListLd, jsonLd, robotsUnless } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // A node of the subject tree and the stories under it — under IT, so
@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ path: str
     alternates: { canonical: sectorPageFor(node.path) ?? `/subject/${node.path.split(".").join("/")}` },
     // A node nobody has reached yet is not a page worth indexing. It stays
     // readable, and comes back when the corpus fills it.
-    robots: story_count > 0 ? undefined : { index: false, follow: true },
+    ...robotsUnless(story_count > 0),
   };
 }
 

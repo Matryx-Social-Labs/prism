@@ -15,6 +15,17 @@ export const ORG_ID = `${SITE_URL}/#organization`;
  * event in the URL and showed another). `follow`, so its links still count.
  */
 export const NOT_INDEXED = { index: false, follow: true } as const;
+
+/**
+ * Spread into a page's metadata: `{ robots: NOT_INDEXED }` when it should not
+ * be indexed, and NOTHING otherwise. Never `robots: undefined` — Next does not
+ * fall back to the layout's robots for an explicit undefined, it erases them,
+ * and with them max-image-preview:large and max-snippet (every indexable
+ * record, actor and subject page shipped no robots meta until 2026-09-27).
+ */
+export function robotsUnless(indexable: boolean): { robots?: typeof NOT_INDEXED } {
+  return indexable ? {} : { robots: NOT_INDEXED };
+}
 export const SITE_ID = `${SITE_URL}/#website`;
 
 /** Who publishes this. `legalName` is the LLP; the brand is Prism. */

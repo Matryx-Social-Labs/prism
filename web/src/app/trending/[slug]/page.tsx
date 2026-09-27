@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
 import { StoryArc } from "@/components/reading/StoryArc";
-import { NOT_INDEXED, jsonLd, storyLd } from "@/lib/seo";
+import { jsonLd, robotsUnless, storyLd } from "@/lib/seo";
 
 // Rendered once a minute, not per request: nothing server-rendered here varies
 // by reader (the lens unlock is client-side), so a crawler hitting thousands of
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description,
     alternates: { canonical: `/trending/${s.canonical_slug}` },
     // A provisional grouping drifts: its URL can name one event and its page show another.
-    robots: s.boundary_status === "verified" ? undefined : NOT_INDEXED,
+    ...robotsUnless(s.boundary_status === "verified"),
     openGraph: { type: "article", title: s.label, description, url: `/trending/${s.canonical_slug}` },
     twitter: { card: "summary_large_image", title: s.label, description },
   };

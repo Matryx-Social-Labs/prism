@@ -6,6 +6,7 @@ import { GET as newsSitemap } from "@/app/news-sitemap.xml/route";
 import { generateMetadata as quoteMetadata } from "@/app/story/[id]/quote/[n]/page";
 import { generateMetadata as storyMetadata } from "@/app/story/[id]/page";
 import SubjectPageRoute, { generateMetadata as subjectMetadata } from "@/app/subject/[...path]/page";
+import { generateMetadata as entityMetadata } from "@/app/entity/[slug]/page";
 import { generateMetadata as arcMetadata } from "@/app/trending/[slug]/page";
 import { renderToString } from "react-dom/server";
 
@@ -32,6 +33,9 @@ function stubApi() {
       const path = decodeURIComponent(url.split("/api/v1/subject/")[1]).split("/").join(".");
       const ancestors = path.split(".").slice(0, -1).map((_, i, all) => node(all.slice(0, i + 1).join(".")));
       return json({ node: node(path), ancestors, children: [], story_count: 5, stories: [] });
+    }
+    if (url.includes("/api/v1/entity/")) {
+      return json({ entity: { slug: "indexable-actor", name: "An Actor", entity_type: "person", schema_type: "Person", qid: null, aliases: [] }, record_count: 9, indexable: true, records: [] });
     }
     const one = url.match(/\/api\/v1\/events\/([^/?]+)$/);
     if (one) return json(record(one[1], one[1] === "multi"));
@@ -102,16 +106,26 @@ describe("records and stories that should not be indexed say so", () => {
     expect((await quoteMetadata({ params: Promise.resolve({ id: "single", n: "0-0" }) })).robots).toEqual(NOINDEX);
   });
 
+  // The KEY must be absent, not undefined: Next does not fall back to the
+  // layout's robots for an explicit undefined — it erases them, and with them
+  // max-image-preview:large and max-snippet (live on every indexable record,
+  // entity and subject page until 2026-09-27).
   it("a record from two outlets keeps the site's default robots", async () => {
     stubApi();
-    expect((await storyMetadata({ params: Promise.resolve({ id: "multi" }) })).robots).toBeUndefined();
-    expect((await quoteMetadata({ params: Promise.resolve({ id: "multi", n: "0-0" }) })).robots).toBeUndefined();
+    expect("robots" in (await storyMetadata({ params: Promise.resolve({ id: "multi" }) }))).toBe(false);
+    expect("robots" in (await quoteMetadata({ params: Promise.resolve({ id: "multi", n: "0-0" }) }))).toBe(false);
+  });
+
+  it("an actor page worth indexing and a subject with stories keep the site's default robots", async () => {
+    stubApi();
+    expect("robots" in (await entityMetadata({ params: Promise.resolve({ slug: "indexable-actor" }) }))).toBe(false);
+    expect("robots" in (await subjectMetadata({ params: Promise.resolve({ path: ["civic"] }) }))).toBe(false);
   });
 
   it("a provisional story asks not to be indexed; a verified one does not", async () => {
     stubApi();
     expect((await arcMetadata({ params: Promise.resolve({ slug: "provisional" }) })).robots).toEqual(NOINDEX);
-    expect((await arcMetadata({ params: Promise.resolve({ slug: "verified" }) })).robots).toBeUndefined();
+    expect("robots" in (await arcMetadata({ params: Promise.resolve({ slug: "verified" }) }))).toBe(false);
   });
 
   it("the sitemap and the news sitemap offer only what asks to be indexed", async () => {

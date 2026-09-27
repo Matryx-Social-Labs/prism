@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { fetchEvent, type EventDetail } from "@/lib/api";
 import { StoryView } from "@/components/StoryView";
 import { sectorGroup } from "@/lib/sectors";
-import { NOT_INDEXED, breadcrumbLd, eventDescription, jsonLd, newsArticleLd } from "@/lib/seo";
+import { breadcrumbLd, eventDescription, jsonLd, newsArticleLd, robotsUnless } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // Rendered once a minute, not per request: nothing server-rendered here varies
@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     description,
     alternates: { canonical: url },
     // One outlet: a rewrite Google already has from that outlet (common/outlets.record_indexable).
-    robots: event.indexable === false ? NOT_INDEXED : undefined,
+    ...robotsUnless(event.indexable !== false),
     openGraph: {
       type: "article",
       siteName: "Prism",
