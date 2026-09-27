@@ -3,6 +3,29 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.110.0] - 2026-09-28
+
+### Changed — a plan is charged automatically until you cancel
+Founder decision. Every plan renews at the price you joined at until you
+cancel. The offer monthly used to stop after 12 charges and founding after 3,
+and nothing re-offered them, so a paying reader would have lost Plus silently.
+Every plan now asks Razorpay for 30 years of cycles: the longest a UPI Autopay
+mandate may run (NPCI), inside Razorpay's 100-year limit. A UPI or eMandate
+subscription cannot be updated once authorised, so a new price only ever
+applies to a new subscription. The Terms and Refund policy now say what billing
+and Razorpay do: automatic charges until cancelled at the joined price, pause
+where the payment method allows it, mistaken charges refunded within six months
+(Razorpay's normal-refund limit, not "no time limit"), and refunds that reach
+you in 5–7 working days. The seven-day refund on yearly and founding charges was
+checked against Razorpay's refund API and is unchanged. /plus says a plan renews
+until you cancel. (#239)
+
+### Fixed — the worker's "Failed to export span batch code: 404"
+With Langfuse switched off, the OpenAI wrapper (`langfuse.openai`, every model
+call) still built its own client from the raw `LANGFUSE_*` keys left on Railway
+and exported spans to a Langfuse service that no longer exists. The switch now
+also turns the SDK's tracing off. (#238)
+
 ## [0.0.109.0] - 2026-09-28
 
 ### Added — duplicate records merge record to record
