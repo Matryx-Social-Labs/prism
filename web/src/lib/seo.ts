@@ -163,7 +163,7 @@ export function storyLd(s: TrendingStoryDetail) {
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     url,
     headline: clip(s.label, 110),
-    description: clip(`${s.source_count} outlets · ${s.developments.length} developments — ${devs[0]?.title ?? s.label}`),
+    description: clip(`${s.source_count} outlets · ${s.developments.length} ${s.boundary_status === "verified" ? "developments" : "records"} — ${devs[0]?.title ?? s.label}`),
     datePublished: first ?? last ?? undefined,
     dateModified: last ?? first ?? undefined,
     inLanguage: "en-IN",

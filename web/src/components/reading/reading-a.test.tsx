@@ -38,6 +38,13 @@ describe("The story arc — a provisional grouping", () => {
     expect(latest.querySelector("a")).toHaveAttribute("href", "/story/b");
     expect(screen.queryByText("How it unfolded")).toBeNull();
   });
+
+  // Founder decision (27 Sep): related coverage counts records, never "developments".
+  it("counts its members as records, not developments", () => {
+    const { container } = render(<StoryArc s={story()} />);
+    expect(screen.getByText("2 records")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\d+ developments?\b/);
+  });
 });
 
 describe("Market Pulse — the rail signed out", () => {

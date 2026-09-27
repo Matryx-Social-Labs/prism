@@ -107,7 +107,7 @@ export function DevelopingRail({ stories, title }: { stories: TrendingStory[]; t
                 <span className="text-balance underline-offset-4 group-hover:underline" style={{ font: "var(--t-title)" }}>{s.hero_title ?? s.label}</span>
                 <span className="flex min-w-0 flex-wrap items-center gap-2.5">
                   <CoverageBar outlets={[]} fallbackCount={s.source_count} width={120} className="p-covbar--mono" />
-                  <span className="p-count whitespace-normal">{plural(s.developments, verified ? "development" : "report")} · {plural(s.source_count, "outlet")}</span>
+                  <span className="p-count whitespace-normal">{plural(s.developments, verified ? "development" : "record")} · {plural(s.source_count, "outlet")}</span>
                 </span>
               </Link>
             </li>

@@ -30,7 +30,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const dated = s.developments.map((d) => d.occurred_at).filter((x): x is string => !!x);
   const route = verified && dated.length === devs ? dated.sort() : null;
   const meta = [sectorGroup(s.sector)?.name ?? "", days ? `${days} ${days === 1 ? "day" : "days"}` : ""];
-  const unit = verified ? (devs === 1 ? "development" : "developments") : devs === 1 ? "report" : "reports";
+  const unit = verified ? (devs === 1 ? "development" : "developments") : devs === 1 ? "record" : "records";
   const count = `${devs} ${unit} · ${t.outlets} ${t.outlets === 1 ? "outlet" : "outlets"}`;
   const address = `${host}/trending/${slug}`;
   const fonts = await ogFonts(s.label, ...meta, count, address, CARD_TEXT, route ? "JANFEBMARAPRMAYJUNJULAUGSEPTOCTNOVDEC" : "");

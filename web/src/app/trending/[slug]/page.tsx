@@ -22,7 +22,7 @@ async function load(slug: string): Promise<TrendingStoryDetail | null> {
 function blurb(s: TrendingStoryDetail): string {
   const lead = s.developments.find((d) => !d.is_current) ?? s.developments[0];
   const base = lead?.title ?? s.label;
-  const members = s.boundary_status === "verified" ? "developments" : "related events";
+  const members = s.boundary_status === "verified" ? "developments" : "records";
   return `${s.source_count} outlets · ${s.developments.length} ${members} — ${base}`.slice(0, 200);
 }
 

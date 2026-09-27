@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Stories developing over days",
-  description: "The stories moving across Indian and international outlets right now: how many report each one, how it unfolded, and who said what — counted, never implied.",
+  description: "The stories moving across Indian outlets right now, with the related coverage of each: how many outlets report it and who said what — counted, never implied.",
   alternates: { canonical: "/trending" },
 };
 
