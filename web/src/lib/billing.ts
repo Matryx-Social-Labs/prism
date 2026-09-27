@@ -6,8 +6,10 @@
 import { API_URL, authHeaders } from "@/lib/api";
 import { track } from "@/lib/analytics";
 
-/** Free lens readings: per visit without an account, per day with one; Plus has
- *  no count (founder decision #3, 27 Sep — the lens meter enforces these). */
+/** Free lens readings: per browser session without an account, per day with
+ *  one; Plus has no count (founder decision #3, 27 Sep). The web's one copy of
+ *  common/quota.py ANON_LENS_PER_SESSION / USER_LENS_PER_DAY, for copy that
+ *  speaks before the server has counted; a 402 carries the limit it hit. */
 export const LENS_READS = { anon: 3, free: 10 } as const;
 
 export interface PlanOut {

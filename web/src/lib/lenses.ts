@@ -54,11 +54,6 @@ export const LENS_META: Record<string, LensMeta> = {
 
 export const LENS_ORDER = ["reader", "cyber", "markets"];
 
-/** The lens meter, the web's one copy of common/quota.py (ANON_LENS_PER_SESSION,
- *  USER_LENS_PER_DAY) for copy that speaks before the server has counted; a 402
- *  carries the limit it hit. Plus reads every lens. */
-export const LENS_READS = { anonymousPerSession: 3, accountPerDay: 10 } as const;
-
 // Styling for lenses the client doesn't know yet: the next unused stops of the
 // spectrum (DESIGN.md § Lenses — health rose, policy amber), then a repeat.
 const FALLBACK_PALETTE: [string, string][] = [

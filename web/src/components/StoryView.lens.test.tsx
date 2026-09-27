@@ -17,7 +17,6 @@ const META = {
   markets: { slug: "markets", short: "Markets", color: "#117A48", bg: "#e0f5ea", tagline: "t" },
 };
 vi.mock("@/lib/lenses", async () => ({
-  // LENS_READS and the rest stay real: the cards print the meter from them.
   ...(await vi.importActual<typeof import("@/lib/lenses")>("@/lib/lenses")),
   useLenses: () => Object.values(META),
   lensMeta: (slug: string) => META[slug as keyof typeof META] ?? META.reader,

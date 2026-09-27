@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { StoryView } from "@/components/StoryView";
 import type { EventDetail } from "@/lib/api";
 
-const fetchBrief = vi.hoisted(() => vi.fn(async (..._args: unknown[]): Promise<unknown> => null));
+const fetchBrief = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => null));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/api", async () => {

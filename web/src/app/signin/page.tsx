@@ -8,7 +8,7 @@ import { type FormEvent, Suspense, useEffect, useState } from "react";
 import { Check } from "@/components/icons";
 import { Alert, TextField } from "@/components/ui";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
-import { LENS_READS } from "@/lib/lenses";
+import { LENS_READS } from "@/lib/billing";
 import { requestMagicLink } from "@/lib/session";
 
 // Server truths the copy leans on (common/config.py): a link lives 15 minutes
@@ -24,7 +24,7 @@ const RESEND_COOLDOWN_S = 30;
 const ACCOUNT_ADDS = [
   "A watchlist of tickers and subjects, free",
   "10 questions a day in Ask, instead of 3 without an account",
-  `${LENS_READS.accountPerDay} professional lens readings a day, instead of ${LENS_READS.anonymousPerSession} without an account`,
+  `${LENS_READS.free} professional lens readings a day, instead of ${LENS_READS.anon} without an account`,
 ];
 
 /** A reader's words for what is wrong with an address, or null when it will do. */

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Lock } from "@/components/icons";
+import { LENS_READS } from "@/lib/billing";
 import { flipDuration } from "@/lib/motion";
-import { LENS_READS, type LensMeta } from "@/lib/lenses";
+import type { LensMeta } from "@/lib/lenses";
 
 /** A lens's own hue, as the variables the flip and the dots read. Any lens, known or not. */
 export function lensVars(meta: LensMeta): React.CSSProperties {
@@ -144,7 +145,7 @@ export function LensLocked({ meta, used, onSignIn }: { meta: LensMeta; used: num
       <div aria-hidden className="grid select-none gap-2 opacity-55 blur-[4px]">
         {["90%", "76%", "84%"].map((w) => <span key={w} className="block h-3 rounded-[2px]" style={{ width: w, background: "var(--lens)", opacity: 0.25 }} />)}
       </div>
-      <p className="text-[15px] font-semibold leading-[1.4]">{LENS_READS.accountPerDay} lens readings a day with a free account</p>
+      <p className="text-[15px] font-semibold leading-[1.4]">{LENS_READS.free} lens readings a day with a free account</p>
       <p className="-mt-2 text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
         {used != null && `You have read ${used} without one. `}
         Read this story through the <span className="font-semibold" style={{ color: "var(--lens)" }}>{meta.short} lens</span>: {meta.plain ?? meta.tagline}.
@@ -160,7 +161,7 @@ export function LensLocked({ meta, used, onSignIn }: { meta: LensMeta; used: num
 /** Used: a free account's readings for the day are spent — a different wall
  *  from not signed in, and the one Plus answers. */
 export function LensUsed({ used, limit, onReader }: { used: number | null; limit: number | null; onReader: () => void }) {
-  const cap = limit ?? LENS_READS.accountPerDay;
+  const cap = limit ?? LENS_READS.free;
   return (
     <div className="grid gap-2.5">
       <p className="text-[15px] font-semibold leading-[1.4]">You have read {used ?? cap} of {cap} free lens readings today</p>
