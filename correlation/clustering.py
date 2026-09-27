@@ -216,7 +216,6 @@ async def find_event(
     published_at,
     embedding: list[float] | None,
     entity_slugs: list[str] | None = None,
-    cve_record: bool = False,
     english_title: str | None = None,
     gist: list[float] | None = None,
     verify_block: str | None = None,
@@ -226,13 +225,6 @@ async def find_event(
         match = await _match_by_cve(session, cve_ids)
         if match:
             return match
-
-    # Authoritative CVE records (NVD/KEV) are one-event-per-CVE by
-    # construction: distinct CVEs must never merge, and their boilerplate
-    # descriptions ("vulnerability in X allows...") make title/embedding
-    # similarity meaningless. Identity match or a new event — nothing fuzzy.
-    if cve_record:
-        return None
 
     if url:
         match = await _match_by_url(session, url)

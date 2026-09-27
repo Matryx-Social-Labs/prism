@@ -10,7 +10,7 @@ import html as _html
 import re
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,44 +61,12 @@ def clean_text(text: str) -> str:
     Stripping first leaves an escaped tag as visible text, which is what the
     publisher meant; React escapes it again at render, so this is not a way in.
 
-    Applied here rather than in each collector because every one of them —
-    rss, nvd, cisa_kev — persists through this function.
+    Applied here rather than in each collector because every one of them
+    persists through this function.
     """
     if not text:
         return text
     return _html.unescape(_TAG.sub(" ", text)).strip()
-
-
-async def note_edition(session: AsyncSession, source: Source, url_canonical: str | None) -> None:
-    """A state page carried an article the publisher already sent: the article
-    is the same, the page is the signal. Put the page's state on the event the
-    article already belongs to — unless the event is foreign or already placed
-    (classification.consumer.feed_state_applies)."""
-    from classification.consumer import feed_state_applies
-    from ingestion.rss import SPEC_BY_SLUG
-
-    spec = SPEC_BY_SLUG.get(source.slug)
-    if not spec or not spec.state or not url_canonical:
-        return
-    rows = (
-        await session.execute(
-            text(
-                """
-                SELECT e.id, e.regions FROM raw_items ri
-                JOIN articles a ON a.raw_item_id = ri.id
-                JOIN event_memberships m ON m.article_id = a.id
-                JOIN events e ON e.id = m.event_id
-                WHERE ri.url_canonical = :u AND ri.relevance <> 'duplicate'
-                LIMIT 3
-                """
-            ),
-            {"u": url_canonical},
-        )
-    ).all()
-    for event_id, regions in rows:
-        regions = list(regions or [])
-        if spec.state not in regions and feed_state_applies(regions):
-            await session.execute(text("UPDATE events SET regions = :r WHERE id = :id"), {"r": [*regions, spec.state], "id": event_id})
 
 
 async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
@@ -131,9 +99,8 @@ async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
         # one URL, and each copy used to go through the gate and the extractor
         # and sit in the record as its own report — 432 of 6,717 articles in
         # the week to 2026-09-20. The second feed's observation is still kept
-        # (`relevance='duplicate'`, never published), and if it came through a
-        # state page the state goes onto the event, which is what that
-        # observation was worth.
+        # (`relevance='duplicate'`, never published). A state page carrying it
+        # does not make it a state story: that is the classifier's call.
         # Which feeds (source ids) already hold each document of the publisher.
         seen_by: dict[tuple[str, str], set[uuid.UUID]] = {}
         by_publisher: dict[str, set[str]] = {}
@@ -194,8 +161,6 @@ async def persist_envelopes(envelopes: list[RawItemEnvelope]) -> int:
             result = await session.execute(stmt)
             inserted = result.scalar_one_or_none()
             if duplicate:
-                if inserted:
-                    await note_edition(session, source, url_canonical)
                 continue
             if inserted is not None:
                 new_ids.append(inserted)

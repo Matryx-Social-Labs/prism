@@ -89,3 +89,22 @@ def test_the_state_is_the_prompt_body_the_llm_saw():
     state = d.state_for("Title", "x" * 5000)
     assert state["title"] == "Title" and len(state["content"]) == d.MAX_GATE_CHARS
     assert d.state_for("T", None)["content"] == "(no content — title only)"
+
+
+@pytest.mark.parametrize("form", ["live blog", "live updates", "top headlines", "roundup of unrelated items",
+                                  "horoscope", "explainer"])
+def test_the_not_news_question_names_the_formats_that_report_no_one_event(form):
+    """None of these reports one event. 12 'live updates' pages passed the gate
+    in the week to 2026-09-27 — Indian Express's daily "India News Live
+    Updates" roundup among them — each filed as one record. Jev reads the
+    statement literally, so each form has to be in it."""
+    assert form in QUESTIONS["not_news"].instructions.lower()
+
+
+def test_the_classification_is_readable_when_the_gate_says_not_news():
+    """One call answers both halves; a backfill re-files a published item the
+    gate now rejects without asking the model twice."""
+    answers = _answers(not_news=NoulAnswer(noul=0.9))
+    gate, cls = to_results(answers, source_country="IN")
+    assert not gate.is_relevant and cls is None
+    assert d.classification_from(answers, source_country="IN").sector == "politics"

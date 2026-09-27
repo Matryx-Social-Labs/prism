@@ -9,11 +9,13 @@ runs perspective grouping + impact propagation and emits event.updates.
 import json
 import time
 import uuid
+from collections import Counter
 from contextlib import nullcontext
 
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from common import subjects
 from common.config import get_settings
 from common.countries import gdelt_country_to_iso
 from common.db import session_scope
@@ -34,6 +36,7 @@ from common.models import (
     Source,
 )
 from common.observability import fetch_prompt, observe
+from common.outlets import RAW_RECORD_FEEDS
 from common.stream import get_redis
 from common.text import entity_slug, is_latin_text
 from correlation.briefs import available_lenses, persist_briefs, template_briefs
@@ -75,6 +78,49 @@ def extracted_reader_brief(shared: dict) -> dict | None:
         return None
     points = [str(p).strip() for p in (shared.get("watch_points") or []) if str(p).strip()][:3]
     return {"text": text, "points": points}
+
+
+def placement(classifications: list[dict], event_path: str | None, event_confidence: float | None) -> dict | None:
+    """The event's sector and subject, from its members' classifications
+    (earliest first): the majority's sector, ties to the earliest member, and
+    that member's path. No model call — the classifier already answered.
+
+    The founding article used to file the event for good, so one general-feed
+    report forced to business kept a Punjab campus protest under Business &
+    Markets however many political reports joined it. And the path is primary
+    (classification/decide.py derives the sector from it), so the sector is
+    always the path's: two sources of truth disagreed on 6.4% of events. A
+    member classified before the subject tree has no path and does not outvote
+    one that has; an event placed on the tree after the fact
+    (tools/backfill_subjects) keeps that placement while no member has one."""
+    placed = [c for c in classifications if c.get("subject_path")]
+    if not placed and event_path:
+        placed = [{"subject_path": event_path, "subject_confidence": event_confidence}]
+    votes = (
+        [(subjects.legacy_for(c["subject_path"])[0], c) for c in placed]
+        if placed else [(c["sector"], c) for c in classifications if c.get("sector")]
+    )
+    if not votes:
+        return None
+    # most_common keeps first-encountered order on a tie: the earliest member.
+    sector = Counter(s for s, _ in votes).most_common(1)[0][0]
+    chosen = next(c for s, c in votes if s == sector)
+    path = chosen.get("subject_path")
+    return {
+        "sector": sector,
+        "subsector": subjects.legacy_for(path)[1] if path else chosen.get("subsector"),
+        "subject_path": path,
+        "subject_confidence": chosen.get("subject_confidence"),
+    }
+
+
+def chosen_states(classifications: list[dict]) -> list[str]:
+    """The states (ISO 3166-2) the classifier placed the event in: each one
+    chosen for at least half its members, earliest first. Never a feed's stamp,
+    and never one member's state over the rest — a national bank strike was
+    filed under Kerala because one member said so (audit, 2026-09-27)."""
+    votes = Counter(r for c in classifications for r in dict.fromkeys(c.get("regions") or []) if "-" in r)
+    return [state for state, n in votes.items() if 2 * n >= len(classifications)]
 
 
 async def _has_reader_brief(event_id: uuid.UUID) -> bool:
@@ -151,7 +197,6 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
     url = (raw_item.url_canonical or raw_item.url) if raw_item else None
     published_at = raw_item.published_at if raw_item else None
     classification = (raw_item.classification or {}) if raw_item else {}
-    cve_record = (enrichment.model or "").startswith("deterministic:")
 
     embedding = await _first_chunk_embedding(session, article_id)
     # The outlet is not an actor in its own coverage: left in, `prajavani` was
@@ -170,7 +215,6 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
         published_at=published_at,
         embedding=embedding,
         entity_slugs=entity_slugs or None,
-        cve_record=cve_record,
         english_title=english_headline(shared),
         gist=[float(v) for v in gist] if gist is not None else None,
         verify_block=article_block(
@@ -202,17 +246,6 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
         )
         session.add(event)
         is_new_event = True
-
-    # State codes (ISO 3166-2, e.g. IN-KA) from a state-edition feed must
-    # survive into the event's regions — even when a new event's shared
-    # extraction returned only country-level regions, or an existing event
-    # was matched — so the feed can tier local(state) -> national.
-    state_codes = [r for r in (classification.get("regions") or []) if "-" in r]
-    if state_codes:
-        merged = list(event.regions or [])
-        merged += [c for c in state_codes if c not in merged]
-        if merged != list(event.regions or []):
-            event.regions = merged
 
     if event.image_url is None and raw_item is not None and raw_item.image_url:
         event.image_url = raw_item.image_url
@@ -377,12 +410,13 @@ async def _upsert_entities(
         await session.execute(link)
 
 
-async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
-    """Merge member enrichments into the served projection.
+async def _rebuild_projection(event_id: uuid.UUID, session=None, *, touch: bool = True) -> None:
+    """Merge member enrichments into the served projection. `touch=False`
+    leaves last_updated_at alone — a backfill re-deriving the record is not news.
 
     Never merge identity, never inflate impact: lens fields are merged
-    field-by-field preferring authoritative sources (NVD for CVSS, KEV for
-    exploitation); disclosed values are attributed once.
+    field-by-field, the first member to disclose a value keeping it; disclosed
+    values are attributed once.
 
     Its own transaction, unless handed one: correlation/merge.py rebuilds the
     survivor inside the merge so the fold and the counts commit together.
@@ -504,15 +538,14 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
             row_lens = (row["lens_fields"] or {}).get("cyber") if row["lens_fields"] else None
             if not row_lens:
                 continue
-            slug = row["source_slug"]
             for cve in row_lens.get("cve_ids") or []:
                 cyber.setdefault("cve_ids", [])
                 if cve not in cyber["cve_ids"]:
                     cyber["cve_ids"].append(cve)
-            if row_lens.get("cvss") and (slug == "nvd" or not cyber.get("cvss")):
+            if row_lens.get("cvss") and not cyber.get("cvss"):
                 if row_lens["cvss"].get("score") is not None:
                     cyber["cvss"] = row_lens["cvss"]
-            if row_lens.get("exploitation") and (slug == "cisa_kev" or not cyber.get("exploitation")):
+            if row_lens.get("exploitation") and not cyber.get("exploitation"):
                 if any(v is not None for v in row_lens["exploitation"].values()):
                     cyber["exploitation"] = row_lens["exploitation"]
             if row_lens.get("affected") and len(row_lens["affected"]) > len(cyber.get("affected", [])):
@@ -556,6 +589,12 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
         # newest member would also be coherent, but it rewrites the headline a
         # reader may have arrived on, which is a bigger product change than this.
         event.summary = summaries[0] if summaries else event.summary
+        classifications = [r["classification"] or {} for r in rows]
+        for key, value in (placement(classifications, event.subject_path, event.subject_confidence) or {}).items():
+            setattr(event, key, value)
+        # Countries stay as the founder's extraction gave them; states are the
+        # classifier's, re-read from every member on every rebuild.
+        event.regions = [r for r in (event.regions or []) if "-" not in r] + chosen_states(classifications)
         # Merged at WRITE time, never replaced (audit H11). This rebuild owns
         # the keys below and nothing else: lens_briefs and lens_points belong to
         # persist_briefs (the analysis pass, the extractor, and the API's
@@ -611,7 +650,8 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
             text("UPDATE events SET projection = COALESCE(projection, '{}'::jsonb) || CAST(:p AS jsonb) WHERE id = :eid"),
             {"p": json.dumps(computed, default=str), "eid": str(event_id)},
         )
-        event.last_updated_at = func.now()
+        if touch:
+            event.last_updated_at = func.now()
 
 
 # Re-run the (LLM) analysis only when the membership crosses a tier — a
@@ -681,7 +721,7 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
         return False, False
 
     settings = get_settings()
-    has_news = any(m["source_slug"] not in ("nvd", "cisa_kev") for m in members)
+    has_news = any(m["source_slug"] not in RAW_RECORD_FEEDS for m in members)
 
     # Single-source news: no competing perspectives; brief is generated on demand
     # on first view. Skip the LLM entirely — this is where most events land.

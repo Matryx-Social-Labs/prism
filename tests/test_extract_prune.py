@@ -3,13 +3,12 @@
 Impacts have no news-side reader (correlation re-derives them in event-analysis),
 so structured_chat prunes them from the schema shown to the model. Claims WERE
 pruned on the same reasoning until 2026-09-04; they are extracted again and, since
-the "What was said" section, read by GET /events/{id}. cve_lens still populates
-both deterministically for CVE records, so the pydantic model keeps the fields —
-validation fills the defaults when the model omits them.
+the "What was said" section, read by GET /events/{id}. The pydantic model keeps
+the fields — validation fills the defaults when the model omits them.
 """
 
 from common.llm import _prune_schema_props
-from enrichment.schemas import ArticleExtraction, SharedExtraction
+from enrichment.schemas import ArticleExtraction
 
 
 def test_prune_removes_nested_props():
@@ -48,12 +47,3 @@ def test_model_validates_without_pruned_fields():
     assert extraction.shared.claims == []
     assert extraction.shared.impacts == []
     assert extraction.shared.entities[0].name == "Acme"
-
-
-def test_cve_lens_path_still_populates_impacts():
-    # cve_lens builds SharedExtraction with impacts directly — must still work.
-    shared = SharedExtraction(
-        headline_summary="CVE-2024-0001 in Acme Widget is exploited.",
-        impacts=[{"entity": "Acme Widget", "effect": "patch_required"}],
-    )
-    assert shared.impacts[0].entity == "Acme Widget"

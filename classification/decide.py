@@ -109,6 +109,8 @@ QUESTIONS: dict[str, Question] = {
         instructions=(
             "The item is a form other than reported news: an opinion column or editorial essay, a product "
             "promotion or vendor marketing, a listicle, a how-to guide or tutorial, career advice, a horoscope, "
+            "a live blog or running 'live updates' page, a 'top headlines' digest or roundup of unrelated items, "
+            "an explainer or backgrounder that reports no new event, "
             "a piece on a celebrity's or businessperson's personal wealth, lifestyle or ventures, sports gossip "
             "or a player spat, or a fixture list or schedule with no result"
         )
@@ -188,6 +190,13 @@ def to_results(d: Decisions, *, source_country: str | None) -> tuple[GateResult,
     )
     if not gate.is_relevant:
         return gate, None
+    return gate, classification_from(d, source_country=source_country)
+
+
+def classification_from(d: Decisions, *, source_country: str | None) -> ClassificationResult:
+    """The classifier's half of the answers, whatever the gate said: one call
+    answers both, so tools/backfill_classification re-files an item the gate
+    now calls not-news without asking again."""
     path, path_confidence = subject.path_from(d)
     sector = _choice(d, "sector")
     # The old columns are DERIVED from the path when there is one, not elicited
@@ -209,7 +218,7 @@ def to_results(d: Decisions, *, source_country: str | None) -> tuple[GateResult,
     state = _choice(d, "indian_state").choice
     country_code = country if country != "other" else source_country
     regions = [c for c in (country_code, state) if c and (c == country_code or is_state_code(c))]
-    return gate, ClassificationResult(
+    return ClassificationResult(
         sector=legacy_sector,
         subsector=legacy_sub,
         regions=regions,

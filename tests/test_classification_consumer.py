@@ -1,4 +1,4 @@
-"""The classification stage's own moving parts: the feed-state stamp, the body
+"""The classification stage's own moving parts: no feed-state stamp, the body
 cap, and the write that must be idempotent under stream replay."""
 
 import uuid
@@ -9,37 +9,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from classification import consumer
-from classification.consumer import _apply_feed_state
 from classification.decide import MAX_GATE_CHARS, body_for_prompt
 from classification.schemas import ClassificationResult, GateResult
 from common.config import get_settings
 from common.db import session_scope
 from common.decisions import ChoiceAnswer, Decisions, NoulAnswer
 from common.models import RawItem, Source
-from ingestion.rss import FeedSpec
-
-
-def _cls(regions: list[str]) -> ClassificationResult:
-    return ClassificationResult(sector="politics", regions=regions)
-
-
-def test_a_state_feed_stamps_its_state_on_a_national_indian_item():
-    spec = FeedSpec(slug="x", url="u", state="IN-KA")
-    before = _cls(["IN"])
-    after = _apply_feed_state(before, spec)
-    assert after.regions == ["IN", "IN-KA"]
-    assert before.regions == ["IN"], "the input must not be mutated"
-
-
-@pytest.mark.parametrize("regions", [["IN", "IN-MH"], ["US"], ["IN", "US"]])
-def test_the_stamp_yields_to_the_article(regions):
-    spec = FeedSpec(slug="x", url="u", state="IN-KA")
-    assert _apply_feed_state(_cls(regions), spec).regions == regions
-
-
-def test_no_stamp_without_a_state_feed():
-    assert _apply_feed_state(_cls(["IN"]), None).regions == ["IN"]
-    assert _apply_feed_state(_cls(["IN"]), FeedSpec(slug="x", url="u")).regions == ["IN"]
 
 
 def test_body_for_prompt_caps_and_names_the_empty_case():
@@ -265,3 +240,34 @@ async def test_an_item_settled_by_another_worker_mid_call_is_not_overwritten(mon
     row = await _row(item_id)
     assert (row.relevance, row.rejection_reason) == ("rejected", "first")
     assert published == []
+
+
+@pytest.mark.asyncio
+async def test_a_state_editions_item_the_classifier_called_national_stays_national(monkeypatch):
+    """Prajavani's whole-site feed is Karnataka's; a national bank strike it
+    carried was stamped IN-KA over the classifier's 'national' (audit
+    2026-09-27: 4.7% of state tags wrong). A state is the classifier's to
+    choose, never the feed's."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    item_id = await _seed()
+    async with session_scope() as s:
+        await s.execute(
+            text("INSERT INTO sources (id, slug, name, source_type, country) "
+                 "VALUES (gen_random_uuid(), 'prajavani', 'Prajavani', 'rss', 'IN') ON CONFLICT (slug) DO NOTHING")
+        )
+        await s.execute(
+            text("UPDATE raw_items SET source_id = (SELECT id FROM sources WHERE slug = 'prajavani') WHERE id = :id"),
+            {"id": item_id},
+        )
+
+    async def gate_and_classify(*a, **k):
+        return GateResult(is_relevant=True, reason="news"), ClassificationResult(sector="business", regions=["IN"])
+
+    async def publish(topic, message):
+        return "1-0"
+
+    monkeypatch.setattr(consumer, "_gate_and_classify", gate_and_classify)
+    monkeypatch.setattr(consumer.stream, "publish", publish)
+    await consumer.handle_raw_item({"raw_item_id": str(item_id)})
+    assert (await _row(item_id)).classification["regions"] == ["IN"]

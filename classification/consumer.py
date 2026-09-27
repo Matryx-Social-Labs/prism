@@ -1,8 +1,8 @@
 """Phase 2 — relevance gate + classifier/router.
 
-Consumes raw.items. CVE-feed items (NVD, CISA KEV) are relevant by
-construction and classified deterministically — no LLM spend. News/RSS
-items go through the binary LLM gate, then the classifier — or, with
+Consumes raw.items. A single-topic feed (ESPNcricinfo, RBI) is classified
+deterministically — no LLM spend. Every other item goes through the binary
+LLM gate, then the classifier — or, with
 prism_decisions_mode, through one typed Jev call that answers both
 (classification/decide.py): `shadow` runs it beside the LLM pair and logs the
 two verdicts, `live` lets it answer. Rejected items are kept with a reason for
@@ -34,7 +34,7 @@ from common.models import RawItem, Source
 from common.observability import fetch_prompt, observe
 from common.schemas import ClassifiedItemMessage
 from common.taxonomy import prompt_menu, valid_subsector
-from ingestion.rss import SPEC_BY_SLUG, FeedSpec
+from ingestion.rss import SPEC_BY_SLUG
 
 logger = get_logger(__name__)
 
@@ -53,17 +53,13 @@ async def handle_raw_item(payload: dict) -> None:
             return  # already processed (stream replay)
         source = await session.get(Source, item.source_id)
         source_slug = source.slug if source else "unknown"
-        source_type = source.source_type if source else "unknown"
         source_country = source.country if source else None
         title, body = item.title, item.body
 
     meta = {"stage": "classification", "source_slug": source_slug, "raw_item_id": str(raw_item_id)}
 
     feed_spec = SPEC_BY_SLUG.get(source_slug)
-    if source_type == "cve_feed":
-        classification = _classify_cve_feed(source_slug, title, body)
-        gate = GateResult(is_relevant=True, reason="Authoritative CVE feed record")
-    elif feed_spec is not None and feed_spec.sector is not None:
+    if feed_spec is not None and feed_spec.sector is not None:
         # Single-topic feed: sector known by construction — no LLM spend.
         classification = ClassificationResult(
             sector=feed_spec.sector,
@@ -81,9 +77,6 @@ async def handle_raw_item(payload: dict) -> None:
         gate = GateResult(is_relevant=True, reason=f"Single-topic {feed_spec.sector} feed")
     else:
         gate, classification = await _gate_and_classify(title, body, source_country, meta)
-
-    if classification is not None:
-        classification = _apply_feed_state(classification, feed_spec)
 
     relevant = gate.is_relevant and classification is not None
     values = (
@@ -107,21 +100,6 @@ async def handle_raw_item(payload: dict) -> None:
             stream.CLASSIFIED_ITEMS,
             ClassifiedItemMessage(raw_item_id=str(raw_item_id)).model_dump(),
         )
-
-
-def _apply_feed_state(classification: ClassificationResult, feed_spec: FeedSpec | None) -> ClassificationResult:
-    """Stamp the state (ISO 3166-2) from a state-edition feed onto the regions, so
-    the feed can tier local(state) -> national. Deterministic from the feed, no
-    LLM — but only where the feed's state can be the story's: not when the
-    classifier already placed the event in a state, and not when the article
-    is about another country. Prajavani's whole-site feed is IN-KA and printed
-    the US Senate's Russia-sanctions bill; the stamp put it under Karnataka
-    (founder, 2026-09-20)."""
-    if feed_spec is None or not feed_spec.state:
-        return classification
-    if feed_spec.state in classification.regions or not feed_state_applies(classification.regions):
-        return classification
-    return classification.model_copy(update={"regions": [*classification.regions, feed_spec.state]})
 
 
 async def _gate_and_classify(
@@ -266,31 +244,3 @@ async def _run_classifier(
         "subsector": valid_subsector(result.sector, result.subsector),
         "regions": result.regions or ([source_country] if source_country else []),
     })
-
-
-def feed_state_applies(regions: list[str]) -> bool:
-    """A feed's state stamp holds only when nothing says otherwise: the
-    classifier named no state of its own, and no foreign country is involved."""
-    if any(r.startswith("IN-") for r in regions):
-        return False
-    return all(r == "IN" for r in regions)
-
-
-def _classify_cve_feed(source_slug: str, title: str, body: str | None) -> ClassificationResult:
-    """Deterministic classification for structured CVE records."""
-    fast_lane = source_slug == "cisa_kev"  # KEV = actively exploited → time-critical
-    return ClassificationResult(
-        sector="cybersecurity",
-        subsector="vulnerabilities",
-        # The deterministic paths need a place on the tree too, or the flagship
-        # content for `tech.security.vulnerabilities` would be the one thing
-        # never on it — a CVE record is that node by construction, no model
-        # needed (review, 2026-09-22).
-        subject_path="tech.security.vulnerabilities",
-        subject_confidence=1.0,
-        regions=[],
-        language="en",
-        role_interests=["cyber"],
-        route="fast_lane" if fast_lane else "standard",
-        confidence=1.0,
-    )

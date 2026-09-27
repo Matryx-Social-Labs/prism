@@ -14,5 +14,5 @@ Consumes `classified.items`; emits `enriched.items`. Per article:
 5. **Photo fingerprint** — a dHash of the lead image, so repeats and outlet fallback art
    can be recognised
 
-`cve_lens.py` handles the deterministic NVD/CISA-KEV records; `renderings.py` judges
+`renderings.py` judges
 translated quotes. Details: [docs/PIPELINE.md §5](../docs/PIPELINE.md#5-enrichment).

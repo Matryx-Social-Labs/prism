@@ -14,7 +14,7 @@ class RawItemEnvelope(BaseModel):
     """Normalized envelope every collector produces (INGESTION-CLASSIFICATION.md)."""
 
     source_slug: str
-    source_type: str  # news_api | cve_feed | advisory | rss | scraper
+    source_type: str  # rss (cve_feed: rows of the removed NVD/KEV collectors)
     external_id: str
     url: str | None = None
     title: str

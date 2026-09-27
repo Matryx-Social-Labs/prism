@@ -1,8 +1,7 @@
 """Phase 3 — enrichment: full text, schema-constrained extraction, embeddings.
 
-Consumes classified.items. CVE-feed records are enriched deterministically
-from their structured payload; news articles go through the LLM extractor
-(shared schema + cyber lens in one call). Every value keeps field-level
+Consumes classified.items. Articles go through the LLM extractor (shared
+schema + cyber lens in one call). Every value keeps field-level
 provenance; the raw model output and model id are stored for
 reproducibility. Article text is chunked + embedded for the agent.
 """
@@ -29,7 +28,6 @@ from common.securities import article_tickers
 from common.text import chunk_text, is_model_commentary, title_share
 from correlation.verify import gist_text
 from enrichment.claims import verify_claims
-from enrichment.cve_lens import extract_from_kev, extract_from_nvd
 from enrichment.fulltext import HEAD_CHARS, MIN_HEAD_SHARE, retrieve_fulltext
 from enrichment.schemas import ArticleExtraction
 
@@ -58,9 +56,9 @@ async def handle_classified_item(payload: dict) -> None:
         body = item.body
         url = item.url
         url_canonical = item.url_canonical or item.url
-        raw = dict(item.raw)
         published_at = item.published_at
         sector = (item.classification or {}).get("sector")
+        cyber_ok = cyber_classified(item.classification or {})
         has_image = item.image_url is not None
         image_url = item.image_url
 
@@ -77,8 +75,6 @@ async def handle_classified_item(payload: dict) -> None:
         extraction = ArticleExtraction.model_validate(raw_model_output)
         tier = "duplicate_url"
         logger.info("enrichment_reused_for_duplicate_url", raw_item_id=str(raw_item_id), url=url)
-    elif source_slug in ("nvd", "cisa_kev"):
-        clean_text, tier = (body or title), "body"
     else:
         clean_text, tier, og_image = await retrieve_fulltext(url, body, title)
         if tier == "direct" and await _repeats_on_site(source_id, url_canonical, title, clean_text):
@@ -86,7 +82,7 @@ async def handle_classified_item(payload: dict) -> None:
         if not clean_text:
             clean_text, tier = title, "title"
 
-    # 2. Extraction — deterministic for CVE records, LLM for articles
+    # 2. Extraction
     model_used: str
     if not reused:
         raw_model_output = None
@@ -95,12 +91,6 @@ async def handle_classified_item(payload: dict) -> None:
         # through here would reset raw_model_output to None and re-run the model,
         # which is the exact spend this branch exists to avoid.
         pass
-    elif source_slug == "nvd":
-        extraction = extract_from_nvd(raw)
-        model_used = "deterministic:nvd"
-    elif source_slug == "cisa_kev":
-        extraction = extract_from_kev(raw)
-        model_used = "deterministic:cisa_kev"
     else:
         extract_model = (
             settings.prism_model_extract_light
@@ -127,7 +117,6 @@ async def handle_classified_item(payload: dict) -> None:
             # `impacts` stays pruned: correlation re-derives them in
             # event-analysis and nothing reads the extracted ones, so asking for
             # them costs output tokens on the highest-volume stage for nothing.
-            # CVE impacts come from the deterministic cve_lens path regardless.
             #
             # `claims` is BACK. It was pruned on the same "nothing reads it"
             # reasoning, which was true and is the reason the perspectives layer
@@ -138,10 +127,8 @@ async def handle_classified_item(payload: dict) -> None:
         # The ACTUAL provider, not a hardcoded one. This read "ollama:" while
         # llm_provider defaulted to openrouter and the OpenRouter key was set, so
         # every row claimed a provider that had not been called. The prefix is
-        # load-bearing — correlation/consumer.py and tools/scratch.py both test
-        # `startswith("deterministic:")` to spot CVE records — and it is the first
-        # thing anyone reads when attributing spend, which is exactly how it
-        # misled a spend investigation on 2026-08-03.
+        # the first thing anyone reads when attributing spend, which is exactly
+        # how it misled a spend investigation on 2026-08-03.
         model_used = f"{settings.llm_provider}:{extract_model}"
         raw_model_output = extraction.model_dump()
 
@@ -208,7 +195,7 @@ async def handle_classified_item(payload: dict) -> None:
             logger.info("claims_rejected", raw_item_id=str(raw_item_id), **claim_rejects)
 
         lens_fields = {}
-        if extraction.cyber:
+        if extraction.cyber and cyber_ok:
             lens_fields["cyber"] = extraction.cyber.model_dump()
         fin = extraction.finance.model_dump() if extraction.finance else {}
         # The one place a ticker enters the database. Everything downstream —
@@ -267,6 +254,19 @@ async def handle_classified_item(payload: dict) -> None:
             article_id=str(article_id),
             enrichment_id=str(enrichment_id),
         ).model_dump(),
+    )
+
+
+def cyber_classified(classification: dict) -> bool:
+    """Whether an article's cyber lens facts are worth storing: the classifier
+    filed it under tech or cyber (the sector is the subject path's), or said it
+    matters to a security professional. The extractor fills the cyber lens on
+    anything — a child's burn death carried CWE-284 and a pooja NIST AC-6, 260
+    events in 7 days (audit, 2026-09-27). `raw_model_output` still keeps what
+    it said."""
+    return (
+        classification.get("sector") in ("cybersecurity", "technology")
+        or "cyber" in (classification.get("role_interests") or [])
     )
 
 

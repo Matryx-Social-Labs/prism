@@ -48,7 +48,6 @@ flowchart LR
     API -->|magic link| Email["Email (console/Resend)"]
     API -->|sign-in| Google["Google Identity Services"]
     Worker -->|push-index| IndexNow["IndexNow"]
-    Worker -->|cyber feeds| CVE["NVD / CISA KEV"]
     Worker -->|news| RSS["RSS sources"]
     Worker -->|allowlisted accounts| X["X / Twitter API"]
     Worker -->|show feeds| Podcasts["Podcast RSS + audio"]
@@ -158,11 +157,7 @@ flowchart LR
     AdminTrig["admin-triggered\nstream.ADMIN_TRIGGERS\n__main__.py:269-276"] --> Runner
     Requeue["APScheduler: requeue_stalled\nevery 10 min\nrunner.py:63"] -.-> RawItems
     Runner --> RSS["ingestion/rss.py"]
-    Runner --> NVD["ingestion/nvd.py"]
-    Runner --> KEV["ingestion/cisa_kev.py"]
     RSS --> RawItems[("raw_items")]
-    NVD --> RawItems
-    KEV --> RawItems
     RawItems -->|"stream.RAW_ITEMS\ningestion/base.py:204"| Classify["classification/consumer.py:44\nhandle_raw_item"]
     Classify -->|"stream.CLASSIFIED_ITEMS\nconsumer.py:106-107"| Enrich["enrichment/consumer.py:42\nhandle_classified_item"]
     Enrich -->|"stream.ENRICHED_ITEMS\nconsumer.py:242-243"| Correlate["correlation/consumer.py:91\nhandle_enriched_item -> _attach"]
@@ -189,8 +184,8 @@ against gist-embedding candidates).
 | **common** | Shared infra — largest package (51 files) | `stream.py`, `observability.py`, `logging.py`, `db.py`, `config.py`, `llm.py`, `models.py` (570 lines, SQLAlchemy ORM — see `DB-SCHEMA.md`), `decisions.py` (Jev client), `pair_judge.py` (generic cached pairwise-judge, reused by podcasts/xposts), `razorpay.py`, `auth.py`, `budget.py`, `embeddings.py`, `imagehash.py` (SSRF-guarded image fetch), `admin_audit.py`, `quota.py`, `usage.py`, `lenses.py` (in-code role-lens registry — stands in for a deferred `role_lenses` table, `common/lenses.py:1-7`) |
 | **correlation** | Canonicalize enriched articles into events; storyline/thread/trending layers on top | `consumer.py` (match-or-create, event projection rebuild), `clustering.py` (7-tier match cascade), `verify.py` (the 2026-09-25 verified/Jev tier), `partition.py` (global Leiden storyline partitioner), `threads.py` (cross-event thread links), `trending.py` (community→durable `stories` reconciliation), `briefs.py`, `cites.py`, `digest.py`, `cluster_metrics.py` |
 | **db** | Alembic migration environment | `env.py` (`target_metadata = common.models.Base.metadata`), `versions/` (52 files, linear chain, head `e5a9c3b7d2f1`) |
-| **enrichment** | Full text, schema-constrained LLM extraction, embeddings, claim verification | `consumer.py` (consumes `classified.items`, emits `enriched.items`; writes `articles.gist_embedding`), `fulltext.py` (trafilatura fetch), `claims.py` (verbatim-quote enforcement), `cve_lens.py` (deterministic, no LLM), `renderings.py` (quote-language verdicts), `schemas.py` |
-| **ingestion** | Collectors → `raw.items` | `runner.py` (`run_all()`: budget-floor gate + stall requeue), `base.py` (idempotent persist/watermark), `rss.py`, `nvd.py`, `cisa_kev.py`, `seed.py` (India-first `sources` seed) |
+| **enrichment** | Full text, schema-constrained LLM extraction, embeddings, claim verification | `consumer.py` (consumes `classified.items`, emits `enriched.items`; writes `articles.gist_embedding`), `fulltext.py` (trafilatura fetch), `claims.py` (verbatim-quote enforcement), `renderings.py` (quote-language verdicts), `schemas.py` |
+| **ingestion** | Collectors → `raw.items` | `runner.py` (`run_all()`: budget-floor gate + stall requeue), `base.py` (idempotent persist/watermark), `rss.py`, `seed.py` (India-first `sources` seed) |
 | **personalization** | Per-lens feed ranking | `ranking.py` (`score_event()`: recency decay + lens weights + corroboration) |
 | **podcasts** | Poll → transcribe → match transcript windows to events | `runner.py`, `feeds.py`, `transcribe.py` (Groq Whisper via OpenRouter), `match.py`, `judge.py`, `shows.py` |
 | **worker** | Single process (or `--stages`-split) running all stage consumers + scheduled jobs | `__main__.py` (387 lines: argparse `--stages`, wires the three stream consumers, a fake `/healthz` HTTP server for Railway, ~9 APScheduler jobs) |
@@ -315,7 +310,6 @@ default is not always what runs.
 | `prism_quote_verdicts` | `False` | `true` | bool; worker/API split acts as shadow | Speaker-card quote rendering judge |
 | `prism_ask_guard_enabled` | `True` | — | bool | Cheap moderation pre-check before Ask |
 | `prism_ingestion_enabled` | `True` | `true` | bool | Master switch for live ingestion |
-| `prism_cve_feeds_enabled` | `False` | — | bool | NVD/CISA KEV ingestion |
 | `prism_podcasts_enabled` | `False` | `true` | bool | Podcast clip pipeline |
 | `prism_veto_enabled` | `True` | **`false`** | bool | Grounded storyline-veto overlay |
 | `prism_langfuse_enabled` | `False` | — | bool | Explicit switch required in addition to credentials (self-hosted stack costs money when woken) |
@@ -352,7 +346,6 @@ Derived: `langfuse_enabled` property is true only if the flag AND both Langfuse 
 | `prism_session_cookie` / `prism_cookie_domain` / `prism_cookie_secure` | `prism_session` / `""` / `True` | Session cookie name/scope/security |
 | `google_client_id` | `""` | Google sign-in client id (empty = sign-in off) |
 | `razorpay_key_id` / `razorpay_key_secret` / `razorpay_webhook_secret` | `""` | Billing credentials (empty = checkout/webhook 503) |
-| `nvd_api_key` | `""` | NVD feed key |
 | `x_bearer_token` | `""` | X API bearer token |
 | `langfuse_public_key` / `langfuse_secret_key` / `langfuse_base_url` | `""` | Self-hosted Langfuse credentials |
 | `prism_paid_launch_date` | `""` | Start of the 90-day paid-offer clock; empty = offer prices shown |

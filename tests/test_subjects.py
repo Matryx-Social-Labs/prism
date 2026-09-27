@@ -152,14 +152,6 @@ async def test_deepening_takes_the_old_columns_down_with_it():
     assert out.subject_confidence == pytest.approx(0.9), "least sure step"
 
 
-def test_the_deterministic_feeds_are_placed_without_a_model():
-    from classification.consumer import _classify_cve_feed
-
-    cve = _classify_cve_feed("cisa_kev", "t", None)
-    assert cve.subject_path == "tech.security.vulnerabilities"
-    assert cve.subject_confidence == 1.0
-
-
 def test_every_menu_is_short_enough_to_be_read_carefully():
     subj.demo()
 

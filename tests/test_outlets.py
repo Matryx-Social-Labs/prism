@@ -11,7 +11,6 @@ def test_origin_is_country_and_language_not_a_label():
     assert classify("IN", None) == "national"  # language unknown → the English-national default
     assert classify("GB", "en") == "intl"
     assert classify("QA", "ar") == "intl"
-    assert classify("US", "en", "cve_feed") == "wire"
 
 
 def test_monogram_prefers_the_registry_then_initials():

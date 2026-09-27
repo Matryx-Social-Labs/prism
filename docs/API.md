@@ -76,7 +76,7 @@ Passwordless magic link + Google sign-in.
 
 Params: `lens?`, `sector?` (comma-separated), `interests?` (comma-separated `sector` or `sector:subsector` tokens), `region?`, `state?`, `scope?` (`region`|`national`|`world`|`all`), `languages?` (comma-separated), `sort` (`latest`|`top`, default `latest`), `limit` (clamped 1-100, default 30).
 
-Notable behaviour: CVE-only records (sources `nvd`/`cisa_kev`) are excluded from the main window and woven back in only for lenses whose config sets `include_cve_records`, at a fixed 2-news-to-1-record interleave ratio (not applied under `sort=top`). Per-sector windowing (the latest 120 per sector, walked on the `(sector, last_updated_at DESC)` index with one `LATERAL` per sector, plus a branch for NULL-sector events) stops one high-churn sector from starving the others. It replaced a `ROW_NUMBER()` over the whole table on 2026-09-27: 663 ms → 48 ms with identical rows. `attach_clip_shows()` runs as a post-hoc extra query to fill `clip_shows`, gated by `prism_podcasts_enabled`. Browser cache `max-age=30` (see Error conventions).
+Notable behaviour: CVE-only records (sources `nvd`/`cisa_kev`, whose collectors were removed 2026-09-27) are excluded from the window for every lens. Per-sector windowing (the latest 120 per sector, walked on the `(sector, last_updated_at DESC)` index with one `LATERAL` per sector, plus a branch for NULL-sector events) stops one high-churn sector from starving the others. It replaced a `ROW_NUMBER()` over the whole table on 2026-09-27: 663 ms → 48 ms with identical rows. `attach_clip_shows()` runs as a post-hoc extra query to fill `clip_shows`, gated by `prism_podcasts_enabled`. Browser cache `max-age=30` (see Error conventions).
 
 ## Search (`api/routes/search.py`)
 

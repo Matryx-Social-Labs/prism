@@ -56,6 +56,14 @@ CODES: dict[str, str] = {
     "qaumiawaz": "QA",
     "thehackernews": "THN",
     "bleepingcomputer": "BC",
+    "medianama": "MN",
+    "inc42": "I42",
+    "entrackr": "ENT",
+    "therecord": "REC",
+    "securityweek": "SW",
+    "krebsonsecurity": "KOS",
+    "cyberscoop": "CS",
+    "theregister": "REG",
     "bbc": "BBC",
     "aljazeera": "AJ",
     "anadolu": "AA",
@@ -67,8 +75,6 @@ CODES: dict[str, str] = {
     "presstv": "PTV",
     "scmp": "SCMP",
     "tass": "TASS",
-    "nvd": "NVD",
-    "cisa_kev": "CISA",
     "gdelt": "GD",
 }
 
@@ -113,6 +119,14 @@ DOMAINS: dict[str, str] = {
     "qaumiawaz": "qaumiawaz.com",
     "thehackernews": "thehackernews.com",
     "bleepingcomputer": "bleepingcomputer.com",
+    "medianama": "medianama.com",
+    "inc42": "inc42.com",
+    "entrackr": "entrackr.com",
+    "therecord": "therecord.media",
+    "securityweek": "securityweek.com",
+    "krebsonsecurity": "krebsonsecurity.com",
+    "cyberscoop": "cyberscoop.com",
+    "theregister": "theregister.com",
     "bbc": "bbc.com",
     "aljazeera": "aljazeera.com",
     "anadolu": "aa.com.tr",
@@ -124,8 +138,6 @@ DOMAINS: dict[str, str] = {
     "presstv": "presstv.ir",
     "scmp": "scmp.com",
     "tass": "tass.com",
-    "nvd": "nvd.nist.gov",
-    "cisa_kev": "cisa.gov",
 }
 
 
@@ -141,10 +153,8 @@ class Outlet:
     domain: str | None = None
 
 
-def classify(country: str | None, language: str | None, source_type: str | None = None) -> str:
+def classify(country: str | None, language: str | None) -> str:
     """Where an outlet sits on the coverage bar. Facts of the source, not a rating."""
-    if source_type in ("cve_feed", "advisory"):
-        return "wire"
     if country == "IN":
         return "national" if (language or "en") == "en" else "regional"
     return "intl"
@@ -183,10 +193,13 @@ def domain_for(publisher: str, slug: str) -> str | None:
 # the records sitemap and IndexNow all read this, so they cannot disagree.
 RECORD_MIN_OUTLETS = 2
 
-# Feeds that publish database rows, not journalism: an event sourced WHOLLY from
-# these is a raw record (api/routes/feed keeps it out of the news window), and
-# neither is an outlet when counting who reported a story. Declared once; the
-# feed's SQL, IndexNow and the rule below read this.
+# Feeds that published database rows, not journalism. Their collectors are gone
+# (founder, 2026-09-27: no vulnerability-record feeds), but a few of their events
+# stay because the labelled gold set points at them (tools/repair.py --drop-cve
+# keeps those). An event sourced WHOLLY from these is a raw record, kept out of
+# the news window (api/routes/feed) and IndexNow, and neither is an outlet when
+# counting who reported a story. Declared once; the feed's SQL, IndexNow and the
+# rule below read this.
 RAW_RECORD_FEEDS = frozenset({"nvd", "cisa_kev"})
 
 
@@ -221,7 +234,7 @@ async def registry(db: AsyncSession) -> dict[str, Outlet]:
             publisher=publisher,
             name=r["name"],
             code=code_for(publisher, r["name"]),
-            origin=classify(r["country"], r["language"], r["source_type"]),
+            origin=classify(r["country"], r["language"]),
             language=r["language"],
             country=r["country"],
             domain=domain_for(publisher, r["slug"]),
@@ -312,7 +325,7 @@ async def monitored(db: AsyncSession) -> Monitored:
                 name=r["name"],
                 publisher=publisher,
                 code=code_for(publisher, r["name"]),
-                origin=classify(r["country"], r["language"], r["source_type"]),
+                origin=classify(r["country"], r["language"]),
                 language=r["language"],
                 state=spec.state,
                 sector=spec.sector,

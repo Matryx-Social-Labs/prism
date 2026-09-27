@@ -2,16 +2,15 @@
 
 By the end of this you'll have the full Prism pipeline running on your machine,
 real stories in the feed, and you'll have watched one story re-typeset itself as
-you switch lenses — the thing Prism exists to do. You do **not** need an LLM key to
-get started: CVE feeds flow end to end with deterministic enrichment, so you'll see
-real cybersecurity stories within a few minutes. A key unlocks news and the
-lens-flip brief later in the tutorial.
+you switch lenses — the thing Prism exists to do. Every item goes through the
+relevance gate, the classifier and the extractor, so you need an LLM key for stories
+to appear (Prism ingests news only — there are no deterministic record feeds).
 
 ## What you'll need
 - **Docker** (for Postgres + Redis)
 - **Python 3.12+** with [uv](https://docs.astral.sh/uv/)
 - **Node 20+**
-- Optional, for news + lens briefs: an **OpenRouter** API key (`OPENROUTER_API_KEY`; production
+- An **OpenRouter** API key (`OPENROUTER_API_KEY`; production
   uses OpenRouter for chat models and for Jev, the Decisions API — `LLM_PROVIDER=ollama` with
   `OLLAMA_API_KEY` also works for chat models; see [LOCAL_DEV.md](./LOCAL_DEV.md))
 
@@ -20,7 +19,7 @@ lens-flip brief later in the tutorial.
 ## Step 1: Bring up infra and the schema
 
 ```bash
-cp .env.example .env           # defaults work for local; leave OPENROUTER_API_KEY blank for now
+cp .env.example .env           # defaults work for local; set OPENROUTER_API_KEY
 docker compose up -d           # Postgres (pgvector) + Redis
 uv sync                        # Python deps
 uv run alembic upgrade head    # create the schema
@@ -51,27 +50,21 @@ moment — the worker started ingesting the instant it launched.
 
 That's your first visible result. Now let's get real stories into it.
 
-## Step 4: Watch CVE stories flow in (no LLM key needed)
+## Step 4: Watch stories flow in
 
 In terminal 1 (the worker), you'll see the pipeline move:
 ```
 collector_run  collector=rss:...        new=…
-collector_run  collector=nvd            new=…
 … classification … enrichment … correlation …
 ```
-CISA KEV and NVD records enrich **deterministically** — no LLM. Within a minute or
-two, hit the API directly:
+Within a few minutes, hit the API directly:
 
 ```bash
 curl -s "http://localhost:8000/api/v1/feed?lens=cyber&limit=5" | \
   python3 -c "import sys,json; [print('•', i['title'][:70]) for i in json.load(sys.stdin)['items']]"
 ```
 
-The cyber lens is the one that lets raw CVE records in, so you'll see them here.
-Once there's journalism to weave them between they hold to one record per two
-stories; this early, with only the deterministic feeds ingesting, records are
-most of what exists, so that's most of what you get. It is still a whole-world
-feed either way: a lens **ranks**, it never filters, so cyber-relevant items rise
+It is a whole-world feed: a lens **ranks**, it never filters, so cyber-relevant items rise
 to the top while elections and markets stay on the page. (Want cybersecurity only?
 That's `?sector=cybersecurity`.)
 
@@ -126,7 +119,7 @@ Next:
 
 ## Troubleshooting
 - **Feed stays empty** — check terminal 1 for `collector_run`. RSS news needs
-  `OPENROUTER_API_KEY` (and `PRISM_INGESTION_ENABLED=true`); without it only CVE feeds (cyber lens) populate. Confirm
+  `OPENROUTER_API_KEY` (and `PRISM_INGESTION_ENABLED=true`); without it nothing gets past the gate. Confirm
   Postgres and Redis are up (`docker compose ps`).
 - **`alembic upgrade` fails** — Postgres isn't ready yet; wait a few seconds after
   `docker compose up -d` and retry.
