@@ -8,7 +8,7 @@ from common.db import session_scope
 from common.logging import get_logger
 from common.models import RawItem
 from common.schemas import ClassifiedItemMessage, EnrichedItemMessage, RawItemMessage
-from ingestion import cisa_kev, nvd, rss
+from ingestion import rss
 from ingestion.seed import seed_sources
 
 logger = get_logger(__name__)
@@ -41,20 +41,14 @@ async def run_all() -> dict[str, int]:
 
     await seed_sources()
     results: dict[str, int] = {}
-    # RSS (India news) first so the general feed is never starved by the CVE
-    # feeds' volume; CVE feeds run after and only ever surface in the cyber lens.
+    # RSS is the only collector: news, never vulnerability-database records
+    # (founder, 2026-09-27 — the NVD and CISA KEV collectors were removed).
     # GDELT is out for now (international + rate-limited) — India-first scope.
-    collectors: list[tuple[str, object]] = [("rss", rss.collect)]
-    if get_settings().prism_cve_feeds_enabled:
-        collectors += [("cisa_kev", cisa_kev.collect), ("nvd", nvd.collect)]
-    else:
-        logger.info("cve_feeds_disabled", reason="prism_cve_feeds_enabled=false")
-    for name, collector in collectors:
-        try:
-            results[name] = await collector()
-        except Exception:
-            logger.exception("collector_failed", collector=name)
-            results[name] = -1
+    try:
+        results["rss"] = await rss.collect()
+    except Exception:
+        logger.exception("collector_failed", collector="rss")
+        results["rss"] = -1
 
     logger.info("ingestion_run_complete", **{f"n_{k}": v for k, v in results.items()})
     return results

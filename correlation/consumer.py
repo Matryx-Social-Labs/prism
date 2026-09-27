@@ -36,6 +36,7 @@ from common.models import (
     Source,
 )
 from common.observability import fetch_prompt, observe
+from common.outlets import RAW_RECORD_FEEDS
 from common.stream import get_redis
 from common.text import entity_slug, is_latin_text
 from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
@@ -196,7 +197,6 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
     url = (raw_item.url_canonical or raw_item.url) if raw_item else None
     published_at = raw_item.published_at if raw_item else None
     classification = (raw_item.classification or {}) if raw_item else {}
-    cve_record = (enrichment.model or "").startswith("deterministic:")
 
     embedding = await _first_chunk_embedding(session, article_id)
     # The outlet is not an actor in its own coverage: left in, `prajavani` was
@@ -215,7 +215,6 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
         published_at=published_at,
         embedding=embedding,
         entity_slugs=entity_slugs or None,
-        cve_record=cve_record,
         english_title=english_headline(shared),
         gist=[float(v) for v in gist] if gist is not None else None,
         verify_block=article_block(
@@ -415,8 +414,8 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
     """Merge member enrichments into the served projection.
 
     Never merge identity, never inflate impact: lens fields are merged
-    field-by-field preferring authoritative sources (NVD for CVSS, KEV for
-    exploitation); disclosed values are attributed once.
+    field-by-field, the first member to disclose a value keeping it; disclosed
+    values are attributed once.
 
     Its own transaction, unless handed one: correlation/merge.py rebuilds the
     survivor inside the merge so the fold and the counts commit together.
@@ -538,15 +537,14 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
             row_lens = (row["lens_fields"] or {}).get("cyber") if row["lens_fields"] else None
             if not row_lens:
                 continue
-            slug = row["source_slug"]
             for cve in row_lens.get("cve_ids") or []:
                 cyber.setdefault("cve_ids", [])
                 if cve not in cyber["cve_ids"]:
                     cyber["cve_ids"].append(cve)
-            if row_lens.get("cvss") and (slug == "nvd" or not cyber.get("cvss")):
+            if row_lens.get("cvss") and not cyber.get("cvss"):
                 if row_lens["cvss"].get("score") is not None:
                     cyber["cvss"] = row_lens["cvss"]
-            if row_lens.get("exploitation") and (slug == "cisa_kev" or not cyber.get("exploitation")):
+            if row_lens.get("exploitation") and not cyber.get("exploitation"):
                 if any(v is not None for v in row_lens["exploitation"].values()):
                     cyber["exploitation"] = row_lens["exploitation"]
             if row_lens.get("affected") and len(row_lens["affected"]) > len(cyber.get("affected", [])):
@@ -721,7 +719,7 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
         return False, False
 
     settings = get_settings()
-    has_news = any(m["source_slug"] not in ("nvd", "cisa_kev") for m in members)
+    has_news = any(m["source_slug"] not in RAW_RECORD_FEEDS for m in members)
 
     # Single-source news: no competing perspectives; brief is generated on demand
     # on first view. Skip the LLM entirely — this is where most events land.

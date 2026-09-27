@@ -50,14 +50,10 @@ ingest critical path.
 ```mermaid
 flowchart TD
     subgraph Sources
-        RSS["RSS feeds (India outlets)"]
-        NVD["NVD CVE feed"]
-        KEV["CISA KEV feed"]
+        RSS["RSS feeds (India outlets + tech/cyber news)"]
     end
 
     RSS --> ING["ingestion/runner.py: run_all()<br/>every 5 min (PRISM_INGEST_INTERVAL_MINUTES)"]
-    NVD --> ING
-    KEV --> ING
 
     ING -->|"persist_envelopes()<br/>dedupe on (source_id, external_id)<br/>+ cross-feed URL dedupe"| RI[("raw_items")]
     ING -->|publish new rows| S1[["raw.items"]]
@@ -236,7 +232,7 @@ Two distinct locking mechanisms, for two distinct problems:
 
 ## 3. Ingestion
 
-Collectors live in `ingestion/` (`rss.py`, `nvd.py`, `cisa_kev.py`), sharing plumbing in
+The collector lives in `ingestion/` (`rss.py`), sharing plumbing in
 `ingestion/base.py`. `run_all()` (`ingestion/runner.py:17-60`) is the single entry point called by
 both the scheduler and the admin-trigger handler.
 
@@ -256,11 +252,11 @@ nothing (`ingestion/runner.py:17-41`):
    hard ceiling on the *articles* table, not spend directly, because it is *"the one quantity that
    cannot drift"* (`common/config.py:118-126`).
 
-`prism_cve_feeds_enabled` (default **False**, `common/config.py:143`) gates `nvd`/`cisa_kev`
-collection; RSS always runs first "so the general feed is never starved by the CVE feeds' volume"
-(`ingestion/runner.py:44-46`). Comment context: the CVE feeds dominated the corpus by volume
-before this — **19,276 of 27,194** articles and **77%** of all events, none reaching the general
-feed — and that corpus was deleted 2026-09-05 (`common/config.py:111-115`).
+RSS is the only collector. The NVD and CISA KEV collectors (and `prism_cve_feeds_enabled`) were
+removed on 2026-09-27 — founder decision: no vulnerability-record feeds; cyber and tech come
+from news sources that report a story. Their corpus was mostly deleted 2026-09-05
+(`tools/repair.py --drop-cve`); the few record events a labelling task still references stay, and
+`common/outlets.RAW_RECORD_FEEDS` keeps them out of every feed and IndexNow.
 
 ### `common/budget.py` — the LLM balance as a readable fact
 
@@ -317,10 +313,10 @@ developments"* of literal `&#039;` reaching readers, "and every affected headlin
 
 | | |
 |---|---|
-| **Inputs** | RSS feeds (India outlets), NVD CVE feed, CISA KEV feed |
+| **Inputs** | RSS feeds (India outlets, tech and cyber news) |
 | **Outputs** | New rows on `raw.items` stream |
 | **Tables written** | `sources` (watermark), `raw_items` (insert, `relevance='pending'` or `'duplicate'`) |
-| **Models/flags** | No LLM. `PRISM_INGESTION_ENABLED` (default true), `PRISM_INGEST_MAX_ARTICLES` (default 0/off), `PRISM_LLM_BUDGET_FLOOR_USD` (default 5.0), `PRISM_CVE_FEEDS_ENABLED` (default false) |
+| **Models/flags** | No LLM. `PRISM_INGESTION_ENABLED` (default true), `PRISM_INGEST_MAX_ARTICLES` (default 0/off), `PRISM_LLM_BUDGET_FLOOR_USD` (default 5.0) |
 | **Failure behaviour** | Per-collector `try/except`, logs `collector_failed`, continues with the rest (`ingestion/runner.py:52-57`); a failed collector returns `-1` in the result dict rather than aborting the run |
 
 ---
@@ -328,10 +324,9 @@ developments"* of literal `&#039;` reaching readers, "and every affected headlin
 ## 4. Classification
 
 `classification/consumer.py` — module docstring (`classification/consumer.py:1-10`): *"Phase 2 —
-relevance gate + classifier/router. Consumes raw.items... CVE-feed items (NVD, CISA KEV) are
-relevant by construction and classified deterministically... News/RSS items go through the binary
-LLM gate, then the classifier — or, with `prism_decisions_mode`, through one typed Jev call that
-answers both."*
+relevance gate + classifier/router. Consumes raw.items. A single-topic feed (ESPNcricinfo, RBI)
+is classified deterministically... Every other item goes through the binary LLM gate, then the
+classifier — or, with `prism_decisions_mode`, through one typed Jev call that answers both."*
 
 **Note on `docs/INGESTION-CLASSIFICATION.md`**: this doc describes an earlier design ("ported
 from EduThreat") with a `route: fast_lane` concept, a `confidence` field, and NER/RAG
@@ -340,18 +335,19 @@ that doc's phase-2 description is broadly accurate for the **LLM-pair** path but
 the Jev Decisions path at all (`classification/decide.py`), which did not exist when it was
 written. Treat it as background, not a spec.
 
-### Three classification paths
+### Two classification paths
 
-`handle_raw_item()` (`classification/consumer.py:44-109`) picks one of three paths per item:
+`handle_raw_item()` (`classification/consumer.py`) picks one of two paths per item:
 
-1. **Deterministic CVE path** — `source_type == "cve_feed"`: `_classify_cve_feed()`
-   (`classification/consumer.py:279-296`), no LLM. `route="fast_lane"` iff
-   `source_slug == "cisa_kev"` (actively exploited ⇒ time-critical).
-2. **Deterministic single-topic feed path** — the feed declares a fixed `sector` in its
+1. **Deterministic single-topic feed path** — the feed declares a fixed `sector` in its
    `FeedSpec` (`ingestion/rss.py`): built with `confidence=0.8`, `role_interests=["markets"]` iff
-   sector is finance/business.
-3. **LLM-pair-or-Jev path** — everything else, via `_gate_and_classify()`
-   (`classification/consumer.py:127-163`).
+   sector is finance/business. Only genuinely single-topic feeds declare one (ESPNcricinfo, RBI):
+   Mint, BusinessLine and ET's general feeds did until 2026-09-27 and filed a Punjab campus
+   protest under Business & Markets, skipping the gate entirely.
+2. **LLM-pair-or-Jev path** — everything else, via `_gate_and_classify()`.
+
+No feed stamps its own state on an item: which state a story is local to is the classifier's
+answer alone (the state-edition stamp was removed 2026-09-27).
 
 Writes are a single conditional `UPDATE raw_items SET relevance=..., classification=...,
 classified_at=..., rejection_reason=... WHERE id=:id AND relevance='pending'`
@@ -477,7 +473,7 @@ three cheaper fallbacks, resolved in `handle_classified_item()`
 | Tier | When | Where |
 |---|---|---|
 | `duplicate_url` | a prior enrichment exists for the same canonical URL (534 URL groups arrive more than once in production, 533 of them cross-source) | `enrichment/consumer.py:71,76-79`, `_extraction_for_same_url()` at `enrichment/consumer.py:288-324` |
-| `body` | source is `nvd`/`cisa_kev` (use the structured payload directly); or the feed's own body is already ≥400 chars (`MIN_USEFUL_CHARS`) | `enrichment/consumer.py:80-81`; `enrichment/fulltext.py:20,70-71` |
+| `body` | the feed's own body is already ≥400 chars (`MIN_USEFUL_CHARS`) | `enrichment/fulltext.py:20,70-71` |
 | `direct` | fetched via `httpx` + `trafilatura.bare_extraction`, with an SSRF guard (`refuse_non_public`, every hop) | `enrichment/fulltext.py:73-103` |
 | `title` | nothing else produced usable text | `enrichment/consumer.py:84-85` |
 | `none` | (rare) no body, no URL, or fetch failed and body absent | `enrichment/fulltext.py:107-109` |
@@ -616,13 +612,12 @@ anticipated but isn't built).
 database... a symbol that cannot be traced to a listed security is refused at this line rather
 than filtered at each of the places it would later be shown"* (`enrichment/consumer.py:197-202`).
 
-**Cyber lens, deterministic for CVE feeds**: `extract_from_nvd()` / `extract_from_kev()`
-(`enrichment/cve_lens.py:26-137`) build `ArticleExtraction` straight from the structured payload —
-CVSS from `cvssMetricV31`/`V40`/`V30`/`V2` in that preference order, affected products from
-`configurations[].nodes[].cpeMatch[]`, KEV's `known_exploited=True`/`kev_listed=True`. A small
-static control-mapping ruleset (`_default_control_mapping()`,
-`enrichment/cve_lens.py:188-217`) adds NIST/CIS control references keyed on exploitation/
-ransomware status — no LLM.
+**Cyber lens facts only on cyber articles**: the extractor fills its cyber lens on any article, so
+`lens_fields["cyber"]` is stored only when `cyber_classified()` (`enrichment/consumer.py`) says the
+classifier filed the article under tech or cyber, or flagged it for the cyber lens — a child's burn
+death had carried CWE-284 and a pooja NIST AC-6 (260 events in 7 days, audit 2026-09-27).
+`raw_model_output` keeps what the model said. The deterministic NVD/KEV path (`cve_lens.py`) was
+removed with those collectors on 2026-09-27.
 
 ### Table: enrichment
 
@@ -631,7 +626,7 @@ ransomware status — no LLM.
 | **Inputs** | `classified.items` messages (`raw_item_id`) |
 | **Outputs** | `enriched.items` messages (`raw_item_id`, `article_id`, `enrichment_id`) |
 | **Tables written** | `articles` (incl. `gist_embedding`), `article_chunks`, `enrichments`, `field_provenance`; may update `raw_items.image_url`/`image_phash` |
-| **Models/flags** | `prism_model_extract`/`prism_model_extract_light` (`google/gemini-3.1-flash-lite`); deterministic path for `nvd`/`cisa_kev`; embed model `intfloat/multilingual-e5-base` (`prism_embed_model`), `prism_embed_dim=768` |
+| **Models/flags** | `prism_model_extract`/`prism_model_extract_light` (`google/gemini-3.1-flash-lite`); embed model `intfloat/multilingual-e5-base` (`prism_embed_model`), `prism_embed_dim=768` |
 | **Failure behaviour** | Reused extraction for a duplicate canonical URL (no re-spend); claims failing verbatim check are dropped and counted, never stored; fulltext fetch failure falls back through tiers to `title`/`none`; image hash failure returns `None` silently ("a photo without a hash is simply shown as before") |
 
 ---
@@ -649,7 +644,7 @@ flowchart TD
     START(["new enriched article"]) --> HASCVE{"cve_ids present?"}
     HASCVE -->|yes| CVEQ{"event already has\nthis CVE id?"}
     CVEQ -->|yes| A1(["attach: cve_id (score 1.0)"])
-    CVEQ -->|"no (nvd/cisa_kev record)"| N1(["new event — no fuzzy tiers at all"])
+    CVEQ -->|no| URLQ
     HASCVE -->|no| URLQ{"an event already has an\narticle with this canonical URL?"}
     URLQ -->|yes| A2(["attach: url_exact (score 1.0)"])
     URLQ -->|no| TITLEQ{"pg_trgm title similarity\n>= 0.6, event updated\nwithin 4 days?"}
@@ -797,7 +792,11 @@ cache.
   even though `latest_published_at` tracks the newest — deliberately, because the headline (fixed
   at creation) and a *freshest* summary can describe two different articles once a later member
   wrongly merges in (measured: **830 of 1,054** multi-member events, 79%, had a
-  headline/summary mismatch before this fix).
+  headline/summary mismatch before this fix). The same pass files the event: its sector and
+  subject are the members' majority (`placement()`, ties to the earliest member, the sector
+  always the subject path's — they disagreed on 6.4% of events), and its states are the ones the
+  classifier chose for at least half its members (`chosen_states()`); countries stay as the
+  founder's extraction gave them. No model call — both re-read the stored classifications.
 - **Debounced analysis** (`mark_event_dirty()` → `run_due_analyses()`,
   `correlation/consumer.py:234-276`): real-time attach is cheap (DB-only); the LLM analysis pass
   (perspectives, impacts, briefs, thread links) is deferred `ANALYSIS_DEBOUNCE_S = 90` seconds
@@ -1165,7 +1164,7 @@ The account balance itself is `common/budget.py` (polled every 15 minutes, `GET
 
 ```mermaid
 sequenceDiagram
-    participant Feed as RSS/CVE feed
+    participant Feed as RSS feed
     participant Ing as ingestion/runner.py
     participant DB as Postgres
     participant RQ as Redis Streams

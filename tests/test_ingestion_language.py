@@ -40,6 +40,6 @@ def test_no_collector_hardcodes_a_language():
 
 
 def test_the_fix_is_at_the_choke_point_so_every_collector_inherits_it():
-    """Placed in persist_envelopes rather than rss.py: every collector — rss,
-    nvd, cisa_kev, and anything added later — persists through that one function."""
+    """Placed in persist_envelopes rather than rss.py: every collector — rss and
+    anything added later — persists through that one function."""
     assert "language=source.language or env.language" in inspect.getsource(base)

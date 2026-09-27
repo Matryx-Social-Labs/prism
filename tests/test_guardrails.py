@@ -110,15 +110,6 @@ def test_the_model_column_is_not_hardcoded_to_a_provider():
         "provider hardcoded in the model tag — use settings.llm_provider"
     )
     assert "settings.llm_provider" in src, "the model tag must name the provider actually configured"
-    # The deterministic prefix is NOT a provider and must survive: two call sites
-    # rely on it to mark articles that no fuzzy matching may ever touch.
-    assert '"deterministic:cisa_kev"' in src
-
-
-def test_deterministic_prefix_is_not_a_provider():
-    """The counterpart. Whatever the provider, a CVE record keeps its own prefix."""
-    assert "deterministic:cisa_kev".startswith("deterministic:")
-    assert not "deterministic:cisa_kev".startswith("openrouter:")
 
 
 # --- Langfuse kill switch ----------------------------------------------------
@@ -229,11 +220,11 @@ def test_prompts_still_work_with_tracing_off(monkeypatch):
 
 def test_settings_repr_does_not_leak_credentials():
     """pytest prints the whole Settings object on any assertion failure involving
-    it, and CI keeps those logs. A real NVD key and the production database URL
+    it, and CI keeps those logs. A real API key and the production database URL
     (with password) were visible in a local failure while writing these tests."""
     monkey = get_settings()
     text = repr(monkey)
-    for field in ("nvd_api_key", "openrouter_api_key", "langfuse_secret_key",
+    for field in ("openrouter_api_key", "langfuse_secret_key",
                   "prism_admin_token", "database_url", "redis_url", "resend_api_key"):
         assert field not in text, f"{field} appears in Settings repr — it will reach CI logs"
     # Non-secret config must still be visible, or debugging becomes guesswork.

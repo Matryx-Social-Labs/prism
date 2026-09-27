@@ -687,9 +687,9 @@ async def drop_cve(c: asyncpg.Connection, *, write: bool) -> None:
     not wanted for the India news product as it stands.
 
     SAFE TO DELETE IN THE SENSE THAT MATTERS: both are public authoritative feeds
-    and their enrichment is DETERMINISTIC (enrichment/cve_lens.extract_from_nvd —
-    no LLM), so the whole set is reconstructible for free by re-enabling the
-    collectors. This is not discarding paid-for work.
+    and their enrichment was DETERMINISTIC (no LLM), so this is not discarding
+    paid-for work. The collectors themselves were removed on 2026-09-27 (founder:
+    no vulnerability-record feeds), so nothing will re-ingest what this deletes.
 
     Events are only removed when nothing is left in them. 30 events mix CVE and
     news members; those keep their news members and lose the CVE ones, because

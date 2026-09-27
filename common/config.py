@@ -116,11 +116,6 @@ class Settings(BaseSettings):
     # collectors (and the stalled-item requeue) so no new news is fetched and the
     # downstream LLM pipeline goes idle — the cost brake while the prototype is
     # still being built. On-demand briefs/Ask/digest still work.
-    # The CVE feeds (NVD, CISA KEV) are the cyber beachhead, and they dominate by
-    # volume: 19,276 of 27,194 articles and 77% of all events, none of which ever
-    # reached the general feed. Off while the product is India news; re-enable
-    # with the Cyber tier. Their corpus was deleted 2026-09-05 and costs nothing
-    # to rebuild — public feeds, deterministic enrichment, no LLM.
     # A HARD CEILING ON THE CORPUS, checked before every collector run.
     #
     # "Bounded article cap" and "watched" are not cost controls, and calling them
@@ -148,7 +143,6 @@ class Settings(BaseSettings):
     # dollars, so a stalled enrichment never grows a backlog that becomes a bill
     # the moment credits return. 0 disables the floor. common/budget.py.
     prism_llm_budget_floor_usd: float = 5.0
-    prism_cve_feeds_enabled: bool = False
     prism_ingestion_enabled: bool = True
     # Podcast clips (podcasts/): poll the shows, transcribe, match to events.
     # Off by default until the gold_clips gate reads ≥ 0.9; the transcription
@@ -279,7 +273,6 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str = Field("", repr=False)
 
     # Sources
-    nvd_api_key: str = Field("", repr=False)
     x_bearer_token: str = Field("", repr=False)  # X API app-only bearer (console.x.com), pay-per-use
 
     @property

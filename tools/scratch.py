@@ -215,7 +215,6 @@ async def replay(prod: asyncpg.Connection, local_url: str, event_id, vectors: di
                     published_at=m["published_at"],
                     embedding=vec,
                     entity_slugs=slugs or None,
-                    cve_record=(m["model"] or "").startswith("deterministic:"),
                     english_title=m["xh"] or None,
                     gist=(gists or {}).get(str(m["aid"])),
                     verify_block=article_block(
@@ -358,8 +357,8 @@ async def main() -> None:
         if a.event:
             targets = [uuid.UUID(a.event)]
         else:
-            # CVE records are excluded, always. They are one-event-per-CVE by
-            # construction (find_event returns early on cve_record), so replaying
+            # CVE records are excluded, always. They were one-event-per-CVE by
+            # construction (the NVD/KEV collectors, removed 2026-09-27), so replaying
             # them can only ever reproduce what is already there — 12,788 of the
             # 16,732 events, for no possible change. Filtering them here is the
             # difference between a sweep of 252 events and one of 13,040.

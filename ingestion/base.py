@@ -61,8 +61,8 @@ def clean_text(text: str) -> str:
     Stripping first leaves an escaped tag as visible text, which is what the
     publisher meant; React escapes it again at render, so this is not a way in.
 
-    Applied here rather than in each collector because every one of them —
-    rss, nvd, cisa_kev — persists through this function.
+    Applied here rather than in each collector because every one of them
+    persists through this function.
     """
     if not text:
         return text

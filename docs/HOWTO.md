@@ -94,11 +94,10 @@ curl -s "localhost:8000/api/v1/feed?lens=legal" | jq '.lens' # echoes "legal"
   candidate query, which turned the cyber lens into a cybersecurity-only feed
   with no elections, markets, or world news in it. Only an explicit `?sector=` or
   the reader's `?interests=` narrows the feed now.
-- **Raw NVD/KEV records show up (or don't)** — that's `include_cve_records`, the
-  one lens flag that still changes *which* events are eligible. Records come from
-  their own bounded query and are woven in two stories to one record, so a
-  record-including lens reads as news rather than a changelog. `sort=top` skips
-  the interleave and returns pure score order.
+- **Raw NVD/KEV records never show up** — the collectors were removed (founder,
+  2026-09-27: no vulnerability-record feeds), and the few record events a labelling
+  task still pins are excluded from every lens's window by
+  `common/outlets.RAW_RECORD_FEEDS`.
 
 ---
 

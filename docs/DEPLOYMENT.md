@@ -148,7 +148,6 @@ Local dev can point at this same instance (put the three values in `.env`).
    | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_BASE_URL` | from Part 1 |
    | `CORS_ORIGINS` | `http://localhost:3000` for now; append `,https://<your-vercel-domain>` after Part 3 (any `*.vercel.app` preview URL is already allowed by the API's regex) |
    | `PRISM_ADMIN_TOKEN` | a long random string (guards `/api/v1/admin/*`) |
-   | `NVD_API_KEY` | optional, free from <https://nvd.nist.gov/developers/request-an-api-key> (higher rate limit) |
 
    Optional model overrides: `PRISM_MODEL_GATE`, `PRISM_MODEL_CLASSIFY`,
    `PRISM_MODEL_EXTRACT`, `PRISM_MODEL_CORRELATE`, `PRISM_MODEL_AGENT`,

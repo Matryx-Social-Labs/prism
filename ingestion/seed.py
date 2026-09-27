@@ -1,6 +1,7 @@
 """Seed the sources table (idempotent).
 
-India-first scope: national + state general news + the cybersecurity lens.
+India-first scope: national + state general news, plus technology and
+cybersecurity NEWS (never vulnerability-database records).
 International general outlets are intentionally out for now (see ingestion/rss.py).
 State granularity lives on the feed spec (ISO 3166-2), not the source row.
 """
@@ -11,9 +12,6 @@ from common.db import session_scope
 from common.models import Source
 
 SOURCES = [
-    # ── Authoritative CVE feeds (cyber lens only; never in the general feed) ──
-    {"slug": "cisa_kev", "name": "CISA Known Exploited Vulnerabilities", "source_type": "cve_feed", "country": "US", "language": "en"},
-    {"slug": "nvd", "name": "NVD / CVE", "source_type": "cve_feed", "country": "US", "language": "en"},
     # ── India national ──
     {"slug": "thehindu", "name": "The Hindu", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "timesofindia", "name": "The Times of India", "source_type": "rss", "country": "IN", "language": "en"},

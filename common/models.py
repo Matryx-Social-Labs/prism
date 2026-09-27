@@ -55,7 +55,7 @@ class Source(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    source_type: Mapped[str] = mapped_column(Text, nullable=False)  # news_api|cve_feed|advisory|rss|scraper
+    source_type: Mapped[str] = mapped_column(Text, nullable=False)  # rss (cve_feed: rows of the removed NVD/KEV collectors)
     # The masthead behind the feed. The Hindu ships six regional feeds that
     # republish one another, so corroboration counts publishers, not feeds.
     # Defaults to the slug, so an unrelated source counts for itself.

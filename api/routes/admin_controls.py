@@ -39,7 +39,6 @@ FLAGS: dict[str, str] = {
     "prism_ingestion_enabled": "Collect new reports",
     "prism_ingest_max_articles": "Stop collecting after this many reports in all (0: no cap)",
     "prism_llm_budget_floor_usd": "Stop collecting below this LLM balance, in dollars (0: no floor)",
-    "prism_cve_feeds_enabled": "Collect the CVE security feeds",
     "prism_podcasts_enabled": "Podcast clips: poll, transcribe, match to stories",
     "prism_x_enabled": "Posts from official X accounts",
     "prism_quote_verdicts": "Mark quotes as one statement in two languages, or a translation",

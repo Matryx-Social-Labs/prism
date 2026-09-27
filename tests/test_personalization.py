@@ -265,7 +265,6 @@ async def test_seeded_record_flood_cannot_evict_the_news_beside_it():
         pytest.skip("no database")
 
     async with _cyber_corpus() as (news_ids, record_ids):
-        # lens=reader is the general reader (DEFAULT_LENS): include_cve_records=False.
         ids = {i["id"] for i in await _feed(lens="reader", sector="cybersecurity", limit=60)}
 
     missing = sorted(shape for shape, eid in news_ids.items() if str(eid) not in ids)
@@ -296,9 +295,9 @@ async def test_only_wholly_record_sourced_events_count_as_records():
         assert str(news_ids[shape]) in general, (
             f"source_slugs={_NEWS_SHAPES[shape]!r} was classified as a raw record"
         )
-    # The lens that wants records still gets them — the split is a classification,
-    # not a second way of hiding cyber content.
-    assert cyber & {str(i) for i in record_ids}, "the cyber lens lost its raw records"
+    # No lens is served raw records any more (founder, 2026-09-27: no
+    # vulnerability-record feeds) — the cyber lens included.
+    assert not cyber & {str(i) for i in record_ids}, "the cyber lens wove raw records in"
 
 
 async def test_an_event_with_no_sector_still_reaches_the_feed():
