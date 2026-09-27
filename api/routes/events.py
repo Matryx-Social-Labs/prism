@@ -5,6 +5,7 @@ PR2). The single-flight lock below is in-process only — PR2 replaces it with a
 Redis lock so it holds across API replicas.
 """
 
+import hashlib
 import json
 import uuid
 
@@ -29,6 +30,7 @@ from api.schemas import (
     ImpactOut,
     PerspectiveOut,
     QuestionsResponse,
+    QuoteSource,
     SourceRef,
     SpeakerClaims,
     XPostOut,
@@ -57,9 +59,19 @@ from common.quota import (
 )
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
 
-# Shared with the worker's rendering sweep (enrichment/renderings.py), which must
-# see a speaker card exactly as this route builds it.
-from enrichment.claims import dedupe_sources, flat_ws
+# dedupe_sources and speaker_key are shared with the worker's rendering sweep
+# (enrichment/renderings.py), which judges the card from the same rows. It does
+# not apply the quote checks yet: it asks about the unchecked card, in shadow.
+from enrichment.claims import (
+    Said,
+    check_quote,
+    collapse_repeats,
+    dedupe_sources,
+    flat_ws,
+    fold_speakers,
+    one_speaker_per_quote,
+    same_words,
+)
 from enrichment.claims import speaker_key as _speaker_key
 from enrichment.renderings import apply as apply_renderings
 from enrichment.renderings import claim_key
@@ -240,26 +252,28 @@ def _with_verdicts(claims: list[ClaimOut], card: dict) -> list[ClaimOut]:
     ]
 
 
-def group_claims(sources: list[dict], verdicts: dict[str, dict] | None = None) -> list[SpeakerClaims]:
-    """Speaker-grouped, most-quoted first; newest article first, article order within it.
+def quote_id(quote: str) -> str:
+    """A quote's address: its words, never its position on the card."""
+    return hashlib.md5(quote.encode()).hexdigest()[:12]
 
-    `sources` is the event's article rows, already newest-first, each carrying
-    the enrichment's `claims` JSONB (NULL for an un-enriched article). Shown
-    under the first surface form seen for a speaker key.
+
+def _offset(v: object) -> int | None:
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def _said(sources: list[dict], checked: bool) -> list[Said]:
+    """Every quote on the event's articles, in article order. `checked` keeps
+    only direct speech (enrichment/claims.check_quote), its span re-verified.
 
     Defensive on shape by design: this runs on the most-viewed route, and a row
     written by an older extractor could hold a dict or a string where a list is
     expected. Skipping it costs one article's quotes; raising costs the page.
     """
-    by: dict[str, list[tuple[tuple, ClaimOut]]] = {}
-    label: dict[str, str] = {}
-    first_seen: dict[str, int] = {}
-    roles: dict[str, dict[str, int]] = {}
+    out: list[Said] = []
     for src in sources:
         claims = src["claims"]
         if not isinstance(claims, list):
             continue
-        pub = src["published_at"]
         for c in claims:
             if not isinstance(c, dict):
                 continue
@@ -273,33 +287,76 @@ def group_claims(sources: list[dict], verdicts: dict[str, dict] | None = None) -
             speaker, quote = speaker.strip(), quote.strip()
             if not speaker or not quote:
                 continue  # verified at write time; belt and braces
-            start, end = c.get("quote_start"), c.get("quote_end")
-            start = start if isinstance(start, int) and not isinstance(start, bool) else None
-            end = end if isinstance(end, int) and not isinstance(end, bool) else None
-            key = _speaker_key(speaker)
-            if key not in by:
-                by[key] = []
-                label[key] = speaker
-                first_seen[key] = len(first_seen)
+            start, end = _offset(c.get("quote_start")), _offset(c.get("quote_end"))
+            if checked:
+                # Stored before the direct-speech rule, so checked here too:
+                # every claim already on the record is served under it.
+                why, quote, start = check_quote(src.get("clean_text") or "", quote, speaker, start)
+                if why:
+                    continue
+                end = start + len(quote)
             role = c.get("speaker_role")
-            if isinstance(role, str) and role.strip():
-                r = roles.setdefault(key, {})
-                r[role.strip()] = r.get(role.strip(), 0) + 1
-            # newest article first, then the order the article said them
-            sort_key = (-(pub.timestamp() if pub else 0.0), start or 0)
-            before, after = quote_context(src.get("clean_text"), quote, start, end)
-            by[key].append((sort_key, ClaimOut(
-                quote_text=quote,
-                quote_start=start,
-                quote_end=end,
-                context_before=before,
-                context_after=after,
-                article_id=str(src["article_id"]),
-                source_name=src["source_name"],
-                url=src["url"],
-                published_at=pub.isoformat() if pub else None,
-                lang=src.get("lang"),
-            )))
+            role = role.strip() if isinstance(role, str) and role.strip() else None
+            out.append(Said(speaker, quote, start, end, src, role))
+    return out
+
+
+def _claim_out(s: Said) -> ClaimOut:
+    src, pub = s.src, s.src["published_at"]
+    before, after = quote_context(src.get("clean_text"), s.quote, s.start, s.end)
+    return ClaimOut(
+        id=quote_id(s.quote),
+        quote_text=s.quote,
+        quote_start=s.start,
+        quote_end=s.end,
+        context_before=before,
+        context_after=after,
+        article_id=str(src["article_id"]),
+        source_name=src["source_name"],
+        url=src["url"],
+        published_at=pub.isoformat() if pub else None,
+        lang=src.get("lang"),
+        also_in=[
+            QuoteSource(
+                id=quote_id(a.quote), article_id=str(a.src["article_id"]), source_name=a.src["source_name"],
+                url=a.src["url"], published_at=a.src["published_at"].isoformat() if a.src["published_at"] else None,
+            )
+            for a in s.also
+        ],
+    )
+
+
+def group_claims(sources: list[dict], verdicts: dict[str, dict] | None = None, *, checked: bool = True) -> list[SpeakerClaims]:
+    """Speaker-grouped, most-quoted first; newest article first, article order within it.
+
+    `sources` is the event's article rows, already newest-first, each carrying
+    the enrichment's `claims` JSONB (NULL for an un-enriched article) and the
+    article text. Shown under the first surface form seen for a speaker key.
+
+    `checked` applies the founder's rule (2026-09-27): direct speech only, one
+    speaker per quote, one row per thing said (enrichment/claims.py). Unchecked
+    is the card as served before it, kept only to resolve the share links that
+    addressed it by position (quote_aliases).
+    """
+    said = _said(sources, checked)
+    if checked:
+        said = collapse_repeats(one_speaker_per_quote(fold_speakers(said)))
+    by: dict[str, list[tuple[tuple, ClaimOut]]] = {}
+    label: dict[str, str] = {}
+    first_seen: dict[str, int] = {}
+    roles: dict[str, dict[str, int]] = {}
+    for s in said:
+        key = _speaker_key(s.speaker)
+        if key not in by:
+            by[key] = []
+            label[key] = s.speaker
+            first_seen[key] = len(first_seen)
+        for role in (m.role for m in (s, *s.also) if m.role):
+            r = roles.setdefault(key, {})
+            r[role] = r.get(role, 0) + 1
+        # newest article first, then the order the article said them
+        pub = s.src["published_at"]
+        by[key].append(((-(pub.timestamp() if pub else 0.0), s.start or 0), _claim_out(s)))
     out: list[SpeakerClaims] = []
     for k in sorted(by, key=lambda k: (-len(by[k]), first_seen[k])):
         ordered, languages = interleave_languages(
@@ -336,6 +393,26 @@ async def follow_merge(event_id: uuid.UUID, request: Request, db: AsyncSession =
     ).scalar_one_or_none()
     if into is not None:
         raise _moved(request, into)
+
+
+def quote_aliases(sources: list[dict], groups: list[SpeakerClaims]) -> dict[str, str]:
+    """The quote links shared before 2026-09-27 — `<speaker>-<quote>` positions
+    in the unchecked card — mapped to the row now holding their words.
+
+    The checks remove and merge rows, so every old position after the first
+    removal would otherwise name a different sentence. A position whose words
+    were withdrawn maps to nothing, and its page sends the reader to the story;
+    one that printed another speaker's words now shows them under that speaker.
+    """
+    rows = [c for g in groups for c in g.claims]
+    exact = {c.quote_text: c.id for c in rows}
+    out: dict[str, str] = {}
+    for si, g in enumerate(group_claims(sources, checked=False)):
+        for ci, c in enumerate(g.claims):
+            hit = exact.get(c.quote_text) or next((r.id for r in rows if same_words(r.quote_text, c.quote_text)), None)
+            if hit:
+                out[f"{si}-{ci}"] = hit
+    return out
 
 
 @router.get("/api/v1/events/{event_id}", response_model=EventDetail)
@@ -495,6 +572,7 @@ async def get_event(
         if lens_slug not in allowed and key in safe_projection:
             safe_projection[key] = None
 
+    claims = group_claims(sources, await event_claim_verdicts(db, event["id"]))
     reg = await outlets.registry(db)
     mon = await outlets.monitored(db)
     furniture = await placeholders(db)
@@ -552,7 +630,8 @@ async def get_event(
             )
             for p in perspectives
         ],
-        claims=group_claims(sources, await event_claim_verdicts(db, event["id"])),
+        claims=claims,
+        quote_aliases=quote_aliases(sources, claims),
         clips=await event_clips(db, event["id"]),
         x_posts=await event_x_posts(db, event["id"]),
         impacts=[

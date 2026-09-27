@@ -13,17 +13,25 @@ from datetime import UTC, datetime
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from api.routes.events import _speaker_key, dedupe_sources, group_claims
+from api.routes.events import _speaker_key, dedupe_sources, group_claims, quote_id
 
 T0 = datetime(2026, 7, 27, 10, 0, tzinfo=UTC)
 T1 = datetime(2026, 7, 28, 10, 0, tzinfo=UTC)
 
 
 def _src(article_id, claims, published_at=T0, name="The Hindu", url="https://h.example/a",
-         canonical=None, lang="en"):
+         canonical=None, lang="en", clean_text=None):
+    """An article row as the route reads it. Unless a test brings its own text,
+    the article prints each claim's words inside quotation marks — the shape a
+    direct quote has in a real report, and the only shape the card now shows."""
+    if clean_text is None and isinstance(claims, list):
+        clean_text = " ".join(
+            f"The reporter wrote this line. “{c['quote_text']}”"
+            for c in claims if isinstance(c, dict) and isinstance(c.get("quote_text"), str)
+        )
     return {"article_id": article_id, "source_name": name, "url": url,
             "url_canonical": canonical, "published_at": published_at, "claims": claims,
-            "lang": lang}
+            "lang": lang, "clean_text": clean_text}
 
 
 def _c(speaker, quote, start=None):
@@ -33,8 +41,8 @@ def _c(speaker, quote, start=None):
 
 def test_groups_by_speaker_most_quoted_first_then_first_seen():
     out = group_claims([
-        _src("a1", [_c("Alice", "one thing"), _c("Bob", "another")]),
-        _src("a2", [_c("Alice", "a second thing"), _c("Carol", "third")]),
+        _src("a1", [_c("Alice", "one thing I said today"), _c("Bob", "another thing entirely here")]),
+        _src("a2", [_c("Alice", "a second thing I said"), _c("Carol", "the third thing said here")]),
     ])
     assert [g.speaker for g in out] == ["Alice", "Bob", "Carol"]
     assert len(out[0].claims) == 2
@@ -42,7 +50,8 @@ def test_groups_by_speaker_most_quoted_first_then_first_seen():
 
 def test_only_verified_fields_leave_the_server():
     """`stance` and `said_at` are model opinions verify_claims never checks."""
-    out = group_claims([_src("a1", [_c("Alice", "q", start=40)])])
+    text = "Asked about the fee, the minister said: “We will not roll back the fee.”"
+    out = group_claims([_src("a1", [_c("Alice", "We will not roll back the fee.", start=40)], clean_text=text)])
     cl = out[0].claims[0]
     assert cl.model_dump().keys() == {
         "quote_text", "quote_start", "quote_end", "context_before", "context_after",
@@ -52,21 +61,27 @@ def test_only_verified_fields_leave_the_server():
         "lang",
         # Present but inert unless PRISM_QUOTE_VERDICTS and a judged card.
         "utterance", "translated",
+        # The quote's address (its words, not its position) and the other
+        # outlets that printed the same words.
+        "id", "also_in",
     }
-    assert cl.quote_start == 40
+    # A stale stored offset is repaired from the words, as at write time.
+    assert cl.quote_start == text.index("We will")
     assert cl.published_at == T0.isoformat()
 
 
 def test_within_one_article_quotes_keep_article_order():
     """Two quotes by one speaker from one article come out as the article said them."""
-    out = group_claims([_src("a1", [_c("Alice", "later", start=900), _c("Alice", "earlier", start=100)])])
-    assert [c.quote_text for c in out[0].claims] == ["earlier", "later"]
+    text = "“The earlier thing she said.” Later on: “The later thing she said.”"
+    out = group_claims([_src("a1", [_c("Alice", "The later thing she said."), _c("Alice", "The earlier thing she said.")],
+                             clean_text=text)])
+    assert [c.quote_text for c in out[0].claims] == ["The earlier thing she said.", "The later thing she said."]
 
 
 def test_newer_article_comes_first_across_articles():
     out = group_claims([
-        _src("old", [_c("Alice", "old quote", start=0)], published_at=T0),
-        _src("new", [_c("Alice", "new quote", start=0)], published_at=T1),
+        _src("old", [_c("Alice", "the old quote from Monday", start=0)], published_at=T0),
+        _src("new", [_c("Alice", "the new quote from Tuesday", start=0)], published_at=T1),
     ])
     assert [c.article_id for c in out[0].claims] == ["new", "old"]
 
@@ -81,8 +96,8 @@ def test_speaker_key_folds_punctuation_and_case_only():
 
 def test_folded_speakers_show_under_the_first_surface_form_seen():
     out = group_claims([
-        _src("a1", [_c("D.K. Shivakumar", "first")]),
-        _src("a2", [_c("D K Shivakumar", "second")]),
+        _src("a1", [_c("D.K. Shivakumar", "the first thing he said")]),
+        _src("a2", [_c("D K Shivakumar", "the second thing he said")]),
     ])
     assert len(out) == 1
     assert out[0].speaker == "D.K. Shivakumar"
@@ -90,7 +105,7 @@ def test_folded_speakers_show_under_the_first_surface_form_seen():
 
 
 def test_drops_empty_speaker_or_quote():
-    out = group_claims([_src("a1", [_c("", "q"), _c("Alice", "  "), _c("Bob", "ok")])])
+    out = group_claims([_src("a1", [_c("", "a quote with no speaker"), _c("Alice", "  "), _c("Bob", "this one is fine")])])
     assert [g.speaker for g in out] == ["Bob"]
 
 
@@ -104,27 +119,34 @@ def test_a_drifted_claims_column_cannot_500_the_story_page(bad):
 @pytest.mark.parametrize("claim", [
     {"speaker": 7, "quote_text": "a real quote here"},          # non-string speaker → .strip() raises
     {"speaker": "Alice", "quote_text": ["list"]},                # non-string quote
-    {"speaker": "Alice", "quote_text": "q", "quote_start": {"weird": 1}},  # offset fails ClaimOut
-    {"speaker": "Alice", "quote_text": "q", "quote_end": "12"},  # stringly offset
+    {"speaker": "Alice", "quote_text": "a real quote here", "quote_start": {"weird": 1}},  # offset fails ClaimOut
+    {"speaker": "Alice", "quote_text": "a real quote here", "quote_end": "12"},  # stringly offset
 ])
 def test_a_malformed_leaf_inside_a_well_shaped_claim_cannot_500_either(claim):
     """The container guards are not enough; a drifted row can be a dict with the
     wrong leaf types, and that must also cost one quote, never the page."""
-    out = group_claims([_src("a1", [claim, _c("Bob", "survives")])])
+    rows = [_src("a1", [claim, _c("Bob", "this one survives intact")])]
+    out = group_claims(rows)
     assert [g.speaker for g in out] == ["Bob"] or (
-        # the offset cases keep the claim and null the bad offset
+        # the offset cases keep the claim, its span repaired from the words
         [g.speaker for g in out] == ["Alice", "Bob"]
-        and out[0].claims[0].quote_start is None and out[0].claims[0].quote_end is None
+        and rows[0]["clean_text"][out[0].claims[0].quote_start:out[0].claims[0].quote_end] == "a real quote here"
+    )
+    # The unchecked card (share-link addresses only) must not 500 either.
+    legacy = group_claims(rows, checked=False)
+    assert [g.speaker for g in legacy] == ["Bob"] or (
+        [g.speaker for g in legacy] == ["Alice", "Bob"]
+        and legacy[0].claims[0].quote_start is None and legacy[0].claims[0].quote_end is None
     )
 
 
 def test_a_non_dict_claim_entry_is_skipped():
-    out = group_claims([_src("a1", ["not a claim", _c("Alice", "real")])])
+    out = group_claims([_src("a1", ["not a claim", _c("Alice", "a real quote from Alice")])])
     assert [g.speaker for g in out] == ["Alice"]
 
 
 def test_published_at_none_is_tolerated():
-    out = group_claims([_src("a1", [_c("Alice", "q")], published_at=None)])
+    out = group_claims([_src("a1", [_c("Alice", "a quote with no date")], published_at=None)])
     assert out[0].claims[0].published_at is None
 
 
@@ -138,7 +160,7 @@ def test_one_document_observed_three_times_is_one_source_and_one_quote():
     url = "https://www.bbc.com/hindi/articles/example?at_medium=RSS&at_campaign=rss"
     canonical = "https://www.bbc.com/hindi/articles/example"
     rows = [
-        _src(f"a{i}", [_c("Alice", "एक ही बयान")], published_at=T0, name="BBC News Hindi",
+        _src(f"a{i}", [_c("Alice", "एक ही बयान दिया गया")], published_at=T0, name="BBC News Hindi",
              url=url, canonical=canonical)
         for i in range(3)
     ]
@@ -146,12 +168,17 @@ def test_one_document_observed_three_times_is_one_source_and_one_quote():
     assert [s["article_id"] for s in unique] == ["a0"]
     claims = group_claims(unique)
     assert len(claims) == 1
-    assert [c.quote_text for c in claims[0].claims] == ["एक ही बयान"]
+    assert [c.quote_text for c in claims[0].claims] == ["एक ही बयान दिया गया"]
 
 
 def test_rows_without_a_url_are_distinct_documents():
     rows = [_src("a1", [], url=None), _src("a2", [], url=None)]
     assert [s["article_id"] for s in dedupe_sources(rows)] == ["a1", "a2"]
+
+
+QUOTE = "We were receiving proposals for him"
+NARRATION = "Anita Dipke said the family was proud of him."
+TEXT = f"Her mother Anita Dipke spoke to reporters. \"{QUOTE},\" she said. {NARRATION}"
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -192,7 +219,11 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
                            "url": "https://m.example/x?utm_source=rss",
                            "url_canonical": "https://m.example/x", "title": "T",
                            "published_at": T0, "stance": None, "lang": "en",
-                           "claims": [_c("Anita Dipke", "We were receiving proposals", start=12)]}
+                           "clean_text": TEXT,
+                           # The reporter's sentence was stored as her quote
+                           # before the direct-speech rule; it must not be served.
+                           "claims": [_c("Anita Dipke", NARRATION, start=TEXT.index(NARRATION)),
+                                      _c("Anita Dipke", QUOTE, start=12)]}
                 # The same publisher document was observed under two unstable
                 # feed ids. The route, not only the helper, must collapse it.
                 return [{"article_id": aid, **article}, {"article_id": duplicate_aid, **article}]
@@ -211,17 +242,23 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
             r = await c.get(f"/api/v1/events/{eid}")
             assert r.status_code == 200, r.text
             body = r.json()
+            at = TEXT.index(QUOTE)
             assert body["claims"] == [{
                 "speaker": "Anita Dipke",
                 "role": None,  # the article named no office; the field is present, never invented
-                "claims": [{"quote_text": "We were receiving proposals", "quote_start": 12,
-                            "quote_end": None, "context_before": "", "context_after": "",
+                "claims": [{"id": quote_id(QUOTE), "quote_text": QUOTE, "quote_start": at,
+                            "quote_end": at + len(QUOTE),
+                            "context_before": "Her mother Anita Dipke spoke to reporters. \"",
+                            "context_after": ",\" she said. " + NARRATION,
                             "article_id": str(aid), "source_name": "Mint",
                             "url": "https://m.example/x?utm_source=rss",
                             "published_at": T0.isoformat(), "lang": "en",
-                            "utterance": None, "translated": False}],
+                            "utterance": None, "translated": False, "also_in": []}],
                 "languages": ["en"],
             }], "the route did not pass claims through, or leaked an unverified field"
+            # The address shared before the rule (the quote was 0-0 then, the
+            # narration 0-1) still resolves; the withdrawn narration's does not.
+            assert body["quote_aliases"] == {"0-0": quote_id(QUOTE)}
             assert body["sources"] and body["sources"][0]["article_id"] == str(aid), (
                 "the sources query was changed and sources stopped arriving"
             )
@@ -280,13 +317,12 @@ def test_context_survives_the_newlines_the_verifier_collapsed():
 
 
 def test_context_rides_the_claim_when_the_row_carries_the_article_text():
-    text = "Intro words here. The quote itself. Trailing words here."
-    q = "The quote itself."
-    src = _src("a1", [_c("Alice", q, start=text.index(q))])
+    text = "Intro words here. \u201cThe quote is itself here.\u201d Trailing words here."
+    q = "The quote is itself here."
+    src = _src("a1", [_c("Alice", q, start=text.index(q))], clean_text=text)
     src["claims"][0]["quote_end"] = text.index(q) + len(q)
-    src["clean_text"] = text
     cl = group_claims([src])[0].claims[0]
-    assert cl.context_before == "Intro words here." and cl.context_after == "Trailing words here."
+    assert cl.context_before == "Intro words here. \u201c" and cl.context_after == "\u201d Trailing words here."
 
 
 # ── The language a quote was printed in ──────────────────────────────────────
@@ -315,8 +351,8 @@ def test_a_later_language_cannot_push_an_earlier_one_out_of_the_fold():
 
 def test_english_leads_for_a_reader_who_has_expressed_no_preference():
     out = group_claims([
-        _src("kn1", [_c("X", "kannada one"), _c("X", "kannada two")], published_at=T1, lang="kn"),
-        _src("en1", [_c("X", "english one")], published_at=T0, lang="en"),
+        _src("kn1", [_c("X", "the first kannada line"), _c("X", "the second kannada line")], published_at=T1, lang="kn"),
+        _src("en1", [_c("X", "the one english line")], published_at=T0, lang="en"),
     ])
     assert out[0].claims[0].lang == "en"
     assert out[0].languages == ["en", "kn"]
@@ -326,10 +362,10 @@ def test_one_language_is_left_exactly_as_it_was():
     """Round-robin over a single bucket is the identity: 43% of stored quotes are
     non-English originals and nothing about them should move."""
     out = group_claims([
-        _src("a2", [_c("X", "newer")], published_at=T1, lang="kn"),
-        _src("a1", [_c("X", "older")], published_at=T0, lang="kn"),
+        _src("a2", [_c("X", "the newer line said here")], published_at=T1, lang="kn"),
+        _src("a1", [_c("X", "the older line said here")], published_at=T0, lang="kn"),
     ])
-    assert [c.quote_text for c in out[0].claims] == ["newer", "older"]
+    assert [c.quote_text for c in out[0].claims] == ["the newer line said here", "the older line said here"]
     assert out[0].languages == ["kn"]
 
 
@@ -343,11 +379,12 @@ def test_an_untagged_article_is_not_reported_as_a_language():
 
 def test_a_speaker_quoted_identically_by_two_outlets_still_orders_deterministically():
     """Two ClaimOut rows with equal fields compare equal under Pydantic, so the
-    language order must come from where each was bucketed, not from list.index."""
+    language order must come from where each was bucketed, not from list.index.
+    (Identical words from two outlets are one row now; the order still holds.)"""
     out = group_claims([
-        _src("a1", [_c("X", "the same sentence")], published_at=T1, name="Hindu", lang="hi"),
-        _src("a2", [_c("X", "the same sentence")], published_at=T0, name="Mint", lang="hi"),
-        _src("a3", [_c("X", "a third")], published_at=T0, name="TV9", lang="kn"),
+        _src("a1", [_c("X", "the very same sentence here")], published_at=T1, name="Hindu", lang="hi"),
+        _src("a2", [_c("X", "the very same sentence here")], published_at=T0, name="Mint", lang="hi"),
+        _src("a3", [_c("X", "a third sentence said here")], published_at=T0, name="TV9", lang="kn"),
     ])
     assert out[0].languages == ["hi", "kn"]
 
@@ -407,3 +444,150 @@ def test_a_verdict_about_a_quote_no_longer_on_the_card_changes_nothing():
     card = {"spoken": {gone: 0.01}, "same": [[en, gone, 0.99]]}
     out = group_claims(_meloni(), {"giorgia meloni": card})[0]
     assert not any(c.translated or c.utterance for c in out.claims)
+
+
+# ── Direct speech only, one speaker per quote, one row per thing said ────────
+#
+# Founder decision, 27 Sep 2026: quotes are direct speech only. The rules run
+# where the card is built, so what was stored before them is served under them
+# without a backfill. Fixtures are the live records the audit found.
+
+MAJITHIA = "The accused should face the strictest punishment under law. But police inaction fuelled the situation."
+TOORA = "When we reached here, we came to know that there were rumours. Because of the rumours, students gathered here"
+
+
+def test_the_reporters_sentence_stored_as_a_quote_is_not_served():
+    """Live, event 8db8e742: Scroll's "Saheb said he pointed out sections…" and
+    ToI's "workers accompanying Jarnail Singh abused his family…" were served as
+    quotes. They were stored before the rule; the card no longer shows them."""
+    scroll = ("The video shows police were present. Saheb said he pointed out sections where the road "
+              "surface was breaking apart, after which Verma slapped him. Kejriwal shared the video.")
+    real = "When his worker abused my family, I did what any person would do after getting angry."
+    toi = ("He alleged that workers accompanying Jarnail Singh abused his family and said he reacted after that. "
+           f"Verma said, “{real}”")
+    out = group_claims([
+        _src("s", [_c("Saheb", "Saheb said he pointed out sections where the road surface was breaking apart, "
+                               "after which Verma slapped him.")], clean_text=scroll),
+        _src("t", [_c("Parvesh Verma", "workers accompanying Jarnail Singh abused his family and said he reacted after that."),
+                   _c("Parvesh Verma", real)], clean_text=toi),
+    ])
+    assert [(g.speaker, [c.quote_text for c in g.claims]) for g in out] == [("Parvesh Verma", [real])]
+
+
+def test_a_quote_given_to_two_speakers_stays_with_the_one_named_beside_it():
+    """Live, the LPU record: Majithia's post on X stored under both Majithia and
+    SSP Gaurav Toora — and the landing page showcased it as Toora's."""
+    text = ("SSP Gaurav Toora said the situation was under control. Akali leader Bikram Singh Majithia blamed "
+            f"the AAP leadership. “{MAJITHIA}” Majithia wrote on X.")
+    out = group_claims([_src("tt", [_c("Gaurav Toora", MAJITHIA), _c("Bikram Singh Majithia", MAJITHIA)], clean_text=text)])
+    assert [(g.speaker, len(g.claims)) for g in out] == [("Bikram Singh Majithia", 1)]
+
+
+def test_a_quote_given_to_two_speakers_neither_named_near_it_is_shown_for_neither():
+    text = ("Protests continued on the campus through the night. " * 6 + f"“{MAJITHIA}” "
+            + "Traffic resumed later. " * 12 + "SSP Gaurav Toora and Bikram Singh Majithia visited the site.")
+    out = group_claims([_src("tt", [_c("Gaurav Toora", MAJITHIA), _c("Bikram Singh Majithia", MAJITHIA)], clean_text=text)])
+    assert out == []
+
+
+def test_the_same_words_from_four_outlets_are_one_quote_listing_the_others():
+    """Live: the SSP's "When we reached here…" printed four times on his card."""
+    [card] = group_claims([
+        _src("toi", [_c("Gaurav Toora", TOORA)], published_at=T1, name="The Times of India"),
+        _src("hindu", [_c("Gaurav Toora", TOORA)], published_at=T0, name="The Hindu"),
+        _src("et", [_c("Gaurav Toora", TOORA)], published_at=T1, name="The Economic Times"),
+        _src("dh", [_c("Gaurav Toora", TOORA + ".")], published_at=T1, name="Deccan Herald"),
+    ])
+    [row] = card.claims
+    assert row.article_id == "hindu"  # the earliest report is the citation
+    assert [a.source_name for a in row.also_in] == ["The Times of India", "The Economic Times", "Deccan Herald"]
+
+
+def test_near_identical_words_are_one_quote_and_different_words_are_two():
+    a = "We spoke to students who had some issues with the LPU administration. We heard them and are trying to get them resolved"
+    b = "We spoke to the students who had some issues with the LPU administration. We heard them and are trying to get them resolved"
+    c = "An assessment of the property damage is being done and necessary legal action will be taken"
+    [card] = group_claims([
+        _src("toi", [_c("Gaurav Toora", a), _c("Gaurav Toora", c)], name="The Times of India"),
+        _src("dc", [_c("Gaurav Toora", b)], name="Deccan Chronicle", published_at=T1),
+    ])
+    assert sorted(len(r.also_in) for r in card.claims) == [0, 1]
+
+
+def test_a_first_name_speaker_is_folded_into_the_full_name_on_the_same_record():
+    """Live, event 8db8e742: "Saheb Singh" and "Saheb" were two speakers."""
+    out = group_claims([
+        _src("mint", [_c("Saheb Singh", "I was recording a video when he snatched my phone and raised his hand at me")]),
+        _src("toi", [_c("Saheb", "The police were present right there, and all of this happened in their presence")]),
+    ])
+    assert [(g.speaker, len(g.claims)) for g in out] == [("Saheb Singh", 2)]
+
+
+def test_a_name_two_speakers_could_share_folds_into_neither():
+    out = group_claims([
+        _src("a", [_c("Saheb Singh", "I was recording a video when he snatched my phone")]),
+        _src("b", [_c("Jarnail Singh", "I peeled the road off like a carpet and showed it to him")]),
+        _src("c", [_c("Singh", "We have lodged an FIR and action must be taken")]),
+    ])
+    assert sorted(g.speaker for g in out) == ["Jarnail Singh", "Saheb Singh", "Singh"]
+
+
+def test_a_body_is_never_folded_into_a_longer_body():
+    """Live window: the name rule alone put "Bank of India" under State Bank of
+    India and "IIT-Bombay" under its Faculty Forum."""
+    out = group_claims([
+        _src("a", [_c("State Bank of India", "We have raised the lending rate by ten basis points")]),
+        _src("b", [_c("Bank of India", "Our deposit rates will stay where they are for now")]),
+        _src("c", [_c("IIT-Bombay Faculty Forum", "The faculty stands with the students on this matter")]),
+        _src("d", [_c("IIT-Bombay", "We apologise for the statements in our earlier communication")]),
+    ])
+    assert sorted(g.speaker for g in out) == ["Bank of India", "IIT-Bombay", "IIT-Bombay Faculty Forum", "State Bank of India"]
+
+
+def test_a_name_in_the_next_sentence_does_not_take_the_quote():
+    """Live: "“The BJP wants to kill me. I may die anyday.” Union minister
+    Sukanta Majumdar, however, attributed…" — Majumdar is named nearest, but in
+    the reporter's next sentence; the words are Kunal Ghosh's."""
+    quote = "The BJP wants to kill me. I may die anyday."
+    text = (f"Kunal Ghosh later lodged a complaint at the police station and blamed the BJP. He argued, “{quote}” "
+            "Union minister Sukanta Majumdar, however, attributed the incident to a factional feud.")
+    out = group_claims([_src("dc", [_c("Kunal Ghosh", quote), _c("Sukanta Majumdar", quote)], clean_text=text)])
+    assert [(g.speaker, len(g.claims)) for g in out] == [("Kunal Ghosh", 1)]
+
+
+def test_a_quotes_address_is_its_words_not_its_position():
+    """Share links were `<speaker>-<quote>` positions, so a newer report
+    renumbered every link on the card. The address is now the words."""
+    first = group_claims([_src("a1", [_c("Alice", "the words she said on Monday")])])
+    later = group_claims([
+        _src("a2", [_c("Alice", "a newer quote that now leads the card")], published_at=T1),
+        _src("a1", [_c("Alice", "the words she said on Monday")]),
+    ])
+    old = first[0].claims[0].id
+    assert later[0].claims[0].id != old  # the position now names another quote…
+    assert [c.quote_text for c in later[0].claims if c.id == old] == ["the words she said on Monday"]  # …the id does not
+
+
+def test_the_addresses_shared_before_the_rule_resolve_to_the_same_words():
+    """/story/<id>/quote/<n> links already shared must not break: each old
+    position maps to the row now holding its words, and a withdrawn quote maps
+    to nothing (its page sends the reader to the story)."""
+    from api.routes.events import quote_aliases
+
+    text = (f"“We spoke to the students who had some issues.” DIG Naveen Singla said the girl had left "
+            f"the hostel. “The matter will be investigated with forensic analysis.” Majithia wrote: “{MAJITHIA}”")
+    rows = [_src("a1", [_c("Naveen Singla", "DIG Naveen Singla said the girl had left the hostel."),
+                        _c("Naveen Singla", "The matter will be investigated with forensic analysis."),
+                        _c("Gaurav Toora", "We spoke to the students who had some issues."),
+                        _c("Gaurav Toora", MAJITHIA),
+                        _c("Bikram Singh Majithia", MAJITHIA)], clean_text=text)]
+    groups = group_claims(rows)
+    by_text = {c.quote_text: c.id for g in groups for c in g.claims}
+    # Unchecked, the card was: 0 Singla [narration, investigated], 1 Toora [spoke, Majithia's], 2 Majithia [his].
+    assert quote_aliases(rows, groups) == {
+        "0-1": by_text["The matter will be investigated with forensic analysis."],
+        "1-0": by_text["We spoke to the students who had some issues."],
+        # The link that printed Majithia's words under Toora now shows them under Majithia.
+        "1-1": by_text[MAJITHIA],
+        "2-0": by_text[MAJITHIA],
+    }
