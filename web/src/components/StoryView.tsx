@@ -45,6 +45,7 @@ import { StoryActionBar } from "@/components/story/StoryActionBar";
 import { shortDate } from "@/lib/dateline";
 import { entityRel } from "@/lib/entities";
 import { sectorGroup } from "@/lib/sectors";
+import { quoteOutlets } from "@/lib/quotes";
 import { sentences } from "@/lib/sentences";
 
 /**
@@ -302,7 +303,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   const reportWord = plural(sourceCount, "report", "reports");
   // By masthead, as the header counts: The Times of India and its Delhi desk are one outlet.
   const outletOf = (id: string) => event.sources.find((x) => x.article_id === id);
-  const saidOutlets = new Set(claims.flatMap((sp) => sp.claims.map((c) => outletOf(c.article_id)?.publisher ?? c.source_name))).size;
+  const saidOutlets = quoteOutlets(claims.flatMap((sp) => sp.claims), (id) => outletOf(id)?.publisher);
   const saidLangs = new Set(claims.flatMap((sp) => sp.claims.map((c) => c.lang)).filter(Boolean)).size;
 
   // Facts first — they are the record; the brief beneath is a reading of it.

@@ -13,6 +13,7 @@ import { LiveLead, outletsOf } from "@/components/landing/parts";
 import { fetchEvent, fetchFeed, fetchQuestions, type EventDetail, type FeedItem, type OutletRef } from "@/lib/api";
 import { coverageText, languageNames, languagesOf, publishers } from "@/lib/coverage";
 import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
+import { showcaseQuote } from "@/lib/quotes";
 import { sentences } from "@/lib/sentences";
 import { indexSources } from "@/lib/sources";
 import { Ago } from "@/components/Ago";
@@ -43,7 +44,7 @@ const STEPS = [
 const REFUSALS: [string, string][] = [
   ["No invented numbers.", "Every count on a page is counted from the reports: outlets, languages, quotes, developments. If it is not countable, it is not printed."],
   ["No count without its denominator.", "\u201C2 outlets\u201D means 2 of the outlets Prism monitors, never everyone who covered the story. The list of them is public, with when each was last read."],
-  ["No quote that is not in the article.", "A quote appears only when the same words are in the article it came from. When the check fails the quote is dropped, never paraphrased."],
+  ["No quote that is not in the article.", "A quote appears only when the article it came from prints the same words inside quotation marks. When the check fails the quote is dropped, never paraphrased."],
   ["No guess presented as a fact.", "The brief restates the reports. Where it says why something matters, that is Prism\u2019s reading, and the page says so."],
   ["No left, right or centre.", "Coverage is described by where an outlet comes from, a fact of the source. Prism rates neither an outlet\u2019s politics nor a report\u2019s tone: nobody has made those ratings for Indian outlets, and a machine\u2019s guess is not one."],
   ["No photos of its own.", "A picture is only ever the outlet's, shown as a credited link preview of that outlet's report, never as Prism's."],
@@ -143,7 +144,7 @@ export async function HowItWorks() {
   const event = ex?.event ?? null;
   const outlets = ex?.outlets ?? [];
   const reports = event ? [...event.sources].sort((a, b) => (a.published_at ?? "").localeCompare(b.published_at ?? "")) : [];
-  const quote = event?.claims?.find((c) => c.role) ?? event?.claims?.[0] ?? null;
+  const quote = showcaseQuote(event?.claims);
   const brief = event?.lens_briefs?.reader ?? null;
   const points = brief ? sentences(brief) : [];
   const watch = event?.lens_points?.reader ?? [];
@@ -216,7 +217,7 @@ export async function HowItWorks() {
             example={event && quote ? (
               <Said claims={[{ ...quote, claims: quote.claims.slice(0, 2) }]} sourceIndex={indexSources(event.sources)} />
             ) : <Unavailable what="A verified quote" />}>
-            <p>Prism pulls out what named people and bodies said, and keeps a quote only if the same words are in the article. Each one names the speaker and their office as the article gave it, the outlet that carried it, and opens the article at that line.</p>
+            <p>Prism pulls out what named people and bodies said, and keeps a quote only if the article prints the same words inside quotation marks. Each one names the speaker and their office as the article gave it, the outlet that carried it, and opens the article at that line.</p>
             {quote?.role && <p>Here: {quote.speaker}, {quote.role}.</p>}
           </Step>
 

@@ -107,7 +107,19 @@ export interface PerspectiveOut {
  *  the quote is checked verbatim at write time, the offsets are repaired from
  *  it, source and date come from raw_items. No stance, no said_at: those are
  *  model opinions and a guess must not sit beside a verified quote. */
+/** Another report that printed the same words as a quote row. */
+export interface QuoteSource {
+  id: string;
+  article_id: string;
+  source_name: string;
+  url: string | null;
+  published_at: string | null;
+}
+
 export interface ClaimOut {
+  /** The quote's address, /story/<event>/quote/<id>: its words, never its
+   *  position. Optional: an older payload (two deploy pipelines) has none. */
+  id?: string;
   quote_text: string;
   quote_start: number | null;
   quote_end: number | null;
@@ -129,6 +141,9 @@ export interface ClaimOut {
   /** The outlet's translation: a confident NO to "spoken in the language
    *  printed?". False means not SHOWN to be one — never "the original". */
   translated?: boolean;
+  /** The other reports that printed these words, earliest first; this row's
+   *  own report is the earliest of all. */
+  also_in?: QuoteSource[];
 }
 
 export interface SpeakerClaims {
@@ -206,6 +221,10 @@ export interface EventDetail {
   // the web and the API deploy from two pipelines and /events is cached 60s —
   // a new page can meet an old payload for a window.
   claims?: SpeakerClaims[];
+  /** Quote links shared before 27 Sep 2026 addressed a position,
+   *  `<speaker>-<quote>`; each maps to the id of the quote now holding its
+   *  words. Absent on an older payload; a withdrawn quote has no entry. */
+  quote_aliases?: Record<string, string>;
   // No `story` here: /trending/[slug] owns the timeline. See api/schemas.py.
   // What the ticket carries is the way to that owner. Optional: an older
   // payload (two deploy pipelines, 60s cache) simply has no route.

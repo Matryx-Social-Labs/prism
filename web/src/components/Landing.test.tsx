@@ -105,6 +105,26 @@ describe("Landing", () => {
     expect(screen.getByRole("link", { name: "Sign in to unlock" })).toHaveAttribute("href", "/signin?next=/story/lead");
   });
 
+  it("showcases words two outlets printed, not whatever the record lists first", async () => {
+    // Audit P0 #2: the landing took claims[0], and printed Majithia's post on X
+    // as the SSP's. It now leads with a checked quote more than one outlet carried.
+    fetchFeed.mockResolvedValue([row("lead")]);
+    fetchEvent.mockImplementation(async (id: string) => ({
+      ...record(id),
+      claims: [
+        { speaker: "Naveen Singla", role: "DIG", claims: [{ id: "s1", quote_text: "We are verifying the facts on the ground", quote_start: 0, quote_end: 0, article_id: "a1", source_name: "The Hindu", url: null, published_at: null }] },
+        {
+          speaker: "Gaurav Toora", role: null,
+          claims: [{ id: "t1", quote_text: "When we reached here, we came to know there were rumours", quote_start: 0, quote_end: 0, article_id: "a2", source_name: "Mint", url: null, published_at: null,
+            also_in: [{ id: "t1", article_id: "a3", source_name: "Reuters", url: null, published_at: null }] }],
+        },
+      ],
+    }));
+    render(await Landing());
+    expect(screen.getByText(/When we reached here/)).toBeInTheDocument();
+    expect(screen.queryByText(/We are verifying the facts/)).toBeNull();
+  });
+
   it("prints the Plus price only from the pricing source", async () => {
     render(await Landing());
     expect(screen.getByRole("heading", { name: "Prism Plus" })).toBeInTheDocument();

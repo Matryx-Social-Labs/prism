@@ -1,16 +1,76 @@
-// A quote's address: `<speaker index>-<claim index>` in the order the record
-// lists them, so /story/<id>/quote/<n> names one verbatim sentence for the
-// quote card (lib/ogCard QuoteCard) and the share link on each quote.
+// A quote's address, /story/<id>/quote/<n>: the API's `id`, a hash of the
+// quote's words, so a newer report can never renumber a link already shared
+// (the quote card, lib/ogCard QuoteCard, and the share link on each quote).
+// Before 27 Sep 2026 the address was `<speaker index>-<claim index>` in the
+// order the record listed them; the API maps each such position to the quote
+// now holding its words (`quote_aliases`), and an older payload without the
+// map is still read by position.
 import type { ClaimOut, SpeakerClaims } from "@/lib/api";
 
 export const quoteId = (speakerIdx: number, claimIdx: number) => `${speakerIdx}-${claimIdx}`;
 
-export function findQuote(groups: SpeakerClaims[] | null | undefined, id: string) {
+/** Where a quote's Share link points: its words' id, or its position on an older payload. */
+export const quoteAddress = (claim: ClaimOut, speakerIdx: number, claimIdx: number) => claim.id ?? quoteId(speakerIdx, claimIdx);
+
+export function findQuote(
+  groups: SpeakerClaims[] | null | undefined,
+  id: string,
+  aliases?: Record<string, string> | null,
+): { speaker: string; role: string | null; claim: ClaimOut; id: string } | null {
+  if (!groups) return null;
   const m = /^(\d+)-(\d+)$/.exec(id);
-  if (!m || !groups) return null;
-  const sp = groups[Number(m[1])];
-  const c = sp?.claims[Number(m[2])];
-  return sp && c ? { speaker: sp.speaker, role: sp.role ?? null, claim: c } : null;
+  if (m && aliases) {
+    // A link shared before the quote checks: withdrawn words have no entry.
+    const to = aliases[id];
+    return to ? findQuote(groups, to) : null;
+  }
+  if (m) {
+    const sp = groups[Number(m[1])];
+    const c = sp?.claims[Number(m[2])];
+    return sp && c ? { speaker: sp.speaker, role: sp.role ?? null, claim: c, id } : null;
+  }
+  for (const sp of groups) {
+    // Another outlet's copy of the words resolves to the row that cites them.
+    const c = sp.claims.find((x) => x.id === id || x.also_in?.some((a) => a.id === id));
+    if (c) return { speaker: sp.speaker, role: sp.role ?? null, claim: c, id: c.id ?? id };
+  }
+  return null;
+}
+
+/**
+ * How many outlets printed these quotes: the one each cites and every other
+ * that carried the same words. Counted by masthead when the caller knows it
+ * (The Times of India and its Delhi desk are one outlet), as the header counts.
+ */
+export function quoteOutlets(claims: ClaimOut[], masthead: (articleId: string) => string | null | undefined = () => null): number {
+  return new Set(claims.flatMap((c) => [c, ...(c.also_in ?? [])].map((x) => masthead(x.article_id) ?? x.source_name))).size;
+}
+
+/**
+ * The quote a showcase leads with (the landing's "Exact words", How it works'
+ * step 04), with its speaker's other quotes after it. Every quote the API
+ * returns has passed the direct-speech checks, but not every one is a good
+ * example: prefer words two or more outlets printed, then a speaker the
+ * articles name an office for. Never simply the record's first — that showed
+ * Majithia's post on X as the SSP's on the landing (audit P0 #2).
+ */
+export function showcaseQuote(groups: SpeakerClaims[] | null | undefined): SpeakerClaims | null {
+  // Earlier wins a tie, so the API's own order (most-quoted speaker first) breaks it.
+  const beats = (a: number[], b: number[]) => {
+    const i = a.findIndex((x, k) => x !== b[k]);
+    return i >= 0 && a[i] > b[i];
+  };
+  let best: { sp: SpeakerClaims; claim: ClaimOut; rank: number[] } | null = null;
+  for (const sp of groups ?? []) {
+    for (const claim of sp.claims) {
+      const outlets = quoteOutlets([claim]);
+      const rank = [outlets > 1 ? 1 : 0, sp.role ? 1 : 0, outlets];
+      if (!best || beats(rank, best.rank)) best = { sp, claim, rank };
+    }
+  }
+  if (!best) return null;
+  const { sp, claim } = best;
+  return { ...sp, claims: [claim, ...sp.claims.filter((c) => c !== claim)] };
 }
 
 

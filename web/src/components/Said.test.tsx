@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import type { ClaimOut, SpeakerClaims } from "@/lib/api";
 import { Said } from "@/components/Said";
 
@@ -98,5 +99,54 @@ describe("one statement printed in two languages, and an outlet's translation", 
     };
     render(<Said claims={[sp]} sourceIndex={index(sp)} />);
     expect(screen.getByText("ಕನ್ನಡ translation")).toBeInTheDocument();
+  });
+});
+
+describe("one quote, every outlet that carried it", () => {
+  // Live, the LPU record: the SSP's "When we reached here…" was four rows from
+  // four outlets. The API now sends one row with the others in `also_in`.
+  const also = (article_id: string, source_name: string) => ({ id: "w", article_id, source_name, url: null, published_at: null });
+  const sp: SpeakerClaims = {
+    speaker: "Gaurav Toora",
+    claims: [claim("When we reached here, we came to know that there were rumours.", "en", "The Hindu", {
+      id: "w",
+      article_id: "hindu",
+      also_in: [also("toi", "The Times of India"), also("et", "The Economic Times"), also("toi2", "The Times of India")],
+    })],
+    languages: ["en"],
+  };
+  const sources = new Map([["hindu", 1], ["toi", 2], ["et", 3], ["toi2", 4]]);
+
+  it("prints the quote once and names the other outlets, each once", () => {
+    render(<Said claims={[sp]} sourceIndex={sources} />);
+    expect(screen.getAllByText(/When we reached here/)).toHaveLength(1);
+    expect(screen.getByText("1 quote · 3 outlets")).toBeInTheDocument();
+    const line = screen.getByText(/^Also in/);
+    expect(line).toHaveTextContent("Also in [2] The Times of India · [3] The Economic Times");
+  });
+
+  it("counts and names the other outlets by masthead, as the header counts", () => {
+    // The Times of India and its Delhi desk are one outlet.
+    const toi: SpeakerClaims = {
+      speaker: "Parvesh Verma",
+      claims: [claim("When one of their workers started hurling abuses at my family", "en", "The Times of India", {
+        id: "v", article_id: "toi",
+        also_in: [also("toid", "The Times of India — Delhi"), also("hindu", "The Hindu")],
+      })],
+      languages: ["en"],
+    };
+    const publisher: Record<string, string> = { toi: "The Times of India", toid: "The Times of India", hindu: "The Hindu" };
+    render(<Said claims={[toi]} sourceIndex={new Map([["toi", 1], ["toid", 2], ["hindu", 3]])} outletOf={(id) => ({ publisher: publisher[id] })} />);
+    expect(screen.getByText("1 quote · 2 outlets")).toBeInTheDocument();
+    expect(screen.getByText(/^Also in/)).toHaveTextContent(/^Also in \[3\] The Hindu$/);
+  });
+
+  it("shares the quote by its words' id, not its place on the card", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { share });
+    render(<Said claims={[sp]} sourceIndex={sources} eventId="e1" />);
+    await userEvent.click(screen.getByRole("button", { name: /share this quote/i }));
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: `${window.location.origin}/story/e1/quote/w?s=quote` }));
+    vi.unstubAllGlobals();
   });
 });

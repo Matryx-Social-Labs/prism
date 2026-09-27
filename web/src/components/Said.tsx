@@ -10,7 +10,7 @@ import { fallbackCode } from "@/components/SourceList";
 import { quoteLink } from "@/lib/quoteLink";
 import { langName, langNative } from "@/lib/languages";
 import { loadProfile } from "@/lib/profile";
-import { quoteId, unitsForReader } from "@/lib/quotes";
+import { quoteAddress, quoteOutlets, unitsForReader } from "@/lib/quotes";
 import { ShareButton } from "@/components/ShareButton";
 import { Reveal } from "@/components/Reveal";
 
@@ -58,6 +58,35 @@ function LangLabel({ claim }: { claim: ClaimOut }) {
   );
 }
 
+/**
+ * The other outlets that printed the same words, each once, in the provenance
+ * voice with the `[n]` the Coverage list uses. The quote itself cites the
+ * earliest report; four outlets carrying one sentence are one quote, not four.
+ */
+function AlsoIn({ claim, sourceIndex, outletOf }: { claim: ClaimOut; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { publisher?: string | null } | undefined }) {
+  // By masthead, as the card's count: The Times of India and its Delhi desk are one outlet.
+  const masthead = (r: { article_id: string; source_name: string }) => outletOf?.(r.article_id)?.publisher ?? r.source_name;
+  const others = (claim.also_in ?? []).filter(
+    (a, i, all) => masthead(a) !== masthead(claim) && all.findIndex((b) => masthead(b) === masthead(a)) === i,
+  );
+  if (others.length === 0) return null;
+  return (
+    <p className="mt-1 text-[12.5px] font-medium leading-[1.4]" style={{ color: "var(--ink-3)" }}>
+      Also in{" "}
+      {others.map((a, i) => {
+        const n = sourceIndex.get(a.article_id);
+        return (
+          <span key={a.article_id}>
+            {i > 0 && " · "}
+            {n != null && <span className="font-mono text-[11px] font-normal">[{n}]</span>}{" "}
+            <span style={{ color: "var(--ink-2)" }}>{a.source_name}</span>
+          </span>
+        );
+      })}
+    </p>
+  );
+}
+
 export function Said({
   claims,
   sourceIndex,
@@ -96,11 +125,11 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
   // this lifts the reader's own to the front of that rotation, and makes one
   // unit per STATEMENT — a statement printed in two languages is one unit with
   // the other rendering nested under it, so the fold counts things said. Each
-  // entry keeps its position in the API's array, because that position IS the
-  // quote's share address and the card behind it reads the API's order.
+  // entry keeps its position in the API's array: the share address on an older
+  // payload that carries no quote ids.
   const units = unitsForReader(sp.claims, prefer);
   const shown = all ? units : units.slice(0, QUOTES_FOLD);
-  const outlets = new Set(sp.claims.map((c) => outletOf?.(c.article_id)?.publisher ?? c.source_name)).size; // by masthead, as the header counts
+  const outlets = quoteOutlets(sp.claims, (id) => outletOf?.(id)?.publisher); // by masthead, as the header counts
   const languages = sp.languages ?? [];
   const multilingual = languages.length > 1;
   return (
@@ -158,7 +187,7 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                 </a>
               )}
               {eventId && (
-                <span className="inline-flex min-h-[44px] items-center lg:min-h-[32px]"><ShareButton url={`/story/${eventId}/quote/${quoteId(si, index)}`} title={`“${c.quote_text}” — ${sp.speaker}`} compact /></span>
+                <span className="inline-flex min-h-[44px] items-center lg:min-h-[32px]"><ShareButton url={`/story/${eventId}/quote/${quoteAddress(c, si, index)}`} title={`“${c.quote_text}” — ${sp.speaker}`} compact /></span>
               )}
               {ask && (
                 <button
@@ -171,6 +200,7 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                 </button>
               )}
             </div>
+            <AlsoIn claim={c} sourceIndex={sourceIndex} outletOf={outletOf} />
             {/* The quote in place: the article's own words either side, the
                 quote itself marked. The reader checks us without leaving; the
                 link opens the article on the quote. */}
