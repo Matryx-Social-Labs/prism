@@ -32,7 +32,8 @@ class Price:
 
 # The offer (PLAN-LAUNCH.md §1): ₹149/month until 90 days after the paid launch
 # or the first 1,000 Plus subscribers, whichever first; those who join keep the
-# price for 12 months. Regular prices apply after. The launch date is set the
+# price for as long as their plan renews (common/razorpay.TOTAL_COUNT: until they
+# cancel). Regular prices apply to subscriptions made after. The launch date is set the
 # day payments go live (PRISM_PAID_LAUNCH_DATE); until then the offer is on.
 OFFER = {
     "plus_monthly": Price("plus_monthly", "Plus · monthly", 14900, "month"),

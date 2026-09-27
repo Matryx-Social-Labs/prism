@@ -122,11 +122,15 @@ describe("PlusPage", () => {
     expect(container.textContent).not.toMatch(/model/i);
   });
 
-  // D-b: renewal terms are undecided, so no page promises how a plan ends or
-  // renews or what its price will be; and the quota window is said in IST.
-  it("promises nothing about renewal or future prices, and says when Ask returns in IST", async () => {
+  // Founder, 2026-09-28: a plan is charged automatically until the reader
+  // cancels, at the price they joined at (common/razorpay.TOTAL_COUNT). The page
+  // says so, and still promises no lock, no final price and no future price.
+  it("says a plan renews until you cancel at the price you joined at, and says when Ask returns in IST", async () => {
     const { container } = render(<PlusPage />);
     await screen.findByRole("article", { name: "Plus" });
+    expect(screen.getByRole("article", { name: "Plus" })).toHaveTextContent(/renews until you cancel/i);
+    expect(screen.getByText("Does it renew on its own?")).toBeInTheDocument();
+    expect(container.textContent).toMatch(/price you joined at/i);
     expect(container.textContent).not.toMatch(/yours for 12 months|prices final|locked|held for|first 1,000|UTC/i);
     expect(screen.getByRole("table")).toHaveTextContent("Back at 5:30 am IST");
     expect(screen.getByText("Is GST included?")).toBeInTheDocument();

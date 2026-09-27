@@ -24,21 +24,23 @@ logger = get_logger(__name__)
 
 BASE = "https://api.razorpay.com/v1"
 
-# Charges a subscription runs before it completes. The offer price is kept
-# for twelve monthly charges; a completed subscription is re-offered at the
-# price of the day (never silently stepped up). Founding: three yearly charges
-# at the locked price. Regular plans run until cancelled (Razorpay needs a
-# count; ten years is "until cancelled").
+# Every plan renews until the reader cancels (founder, 2026-09-28). Razorpay
+# needs a count (or an end date) and allows at most 100 years; NPCI caps a UPI
+# Autopay mandate at 30 years from its start (OC-123), so 30 years is "until
+# cancelled" on every payment method. A plan renews at the price it was bought
+# at: a UPI or eMandate subscription cannot be updated once authorised
+# (Razorpay docs), so a new price only ever applies to a new subscription.
+# (The offer monthly used to stop after 12 charges and founding after 3, and
+# nothing re-offered them: a paying reader would have lost Plus silently.)
+UNTIL_CANCELLED_YEARS = 30
 TOTAL_COUNT = {
-    "plus_monthly": 12,
-    # NOT 1: a one-charge subscription is "completed" the moment it is paid and
-    # never "active" (that is how the first real test purchase read as expired,
-    # 2026-09-21). The yearly offer renews at the same price; ten years is
-    # "until cancelled".
-    "plus_yearly": 10,
-    "founding": 3,
-    "plus_monthly_regular": 120,
-    "plus_yearly_regular": 10,
+    # Never 1: a one-charge subscription is "completed" the moment it is paid and
+    # never "active" (the first real test purchase read as expired, 2026-09-21).
+    "plus_monthly": 12 * UNTIL_CANCELLED_YEARS,
+    "plus_yearly": UNTIL_CANCELLED_YEARS,
+    "founding": UNTIL_CANCELLED_YEARS,
+    "plus_monthly_regular": 12 * UNTIL_CANCELLED_YEARS,
+    "plus_yearly_regular": UNTIL_CANCELLED_YEARS,
 }
 
 # Razorpay subscription status → ours (common/billing.entitled reads ours).
