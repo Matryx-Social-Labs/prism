@@ -134,6 +134,22 @@ async def _member(s, event_id, source_id, classification: dict, minutes_ago: int
                     {"i": str(uuid.uuid4()), "e": str(event_id), "a": str(art_id)})
 
 
+async def _drop(event_id) -> None:
+    """Leave nothing behind: a stray event is a story in the next test's feed window."""
+    e = {"e": str(event_id)}
+    async with session_scope() as s:
+        arts = [str(a) for a in (await s.execute(
+            text("SELECT article_id FROM event_memberships WHERE event_id = :e"), e)).scalars()]
+        raws = [str(r) for r in (await s.execute(
+            text("SELECT raw_item_id FROM articles WHERE id = ANY(CAST(:a AS uuid[]))"), {"a": arts})).scalars()]
+        await s.execute(text("DELETE FROM event_memberships WHERE event_id = :e"), e)
+        await s.execute(text("DELETE FROM enrichments WHERE article_id = ANY(CAST(:a AS uuid[]))"), {"a": arts})
+        await s.execute(text("DELETE FROM articles WHERE id = ANY(CAST(:a AS uuid[]))"), {"a": arts})
+        await s.execute(text("DELETE FROM raw_items WHERE id = ANY(CAST(:r AS uuid[]))"), {"r": raws})
+        await s.execute(text("DELETE FROM events WHERE id = :e"), e)
+        await s.execute(text("DELETE FROM sources WHERE slug = :s"), {"s": f"t-{event_id.hex[:8]}"})
+
+
 async def test_the_projection_rebuild_refiles_the_event_by_its_members():
     if not await _db_reachable():
         pytest.skip("no database")
@@ -148,12 +164,13 @@ async def test_the_projection_rebuild_refiles_the_event_by_its_members():
         await _member(s, eid, src, _c("business", "business"), minutes_ago=90)  # the founder
         await _member(s, eid, src, _c("politics.protest", "politics", "governance_policy", 0.9), minutes_ago=60)
         await _member(s, eid, src, _c("politics.protest", "politics", "governance_policy", 0.8), minutes_ago=30)
-
-    await _rebuild_projection(eid)
-
-    async with session_scope() as s:
-        row = (await s.execute(text("SELECT sector, subsector, subject_path, subject_confidence FROM events "
-                                    "WHERE id = :i"), {"i": str(eid)})).one()
+    try:
+        await _rebuild_projection(eid)
+        async with session_scope() as s:
+            row = (await s.execute(text("SELECT sector, subsector, subject_path, subject_confidence FROM events "
+                                        "WHERE id = :i"), {"i": str(eid)})).one()
+    finally:
+        await _drop(eid)
     assert tuple(row) == ("politics", "governance_policy", "politics.protest", 0.9)
 
 
@@ -171,11 +188,12 @@ async def test_the_rebuild_takes_states_from_the_classifier_and_keeps_the_countr
         )
         for minutes, regions in ((90, ["IN"]), (60, ["IN", "IN-KL"]), (30, ["IN"])):
             await _member(s, eid, src, _c("business.banking", "finance", regions=regions), minutes_ago=minutes)
-
-    await _rebuild_projection(eid)
-
-    async with session_scope() as s:
-        regions = (await s.execute(text("SELECT regions FROM events WHERE id = :i"), {"i": str(eid)})).scalar_one()
+    try:
+        await _rebuild_projection(eid)
+        async with session_scope() as s:
+            regions = (await s.execute(text("SELECT regions FROM events WHERE id = :i"), {"i": str(eid)})).scalar_one()
+    finally:
+        await _drop(eid)
     assert regions == ["IN", "US"]
 
 
@@ -207,5 +225,6 @@ async def test_a_general_feed_item_goes_through_the_gate_and_the_classifier(monk
 
     async with session_scope() as s:
         cls = (await s.execute(text("SELECT classification FROM raw_items WHERE id = :i"), {"i": str(item)})).scalar_one()
+        await s.execute(text("DELETE FROM raw_items WHERE id = :i"), {"i": str(item)})
     assert asked == ["Punjab uni students hold protest, block highway"]
     assert (cls["sector"], cls["role_interests"]) == ("politics", []), "no forced business, no forced Markets read"
