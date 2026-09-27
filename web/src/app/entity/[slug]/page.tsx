@@ -14,7 +14,7 @@ import { SITE_URL } from "@/lib/site";
 // nowhere an engine would keep (audit H29).
 //
 // A page exists for every actor a chip names — a link that 404s is worse than a
-// thin page — but only one in three or more records asks to be indexed. The
+// thin page — but only one in four or more records asks to be indexed. The
 // floor is the API's (`INDEXABLE_MIN_RECORDS`) and arrives as `indexable`.
 export const revalidate = 300;
 

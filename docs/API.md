@@ -124,7 +124,7 @@ Trigram indexes need **≥3 characters** to actually be used — a 2-character q
 
 | Method & path | Params | Response | Notes |
 |---|---|---|---|
-| `GET /api/v1/entity/{slug}` | `slug`, `limit` (clamped 1-60, default 30), `lens?` | `EntityPage` | `404` if not found. `indexable` is gated by `INDEXABLE_MIN_RECORDS = 3` for SEO purposes (measured at write time: 55,214 entities total, 5,995 with ≥3 records). Maps the extractor's loose `entity_type` vocabulary to schema.org types (`_SCHEMA_TYPE`). The same rule reaches every link to the page as `indexable` on `EventDetail.entities[]` and `TrendingStoryDetail.cast_refs[]` (`indexable_sql`, stops counting at the floor, ~2 ms a record on prod): the web marks links to stubs `rel="nofollow"` and leaves them out of JSON-LD, because 85% of crawled entity pages were stubs (2026-09-27). |
+| `GET /api/v1/entity/{slug}` | `slug`, `limit` (clamped 1-60, default 30), `lens?` | `EntityPage` | `404` if not found. `indexable` is gated by `INDEXABLE_MIN_RECORDS = 4` for SEO purposes (3 until 2026-09-27, when a crawl found 29 of 100 indexable actor pages under 150 words, 28 of them three-record actors; at 4, 1 of 71). Maps the extractor's loose `entity_type` vocabulary to schema.org types (`_SCHEMA_TYPE`). The same rule reaches every link to the page as `indexable` on `EventDetail.entities[]` and `TrendingStoryDetail.cast_refs[]` (`indexable_sql`, stops counting at the floor, ~2 ms a record on prod): the web marks links to stubs `rel="nofollow"` and leaves them out of JSON-LD, because 85% of crawled entity pages were stubs (2026-09-27). |
 | `GET /api/v1/sitemap/entities` | — | — | Entities with ≥`INDEXABLE_MIN_RECORDS` served records, capped at 50,000. |
 
 ## Corrections and versions (`api/routes/corrections.py`)

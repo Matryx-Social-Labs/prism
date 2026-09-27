@@ -3,6 +3,29 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.104.0] - 2026-09-27
+
+### Fixed — the signals that told Google to skip our pages
+Search Console (21 Sep): 36 known pages, 4 indexed, 29 "crawled – currently
+not indexed". A crawl of every sitemap URL as Googlebot
+(`tools/seo_crawl_audit.py`, 476 URLs) found no redirects, errors, stray
+canonicals or noindex pages in the sitemaps, but three problems we control:
+
+- **Duplicate subject pages.** `/subject/business`, `/subject/health`,
+  `/subject/entertainment` and `/subject/politics` listed exactly the records
+  their `/sector/` page did (30 of 30), under the same title, and both were in
+  the sitemap. The six sector-group subjects now name the sector page as
+  canonical and leave the sitemap. Education, Civic and deeper subject nodes
+  are their own lists and are unchanged.
+- **Thin actor pages.** 29 of 100 indexable actor pages had under 150 words,
+  and 28 of those were actors in exactly three records. The indexing floor is
+  now four: 1 of 71 thin, and 71% of actor pages stay indexable. Links to the
+  newly non-indexable pages turn `nofollow` through the same rule.
+- **`/pulse`** renders in the browser, so a crawler got 26 words. It is out of
+  the sitemap and `noindex` until it renders on the server.
+- The "Page with redirect" pages are the three host variants moving to
+  `https://www`, which is correct. `docs/SEO.md` records the audit.
+
 ## [0.0.103.0] - 2026-09-27
 
 ### Changed — a page renders the same bytes whenever it is rendered

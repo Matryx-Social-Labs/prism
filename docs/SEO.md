@@ -15,7 +15,7 @@ day's record, the sector pages and Stories shipped a skeleton and nothing else.
 | `/story/<id>` | `NewsArticle` with `mainEntityOfPage`, dates, `isBasedOn` (the reports it is written from, with their publishers and languages), `about` (named entities), `keywords`, `isAccessibleForFree`, the publisher by `@id`. Never an image (the photograph is the outlet's). | `lib/seo.ts` `newsArticleLd` |
 | `/trending/<slug>` | `NewsArticle` for the arc with `hasPart` = its developments, dated from the first and last. | `lib/seo.ts` `storyLd` |
 | Every page | `NewsMediaOrganization` (brand Prism, `legalName` the LLP, logo, publishing principles → `/about`) + `WebSite` with a `SearchAction`; `robots` meta with `max-snippet:-1`, `max-image-preview:large`; theme colours; canonicals on `/about`, `/plus`, `/pulse`, the policies. `/search` is `noindex, follow`. `/plus` renders per request (statically it bailed out to an empty Suspense fallback). | `app/layout.tsx`, each page's metadata |
-| `/sitemap.xml` | Static pages, the six subjects, up to 100 stories, the freshest 100 records with `lastmod` (the feed API's page cap; page with an offset if older records should be listed). | `app/sitemap.ts` |
+| `/sitemap.xml` | Static pages, the six subjects, the subject-tree nodes a sector page does not already list, up to 100 stories, the freshest 100 records with `lastmod` (the feed API's page cap). Not `/pulse` (it renders in the browser; `noindex` until it renders on the server). | `app/sitemap.ts` |
 | `/news-sitemap.xml` | Google News sitemap: records of the last 48 hours, publication "Prism", language `en`. | `app/news-sitemap.xml/route.ts` |
 | `/robots.txt` | Everything public allowed for every agent (AI crawlers included — being cited is the point); account, auth, `/you`, `/search`, `/label/`, `/plus/welcome` disallowed; both sitemaps listed. | `app/robots.ts` |
 | `/llms.txt` | What Prism is, how to cite a record, the live URLs — the emerging convention answer engines read first. | `public/llms.txt` |
@@ -75,6 +75,35 @@ Console property once it exists (impressions/clicks by page are the baseline
 the ledger needs), and a yes/no on entity hub pages (`/entity/<slug>`, audit
 H29) — the cast chips currently link to `/search`, which is `noindex`, so no
 topical authority accrues anywhere.
+
+## Indexing audit, 2026-09-27
+
+Search Console (snapshot of 2026-09-21, the day of the SEO release): 36 known
+pages, 4 indexed, 0 impressions; 29 "Crawled - currently not indexed", 3 "Page
+with redirect". `tools/seo_crawl_audit.py` fetches our sitemaps' URLs as
+Googlebot and checks the signals we control:
+
+- **Page with redirect (3)** are the three host variants (`http://readprism.news`,
+  `https://readprism.news`, `http://www.readprism.news`) moving to
+  `https://www.readprism.news`. Correct, nothing to fix (the http apex takes two
+  hops; Google follows them).
+- **No sitemap URL** redirected, errored, named another canonical or was
+  `noindex` (476 URLs checked: all of sitemap.xml and the news sitemap, a
+  sample of records and actors).
+- **Fixed:** `/subject/<group>` for the six sector groups listed exactly the
+  records `/sector/<group>` did (30 of 30, same title). It now names the sector
+  page as canonical and is out of the sitemap (`sectorPageFor`). Education,
+  Civic and deeper subject nodes are unchanged.
+- **Fixed:** actor pages in three records were thin (28 of the 29 thin ones);
+  the indexing floor is four records now.
+- **Fixed:** `/pulse` (26 words to a crawler) is out of the sitemap and `noindex`.
+- Records are not thin (0 of 250, median 465 words), nor are stories (316) or
+  subject pages (1,198). What remains is the site's age and duplicate records
+  (about 10%, which the verified matching tier addresses).
+
+Rerun after a change: `uv run python -m tools.seo_crawl_audit --csv .context/review/seo-crawl.csv`.
+For the URLs Google itself skipped, export Pages → "Crawled - currently not
+indexed" from Search Console.
 
 ## How to check it is working
 
