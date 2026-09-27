@@ -36,7 +36,7 @@ from common.models import (
 from common.observability import fetch_prompt, observe
 from common.stream import get_redis
 from common.text import entity_slug, is_latin_text
-from correlation.briefs import persist_briefs, primary_lens_for, template_briefs
+from correlation.briefs import available_lenses, persist_briefs, template_briefs
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
 from correlation.threads import link_event_threads
@@ -700,10 +700,11 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
                 f"- id={m['article_id']} source={m['source_name']} country={m['source_country'] or '?'} "
                 f"stance={stance.get('label') or 'unknown'} summary={m['summary'] or '(none)'}"
             )
-        lenses = ["reader"]
-        primary = primary_lens_for(event_sector)
-        if primary != "reader":
-            lenses.append(primary)
+        # Every lens the story offers, not only its sector's: a Markets tap on a
+        # politics story found no brief and waited ~30 s on the model (audit,
+        # 2026-09-27). One more lens is a few hundred output tokens in a call
+        # that is made anyway.
+        lenses = available_lenses(event_projection, event_sector)
         lens_fields = {k: v for k, v in event_projection.items() if k in ("cyber", "finance") and v}
         prompt = fetch_prompt("event-analysis")
         messages = prompt.compile(

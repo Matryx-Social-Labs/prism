@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     # vs 0.96, zero failures vs three, 19.8s vs 40.1s a brief, a quarter of
     # the price. Ask stays on prism_model_agent.
     prism_model_correlate: str = "z-ai/glm-5.3-flash"
+    # OpenRouter endpoints the lens brief is pinned to (same format as
+    # prism_extract_providers). Measured 2026-09-27, glm-5.3-flash at minimal
+    # reasoning on 10 live Markets briefs: Together 4.3-5.4 s; OpenRouter's own
+    # routing sent most to Decart, 11-37 s, and one came back one word long.
+    prism_brief_providers: str = "together"
     prism_model_agent: str = "qwen/qwen3.7-plus"  # Ask — user-facing, Plus
     prism_model_agent_free: str = "z-ai/glm-5.3-flash"  # Ask for free and anonymous readers: same prompt, ~1/6 the cost
     prism_model_judge: str = "google/gemini-3.5-flash"  # evals — low volume, wants strong reasoning
@@ -266,7 +271,6 @@ class Settings(BaseSettings):
     prism_cookie_domain: str = ""
     prism_cookie_secure: bool = True
     prism_magic_request_cooldown_s: int = 30  # per-email rate limit on link requests
-    prism_free_markets_samples: int = 3  # sample grant on signup (D13 Markets-only)
     # Google sign-in (Google Identity Services, ID-token mode). The client id is
     # public; the API only uses it to check a token's audience. Empty = off.
     google_client_id: str = ""

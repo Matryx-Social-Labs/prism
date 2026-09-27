@@ -50,8 +50,8 @@ everyone** ("One story. Every perspective."):
   outlets feed Both-Sides grouping) + a GDELT world query — the general feed now carries real
   world news, not only professional stories.
 - **Lens briefs** (the core multi-lens feature): every event carries written per-lens analysis —
-  general always; the story's primary lens generated at pipeline time; any other lens generated
-  on demand and cached. A war story exposes a cyber read (who is exposed, what to check) and a
+  general always; every lens the story offers written at pipeline time or by the worker's sweep;
+  anything still missing generated on demand and cached. A war story exposes a cyber read (who is exposed, what to check) and a
   market read (sectors, tickers, direction) on request; CVE records get zero-LLM template briefs.
 - **Web**: spectrum-brand redesign (adaptive dark/light), landing page with a live lens-switch
   demo, story pages with in-place lens switching.

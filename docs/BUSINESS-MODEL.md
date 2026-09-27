@@ -11,7 +11,8 @@ assume, it says so.
 **Product state.** Reader-facing record per story (headline, brief as points, who
 said what with roles, coverage by outlet origin, report cards with credited
 photos, podcast clips, story route), Ask (cited RAG per story), two professional
-lenses (Markets, Cyber) behind sign-in with 3 free Markets samples, watchlist,
+lenses (Markets, Cyber) metered like Ask (3 readings a session without an account,
+10 a day with one, every lens on Plus), watchlist,
 Market Pulse, onboarding with state · languages · interests. Free to read
 without an account. Web only; the design system is built to port to React
 Native.
@@ -38,8 +39,8 @@ normal 5/day ≈ $0.45). The margin question is entirely "how many subscribers
 cover the fixed cost", not "does a user cost more than they pay".
 
 **Machinery already built (no new code to charge):** `isLocked(lens)` and the
-inline unlock prompt on the record; `common/quota.try_consume_sample` (atomic
-freemium decrement, 3 Markets samples on signup); `lens_unlocks`, `usage_quota`,
+inline unlock prompt on the record; the lens meter in `common/quota.py` (counted
+from `lens_unlocks`, 2026-09-27; `usage_quota` is no longer read); `lens_unlocks`,
 `watchlist` tables; Ask caps `ANON_ASK_PER_SESSION = 3`, `USER_ASK_PER_DAY = 30`;
 magic-link auth; profile with state, languages, interests. Missing: a
 `subscriptions` table, a payment provider, per-IP limits, model tiering by plan.
@@ -84,7 +85,7 @@ already pay for: ₹300–1,000/month.
 
 | Tier | Price (incl. 18% GST) | Net to Prism¹ | What it includes |
 |---|---|---|---|
-| **Reader** | ₹0, no account needed | — | Today · Stories · Search · the full record (brief, who said what, coverage, reports, photos, clips, route) · Ask **10 questions/day** signed-in (3/day anonymous) · Watchlist (account) · 3 Markets samples · one Cyber sample |
+| **Reader** | ₹0, no account needed | — | Today · Stories · Search · the full record (brief, who said what, coverage, reports, photos, clips, route) · Ask **10 questions/day** signed-in (3/day anonymous) · Watchlist (account) · lens readings: 3 a session anonymous, 10/day signed in |
 | **Prism Plus** | **₹199/month** or **₹1,499/year** (₹125/month effective) | ₹165 / ₹1,241 | Markets and Cyber readings on every story · Market Pulse in full · Ask **100/day** on the stronger model · watchlist alerts (email; push when the app exists) · "what changed since you last read" · original-language quotes beside the translation when built |
 | **Founding member** (first 500, then closed) | **₹999/year, price locked 3 years** | ₹827 | Plus, a name on /about, a say in the roadmap |
 | **Teams / API** (from month 6+) | quote, from ₹4,999/month | — | seats, Slack/email alerts, the events + claims API |
@@ -118,7 +119,7 @@ on the same story**, never access to the story. Concretely:
 |---|---|---|---|
 | Read any record, sources, quotes, coverage, clips | ✓ | ✓ | ✓ |
 | Ask | 3/day (per IP+session) | 10/day | 100/day, stronger model |
-| Markets / Cyber reading | prompt to sign in (the flip still happens, the text is behind the unlock — existing) | 3 samples, then the upgrade prompt | ✓ |
+| Markets / Cyber reading | 3 a session (with a per-address ceiling), then the prompt to sign in | 10 a day (rolling), then the upgrade prompt | ✓ |
 | Watchlist, follow a story | sign in | ✓ | ✓ + alerts |
 | Daily brief email (7:00 IST) | — | ✓ (opt-in) | ✓ with lens |
 | Market Pulse | headline + first paragraph | first paragraph | full |
@@ -138,7 +139,7 @@ arrives, add these — all small, all in `common/quota.py` + Redis:
 | **Question length** | ≤ 500 characters; context window capped at 6 sources | bounds the input tokens |
 | **Per-user monthly inference budget** | ₹40 (≈ $0.45) free, ₹200 Plus; soft stop with a message | a hard ceiling per person, whatever the mix |
 | **Global daily spend ceiling** | $25/day; at 80% degrade Ask to the light model, at 100% Ask off for anonymous | the budget floor is a floor on balance, not a ceiling on burn |
-| **Lens briefs** | generate on demand once per event per lens (already cached); never for anonymous | first-reader cost only |
+| **Lens briefs** | written ahead by the worker for every lens a story offers (analysis pass + sweep), on demand only when missing; cached per event per lens | corpus cost, not reader cost: ≈ $0.0002 a brief at minimal reasoning |
 | **Podcast judge** | already cached per pair | — |
 | **Bot filter** | require a session token issued on page load for Ask; block UA-less clients | stops curl loops |
 

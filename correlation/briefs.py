@@ -1,11 +1,13 @@
 """Lens briefs — the same event, written through each profession's eyes.
 
-Hybrid generation (cost discipline):
-- Pipeline time (correlation): general + the event's primary lens, one LLM
-  call per news event; regenerated when membership changes.
-- On demand (API): any other lens on first request, cached into the event
-  projection — this is what lets a cyber professional pull the cyber read
-  of a war story, or a trader pull the market read of a breach.
+Written before anyone taps, so a tap reads a brief rather than waiting on one:
+- Pipeline time (correlation): every lens the story offers, in the one
+  analysis call per news event; regenerated when membership changes.
+- Sweep (worker): the lenses recent stories offer and still lack, single-
+  source stories above all (sweep_lens_briefs).
+- On demand (API): anything still missing on first request, cached into the
+  event projection — this is what lets a cyber professional pull the cyber
+  read of a war story, or a trader pull the market read of a breach.
 - CVE-record-only events: composed template briefs, zero LLM cost.
 """
 
@@ -17,7 +19,7 @@ from sqlalchemy import text as sql_text
 from common.config import get_settings
 from common.db import session_scope
 from common.lenses import LENSES
-from common.llm import structured_chat
+from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
 from common.text import is_model_commentary
@@ -26,15 +28,14 @@ from correlation.schemas import LensBriefs
 
 logger = get_logger(__name__)
 
-SECTOR_PRIMARY_LENS = {
-    "cybersecurity": "cyber",
-    "finance": "markets",
-    "business": "markets",
-}
-
-
-def primary_lens_for(sector: str | None) -> str:
-    return SECTOR_PRIMARY_LENS.get(sector or "", "reader")
+# The brief is written at the smallest reasoning effort. Bake-off 2026-09-27
+# (tools/bakeoff_brief, pinned to Together, 10 live briefs a lens, judged blind):
+#   Markets  minimal 4.9 s (max 6.8)  $0.00021  grounded 0.84 | default 26.2 s (max 43.3)  $0.00099  grounded 0.91
+#   Cyber    minimal 7.1 s (max 20.8) $0.00027  grounded 0.78 | default 22.8 s (max 35.3)  $0.00097  grounded 0.55
+# No steady grounding cost either way (the judge swings more than the
+# setting), ~15% fewer words, a quarter of the price and a fifth of the wait.
+# Room for two lenses' prose and points, not for a model thinking aloud.
+BRIEF_MAX_TOKENS = 2000
 
 
 def template_briefs(projection: dict, summary: str | None) -> dict[str, dict]:
@@ -155,12 +156,17 @@ async def generate_briefs(event_id: uuid.UUID, lenses: list[str]) -> dict[str, d
         or "(none yet)",
         lens_fields=json.dumps(lens_fields, default=str)[:2500] or "(none)",
     )
+    settings = get_settings()
     result = await structured_chat(
-        model=get_settings().prism_model_correlate,
+        model=settings.prism_model_correlate,
         messages=messages,
         output_model=LensBriefs,
         trace_name="lens-brief",
-        max_tokens=3000,
+        # A tap used to wait on the default: glm thought for 2,758 of its 3,000
+        # tokens and took 25 s (audit, 2026-09-27). See BRIEF_MAX_TOKENS.
+        max_tokens=BRIEF_MAX_TOKENS,
+        reasoning=REASONING_OFF,
+        providers=[p.strip() for p in settings.prism_brief_providers.split(",") if p.strip()] or None,
         metadata={"stage": "lens-brief", "event_id": str(event_id), "lenses": lenses},
         langfuse_prompt=prompt if prompt.version else None,
     )
@@ -268,3 +274,71 @@ def available_lenses(projection: dict | None, sector: str | None = None) -> list
         for slug, lens in LENSES.items()
         if not lens.upcoming and (applicable.get(slug, False) or slug in briefs)
     ]
+
+
+# available_lenses' evidence clauses as SQL over `events`, for the sweep below
+# (and tools/bakeoff_brief) to find the events that offer a professional lens
+# without reading every projection in the window. Keep the two in step; the
+# sweep re-checks each row with available_lenses itself.
+OFFERS_SQL: dict[str, str] = {
+    "cyber": "(jsonb_typeof(projection->'cyber') = 'object' OR projection->'role_interests' ? 'cyber' "
+             "OR sector = 'cybersecurity')",
+    "markets": "(jsonb_typeof(projection->'finance') = 'object' OR projection->'role_interests' ? 'markets' "
+               "OR sector IN ('finance', 'business'))",
+}
+SWEEP_HOURS = 48
+SWEEP_LIMIT = 50
+SWEEP_RETRY_S = 6 * 3600  # a lens the model wrote nothing for is tried again after this
+
+
+async def sweep_lens_briefs(*, hours: int = SWEEP_HOURS, limit: int = SWEEP_LIMIT) -> int:
+    """Write the professional lenses recent stories offer and do not have yet.
+
+    The analysis pass writes every lens a story of two or more reports offers;
+    a single-source story never reaches it (correlation/consumer.py
+    MIN_SOURCES_FOR_ANALYSIS), and a lens a story comes to offer between tiers
+    waits for the next one. Either way the first reader to tap it waited on the
+    model: 92% of Markets taps in 48 h (audit, 2026-09-27). Newest first, a
+    bounded batch per pass, nothing under the budget floor. Returns briefs written.
+    """
+    from common import budget
+    from common.stream import get_redis
+
+    if budget.below_floor(await budget.current()):
+        return 0
+    lacking = " OR ".join(
+        f"({offers} AND NOT COALESCE(projection->'lens_briefs', '{{}}'::jsonb) ? '{slug}')"
+        for slug, offers in OFFERS_SQL.items()
+    )
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                sql_text(
+                    f"SELECT id, sector, projection FROM events "
+                    f"WHERE last_updated_at > now() - make_interval(hours => :h) AND ({lacking}) "
+                    f"ORDER BY last_updated_at DESC LIMIT :n"
+                ),
+                {"h": hours, "n": limit},
+            )
+        ).mappings().all()
+    redis = get_redis()
+    written = 0
+    for row in rows:
+        have = (row["projection"] or {}).get("lens_briefs") or {}
+        missing = [
+            slug for slug in available_lenses(row["projection"], row["sector"])
+            if slug != "reader" and slug not in have
+            # Once per SWEEP_RETRY_S: a story the model writes nothing for must
+            # not hold a place in every batch.
+            and await redis.set(f"prism:lens-sweep:{row['id']}:{slug}", 1, nx=True, ex=SWEEP_RETRY_S)
+        ]
+        if not missing:
+            continue
+        try:
+            briefs = await generate_briefs(row["id"], missing)
+            await persist_briefs(row["id"], briefs)
+            written += len(briefs)
+        except Exception:
+            logger.warning("lens_brief_sweep_failed", event_id=str(row["id"]), lenses=missing, exc_info=True)
+    logger.info("lens_brief_sweep", candidates=len(rows), written=written)
+    return written

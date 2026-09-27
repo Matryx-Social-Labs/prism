@@ -426,6 +426,13 @@ class BriefResponse(BaseModel):
     brief: str | None
     points: list[str] = []
     cached: bool
+    # The lens's extracted facts (tickers, catalyst, CVSS, KEV, affected
+    # products): projection.finance / projection.cyber, which the record strips
+    # for anyone who has not opened the lens. Served here, behind the same gate.
+    facts: dict | None = None
+    # Asked with generate=false and nothing written yet: the facts are here,
+    # the prose comes from a second request that writes it.
+    pending: bool = False
 
 
 class QuestionsResponse(BaseModel):

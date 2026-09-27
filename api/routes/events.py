@@ -5,6 +5,7 @@ PR2). The single-flight lock below is in-process only — PR2 replaces it with a
 Redis lock so it holds across API replicas.
 """
 
+import asyncio
 import hashlib
 import json
 import uuid
@@ -45,16 +46,18 @@ from common.locks import single_flight
 from common.logging import get_logger
 from common.outlets import record_indexable
 from common.quota import (
+    ANON_LENS_PER_SESSION,
     READER_LENS,
+    USER_LENS_PER_DAY,
+    anon_lens_open,
+    anon_lens_release,
     ask_allowance,
     ask_burst_ok,
     ask_record_spend,
-    grant_samples,
     has_unlocked,
+    lens_reads_today,
     record_unlock,
     release_unlock,
-    remaining_samples,
-    try_consume_sample,
     unlocked_lenses,
 )
 from correlation.briefs import available_lenses, generate_briefs, persist_briefs
@@ -649,7 +652,9 @@ async def get_event(
     )
 
 
-async def _read_cached_brief(db: AsyncSession, event_id: uuid.UUID, lens: str) -> BriefResponse | None:
+async def _brief_of(db: AsyncSession, event_id: uuid.UUID, lens: str) -> BriefResponse:
+    """What the event holds for this lens now: the written brief if any, and the
+    lens's facts. 404 when there is no such event."""
     row = (
         await db.execute(
             text("SELECT projection FROM events WHERE id = :eid"), {"eid": str(event_id)}
@@ -658,70 +663,103 @@ async def _read_cached_brief(db: AsyncSession, event_id: uuid.UUID, lens: str) -
     if row is None:
         raise HTTPException(status_code=404, detail="event not found")
     projection = row["projection"] or {}
-    cached = (projection.get("lens_briefs") or {}).get(lens)
-    if cached:
-        points = (projection.get("lens_points") or {}).get(lens) or []
-        return BriefResponse(lens=lens, brief=cached, points=points, cached=True)
-    return None
+    facts_key = PAID_LENS_FIELDS.get(lens)
+    return BriefResponse(
+        lens=lens,
+        brief=(projection.get("lens_briefs") or {}).get(lens) or None,
+        points=(projection.get("lens_points") or {}).get(lens) or [],
+        cached=True,
+        facts=(projection.get(facts_key) or None) if facts_key else None,
+    )
+
+
+def _lens_limit(lens: str, used: int, limit: int, *, anonymous: bool) -> HTTPException:
+    # The reader is told what would open it: an account, or Plus (as Ask's 429).
+    return HTTPException(
+        status_code=402,
+        detail={"error": "lens limit reached", "lens": lens, "used": used, "limit": limit, "remaining": 0,
+                "signin_helps": anonymous, "plus_helps": True},
+    )
+
+
+async def _open_lens(
+    db: AsyncSession, user_id: uuid.UUID | None, anon: str | None, ip: str | None,
+    event_id: uuid.UUID, lens: str,
+) -> None:
+    """THE GATE for a professional lens. Plus reads every lens. Anyone else
+    spends one read the first time they open this lens on this story, and it
+    stays open for them there; past the meter, 402 (common/quota.py)."""
+    if user_id is None:
+        if anon is None:  # a caller that keeps no session (an old page, a script)
+            raise HTTPException(status_code=401, detail="sign in to open this lens")
+        allowed, used = await anon_lens_open(anon, ip, event_id, lens)
+        if not allowed:
+            raise _lens_limit(lens, used, ANON_LENS_PER_SESSION, anonymous=True)
+        return
+    # The claim is the read; a claim that already existed (this story, an
+    # earlier visit or another tab) spends nothing.
+    if await _on_plus(db, user_id) or not await record_unlock(db, user_id, event_id, lens):
+        return
+    used = await lens_reads_today(db, user_id)
+    if used > USER_LENS_PER_DAY:
+        await release_unlock(db, user_id, event_id, lens)
+        raise _lens_limit(lens, used - 1, USER_LENS_PER_DAY, anonymous=False)
+
+
+# The on-demand brief's own deadline: a reader is waiting, and one is written
+# in ~5 s. The single-flight lock outlives it and a waiter outwaits it, so a
+# re-tap waits for the one generation rather than starting a second: the lock
+# was 30 s and the wait 25 s against a 25 s generation, so it paid twice.
+BRIEF_DEADLINE_S = 45.0
+BRIEF_LOCK_TTL_S = int(BRIEF_DEADLINE_S) + 15
+BRIEF_WAIT_S = BRIEF_DEADLINE_S + 5
 
 
 # On-demand lens briefs: any lens on any story — this is what lets a cyber
 # professional pull the cyber read of a war, or a trader the market read of a
 # breach. Generated once, cached on the event projection. A Redis single-flight
-# per (event, lens) holds across API replicas so a burst of viewers (and, once
-# the paywall lands, a burst of sample-spenders) costs exactly one LLM call.
+# per (event, lens) holds across API replicas so a burst of viewers costs
+# exactly one LLM call.
 @router.get("/api/v1/events/{event_id}/brief", response_model=BriefResponse, dependencies=[Depends(follow_merge)])
 async def get_brief(
     event_id: uuid.UUID,
     lens: str,
+    request: Request,
+    # False: answer from what is written (and the facts) at once, never wait on
+    # the model; the page asks again with True only when that was nothing.
+    generate: bool = True,
+    # An anonymous reader's browser session: a random id the page keeps.
+    anon_session: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
     user_id: uuid.UUID | None = Depends(get_current_user_optional),
 ):
-    if lens not in LENSES:
-        raise HTTPException(status_code=422, detail=f"unknown lens '{lens}'")
+    # Served lenses only, before any gate or model call: an upcoming lens
+    # (common/lenses.py) has no fields and no prompt, so each request was an LLM
+    # call that wrote nothing and cached nothing.
+    if lens not in LENSES or LENSES[lens].upcoming:
+        raise HTTPException(status_code=422, detail=f"lens '{lens}' is not served")
 
-    # THE GATE SITS ABOVE THE CACHE READ, and that placement is the whole thing.
-    # `_read_cached_brief` early-returns, so a check placed below it would only
-    # ever run for the FIRST viewer of each (event, lens) — every later reader
-    # would be served free. The paywall has to be the first thing that happens.
-    paid = lens != READER_LENS
-    claimed_now = False
-    if paid:
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="sign in to open this lens")
-        # Plus reads every lens and never spends a sample; free readers claim
-        # the lens on this story and pay one sample for it.
-        if not await _on_plus(db, user_id) and not await has_unlocked(db, user_id, event_id, lens):
-            # Claim first, then debit: the claim is the concurrency winner, so
-            # two tabs cannot both spend a sample on the same lens.
-            claimed_now = await record_unlock(db, user_id, event_id, lens)
-            if claimed_now and not await try_consume_sample(db, user_id):
-                await release_unlock(db, user_id, event_id, lens)
-                left = await remaining_samples(db, user_id)
-                raise HTTPException(
-                    status_code=402,
-                    detail={
-                        "error": "no samples remaining",
-                        # None means NO QUOTA ROW — never granted — which is a
-                        # different fact from having spent everything.
-                        "remaining": left,
-                        "lens": lens,
-                    },
-                )
+    current = await _brief_of(db, event_id, lens)
+    # THE GATE SITS ABOVE EVERY RETURN, and that placement is the whole thing:
+    # a check placed below the cached answer would only ever run for the FIRST
+    # viewer of each (event, lens) — every later reader would be served free.
+    ip = client_ip(request)
+    anon = str(anon_session) if anon_session else None
+    if lens != READER_LENS:
+        await _open_lens(db, user_id, anon, ip, event_id, lens)
+    if current.brief or not generate:
+        return current.model_copy(update={"pending": not current.brief})
 
-    cached = await _read_cached_brief(db, event_id, lens)
-    if cached:
-        return cached
-
-    async with single_flight(f"brief:{event_id}:{lens}"):
+    async with single_flight(f"brief:{event_id}:{lens}", ttl=BRIEF_LOCK_TTL_S, wait_timeout=BRIEF_WAIT_S):
         # Past the single-flight barrier, re-read: the leader may have just
         # filled the cache while we waited. If it's still empty, generate — that
         # covers the leader and the fallback case where the leader stalled/died.
-        cached = await _read_cached_brief(db, event_id, lens)
-        if cached:
-            return cached
+        current = await _brief_of(db, event_id, lens)
+        if current.brief:
+            return current
         try:
-            briefs = await generate_briefs(event_id, [lens])
+            async with asyncio.timeout(BRIEF_DEADLINE_S):
+                briefs = await generate_briefs(event_id, [lens])
             await persist_briefs(event_id, briefs)
             read = briefs.get(lens) or {}
         except Exception:
@@ -730,15 +768,16 @@ async def get_brief(
             # shows "the <lens> read isn't available yet" — never a 500.
             logger.warning("brief_unavailable", event_id=str(event_id), lens=lens, exc_info=True)
             read = {}
-            # NOBODY PAYS FOR AN EMPTY PANEL. The claim was taken above on the
-            # assumption a brief would materialise; it did not, so give it back.
-            # Only the caller that actually claimed it may release it — otherwise
-            # a second tab's failure would revoke the first tab's paid unlock.
-            if claimed_now:
+        if not read.get("text") and lens != READER_LENS:
+            # NOBODY PAYS FOR AN EMPTY PANEL, whether the model failed or wrote
+            # nothing (it used to be only the first). Giving back is idempotent,
+            # so it does not matter which request made the claim.
+            if user_id is not None:
                 await release_unlock(db, user_id, event_id, lens)
-                await grant_samples(db, user_id, 1)
-        return BriefResponse(
-            lens=lens, brief=read.get("text"), points=read.get("points") or [], cached=False
+            elif anon:
+                await anon_lens_release(anon, ip, event_id, lens)
+        return current.model_copy(
+            update={"brief": read.get("text") or None, "points": read.get("points") or [], "cached": False}
         )
 
 

@@ -336,7 +336,6 @@ Derived: `langfuse_enabled` property is true only if the flag AND both Langfuse 
 | `prism_trusted_proxy_hops` | `1` | Trusted proxy count for `X-Forwarded-For` (Railway = 1) |
 | `prism_magic_token_ttl_min` / `prism_session_ttl_days` | `15` / `30` | Magic-link / session lifetimes |
 | `prism_magic_request_cooldown_s` | `30` | Per-email magic-link rate limit |
-| `prism_free_markets_samples` | `3` | Free Markets-lens samples on signup (founder decision D13) |
 | `langfuse_timeout` / `langfuse_flush_at` | `30` / `128` | Self-hosted Langfuse export tuning (SDK defaults too aggressive for a scale-to-zero instance) |
 
 ### Infra

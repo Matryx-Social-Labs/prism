@@ -5,7 +5,7 @@ import Link from "next/link";
 import { track } from "@/lib/analytics";
 import { cameFromInside } from "@/lib/nav";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchBrief, fetchQuestions, type EventDetail, type OutletRef, type TrendingStoryDetail } from "@/lib/api";
+import { fetchBrief, fetchQuestions, type BriefResult, type CyberLens, type EventDetail, type FinanceLens, type OutletRef, type TrendingStoryDetail } from "@/lib/api";
 import { headlineByline } from "@/lib/headline";
 import { useStateNames } from "@/lib/useStateName";
 import { useRouter } from "next/navigation";
@@ -79,8 +79,6 @@ function outletsOf(event: EventDetail): OutletRef[] {
 }
 
 export function StoryView({ event }: { event: EventDetail }) {
-  const cyber = event.projection?.cyber ?? null;
-  const finance = event.projection?.finance ?? null;
   // ONE index for [n]: the report list and the citation under every quote read
   // the same map, so the two can never number one article differently.
   const sourceIndex = indexSources(event.sources);
@@ -96,10 +94,18 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Every block after the first the reader picks flips in (LensBrief).
   const [flipped, setFlipped] = useState(false);
   const [points, setPoints] = useState<Record<string, string[]>>(event.lens_points ?? {});
+  // A professional lens's facts, by lens, from its /brief answer: the page is
+  // fetched anonymously, so the record never carries them. A lens here has
+  // been opened on this page.
+  const [facts, setFacts] = useState<Record<string, CyberLens | FinanceLens | null>>({});
+  const cyber = (facts.cyber as CyberLens | null | undefined) ?? event.projection?.cyber ?? null;
+  const finance = (facts.markets as FinanceLens | null | undefined) ?? event.projection?.finance ?? null;
   const [briefLoading, setBriefLoading] = useState(false);
   // Which paywall wall this lens hit, if any. Null means the lens is readable.
   const [gateState, setGateState] = useState<
-    { lens: string; kind: "signin" } | { lens: string; kind: "no_samples"; remaining: number | null } | null
+    | { lens: string; kind: "signin"; used: number | null }
+    | { lens: string; kind: "limit"; used: number | null; limit: number | null }
+    | null
   >(null);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
@@ -109,9 +115,6 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Did the READER ask for this lens, or did it come back from their profile?
   // The locked-lens guard below has to tell those apart, and `lens` alone can't.
   const readerPicked = useRef(false);
-  // Tracks the previous session so the guard below can spot a sign-OUT rather
-  // than the steady state of never having been signed in.
-  const wasSignedIn = useRef(false);
 
   const registry = useLenses();
   const registrySlugs = registry.map((m) => m.slug);
@@ -119,11 +122,12 @@ export function StoryView({ event }: { event: EventDetail }) {
     ? registrySlugs.filter((slug) => event.available_lenses.includes(slug))
     : registrySlugs;
 
-  // Sign-in gate (no paywall — free once signed in): the general reader lens is
-  // open to everyone; the professional lenses (markets, cyber) require an account.
+  // The lens meter is the server's (common/quota.py): a few professional
+  // readings a session without an account, more a day with one, every lens on
+  // Plus. A lens is locked here only once the server has said so.
   const session = useSession();
   const router = useRouter();
-  const isLocked = (slug: string) => slug !== "reader" && !session;
+  const isLocked = (slug: string) => gateState?.lens === slug;
 
   useEffect(() => {
     const profile = loadProfile();
@@ -135,31 +139,35 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   useEffect(() => {
     let cancelled = false;
-    // Don't fetch (or generate) a locked pro lens for a signed-out reader.
-    if (!isLocked(lens)) {
-      fetchQuestions(event.id, lens, session?.token).then((qs) => !cancelled && setQuestions(qs));
-      if (!briefs[lens]) {
-        setBriefLoading(true);
-        fetchBrief(event.id, lens, session?.token).then((res) => {
-          if (cancelled) return;
-          setBriefLoading(false);
-          // Each paywall outcome gets its own affordance. Collapsing them into
-          // "no brief" is what made the first version show an empty panel to a
-          // reader who just needed to sign in.
-          if (res.state === "signin_required") {
-            setGateState({ lens, kind: "signin" });
-            return;
-          }
-          if (res.state === "no_samples") {
-            setGateState({ lens, kind: "no_samples", remaining: res.remaining });
-            return;
-          }
-          if (res.state === "unavailable") return;
-          setGateState(null);
-          if (res.brief) setBriefs((prev) => ({ ...prev, [lens]: res.brief! }));
-          if (res.points?.length) setPoints((prev) => ({ ...prev, [lens]: res.points! }));
-        });
-      }
+    fetchQuestions(event.id, lens, session?.token).then((qs) => !cancelled && setQuestions(qs));
+    // Each paywall outcome gets its own affordance. Collapsing them into "no
+    // brief" is what made the first version show an empty panel to a reader
+    // who just needed to sign in.
+    const apply = (res: BriefResult | null) => {
+      if (cancelled || !res || res.state === "unavailable") return;
+      if (res.state === "signin_required") return setGateState({ lens, kind: "signin", used: res.used });
+      if (res.state === "limit") return setGateState({ lens, kind: "limit", used: res.used, limit: res.limit });
+      setGateState(null);
+      setFacts((prev) => ({ ...prev, [lens]: res.facts ?? null }));
+      if (res.brief) setBriefs((prev) => ({ ...prev, [lens]: res.brief! }));
+      if (res.points?.length) setPoints((prev) => ({ ...prev, [lens]: res.points! }));
+    };
+    // A professional lens is opened once on a page (its facts come with it);
+    // the Reader brief is usually on the page already.
+    const fetching = lens === "reader" ? !briefs[lens] : !(lens in facts) || isLocked(lens);
+    setBriefLoading(fetching);
+    if (fetching) {
+      (async () => {
+        // Facts first: what is written comes back at once, and only when the
+        // prose is not written yet does a second request wait on the model.
+        let res = await fetchBrief(event.id, lens, session?.token, false);
+        if (res?.state === "ok" && res.pending) {
+          apply(res);
+          res = await fetchBrief(event.id, lens, session?.token, true);
+        }
+        apply(res);
+        if (!cancelled) setBriefLoading(false);
+      })();
     }
     return () => {
       cancelled = true;
@@ -169,14 +177,12 @@ export function StoryView({ event }: { event: EventDetail }) {
 
   // Snap back to the reader lens only when a locked pro lens arrived from the
   // PROFILE rather than from a tap. A deliberate pick is allowed to stay so the
-  // reader sees the flip and the inline unlock prompt. (History of this guard:
+  // reader sees the flip and what would open it. (History of this guard:
   // git log -S readerPicked — two regressions, both about signed-out readers.)
   useEffect(() => {
-    if (wasSignedIn.current && !session) readerPicked.current = false;
-    wasSignedIn.current = Boolean(session);
     if (isLocked(lens) && !readerPicked.current) setLens("reader");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, lens]);
+  }, [gateState, lens]);
 
   const meta = lensMeta(lens);
   const brief = briefs[lens];
@@ -310,7 +316,7 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Facts first — they are the record; the brief beneath is a reading of it.
   const lensFacts = (
     <>
-      {lens === "cyber" && cyber && !isLocked(lens) && (
+      {lens === "cyber" && cyber && (
         <div className="grid gap-3.5">
           <div className="flex flex-wrap items-center gap-2">
             {cvss.score != null && <span className="p-badge font-mono" style={{ background: "var(--lens-soft)", color: "var(--lens)" }}>CVSS {cvss.score.toFixed(1)}</span>}
@@ -356,7 +362,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           )}
         </div>
       )}
-      {lens === "markets" && finance && !isLocked(lens) && (
+      {lens === "markets" && finance && (
         <div className="grid gap-3">
           <div className="flex flex-wrap items-center gap-2 font-mono text-[11.5px]" style={{ color: "var(--ink-2)" }}>
             {(finance.tickers ?? []).map((t) => <span key={t} className="p-badge font-mono" style={{ background: "var(--lens-soft)", color: "var(--lens)" }}>{t}</span>)}
@@ -378,17 +384,21 @@ export function StoryView({ event }: { event: EventDetail }) {
     </>
   );
 
-  // The lens block's body, by state. OUT OF SAMPLES is a different wall from
-  // NOT SIGNED IN, and the reader needs a different next step for each; `null`
-  // remaining means no quota row was ever granted, which is not "0 left".
-  const ready = !(gateState?.lens === lens) && !isLocked(lens) && !!brief;
+  // The lens block's body, by state. OUT OF READINGS WITH AN ACCOUNT is a
+  // different wall from WITHOUT ONE, and the reader needs a different next
+  // step for each: Plus, or an account. Facts print first; only the prose
+  // waits behind a skeleton.
+  const ready = !isLocked(lens) && !!brief;
   const lensBody =
-    gateState?.lens === lens && gateState.kind === "no_samples" ? (
-      <LensUsed meta={meta} remaining={gateState.remaining} onReader={() => setLens("reader")} />
-    ) : isLocked(lens) || gateState?.lens === lens ? (
-      <LensLocked meta={meta} onSignIn={() => router.push(`/signin?next=/story/${event.id}`)} />
+    gateState?.lens === lens && gateState.kind === "limit" ? (
+      <LensUsed used={gateState.used} limit={gateState.limit} onReader={() => setLens("reader")} />
+    ) : gateState?.lens === lens ? (
+      <LensLocked meta={meta} used={gateState.used} onSignIn={() => router.push(`/signin?next=/story/${event.id}`)} />
     ) : briefLoading && !brief ? (
-      <LensWriting meta={meta} />
+      <>
+        {lensFacts}
+        <LensWriting meta={meta} />
+      </>
     ) : brief ? (
       <>
         {lensFacts}

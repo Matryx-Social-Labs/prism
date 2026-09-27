@@ -29,7 +29,7 @@ the open web or from unrelated events.
 The agent seeds a few likely questions per story, tuned by the user's role. For a cyber story:
 "Does this affect my stack?", "Is it being exploited?", "What should I patch or mitigate?", "Which
 of my controls does this touch?". For a general story: "What led to this?", "Who is affected?",
-"What are the likely outcomes?", "How is each side framing it?".
+"What are the likely outcomes?", "What do the reports not say yet?".
 
 ## Groundedness evaluation
 The agent is evaluated for groundedness: a sample of answers is checked to confirm each claim is

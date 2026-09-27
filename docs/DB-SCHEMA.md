@@ -350,8 +350,9 @@ first-user-creation), `consumed_at` nullable. `sessions`: bearer/cookie session,
 `db/versions/de000473f0e5_auth_tokens_sessions_magic_link_auth.py`. CRUD in `common/auth.py`.
 
 ### `usage_quota`, `usage_daily`, `user_days`
-`usage_quota` is ORM (`common/models.py:450-468`): per-account freemium sample cap (Markets lens
-only — one counter suffices). `id` PK, `user_id` FK→users **unique**, `remaining` int default 0,
+`usage_quota` is ORM (`common/models.py:450-468`): the retired per-account lifetime sample cap —
+no longer read or written since 2026-09-27; the lens meter counts `lens_unlocks` in a rolling day
+(`common/quota.py`). `id` PK, `user_id` FK→users **unique**, `remaining` int default 0,
 `period_start`. Debited with a single atomic `UPDATE ... WHERE remaining > 0 RETURNING`
 (`common/quota.py`) so two concurrent viewers of the same event+lens can never double-spend the last
 sample. From `db/versions/02f6edae6a63_users_usage_quota_freemium_sample_cap.py`.

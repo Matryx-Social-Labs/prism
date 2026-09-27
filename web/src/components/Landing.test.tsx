@@ -89,7 +89,7 @@ describe("Landing", () => {
     expect(screen.getByText("of 27 monitored outlets in today's record")).toBeInTheDocument();
   });
 
-  it("builds the proof and the lens flip from one real record, and flips a paid lens to the sign-in, not to a sample", async () => {
+  it("builds the proof and the lens flip from one real record, and flips a paid lens to the story, not to a sample", async () => {
     fetchFeed.mockResolvedValue([row("lead"), row("two")]);
     fetchEvent.mockImplementation(async (id: string) => record(id));
     render(await Landing());
@@ -98,11 +98,11 @@ describe("Landing", () => {
     expect(within(newest).getAllByRole("link").map((a) => a.textContent?.trim())).toEqual(["Report a4", "Report a3", "Report a2"]);
     // Exact words: the verified quote, as the article printed it.
     expect(screen.getByText(/We were receiving proposals from every ward/)).toBeInTheDocument();
-    // The flip: the record's own brief, then the professional lens asks for an account.
+    // The flip: the record's own brief, then the professional lens is read on the story.
     expect(screen.getByText("The council voted to widen the road.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: /Markets/ }));
     expect(screen.queryByText("The council voted to widen the road.")).toBeNull();
-    expect(screen.getByRole("link", { name: "Sign in to unlock" })).toHaveAttribute("href", "/signin?next=/story/lead");
+    expect(screen.getByRole("link", { name: "Read it on the story" })).toHaveAttribute("href", "/story/lead");
   });
 
   it("showcases words two outlets printed, not whatever the record lists first", async () => {

@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Lock } from "@/components/icons";
+import { LENS_READS } from "@/lib/billing";
 import { flipDuration } from "@/lib/motion";
 import type { LensMeta } from "@/lib/lenses";
 
@@ -13,8 +15,8 @@ export function lensVars(meta: LensMeta): React.CSSProperties {
 /**
  * "Read it as": the lenses as one segmented control (Design System v2 ·
  * LensSwitch). A professional lens carries its dot — the one place colour
- * speaks — and a lock while it needs an account; on a desk each tab prints
- * the key that flips to it.
+ * speaks — and a lock once the reader's free readings are spent; on a desk
+ * each tab prints the key that flips to it.
  */
 export function LensSwitch({
   lenses,
@@ -44,7 +46,7 @@ export function LensSwitch({
                 role="tab"
                 aria-selected={on}
                 onClick={() => onPick(m.slug)}
-                aria-label={locked ? `${m.short} lens, sign in to unlock, free` : undefined}
+                aria-label={locked ? `${m.short} lens, free readings spent` : undefined}
                 className="min-h-[44px] whitespace-nowrap lg:min-h-[38px]"
                 style={{ ...lensVars(m), color: on ? "var(--ink)" : "var(--ink-2)" }}
               >
@@ -132,31 +134,44 @@ export function LensWriting({ meta }: { meta: LensMeta }) {
   );
 }
 
-/** Locked: what the lens reads, blurred placeholder lines, and the one way in. */
-export function LensLocked({ meta, onSignIn }: { meta: LensMeta; onSignIn: () => void }) {
+// Where a reader at a lens limit reads about Plus; `from` labels the arrival.
+const PLUS_FROM_LENS = "/plus?from=lens-limit";
+
+/** Locked: out of the reads open without an account. What the lens reads,
+ *  blurred placeholder lines, what an account gives, and Plus. */
+export function LensLocked({ meta, used, onSignIn }: { meta: LensMeta; used: number | null; onSignIn: () => void }) {
   return (
     <div className="grid gap-3">
       <div aria-hidden className="grid select-none gap-2 opacity-55 blur-[4px]">
         {["90%", "76%", "84%"].map((w) => <span key={w} className="block h-3 rounded-[2px]" style={{ width: w, background: "var(--lens)", opacity: 0.25 }} />)}
       </div>
-      <p className="text-[15px] font-semibold leading-[1.4]">Free with an account</p>
+      <p className="text-[15px] font-semibold leading-[1.4]">{LENS_READS.free} lens readings a day with a free account</p>
       <p className="-mt-2 text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
+        {used != null && `You have read ${used} without one. `}
         Read this story through the <span className="font-semibold" style={{ color: "var(--lens)" }}>{meta.short} lens</span>: {meta.plain ?? meta.tagline}.
       </p>
-      <div><button type="button" onClick={onSignIn} className="p-btn p-btn--primary p-btn--sm">Sign in to unlock</button></div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button type="button" onClick={onSignIn} className="p-btn p-btn--primary p-btn--sm">Sign in to keep reading</button>
+        <Link href={PLUS_FROM_LENS} className="text-[14px] font-semibold" style={{ color: "var(--accent)" }}>Every lens with Plus →</Link>
+      </div>
     </div>
   );
 }
 
-/** Used: out of free professional reads — a different wall from not signed in. */
-export function LensUsed({ meta, remaining, onReader }: { meta: LensMeta; remaining: number | null; onReader: () => void }) {
+/** Used: a free account's readings for the day are spent — a different wall
+ *  from not signed in, and the one Plus answers. */
+export function LensUsed({ used, limit, onReader }: { used: number | null; limit: number | null; onReader: () => void }) {
+  const cap = limit ?? LENS_READS.free;
   return (
     <div className="grid gap-2.5">
-      <p className="text-[15px] font-semibold leading-[1.4]">
-        You&apos;ve used your free {meta.short} reads{typeof remaining === "number" ? `, ${remaining} left` : ""}
+      <p className="text-[15px] font-semibold leading-[1.4]">You have read {used ?? cap} of {cap} free lens readings today</p>
+      <p className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>
+        Plus opens every lens on every story. The reader view of this story stays open, with its sources and quotes.
       </p>
-      <p className="text-[14.5px] leading-[1.55]" style={{ color: "var(--ink-2)" }}>The reader view of this story stays open, with its sources and quotes.</p>
-      <div><button type="button" onClick={onReader} className="p-btn p-btn--secondary p-btn--sm">Back to the reader view</button></div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link href={PLUS_FROM_LENS} className="p-btn p-btn--primary p-btn--sm">See Plus</Link>
+        <button type="button" onClick={onReader} className="p-btn p-btn--secondary p-btn--sm">Back to the reader view</button>
+      </div>
     </div>
   );
 }

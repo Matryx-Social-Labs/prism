@@ -723,14 +723,46 @@ export async function fetchLenses(): Promise<LensInfo[]> {
  *
  *  A discriminated union rather than `T | null`, because the paywall has three
  *  distinct "no brief" outcomes and the reader needs a different affordance for
- *  each: sign in, buy more, or come back later. Collapsing them to null is what
- *  made the first version render an empty panel for all three.
+ *  each: sign in, Plus, or come back later. Collapsing them to null is what
+ *  made the first version render an empty panel for all three. `used`/`limit`
+ *  are the meter the server counted (common/quota.py), null when it gave none.
  */
 export type BriefResult =
-  | { state: "ok"; lens: string; brief: string | null; points?: string[]; cached: boolean }
-  | { state: "signin_required" }
-  | { state: "no_samples"; remaining: number | null }
+  | {
+      state: "ok";
+      lens: string;
+      brief: string | null;
+      points?: string[];
+      cached: boolean;
+      /** The lens's facts (projection.finance / .cyber), which the record strips. */
+      facts?: CyberLens | FinanceLens | null;
+      /** Asked with generate=false and nothing written yet: ask again to write it. */
+      pending?: boolean;
+    }
+  | { state: "signin_required"; used: number | null; limit: number | null }
+  | { state: "limit"; used: number | null; limit: number | null }
   | { state: "unavailable" };
+
+const LENS_SESSION = "prism.lensSession";
+let lensSessionFallback: string | null = null;
+
+/** This browser session's anonymous id for the lens meter (common/quota.py): a
+ *  few lens reads a session without an account. sessionStorage, so it ends with
+ *  the session; a fresh id is no fresh allowance past the server's per-address
+ *  ceiling. Where storage is refused, one id for the life of the page. */
+function lensSession(): string {
+  try {
+    let id = sessionStorage.getItem(LENS_SESSION);
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem(LENS_SESSION, id);
+    }
+    return id;
+  } catch {
+    lensSessionFallback ??= crypto.randomUUID();
+    return lensSessionFallback;
+  }
+}
 
 /** Bearer header, or nothing. Kept in one place so no caller invents its own. */
 export function authHeaders(token?: string | null): Record<string, string> {
@@ -774,28 +806,33 @@ export async function fetchQuestions(
   return data.questions;
 }
 
+/** `generate: false` answers at once from what is written (with the facts) and
+ *  never waits on the model; the page asks again only when that was nothing. */
 export async function fetchBrief(
   eventId: string,
   lens: string,
   token?: string | null,
+  generate = true,
 ): Promise<BriefResult> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/brief?lens=${encodeURIComponent(lens)}`, {
+    const params = new URLSearchParams({ lens, generate: String(generate) });
+    if (!token) params.set("anon_session", lensSession());
+    const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(eventId)}/brief?${params}`, {
       cache: "no-store",
       headers: authHeaders(token),
       credentials: "include",
     });
     // 401 and 402 ARE THE PRODUCT, not failures. The previous `if (!res.ok)
     // return null` collapsed them into "no brief", so a reader who needed to
-    // sign in, and one who had run out of samples, both saw an empty panel with
+    // sign in, and one who had run out of reads, both saw an empty panel with
     // no way forward. The paywall would have been invisible.
-    if (res.status === 401) return { state: "signin_required" };
+    if (res.status === 401) return { state: "signin_required", used: null, limit: null };
     if (res.status === 402) {
       const body = await res.json().catch(() => ({}));
       const d = body?.detail ?? {};
-      // `remaining: null` means NO QUOTA ROW — never granted — which reads
-      // differently to the user than "you have spent them all".
-      return { state: "no_samples", remaining: d.remaining ?? null };
+      const used = typeof d.used === "number" ? d.used : null;
+      const limit = typeof d.limit === "number" ? d.limit : null;
+      return d.signin_helps ? { state: "signin_required", used, limit } : { state: "limit", used, limit };
     }
     if (!res.ok) return { state: "unavailable" };
     return { state: "ok", ...(await res.json()) };

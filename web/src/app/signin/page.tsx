@@ -8,6 +8,7 @@ import { type FormEvent, Suspense, useEffect, useState } from "react";
 import { Check } from "@/components/icons";
 import { Alert, TextField } from "@/components/ui";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
+import { LENS_READS } from "@/lib/billing";
 import { requestMagicLink } from "@/lib/session";
 
 // Server truths the copy leans on (common/config.py): a link lives 15 minutes
@@ -18,12 +19,12 @@ const LINK_TTL_MIN = 15;
 const RESEND_COOLDOWN_S = 30;
 
 // What an account adds, from the code that enforces it: common/quota.py
-// (USER_ASK_PER_DAY 10, ANON_ASK_PER_SESSION 3), prism_free_markets_samples 3
-// granted at sign-up (common/auth.py), and the watchlist API has no plan gate.
+// (USER_ASK_PER_DAY 10, ANON_ASK_PER_SESSION 3; the lens meter via LENS_READS),
+// and the watchlist API has no plan gate.
 const ACCOUNT_ADDS = [
   "A watchlist of tickers and subjects, free",
   "10 questions a day in Ask, instead of 3 without an account",
-  "3 free professional readings",
+  `${LENS_READS.free} professional lens readings a day, instead of ${LENS_READS.anon} without an account`,
 ];
 
 /** A reader's words for what is wrong with an address, or null when it will do. */
