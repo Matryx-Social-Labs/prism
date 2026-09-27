@@ -240,6 +240,17 @@ gh secret set VERCEL_PROJECT_ID --repo Matryx-Social-Labs/prism   # projectId fr
   `vercel pull → vercel build --prod → vercel deploy --prebuilt --prod`,
   and prints the deployment URL in the run summary. Production deploys are
   serialized so rapid pushes don't race.
+- **The web deploy is skipped when nothing it is built from changed**
+  (`web/`, `vercel.json`, `.github/workflows/ci.yml`) since the commit that is
+  live. Each deployment is stamped `meta.prismSha=<main commit>`, and the job
+  reads the live one back from the Vercel API. A new deployment starts with an
+  empty page (ISR) cache, and backend-only promotes were redeploying the web
+  3–11 times a day. If the live deployment has no stamp, or the commit is
+  unknown, it deploys. The run summary says which happened.
+- **Function region**: the Vercel project's default function region is the
+  one next to the API (Railway `asia-southeast1` → Vercel `sin1`). Every
+  server render calls the API, so a far region adds a round trip to each
+  fetch (it was `iad1`, Washington, until 2026-09-27).
 - Pushing workflow files requires the `workflow` OAuth scope:
   `gh auth refresh -h github.com -s workflow` once, if a push is rejected
   with "refusing to allow an OAuth App to … workflow".

@@ -149,6 +149,12 @@ jobs:
         # (scripts/check-admin-only.mjs).
         run: npm run check:charts
 
+      - name: Cached routes refresh on their declared clocks
+        # A route re-renders at its shortest fetch, so a page's own revalidate
+        # can be undercut without a trace; both sitemaps were, down to 60 s
+        # (scripts/check-cache-windows.mjs).
+        run: npm run check:cache
+
   vouched:
     # The commit on main must already carry green backend + web checks — the
     # ones its run on dev produced. The ruleset on main enforces the same
@@ -195,13 +201,41 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # the next step diffs against whichever commit is live
+
+      - name: Skip when nothing the web is built from changed
+        # Every deploy starts Vercel's page cache empty ("each new deployment
+        # uses its own ISR cache"), and every promote used to redeploy the web,
+        # backend-only ones included: 3-11 a day (2026-09-27). The diff is taken
+        # against the commit that is LIVE, stamped on each deployment as
+        # meta.prismSha below, never against the previous push: a failed or
+        # skipped deploy must not hide a web change. Unknown live commit: deploy.
+        id: web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          live=$(curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&state=READY&limit=1" \
+            | jq -r '.deployments[0].meta.prismSha // empty') || live=""
+          if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null \
+             && git diff --quiet "$live" "$GITHUB_SHA" -- web/ vercel.json .github/workflows/ci.yml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "### Web unchanged since ${live:0:7} (live) — deploy skipped, page cache kept" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "deploying: the web changed since the live commit (${live:-unknown})"
+          fi
 
       - name: Setup Node
+        if: steps.web.outputs.changed == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: '22'
 
       - name: Re-author HEAD for Vercel's Hobby-plan owner check
+        if: steps.web.outputs.changed == 'true'
         # Vercel Hobby only lets the project owner deploy: it checks the
         # commit author email against the owner's verified email. Commits
         # here are authored by whoever wrote the change (good for GitHub
@@ -214,15 +248,18 @@ jobs:
           git commit --amend --reset-author --no-edit
 
       - name: Install Vercel CLI
+        if: steps.web.outputs.changed == 'true'
         run: npm install -g vercel@latest
 
       - name: Pull Vercel project + env (production)
+        if: steps.web.outputs.changed == 'true'
         # Downloads project config and prod env vars into .vercel/ so the
         # build below uses exactly the env Vercel would. The Vercel
         # project's Root Directory must be set to `web`.
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Inject public build env
+        if: steps.web.outputs.changed == 'true'
         # The Vercel team forces env vars to "Sensitive", and sensitive
         # values pull as EMPTY strings outside Vercel's own builders — so a
         # prebuilt CI deploy would bake "" into the client bundle. These vars
@@ -252,12 +289,14 @@ jobs:
           done
 
       - name: Build with Vercel
+        if: steps.web.outputs.changed == 'true'
         # Retries only a next/font Google fetch failure (web/scripts/retry-next-font.sh).
         run: web/scripts/retry-next-font.sh vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy prebuilt output
+        if: steps.web.outputs.changed == 'true'
         run: |
-          url=$(vercel deploy --prebuilt --archive=tgz --prod --token=${{ secrets.VERCEL_TOKEN }})
+          url=$(vercel deploy --prebuilt --archive=tgz --prod --meta prismSha=${{ github.sha }} --token=${{ secrets.VERCEL_TOKEN }})
           echo "Deployed to $url"
           echo "### :rocket: Deployed" >> "$GITHUB_STEP_SUMMARY"
           echo "$url" >> "$GITHUB_STEP_SUMMARY"
