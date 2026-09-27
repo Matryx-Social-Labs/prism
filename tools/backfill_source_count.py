@@ -69,7 +69,7 @@ async def main() -> int:
 
     async with session_scope() as session:
         rows = await recount(session, apply=args.apply)
-    total = sum(1 for _ in rows)
+    total = len(rows)
     to_one = sum(1 for _, old, new in rows if old > 1 and new == 1)
     print(f"{total} events change; {to_one} of them passed as multi-source (≥2) with one publisher")
     for (old, new), n in Counter((old, new) for _, old, new in rows).most_common(15):
