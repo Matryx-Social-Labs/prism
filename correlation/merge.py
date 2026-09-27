@@ -246,19 +246,11 @@ async def apply(m: Merge) -> bool:
         await _move_story_members(s, m)
 
         # As an attach would: the survivor takes the copy's photo if it had
-        # none, and the copy's state codes (IN-KA) so a state feed keeps it.
+        # none. Its sector and states are re-read from all its members by the
+        # rebuild below (the classifier's majority, never a union).
         await s.execute(
-            text(
-                """
-                UPDATE events sv SET
-                    image_url = COALESCE(sv.image_url, ab.image_url),
-                    regions = COALESCE(sv.regions, '{}') || ARRAY(
-                        SELECT x FROM unnest(ab.regions) x
-                        WHERE x LIKE '%-%' AND NOT x = ANY(COALESCE(sv.regions, '{}'))
-                    )
-                FROM events ab WHERE sv.id = :s AND ab.id = :a
-                """
-            ),
+            text("UPDATE events sv SET image_url = COALESCE(sv.image_url, ab.image_url) "
+                 "FROM events ab WHERE sv.id = :s AND ab.id = :a"),
             ids,
         )
         await s.execute(text("UPDATE events SET merged_into = :s WHERE id = :a OR merged_into = :a"), ids)
