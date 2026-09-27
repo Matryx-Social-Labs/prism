@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: [main, dev]
+  # Run on main to force a web deploy — e.g. after changing an env var in the
+  # Vercel dashboard, which no diff can see: `gh workflow run ci.yml --ref main`.
+  workflow_dispatch:
   pull_request:
     branches: [dev]  # feature branches land on dev; main is never a PR target
 
@@ -161,7 +164,7 @@ jobs:
     # thing at push time; this makes the deploy depend on it explicitly and
     # names the failure if someone ever bypasses the ruleset.
     name: main · this commit passed CI on dev
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04  # pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19; we upgrade on purpose, not by label drift
     timeout-minutes: 3
     steps:
@@ -186,7 +189,7 @@ jobs:
     # main, after `vouched` confirms the commit's dev checks.
     name: Deploy web to Vercel (production)
     needs: [vouched]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04  # pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19; we upgrade on purpose, not by label drift
     timeout-minutes: 15
     concurrency:
@@ -208,17 +211,23 @@ jobs:
         # Every deploy starts Vercel's page cache empty ("each new deployment
         # uses its own ISR cache"), and every promote used to redeploy the web,
         # backend-only ones included: 3-11 a day (2026-09-27). The diff is taken
-        # against the commit that is LIVE, stamped on each deployment as
-        # meta.prismSha below, never against the previous push: a failed or
-        # skipped deploy must not hide a web change. Unknown live commit: deploy.
+        # against the commit that is LIVE — the deployment the production domain
+        # points at, so a rollback moves the baseline too — stamped as
+        # meta.prismSha below; never against the previous push, so a failed or
+        # skipped deploy cannot hide a web change. Unknown live commit, or a
+        # manual run: deploy.
         id: web
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PROD_HOST: www.readprism.news  # the canonical host, as pinned in "Inject public build env"
         run: |
           set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"; echo "manual run: deploying"; exit 0
+          fi
           live=$(curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&state=READY&limit=1" \
-            | jq -r '.deployments[0].meta.prismSha // empty') || live=""
+            "https://api.vercel.com/v13/deployments/$PROD_HOST?teamId=$VERCEL_ORG_ID" \
+            | jq -r '.meta.prismSha // empty') || live=""
           if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null \
              && git diff --quiet "$live" "$GITHUB_SHA" -- web/ vercel.json .github/workflows/ci.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

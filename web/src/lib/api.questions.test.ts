@@ -44,5 +44,13 @@ describe("fetchQuestions", () => {
     const calls = stubFetch();
     await fetchQuestions("e1", "cyber", "tok");
     expect(calls[0].init.cache).toBe("no-store");
+    expect((calls[0].init as { next?: unknown }).next).toBeUndefined();
+  });
+
+  it("caches the anonymous questions, the same for everyone, so /about can be cached", async () => {
+    const calls = stubFetch();
+    await fetchQuestions("e1");
+    expect(calls[0].init.cache).toBeUndefined();
+    expect((calls[0].init as { next?: { revalidate: number } }).next?.revalidate).toBe(300);
   });
 });
