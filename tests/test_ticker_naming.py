@@ -25,6 +25,7 @@ ROWS = [
     ("ADANIPORTS", "NSE", "Adani Ports and Special Economic Zone Limited"),
     ("BPCL", "NSE", "Bharat Petroleum Corporation Limited"),
     ("DLF", "NSE", "DLF Limited"),
+    ("CESC", "NSE", "CESC Limited"),
     ("TPG", "NASDAQ", "TPG Inc. - Class A Common Stock"),
     ("CHSCL", "NASDAQ", "CHS Inc - Class B Cumulative Redeemable Preferred Stock, Series 4"),
     ("MBNKO", "NASDAQ", "Medallion Bank - Fixed-Rate Reset Non-Cumulative Perpetual Preferred Stock, Series F"),
@@ -153,3 +154,13 @@ def test_a_company_links_to_its_common_share():
     non-voting class (GOOG): one company, the ticker readers follow."""
     ents = [org("Boeing"), org("Google")]
     assert choose_tickers(LISTED, [], "Boeing and Google sign a deal", "", ents, "business") == ["BA", "GOOGL"]
+
+
+def test_a_name_two_indian_companies_share_is_never_linked():
+    """"CESC" is CESC Limited, Kolkata's listed utility, and also Chamundeshwari
+    Electricity Supply Corporation, Mysuru's state-owned discom, which Kannada
+    papers name as CESC every week. The first prod revalidation linked the
+    Mysuru one's grievance meetings to the Kolkata listing (2026-09-27)."""
+    ents = [org("CESC", kind="organization")]
+    assert choose_tickers(LISTED, [], "ವಿದ್ಯುತ್ ಗ್ರಾಹಕರ ಕುಂದುಕೊರತೆ: CESC ಸಭೆ", "", ents, "business") == []
+

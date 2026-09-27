@@ -122,6 +122,9 @@ AMBIGUOUS = frozenset({
     "intercontinental exchange", "indian energy exchange", "moody s", "s and p global",
     "msci", "crisil", "icra", "reliance", "fortis", "tata motors", "people", "urban", "ats",
     "dow", "eqt",
+    # CESC Limited (Kolkata) and Chamundeshwari ESC (Mysuru, not listed) — Kannada
+    # papers name the second every week.
+    "cesc",
 })
 
 
