@@ -1,20 +1,33 @@
-"""A small hole measured on production, silent: BleepingComputer 403d on every
-30-minute cycle since ingestion began, emitting a traceback each time.
-"""
+"""The feed registry's hygiene: what is on, what is off and why, and that every
+feed can actually be fetched and attributed."""
 
-from ingestion.rss import FEEDS, USER_AGENT
+import pytest
+
+from ingestion.rss import FEEDS, SPEC_BY_SLUG, USER_AGENT
+
+# Founder, 2026-09-27: cyber and tech come from news that reports a story, never
+# vulnerability-record feeds. Each verified 200 with recent items, with this
+# User-Agent, from the worker's own egress (docs/DATA-SOURCES.md).
+CYBER_AND_TECH_NEWS = (
+    "ettech", "etciso", "medianama", "inc42", "entrackr", "thehindu_technology", "livemint_technology",
+    "thehackernews", "bleepingcomputer", "therecord", "securityweek", "krebsonsecurity", "cyberscoop",
+    "theregister_security",
+)
 
 
-def test_a_feed_blocked_at_the_egress_is_not_fetched_every_cycle():
-    off = [f.slug for f in FEEDS if not f.enabled]
-    assert "bleepingcomputer" in off, "the dead feed is being fetched again"
+@pytest.mark.parametrize("slug", CYBER_AND_TECH_NEWS)
+def test_cyber_and_tech_come_from_news_feeds_the_classifier_reads(slug):
+    """On, and never declared single-topic: a declared sector skips the gate and
+    the classifier, which is how three general feeds filed a campus protest as
+    business."""
+    assert SPEC_BY_SLUG[slug].enabled and SPEC_BY_SLUG[slug].sector is None
 
 
 def test_every_other_feed_stays_on():
     """A disable flag is a trapdoor — one stray default and ingestion goes quiet."""
     on = [f.slug for f in FEEDS if f.enabled]
     # Every feed that is off is off for a measured reason written beside it.
-    assert {f.slug for f in FEEDS if not f.enabled} == {"bleepingcomputer", "pib", "sebi", "businessstandard"}
+    assert {f.slug for f in FEEDS if not f.enabled} == {"pib", "sebi", "businessstandard"}
     for core in ("thehindu", "timesofindia", "ndtv", "thehackernews", "rbi"):
         assert core in on
 

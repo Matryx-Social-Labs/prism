@@ -16,7 +16,9 @@ Used for worldwide, multi-language coverage and first-pass clustering and entiti
 These give immediate global reach and reduce how much clustering Prism must do from zero.
 
 ### Tier 2 — Domain feeds (cyber beachhead depth)
-Used for authoritative, structured cybersecurity signal.
+**Removed 2026-09-27 (founder decision: no vulnerability-record feeds — CERTs, KEV, NVD).**
+Cyber and tech now come from news sources that report a story; see § Cyber and tech news below.
+The original plan, kept for the record:
 - **NVD / CVE**: canonical vulnerability records with CVSS, affected product configurations (CPE),
   and references.
 - **CISA KEV**: the Known Exploited Vulnerabilities catalog, for exploitation status.
@@ -47,9 +49,9 @@ set at build time, guided by the beachhead audience (English-first for cyber, wi
 priority languages to follow).
 
 ## What to license first (recommendation)
-Start with GDELT (free tier and Cloud) plus one paid enrichment API, and the NVD/CVE and CISA KEV
-feeds, which are free and authoritative for the beachhead. Add own collectors only where the APIs
-leave a real gap. Defer finance feeds to Phase 2.
+Start with GDELT (free tier and Cloud) plus one paid enrichment API. (The NVD/CVE and CISA KEV
+feeds this originally recommended were built, then removed on 2026-09-27 — see Tier 2.) Add own
+collectors only where the APIs leave a real gap. Defer finance feeds to Phase 2.
 
 ## Expansion 2026-09-24 (founder D-e: Indian news breadth, most-read languages first)
 
@@ -236,3 +238,52 @@ off, rather than retrying the exact URLs here again.
   correctly and nothing else was disturbed. Worth a `git diff` sanity check on
   this file specifically before merging, since I can't rule out a second process
   writing to this shared worktree.
+
+## Cyber and tech news (2026-09-27, founder decision: stories, not vulnerability records)
+
+The NVD and CISA KEV collectors were removed: the founder wants "pure cybersecurity news or
+technology news sources which actually involve a story", not feeds that list vulnerabilities.
+The cyber lens keeps what the extractor reads out of news articles — CVE ids, CVSS, whether a
+flaw is exploited or KEV-listed, affected products — and those facts are now stored only on
+articles the classifier files under tech or cyber (`enrichment/consumer.cyber_classified`). Ten
+NVD/KEV articles stay in production because a labelling task still references them
+(`tools/repair.py --drop-cve` keeps those); `common/outlets.RAW_RECORD_FEEDS` keeps their
+three record events out of every feed.
+
+None of the feeds below declares a `sector`: each goes through the gate and the classifier, so a
+funding round lands in Business & Markets and a breach in Tech & Cyber. (A declared sector skips
+both, which is how three general business-paper feeds filed a Punjab campus protest as business —
+Mint `/rss/news`, BusinessLine's default feed and ET top stories lost theirs the same day.)
+
+Verification: fetched with the pipeline's own client (`httpx`, `ingestion.rss.USER_AGENT`,
+redirects followed) and parsed with `feedparser`, twice — from a laptop, and from the
+production worker's own Railway egress (`railway ssh --service worker`, read-only GETs), since
+BleepingComputer showed the two can differ. Full text: `trafilatura.extract` on the newest
+article (from the laptop). 2026-09-27 was a Sunday, which explains the 40–55h-old newest items
+on the weekday-only desks.
+
+| Outlet | Slug (publisher) | Country | Feed URL | Items in feed | Newest (worker) | Article page from the worker | Full text (chars) | Notes |
+|---|---|---|---|---|---|---|---|---|
+| ETtech | ettech (economictimes) | IN | economictimes.indiatimes.com/tech/technology/rssfeeds/78570561.cms | 50 | 1.9 h | 200 | 5,078 | ~13/day |
+| ETCISO | etciso (economictimes) | IN | ciso.economictimes.indiatimes.com/rss/recentstories | 20 | 39.9 h | 200 | 4,392 | ~4/day; `/rss/topstories` carries only 10 older items |
+| MediaNama | medianama | IN | medianama.com/feed/ | 10 | 54.5 h | 200 | 3,865 | tech policy; ~10/day on weekdays |
+| Inc42 | inc42 | IN | inc42.com/feed/ | 24 | 11.7 h | 200 | 738 | summaries are ~125 chars, so the article fetch carries the text |
+| Entrackr | entrackr | IN | entrackr.com/rss | 50 | 36.2 h | **403** | — | `/feed/` is 404; the feed body carries the article (median 2,152 chars), which is what enrichment falls back to |
+| The Hindu — Technology | thehindu_technology (thehindu) | IN | thehindu.com/sci-tech/technology/feeder/default.rss | 60 | 7.1 h | 200 | 9,470 | |
+| Mint — Technology | livemint_technology (livemint) | IN | livemint.com/rss/technology | 35 | 8.1 h | 200 | 5,203 | |
+| BleepingComputer | bleepingcomputer | US | bleepingcomputer.com/feed/ | 15 | 2.7 h | 200 | — | **re-enabled**: 403 from Railway on every cycle since 2026-07-29, 200 from the worker on 2026-09-27 |
+| The Record | therecord | US | therecord.media/feed/ | 5 | 46.4 h | 200 | 3,185 | the feed holds only 5 items; 5-minute polling keeps up |
+| SecurityWeek | securityweek | US | securityweek.com/feed/ | 10 | 9.4 h | 200 | 2,160 | |
+| Krebs on Security | krebsonsecurity | US | krebsonsecurity.com/feed/ | 10 | 45.0 h | 200 | 10,016 | about one post a week |
+| CyberScoop | cyberscoop | US | cyberscoop.com/feed/ | 10 | 45.3 h | 200 | 4,173 | |
+| The Register — Security | theregister_security (theregister) | GB | theregister.com/security/headlines.atom | 50 | 47.5 h | 200 | 3,401 | |
+
+The Hacker News (already on) is the other global cyber source. The US and UK outlets fill the
+`intl` group on `/sources`, which had none; no new group was needed.
+
+### Rejected
+
+| Outlet | What was tried | Reason |
+|---|---|---|
+| Dark Reading | darkreading.com/rss.xml | The feed answers 200, but article pages 403 from both egresses and its entries are dated ~67 days in the future (the newest read −1,605 h), which would break "latest published" ordering |
+

@@ -71,7 +71,7 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss"),
     # 403 Forbidden from Railway's egress on every cycle since it was added
     # (2026-09-24, never one success); it answered from a laptop. Off until a
-    # licensed or allowlisted feed exists, like bleepingcomputer.
+    # licensed or allowlisted feed exists.
     FeedSpec("businessstandard", "https://www.business-standard.com/rss/latest.rss", enabled=False),
     FeedSpec("economictimes", "https://economictimes.indiatimes.com/rssfeedstopstories.cms"),
     # ── India national (single-topic — deterministic, zero LLM) ──
@@ -141,15 +141,35 @@ FEEDS: list[FeedSpec] = [
     FeedSpec("thehindu_telangana", "https://www.thehindu.com/news/national/telangana/feeder/default.rss", state="IN-TG"),
     FeedSpec("toi_delhi", "https://timesofindia.indiatimes.com/rssfeeds/-2128839596.cms", state="IN-DL"),
     FeedSpec("toi_mumbai", "https://timesofindia.indiatimes.com/rssfeeds/-2128838597.cms", state="IN-MH"),
-    # ── Cybersecurity lens (global by nature — feeds the cyber lens, not the India general feed) ──
+    # ── Technology and cybersecurity NEWS (founder, 2026-09-27: stories, never
+    # vulnerability-record feeds like NVD or CISA KEV). No declared sector — the
+    # gate and the classifier decide, so a funding round lands in Business and a
+    # breach in Tech & Cyber. Each verified 2026-09-27 with this User-Agent from
+    # the worker's own Railway egress: 200, recent items, the article page
+    # fetchable (docs/DATA-SOURCES.md § Cyber and tech news).
+    # India first:
+    FeedSpec("ettech", "https://economictimes.indiatimes.com/tech/technology/rssfeeds/78570561.cms"),
+    FeedSpec("etciso", "https://ciso.economictimes.indiatimes.com/rss/recentstories"),
+    FeedSpec("medianama", "https://www.medianama.com/feed/"),
+    FeedSpec("inc42", "https://inc42.com/feed/"),
+    # Article pages 403 this User-Agent from every egress we tried; the feed
+    # carries the whole article (~2,100 chars median), which is what enrichment
+    # falls back to.
+    FeedSpec("entrackr", "https://entrackr.com/rss"),
+    FeedSpec("thehindu_technology", "https://www.thehindu.com/sci-tech/technology/feeder/default.rss"),
+    FeedSpec("livemint_technology", "https://www.livemint.com/rss/technology"),
+    # Global cyber:
     FeedSpec("thehackernews", "https://feeds.feedburner.com/TheHackersNews"),
-    # 403 on EVERY 30-minute cycle since ingestion began — a dead collector
-    # emitting a traceback per cycle. The block is on the egress IP, not on us:
-    # measured 2026-07-29, the feed returns 200 to this exact User-Agent from a
-    # residential address and 403 from Railway. So there is no UA to fix, and
-    # spoofing a browser to get around a datacentre-IP rule would be evading a
-    # deliberate block rather than fixing a bug. Off until the egress changes.
-    FeedSpec("bleepingcomputer", "https://www.bleepingcomputer.com/feed/", enabled=False),
+    # Off from 2026-07-29 (403 from Railway's egress, 200 from a residential
+    # address, on every cycle). Measured again 2026-09-27 from the worker itself:
+    # 200 on the feed and on an article page. Back on; if the 403s return, it
+    # goes off again rather than spoofing a browser around a deliberate block.
+    FeedSpec("bleepingcomputer", "https://www.bleepingcomputer.com/feed/"),
+    FeedSpec("therecord", "https://therecord.media/feed/"),
+    FeedSpec("securityweek", "https://www.securityweek.com/feed/"),
+    FeedSpec("krebsonsecurity", "https://krebsonsecurity.com/feed/"),
+    FeedSpec("cyberscoop", "https://cyberscoop.com/feed/"),
+    FeedSpec("theregister_security", "https://www.theregister.com/security/headlines.atom"),
 ]
 
 # Identify honestly and be reachable: the old "prism-prototype/0.1" named no

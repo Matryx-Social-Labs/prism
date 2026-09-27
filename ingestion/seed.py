@@ -86,9 +86,23 @@ SOURCES = [
     # one source for this reason.
     {"slug": "toi_delhi", "publisher": "timesofindia", "name": "The Times of India — Delhi", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "toi_mumbai", "publisher": "timesofindia", "name": "The Times of India — Mumbai", "source_type": "rss", "country": "IN", "language": "en"},
-    # ── Cybersecurity lens (global by nature) ──
+    # ── Technology and cybersecurity news (2026-09-27). Sections of a masthead
+    # already here carry its publisher, so ET's, The Hindu's and Mint's tech
+    # desks corroborate as one newsroom with their parent, never as a second. ──
+    {"slug": "ettech", "publisher": "economictimes", "name": "ETtech", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "etciso", "publisher": "economictimes", "name": "ETCISO", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "medianama", "name": "MediaNama", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "inc42", "name": "Inc42", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "entrackr", "name": "Entrackr", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "thehindu_technology", "publisher": "thehindu", "name": "The Hindu — Technology", "source_type": "rss", "country": "IN", "language": "en"},
+    {"slug": "livemint_technology", "publisher": "livemint", "name": "Mint — Technology", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "thehackernews", "name": "The Hacker News", "source_type": "rss", "country": "IN", "language": "en"},
     {"slug": "bleepingcomputer", "name": "BleepingComputer", "source_type": "rss", "country": "US", "language": "en"},
+    {"slug": "therecord", "name": "The Record", "source_type": "rss", "country": "US", "language": "en"},
+    {"slug": "securityweek", "name": "SecurityWeek", "source_type": "rss", "country": "US", "language": "en"},
+    {"slug": "krebsonsecurity", "name": "Krebs on Security", "source_type": "rss", "country": "US", "language": "en"},
+    {"slug": "cyberscoop", "name": "CyberScoop", "source_type": "rss", "country": "US", "language": "en"},
+    {"slug": "theregister_security", "publisher": "theregister", "name": "The Register — Security", "source_type": "rss", "country": "GB", "language": "en"},
 ]
 
 

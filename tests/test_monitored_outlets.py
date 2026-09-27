@@ -64,7 +64,7 @@ async def test_the_set_is_enabled_feeds_counted_by_publisher():
     m = await outlets.monitored(db)
     slugs = db.seen[0][1]["slugs"]
     # Disabled feeds are not monitored, whatever the sources table still holds.
-    assert "pib" not in slugs and "sebi" not in slugs and "bleepingcomputer" not in slugs
+    assert "pib" not in slugs and "sebi" not in slugs and "businessstandard" not in slugs
     assert "thehindu" in slugs
     # The Hindu's two feeds are one masthead; BBC's two services are one.
     assert m.outlets == 4  # thehindu, bbc, rbi, prajavani
