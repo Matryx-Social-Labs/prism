@@ -275,3 +275,64 @@ export interface Coverage {
 }
 
 export const fetchCoverage = (s: Session, days: number) => adminCall<Coverage>(s, `/api/v1/admin/coverage?days=${days}`);
+
+// ── What the models cost (api/routes/admin_metrics.py, common/spend.py) ──
+
+export interface SpendStage {
+  stage: string;
+  model: string;
+  calls: number;
+  input_tokens: number;
+  cached_tokens: number;
+  output_tokens: number;
+  cost: number;
+}
+
+export interface SpendDay {
+  day: string;
+  /** False on a day before the ledger existed: absent, not zero. */
+  recorded: boolean;
+  cost: number;
+  calls: number;
+  stages: SpendStage[];
+}
+
+export interface Spend {
+  days: SpendDay[];
+  balance: { balance: number; at: number } | null;
+  floor: number;
+}
+
+export const fetchSpend = (s: Session, days: number) => adminCall<Spend>(s, `/api/v1/admin/spend?days=${days}`);
+
+/** Dollars: two places, four under a dollar (a stage can cost fractions of a cent a day). */
+export const usd = (v: number) => `$${v.toFixed(v >= 1 ? 2 : 4)}`;
+
+/** Stages summed over the recorded days, most expensive first. */
+export function byStage(data: Spend): SpendStage[] {
+  const acc = new Map<string, SpendStage>();
+  for (const d of data.days) {
+    for (const s of d.stages) {
+      const k = `${s.stage}|${s.model}`;
+      const a = acc.get(k) ?? { ...s, calls: 0, input_tokens: 0, cached_tokens: 0, output_tokens: 0, cost: 0 };
+      acc.set(k, {
+        ...a,
+        calls: a.calls + s.calls,
+        input_tokens: a.input_tokens + s.input_tokens,
+        cached_tokens: a.cached_tokens + s.cached_tokens,
+        output_tokens: a.output_tokens + s.output_tokens,
+        cost: a.cost + s.cost,
+      });
+    }
+  }
+  return [...acc.values()].sort((a, b) => b.cost - a.cost);
+}
+
+/** Days until the balance reaches the floor at the recorded days' average; null without both. */
+export function runwayDays(data: Spend): number | null {
+  const recorded = data.days.filter((d) => d.recorded);
+  if (!data.balance || recorded.length === 0) return null;
+  const perDay = recorded.reduce((n, d) => n + d.cost, 0) / recorded.length;
+  if (perDay <= 0) return null;
+  return Math.max(0, (data.balance.balance - data.floor) / perDay);
+}

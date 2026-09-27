@@ -64,8 +64,8 @@ async def test_private_calls_refuse_data_collection_and_keep_it_through_the_reas
                                     trace_name="t", reasoning=llm.REASONING_OFF, private=True)
     assert out.ok
     assert calls == [
-        {"reasoning": {"enabled": False}, "provider": DENY},
-        {"reasoning": {"effort": "minimal"}, "provider": DENY},
+        {"usage": {"include": True}, "reasoning": {"enabled": False}, "provider": DENY},
+        {"usage": {"include": True}, "reasoning": {"effort": "minimal"}, "provider": DENY},
     ]
 
 
@@ -84,7 +84,7 @@ async def test_pipeline_calls_over_published_news_do_not_send_it(monkeypatch):
     monkeypatch.setattr(llm, "get_llm", lambda: _client(calls))
     await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out,
                               trace_name="t", reasoning=llm.REASONING_OFF)
-    assert calls == [{"reasoning": {"enabled": False}}]
+    assert calls == [{"usage": {"include": True}, "reasoning": {"enabled": False}}]
 
 
 async def test_the_guard_reading_the_question_is_private(monkeypatch):

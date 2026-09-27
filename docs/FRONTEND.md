@@ -92,6 +92,7 @@ Root layout (`web/src/app/layout.tsx`, Server Component): loads every font (`nex
 | `/admin/controls` | Feature-flag switches (read-only) + "Collect now" + audit feed | `fetchFlags`, `fetchAudit(session, 50)`; mutates `triggerCollection` | Client | Same admin gate |
 | `/admin/coverage` | Outlet-coverage tables + lazy 3D network graph | `fetchCoverage(session, days)` | Client (`CoverageGraph` is `next/dynamic(ssr:false)`) | Same admin gate |
 | `/admin/labellers` | Applicants, active labellers, standing board, grant/withdraw forms | `fetchLabellers`; mutates `setLabellerStatus`/`addLabeller`/`setQualification` | Client | Same admin gate |
+| `/admin/spend` | What the models cost: balance and runway to the collection floor, cost by UTC day, cost by stage with its prompt-cache share | `fetchSpend(session, days)` (`GET /api/v1/admin/spend`) | Client | Same admin gate |
 | `/admin/people` | Every account, searchable/filterable/paginated | `fetchPeople(session)` | Client | Same admin gate |
 | `/auth/verify` | Magic-link completion screen | `verifyMagicLink(token)` (`POST /api/v1/auth/verify`) | Client, wrapped in `<Suspense>` (`useSearchParams`) | Public — this *is* the sign-in completion step. On success: `saveSession`, then `router.replace(afterSignIn(needsProfile, takeNext("/feed", next)))` |
 | `/corrections` | Public editorial corrections log | `fetchCorrections()` | Server, async, `revalidate=300` | Public |

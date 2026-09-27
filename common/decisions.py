@@ -31,6 +31,7 @@ from typing import Annotated, Any, Literal
 import httpx
 from pydantic import BaseModel, Field, TypeAdapter
 
+from common import spend
 from common.config import get_settings
 from common.llm import QUOTA_STATUS, LlmQuotaError, respect_cooldown, start_cooldown
 from common.logging import get_logger
@@ -177,6 +178,8 @@ async def decide(
         id=str(payload.get("id") or ""),
     )
     elapsed_ms = round((time.perf_counter() - started) * 1000)
+    await spend.record(trace_name, decisions.model, input_tokens=decisions.usage.input_tokens,
+                       output_tokens=decisions.usage.output_tokens, cost=decisions.usage.cost)
     logger.info(
         "decision",
         trace=trace_name,

@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.98.0] - 2026-09-27
+
+### Changed — the model bill, cut where it was measured and shown where it goes
+An audit of the OpenRouter bill (about $10 a day on average, $15 on busy days) found
+extraction was ~78% of it, and why: every call sent ~8,000 input tokens, ~7,500 of
+them the same prompt and JSON schema, placed AFTER the article, so the provider
+cached none of it.
+
+- **The schema now comes before the article** (`common/llm.structured_chat`), so the
+  fixed prefix is cached. On 40 live articles an extraction fell from $0.00298 to
+  $0.00175 (−41%), the prefix served from cache on 32 of 40, with identical validity,
+  English headlines, briefs and entities, and verbatim quotes kept at 1.02 per article
+  against 0.88. Every structured call benefits, not only extraction.
+- **Sending the schema only once was measured and not shipped:** without the in-prompt
+  copy the prefix is too short to cache and a call costs $0.00226.
+- **The spend ledger** (`common/spend.py`): every chat call, Jev decision, Ask answer
+  and podcast transcription records OpenRouter's own cost and tokens per stage per
+  UTC day. `GET /api/v1/admin/spend` and **/admin/spend** show the balance, the runway
+  to the collection floor, cost by day and by stage with its cache share. Days before
+  the ledger read "not recorded", never $0. Recording never fails a call.
+
 ## [0.0.97.0] - 2026-09-25
 
 ### Added — one happening, one event (the verified matching tier, off by default)

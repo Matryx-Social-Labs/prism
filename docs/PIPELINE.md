@@ -1131,26 +1131,24 @@ lookup never depends on Langfuse being reachable, tracing on or off.
 
 ### Where spend goes
 
-Four independent, **not mutually aggregated**, cost-visibility mechanisms — there is no single
-per-stage spend dashboard in the code read for this document:
+**The spend ledger (`common/spend.py`, since 2026-09-27)** records every model call — each
+`structured_chat` call, every Jev decision, every Ask answer and every podcast transcription —
+with OpenRouter's own `usage.cost`, input, cached and output tokens, per stage (the trace name)
+and model, in one Redis hash per UTC day (120 days). `GET /api/v1/admin/spend` serves it and
+`/admin/spend` draws it: balance, runway to the floor, cost by day, cost by stage with its cache
+share. Days before the ledger existed read "not recorded", never $0. Every call also logs one
+`llm_call` line (trace, model, tokens, cost).
 
-1. **`common/budget.py`** — account-level OpenRouter balance (not per-call), polled every 15 min,
-   surfaced at `GET /api/v1/admin/status` (`llm_balance_usd`, `llm_budget_floor_usd`,
-   `collecting`).
-2. **Langfuse**, when explicitly enabled — full per-call model/tokens/latency/cost, but off by
-   default for the reason above, so this is usually not the source of truth in practice.
-3. **`common/quota.py`** — an *estimated*, self-admittedly under-counting Ask-specific daily
-   spend ceiling (§8), independent of what OpenRouter would actually bill.
-4. **Scattered per-call log lines** — `podcasts/transcribe.py` logs `cost_usd` per episode,
-   `common/decisions.py` logs `cost` per Decisions call — each real but local to its own log line,
-   never summed into a report.
+Measured before the ledger (2026-09-27 audit, `docs/ML-EVALUATION.md`): about $10/day on
+average, $15/day on busy days, and **extraction ~78%** of it — every call carried ~8,000 input
+tokens, ~7,500 of them the same prompt and schema, sent after the article so nothing cached.
+The schema now sits before the article (`common/llm.structured_chat`): on 40 live articles a
+call fell from $0.00298 to $0.00175 with the prefix cached on 32 of 40, and identical
+validity, headlines, entities and verbatim quotes. Next: Jev gate+classify (~$1.1/day), then
+event analysis on GLM (~$0.6/day). X reads (~$0.9/day) are billed by X, not here.
 
-By comment-stated volume (not independently re-measured in this pass): extraction dominates spend
-because it runs at the highest volume and Ask's paid model costs materially more per call than its
-free-tier counterpart; podcasts (~$0.06/day) and X reads (~$2/day at 25 accounts) are both small
-next to the gate/extract volume implied by the throughput numbers in `worker/__main__.py:306-313`
-(a steady-state figure of ~$1.55 per 1,000 items is cited there but not independently re-derived
-here).
+The account balance itself is `common/budget.py` (polled every 15 minutes, `GET
+/api/v1/admin/status`); the Ask allowance is `common/quota.py`.
 
 ### Table: observability & cost
 
@@ -1237,10 +1235,7 @@ defaults above are not the whole story:
    ahead of extraction. Some of this shipped (`fast_lane` routing is real, in both the LLM-pair and
    Jev paths), but the multi-source provenance and preprocessing-pass parts were not built as
    described. Treat both as historical background; this document and the code are current.
-2. **No single per-stage LLM cost dashboard exists.** §9 lists four independent,
-   non-aggregated cost-visibility mechanisms; "how much did enrichment cost this week" is
-   answered by Langfuse when it is on for the period, and nowhere directly otherwise.
-3. **`personalization/`'s README describes a `feed.updates` stream and `user_event_scores`/
+2. **`personalization/`'s README describes a `feed.updates` stream and `user_event_scores`/
    `feed_items` tables that do not exist in code today** — confirmed absent.
 
 `correlation/threads.py::link_event_threads` is current: it runs after every analysis pass
