@@ -10,7 +10,7 @@ import { fallbackCode } from "@/components/SourceList";
 import { quoteLink } from "@/lib/quoteLink";
 import { langName, langNative } from "@/lib/languages";
 import { loadProfile } from "@/lib/profile";
-import { quoteAddress, quoteOutlets, unitsForReader } from "@/lib/quotes";
+import { isReported, quoteAddress, quoteOutlets, saidCount, saidWords, unitsForReader } from "@/lib/quotes";
 import { ShareButton } from "@/components/ShareButton";
 import { Reveal } from "@/components/Reveal";
 
@@ -87,6 +87,37 @@ function AlsoIn({ claim, sourceIndex, outletOf }: { claim: ClaimOut; sourceIndex
   );
 }
 
+/**
+ * The words themselves. A quote is set in the record voice inside quotation
+ * marks. Words an Indian-language article only REPORTED ("X said that…",
+ * founder decision 28 Sep) are the article's words for what was said, not the
+ * speaker's: never inside quotation marks, set upright in the reading voice on
+ * a dashed rule — the line form the system gives what is not verified in full.
+ */
+function Words({ claim, font, color }: { claim: ClaimOut; font: string; color: string }) {
+  if (isReported(claim)) {
+    return (
+      <p className="border-l-2 border-dashed pl-3" style={{ font: "var(--t-body)", color, borderColor: "var(--line-strong)", textWrap: "pretty", overflowWrap: "anywhere" }}>
+        {claim.quote_text}
+      </p>
+    );
+  }
+  return (
+    <blockquote className="font-record" style={{ font, color, textWrap: "pretty", overflowWrap: "anywhere" }}>
+      “{claim.quote_text}”
+    </blockquote>
+  );
+}
+
+/** "reported", in the provenance line: the article's report of what was said, not a quote. */
+function ReportedLabel({ claim }: { claim: ClaimOut }) {
+  return (
+    <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-2)" }} title={`${claim.source_name}'s report of what was said — its words, not a quote`}>
+      reported
+    </span>
+  );
+}
+
 export function Said({
   claims,
   sourceIndex,
@@ -147,7 +178,7 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
           {/* Who they are, as the articles put it — never a title we supplied. */}
           {sp.role && <p className="text-[13px] leading-[1.35]" style={{ color: "var(--ink-2)" }}>{sp.role}</p>}
           <p className="text-[12.5px] leading-[1.3]" style={{ color: "var(--ink-3)" }}>
-            {sp.claims.length} {sp.claims.length === 1 ? "quote" : "quotes"} · {outlets} {outlets === 1 ? "outlet" : "outlets"}
+            {saidCount(sp.claims)} · {outlets} {outlets === 1 ? "outlet" : "outlets"}
             {/* Counted, the way the coverage bar counts languages. */}
             {multilingual && ` · ${languages.length} languages`}
           </p>
@@ -158,9 +189,7 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
         const unitLanguages = new Set([c.lang, ...also.map((a) => a.claim.lang)].filter(Boolean)).size;
         return (
           <div key={`${c.article_id}-${index}`} className={j > 0 ? "border-t pt-3.5" : ""} style={j > 0 ? { borderColor: "var(--line)" } : undefined}>
-            <blockquote className="font-record" style={{ font: "var(--t-quote)", color: "var(--ink)", textWrap: "pretty", overflowWrap: "anywhere" }}>
-              “{c.quote_text}”
-            </blockquote>
+            <Words claim={c} font="var(--t-quote)" color="var(--ink)" />
             <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12.5px] font-medium leading-[1.3]" style={{ color: "var(--ink-3)" }}>
               {n != null && <span className="font-mono text-[11px] font-normal">[{n}]</span>}
               {/* Which language this rendering is in. Shown when the card
@@ -169,6 +198,7 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                   a single-language card says nothing: it would answer a
                   question nobody asked. */}
               {(multilingual || c.translated) && c.lang && <LangLabel claim={c} />}
+              {isReported(c) && <ReportedLabel claim={c} />}
               <span className="inline-flex items-center gap-1.5" style={{ color: "var(--ink-2)" }}>
                 <OutletIcon domain={outletOf?.(c.article_id)?.domain} code={outletOf?.(c.article_id)?.code ?? fallbackCode(c.source_name)} name={c.source_name} size={16} />
                 {c.source_name}
@@ -183,20 +213,20 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                   className="inline-flex min-h-[44px] items-center gap-1 font-semibold lg:min-h-[32px]"
                   style={{ color: "var(--accent)" }}
                 >
-                  Open at the quote <ArrowUpRight size={13} />
+                  {isReported(c) ? "Open at the line" : "Open at the quote"} <ArrowUpRight size={13} />
                 </a>
               )}
               {eventId && (
-                <span className="inline-flex min-h-[44px] items-center lg:min-h-[32px]"><ShareButton url={`/story/${eventId}/quote/${quoteAddress(c, si, index)}`} title={`“${c.quote_text}” — ${sp.speaker}`} compact /></span>
+                <span className="inline-flex min-h-[44px] items-center lg:min-h-[32px]"><ShareButton url={`/story/${eventId}/quote/${quoteAddress(c, si, index)}`} title={`${saidWords(c)} — ${sp.speaker}`} compact /></span>
               )}
               {ask && (
                 <button
                   type="button"
-                  onClick={() => ask({ prefill: `About the quote “${c.quote_text.length > 160 ? c.quote_text.slice(0, 160) + "…" : c.quote_text}” by ${sp.speaker}: what else did they say on this story, and does any report contradict it?`, via: "quote" })}
+                  onClick={() => ask({ prefill: `About ${isReported(c) ? "what the article reports" : "the quote"} ${saidWords(c, 161)} by ${sp.speaker}: what else did they say on this story, and does any report contradict it?`, via: "quote" })}
                   className="min-h-[44px] font-semibold lg:min-h-[32px]"
                   style={{ color: "var(--ink-2)" }}
                 >
-                  Ask about this quote
+                  {isReported(c) ? "Ask about this" : "Ask about this quote"}
                 </button>
               )}
             </div>
@@ -233,9 +263,7 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
                   const an = sourceIndex.get(a.article_id);
                   return (
                     <div key={`${a.article_id}-${ai}`}>
-                      <blockquote className="font-record" style={{ font: "var(--t-quote-s)", color: "var(--ink-2)", textWrap: "pretty", overflowWrap: "anywhere" }}>
-                        “{a.quote_text}”
-                      </blockquote>
+                      <Words claim={a} font="var(--t-quote-s)" color="var(--ink-2)" />
                       <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12.5px] font-medium" style={{ color: "var(--ink-3)" }}>
                         {an != null && <span className="font-mono text-[11px] font-normal">[{an}]</span>}
                         {a.lang && <LangLabel claim={a} />}

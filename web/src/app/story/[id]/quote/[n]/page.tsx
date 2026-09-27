@@ -9,7 +9,7 @@ import { fetchEvent, type EventDetail, type FeedItem, type OutletRef } from "@/l
 import { istTime, shortDate } from "@/lib/dateline";
 import { langName, langNative } from "@/lib/languages";
 import { quoteLink } from "@/lib/quoteLink";
-import { findQuote } from "@/lib/quotes";
+import { findQuote, isReported, saidWords } from "@/lib/quotes";
 import { robotsUnless } from "@/lib/seo";
 import { indexSources } from "@/lib/sources";
 
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
   const q = findQuote(event.claims, n, event.quote_aliases);
   if (!q) return { title: event.title };
-  const title = `“${q.claim.quote_text.length > 90 ? `${q.claim.quote_text.slice(0, 89)}…` : q.claim.quote_text}” — ${q.speaker}`;
+  const title = `${saidWords(q.claim, 90)} — ${q.speaker}`;
   const description = `${q.speaker}${q.role ? `, ${q.role}` : ""}, as reported by ${q.claim.source_name}. On Prism: ${event.title}`;
   return {
     title,
@@ -102,6 +102,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   // address: the link was shared, so it lands on the story rather than a 404.
   if (!q) redirect(`/story/${event.id}`);
   const { claim, speaker, role } = q;
+  const reported = isReported(claim);
   const index = indexSources(event.sources).get(claim.article_id);
   const when = claim.published_at ? `${shortDate(claim.published_at)} ${istTime(claim.published_at)} IST` : null;
   const provenance = [claim.source_name.toUpperCase(), index != null ? `[${index}]` : null, when?.toUpperCase()].filter(Boolean).join(" · ");
@@ -113,13 +114,25 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         <BackBar label="Story" href={`/story/${event.id}`} />
       </div>
       <article className="mx-auto grid w-full max-w-[720px] grid-cols-[minmax(0,1fr)] gap-[22px] px-[var(--gutter)] pb-12 pt-5 lg:pt-12">
-        <blockquote
-          lang={claim.lang ?? undefined}
-          className="pl-4 text-pretty [font:italic_400_26px/1.35_var(--font-record)] lg:pl-7 lg:[font:italic_400_38px/1.3_var(--font-record)]"
-          style={{ borderLeft: "var(--rule-section) solid var(--ink)", color: "var(--ink)", overflowWrap: "anywhere" }}
-        >
-          “{claim.quote_text}”
-        </blockquote>
+        {reported ? (
+          // The article's report of what was said: its words, never inside
+          // quotation marks, upright in the reading voice on a dashed rule.
+          <p
+            lang={claim.lang ?? undefined}
+            className="pl-4 text-pretty [font:400_22px/1.45_var(--font-read)] lg:pl-7 lg:[font:400_28px/1.4_var(--font-read)]"
+            style={{ borderLeft: "var(--rule-section) dashed var(--ink)", color: "var(--ink)", overflowWrap: "anywhere" }}
+          >
+            {claim.quote_text}
+          </p>
+        ) : (
+          <blockquote
+            lang={claim.lang ?? undefined}
+            className="pl-4 text-pretty [font:italic_400_26px/1.35_var(--font-record)] lg:pl-7 lg:[font:italic_400_38px/1.3_var(--font-record)]"
+            style={{ borderLeft: "var(--rule-section) solid var(--ink)", color: "var(--ink)", overflowWrap: "anywhere" }}
+          >
+            “{claim.quote_text}”
+          </blockquote>
+        )}
 
         <div className="grid gap-1.5">
           <p style={{ font: "600 17px/1.3 var(--font-read)", overflowWrap: "anywhere" }}>{speaker}</p>
@@ -135,23 +148,26 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               ) : (
                 <span className="p-meta__prov" title={`Printed in ${langName(claim.lang)} by ${claim.source_name}`}>{claim.lang.toUpperCase()}</span>
               ))}
+            {reported && <span className="p-meta__prov" title={`${claim.source_name}'s report of what was said — its words, not a quote`}>reported</span>}
           </p>
         </div>
 
         <p className="flex items-start gap-2" style={{ font: "500 14px/1.4 var(--font-read)", color: "var(--ink-2)" }}>
           <span className="mt-0.5 shrink-0" aria-hidden="true"><Check size={16} /></span>
-          {claim.translated ? "Checked against the article. The outlet translated these words." : "Word for word, checked against the article."}
+          {reported
+            ? "The article's report of what was said, checked against the article. Not a quote."
+            : claim.translated ? "Checked against the article. The outlet translated these words." : "Word for word, checked against the article."}
         </p>
 
         <div className="flex flex-wrap gap-2.5">
           {claim.url && (
             <a href={quoteLink(claim.url, claim.quote_text)} target="_blank" rel="noopener noreferrer" className="p-btn p-btn--primary">
-              Open at the quote
+              {reported ? "Open at the line" : "Open at the quote"}
               <ArrowUpRight size={16} />
             </a>
           )}
           <div className="inline-flex">
-            <ShareButton url={`/story/${event.id}/quote/${q.id}`} title={`“${claim.quote_text}” — ${speaker}`} label="Share this quote" fill />
+            <ShareButton url={`/story/${event.id}/quote/${q.id}`} title={`${saidWords(claim)} — ${speaker}`} label={reported ? "Share this" : "Share this quote"} fill />
           </div>
         </div>
 

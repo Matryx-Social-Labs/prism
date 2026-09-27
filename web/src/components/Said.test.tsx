@@ -150,3 +150,23 @@ describe("one quote, every outlet that carried it", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("reported speech on the card", () => {
+  it("prints reported words without quotation marks, labelled, and counts them apart", () => {
+    const sp: SpeakerClaims = {
+      speaker: "Sangappa",
+      claims: [
+        claim("ನಗರವನ್ನು ಸ್ವಚ್ಛವಾಗಿಡುವಲ್ಲಿ ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ ಅತ್ಯಂತ ಮಹತ್ವದ್ದಾಗಿದೆ", "kn", "Prajavani", { id: "r", speech: "reported" }),
+        claim("ನಾವು ಕೆಲಸ ಮುಂದುವರಿಸುತ್ತೇವೆ ಎಂಬುದು ನಮ್ಮ ಭರವಸೆ", "kn", "Vijay Karnataka", { id: "q" }),
+      ],
+      languages: ["kn"],
+    };
+    render(<Said claims={[sp]} sourceIndex={index(sp)} />);
+    const words = screen.getByText(/ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ/);
+    expect(words.textContent).not.toMatch(/[“”"]/);
+    expect(words.closest("blockquote")).toBeNull();
+    expect(screen.getByText(/ನಾವು ಕೆಲಸ/).textContent).toMatch(/^“.*”$/);
+    expect(screen.getAllByText("reported")).toHaveLength(1);
+    expect(screen.getByText("1 quote · 1 reported · 2 outlets")).toBeInTheDocument();
+  });
+});

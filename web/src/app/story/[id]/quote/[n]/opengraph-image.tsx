@@ -26,7 +26,7 @@ async function quoteCard(id: string, n: string, host: string) {
   const address = `${host}/story/${id}/quote/${q.id}`;
   const fonts = await ogFonts(q.claim.quote_text, q.speaker, q.role ?? "", ...meta, e.title, address, CARD_TEXT);
   return new ImageResponse(
-    <QuoteCard address={address} quote={q.claim.quote_text} speaker={q.speaker} role={q.role} meta={meta} translated={q.claim.translated ?? false} storyTitle={e.title} />,
+    <QuoteCard address={address} quote={q.claim.quote_text} speaker={q.speaker} role={q.role} meta={meta} translated={q.claim.translated ?? false} reported={q.claim.speech === "reported"} storyTitle={e.title} />,
     { ...size, fonts: fonts.length ? fonts : undefined },
   );
 }

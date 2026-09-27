@@ -144,6 +144,11 @@ export interface ClaimOut {
   /** The other reports that printed these words, earliest first; this row's
    *  own report is the earliest of all. */
   also_in?: QuoteSource[];
+  /** How the article gives the words: "direct", inside its quotation marks, or
+   *  "reported", an Indian-language article's "X said that…" — the article's
+   *  report of what was said, never printed inside quotation marks. Absent on
+   *  an older payload, which held only direct quotes. */
+  speech?: "direct" | "reported";
 }
 
 export interface SpeakerClaims {

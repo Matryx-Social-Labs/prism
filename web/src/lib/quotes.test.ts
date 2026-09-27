@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClaimOut, SpeakerClaims } from "@/lib/api";
-import { findQuote, orderForReader, quoteId, quoteOutlets, showcaseQuote, unitsForReader } from "@/lib/quotes";
+import { findQuote, orderForReader, quoteId, quoteOutlets, saidCount, saidWords, showcaseQuote, unitsForReader } from "@/lib/quotes";
 
 const q = (quote_text: string, lang: string | null): ClaimOut => ({
   quote_text,
@@ -129,5 +129,29 @@ describe("showcaseQuote", () => {
     ];
     expect(showcaseQuote(single)?.speaker).toBe("Naveen Singla");
     expect(showcaseQuote([])).toBeNull();
+  });
+});
+
+// Reported speech (founder decision 28 Sep): an Indian-language article's
+// "X said that…" is shown, labelled, and never printed as a quote.
+describe("reported speech", () => {
+  const reported = said("r1", "ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ ಅತ್ಯಂತ ಮಹತ್ವದ್ದಾಗಿದೆ", { speech: "reported" });
+
+  it("never wraps reported words in quotation marks; a quote keeps its marks", () => {
+    expect(saidWords(reported)).toBe("ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ ಅತ್ಯಂತ ಮಹತ್ವದ್ದಾಗಿದೆ");
+    expect(saidWords(said("q1", "We will reopen the bridge"))).toBe("“We will reopen the bridge”");
+    expect(saidWords(said("q2", "We will reopen the bridge on Monday"), 10)).toBe("“We will r…”");
+  });
+
+  it("counts quotes and reported words apart", () => {
+    expect(saidCount([said("a", "one"), said("b", "two"), reported])).toBe("2 quotes · 1 reported");
+    expect(saidCount([said("a", "one")])).toBe("1 quote");
+    expect(saidCount([reported])).toBe("1 reported");
+  });
+
+  it("is never the showcase: the landing shows a quote", () => {
+    const only = [{ speaker: "Sangappa", role: "Deputy commissioner", claims: [{ ...reported, also_in: [{ id: "x", article_id: "x", source_name: "Vijay Karnataka", url: null, published_at: null }] }] }];
+    expect(showcaseQuote(only)).toBeNull();
+    expect(showcaseQuote([...only, ...groups])?.claims[0].id).toBe("t1");
   });
 });
