@@ -290,6 +290,7 @@ async def _match_by_cve(session: AsyncSession, cve_ids: list[str]) -> Match | No
             FROM events e
             WHERE jsonb_exists_any(e.projection -> 'cyber' -> 'cve_ids',
                                    CAST(:cve_ids AS text[]))
+              AND e.merged_into IS NULL
             ORDER BY e.last_updated_at DESC
             LIMIT 1
             """
@@ -377,6 +378,7 @@ async def _match_by_title(session: AsyncSession, title: str, published_at) -> Ma
             SELECT e.id, similarity(e.title, :title) AS sim
             FROM events e
             WHERE similarity(e.title, :title) >= :threshold
+              AND e.merged_into IS NULL
               AND (CAST(:published_at AS timestamptz) IS NULL
                    OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
             ORDER BY sim DESC
@@ -410,7 +412,7 @@ async def _match_by_title_cosine(
             f"""
             SELECT e.id, e.title
             FROM events e
-            WHERE e.title IS NOT NULL AND e.title <> ''
+            WHERE e.title IS NOT NULL AND e.title <> '' AND e.merged_into IS NULL
               AND (CAST(:published_at AS timestamptz) IS NULL
                    OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
             -- Ordered so a tie between two equally-scoring events resolves the
@@ -502,7 +504,7 @@ async def _match_by_headline(session: AsyncSession, english_title: str, publishe
             f"""
             SELECT e.id, e.title
             FROM events e
-            WHERE e.headline_by = 'prism' AND e.title <> ''
+            WHERE e.headline_by = 'prism' AND e.title <> '' AND e.merged_into IS NULL
               AND (CAST(:published_at AS timestamptz) IS NULL
                    OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
             ORDER BY e.id
@@ -642,7 +644,7 @@ async def _match_by_embedding(
             f"""
             SELECT e.id, (e.embedding <=> CAST(:vec AS vector)) AS dist
             FROM events e
-            WHERE e.embedding IS NOT NULL
+            WHERE e.embedding IS NOT NULL AND e.merged_into IS NULL
               AND (e.embedding <=> CAST(:vec AS vector)) <= :threshold
               AND (CAST(:published_at AS timestamptz) IS NULL
                    OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')

@@ -129,8 +129,9 @@ async def watchlist_events(
                 """
                 SELECT id, title, summary, sector, projection, last_updated_at
                 FROM events
-                WHERE sector = ANY(:sectors)
-                   OR jsonb_exists_any(projection -> 'finance' -> 'tickers', :tickers)
+                WHERE (sector = ANY(:sectors)
+                   OR jsonb_exists_any(projection -> 'finance' -> 'tickers', :tickers))
+                  AND merged_into IS NULL
                 ORDER BY last_updated_at DESC
                 LIMIT 40
                 """

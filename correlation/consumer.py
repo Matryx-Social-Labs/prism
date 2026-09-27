@@ -9,6 +9,7 @@ runs perspective grouping + impact propagation and emits event.updates.
 import json
 import time
 import uuid
+from contextlib import nullcontext
 
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -376,14 +377,17 @@ async def _upsert_entities(
         await session.execute(link)
 
 
-async def _rebuild_projection(event_id: uuid.UUID) -> None:
+async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
     """Merge member enrichments into the served projection.
 
     Never merge identity, never inflate impact: lens fields are merged
     field-by-field preferring authoritative sources (NVD for CVSS, KEV for
     exploitation); disclosed values are attributed once.
+
+    Its own transaction, unless handed one: correlation/merge.py rebuilds the
+    survivor inside the merge so the fold and the counts commit together.
     """
-    async with session_scope() as session:
+    async with nullcontext(session) if session is not None else session_scope() as session:
         rows = (
             await session.execute(
                 text(

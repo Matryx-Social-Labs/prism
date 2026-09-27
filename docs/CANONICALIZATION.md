@@ -298,9 +298,18 @@ thresholds move with the embedding model; calibrate Jev floors on labels, not 0.
 
 ## Open work
 
-- **Repair the backlog** (after the live tier is verified): add `events.merged_into`,
-  301 old `/story/<id>` URLs, and move memberships and the 15 tables that point at
-  events (including paid `lens_unlocks`). Founder-anchored only — never union-find.
+- **Repair the backlog** — built, `correlation/merge.py` + `tools/merge_duplicates.py`
+  (founder decision 2026-09-27: merge now). Input: shadow verdicts >= 0.85 whose
+  article founded its own record. The copy folds into the record Jev named, resolved
+  to a survivor that is not itself a copy (star, never a chain); a copy holding any
+  article nobody judged the same happening is reported, not merged. Members and every
+  table that points at events move (`merge.HANDLED_TABLES`, checked against the schema
+  by a test; paid `lens_unlocks` included), the survivor's projection is rebuilt in the
+  same transaction, `events.merged_into` is set, and `/api/v1/events/<copy>` answers
+  308 → the survivor (the story page turns it into a permanent redirect). Dry run
+  2026-09-27 on production: 591 merges into 409 survivors (108 through a copy, chains
+  up to 4 deep), 158 skipped (175 entity_overlap, 73 embedding, 45 title_time members
+  never judged). Dry run by default; `--apply --limit 20` first.
 - **Ratify silver**: push it as an `event_identity` label batch for two labellers.
 - **The title tier compares unlike things** (outlet title vs Prism headline) — test
   outlet-title-vs-founder-title in replay, or retire it if the verified tier

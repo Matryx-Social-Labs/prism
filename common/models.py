@@ -182,6 +182,11 @@ class Event(TimestampMixin, Base):
     story_visible_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     projection: Mapped[dict | None] = mapped_column(JSONB)  # promoted shared + lens fields for serving
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBED_DIM))
+    # Set when this record was folded into another it duplicates
+    # (correlation/merge.py). The row stays: its URL redirects, lists skip it.
+    merged_into: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("events.id", ondelete="SET NULL")
+    )
 
 
 class EventMembership(TimestampMixin, Base):

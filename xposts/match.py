@@ -119,7 +119,7 @@ async def match_recent(hours: int = HOLD) -> int:
                     """
                     SELECT e.id, e.title, e.first_seen_at, 1 - (e.embedding <=> CAST(:vec AS vector)) AS cos
                     FROM events e
-                    WHERE e.embedding IS NOT NULL
+                    WHERE e.embedding IS NOT NULL AND e.merged_into IS NULL
                       AND e.last_updated_at > :lo AND e.first_seen_at < :hi
                     ORDER BY e.embedding <=> CAST(:vec AS vector)
                     LIMIT :k

@@ -31,6 +31,7 @@ _PER_SECTOR = 120
 _WINDOW_COLS = ("e.id, e.title, e.summary, e.sector, e.subsector, e.regions, e.image_url, "
                 "e.projection, e.last_updated_at, e.occurred_at")
 _WINDOW_FILTERS = """
+    AND e.merged_into IS NULL
     AND NOT (
         COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
         AND (e.projection->'source_slugs') <@ CAST(:cve_only AS jsonb)

@@ -146,11 +146,17 @@ def _window(col: str) -> str:
 
     The upper bound is guarded on NULL rather than always applied: against
     `now()` it is a tautology, and a tautology in a hot query is a future puzzle.
+
+    A record merged into another (correlation/merge.py) is outside every window:
+    its members now sit on the survivor, which carries them into the graph.
     """
     as_of = "CAST(:as_of AS timestamptz)"
+    alias = col.rpartition(".")[0]
+    merged = f"{alias}.merged_into" if alias else "merged_into"
     return (
         f"{col} > coalesce({as_of}, now()) - interval '{STORY_WINDOW_DAYS} days'"
         f" AND ({as_of} IS NULL OR {col} <= {as_of})"
+        f" AND {merged} IS NULL"
     )
 
 

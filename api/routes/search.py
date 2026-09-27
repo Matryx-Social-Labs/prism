@@ -47,12 +47,13 @@ async def search(
                        e.projection, e.last_updated_at, e.occurred_at
                 FROM events e
                 {report_photo_join("e")}
-                WHERE e.title ILIKE :q OR e.summary ILIKE :q
+                WHERE (e.title ILIKE :q OR e.summary ILIKE :q
                    OR e.id IN (
                        SELECT ee.event_id FROM event_entities ee
                        JOIN entities ent ON ent.id = ee.entity_id
                        WHERE ent.name ILIKE :q
-                   )
+                   ))
+                  AND e.merged_into IS NULL
                 ORDER BY e.last_updated_at DESC
                 LIMIT :limit
                 """
