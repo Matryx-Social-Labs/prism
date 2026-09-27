@@ -21,7 +21,9 @@ import { getWatchlist, watchlistEvents, type WatchEvent, type WatchItem } from "
  * You (Design System v2 · Accounts board, flow 04): your profile — state,
  * profession and the reading it picks, the subjects you follow — then what you
  * follow on the watchlist, then the account. The profile is the one onboarding
- * writes (lib/profile, this browser); Save re-sorts the record and says so.
+ * writes (lib/profile, this browser). It drives the For you tab and the state
+ * scope, never Today's order (D2: one front page for everyone), and the copy
+ * says only that.
  */
 const TOAST_MS = 4000;
 const LINK = "inline-flex min-h-11 items-center";
@@ -94,7 +96,7 @@ export default function YouPage() {
 
   const profile = (
     <section className="grid content-start gap-3.5" aria-labelledby="profile-title">
-      <SectionHead id="profile-title" title="Your profile" sub="Kept in this browser · sorts your record" />
+      <SectionHead id="profile-title" title="Your profile" sub="Kept in this browser · sets For you and your state scope" />
       {loaded && (
         <form className="grid gap-3.5" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <StateSelect value={state} onChange={setState} />
@@ -112,7 +114,7 @@ export default function YouPage() {
               <SubjectToggles taxonomy={taxonomy} picks={picks} onPicks={setPicks} />
             ) : (
               <div className="flex flex-wrap items-center gap-1.5">
-                {subjects.length === 0 && <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>None yet. Follow nothing and the record is everyone&rsquo;s.</p>}
+                {subjects.length === 0 && <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>None yet. Pick subjects and a For you tab joins Today.</p>}
                 {subjects.map(({ group, topics }) => (
                   <SubjectChip key={group.slug}>{topics ? `${group.name} · ${topics} ${topics === 1 ? "topic" : "topics"}` : group.name}</SubjectChip>
                 ))}
@@ -131,7 +133,7 @@ export default function YouPage() {
               </p>
             </div>
           )}
-          <button type="submit" className="p-btn p-btn--primary p-btn--block">Save and re-sort my record</button>
+          <button type="submit" className="p-btn p-btn--primary p-btn--block">Save my profile</button>
         </form>
       )}
     </section>
@@ -212,7 +214,7 @@ export default function YouPage() {
       </div>
       {/* Always mounted, so the live region exists before the words arrive. */}
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--tabbar)+16px+env(safe-area-inset-bottom))] z-50 flex justify-center px-[var(--gutter)] lg:bottom-6">
-        {toast && <Toast>Saved · your record is re-sorted</Toast>}
+        {toast && <Toast>Saved · For you and your state scope are updated</Toast>}
       </div>
     </div>
   );

@@ -21,7 +21,8 @@ import { setProfile, useSession } from "@/lib/session";
  * revisitable), Skip for now on every step, and nothing that blocks reading.
  * The board's fourth step (languages) is still PROPOSED and not built: the
  * platform runs English-only (founder, 2026-09-16), so the profile keeps ["en"].
- * On desktop the record beside the form re-sorts as the reader answers.
+ * On desktop a preview of For you beside the form follows the answers. The
+ * profile makes For you and a state scope; Today stays one page (D2).
  */
 const STEPS = ["Where you are", "What you do", "What you follow"] as const;
 const LAST = STEPS.length - 1;
@@ -109,7 +110,7 @@ function OnboardingPage() {
     <section key="where" className="grid gap-5">
       <div className="grid gap-1.5">
         <h1 className="text-balance" style={H1}>Which state are you in?</h1>
-        <p style={LEDE}>Prism leads with news from your state, and your state becomes a scope on Today.</p>
+        <p style={LEDE}>Your state becomes a scope on Today: one tap shows its news. Today itself is the same for everyone.</p>
       </div>
       {covered.length > 0 && (
         <div className="grid gap-2" role="group" aria-labelledby="covered-label">
@@ -164,7 +165,7 @@ function OnboardingPage() {
     <section key="follow" className="grid gap-5">
       <div className="grid gap-1.5">
         <h1 className="text-balance" style={H1}>What do you follow?</h1>
-        <p style={LEDE}>Turn on a subject to pick its topics. Your record leads with these.</p>
+        <p style={LEDE}>Turn on a subject to pick its topics. They make your For you tab, beside Today.</p>
       </div>
       <SubjectToggles taxonomy={taxonomy} picks={picks} onPicks={setPicks} preset={preset} />
       {session && (

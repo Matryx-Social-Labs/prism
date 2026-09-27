@@ -8,9 +8,10 @@ const ROWS = 3;
 const DESKTOP = "(min-width: 1024px)";
 
 /**
- * "Your record, as it will open" — the desktop column beside onboarding: the
+ * "For you, as it will open" — the desktop column beside onboarding: the
  * three newest stories for the answers so far, from the same feed call For you
- * makes (interests + state, newest first), so it re-sorts as the reader answers.
+ * makes (interests + state, newest first), so it follows the reader's answers.
+ * Today itself is one page for everyone (D2), so this previews For you only.
  * Real rows or nothing: while loading it shows placeholders, on a failed call a
  * line that says so. Not fetched on a phone, where the column is not drawn.
  */
@@ -38,8 +39,8 @@ export function OnboardingPreview({ interests, state, subjects }: { interests: s
   if (!desktop) return null;
   const n = subjects.length;
   return (
-    <aside className="hidden content-start gap-2.5 pt-10 lg:grid" aria-label="Your record, as it will open">
-      <p className="p-eyebrow">Your record, as it will open</p>
+    <aside className="hidden content-start gap-2.5 pt-10 lg:grid" aria-label="For you, as it will open">
+      <p className="p-eyebrow">For you, as it will open</p>
       <p className="p-count">{`newest first · ${n ? `${n} ${n === 1 ? "subject" : "subjects"}` : "every subject"}`}</p>
       {failed ? (
         <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>The record could not be loaded just now. Your answers still count.</p>
