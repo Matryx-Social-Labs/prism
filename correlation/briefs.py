@@ -20,6 +20,7 @@ from common.lenses import LENSES
 from common.llm import structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
+from common.text import is_model_commentary
 from correlation.cites import cite_lines
 from correlation.schemas import LensBriefs
 
@@ -163,10 +164,12 @@ async def generate_briefs(event_id: uuid.UUID, lenses: list[str]) -> dict[str, d
         metadata={"stage": "lens-brief", "event_id": str(event_id), "lenses": lenses},
         langfuse_prompt=prompt if prompt.version else None,
     )
+    # A read that describes its input ("…in the provided text") is dropped here,
+    # not only at the store: the API serves this return value before persisting.
     generated = {
         slug: read
         for slug, read in result.model_dump().items()
-        if slug in lenses and read and read.get("text")
+        if slug in lenses and read and read.get("text") and not is_model_commentary(read["text"])
     }
     logger.info("lens_briefs_generated", event_id=str(event_id), lenses=list(generated))
     return generated
@@ -180,6 +183,12 @@ async def persist_briefs(event_id: uuid.UUID, briefs: dict[str, dict | str]) -> 
     """
     if not briefs:
         return
+    # Model commentary about the input is never stored, from any writer (the
+    # extractor's Reader brief, the analysis pass, the API, the backfill).
+    briefs = {
+        slug: read for slug, read in briefs.items()
+        if not is_model_commentary(read.get("text") if isinstance(read, dict) else read)
+    }
     texts = {
         slug: (read["text"] if isinstance(read, dict) else str(read))
         for slug, read in briefs.items()

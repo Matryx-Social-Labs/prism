@@ -1,5 +1,65 @@
 """Text utilities shared across stages."""
 
+import re
+import unicodedata
+
+# Function words a headline shares with any page. English only: the other
+# scripts' function words are short enough that the length floor drops them.
+_STOPWORDS = frozenset(
+    """the and but for from with are was were been being this that these those its into over after before
+    about than then has have had not will would can could may might shall should does did they you his her
+    their our your him them who whom which what when where why how all any some more most other such only
+    own same too very just also new says said say amid upon via""".split()
+)
+
+
+def _words(text: str) -> list[str]:
+    """Case-folded runs of letters, marks and digits. Marks are kept: Python's
+    `\\w` does not match a Kannada or Devanagari vowel sign, so a regex tokenizer
+    cuts every Indic word into fragments and finds no overlap anywhere."""
+    return "".join(ch if unicodedata.category(ch)[0] in "LMN" else " " for ch in text.casefold()).split()
+
+
+def title_share(title: str, text: str) -> float | None:
+    """The fraction of a headline's content words that the text contains, or
+    None when the headline has fewer than three — too little to judge by.
+
+    A word counts when its stem (the word less up to two final letters) appears
+    anywhere in the text, so an inflected form still counts: Kannada and Malayalam
+    fuse case endings onto the noun a headline uses bare."""
+    words = {w for w in _words(title) if len(w) >= 3 and not w.isdigit() and w not in _STOPWORDS}
+    if len(words) < 3:
+        return None
+    haystack = " ".join(_words(text))
+    return sum(1 for w in words if w[: max(4, len(w) - 2)] in haystack) / len(words)
+
+
+# The model writing ABOUT its input instead of reporting news. Every alternative
+# is a phrase seen in production 2026-09-27 (byline bios read as articles), and
+# each is narrow on purpose. Scanned against 29,350 extractions and 27,409 stored
+# briefs: "does not provide immunity" is a court ruling, and "the article does
+# not specify", "provides no figures", "rather than news of a decision" are
+# briefs naming a gap or framing a story — the product working. Looser patterns
+# flagged all of them.
+_MODEL_COMMENTARY = re.compile(
+    r"\bthe provided (?:article |news )?(?:text|article|content|snippet|input|excerpt|passage)\b"
+    r"|\b(?:the|this) (?:article|text) (?:is|serves as) (?:a|an) (?:author|journalist|biograph|profile of)"
+    r"|\b(?:article|text) profiles\b[^.]{0,80}\b(?:correspondent|journalist|reporter|editor)\b"
+    r"|\bdescribes the (?:author|journalist)"
+    r"|\bdoes not report on (?:a |an |any )"
+    r"|\bno news (?:content|event|report|story)"
+    r"|\b(?:author|journalist|correspondent)(?:['’]s)? (?:bio|biography|biographical|profile)\b"
+    r"|\b(?:biography|biographical profile|professional (?:background|biography)) of (?:a |an |the )?"
+    r"(?:journalist|correspondent|author|reporter)\b",
+    re.IGNORECASE,
+)
+
+
+def is_model_commentary(text: str | None) -> bool:
+    """True when a model's output describes the text it was given ("The provided
+    text contains the biography of a journalist…") rather than reporting news."""
+    return bool(text and _MODEL_COMMENTARY.search(text))
+
 
 def chunk_text(text: str, max_chars: int = 1200, overlap: int = 150) -> list[str]:
     """Split text into chunks near paragraph boundaries with a small overlap."""

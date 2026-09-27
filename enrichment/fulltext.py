@@ -14,10 +14,35 @@ import trafilatura
 
 from common.imagehash import refuse_non_public
 from common.logging import get_logger
+from common.text import title_share
 
 logger = get_logger(__name__)
 
 MIN_USEFUL_CHARS = 400
+
+# A fetched page is the article only if it is about the article's headline.
+# Measured on 24,287 direct-tier articles (production, 30 days to 2026-09-27):
+# below 15% of the title's content words, 75 pages were refused and nearly all
+# were the wrong text — IE author bios, an embedded tweet in place of a Kannada
+# story, a paywall notice, an app-download footer, a sidebar. The handful of
+# real stories caught fall back to the feed's own description, not to nothing.
+MIN_TITLE_SHARE = 0.15
+# A page whose opening repeats another URL's on the same site is boilerplate
+# unless that opening is about this headline (enrichment/consumer.py). A lead
+# restates its headline; a byline bio or a site's navigation does not. Measured
+# on the same set: 43 of 46 repeated bios and navigation pages open at <= 0.25 of
+# their title, while the same story re-filed under a second URL mostly opens at
+# >= 0.3 — the 3 of ~25 re-files below it fall back to the feed body.
+HEAD_CHARS = 500
+MIN_HEAD_SHARE = 0.3
+
+
+def off_title(title: str | None, text: str) -> float | None:
+    """The title share when the text is too far off the headline to be its
+    article, else None."""
+    share = title_share(title or "", text)
+    return share if share is not None and share < MIN_TITLE_SHARE else None
+
 
 # Named HTML tags only — NOT "anything in angle brackets". Articles legitimately
 # contain the latter: a security piece describing `/proc/<pid>/root` is prose, and
@@ -61,11 +86,15 @@ def _demarkup(text: str, url: str | None) -> str:
     return html.unescape(_HTML_TAG.sub(" ", text)).strip()
 
 
-async def retrieve_fulltext(url: str | None, body: str | None) -> tuple[str, str, str | None]:
+async def retrieve_fulltext(
+    url: str | None, body: str | None, title: str | None = None
+) -> tuple[str, str, str | None]:
     """Return (clean_text, retrieval_tier, og_image). Prefers a complete body.
 
     og_image comes for free from the metadata of the page we already fetch —
-    never a separate request.
+    never a separate request. A page off its `title` is refused for the feed
+    body: the wrong text is worse than a short one, because it is what the
+    extractor summarises and what the matcher embeds.
     """
     if body and len(body) >= MIN_USEFUL_CHARS:
         return body, "body", None
@@ -99,6 +128,10 @@ async def retrieve_fulltext(url: str | None, body: str | None) -> tuple[str, str
                 # repairing rather than accepting.
                 logger.info("fulltext_markup_leaked", url=url, chars=len(extracted))
                 extracted = _demarkup(extracted, url)
+            share = off_title(title, extracted) if extracted else None
+            if share is not None:
+                logger.info("fulltext_rejected", reason="off_title", url=url, title_share=round(share, 2))
+                extracted = None
             if extracted and (len(extracted) >= MIN_USEFUL_CHARS or not body):
                 return extracted, "direct", image
         except Exception:

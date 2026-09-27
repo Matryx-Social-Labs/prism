@@ -15,6 +15,7 @@ it deletes and rewrites event_memberships — so read its report before trusting
   uv run python -m tools.repair --reembed       # re-embed the corpus (model swap)
   uv run python -m tools.repair --drop-cve      # remove the CVE-feed corpus
   uv run python -m tools.repair --clusters      # report only
+  uv run python -m tools.repair --fulltext      # wrong fetched text (bios, navigation)
 
 The expensive work is already paid for: extraction and embeddings exist on every
 one of these rows. Re-deciding who belongs with whom is pure computation over data
@@ -37,8 +38,14 @@ import asyncpg
 
 from common.embeddings import embed_texts
 from common.entity_aliases import ENTITY_ALIASES
-from common.text import chunk_text, entity_slug
-from enrichment.fulltext import _markup_leaked, retrieve_fulltext
+from common.text import chunk_text, entity_slug, is_model_commentary, title_share
+from enrichment.fulltext import (
+    HEAD_CHARS,
+    MIN_HEAD_SHARE,
+    _markup_leaked,
+    off_title,
+    retrieve_fulltext,
+)
 
 OVER_MERGE_MIN = 20  # members at or above which an event is worth re-deciding
 # Modest on purpose: this walks one publisher's site to recover an error we caused,
@@ -476,6 +483,194 @@ async def reembed(c: asyncpg.Connection, *, write: bool, batch: int = 64,
     print("  Deploy the matching config AFTER this, never before.")
 
 
+# ── section: fetched text that was not the article ──────────────────────────
+
+async def report_fulltext(c: asyncpg.Connection) -> dict:
+    """Articles whose fetched text was not their article, by the same rules the
+    enrichment path now applies, and the events that text contaminated.
+
+    Measured 2026-09-27: trafilatura returned the author's bio for 56 of 255 Indian
+    Express articles and the site navigation for 11 of 47 RBI releases; identical
+    bodies joined on the embedding tier at 1.000, so "Journalist Biography Profile"
+    held five unrelated stories and 97ba88e3 fourteen.
+
+    The repair re-uses the pipeline rather than re-implementing it. A bad article
+    is deleted and its raw item stays 'relevant', so the worker's stalled-item
+    sweep (ingestion/runner.requeue_stalled, every 10 minutes) re-enriches it
+    through the guarded fetch — the right text, or the feed body — and correlates
+    it afresh. An event whose FOUNDER was bad is junk as a whole (title, summary
+    and vector came from the bio): every member is detached, the good ones only
+    by membership, which the same sweep re-correlates for free.
+    """
+    print(f"\n{'='*74}\nFETCHED TEXT that was not the article\n{'='*74}")
+    # A parallel hash over the whole corpus needs more shared memory than the
+    # production container's /dev/shm has (DiskFullError, 2026-09-27).
+    await c.execute("SET max_parallel_workers_per_gather = 0")
+    rows = await c.fetch(
+        """
+        SELECT a.id::text AS id, ri.source_id::text AS sid, s.slug,
+               coalesce(ri.url_canonical, ri.url) AS url, coalesce(ri.title, '') AS title,
+               CASE WHEN a.retrieval_tier IN ('direct', 'duplicate_url') THEN a.clean_text END AS text,
+               en.summary, en.shared_fields ->> 'headline' AS headline
+        FROM articles a
+        JOIN raw_items ri ON ri.id = a.raw_item_id
+        JOIN sources s ON s.id = ri.source_id
+        LEFT JOIN enrichments en ON en.article_id = a.id
+        """
+    )
+    urls_by_head: dict[tuple, set] = {}
+    failing: dict[tuple, int] = {}  # members of a repeated opening that is not about their headline
+    for r in rows:
+        if r["text"]:
+            key = (r["sid"], r["text"][:HEAD_CHARS])
+            urls_by_head.setdefault(key, set()).add(r["url"])
+            share = title_share(r["title"], key[1])
+            failing[key] = failing.get(key, 0) + (share is not None and share < MIN_HEAD_SHARE)
+    bad: dict[str, str] = {}
+    for r in rows:
+        key = (r["sid"], r["text"][:HEAD_CHARS]) if r["text"] else None
+        head_share = title_share(r["title"], key[1]) if key else None
+        if is_model_commentary(r["summary"]) or is_model_commentary(r["headline"]):
+            bad[r["id"]] = "model_commentary"
+        elif r["text"] and off_title(r["title"], r["text"]) is not None:
+            bad[r["id"]] = "off_title"
+        # The enrichment rule, per article — and, with hindsight the live path
+        # lacks, per opening: once two headlines have failed on the same text it
+        # is boilerplate for every URL carrying it, including the first, whose
+        # headline can share a word with the bio (97ba88e3: "Madhya Pradesh").
+        elif key and len(urls_by_head[key]) > 1 and (
+            (head_share is not None and head_share < MIN_HEAD_SHARE) or failing[key] >= 2
+        ):
+            bad[r["id"]] = "repeated_on_site"
+    # Another feed's copy of the same URL reused this text and its extraction
+    # (enrichment/consumer._extraction_for_same_url); left in place it would hand
+    # the bad extraction straight back to the re-enriched article.
+    bad_urls = {r["url"] for r in rows if r["id"] in bad and r["url"]}
+    for r in rows:
+        if r["id"] not in bad and r["url"] in bad_urls:
+            bad[r["id"]] = "same_url"
+
+    by_reason: dict[str, int] = {}
+    by_src: dict[str, int] = {}
+    slug_of = {r["id"]: r["slug"] for r in rows}
+    for aid, why in bad.items():
+        by_reason[why] = by_reason.get(why, 0) + 1
+        by_src[slug_of[aid]] = by_src.get(slug_of[aid], 0) + 1
+    print(f"\n  {len(bad)} of {len(rows)} articles")
+    for why, n in sorted(by_reason.items(), key=lambda kv: -kv[1]):
+        print(f"    {n:>5}  {why}")
+    print("  by source:")
+    for slug, n in sorted(by_src.items(), key=lambda kv: -kv[1])[:12]:
+        print(f"    {n:>5}  {slug}")
+    for r in [r for r in rows if r["id"] in bad][:8]:
+        print(f"    {r['id']}  {bad[r['id']]:16} {r['slug']:14} {r['title'][:52]!r}")
+
+    members = await c.fetch(
+        """
+        SELECT em.event_id::text AS eid, em.article_id::text AS aid, e.title,
+               row_number() OVER (PARTITION BY em.event_id
+                                  ORDER BY (em.match_type = 'new_event') DESC, em.created_at, em.id) AS rank
+        FROM event_memberships em JOIN events e ON e.id = em.event_id
+        WHERE em.event_id IN (SELECT event_id FROM event_memberships WHERE article_id = ANY($1::uuid[]))
+        """,
+        sorted(bad),
+    )
+    title_of = {m["eid"]: m["title"] for m in members}
+    size = {e: sum(1 for m in members if m["eid"] == e) for e in title_of}
+    n_bad = {e: sum(1 for m in members if m["eid"] == e and m["aid"] in bad) for e in title_of}
+    founder_bad = {m["eid"] for m in members if m["rank"] == 1 and m["aid"] in bad}
+    # Founded by bad text AND mostly bad: the event is the boilerplate (a bio's
+    # stories, a navigation page's releases). Founded by bad text but mostly good
+    # — the DUSU results record, 7 outlets, founded by a re-titled live blog — it
+    # is a real story: it keeps its id and takes its summary and vector from the
+    # earliest member it keeps.
+    dissolve = sorted(e for e in founder_bad if 2 * n_bad[e] >= size[e])
+    trim = sorted(set(title_of) - set(dissolve))
+    refound = sorted(founder_bad - set(dissolve))
+    recorrelate = [m["aid"] for m in members if m["eid"] in set(dissolve) and m["aid"] not in bad]
+    print(f"\n  events touched: {len(title_of)}")
+    print(f"    dissolve (founded by bad text, mostly bad): {len(dissolve)}, hiding "
+          f"{sum(size[e] for e in dissolve)} memberships; {len(recorrelate)} good members re-correlate")
+    print(f"    trim (bad members leave): {len(trim)}, of which {len(refound)} lose their founder")
+    for e in sorted(dissolve, key=lambda e: -size[e])[:8]:
+        print(f"    dissolve {e}  {n_bad[e]:>3}/{size[e]:<3} bad  {title_of[e][:50]!r}")
+    for e in sorted(trim, key=lambda e: -size[e])[:6]:
+        print(f"    trim     {e}  {n_bad[e]:>3}/{size[e]:<3} bad  {title_of[e][:50]!r}")
+    return {"articles": sorted(bad), "dissolve": dissolve, "trim": trim, "refound": refound}
+
+
+async def apply_fulltext(c: asyncpg.Connection, plan: dict) -> None:
+    """Delete the bad articles, detach dissolved events' members, hide those events.
+
+    One transaction. The re-enrichment and re-correlation happen in the WORKER, so
+    this must run only once the guarded fetch is deployed there — otherwise the
+    sweep re-fetches the same bios.
+    """
+    arts, dissolve, trim, refound = plan["articles"], plan["dissolve"], plan["trim"], plan["refound"]
+    async with c.transaction():
+        await c.execute("DELETE FROM event_memberships WHERE event_id = ANY($1::uuid[])", dissolve)
+        await c.execute("DELETE FROM event_memberships WHERE article_id = ANY($1::uuid[])", arts)
+        await c.execute("DELETE FROM field_provenance WHERE enrichment_id IN "
+                        "(SELECT id FROM enrichments WHERE article_id = ANY($1::uuid[]))", arts)
+        await c.execute("DELETE FROM enrichments WHERE article_id = ANY($1::uuid[])", arts)
+        await c.execute("DELETE FROM article_chunks WHERE article_id = ANY($1::uuid[])", arts)
+        # article_entities and event_match_verdicts go with the article (ON DELETE CASCADE).
+        await c.execute("DELETE FROM articles WHERE id = ANY($1::uuid[])", arts)
+        # An actor none of an event's remaining articles names is not its actor.
+        await c.execute(
+            """DELETE FROM event_entities ee WHERE ee.event_id = ANY($1::uuid[]) AND NOT EXISTS (
+                   SELECT 1 FROM event_memberships em JOIN article_entities ae ON ae.article_id = em.article_id
+                   WHERE em.event_id = ee.event_id AND ae.entity_id = ee.entity_id)""",
+            dissolve + trim,
+        )
+        # Every surface serves only events with a source (projection.source_slugs),
+        # and a NULL vector keeps the bio's out of both body-vector tiers. The row
+        # stays: its id may be in a reader's history or a lens unlock.
+        await c.execute(
+            """UPDATE events SET embedding = NULL,
+                      projection = coalesce(projection, '{}'::jsonb) || '{"source_slugs": [], "source_count": 0}'
+               WHERE id = ANY($1::uuid[])""",
+            dissolve,
+        )
+        # A trimmed event's outlets and count (mastheads, as _rebuild_projection
+        # counts them), from who is left; the rest of its projection is rebuilt
+        # when its next report arrives.
+        await c.execute(
+            """UPDATE events e SET projection = coalesce(e.projection, '{}'::jsonb) || jsonb_build_object(
+                   'source_slugs', (SELECT coalesce(jsonb_agg(DISTINCT s.slug ORDER BY s.slug), '[]'::jsonb)
+                                    FROM event_memberships em JOIN articles a ON a.id = em.article_id
+                                    JOIN raw_items ri ON ri.id = a.raw_item_id JOIN sources s ON s.id = ri.source_id
+                                    WHERE em.event_id = e.id),
+                   'source_count', (SELECT count(DISTINCT coalesce(s.publisher, s.slug))
+                                    FROM event_memberships em JOIN articles a ON a.id = em.article_id
+                                    JOIN raw_items ri ON ri.id = a.raw_item_id JOIN sources s ON s.id = ri.source_id
+                                    WHERE em.event_id = e.id))
+               WHERE e.id = ANY($1::uuid[])""",
+            trim,
+        )
+        # A kept event whose founder left: its summary and vector were the bad
+        # text's. Take both from the earliest member it keeps, the rule
+        # correlation/consumer._rebuild_projection and _attach follow.
+        await c.execute(
+            """UPDATE events e SET summary = coalesce(k.summary, e.summary), embedding = k.embedding
+               FROM (SELECT DISTINCT ON (em.event_id) em.event_id, en.summary, ac.embedding
+                     FROM event_memberships em
+                     LEFT JOIN enrichments en ON en.article_id = em.article_id
+                     LEFT JOIN article_chunks ac ON ac.article_id = em.article_id AND ac.chunk_index = 0
+                     WHERE em.event_id = ANY($1::uuid[])
+                     ORDER BY em.event_id, em.created_at, em.id) k
+               WHERE e.id = k.event_id""",
+            refound,
+        )
+        left = await c.fetchval("SELECT count(*) FROM articles WHERE id = ANY($1::uuid[])", arts)
+        held = await c.fetchval("SELECT count(*) FROM event_memberships WHERE event_id = ANY($1::uuid[])", dissolve)
+        if left or held:
+            raise RuntimeError(f"repair did not take: {left} articles left, {held} dissolved memberships held")
+    print(f"  APPLIED: {len(arts)} articles deleted for re-enrichment, {len(dissolve)} events dissolved, "
+          f"{len(trim)} trimmed ({len(refound)} re-founded)")
+    print("  The worker's requeue sweep (every 10 min) re-enriches and re-correlates them.")
+
+
 # Every table that points at articles / raw_items / events, in the order the
 # foreign keys allow. Read out of information_schema rather than remembered:
 # guessing this order is how a delete half-completes and rolls back after an hour.
@@ -579,11 +774,14 @@ async def main() -> None:
                     help="resume --reembed after this chunk id (printed by the progress line)")
     ap.add_argument("--reembed", action="store_true",
                     help="rebuild every vector with the configured model (local, free)")
+    ap.add_argument("--fulltext", action="store_true",
+                    help="articles whose fetched text was a bio or site navigation, and their events "
+                         "(--apply only after the guarded fetch is deployed to the worker)")
     ap.add_argument("--limit", type=int, default=None,
                     help="cap articles for --markup; prove the write path on a few first")
     ap.add_argument("--apply", action="store_true", help="WRITE. Without it, nothing changes.")
     a = ap.parse_args()
-    every = not (a.entities or a.titles or a.markup or a.reembed or a.drop_cve)
+    every = not (a.entities or a.titles or a.markup or a.reembed or a.drop_cve or a.fulltext)
 
     c = await asyncpg.connect(_db_url(), timeout=45)
     try:
@@ -609,6 +807,10 @@ async def main() -> None:
             fixed = await report_markup(c, a.limit)
             if a.apply and a.markup:
                 await apply_markup(c, fixed)
+        if a.fulltext:
+            plan = await report_fulltext(c)
+            if a.apply:
+                await apply_fulltext(c, plan)
 
         if not a.apply:
             print("\nNothing was written. Re-run with --apply plus a section to act.")
