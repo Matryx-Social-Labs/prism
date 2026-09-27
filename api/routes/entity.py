@@ -5,8 +5,9 @@ The cast of a record is already extracted, deduplicated and folded to a slug
 is `noindex` — so the most-linked anchors on the site pointed at a page no engine
 would keep, and no topical authority accrued anywhere (audit H29).
 
-Thin pages are a liability, not an asset: 55,214 entities exist but only ~6,000
-appear in three or more records. The threshold lives here (`INDEXABLE_MIN_RECORDS`)
+Thin pages are a liability, not an asset: 55,214 entities existed but only ~6,000
+appeared in three or more records (the floor is four since 2026-09-27, see
+below). The threshold lives here (`INDEXABLE_MIN_RECORDS`)
 and rides in the response, so the page can render for every entity the chips point
 at while asking to be indexed only when there is a story to index.
 """
@@ -26,10 +27,12 @@ from common.lenses import get_lens
 
 router = APIRouter()
 
-# Below this an entity page exists but asks not to be indexed: one or two
-# records is a stub, and a few thousand stubs would spend the crawl budget the
-# records need. Measured on prod 2026-09-22: 55,214 entities, 5,995 with >= 3.
-INDEXABLE_MIN_RECORDS = 3
+# Below this an entity page exists but asks not to be indexed: a stub would
+# spend the crawl budget the records need. Measured on prod 2026-09-22: 55,214
+# entities, 5,995 with >= 3. Raised 3 -> 4 on 2026-09-27: 29 of 100 indexable
+# pages had under 150 words and 28 of them were three-record actors, the kind
+# Google files as "crawled - currently not indexed"; at four, 1 of 71 was thin.
+INDEXABLE_MIN_RECORDS = 4
 MAX_RECORDS = 60
 
 

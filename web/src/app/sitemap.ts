@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { fetchFeed, fetchSubjects, fetchTrending } from "@/lib/api";
-import { SECTOR_GROUPS } from "@/lib/sectors";
+import { SECTOR_GROUPS, sectorPageFor } from "@/lib/sectors";
 import { SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
@@ -27,14 +27,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/sources`, changeFrequency: "daily", priority: 0.4 },
     { url: `${SITE_URL}/corrections`, changeFrequency: "daily", priority: 0.4 },
     { url: `${SITE_URL}/plus`, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${SITE_URL}/pulse`, changeFrequency: "daily", priority: 0.4 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/refunds`, changeFrequency: "yearly", priority: 0.2 },
     ...SECTOR_GROUPS.map((g) => ({ url: `${SITE_URL}/sector/${g.slug}`, changeFrequency: "hourly" as const, priority: 0.7 })),
     // Every node of the subject tree that has stories under it. A node with
-    // none is left out rather than offered to a crawler as an empty room.
-    ...subjectNodes.map((n) => ({
+    // none is left out rather than offered to a crawler as an empty room, and
+    // so is a node whose records its /sector page already lists (sectorPageFor).
+    // /pulse is not here either: it renders in the browser, 26 words to a crawler.
+    ...subjectNodes.filter((n) => !sectorPageFor(n.path)).map((n) => ({
       url: `${SITE_URL}/subject/${n.path.split(".").join("/")}`,
       changeFrequency: "hourly" as const,
       priority: n.depth === 1 ? 0.7 : 0.6,

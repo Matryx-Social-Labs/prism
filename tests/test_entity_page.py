@@ -97,6 +97,18 @@ async def test_a_thin_actor_still_has_a_page_but_declines_indexing():
     assert body["records"], "but the chip that links here must still land on something"
 
 
+async def test_an_actor_in_three_records_is_still_a_stub():
+    """Crawl of 2026-09-27: 29 of 100 indexable actor pages had under 150 words
+    of text, and 28 of those were actors in exactly three records. Google files
+    pages like that under "crawled - currently not indexed". Four is the floor
+    where they stop being thin (1 of 71); the sitemap follows the same number."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    slug = await _seed(3)
+    body = (await _get(f"/api/v1/entity/{slug}")).json()
+    assert body["record_count"] == 3 and body["indexable"] is False
+
+
 async def test_an_unknown_actor_is_404_not_an_empty_page():
     if not await _db_reachable():
         pytest.skip("no database")

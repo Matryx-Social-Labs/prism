@@ -69,6 +69,19 @@ export function sectorGroup(slug: string | null | undefined): SectorGroup | null
   return BY_SLUG.get(slug) ?? BY_PIPELINE.get(slug) ?? null;
 }
 
+/**
+ * The sector page a subject node duplicates, if any. A top-level subject that is
+ * one of the six groups lists the same records as its /sector page — all 30 on
+ * /subject/business were on /sector/business, under the same title (crawl of
+ * 2026-09-27) — so Google indexes one and drops the other. The sector page is
+ * the one to keep: the subject names it as canonical and the sitemap lists it
+ * alone. Exact group slugs only (not pipeline names like "finance"): Education
+ * and Civic have no sector page, and deeper nodes are lists of their own.
+ */
+export function sectorPageFor(subjectPath: string): string | null {
+  return BY_SLUG.has(subjectPath) ? `/sector/${subjectPath}` : null;
+}
+
 /** The `?sector=` parameter the feed API expects for a group. */
 export function sectorParam(group: SectorGroup): string {
   return group.sectors.join(",");
