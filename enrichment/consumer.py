@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy import text as sa_text
 
 from common import stream
@@ -26,11 +26,11 @@ from common.models import Article, ArticleChunk, Enrichment, FieldProvenance, Ra
 from common.observability import fetch_prompt, observe
 from common.schemas import EnrichedItemMessage
 from common.securities import validated
-from common.text import chunk_text
+from common.text import chunk_text, is_model_commentary, title_share
 from correlation.verify import gist_text
 from enrichment.claims import verify_claims
 from enrichment.cve_lens import extract_from_kev, extract_from_nvd
-from enrichment.fulltext import retrieve_fulltext
+from enrichment.fulltext import HEAD_CHARS, MIN_HEAD_SHARE, retrieve_fulltext
 from enrichment.schemas import ArticleExtraction
 
 logger = get_logger(__name__)
@@ -80,7 +80,9 @@ async def handle_classified_item(payload: dict) -> None:
     elif source_slug in ("nvd", "cisa_kev"):
         clean_text, tier = (body or title), "body"
     else:
-        clean_text, tier, og_image = await retrieve_fulltext(url, body)
+        clean_text, tier, og_image = await retrieve_fulltext(url, body, title)
+        if tier == "direct" and await _repeats_on_site(source_id, url_canonical, title, clean_text):
+            clean_text, tier = body or "", "body"
         if not clean_text:
             clean_text, tier = title, "title"
 
@@ -142,6 +144,21 @@ async def handle_classified_item(payload: dict) -> None:
         # misled a spend investigation on 2026-08-03.
         model_used = f"{settings.llm_provider}:{extract_model}"
         raw_model_output = extraction.model_dump()
+
+    # The model describing its input ("The provided text contains the biography
+    # of a journalist…") is not news, whatever the gate thought of the headline:
+    # rejected the way the gate rejects, so nothing downstream ever publishes it
+    # and the stalled-item sweep does not re-drive it.
+    if is_model_commentary(extraction.shared.headline_summary) or is_model_commentary(extraction.shared.headline):
+        logger.info("extraction_not_news", raw_item_id=str(raw_item_id), reason="model_commentary",
+                    summary=extraction.shared.headline_summary[:160])
+        async with session_scope() as session:
+            await session.execute(
+                update(RawItem)
+                .where(RawItem.id == raw_item_id)
+                .values(relevance="rejected", rejection_reason="extraction: model commentary about the text, not news")
+            )
+        return
 
     # 3. Chunk + embed. The gist — the extractor's English headline + summary —
     # rides the same call: it is what the verified matching tier retrieves on
@@ -284,6 +301,43 @@ def occurred_on(value: str | None, published_at) -> date | None:
     else:
         pub = published_at
     return None if d > pub else d
+
+
+async def _repeats_on_site(source_id, url: str | None, title: str, clean_text: str) -> bool:
+    """Whether this page opens exactly as another URL's on the same site does
+    while not opening on its own headline: a byline bio or the site's navigation,
+    not an article (enrichment/fulltext.py MIN_HEAD_SHARE).
+
+    The share is checked first, in Python, so the query — a scan of one site's
+    articles — runs only for the ~3% of pages that do not open on their headline.
+    Measured 2026-09-27: 50 Indian Express articles in 11 bio groups (one of 14)
+    and 11 RBI releases that were all the same page of navigation.
+    ponytail: unindexed prefix compare, fine while it runs this rarely; index
+    md5(left(clean_text, HEAD_CHARS)) if it ever shows in the enrichment timings.
+    """
+    head = clean_text[:HEAD_CHARS]
+    share = title_share(title, head)
+    if share is None or share >= MIN_HEAD_SHARE:
+        return False
+    async with session_scope() as session:
+        same_as = (
+            await session.execute(
+                sa_text(
+                    """
+                    SELECT coalesce(ri.url_canonical, ri.url)
+                    FROM articles a JOIN raw_items ri ON ri.id = a.raw_item_id
+                    WHERE ri.source_id = :sid AND left(a.clean_text, :n) = :head
+                      AND coalesce(ri.url_canonical, ri.url) IS DISTINCT FROM :url
+                    LIMIT 1
+                    """
+                ),
+                {"sid": source_id, "n": HEAD_CHARS, "head": head, "url": url},
+            )
+        ).scalar_one_or_none()
+    if same_as is None:
+        return False
+    logger.info("fulltext_rejected", reason="repeated_on_site", url=url, same_as=same_as, head_share=round(share, 2))
+    return True
 
 
 async def _extraction_for_same_url(url: str | None) -> tuple[str, dict, str] | None:

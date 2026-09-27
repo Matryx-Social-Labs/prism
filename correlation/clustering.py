@@ -22,7 +22,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
-from common.text import detect_script
+from common.text import detect_script, title_share
 from correlation.verify import Candidate, event_blocks, judge, record
 
 logger = logging.getLogger(__name__)
@@ -79,10 +79,18 @@ _SCALE = {
         "story_edge_max": 0.656,
         # The verified tier's gist floor was measured on mE5 only: off here.
         "gist_candidate": None,
+        # The identical-body guard was measured on mE5 only: off here.
+        "identical_body": None,
     },
     "intfloat/multilingual-e5-base": {
         "embedding": 0.050, "entity_near": 0.079, "entity_loose": 0.106,
         "embed_far": 0.106, "story_max": 0.127, "story_edge_max": 0.145,
+        # The same TEXT, not the same story: measured on production 2026-09-27,
+        # 76 embedding-tier joins sat under this, 43 of them byline bios or site
+        # navigation at exactly 0 and three more unrelated Aaj Tak pages at
+        # 0.007-0.009. Far below the same-event median (0.063), so no
+        # translation or retelling lands here. See _boilerplate_body.
+        "identical_body": 0.01,
         # Verified tier (correlation/verify.py): gist cosine >= 0.90 held every
         # labelled same-happening pair from September (xl min 0.929, same-language
         # min 0.898). A CANDIDATE floor, not a merge threshold — Jev decides.
@@ -249,6 +257,13 @@ async def find_event(
     # into one Kannada event, 120 arrived here, and not one of them shared two
     # actors with the founding article.
     trusted = detect_script(title) in EMBEDDING_TRUSTED_SCRIPTS
+
+    # A body identical to an event's under an unrelated headline is boilerplate
+    # (a byline bio, a site's navigation), and it carries no evidence to EITHER
+    # body-vector tier: the embedding tier would take it at 1.000, and the entity
+    # tier at the same distance plus the actors extracted from that same text.
+    if embedding is not None and await _boilerplate_body(session, embedding, title, published_at):
+        embedding = None
 
     if embedding is not None and trusted:
         match = await _match_by_embedding(session, embedding, published_at)
@@ -633,6 +648,56 @@ async def _match_by_entities(
         if cand and cosine(title, cand, load_idf()) < TITLE_COSINE_GATE:
             return None
     return Match(event_id=row.id, match_type="entity_overlap", match_score=1.0 - float(row.dist))
+
+
+# Headlines "agree" when this share of the article's title words appear in the
+# founder's title. Measured on the 76 near-identical joins above: the same story
+# re-filed or syndicated shares >= 0.3 (one Hindi pair at 0.22 is the exception
+# and goes on down the cascade); all but 3 of 46 bio/navigation joins share less.
+RELATED_TITLE_SHARE = 0.3
+
+
+async def _boilerplate_body(session: AsyncSession, embedding: list[float], title: str, published_at) -> bool:
+    """Whether the nearest in-window event has this article's body, word for
+    word, under a headline this one does not share.
+
+    The founder's own title, not the event's: the event title is Prism's English
+    headline, and a Hindi article re-filed by its own site shares nothing with it.
+    """
+    max_dist = _scale().get("identical_body")
+    if max_dist is None:
+        return False
+    vector_literal = "[" + ",".join(f"{v:.6f}" for v in embedding) + "]"
+    row = (
+        await session.execute(
+            text(
+                f"""
+                SELECT e.id, (e.embedding <=> CAST(:vec AS vector)) AS dist,
+                       (SELECT ri.title FROM event_memberships em
+                        JOIN articles a ON a.id = em.article_id
+                        JOIN raw_items ri ON ri.id = a.raw_item_id
+                        WHERE em.event_id = e.id
+                        ORDER BY (em.match_type = 'new_event') DESC, em.created_at, em.id
+                        LIMIT 1) AS founder_title
+                FROM events e
+                WHERE e.embedding IS NOT NULL AND e.merged_into IS NULL
+                  AND (e.embedding <=> CAST(:vec AS vector)) <= :identical
+                  AND (CAST(:published_at AS timestamptz) IS NULL
+                       OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
+                ORDER BY dist ASC
+                LIMIT 1
+                """
+            ),
+            {"vec": vector_literal, "identical": max_dist, "published_at": published_at},
+        )
+    ).first()
+    if row is None or not row.founder_title:
+        return False
+    share = title_share(title, row.founder_title)
+    if share is None or share >= RELATED_TITLE_SHARE:
+        return False
+    logger.info("identical_body_refused event=%s dist=%.4f title_share=%.2f", row.id, row.dist, share)
+    return True
 
 
 async def _match_by_embedding(
