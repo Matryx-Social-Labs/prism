@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.routes.entity import indexable_sql
 from api.routes.serialization import outlet_refs
 from api.schemas import TrendingResponse, TrendingStoryDetail
 from common import outlets
@@ -208,17 +209,21 @@ RELATED_MIN_WEIGHT = 0.5
 
 
 async def _cast_refs(db: AsyncSession, names: list[str]) -> list[dict]:
-    """[{name, slug}] for the cast, slug omitted where no entity row matches."""
+    """[{name, slug, indexable}] for the cast, slug omitted where no entity row matches."""
     if not names:
         return []
     rows = (
         await db.execute(
-            text("SELECT name, slug FROM entities WHERE name = ANY(CAST(:names AS text[]))"),
+            text(f"SELECT en.name, en.slug, {indexable_sql('en.id')} FROM entities en WHERE en.name = ANY(CAST(:names AS text[]))"),
             {"names": names},
         )
     ).all()
-    by_name = {r[0]: r[1] for r in rows}
-    return [{"name": n, "slug": by_name.get(n)} for n in names]
+    by_name = {r[0]: (r[1], r[2]) for r in rows}
+    refs = []
+    for n in names:
+        slug, indexable = by_name.get(n, (None, False))
+        refs.append({"name": n, "slug": slug, "indexable": indexable})
+    return refs
 
 
 async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: list[str]) -> list[dict]:

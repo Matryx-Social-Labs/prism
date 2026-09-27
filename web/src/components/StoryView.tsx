@@ -43,6 +43,7 @@ import { LensBrief, LensLocked, LensSwitch, LensUsed, LensWriting } from "@/comp
 import { ReadProgress, SectionRail, SectionTabs, jumpTo, type NavItem } from "@/components/story/StoryNav";
 import { StoryActionBar } from "@/components/story/StoryActionBar";
 import { shortDate } from "@/lib/dateline";
+import { entityRel } from "@/lib/entities";
 import { sectorGroup } from "@/lib/sectors";
 import { sentences } from "@/lib/sentences";
 
@@ -270,9 +271,9 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Region labels are places on the chart, not actors with a page; only the
   // cast links out (audit H29 — these chips used to point at /search, which is
   // noindex). The slug is the server's: identity is folded there, not here.
-  const namedIn: { label: string; href: string | null }[] = [
+  const namedIn: { label: string; href: string | null; rel?: "nofollow" }[] = [
     ...regionLabels.map((label) => ({ label, href: null })),
-    ...event.entities.map((en) => ({ label: en.name, href: en.slug ? `/entity/${en.slug}` : null })),
+    ...event.entities.map((en) => ({ label: en.name, href: en.slug ? `/entity/${en.slug}` : null, rel: entityRel(en) })),
   ].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
   const coverageLine = (
     <>
@@ -657,7 +658,7 @@ export function StoryView({ event }: { event: EventDetail }) {
               <div className="flex flex-wrap gap-1.5">
                 {namedIn.slice(0, 12).map((n) =>
                   n.href ? (
-                    <Link key={n.label} href={n.href} className="p-chip">{n.label}</Link>
+                    <Link key={n.label} href={n.href} rel={n.rel} className="p-chip">{n.label}</Link>
                   ) : (
                     <span key={n.label} className="p-chip">{n.label}</span>
                   ),

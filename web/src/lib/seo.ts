@@ -63,9 +63,10 @@ export function newsArticleLd(event: EventDetail) {
   const sources = (event.sources ?? []).filter((s) => s.url);
   // `about` names the actors AND addresses them: an engine that follows the id
   // lands on the hub page that carries the same @id, so record and hub read as
-  // one graph instead of two mentions of a string.
+  // one graph instead of two mentions of a string. A stub (noindex) is named,
+  // not addressed: its URL here only sent crawlers to a page they must drop.
   const about = (event.entities ?? []).slice(0, 12).map((e) =>
-    e.slug
+    e.slug && e.indexable !== false
       ? { "@type": "Thing", name: e.name, "@id": `${SITE_URL}/entity/${e.slug}#entity`, url: `${SITE_URL}/entity/${e.slug}` }
       : { "@type": "Thing", name: e.name },
   );

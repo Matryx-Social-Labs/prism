@@ -11,6 +11,8 @@ and rides in the response, so the page can render for every entity the chips poi
 at while asking to be indexed only when there is a story to index.
 """
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +31,24 @@ router = APIRouter()
 # records need. Measured on prod 2026-09-22: 55,214 entities, 5,995 with >= 3.
 INDEXABLE_MIN_RECORDS = 3
 MAX_RECORDS = 60
+
+
+def indexable_sql(id_column: str) -> str:
+    """SQL: does this entity's page ask to be indexed? The rule get_entity and the
+    sitemap apply, for the chips that link to it: 85% of crawled entity pages were
+    stubs (2026-09-27), found through links that could have said nofollow. Stops
+    at the floor, so a national magnet costs three index probes, not a count.
+
+    `id_column` is a column reference ("en.id"), pasted into the SQL — never a
+    value, so anything but an identifier is refused."""
+    if not re.fullmatch(r"[a-z_]+(\.[a-z_]+)?", id_column):
+        raise ValueError(f"not a column reference: {id_column!r}")
+    return f"""(SELECT count(*) FROM (
+        SELECT 1 FROM event_entities ee_i JOIN events e_i ON e_i.id = ee_i.event_id
+        WHERE ee_i.entity_id = {id_column}
+          AND COALESCE(jsonb_array_length(e_i.projection->'source_slugs'), 0) > 0
+        LIMIT {INDEXABLE_MIN_RECORDS}) served) >= {INDEXABLE_MIN_RECORDS}"""
+
 
 # The extractor's type vocabulary is open, and production carries typos and
 # concatenations ("org  anization", "personrole|subjectaffected"). Map what we

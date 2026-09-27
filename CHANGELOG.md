@@ -3,6 +3,31 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.100.0] - 2026-09-27
+
+### Changed — crawlers stop spending the site on pages they are told to drop
+Vercel function calls went from 1–2k a day to 160–178k after the SEO release,
+enough for a fair-use block on the Hobby plan (2026-09-27). Entity pages were 46%
+of those calls, and **85% of the entity pages crawlers fetched were stubs**: an
+actor in one or two records, whose page already says `noindex` (29 of 34 in a
+production log sample; 84,764 entity pages exist, 9,951 are indexable).
+Crawlers found them through the record's own links.
+
+- **The API says which actors are stubs**: `indexable` on
+  `EventDetail.entities[]` and `TrendingStoryDetail.cast_refs[]`, computed by
+  the entity page's own rule (`api/routes/entity.indexable_sql`), so a chip and
+  the page cannot disagree. The count stops at the floor: about 2 ms a record
+  on production, 0.9 ms for the largest entity.
+- **Links to stubs are `rel="nofollow"`**: the "Named in the reports" chips, the
+  marked names in a record's text, and a story's cast. A record's NewsArticle
+  JSON-LD still names a stub but no longer gives its URL.
+- Nothing changes for a reader: every link still goes where it went.
+
+Caching the record pages (ISR) was built and measured, then left out. Crawlers
+almost never fetch the same URL twice inside a cache window, every first render
+would add a paid cache write, and server-rendered relative times ("14m ago")
+would make every refresh a write too. It would have raised the bill.
+
 ## [0.0.99.0] - 2026-09-27
 
 ### Changed — extraction pinned to one endpoint, so the cache actually hits

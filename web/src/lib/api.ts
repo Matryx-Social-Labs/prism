@@ -88,6 +88,8 @@ export interface EntityOut {
   role: string;
   /** The actor's page, where the server has one. Identity is the server's. */
   slug?: string | null;
+  /** False when that page is a stub asking not to be indexed: link it nofollow. */
+  indexable?: boolean;
 }
 
 export interface PerspectiveOut {
@@ -454,7 +456,7 @@ export interface TrendingStoryDetail {
   canonical_slug: string;
   label: string;
   cast: string[];
-  cast_refs?: { name: string; slug: string | null }[];
+  cast_refs?: { name: string; slug: string | null; indexable?: boolean }[];
   sector: string | null;
   source_count: number;
   velocity: number;

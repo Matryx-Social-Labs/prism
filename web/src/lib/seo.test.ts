@@ -35,6 +35,22 @@ describe("structured data", () => {
     expect(ld.publisher).toEqual({ "@id": expect.stringMatching(/#organization$/) });
   });
 
+  it("addresses an actor only when its page asks to be indexed", () => {
+    // A stub's URL in structured data is one more way for a crawler to find a
+    // noindex page (85% of crawled entity pages, 2026-09-27); its name stays.
+    const ld = newsArticleLd({
+      ...event,
+      entities: [
+        { name: "Mumbai Police", entity_type: "org", role: "actor", slug: "mumbai-police", indexable: true },
+        { name: "Asha Rao", entity_type: "person", role: "subject", slug: "asha-rao", indexable: false },
+      ],
+    } as EventDetail) as Record<string, unknown>;
+    expect(ld.about).toEqual([
+      { "@type": "Thing", name: "Mumbai Police", "@id": expect.stringMatching(/\/entity\/mumbai-police#entity$/), url: expect.stringMatching(/\/entity\/mumbai-police$/) },
+      { "@type": "Thing", name: "Asha Rao" },
+    ]);
+  });
+
   it("serialising never lets a scraped headline close the script element", () => {
     const out = jsonLd(newsArticleLd(event));
     expect(out).not.toContain("</script>");
