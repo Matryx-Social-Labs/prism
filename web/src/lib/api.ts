@@ -21,6 +21,8 @@ export interface OutletRef {
 
 export interface FeedItem {
   id: string;
+  /** False for a one-outlet record: readable and linked, but it asks not to be indexed. */
+  indexable?: boolean;
   title: string;
   headline_lang: string | null; // language of `title`; UI tags it when not the reader's primary
   available_languages: string[];
@@ -181,6 +183,8 @@ export interface StoryTimelineData {
 
 export interface EventDetail {
   id: string;
+  /** False for a one-outlet record: readable and linked, but it asks not to be indexed. */
+  indexable?: boolean;
   title: string;
   /** "prism" when the headline was written from the reports; null when it is the first report's own. */
   headline_by?: string | null;

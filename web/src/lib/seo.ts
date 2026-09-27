@@ -7,6 +7,14 @@ import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site";
 
 export const ORG_ID = `${SITE_URL}/#organization`;
+
+/**
+ * A page that stays readable and linked but asks not to be indexed: a record
+ * from one outlet, a provisional story (Search Console, 2026-09-21 — 13 of the
+ * 19 records it would not index were one-outlet rewrites; 4 stories named one
+ * event in the URL and showed another). `follow`, so its links still count.
+ */
+export const NOT_INDEXED = { index: false, follow: true } as const;
 export const SITE_ID = `${SITE_URL}/#website`;
 
 /** Who publishes this. `legalName` is the LLP; the brand is Prism. */

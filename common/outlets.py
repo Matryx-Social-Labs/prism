@@ -175,6 +175,22 @@ def domain_for(publisher: str, slug: str) -> str | None:
         return None
 
 
+# A record asks to be indexed from its second outlet (publisher) on. Search
+# Console, 2026-09-21: 13 of the 19 records Google crawled and would not index
+# were one-outlet rewrites of a single article, which Google keeps instead. The
+# same story across outlets is what Prism adds; 86% of 90 days' records had one
+# source. Readable and linked either way; the record page's robots, the feed row,
+# the records sitemap and IndexNow all read this, so they cannot disagree.
+RECORD_MIN_OUTLETS = 2
+
+
+def record_indexable(source_slugs: list[str], registry: dict[str, Outlet] | None) -> bool:
+    """Outlets are counted the way the page prints them: by publisher, and by
+    slug for sources the registry does not know (lib/coverage.publishers)."""
+    known = {registry[s].publisher for s in source_slugs if registry and s in registry}
+    return len(known or set(source_slugs)) >= RECORD_MIN_OUTLETS
+
+
 _cache: tuple[float, dict[str, Outlet]] | None = None
 TTL_S = 600
 

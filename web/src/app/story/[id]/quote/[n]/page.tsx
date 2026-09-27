@@ -10,6 +10,7 @@ import { istTime, shortDate } from "@/lib/dateline";
 import { langName, langNative } from "@/lib/languages";
 import { quoteLink } from "@/lib/quoteLink";
 import { findQuote } from "@/lib/quotes";
+import { NOT_INDEXED } from "@/lib/seo";
 import { indexSources } from "@/lib/sources";
 
 // One quote's own address: the quote, checked, with the article around it and
@@ -31,6 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description,
     alternates: { canonical: `/story/${id}` },
+    robots: event.indexable === false ? NOT_INDEXED : undefined, // as its record
     openGraph: { type: "article", siteName: "Prism", title, description, url: `/story/${id}/quote/${n}` },
     twitter: { card: "summary_large_image", title, description },
   };

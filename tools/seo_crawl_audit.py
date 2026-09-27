@@ -14,6 +14,7 @@ for the ones we control:
 
   uv run python -m tools.seo_crawl_audit                    # sitemap.xml + news, 150 records, 100 entities
   uv run python -m tools.seo_crawl_audit --records 400 --entities 300 --csv .context/review/seo-crawl.csv
+  uv run python -m tools.seo_crawl_audit --urls ~/Downloads/<GSC drilldown>/Table.csv   # the URLs Google skipped
 """
 
 from __future__ import annotations
@@ -110,32 +111,11 @@ def host_variants() -> list[str]:
     return lines
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--records", type=int, default=150, help="records sampled from records-sitemap.xml")
-    ap.add_argument("--entities", type=int, default=100, help="actors sampled from entities-sitemap.xml")
-    ap.add_argument("--csv", type=Path)
-    args = ap.parse_args()
+def _listed(path: Path) -> list[str]:
+    return [line.split(",")[0].strip() for line in path.read_text().splitlines() if line.startswith("http")]
 
-    rng = random.Random(7)
-    sets = {
-        "sitemap.xml": sitemap_urls("/sitemap.xml"),
-        "news-sitemap.xml": sitemap_urls("/news-sitemap.xml"),
-        "records-sitemap.xml": sitemap_urls("/records-sitemap.xml"),
-        "entities-sitemap.xml": sitemap_urls("/entities-sitemap.xml"),
-    }
-    sample = {
-        "sitemap.xml": sets["sitemap.xml"],
-        "news-sitemap.xml": sets["news-sitemap.xml"],
-        "records-sitemap.xml": rng.sample(sets["records-sitemap.xml"], min(args.records, len(sets["records-sitemap.xml"]))),
-        "entities-sitemap.xml": rng.sample(sets["entities-sitemap.xml"], min(args.entities, len(sets["entities-sitemap.xml"]))),
-    }
-    urls = sorted({u for us in sample.values() for u in us})
-    print("sitemaps: " + ", ".join(f"{k} {len(v)} URLs" for k, v in sets.items()))
-    print(f"auditing {len(urls)} distinct URLs (all of sitemap.xml + news, a sample of records and entities)\n")
-    with cf.ThreadPoolExecutor(max_workers=6) as pool:
-        pages = list(pool.map(audit, urls))
 
+def report(pages: list[Page], out: Path | None) -> None:
     by_kind = collections.Counter()
     for p in pages:
         for prob in filter(None, p.problems.split("; ")):
@@ -161,6 +141,46 @@ def main() -> None:
                 print(f"  {p.url.replace(SITE, '')[:70]:<70}  {p.problems}")
     for t, us in list(dup_titles.items())[:3]:
         print(f"  same title {t[:60]!r}: {', '.join(u.replace(SITE, '') for u in us[:3])}")
+    if out:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(asdict(pages[0])))
+            w.writeheader()
+            w.writerows(asdict(p) for p in pages)
+        print(f"\nwrote {out}")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--records", type=int, default=150, help="records sampled from records-sitemap.xml")
+    ap.add_argument("--entities", type=int, default=100, help="actors sampled from entities-sitemap.xml")
+    ap.add_argument("--csv", type=Path)
+    ap.add_argument("--urls", type=Path, help="audit these URLs instead (first column; a Search Console export works)")
+    args = ap.parse_args()
+    if args.urls:
+        report([audit(u) for u in _listed(args.urls)], args.csv)
+        return
+
+    rng = random.Random(7)
+    sets = {
+        "sitemap.xml": sitemap_urls("/sitemap.xml"),
+        "news-sitemap.xml": sitemap_urls("/news-sitemap.xml"),
+        "records-sitemap.xml": sitemap_urls("/records-sitemap.xml"),
+        "entities-sitemap.xml": sitemap_urls("/entities-sitemap.xml"),
+    }
+    sample = {
+        "sitemap.xml": sets["sitemap.xml"],
+        "news-sitemap.xml": sets["news-sitemap.xml"],
+        "records-sitemap.xml": rng.sample(sets["records-sitemap.xml"], min(args.records, len(sets["records-sitemap.xml"]))),
+        "entities-sitemap.xml": rng.sample(sets["entities-sitemap.xml"], min(args.entities, len(sets["entities-sitemap.xml"]))),
+    }
+    urls = sorted({u for us in sample.values() for u in us})
+    print("sitemaps: " + ", ".join(f"{k} {len(v)} URLs" for k, v in sets.items()))
+    print(f"auditing {len(urls)} distinct URLs (all of sitemap.xml + news, a sample of records and entities)\n")
+    with cf.ThreadPoolExecutor(max_workers=6) as pool:
+        pages = list(pool.map(audit, urls))
+
+    report(pages, None)
     print("\nhost variants:")
     for line in host_variants():
         print("  " + line)

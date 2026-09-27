@@ -28,6 +28,8 @@ class OutletRef(BaseModel):
 
 class FeedItem(BaseModel):
     id: str
+    # Asks to be indexed: two outlets or more (common/outlets.record_indexable).
+    indexable: bool = True
     title: str
     headline_lang: str | None = None  # language of `title`; frontend tags non-primary
     available_languages: list[str] = []  # languages this story is covered in
@@ -340,6 +342,8 @@ class SpeakerClaims(BaseModel):
 
 class EventDetail(BaseModel):
     id: str
+    # Asks to be indexed: two outlets or more (common/outlets.record_indexable).
+    indexable: bool
     title: str
     # Whose words the title holds: "prism" when written from the reports,
     # None when it is the first report's own headline.

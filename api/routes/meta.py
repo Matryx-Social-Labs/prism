@@ -16,12 +16,13 @@ from api.schemas import (
     SubsectorOut,
     TaxonomyResponse,
 )
+from common import outlets
 from common.db import get_db
 from common.embeddings import check_corpus_model
 from common.freshness import MAX_WINDOW_HOURS, MIN_WINDOW_HOURS, WINDOW_HOURS, pipeline_freshness
 from common.lenses import DEFAULT_LENS, active_lenses
 from common.logging import get_logger
-from common.outlets import monitored
+from common.outlets import monitored, record_indexable
 from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
 
@@ -133,19 +134,27 @@ async def sitemap_records(db: AsyncSession = Depends(get_db)):
     """Every served record's id and last change, newest first, for the records
     sitemap — the feed pages at 100 and the archive was invisible to crawlers
     past the freshest hundred (audit H30). Capped at the sitemap protocol's
-    50,000 URLs per file; page this endpoint when the corpus passes it."""
+    50,000 URLs per file; page this endpoint when the corpus passes it.
+
+    Only records that ask to be indexed (common/outlets.record_indexable: two
+    outlets or more), so the sitemap never offers a page whose robots say no.
+    Two sources is the SQL's cut; two publishers is the rule's."""
     rows = (
         await db.execute(
             text(
                 """
-                SELECT id, last_updated_at FROM events
-                WHERE COALESCE(jsonb_array_length(projection->'source_slugs'), 0) > 0
+                SELECT id, last_updated_at, projection->'source_slugs' FROM events
+                WHERE COALESCE(jsonb_array_length(projection->'source_slugs'), 0) >= 2
                 ORDER BY last_updated_at DESC LIMIT 50000
                 """
             )
         )
     ).all()
-    return {"records": [{"id": str(r[0]), "last_updated_at": r[1].isoformat() if r[1] else None} for r in rows]}
+    reg = await outlets.registry(db)
+    return {"records": [
+        {"id": str(r[0]), "last_updated_at": r[1].isoformat() if r[1] else None}
+        for r in rows if record_indexable(r[2] or [], reg)
+    ]}
 
 
 @router.get("/api/v1/taxonomy", response_model=TaxonomyResponse)

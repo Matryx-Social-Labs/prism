@@ -19,16 +19,13 @@ from api.schemas import TrendingResponse, TrendingStoryDetail
 from common import outlets
 from common.db import get_db
 from common.images import REAL_PHOTO_SQL, hi_res, placeholders
+from common.stories import STORY_BOUNDARY_STATUS
 from common.taxonomy import TAXONOMY
 
 router = APIRouter()
 
 # Chains observed in production are 1-2 hops; this is a corruption guard, not a limit.
 _MAX_MERGE_HOPS = 8
-# Promotion is a deliberate code/config change after the time-held-out,
-# two-labeller story evaluation passes. Until then, do not even serve a route
-# tree that a client could mistake for verified chronology.
-STORY_BOUNDARY_STATUS = "provisional"
 
 
 @router.get("/api/v1/trending", response_model=TrendingResponse)

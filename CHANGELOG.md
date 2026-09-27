@@ -3,6 +3,30 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.105.0] - 2026-09-27
+
+### Changed — search engines are offered the records and stories worth indexing
+Search Console's list of the 29 pages it crawled on 22 Sep and would not index
+(`tools/seo_crawl_audit.py --urls`, new): all 29 pass every technical check.
+The pattern is content. **13 of the 19 records came from one outlet**, a
+rewrite of an article Google already has, and several were duplicates of
+other records of ours. **All 4 stories were provisional groupings whose URL
+named one event while the page showed another.**
+
+- **A record asks to be indexed from its second outlet on**
+  (`common/outlets.record_indexable`, counted by publisher as the page prints
+  outlets). 86% of 90 days' records have one source. They stay readable and
+  linked (`noindex, follow`) and become indexable when a second outlet
+  reports. The record page, its quote pages, the feed rows (`indexable`), the
+  records sitemap, `sitemap.xml`, the news sitemap and IndexNow all read the
+  one rule. The records sitemap goes from ~26k URLs to ~3.6k.
+- **A story asks to be indexed once its boundary is verified.**
+  `STORY_BOUNDARY_STATUS` moved to `common/stories.py` so the worker's IndexNow
+  reads the same value as the API. Every story is provisional today, so none
+  is indexed or announced. `/trending` itself is unchanged.
+- The duplicates are left to the verified matching tier and the backlog
+  merge.
+
 ## [0.0.104.0] - 2026-09-27
 
 ### Fixed — the signals that told Google to skip our pages

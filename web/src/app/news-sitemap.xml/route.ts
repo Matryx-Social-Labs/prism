@@ -22,7 +22,8 @@ export async function GET() {
   // touched it — Google reads a re-dated article as gaming.
   const published = (e: FeedItem) => e.latest_published_at ?? e.last_updated_at;
   const cutoff = Date.now() - 2 * 24 * 3600 * 1000;
-  const recent = items.filter((e) => Date.parse(published(e)) >= cutoff).slice(0, 1000);
+  // Only records that ask to be indexed: two outlets or more (common/outlets.record_indexable).
+  const recent = items.filter((e) => e.indexable !== false && Date.parse(published(e)) >= cutoff).slice(0, 1000);
   const body = recent
     .map(
       (e) => `  <url>

@@ -16,8 +16,11 @@ from typing import Any
 import httpx
 from sqlalchemy import text
 
+from common import outlets
 from common.config import get_settings
 from common.logging import get_logger
+from common.outlets import record_indexable
+from common.stories import STORY_BOUNDARY_STATUS
 
 logger = get_logger(__name__)
 
@@ -36,13 +39,16 @@ def _host() -> str:
 
 async def changed_urls(db, *, since_minutes: int = 70) -> list[str]:
     """Records and stories that moved in the window: the same rows the feed and
-    Stories serve (CVE-only records excluded, merged stories excluded)."""
+    Stories serve (CVE-only records excluded, merged stories excluded), and of
+    those only what asks to be indexed — a record from its second outlet
+    (common/outlets.record_indexable), a story once its boundary is verified
+    (common/stories). Announcing a noindex page is a crawl spent on nothing."""
     web = get_settings().prism_web_url.rstrip("/")
-    events = (
+    rows = (
         await db.execute(
             text(
                 """
-                SELECT e.id FROM events e
+                SELECT e.id, e.projection->'source_slugs' FROM events e
                 WHERE e.last_updated_at >= now() - make_interval(mins => :m)
                   AND NOT (
                       COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
@@ -53,8 +59,10 @@ async def changed_urls(db, *, since_minutes: int = 70) -> list[str]:
             ),
             {"m": since_minutes, "cve_only": CVE_ONLY_JSON},
         )
-    ).scalars().all()
-    stories = (
+    ).all()
+    reg = await outlets.registry(db)
+    events = [r[0] for r in rows if record_indexable(r[1] or [], reg)]
+    stories = [] if STORY_BOUNDARY_STATUS != "verified" else (
         await db.execute(
             text(
                 "SELECT slug FROM stories WHERE status = 'active' AND merged_into IS NULL "
