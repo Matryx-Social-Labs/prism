@@ -228,3 +228,28 @@ async def test_a_general_feed_item_goes_through_the_gate_and_the_classifier(monk
         await s.execute(text("DELETE FROM raw_items WHERE id = :i"), {"i": str(item)})
     assert asked == ["Punjab uni students hold protest, block highway"]
     assert (cls["sector"], cls["role_interests"]) == ("politics", []), "no forced business, no forced Markets read"
+
+
+async def test_a_backfill_rebuild_does_not_redate_the_event():
+    """The feed orders by last_updated_at; a backfill that re-derived 15,000
+    records with the default touch would put all of them at the top as new."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid = uuid.uuid4()
+    async with session_scope() as s:
+        src = await _source(s, f"t-{eid.hex[:8]}")
+        await s.execute(
+            text("INSERT INTO events (id, title, sector, regions, last_updated_at) "
+                 "VALUES (:i, 'Old story', 'business', '{IN}', now() - interval '2 days')"),
+            {"i": str(eid)},
+        )
+        await _member(s, eid, src, _c("politics.courts", "politics"), minutes_ago=3000)
+    try:
+        await _rebuild_projection(eid, touch=False)
+        async with session_scope() as s:
+            sector, old = (await s.execute(text(
+                "SELECT sector, now() - last_updated_at > interval '1 day' FROM events WHERE id = :i"),
+                {"i": str(eid)})).one()
+    finally:
+        await _drop(eid)
+    assert (sector, old) == ("politics", True)

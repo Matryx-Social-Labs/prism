@@ -410,8 +410,9 @@ async def _upsert_entities(
         await session.execute(link)
 
 
-async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
-    """Merge member enrichments into the served projection.
+async def _rebuild_projection(event_id: uuid.UUID, session=None, *, touch: bool = True) -> None:
+    """Merge member enrichments into the served projection. `touch=False`
+    leaves last_updated_at alone — a backfill re-deriving the record is not news.
 
     Never merge identity, never inflate impact: lens fields are merged
     field-by-field, the first member to disclose a value keeping it; disclosed
@@ -649,7 +650,8 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
             text("UPDATE events SET projection = COALESCE(projection, '{}'::jsonb) || CAST(:p AS jsonb) WHERE id = :eid"),
             {"p": json.dumps(computed, default=str), "eid": str(event_id)},
         )
-        event.last_updated_at = func.now()
+        if touch:
+            event.last_updated_at = func.now()
 
 
 # Re-run the (LLM) analysis only when the membership crosses a tier — a
