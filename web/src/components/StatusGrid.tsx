@@ -28,9 +28,10 @@ export const NEXT = [
 /** The truth layer is never the premium feature (strategy report, 2026-09-24). */
 export const FREE_EVIDENCE =
   "The evidence is free and stays free: every record, every report behind it, every verified quote, the coverage and its count, and the story status, for every reader, with or without an account.";
-export const FREE_LINE = `${FREE_EVIDENCE} What can be paid for is depth and convenience: more questions, professional readings, watchlists and alerts.`;
-/** What Plus carries today, as the pricing page lists it (components/PlusPage.tsx). */
-const PLUS_LINE = "More questions a day, answers drawn from the whole story, and a larger model on every answer.";
+// The watchlist is free and alerts are not built, so neither is sold here.
+export const FREE_LINE = `${FREE_EVIDENCE} What can be paid for is depth and convenience: every lens on every story and more questions.`;
+/** What Plus carries today, as the pricing page lists it (components/PlusPage.tsx). Never a model (PRODUCT.md). */
+const PLUS_LINE = "Every lens on every story, more questions a day, and answers drawn from the whole story.";
 
 // State is line form (Design System v2): solid is live, dashed is being
 // validated, dotted is not built yet. The label says it too; the rule never

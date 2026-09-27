@@ -8,7 +8,7 @@ import { Reveal } from "@/components/Reveal";
 import { SectionHead } from "@/components/SectionHead";
 import { Alert } from "@/components/ui";
 import { track } from "@/lib/analytics";
-import { fetchPlans, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
+import { fetchPlans, LENS_READS, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
 import { fetchMe, useSession } from "@/lib/session";
 
@@ -16,8 +16,10 @@ import { fetchMe, useSession } from "@/lib/session";
 // a monthly/yearly switch, three plans side by side with the recommended one
 // ruled in ink and accent, one trust line, then "Side by side" and "Before you
 // pay" in two columns. Every number is the API's or the cap the server
-// enforces; nothing here is a promise the product does not keep today (plan
-// renewal terms are an open founder decision — no price-after-launch claim).
+// enforces; nothing here is a promise the product does not keep today. Plus
+// sells the lenses and Ask, never a model (PRODUCT.md; founder decision #2,
+// 27 Sep), and no line says how a plan ends, renews or what it will cost later:
+// renewal terms are undecided (D-b).
 const ASK = { anon: 3, free: 10, plus: 100 }; // common/quota.py
 const FOUNDING_SEATS = 500; // common/billing.FOUNDING_CAP
 
@@ -27,9 +29,9 @@ const FAQ: { q: string; a: string }[] = [
   { q: "Can I cancel?", a: "Yes, in one click from your account, any time. You keep Plus until the end of the period you paid for and are not charged again." },
   { q: "What if I change my mind?", a: "A yearly or founding charge is refunded in full if you ask within 7 days — no questions. Monthly charges are not refunded; cancelling stops the next one." },
   { q: "Who charges me, and how?", a: "Razorpay processes the payment (UPI Autopay, cards, net banking). It is collected by Matryx Social Labs Private Limited on behalf of Prism Media Intelligence LLP until the LLP's own merchant account is live, so that is the name you may see on your statement." },
-  { q: "Are the prices final?", a: "Yes. Every price on this page includes GST, and each charge comes with an invoice by email." },
+  { q: "Is GST included?", a: "Yes. Every price on this page includes GST, and each charge comes with an invoice by email." },
   { q: "What if a charge fails?", a: "Plus stays on for three days while Razorpay tries again, and we email you. If it still fails, Plus pauses and reading stays free." },
-  { q: "What does Plus not change?", a: "Reading. Every record, source, quote, coverage split and clip stays free for everyone, with or without an account. Plus changes how much you can ask of it." },
+  { q: "What does Plus not change?", a: "The record. Every record, source, quote, coverage split and clip stays free for everyone, with or without an account. Plus adds every lens on every story and more of Ask." },
 ];
 
 function Feature({ ok = true, children }: { ok?: boolean; children: React.ReactNode }) {
@@ -166,7 +168,9 @@ export function PlusPage() {
     );
   }
 
-  const offerBadge = plans?.offer ? `Launch offer · ${offerEnds ? `until ${offerEnds}` : "first 1,000 readers"}` : null;
+  // The offer closes on a date or at a subscriber count, whichever comes first
+  // (common/billing.offer_open), so the date is when it ends at the latest.
+  const offerBadge = plans?.offer ? `Launch offer${offerEnds ? ` · ends by ${offerEnds}` : ""}` : null;
   // Founding memberships are sold only on the launch offer and only while seats remain
   // (common/billing.prices): gone because they are taken is said; gone because the offer closed is left out.
   const foundingGone = !founding && !!plans && plans.founding_left <= 0;
@@ -179,9 +183,9 @@ export function PlusPage() {
           <p className="p-eyebrow">Prism Plus</p>
           {offerBadge && <span className="p-badge p-badge--accent">{offerBadge}</span>}
         </div>
-        <h1 className="mt-2.5 text-balance [font:var(--t-display-l)] lg:[font:var(--t-display-xl)]" style={{ letterSpacing: "var(--track-display)" }}>Ask more of every story.</h1>
+        <h1 className="mt-2.5 text-balance [font:var(--t-display-l)] lg:[font:var(--t-display-xl)]" style={{ letterSpacing: "var(--track-display)" }}>Every lens on every story.</h1>
         <p className="mt-3 max-w-[60ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-          The record stays free for everyone. Plus is for the reader who asks more of it: answers drawn from the whole story, a hundred questions a day.
+          The record stays free for everyone. Plus is for reading it for your work: every professional reading of every story, as often as you like, and a hundred questions a day, answered from the whole story.
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3.5">
           <div className="p-seg" role="tablist" aria-label="Billing period">
@@ -210,13 +214,13 @@ export function PlusPage() {
             name="Plus"
             price={plus ? rupees(plus.amount_paise) : <span className="p-skel inline-block h-9 w-28 align-middle" aria-hidden />}
             per={period === "year" ? "/ year" : "/ month"}
-            note={plus ? [period === "year" && perMonth ? `≈ ${rupees(perMonth)} a month, GST included.` : "GST included; cancel any time.", plans?.offer ? "The price you join at is yours for 12 months." : ""].join(" ").trim() : null}
+            note={plus ? (period === "year" && perMonth ? `≈ ${rupees(perMonth)} a month, GST included.` : "GST included; cancel any time.") : null}
             action={<Action plan={plusPlan} primary label={plusCta} />}
           >
-            <Feature>Answers from the <b className="font-semibold">whole story</b> — every development&rsquo;s reports</Feature>
+            <Feature><b className="font-semibold">Every lens on every story</b>, as often as you like</Feature>
             <Feature><b className="font-semibold">{ASK.plus} questions a day</b> on any story</Feature>
+            <Feature>Answers from the <b className="font-semibold">whole story</b> — the reports of every related record</Feature>
             <Feature>Ask <b className="font-semibold">stays on</b> when the free box rests for the day</Feature>
-            <Feature>A larger model on every answer</Feature>
             <Feature>Everything in Free</Feature>
           </PlanColumn>
         </Reveal>
@@ -231,9 +235,9 @@ export function PlusPage() {
             action={session ? <StateBox>{onPlus ? "Included" : "Your plan"}</StateBox> : <Link href="/feed" className="p-btn p-btn--secondary p-btn--block">Keep reading free</Link>}
           >
             <Feature>Every record, source, verified quote, coverage count and clip, forever</Feature>
+            <Feature><b className="font-semibold">{LENS_READS.free} lens readings a day</b> with an account, {LENS_READS.anon} without</Feature>
             <Feature><b className="font-semibold">{ASK.free} questions a day</b> with an account, {ASK.anon} without</Feature>
-            <Feature>The standard model</Feature>
-            <Feature ok={false}>Answers from this development only</Feature>
+            <Feature ok={false}>Answers from this record only</Feature>
             <Feature ok={false}>Ask rests for the day when the free box is spent</Feature>
           </PlanColumn>
         </Reveal>
@@ -245,11 +249,10 @@ export function PlusPage() {
               name="Founding member"
               price={rupees(founding.amount_paise)}
               per="/ year"
-              sub={`${plans!.founding_left} of ${FOUNDING_SEATS} seats · price locked 3 years`}
+              sub={`${plans!.founding_left} ${plans!.founding_left === 1 ? "seat" : "seats"} left`}
               action={onPlus ? null : <Action plan="founding" primary={false} label="Become a founding member" />}
             >
               <Feature>Everything in Plus</Feature>
-              <Feature>{rupees(founding.amount_paise)} a year, <b className="font-semibold">held for three years</b></Feature>
               <Feature>One of the first {FOUNDING_SEATS} readers who paid for an independent record</Feature>
             </PlanColumn>
           ) : (
@@ -302,10 +305,11 @@ export function PlusPage() {
             <tbody>
               {[
                 ["Reading the record", "Everything", "Everything"],
+                ["Lens readings", `${LENS_READS.free} a day · ${LENS_READS.anon} without an account`, "Every lens, every story"],
                 ["Questions a day", `${ASK.free} · ${ASK.anon} without an account`, String(ASK.plus)],
-                ["The model", "Standard", "Stronger"],
-                ["Answers drawn from", "This development", "The whole story"],
-                ["When the free box rests", "Back at midnight UTC", "Stays on"],
+                ["Answers drawn from", "This record", "The whole story"],
+                // The shared free budget is counted per UTC day (common/quota.ask_burst_ok).
+                ["When the free box rests", "Back at 5:30 am IST", "Stays on"],
                 ["Price", "₹0", plus ? `${rupees(plus.amount_paise)} ${period === "year" ? "a year" : "a month"}` : "—"],
               ].map(([what, free, pl]) => (
                 <tr key={what}>
@@ -336,7 +340,7 @@ export function PlusPage() {
       {!onPlus && (
         <section className="mt-16 flex flex-wrap items-center gap-4 pt-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
           <p className="min-w-0 flex-[1_1_280px]" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>
-            {monthly && yearly ? `${rupees(yearly.amount_paise)} a year, or ${rupees(monthly.amount_paise)} a month.` : "A hundred questions a day, from the whole story."}
+            {monthly && yearly ? `${rupees(yearly.amount_paise)} a year, or ${rupees(monthly.amount_paise)} a month.` : "Every lens on every story, and a hundred questions a day."}
           </p>
           <div className="w-full sm:w-auto"><Action plan={plusPlan} primary label={plusCta} cls="p-btn--lg max-sm:w-full" /></div>
         </section>

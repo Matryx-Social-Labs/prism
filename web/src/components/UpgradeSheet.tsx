@@ -24,7 +24,7 @@ const HEADING: Record<UpgradeReason, string> = {
 };
 // common/quota.PLUS_ASK_PER_DAY
 const PLUS_ASK = 100;
-const GAINS = [`${PLUS_ASK} questions a day, answered from the whole story`, "Ask stays on when the free tier rests"];
+const GAINS = [`${PLUS_ASK} questions a day, answered from the whole story`, "Ask stays on when the free tier rests", "Every lens on every story, as often as you like"];
 
 export function UpgradeSheet({
   open,
@@ -126,7 +126,7 @@ export function UpgradeSheet({
             {action}
             <Link href={next} className="inline-flex min-h-[44px] items-center justify-self-center text-[14px] font-semibold" style={{ color: "var(--accent)" }} onClick={onClose}>All plans →</Link>
             <p className="text-center text-[12.5px] leading-[1.45]" style={{ color: "var(--ink-3)" }}>
-              {plans?.offer ? "Launch offer, held for 12 months. " : ""}GST included. Cancel any time; paid time is kept.
+              {plans?.offer ? "Launch offer. " : ""}GST included. Cancel any time; paid time is kept.
             </p>
           </>
         )}

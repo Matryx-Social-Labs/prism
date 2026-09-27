@@ -49,7 +49,8 @@ describe("PlusPage", () => {
     expect(plus).toHaveTextContent("≈ ₹100 a month");
     // 12 × 149 − 1,199 = 589: arithmetic on the API's figures, not a typed number.
     expect(screen.getByRole("tab", { name: /Yearly/ })).toHaveTextContent("save ₹589");
-    expect(screen.getByRole("article", { name: "Founding member" })).toHaveTextContent("500 of 500 seats");
+    // Remaining seats, said as remaining: "500 of 500 seats" read as sold out.
+    expect(screen.getByRole("article", { name: "Founding member" })).toHaveTextContent("500 seats left");
     expect(screen.getAllByRole("link", { name: "Sign in to continue" })[0]).toHaveAttribute("href", "/signin?next=/plus");
     expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
     await userEvent.click(screen.getByRole("tab", { name: "Monthly" }));
@@ -108,6 +109,27 @@ describe("PlusPage", () => {
     expect(screen.getByText("Who charges me, and how?")).toBeInTheDocument();
     expect(screen.getByText(/collected by Matryx Social Labs Private Limited on behalf of Prism Media Intelligence LLP/)).toBeInTheDocument();
     expect(screen.getByRole("table")).toHaveTextContent("Questions a day");
+  });
+
+  // Founder decision #2 (27 Sep): Plus sells the lenses and Ask. PRODUCT.md:
+  // "Plus sells depth and convenience … never a model".
+  it("sells every lens and more of Ask, and never a model", async () => {
+    const { container } = render(<PlusPage />);
+    const plus = await screen.findByRole("article", { name: "Plus" });
+    expect(plus).toHaveTextContent(/Every lens on every story/);
+    expect(screen.getByRole("article", { name: "Free" })).toHaveTextContent("10 lens readings a day with an account, 3 without");
+    expect(screen.getByRole("table")).toHaveTextContent(/Lens readings/);
+    expect(container.textContent).not.toMatch(/model/i);
+  });
+
+  // D-b: renewal terms are undecided, so no page promises how a plan ends or
+  // renews or what its price will be; and the quota window is said in IST.
+  it("promises nothing about renewal or future prices, and says when Ask returns in IST", async () => {
+    const { container } = render(<PlusPage />);
+    await screen.findByRole("article", { name: "Plus" });
+    expect(container.textContent).not.toMatch(/yours for 12 months|prices final|locked|held for|first 1,000|UTC/i);
+    expect(screen.getByRole("table")).toHaveTextContent("Back at 5:30 am IST");
+    expect(screen.getByText("Is GST included?")).toBeInTheDocument();
   });
 });
 

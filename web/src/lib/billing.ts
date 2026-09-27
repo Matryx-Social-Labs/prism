@@ -6,6 +6,10 @@
 import { API_URL, authHeaders } from "@/lib/api";
 import { track } from "@/lib/analytics";
 
+/** Free lens readings: per visit without an account, per day with one; Plus has
+ *  no count (founder decision #3, 27 Sep — the lens meter enforces these). */
+export const LENS_READS = { anon: 3, free: 10 } as const;
+
 export interface PlanOut {
   plan: "plus_monthly" | "plus_yearly" | "founding" | string;
   label: string;

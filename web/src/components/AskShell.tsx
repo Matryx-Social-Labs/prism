@@ -100,7 +100,7 @@ export function LimitNote({ limit, next, onUpgrade }: { limit: AskLimit; next: s
   else if (limit.status === 503) {
     body = (
       <>
-        <span>Ask is resting for free readers today. Back at midnight UTC{limit.plus_helps ? " —" : "."}</span>
+        <span>Ask is resting for free readers today. Back at 5:30 am IST{limit.plus_helps ? " —" : "."}</span>
         {limit.plus_helps && plusLink("Plus stays on →", { reason: "ask-rest" })}
       </>
     );
