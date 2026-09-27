@@ -36,7 +36,7 @@ export const ORGANIZATION = {
   legalName: LEGAL_ENTITY,
   url: `${SITE_URL}/`,
   logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/prism-mark-512.png`, width: 512, height: 512 },
-  description: "One live story record from monitored Indian and international outlets: every development, verified quote and source open to inspection.",
+  description: "One live story record from monitored Indian outlets: every development, verified quote and source open to inspection.",
   areaServed: { "@type": "Country", name: "India" },
   knowsLanguage: ["en", "hi", "kn", "ta", "te"],
   // What we do and refuse to do, in the vocabulary engines read: no invented

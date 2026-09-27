@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!group) return { title: "Not found" };
   return {
     title: `${group.name} — today's record`,
-    description: `Today's ${group.name} stories from monitored Indian and international outlets, one record per story: who reported it, what changed, who said what.`,
+    description: `Today's ${group.name} stories from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`,
     alternates: { canonical: `/sector/${group.slug}` },
   };
 }
