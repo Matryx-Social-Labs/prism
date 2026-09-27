@@ -3,6 +3,31 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.111.0] - 2026-09-28
+
+### Added — reported speech for Indian-language articles, labelled "reported"
+Direct-only quotes dropped 55% of Indian-language claims against 16% of
+English: Hindi, Kannada, Malayalam and Odia outlets mostly print what was said
+without quotation marks ("X ने कहा कि…", "…ಎಂದು X ಹೇಳಿದರು"). Founder decision:
+for Indian-language articles only, keep those words, and say what they are.
+
+- **A reported claim is kept** when a speech verb frames it in the language's
+  own pattern and the speaker is named beside it (read off 6,987 real
+  articles; names matched across scripts). The fragment, one-speaker, repeat
+  and narration rules all apply. English articles stay direct speech only.
+- **It is never shown as a quote**: no quotation marks, upright on a dashed
+  rule, "reported" beside the outlet, and "the article's report of what was
+  said, not a quote" on its page and share card. Cards count "2 quotes ·
+  1 reported". The landing and How it works still showcase only quotes.
+- Measured: Indian-language claims kept rise from 48% to 69% (21 days); 59 of
+  60 hand-checked reported claims were attributed right, and the rule that
+  caught the one error ships with this. (#241)
+
+- `tools/backfill_reported_claims.py` re-applies the rule to claims the
+  direct-only gate dropped at write time (27 Sep 19:26 UTC on): the stored
+  extractor output still holds them, so no model is called. Production dry run:
+  9 claims in 9 Indian-language articles. (#242)
+
 ## [0.0.110.0] - 2026-09-28
 
 ### Changed — a plan is charged automatically until you cancel
