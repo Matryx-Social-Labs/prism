@@ -299,3 +299,25 @@ async def test_only_wholly_record_sourced_events_count_as_records():
     # The lens that wants records still gets them — the split is a classification,
     # not a second way of hiding cyber content.
     assert cyber & {str(i) for i in record_ids}, "the cyber lens lost its raw records"
+
+
+async def test_an_event_with_no_sector_still_reaches_the_feed():
+    """The window walks each sector's (sector, last_updated_at) index since
+    2026-09-27 (663 ms → 48 ms). A NULL sector has no value to walk by, so it gets
+    a branch of its own: PARTITION BY gave NULL a group, and an event the
+    classifier could not place must not vanish from the feed because of it."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid = uuid.uuid4()
+    async with session_scope() as s:
+        await s.execute(
+            text("INSERT INTO events (id,title,summary,sector,projection,last_updated_at) VALUES "
+                 "(:i,'An unplaced story','s',NULL,CAST(:p AS jsonb), now() + interval '1 hour')"),
+            {"i": str(eid), "p": json.dumps({"source_slugs": ["the_hindu"]})},
+        )
+    try:
+        ids = {i["id"] for i in await _feed(lens="reader", limit=5)}
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM events WHERE id = :i"), {"i": str(eid)})
+    assert str(eid) in ids, "a NULL-sector event dropped out of the candidate window"

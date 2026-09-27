@@ -6,7 +6,10 @@ Redis (single-flight across replicas), so a burst of viewers costs one LLM call.
 No table/migration — the digest is derived and cheap to regenerate.
 """
 
+import asyncio
+import contextlib
 import json
+import time
 from datetime import UTC, datetime
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
@@ -24,6 +27,11 @@ logger = get_logger(__name__)
 
 CACHE_KEY = "digest:markets"
 CACHE_TTL = 3 * 60 * 60  # 3h — the pulse is a rolling read, not real-time
+# Kept this long after it goes stale, so the reader who arrives after expiry gets
+# the last digest at once while one refresh runs behind them. Regenerating inside
+# that reader's request took 27 s (2026-09-27).
+STALE_TTL = 24 * 60 * 60
+_refreshing: set[asyncio.Task] = set()  # held so a running refresh is not garbage-collected
 TOP_N = 12
 
 
@@ -120,22 +128,63 @@ async def _generate() -> dict | None:
     }
 
 
+async def _store(redis, digest: dict) -> None:
+    entry = {"digest": digest, "fresh_until": time.time() + CACHE_TTL}
+    await redis.set(CACHE_KEY, json.dumps(entry), ex=STALE_TTL)
+
+
+def _read(raw: str) -> tuple[dict, float]:
+    """(digest, fresh_until). A bare digest was cached before 2026-09-27: stale."""
+    entry = json.loads(raw)
+    if "fresh_until" not in entry:
+        return entry, 0.0
+    return entry["digest"], entry["fresh_until"]
+
+
+async def _refresh() -> None:
+    """One refresh across requests and replicas. Never raises: it runs detached,
+    and any failure (the model, or Redis on the lock) leaves the stale digest."""
+    lock = f"refresh:{CACHE_KEY}"
+    try:
+        redis = get_redis()
+        if not await redis.set(lock, "1", nx=True, ex=120):
+            return
+    except Exception as exc:  # noqa: BLE001 — a background refresh must never surface
+        logger.warning("digest_refresh_failed", stage="lock", error=str(exc)[:160])
+        return
+    try:
+        digest = await _generate()
+        if digest is not None:
+            await _store(redis, digest)
+    except Exception as exc:  # noqa: BLE001 — a background refresh must never surface; the stale digest stands
+        logger.warning("digest_refresh_failed", stage="generate", error=str(exc)[:160])
+    finally:
+        with contextlib.suppress(Exception):  # the lock's TTL reaps it, as in common/locks.single_flight
+            await redis.delete(lock)
+
+
 async def get_market_digest() -> dict | None:
-    """Cached digest; regenerates once per TTL, single-flighted across replicas.
-    Returns None when synthesis is unavailable (the route 204s and the feed hides
-    the Pulse card) — never cache a failure, so it retries on the next request."""
+    """Cached digest. Stale is served at once and refreshed behind the reader;
+    only an empty cache generates in the request, single-flighted across
+    replicas. Returns None when synthesis is unavailable (the route 204s and the
+    feed hides the Pulse card) — never cache a failure, so it retries next time."""
     redis = get_redis()
     cached = await redis.get(CACHE_KEY)
     if cached:
-        return json.loads(cached)
+        digest, fresh_until = _read(cached)
+        if fresh_until < time.time():
+            task = asyncio.create_task(_refresh())
+            _refreshing.add(task)
+            task.add_done_callback(_refreshing.discard)
+        return digest
 
     async with single_flight(CACHE_KEY, ttl=60, wait_timeout=45.0) as leader:
         if not leader:
             cached = await redis.get(CACHE_KEY)
             if cached:
-                return json.loads(cached)
+                return _read(cached)[0]
         digest = await _generate()
         if digest is None:
             return None
-        await redis.set(CACHE_KEY, json.dumps(digest), ex=CACHE_TTL)
+        await _store(redis, digest)
         return digest

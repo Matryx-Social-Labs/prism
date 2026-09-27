@@ -3,6 +3,36 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.101.0] - 2026-09-27
+
+### Changed — the API answers faster, and never makes a reader wait for a model
+Phase 1 of the caching plan, backend half.
+
+- **The feed query reads 1,200 events instead of all 26,727.** It took the latest
+  120 per sector with a window function over the whole table, unpacking every
+  event's projection to test it: 663 ms of an API call that took 1.0–1.6 s. It
+  now walks the `(sector, last_updated_at)` index per sector: **48 ms, with
+  identical rows**. That was checked on production for five parameter mixes
+  (default, two sectors, national, world, one state), photos included. Events
+  with no sector keep their own group, and a new test fails if they drop out.
+- **The markets digest is served stale while it refreshes.** The first reader
+  after its 3-hour expiry waited 27 s while the model rewrote it. Now the last
+  digest (kept 24 h) is served at once, and one refresh runs behind it across
+  requests and replicas. A failed refresh keeps the old digest. Only an empty
+  cache still generates in the request.
+- **Browser cache headers on public reads** (`api/cache_headers.py`). 15 of 17
+  public GETs sent none, so browsers went back to Singapore every time. The
+  allowlist covers the feed (30 s), search and trending (60 s), entity, record
+  history, corrections, digest, sources and plans (300 s), and the
+  vocabularies (1 h). Only a successful GET is marked, and a route's own
+  header wins. A test reads every listed route's signature and fails if one
+  depends on the signed-in reader, so a paid lens can never be cached as
+  public.
+- `tools/web_cache_report.py`: daily Vercel function calls, memory per 1,000
+  calls and CDN hit/miss, plus first and warm response times with the serving
+  region, for the pages and API calls that matter. The baseline is saved; each
+  gate reruns it.
+
 ## [0.0.100.0] - 2026-09-27
 
 ### Changed — crawlers stop spending the site on pages they are told to drop
