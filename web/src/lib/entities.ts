@@ -62,6 +62,15 @@ export function markBlocks(texts: string[], entities: EntityOut[]): Segment[][] 
 }
 
 /** A reader's word for the pipeline's type: "government|subject" → "Government". */
+/**
+ * rel for a link to an actor's page: nofollow where that page is a stub asking
+ * not to be indexed (the API's rule, api/routes/entity.indexable_sql). 85% of
+ * the entity pages crawlers fetched were stubs (2026-09-27). Unknown: plain.
+ */
+export function entityRel(e: { indexable?: boolean }): "nofollow" | undefined {
+  return e.indexable === false ? "nofollow" : undefined;
+}
+
 export function entityKind(e: EntityOut): string {
   const t = (e.entity_type || "").split("|")[0].replace(/_/g, " ");
   const KIND: Record<string, string> = {

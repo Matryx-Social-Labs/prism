@@ -16,6 +16,7 @@ import { BackBar } from "@/components/ui";
 import type { StoryDevelopment, TrendingStoryDetail } from "@/lib/api";
 import { coverageText, publishers } from "@/lib/coverage";
 import { shortDate } from "@/lib/dateline";
+import { entityRel } from "@/lib/entities";
 import { REPORT_IMAGES } from "@/lib/images";
 import { framesFromStory } from "@/lib/photos";
 import { sectorGroup } from "@/lib/sectors";
@@ -163,7 +164,7 @@ export function StoryArc({ s }: { s: TrendingStoryDetail }) {
           <RailHead id="cast-title">Who is in it · <span className="font-mono">{s.cast.length}</span></RailHead>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {(s.cast_refs?.length ? s.cast_refs : s.cast.map((name) => ({ name, slug: null }))).slice(0, 12).map((c) =>
-              c.slug ? <Link key={c.name} href={`/entity/${c.slug}`} className="p-chip">{c.name}</Link> : <span key={c.name} className="p-chip">{c.name}</span>,
+              c.slug ? <Link key={c.name} href={`/entity/${c.slug}`} rel={entityRel(c)} className="p-chip">{c.name}</Link> : <span key={c.name} className="p-chip">{c.name}</span>,
             )}
           </div>
         </section>

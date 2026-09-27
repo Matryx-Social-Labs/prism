@@ -232,6 +232,9 @@ class EntityOut(BaseModel):
     # is Unicode-aware precisely so an Indic name does not fold to nothing — so
     # the slug travels with the name instead of being re-derived in the browser.
     slug: str | None = None
+    # Whether that page asks to be indexed (api/routes/entity.indexable_sql); a
+    # link to a stub is nofollow, so crawlers stop spending on noindex pages.
+    indexable: bool
 
 
 class SubjectNode(BaseModel):
@@ -547,6 +550,7 @@ class StoryOutlet(BaseModel):
 class CastRef(BaseModel):
     name: str
     slug: str | None = None  # the actor's page, where an entity row matches the name
+    indexable: bool  # that page asks to be indexed; a link to a stub is nofollow
 
 
 class TrendingStoryDetail(BaseModel):

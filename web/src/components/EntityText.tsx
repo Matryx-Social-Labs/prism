@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { useAsk } from "@/components/AskContext";
 import type { EntityOut, SpeakerClaims } from "@/lib/api";
-import { entityKind, markEntities, type Segment } from "@/lib/entities";
+import { entityKind, entityRel, markEntities, type Segment } from "@/lib/entities";
 
 /**
  * Prose with the story's named entities marked (DESIGN.md § Entity marks).
@@ -57,6 +57,7 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
   const said = claims.find((sp) => norm(sp.speaker) === norm(entity.name));
   // The actor's page when the server has one (identity is the server's), else search.
   const href = entity.slug ? `/entity/${entity.slug}` : `/search?q=${encodeURIComponent(entity.name)}`;
+  const rel = entity.slug ? entityRel(entity) : undefined;
   // The card opens under the mark, nudged left just enough to stay on screen.
   const [dx, setDx] = useState(0);
   const kind = entityKind(entity);
@@ -93,6 +94,7 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
     <span ref={wrap} className="relative inline" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
       <Link
         href={href}
+        rel={rel}
         className="p-ent"
         aria-describedby={open ? id : undefined}
         onClick={(e) => {
@@ -133,7 +135,7 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
               Ask about {entity.name} on this story
             </button>
           )}
-          <Link href={href} className="font-semibold" style={{ color: "var(--ink-2)" }}>
+          <Link href={href} rel={rel} className="font-semibold" style={{ color: "var(--ink-2)" }}>
             All stories about {entity.name} →
           </Link>
         </span>
