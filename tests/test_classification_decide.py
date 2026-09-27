@@ -89,3 +89,13 @@ def test_the_state_is_the_prompt_body_the_llm_saw():
     state = d.state_for("Title", "x" * 5000)
     assert state["title"] == "Title" and len(state["content"]) == d.MAX_GATE_CHARS
     assert d.state_for("T", None)["content"] == "(no content — title only)"
+
+
+@pytest.mark.parametrize("form", ["live blog", "live updates", "top headlines", "roundup of unrelated items",
+                                  "horoscope", "explainer"])
+def test_the_not_news_question_names_the_formats_that_report_no_one_event(form):
+    """None of these reports one event. 12 'live updates' pages passed the gate
+    in the week to 2026-09-27 — Indian Express's daily "India News Live
+    Updates" roundup among them — each filed as one record. Jev reads the
+    statement literally, so each form has to be in it."""
+    assert form in QUESTIONS["not_news"].instructions.lower()

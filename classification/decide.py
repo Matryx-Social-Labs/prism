@@ -109,6 +109,8 @@ QUESTIONS: dict[str, Question] = {
         instructions=(
             "The item is a form other than reported news: an opinion column or editorial essay, a product "
             "promotion or vendor marketing, a listicle, a how-to guide or tutorial, career advice, a horoscope, "
+            "a live blog or running 'live updates' page, a 'top headlines' digest or roundup of unrelated items, "
+            "an explainer or backgrounder that reports no new event, "
             "a piece on a celebrity's or businessperson's personal wealth, lifestyle or ventures, sports gossip "
             "or a player spat, or a fixture list or schedule with no result"
         )
