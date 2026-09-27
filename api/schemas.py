@@ -36,6 +36,9 @@ class FeedItem(BaseModel):
     summary: str | None
     sector: str | None
     subsector: str | None
+    # The subject node (`education.exams`), where the query selects it (search:
+    # its Education and Civic chips filter on the root, which no sector names).
+    subject_path: str | None = None
     regions: list[str]
     image_url: str | None
     # The outlet whose photograph `image_url` is, for the credit on the thumbnail.

@@ -83,6 +83,7 @@ def build_feed_item(
         summary=row["summary"],
         sector=row["sector"],
         subsector=row["subsector"],
+        subject_path=_get(row, "subject_path"),
         regions=row["regions"] or [],
         image_url=row["image_url"],
         image_outlet=next(iter(outlet_refs([row["image_source_slug"]], registry)), None) if _get(row, "image_source_slug") else None,

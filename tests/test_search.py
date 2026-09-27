@@ -64,6 +64,28 @@ async def test_search_matches_title_and_summary():
             )
 
 
+async def test_search_items_carry_their_subject_path():
+    """The search page's EDU and CIV chips filter what came back by subject root:
+    Education and Civic & Safety records are sector `other`, so without the path
+    the chips lit up and filtered nothing."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:8]
+    eid = uuid.uuid4()
+    async with session_scope() as s:
+        await s.execute(
+            text("INSERT INTO events (id, title, sector, subject_path) VALUES (:i, :t, 'other', 'education.exams')"),
+            {"i": str(eid), "t": f"Board exam {tag} postponed"},
+        )
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+            items = (await ac.get("/api/v1/search", params={"q": tag})).json()["items"]
+        assert [(i["id"], i["subject_path"]) for i in items] == [(str(eid), "education.exams")]
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM events WHERE id = :i"), {"i": str(eid)})
+
+
 # --- the index that keeps this route off a full table scan ----------------------
 # Measured on production before migration c8a3f5d21b74: Seq Scan, ~100ms per query
 # over 19,356 events, growing linearly. The route's leading-wildcard ILIKE cannot

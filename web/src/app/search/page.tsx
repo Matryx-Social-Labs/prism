@@ -8,17 +8,16 @@ import { Masthead } from "@/components/Masthead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { Alert, EmptyState, TextField } from "@/components/ui";
 import { fetchTrending, searchEvents, type FeedItem } from "@/lib/api";
-import { chartOrder } from "@/lib/chart";
 import { loadProfile } from "@/lib/profile";
-import { sectorGroup } from "@/lib/sectors";
+import { navItem, underNav } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 
 /**
  * Search (Design System v2 · Reading board, flow 04): the query field first;
  * before typing, one line on what is searched and the names in the news now
  * (real names off the live stories — nothing when that list is empty, never a
- * canned query); then "Records", counted, on the story row grammar,
- * most-corroborated first, which the subject chips filter in place; a query
+ * canned query); then "Records", counted, on the story row grammar, in the
+ * API's order, which the subject chips filter in place; a query
  * with nothing behind it says so. The board draws a "People and organisations"
  * section first: /api/v1/search returns records only, so it is not drawn. A
  * failed request says so, in its own line — never "no matches" for an error.
@@ -99,12 +98,10 @@ function SearchInner() {
   const term = q.trim();
   useScrollRestore(`search:${term}:scrollY`, resultsTerm === term && results.length > 0);
 
-  // The strip filters what came back; the API searches everything.
-  const shown = useMemo(() => {
-    const g = sectorGroup(group);
-    const rows = g ? results.filter((r) => g.sectors.includes(r.sector ?? "")) : results;
-    return chartOrder(rows);
-  }, [results, group]);
+  // The strip filters what came back; the API searches everything. The API's
+  // order stands: re-sorted most-outlets-first, the exact record for a query
+  // sank below broad stories that merely mention it (audit 2026-09-27).
+  const shown = useMemo(() => results.filter((r) => underNav(group, r)), [results, group]);
 
   const more = !group && results.length >= SEARCH_CAP ? "+" : "";
   const count = searched && !loading && !failed ? `${shown.length}${more} ${shown.length === 1 && !more ? "result" : "results"}` : null;
@@ -162,7 +159,7 @@ function SearchInner() {
               <SectionHead id="records-title" title="Records" sub={strip ?? undefined} />
               <SectorStrip active={group} onPick={setGroup} allHref="/search" allLabel="All stories" />
               {shown.length === 0 && (
-                <EmptyState title={<>None of the {results.length} matches for &ldquo;{term}&rdquo; are in {sectorGroup(group)?.name}.</>} />
+                <EmptyState title={<>None of the {results.length} matches for &ldquo;{term}&rdquo; are in {navItem(group)?.name}.</>} />
               )}
             </>
           )}
