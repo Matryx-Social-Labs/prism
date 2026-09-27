@@ -4,7 +4,7 @@ import { Ago } from "@/components/Ago";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ClipOut } from "@/lib/api";
-import { Headphones, Pause, Play, SkipNext } from "@/components/icons";
+import { ArrowUpRight, Headphones, Pause, Play, SkipNext } from "@/components/icons";
 
 /**
  * "Heard on": the stretches of news podcasts that discussed this story, in the
@@ -253,7 +253,7 @@ function Transcript({ clip, time, playing, freeRun, onKeepListening }: { clip: C
         <span className="font-mono text-[11px]">Transcript {mmss(clip.start_s)}–{mmss(clip.end_s)}</span>
         <span className="ml-auto flex items-center gap-3">
           {clip.episode_url && (
-            <a href={clip.episode_url} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>Full episode ↗</a>
+            <a href={clip.episode_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--ink-2)" }}>Full episode <ArrowUpRight size={12} /></a>
           )}
           {playing && !freeRun && (
             <button type="button" onClick={onKeepListening} className="whitespace-nowrap font-semibold underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>Keep listening</button>

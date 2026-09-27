@@ -28,7 +28,7 @@ describe("the row X's display rules and the record agree on", () => {
     expect(screen.getByRole("link", { name: "@RBI" })).toHaveAttribute("href", "https://x.com/RBI");
     // Verbatim, line break and all — never truncated, never "smartened".
     expect(screen.getByText(/OMO sale of Government of India securities/).textContent).toBe(post().text);
-    expect(screen.getByRole("link", { name: "View on X ↗" })).toHaveAttribute("href", "https://x.com/RBI/status/1001");
+    expect(screen.getByRole("link", { name: "View on X" })).toHaveAttribute("href", "https://x.com/RBI/status/1001");
     expect(document.querySelector("time")?.closest("a")).toHaveAttribute("href", "https://x.com/RBI/status/1001");
     expect(screen.getByLabelText("X")).toBeInTheDocument();
   });
