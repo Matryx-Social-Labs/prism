@@ -1,35 +1,63 @@
-"""Market Pulse digest degrades instead of 500-ing.
+"""Market Pulse degrades to its board, never to a 500 and never to an empty page.
 
-The Pulse is a pure LLM synthesis. When the model is unavailable (quota
-exhausted, timeout), _generate must return None so the route 204s and the feed
-hides the card — never a 500 to every reader (the bug design-review caught: the
-browser reported the 500 as a CORS failure)."""
+The board is the record; the three-line read is the model's. When the model is
+unavailable (quota exhausted, timeout) the board is served without the read —
+the old essay had nothing else to show, so the route 204'd and the page went
+blank (the bug design-review caught: the browser reported the 500 as a CORS
+failure)."""
 
 import pytest
 
 import correlation.digest as digest
+from common.llm import REASONING_OFF
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
-
-async def test_generate_returns_none_when_llm_unavailable(monkeypatch):
-    async def _stories():
-        return [{"id": "e1", "title": "Reliance jumps", "summary": "up", "tickers": ["RELIANCE"], "catalyst": None}]
-
-    async def _boom(*a, **k):
-        raise RuntimeError("llm quota exhausted (402)")
-
-    monkeypatch.setattr(digest, "_top_stories", _stories)
-    monkeypatch.setattr(digest, "structured_chat", _boom)
-    monkeypatch.setattr(digest, "fetch_prompt", lambda name: type("P", (), {"version": None, "compile": lambda self, **kw: []})())
-
-    assert await digest._generate() is None  # synthesis failed → no digest, not an exception
+BOARD = {
+    "companies": [{"symbol": "SBIN", "company": "State Bank of India", "headline": "Bank strike deferred",
+                   "catalyst": None, "reading": "positive", "outlets": 3}],
+    "market_wide": [],
+}
 
 
-async def test_generate_quiet_when_no_stories(monkeypatch):
-    async def _none():
+class _Prompt:
+    version = None
+
+    def compile(self, **_kw):
         return []
 
-    monkeypatch.setattr(digest, "_top_stories", _none)
-    out = await digest._generate()
-    assert out is not None and out["movers"] == []  # empty market ≠ failure; still a valid 200 payload
+
+async def test_a_failed_read_leaves_the_board_without_it(monkeypatch):
+    async def _boom(**_k):
+        raise RuntimeError("llm quota exhausted (402)")
+
+    monkeypatch.setattr(digest, "structured_chat", _boom)
+    monkeypatch.setattr(digest, "fetch_prompt", lambda name: _Prompt())
+    assert await digest._read(BOARD) == []
+
+
+async def test_an_empty_day_never_calls_the_model(monkeypatch):
+    called = []
+
+    async def _spy(**_k):
+        called.append(1)
+
+    monkeypatch.setattr(digest, "structured_chat", _spy)
+    monkeypatch.setattr(digest, "fetch_prompt", lambda name: _Prompt())
+    assert await digest._read({"companies": [], "market_wide": []}) == []
+    assert called == []
+
+
+async def test_the_read_is_a_record_shaped_call_without_reasoning(monkeypatch):
+    """Three lines from the rows need no thinking aloud; thinking tokens share
+    the ceiling and are billed (memory: openrouter reasoning tokens)."""
+    seen = {}
+
+    async def _fake(**k):
+        seen.update(k)
+        return digest.MarketReadLLM(lines=["State Bank of India leads the board.", "Its shares jumped 9%."])
+
+    monkeypatch.setattr(digest, "structured_chat", _fake)
+    monkeypatch.setattr(digest, "fetch_prompt", lambda name: _Prompt())
+    assert await digest._read(BOARD) == ["State Bank of India leads the board."], "9 is on no row"
+    assert seen["reasoning"] == REASONING_OFF
