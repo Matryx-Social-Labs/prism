@@ -508,15 +508,26 @@ async def revalidate(url: str | None = None, apply: bool = False, sample: int = 
             async with c.transaction():
                 for table, col, ids in (("enrichments", "lens_fields", changed), ("events", "projection", rewrite)):
                     await c.executemany(
-                        f"UPDATE {table} SET {col} = jsonb_set(COALESCE({col}, '{{}}'::jsonb), '{{finance}}', "
-                        f"COALESCE({col} -> 'finance', '{{}}'::jsonb) || jsonb_build_object('tickers', $1::jsonb)) "
-                        "WHERE id = $2",
+                        SET_TICKERS.format(table=table, col=col),
                         [(json.dumps(t), i) for i, t in ids.items()],
                     )
     finally:
         await c.close()
     if not apply:
         print("\n  DRY RUN — nothing was written. Re-run with --apply.")
+
+
+# Writes one record's ticker list under `finance`. The column, or its finance
+# key, can hold JSON null (a scalar, which COALESCE does not catch): jsonb_set
+# on it raises "cannot set path in scalar", and `null || {...}` makes an array.
+# The first prod --apply failed on exactly that (2026-09-27), in one
+# transaction, so nothing was written.
+SET_TICKERS = (
+    "UPDATE {table} SET {col} = jsonb_set("
+    "CASE WHEN jsonb_typeof({col}) = 'object' THEN {col} ELSE '{{}}'::jsonb END, '{{finance}}', "
+    "CASE WHEN jsonb_typeof({col} -> 'finance') = 'object' THEN {col} -> 'finance' ELSE '{{}}'::jsonb END "
+    "|| jsonb_build_object('tickers', $1::jsonb)) WHERE id = $2"
+)
 
 
 GOLD_LINKS = "tools/gold_company_links.jsonl"
