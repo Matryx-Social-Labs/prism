@@ -67,7 +67,7 @@ export function Said({
   claims: SpeakerClaims[];
   sourceIndex: Map<string, number>;
   /** article_id → the outlet's icon facts, when the caller has them. */
-  outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined;
+  outletOf?: (articleId: string) => { domain?: string | null; code?: string | null; publisher?: string | null } | undefined;
   /** When set, each quote carries Share → its own address and quote card. */
   eventId?: string;
 }) {
@@ -87,7 +87,7 @@ export function Said({
   );
 }
 
-function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: SpeakerClaims; si: number; prefer: readonly string[]; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { domain?: string | null; code?: string | null } | undefined; eventId?: string }) {
+function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: SpeakerClaims; si: number; prefer: readonly string[]; sourceIndex: Map<string, number>; outletOf?: (articleId: string) => { domain?: string | null; code?: string | null; publisher?: string | null } | undefined; eventId?: string }) {
   // Two quotes per speaker, the rest on request: a minister with nine quotes
   // is a column of italics that buries the next speaker.
   const [all, setAll] = useState(false);
@@ -100,7 +100,7 @@ function SpeakerCard({ sp, si, prefer, sourceIndex, outletOf, eventId }: { sp: S
   // quote's share address and the card behind it reads the API's order.
   const units = unitsForReader(sp.claims, prefer);
   const shown = all ? units : units.slice(0, QUOTES_FOLD);
-  const outlets = new Set(sp.claims.map((c) => c.source_name)).size;
+  const outlets = new Set(sp.claims.map((c) => outletOf?.(c.article_id)?.publisher ?? c.source_name)).size; // by masthead, as the header counts
   const languages = sp.languages ?? [];
   const multilingual = languages.length > 1;
   return (

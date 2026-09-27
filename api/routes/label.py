@@ -320,8 +320,8 @@ async def next_task(
                     """
                     SELECT e.id, e.title,
                            coalesce(e.occurred_at, e.first_seen_at) AS at,
-                           (SELECT count(*) FROM event_memberships m WHERE m.event_id = e.id)
-                             AS source_count,
+                           -- printed "k outlets": the record's publisher count, not its articles
+                           COALESCE((e.projection ->> 'source_count')::int, 0) AS source_count,
                            (SELECT array_agg(en.name ORDER BY en.name)
                             FROM event_entities ee JOIN entities en ON en.id = ee.entity_id
                             WHERE ee.event_id = e.id
