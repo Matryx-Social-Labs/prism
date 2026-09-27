@@ -57,7 +57,10 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
   if (!page) notFound();
   const { node, ancestors, children, story_count, stories } = page;
   const href = (p: string) => `/subject/${p.split(".").join("/")}`;
-  const url = `${SITE_URL}${href(node.path)}`;
+  // Structured data names the page a group's subject defers to (sectorPageFor),
+  // the same address its canonical gives; the visible links stay on the tree.
+  const indexed = (p: string) => `${SITE_URL}${sectorPageFor(p) ?? href(p)}`;
+  const url = indexed(node.path);
   const root = ancestors[0] ?? node;
   // A subject root that is one of the six sector groups has a story list to
   // draw "Developing" from; Education and Civic have none, so no rail.
@@ -81,7 +84,7 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
           __html: jsonLd(
             breadcrumbLd([
               { name: "Prism", url: `${SITE_URL}/` },
-              ...ancestors.map((a) => ({ name: a.label, url: `${SITE_URL}${href(a.path)}` })),
+              ...ancestors.map((a) => ({ name: a.label, url: indexed(a.path) })),
               { name: node.label, url },
             ]),
           ),
