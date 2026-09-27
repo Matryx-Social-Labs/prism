@@ -249,6 +249,7 @@ All routes require an account session (`get_current_user`) — this sits in fron
 | `GET /api/v1/admin/metrics` | `days` (1-366, default 28) | `common.metrics.dashboard`. |
 | `GET /api/v1/admin/metrics/weekly.csv` | `weeks` (1-104, default 12) | Returns `text/csv` directly (not a JSON model), with `Content-Disposition: attachment; filename="prism-weekly.csv"`. |
 | `GET /api/v1/admin/coverage` | `days` (1-366, default 28) | Outlet co-coverage graph (`common.coverage.network`) — feeds `/admin/coverage`'s 3D visualization on the frontend. |
+| `GET /api/v1/admin/spend` | `days` (1-120, default 14) | Model spend per stage per UTC day from the ledger (`common/spend.py`), plus the OpenRouter balance and the collection floor — feeds `/admin/spend`. A day before the ledger existed has `recorded: false`. |
 
 ## Photos — no placeholder or fallback images (`common/images.py`)
 

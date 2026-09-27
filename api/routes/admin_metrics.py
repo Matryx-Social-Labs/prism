@@ -3,6 +3,7 @@
 GET /api/v1/admin/metrics?days=28        — visits, sign-ups, engagement, money, demand, supply
 GET /api/v1/admin/metrics/weekly.csv     — one row per IST week, counts only, for investors
 GET /api/v1/admin/coverage?days=28       — outlets linked by the stories they share (common/coverage)
+GET /api/v1/admin/spend?days=14          — model spend per stage per day (common/spend) + the balance
 
 Founder-only (api/deps.require_admin_user). common/metrics says what every
 number is, where it is counted, and what is deliberately not computed.
@@ -18,7 +19,8 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import require_admin_user
-from common import coverage, metrics
+from common import budget, coverage, metrics, spend
+from common.config import get_settings
 from common.db import get_db
 
 router = APIRouter()
@@ -60,3 +62,17 @@ async def coverage_network(
 ):
     response.headers.update(PRIVATE)
     return await coverage.network(db, metrics.window(days))
+
+
+@router.get("/api/v1/admin/spend")
+async def model_spend(
+    response: Response,
+    days: Annotated[int, Query(ge=1, le=spend.KEEP_DAYS)] = 14,
+    _: str = Depends(require_admin_user),
+):
+    """What the models cost, per stage per day, from the ledger every model call
+    writes (common/spend). Days before the ledger existed come back
+    `recorded: false` — absent, not zero."""
+    response.headers.update(PRIVATE)
+    return {"days": await spend.days(days), "balance": await budget.current(),
+            "floor": get_settings().prism_llm_budget_floor_usd}

@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 import httpx
 from sqlalchemy import text
 
+from common import spend
 from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_texts
@@ -148,6 +149,7 @@ async def transcribe_episode(episode_id: uuid.UUID) -> int:
         async with podcast_client(httpx.Timeout(300.0, connect=30.0)) as http:
             path, size = await _download(ep["audio_url"], http)
             segments, words, duration, cost = await transcribe_file(path, language, http)
+        await spend.record("podcast-transcribe", TRANSCRIBE_MODEL, cost=cost)
         wins = windows_from_segments(segments, words)
         vecs = await embed_texts([w.text for w in wins]) if wins else []
         async with session_scope() as s:

@@ -42,7 +42,7 @@ async def test_reasoning_off_is_sent_and_mandatory_reasoning_falls_back_to_minim
     get_settings.cache_clear()
     out = await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t", reasoning=llm.REASONING_OFF)
     assert out.ok is True
-    assert calls == [{"reasoning": {"enabled": False}}, {"reasoning": {"effort": "minimal"}}]
+    assert calls == [{"usage": {"include": True}, "reasoning": {"enabled": False}}, {"usage": {"include": True}, "reasoning": {"effort": "minimal"}}]
 
 
 @pytest.mark.asyncio
@@ -76,7 +76,7 @@ async def test_known_mandatory_reasoning_model_starts_at_minimal(monkeypatch):
         reasoning=llm.REASONING_OFF,
     )
     assert out.ok is True
-    assert calls == [{"reasoning": {"effort": "minimal"}}]
+    assert calls == [{"usage": {"include": True}, "reasoning": {"effort": "minimal"}}]
 
 
 async def _noop():
@@ -191,8 +191,8 @@ async def test_a_content_policy_block_moves_the_article_to_the_fallback_model(mo
     assert out.ok is True
     # one refusal, then the fallback with the reasoning payload IT accepts
     assert models == [
-        ("google/gemini-3.1-flash-lite", {"reasoning": {"enabled": False}}),
-        ("z-ai/glm-5.3-flash", {"reasoning": {"effort": "minimal"}}),
+        ("google/gemini-3.1-flash-lite", {"usage": {"include": True}, "reasoning": {"enabled": False}}),
+        ("z-ai/glm-5.3-flash", {"usage": {"include": True}, "reasoning": {"effort": "minimal"}}),
     ]
 
 

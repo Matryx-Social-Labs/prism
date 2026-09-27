@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 
 from agent.structure import TailSplitter
+from common import spend
 from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_query
@@ -185,7 +186,8 @@ async def answer_stream(
             # retain nor train on it only (common/llm.PRIVATE_PROVIDERS).
             extra_body={
                 "reasoning": reasoning_payload(model, REASONING_OFF),
-                **({"provider": PRIVATE_PROVIDERS} if settings.llm_provider == "openrouter" else {}),
+                # The final chunk then carries the answer's usage and cost (common/spend).
+                **({"provider": PRIVATE_PROVIDERS, "usage": {"include": True}} if settings.llm_provider == "openrouter" else {}),
             },
             name="agent-qa",
             metadata={
@@ -194,7 +196,10 @@ async def answer_stream(
                 "langfuse_session_id": str(session_id),
             },
         )
+        usage_part = None
         async for part in response:
+            if getattr(part, "usage", None) is not None:
+                usage_part = part
             delta = part.choices[0].delta.content if part.choices else None
             if delta:
                 for out in splitter.feed(delta):
@@ -204,6 +209,8 @@ async def answer_stream(
         if rest:
             full_text += rest
             yield {"type": "token", "text": rest}
+        if usage_part is not None:
+            await spend.record_response(usage_part, "agent-qa", model)
     except Exception:
         logger.exception("agent_completion_failed", event_id=str(event_id))
         yield {"type": "error", "message": "The agent is unavailable right now. Please retry."}
