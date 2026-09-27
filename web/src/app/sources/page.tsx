@@ -83,17 +83,16 @@ export default async function SourcesPage() {
               </p>
             </div>
 
+            {/* An origin with no outlet is left out: an empty "International"
+                group read as a promise of outlets Prism does not read. */}
             {ORIGINS.map((origin) => {
               const group = feeds.filter((f) => f.origin === origin);
+              if (!group.length) return null;
               const outlets = new Set(group.map((f) => f.publisher)).size;
               return (
                 <section key={origin} aria-labelledby={`origin-${origin}`} className="grid grid-cols-[minmax(0,1fr)] gap-1">
-                  <SectionHead id={`origin-${origin}`} title={ORIGIN_LABEL[origin]} sub={group.length ? `${plural(outlets, "outlet")} · ${plural(group.length, "feed")}` : "0 outlets"} />
-                  {group.length ? (
-                    <ul>{group.map((f) => <FeedRow key={f.slug} feed={f} />)}</ul>
-                  ) : (
-                    <p style={{ font: "400 13px/1.5 var(--font-read)", color: "var(--ink-3)" }}>None read yet.</p>
-                  )}
+                  <SectionHead id={`origin-${origin}`} title={ORIGIN_LABEL[origin]} sub={`${plural(outlets, "outlet")} · ${plural(group.length, "feed")}`} />
+                  <ul>{group.map((f) => <FeedRow key={f.slug} feed={f} />)}</ul>
                 </section>
               );
             })}
