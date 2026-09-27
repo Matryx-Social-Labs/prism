@@ -34,7 +34,7 @@ from api.schemas import (
     XPostOut,
 )
 from common import outlets, usage
-from common.billing import plan_for
+from common.billing import PLUS, plan_for
 from common.config import get_settings
 from common.db import get_db
 from common.images import hi_res, is_placeholder, placeholders
@@ -65,6 +65,13 @@ from enrichment.renderings import apply as apply_renderings
 from enrichment.renderings import claim_key
 
 logger = get_logger(__name__)
+
+
+async def _on_plus(db: AsyncSession, user_id: uuid.UUID | None) -> bool:
+    """Plus opens every lens on every story (docs/BUSINESS-MODEL.md §3). The
+    three lens gates below asked only for per-story unlocks and free samples,
+    so a reader on an active yearly plan read "0 left" (2026-09-27)."""
+    return user_id is not None and await plan_for(db, user_id) == PLUS
 router = APIRouter()
 
 
@@ -436,12 +443,14 @@ async def get_event(
     # voice in review; the server-side gate has to live wherever the content
     # leaves the server, not only on the route that generates it.
     #
-    # Reader lens is always included. Anything else is included only for a
-    # reader who has unlocked it.
+    # Reader lens is always included. Anything else is included for Plus, or
+    # for a reader who has unlocked it on this story.
     all_briefs = projection.get("lens_briefs") or {}
     all_points = projection.get("lens_points") or {}
     allowed = {READER_LENS}
-    if user_id is not None:
+    if await _on_plus(db, user_id):
+        allowed |= set(LENSES)
+    elif user_id is not None:
         allowed |= await unlocked_lenses(db, user_id, event_id)
     briefs = {k: v for k, v in all_briefs.items() if k in allowed}
     points = {k: v for k, v in all_points.items() if k in allowed}
@@ -578,7 +587,9 @@ async def get_brief(
     if paid:
         if user_id is None:
             raise HTTPException(status_code=401, detail="sign in to open this lens")
-        if not await has_unlocked(db, user_id, event_id, lens):
+        # Plus reads every lens and never spends a sample; free readers claim
+        # the lens on this story and pay one sample for it.
+        if not await _on_plus(db, user_id) and not await has_unlocked(db, user_id, event_id, lens):
             # Claim first, then debit: the claim is the concurrency winner, so
             # two tabs cannot both spend a sample on the same lens.
             claimed_now = await record_unlock(db, user_id, event_id, lens)
@@ -648,7 +659,7 @@ async def get_questions(
     unlocked = (
         user_id is not None
         and lens is not None
-        and await has_unlocked(db, user_id, event_id, lens)
+        and (await _on_plus(db, user_id) or await has_unlocked(db, user_id, event_id, lens))
     )
     return QuestionsResponse(
         questions=suggested_questions(row["projection"], lens, unlocked=unlocked)
