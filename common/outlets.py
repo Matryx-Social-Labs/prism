@@ -183,12 +183,20 @@ def domain_for(publisher: str, slug: str) -> str | None:
 # the records sitemap and IndexNow all read this, so they cannot disagree.
 RECORD_MIN_OUTLETS = 2
 
+# Feeds that publish database rows, not journalism: an event sourced WHOLLY from
+# these is a raw record (api/routes/feed keeps it out of the news window), and
+# neither is an outlet when counting who reported a story. Declared once; the
+# feed's SQL, IndexNow and the rule below read this.
+RAW_RECORD_FEEDS = frozenset({"nvd", "cisa_kev"})
+
 
 def record_indexable(source_slugs: list[str], registry: dict[str, Outlet] | None) -> bool:
-    """Outlets are counted the way the page prints them: by publisher, and by
-    slug for sources the registry does not know (lib/coverage.publishers)."""
-    known = {registry[s].publisher for s in source_slugs if registry and s in registry}
-    return len(known or set(source_slugs)) >= RECORD_MIN_OUTLETS
+    """Outlets are counted the way the page prints them: by publisher among the
+    registered sources, or by slug when none is registered (lib/coverage.publishers).
+    Raw-record feeds are not outlets: a CVE both NVD and CISA carry is one record."""
+    news = [s for s in source_slugs if s not in RAW_RECORD_FEEDS]
+    known = {registry[s].publisher for s in news if registry and s in registry}
+    return len(known or set(news)) >= RECORD_MIN_OUTLETS
 
 
 _cache: tuple[float, dict[str, Outlet]] | None = None

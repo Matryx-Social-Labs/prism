@@ -13,6 +13,7 @@ from common.config import get_settings
 from common.db import get_db
 from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
+from common.outlets import RAW_RECORD_FEEDS
 from common.taxonomy import TAXONOMY
 
 router = APIRouter()
@@ -22,7 +23,7 @@ router = APIRouter()
 # real coverage. Declared once — the SQL and the JSON form have to agree, and
 # when they drifted the window quotaed one set of rows while the filter dropped
 # another.
-CVE_ONLY_SOURCES = frozenset({"nvd", "cisa_kev"})
+CVE_ONLY_SOURCES = RAW_RECORD_FEEDS
 CVE_ONLY_JSON = json.dumps(sorted(CVE_ONLY_SOURCES))
 
 # The candidate window, per sector (see get_feed). Constants, never input.

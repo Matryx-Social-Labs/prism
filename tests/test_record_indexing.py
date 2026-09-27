@@ -59,6 +59,17 @@ def test_unregistered_sources_count_as_themselves():
     assert record_indexable(["zz_a"], None) is False
 
 
+def test_raw_record_feeds_are_not_outlets():
+    """NVD and CISA KEV publish database rows, not journalism (api/routes/feed
+    keeps them out of the news window). A CVE both feeds carry is still one
+    machine record — review of #219: without this it counted as two outlets."""
+    reg = {**REGISTRY, "nvd": _outlet("nvd", "nvd"), "cisa_kev": _outlet("cisa_kev", "cisa_kev")}
+    assert record_indexable(["nvd", "cisa_kev"], reg) is False
+    assert record_indexable(["nvd", "cisa_kev"], {}) is False
+    assert record_indexable(["nvd", "hindu_national"], reg) is False, "one newsroom is still one outlet"
+    assert record_indexable(["nvd", "hindu_national", "express"], reg) is True
+
+
 def test_a_feed_row_carries_the_rule():
     row = {"id": uuid.uuid4(), "title": "t", "summary": None, "sector": "politics", "subsector": None, "regions": [],
            "image_url": None, "occurred_at": None, "last_updated_at": dt.datetime.now(dt.UTC),

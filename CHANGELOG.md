@@ -15,7 +15,9 @@ named one event while the page showed another.**
 
 - **A record asks to be indexed from its second outlet on**
   (`common/outlets.record_indexable`, counted by publisher as the page prints
-  outlets). 86% of 90 days' records have one source. They stay readable and
+  outlets). The raw-record feeds (NVD, CISA KEV) are not outlets, so a CVE
+  both carry is still one machine record. 86% of 90 days' records have one
+  source. They stay readable and
   linked (`noindex, follow`) and become indexable when a second outlet
   reports. The record page, its quote pages, the feed rows (`indexable`), the
   records sitemap, `sitemap.xml`, the news sitemap and IndexNow all read the

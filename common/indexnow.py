@@ -19,14 +19,14 @@ from sqlalchemy import text
 from common import outlets
 from common.config import get_settings
 from common.logging import get_logger
-from common.outlets import record_indexable
+from common.outlets import RAW_RECORD_FEEDS, record_indexable
 from common.stories import STORY_BOUNDARY_STATUS
 
 logger = get_logger(__name__)
 
 # The feed's own rule (api/routes/feed.py): a record whose only sources are the
 # CVE feeds is not journalism and is not served — so not pinged either.
-CVE_ONLY_JSON = json.dumps(sorted({"nvd", "cisa_kev"}))
+CVE_ONLY_JSON = json.dumps(sorted(RAW_RECORD_FEEDS))
 
 KEY = "f03e0a4bf99412be88776a3ae743d5fd"
 ENDPOINT = "https://api.indexnow.org/indexnow"

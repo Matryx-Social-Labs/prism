@@ -141,7 +141,7 @@ def report(pages: list[Page], out: Path | None) -> None:
                 print(f"  {p.url.replace(SITE, '')[:70]:<70}  {p.problems}")
     for t, us in list(dup_titles.items())[:3]:
         print(f"  same title {t[:60]!r}: {', '.join(u.replace(SITE, '') for u in us[:3])}")
-    if out:
+    if out and pages:
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=list(asdict(pages[0])))
