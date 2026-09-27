@@ -223,9 +223,166 @@ def _narrates(quote: str, speaker: str) -> bool:
                for pattern in (_WORD_BEFORE_VERB, _WORD_AFTER_VERB) for m in pattern.finditer(quote))
 
 
-def check_quote(text: str, quote: str, speaker: str, start: int | None = None) -> tuple[str | None, str, int]:
-    """Why these words may not be shown as the speaker's quote (None when they
-    may), the quote as shown, and where it starts in flat_ws(text).
+# ── Reported speech, Indian-language articles only (founder decision, 28 Sep) ─
+#
+# Direct-only cost 55% of Indian-language claims against 16% of English ones
+# (live window, 27 Sep): Hindi, Kannada, Malayalam and Odia outlets mostly print
+# what someone said without quotation marks — "X ने कहा कि…", "…ಎಂದು X
+# ಹೇಳಿದರು". Such words are kept when the article attributes them with a speech
+# verb in its language's own pattern AND names the speaker near them, and they
+# are served as "reported", never as a quote. English stays direct only.
+#
+# Every pattern below was read off the unquoted claims of 6,987 Indian-language
+# articles (21 days, prod, read-only), not written from memory. Measured: 2,520
+# claims come back; a hand check of 40 of them found every attribution right
+# (3 are joint statements, credited to one of the people who made them).
+
+REPORTED_LANGS = frozenset({"hi", "mr", "ur", "gu", "pa", "bn", "as", "or", "ta", "te", "kn", "ml"})
+# A speech verb, then "that" or a comma, right before the words.
+_SAID_THAT = {
+    "hi": r"कहा|बताया|कहना\s+(?:है|था|हैं|थे)|कहते\s+हैं|लिखा|पूछा|जोड़ा|दावा\s+किया|आरोप\s+लगाया|चेतावनी\s+दी|जानकारी\s+दी|स्पष्ट\s+किया",
+    "mr": r"म्हणाले|म्हणाल्या|म्हणाला|सांगितले|सांगितलं|म्हटले|म्हटलं",
+    "ur": r"کہا|بتایا|کہنا\s+(?:ہے|تھا)|کہتے\s+ہیں|لکھا|پوچھا",
+    "gu": r"કહ્યું|જણાવ્યું|કહે\s+છે|કહેવું\s+છે",
+    "pa": r"ਕਿਹਾ|ਦੱਸਿਆ|ਆਖਿਆ|ਕਹਿਣਾ\s+ਹੈ",
+    "bn": r"বলেন|বলেছেন|বলছেন|জানান|জানিয়েছেন",
+    "as": r"কয়|কৈছে|ক'লে|কলে|জনায়|জনাইছে",
+    "or": r"କହିଛନ୍ତି|କହିଥିଲେ|କହିଲେ|କହନ୍ତି",
+    "ta": r"கூறியது|கூறியதாவது|தெரிவித்ததாவது|கூறுகையில்|பேசுகையில்|கூறியிருப்பதாவது|பதிவிட்டுள்ளதாவது",
+    "te": r"మాట్లాడుతూ|అన్నారు|తెలిపారు|పేర్కొన్నారు",
+    "kn": r"ಮಾತನಾಡಿ|ಹೇಳಿದರು|ತಿಳಿಸಿದರು",
+    "ml": r"പറഞ്ഞു|വ്യക്തമാക്കി",
+}
+_THAT = r"(?:\s*(?:कि|की|کہ|કે|ਕਿ|যে|ଯେ))?\s*[,:\-–—]*\s*\.{0,2}\s*$"
+# A quotative right after the words ("…ಎಂದು", "…என்று", "…ବୋଲି")…
+_QUOTATIVE = {
+    "kn": r"ಎಂದು|ಎಂದರು|ಎಂದಿದ್ದಾರೆ|ಎಂದಿದ್ದರು|ಎಂಬುದಾಗಿ", "ta": r"என்று|என்றார்|என்றாா்|என்றனர்|என|எனத்|என்றும்",
+    "te": r"అని|అన్నారు", "ml": r"എന്ന്|എന്നും|എന്നാണ്", "or": r"ବୋଲି", "as": r"বুলি", "mr": r"असं|असे|अशी|असा",
+    "bn": r"বলে", "gu": r"એમ|તેમ",
+}
+# …then, before the sentence ends, a verb that reports speech.
+_SPEECH_ACT = {
+    "kn": r"ಎಂದರು|ಎಂದಿದ್ದಾರೆ|ಎಂದಿದ್ದರು|ಹೇಳಿದ|ಹೇಳು|ತಿಳಿಸಿದ|ನೀಡಿದ|ಒತ್ತಾಯಿಸಿದ|ವ್ಯಕ್ತಪಡಿಸಿದ|ಆಗ್ರಹಿಸಿದ|ಎಚ್ಚರಿಸಿದ|ಆರೋಪಿಸಿದ|ದೂರಿದ|ಸೂಚಿಸಿದ|ವಿವರಿಸಿದ|ಅಭಿಪ್ರಾಯಪಟ್ಟ|ಸ್ಪಷ್ಟಪಡಿಸಿದ|ಟೀಕಿಸಿದ|ಪ್ರಶ್ನಿಸಿದ|ಮನವಿ\s+ಮಾಡಿದ|ಕರೆ\s+ನೀಡಿದ",
+    "ta": r"என்றார்|என்றாா்|என்றனர்|என்கிற|தெரிவித்|கூறி|கூறின|விடுத்|எச்சரித்|வலியுறுத்தின|பதிவிட்|சாட்டின|சாட்டியிருந்|குறிப்பிட்",
+    "te": r"అన్నారు|దుయ్యబట్టారు|చెప్పుకొచ్చా|రాశారు|విమర్శించారు|తోసిపుచ్చారు|ధ్వజమెత్తారు|హెచ్చరించారు|తెలిపారు|పేర్కొన్నారు|చెప్పారు|వెల్లడించారు",
+    "ml": r"പറഞ്ഞു|വ്യക്തമാക്കി|ആവശ്യപ്പെട്ടു|അറിയിച്ചു|ആരോപിച്ചു|പ്രതികരിച്ചു|കുറ്റപ്പെടുത്തി|കൂട്ടിച്ചേർത്തു|അഭിപ്രായപ്പെട്ടു|ചൂണ്ടിക്കാട്ടി|കുറിച്ചു|പറയുന്നു|വിമർശിച്ചു|പ്രസ്താവിച്ചു|ഓർമിപ്പിച്ചു|പറയുന്നത്|വിശദീകരിച്ചു",
+    "or": r"କହିଛନ୍ତି|କହିଥିଲେ|କହିଲେ|ଅଭିଯୋଗ\s+କରିଛନ୍ତି|ସୂଚନା\s+ଦେଇଛନ୍ତି",
+    "as": r"কয়|কৈছে|মন্তব্য|জনায়|দাবী",
+    "mr": r"सांगितले|सांगितलं|म्हटलं|म्हटले|म्हणाले|म्हणाला|म्हणाल्या",
+    "bn": r"দাবি|বলেন|জানান",
+    "gu": r"કહ્યું|જણાવ્યું",
+}
+_SAID_THAT_RE = {lang: re.compile(f"(?:{p}){_THAT}") for lang, p in _SAID_THAT.items()}
+_QUOTATIVE_RE = {lang: re.compile(rf"[\W]*(?:{p})(?!\w)") for lang, p in _QUOTATIVE.items()}
+_SPEECH_ACT_RE = {lang: re.compile(f"(?:{p})") for lang, p in _SPEECH_ACT.items()}
+# The reporter's own framing inside the words: a second "he said that" ("…है.
+# उन्होंने इसे … बताया है."), or a quotative and its verb ending a sentence
+# ("…ಎಂದು ಆರೋಪಿಸಿದರು.") — the span ran on past what was reported.
+_NOT_A_LETTER = r"(?![ऀ-ॿ])"
+_REPORTER_INSIDE = {
+    "hi": re.compile(r"(?:उन्होंने|उनका|उनके)(?:\s+\S+){0,10}?\s+(?:कहा|बताया|कहना\s+(?:है|था)|मुताबिक|अनुसार)"
+                     rf"{_NOT_A_LETTER}(?:\s*(?:कि|,|-|:)|\s+है\s*[.।])"),
+    "ur": re.compile(r"(?:انہوں نے|انھوں نے|ان کا|ان کے)(?:\s+\S+){0,10}?\s+(?:کہا|بتایا|کہنا\s+(?:ہے|تھا)|مطابق)\s*(?:کہ|،|,)"),
+    **{lang: re.compile(rf"(?:{q})(?:\s+\S+){{0,8}}?\s+(?:{_SPEECH_ACT[lang]})\S*\s*[.।]") for lang, q in _QUOTATIVE.items()},
+}
+# Malayalam fuses its quotative onto the last word ("…സ്വീകരിക്കണമെന്ന്").
+_FUSED_QUOTATIVE = re.compile(r"(?:ന്ന്|ന്നും)$")
+# A sentence ends at a danda, "?", "!", or a full stop after a word of four or
+# more characters — "ಡಾ." and "ಎಚ್.ಸಿ." are initials, not sentence ends.
+_REPORT_END = re.compile(r"[।॥۔!?]|(?<=[^\s.]{4})\.(?=\s|$)")
+
+# Consonant skeletons: speaker names are canonicalised to English by the
+# extractor, while the article prints them in its script. Every Brahmic block
+# (Devanagari U+0900 … Malayalam U+0D00) shares one layout, so one table of
+# offsets reads nine scripts; Urdu has its own. Classes merge what one script
+# cannot tell apart (Tamil has one letter for k/g, one for t/d, one for c/s).
+_BRAHMIC = {
+    0x01: "n", 0x02: "n", 0x0B: "r", 0x43: "r", 0x44: "r", 0x60: "r",
+    0x15: "k", 0x16: "k", 0x17: "k", 0x18: "k", 0x19: "n",
+    0x1A: "s", 0x1B: "s", 0x1C: "s", 0x1D: "s", 0x1E: "n",
+    0x1F: "t", 0x20: "t", 0x21: "t", 0x22: "t", 0x23: "n",
+    0x24: "t", 0x25: "t", 0x26: "t", 0x27: "t", 0x28: "n", 0x29: "n",
+    0x2A: "p", 0x2B: "p", 0x2C: "p", 0x2D: "p", 0x2E: "n",
+    0x30: "r", 0x31: "r", 0x32: "l", 0x33: "l", 0x34: "l", 0x36: "s", 0x37: "s", 0x38: "s",
+    0x58: "k", 0x59: "k", 0x5A: "k", 0x5B: "s", 0x5C: "r", 0x5D: "r", 0x5E: "p",
+    0x7A: "n", 0x7B: "n", 0x7C: "r", 0x7D: "l", 0x7E: "l", 0x7F: "k",
+}
+_ARABIC = {
+    "ب": "p", "پ": "p", "ت": "t", "ٹ": "t", "ث": "s", "ج": "s", "چ": "s", "خ": "k", "د": "t", "ڈ": "t", "ذ": "s",
+    "ر": "r", "ڑ": "r", "ز": "s", "ژ": "s", "س": "s", "ش": "s", "ص": "s", "ض": "s", "ط": "t", "ظ": "s", "غ": "k",
+    "ف": "p", "ق": "k", "ک": "k", "ك": "k", "گ": "k", "ل": "l", "م": "n", "ن": "n", "ں": "n",
+}
+_LATIN_DIGRAPHS = (("sh", "s"), ("ch", "s"), ("th", "t"), ("dh", "t"), ("bh", "p"), ("ph", "p"), ("kh", "k"), ("gh", "k"), ("jh", "s"))
+_LATIN_CLASS = str.maketrans({"g": "k", "q": "k", "c": "k", "x": "k", "j": "s", "z": "s", "d": "t", "b": "p", "f": "p", "m": "n"})
+_REPEAT = re.compile(r"(.)\1+")
+_NAME_SPLIT = re.compile(r"[\s.]+")
+
+
+def _native_skeleton(word: str) -> str:
+    out = []
+    for ch in word:
+        cp = ord(ch)
+        c = _BRAHMIC.get(cp & 0x7F) if 0x0900 <= cp <= 0x0D7F else _ARABIC.get(ch)
+        if c:
+            out.append(c)
+    return _REPEAT.sub(r"\1", "".join(out))
+
+
+def _latin_skeleton(word: str) -> str:
+    w = re.sub(r"[^a-z]", "", word.lower())
+    for a, b in _LATIN_DIGRAPHS:
+        w = w.replace(a, b)
+    return _REPEAT.sub(r"\1", re.sub(r"[aeiouyhvw]", "", w).translate(_LATIN_CLASS))
+
+
+def named_in(speaker: str, text: str) -> bool:
+    """Is this (English-spelled) speaker named in `text`, in the article's own
+    script? The surname's skeleton, three consonants or more, opening a word
+    (a case ending may follow: "ಸಿದ್ದರಾಮಯ್ಯನವರು"), or every part of the name in
+    a row. Shorter names prove nothing on their own."""
+    names = [s for s in (_latin_skeleton(w) for w in _NAME_SPLIT.split(speaker)) if s]
+    words = [s for s in (_native_skeleton(w) for w in _NAME_SPLIT.split(text)) if s]
+    if not names:
+        return False
+    if len(names[-1]) >= 3 and any(w.startswith(names[-1]) for w in words):
+        return True
+    n = len(names)
+    return n > 1 and any(all(words[i + j].startswith(names[j]) for j in range(n)) for i in range(len(words) - n + 1))
+
+
+def _reported(flat: str, s: int, e: int, speaker: str, lang: str) -> str | None:
+    """Why the unquoted words flat[s:e] are not the speaker's reported speech,
+    or None when they are: a speech verb attributes them in the language's own
+    pattern, and the speaker is named where the nearest-speaker rule looks —
+    NEAR_CHARS before the words, or after them in the attribution itself."""
+    ends = [m.end() for m in _REPORT_END.finditer(flat, max(0, s - NEAR_CHARS), s)]
+    sentence_before = flat[ends[-1] if ends else max(0, s - NEAR_CHARS):s]
+    attribution = ""  # after the words: the quotative up to its speech verb
+    if lang in _SAID_THAT_RE and _SAID_THAT_RE[lang].search(sentence_before):
+        pass  # "…X ने कहा कि" right before the words
+    elif lang in _QUOTATIVE_RE and ((q := _QUOTATIVE_RE[lang].match(flat, e, e + 40)) or (lang == "ml" and _FUSED_QUOTATIVE.search(flat, s, e))):
+        at = q.end() if q else e
+        said = q and _SPEECH_ACT_RE[lang].search(q.group())  # "…ಎಂದರು": the quotative is the verb
+        verb = None if said else _SPEECH_ACT_RE[lang].search(flat, at, at + NEAR_CHARS)
+        if not said and (verb is None or _REPORT_END.search(flat, at, verb.start())):
+            return "not_quoted"
+        attribution = flat[e:verb.end() if verb else at]
+    else:
+        return "not_quoted"
+    if not named_in(speaker, flat[max(0, s - NEAR_CHARS):s] + " " + attribution):
+        return "not_named"
+    if named_in(speaker, flat[s:e]) or (lang in _REPORTER_INSIDE and _REPORTER_INSIDE[lang].search(flat, s, e)):
+        return "narration"
+    return None
+
+
+def check_quote(
+    text: str, quote: str, speaker: str, start: int | None = None, lang: str | None = None,
+) -> tuple[str | None, str, int, str]:
+    """Why these words may not be shown as the speaker's (None when they may),
+    the words as shown, where they start in flat_ws(text), and how the article
+    gives them: "direct" (inside its quotation marks) or "reported" (an
+    Indian-language article's "X said that…", when `lang` is one).
 
     `start` is the stored span, trusted only while the words are still there.
     The quotation marks the model sometimes copies with the words are trimmed:
@@ -236,7 +393,7 @@ def check_quote(text: str, quote: str, speaker: str, start: int | None = None) -
     if start is None or flat[start:start + len(quote)] != quote:
         start = flat.find(quote) if quote else -1
         if start < 0:
-            return "not_verbatim", quote, -1
+            return "not_verbatim", quote, -1, "direct"
     trimmed = quote.strip(_DOUBLE + _SINGLE + " ")
     start += len(quote) - len(quote.lstrip(_DOUBLE + _SINGLE + " "))
     # The span in the raw text, whose line breaks mark the paragraphs. The raw
@@ -248,23 +405,31 @@ def check_quote(text: str, quote: str, speaker: str, start: int | None = None) -
     else:
         m = re.compile(r"\s+".join(map(re.escape, trimmed.split(" ")))).search(text, start) if trimmed else None
         raw = m.span() if m else None
+    speech = "direct"
     if raw is None or not _quoted(text, *raw):
-        return "not_quoted", trimmed, start
+        if not trimmed or lang not in REPORTED_LANGS:
+            return "not_quoted", trimmed, start, speech
+        why = _reported(flat, start, start + len(trimmed), speaker, lang)
+        if why:
+            return why, trimmed, start, speech
+        speech = "reported"
     if len(trimmed.split()) < MIN_QUOTE_WORDS or _WORD_LIST.fullmatch(trimmed):
-        return "fragment", trimmed, start
+        return "fragment", trimmed, start, speech
     if _narrates(trimmed, speaker):
-        return "narration", trimmed, start
-    return None, trimmed, start
+        return "narration", trimmed, start, speech
+    return None, trimmed, start, speech
 
 
-def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], dict[str, int]]:
+def verify_claims(claims: list[Claim], clean_text: str, lang: str | None = None) -> tuple[list[Claim], dict[str, int]]:
     """Keep the claims whose quote really appears in the article, inside its
-    quotation marks. Repair spans.
+    quotation marks — or, in an Indian-language article (`lang`), reported
+    with a speech verb beside the speaker's name. Repair spans.
 
     Returns (kept, rejected_by_reason). The reasons are counted rather than
     discarded so extraction quality stays measurable without re-reading articles.
     """
-    rejected = {"no_speaker": 0, "short_quote": 0, "not_verbatim": 0, "not_quoted": 0, "narration": 0, "fragment": 0}
+    rejected = {"no_speaker": 0, "short_quote": 0, "not_verbatim": 0, "not_quoted": 0, "not_named": 0,
+                "narration": 0, "fragment": 0}
     if not clean_text:
         return [], rejected
 
@@ -285,7 +450,7 @@ def verify_claims(claims: list[Claim], clean_text: str) -> tuple[list[Claim], di
             # counted here so nobody has to guess how often it happens.
             rejected["not_verbatim"] += 1
             continue
-        why, quote, at = check_quote(clean_text, quote, c.speaker, at)
+        why, quote, at, _ = check_quote(clean_text, quote, c.speaker, at, lang)
         if why:
             rejected[why] += 1
             continue
@@ -331,7 +496,8 @@ _SENTENCE_END = re.compile(r"""[.!?।]["'”’]*\s""")
 class Said:
     """One quote as the card will show it: `start` indexes flat_ws of the
     article (`src`, the article row), `also` holds the other reports that
-    printed the same words."""
+    printed the same words, `speech` says how this article gives them
+    ("direct" or "reported", check_quote)."""
 
     speaker: str
     quote: str
@@ -340,6 +506,7 @@ class Said:
     src: Mapping[str, Any]
     role: str | None = None
     also: tuple[Said, ...] = ()
+    speech: str = "direct"
 
 
 @lru_cache(maxsize=4096)
@@ -446,7 +613,8 @@ def one_speaker_per_quote(said: list[Said]) -> list[Said]:
 def collapse_repeats(said: list[Said]) -> list[Said]:
     """One row per thing said. The same words from one speaker in four outlets
     are one quote carried four times (live: the SSP's "When we reached here…"
-    ×4): the earliest report is the citation, the rest ride on it as `also`.
+    ×4): the earliest report is the citation, the rest ride on it as `also`;
+    an outlet that quoted the words outranks one that only reported them.
     Rows keep the order they were first met in."""
     rows: list[Said] = []
     keys: list[str] = []
@@ -460,7 +628,8 @@ def collapse_repeats(said: list[Said]) -> list[Said]:
         r = rows[at]
         if s.src["article_id"] in {m.src["article_id"] for m in (r, *r.also)}:
             continue  # one article printing it twice is still one report
-        lead, other = (s, r) if _published(s) < _published(r) else (r, s)
+        # The quoted words lead over a report of them, then the earliest report.
+        lead, other = (s, r) if (s.speech != "direct", _published(s)) < (r.speech != "direct", _published(r)) else (r, s)
         rows[at] = replace(lead, also=tuple(sorted((*r.also, replace(other, also=())), key=_published)))
     return rows
 

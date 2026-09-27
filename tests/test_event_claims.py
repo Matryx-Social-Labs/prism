@@ -64,6 +64,8 @@ def test_only_verified_fields_leave_the_server():
         # The quote's address (its words, not its position) and the other
         # outlets that printed the same words.
         "id", "also_in",
+        # "direct" (inside the article's quotation marks) or "reported".
+        "speech",
     }
     # A stale stored offset is repaired from the words, as at write time.
     assert cl.quote_start == text.index("We will")
@@ -253,7 +255,7 @@ async def test_THE_ROUTE_returns_claims_to_an_anonymous_reader_and_keeps_sources
                             "article_id": str(aid), "source_name": "Mint",
                             "url": "https://m.example/x?utm_source=rss",
                             "published_at": T0.isoformat(), "lang": "en",
-                            "utterance": None, "translated": False, "also_in": []}],
+                            "utterance": None, "translated": False, "also_in": [], "speech": "direct"}],
                 "languages": ["en"],
             }], "the route did not pass claims through, or leaked an unverified field"
             # The address shared before the rule (the quote was 0-0 then, the
@@ -591,3 +593,36 @@ def test_the_addresses_shared_before_the_rule_resolve_to_the_same_words():
         "1-1": by_text[MAJITHIA],
         "2-0": by_text[MAJITHIA],
     }
+
+
+# ── Reported speech in Indian-language articles (founder decision, 28 Sep) ──
+
+SANGAPPA = "ನಗರವನ್ನು ಸ್ವಚ್ಛ ಹಾಗೂ ವಾಸಯೋಗ್ಯವಾಗಿಡುವಲ್ಲಿ ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ ಅತ್ಯಂತ ಮಹತ್ವದ್ದಾಗಿದೆ"
+SANGAPPA_TEXT = f"ಬಾಗಲಕೋಟೆ: {SANGAPPA} ಎಂದು ಜಿಲ್ಲಾಧಿಕಾರಿ ಸಂಗಪ್ಪ ಹೇಳಿದರು. ನಗರಸಭೆ ಸಭಾಭವನದಲ್ಲಿ ಕಾರ್ಯಕ್ರಮ ನಡೆಯಿತು."
+
+
+def test_an_indian_language_report_is_served_as_reported_speech():
+    """Stored before (and dropped since) the direct-only rule: served again,
+    marked "reported" so the card never prints it as a quote."""
+    [card] = group_claims([_src("pv", [_c("Sangappa", SANGAPPA)], lang="kn", name="Prajavani", clean_text=SANGAPPA_TEXT)])
+    [row] = card.claims
+    assert (row.quote_text, row.speech) == (SANGAPPA, "reported")
+
+
+def test_the_same_shape_in_english_is_still_not_served():
+    text = "Bagalkot: The role of civic workers in keeping the city clean is very important, said deputy commissioner Sangappa."
+    quote = "The role of civic workers in keeping the city clean is very important"
+    assert group_claims([_src("en", [_c("Sangappa", quote)], lang="en", clean_text=text)]) == []
+
+
+def test_a_quote_and_a_report_of_the_same_words_are_one_row_citing_the_quote():
+    """Two outlets, one sentence: one printed it in quotation marks, the other
+    reported it. The row is the quote, whichever came first."""
+    quoted = f"ಬಾಗಲಕೋಟೆ: ‘{SANGAPPA}’ ಎಂದು ಜಿಲ್ಲಾಧಿಕಾರಿ ಸಂಗಪ್ಪ ಹೇಳಿದರು."
+    [card] = group_claims([
+        _src("later", [_c("Sangappa", SANGAPPA)], published_at=T1, lang="kn", name="Vijay Karnataka", clean_text=quoted),
+        _src("first", [_c("Sangappa", SANGAPPA)], published_at=T0, lang="kn", name="Prajavani", clean_text=SANGAPPA_TEXT),
+    ])
+    [row] = card.claims
+    assert (row.article_id, row.speech) == ("later", "direct")
+    assert [a.article_id for a in row.also_in] == ["first"]

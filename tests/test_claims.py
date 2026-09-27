@@ -6,7 +6,7 @@ quote renders exactly like a real one. These tests pin the cases where a failure
 still LOOKS like a working claim.
 """
 
-from enrichment.claims import MIN_QUOTE_CHARS, check_quote, verify_claims
+from enrichment.claims import MIN_QUOTE_CHARS, check_quote, named_in, verify_claims
 from enrichment.schemas import Claim
 
 ARTICLE = (
@@ -94,7 +94,7 @@ def test_the_rejection_reasons_are_counted_not_swallowed():
          claim(speaker="")], ARTICLE)
     assert len(kept) == 1
     assert why == {"no_speaker": 1, "short_quote": 0, "not_verbatim": 1,
-                   "not_quoted": 0, "narration": 0, "fragment": 0}
+                   "not_quoted": 0, "not_named": 0, "narration": 0, "fragment": 0}
 
 
 def test_a_role_the_article_never_stated_is_dropped_not_printed():
@@ -176,8 +176,8 @@ def test_words_inside_quotation_marks_are_a_quote_in_every_style_outlets_use():
     for opener, closer in [("“", "”"), ('"', '"'), ("‘", "’"), ("'", "'"),
                            ("‘‘", "’’"), ("«", "»")]:
         text = f"Earlier, SSP Gaurav Toora said: {opener}We spoke to the students who had some issues.{closer} Traffic resumed."
-        why, quote, at = check_quote(text, "We spoke to the students who had some issues.", "Gaurav Toora")
-        assert why is None, (opener, closer)
+        why, quote, at, speech = check_quote(text, "We spoke to the students who had some issues.", "Gaurav Toora")
+        assert why is None and speech == "direct", (opener, closer)
         assert " ".join(text.split())[at:at + len(quote)] == quote
 
 
@@ -229,7 +229,7 @@ def test_a_speaker_quoting_someone_else_is_still_their_quote():
 
 def test_the_models_own_copy_of_the_quotation_marks_is_trimmed():
     text = "On the other hand, Verma said: “When one of his workers started shouting abuses at my family, I reacted.”"
-    why, quote, _ = check_quote(text, "“When one of his workers started shouting abuses at my family, I reacted.”", "Parvesh Verma")
+    why, quote, _, _ = check_quote(text, "“When one of his workers started shouting abuses at my family, I reacted.”", "Parvesh Verma")
     assert why is None
     assert quote == "When one of his workers started shouting abuses at my family, I reacted."
 
@@ -253,3 +253,120 @@ def test_an_unclosed_quote_does_not_run_into_the_next_paragraph():
 
 def test_a_quote_the_article_no_longer_contains_is_not_shown():
     assert check_quote("Nothing here matches at all.", "We will reopen the bridge on Monday.", "X")[0] == "not_verbatim"
+
+
+# ── Reported speech, Indian-language articles only (founder decision, 28 Sep) ─
+#
+# Direct-only cost 55% of Indian-language claims against 16% of English ones:
+# Hindi, Kannada, Malayalam and Odia outlets mostly print speech without
+# quotation marks ("…ने कहा कि", "…ಎಂದು ಹೇಳಿದರು"). Such words are kept when the
+# article attributes them with a speech verb in the language's own pattern and
+# names the speaker, and they are served as "reported", never as a quote.
+# Fixtures are shaped on live articles.
+
+SAPKALE = "26 सितंबर तक इस वर्ष गणेशोत्सव के दौरान कुल 199185 गणेश प्रतिमाओं का विसर्जन हुआ है।"
+
+
+def test_a_hindi_statement_after_x_ne_kaha_ki_is_reported_speech():
+    text = f"मुंबई में 278 स्थानों पर तालाब बनाए गए थे। BMC के उपायुक्त प्रशांत सपकाले ने बताया कि {SAPKALE} उन्होंने बताया कि भक्तों ने इको-फ्रेंडली मूर्तियों को प्राथमिकता दी।"
+    why, quote, at, speech = check_quote(text, SAPKALE, "Prashant Sapkale", lang="hi")
+    assert (why, speech) == (None, "reported")
+    assert " ".join(text.split())[at:at + len(quote)] == quote
+
+
+def test_english_articles_stay_direct_speech_only():
+    text = "Education minister Nityananda Gond said that schools in the flooded districts will stay shut for two more days."
+    quote = "schools in the flooded districts will stay shut for two more days."
+    assert check_quote(text, quote, "Nityananda Gond", lang="en")[0] == "not_quoted"
+    assert check_quote(text, quote, "Nityananda Gond")[0] == "not_quoted"  # no language: no exception
+
+
+def test_verb_final_languages_report_with_a_quotative_after_the_words():
+    cases = [
+        ("kn", "Sangappa", "ನಗರವನ್ನು ಸ್ವಚ್ಛ ಹಾಗೂ ವಾಸಯೋಗ್ಯವಾಗಿಡುವಲ್ಲಿ ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ ಅತ್ಯಂತ ಮಹತ್ವದ್ದಾಗಿದೆ",
+         "ಬಾಗಲಕೋಟೆ: {q} ಎಂದು ಜಿಲ್ಲಾಧಿಕಾರಿ ಸಂಗಪ್ಪ ಹೇಳಿದರು. ನಗರಸಭೆ ಸಭಾಭವನದಲ್ಲಿ ಕಾರ್ಯಕ್ರಮ ನಡೆಯಿತು."),
+        ("ml", "A.V. Anandraj", "ശ്രീനാരായണഗുരുദേവനെ ആക്ഷേപിച്ചവർക്കെതിരേ ശക്തമായ നിയമനടപടികൾ സ്വീകരിക്കണമെന്ന്",
+         "പ്രകടനം നടത്തി. {q} യൂണിയൻ ചെയർമാൻ ഡോ. എ.വി. ആനന്ദരാജ് ആവശ്യപ്പെട്ടു. യൂണിയൻ വൈസ് ചെയർമാൻ സംസാരിച്ചു."),
+        ("ta", "Rohit Sharma", "என்னுடைய வேலை முடிந்துவிட்டது என்ற எண்ணம் ஒருபோதும் என்னுடைய மனதில் வரவில்லை",
+         "உலகக் கோப்பையில் விளையாடுவது குறித்து ரோஹித் சர்மா பேசியதாவது: {q} என்றார். தொடர் அடுத்தாண்டு நடைபெறும்."),
+        ("or", "Nityananda Gond", "ବର୍ଷାକୁ ଦୃଷ୍ଟିରେ ରଖି ଜିଲ୍ଲାପାଳମାନେ ଦୁଇ କିମ୍ବା ତିନି ଦିନ ସ୍କୁଲ ଛୁଟି କରିଥିଲେ।",
+         "ଗଣଶିକ୍ଷା ମନ୍ତ୍ରୀ ନିତ୍ୟାନନ୍ଦ ଗଣ୍ଡ କହିଛନ୍ତି ଯେ {q} ମନ୍ତ୍ରୀ ସୁରେଶ ପୂଜାରୀ ସ୍ଥିତି ସମୀକ୍ଷା କରିଛନ୍ତି।"),
+        ("ur", "Seema Malhotra", "فصلیں اگانے میں جراثیم کش ادویات کا استعمال کافی زیادہ ہو رہا ہے۔",
+         "پروفیسر سیما ملہوترا کا کہنا ہے کہ {q} نوزائیدہ بچے کے لیے ماں کا دودھ محفوظ ہے۔"),
+    ]
+    for lang, speaker, q, shape in cases:
+        why, _, _, speech = check_quote(shape.format(q=q), q, speaker, lang=lang)
+        assert (why, speech) == (None, "reported"), lang
+
+
+def test_a_pronoun_is_not_a_name():
+    """"उन्होंने कहा कि" (he said that) with nobody named near it: the words may
+    be anyone's, so they are not shown."""
+    text = "छात्रों ने प्रदर्शन किया। उन्होंने कहा कि किताबों में इतनी बड़ी संख्या में गलतियां सामने आने के बाद जिम्मेदारी तय होनी चाहिए।"
+    quote = "किताबों में इतनी बड़ी संख्या में गलतियां सामने आने के बाद जिम्मेदारी तय होनी चाहिए।"
+    assert check_quote(text, quote, "Saurav Das", lang="hi")[0] == "not_named"
+
+
+def test_the_speakers_own_name_inside_reported_words_is_narration():
+    text = "डीआईजी नवीन सिंगला ने कहा कि छात्रा तीन दिन पहले अपने घर चली गई थी, डीआईजी नवीन सिंगला ने बताया।"
+    quote = "छात्रा तीन दिन पहले अपने घर चली गई थी, डीआईजी नवीन सिंगला ने बताया।"
+    assert check_quote(text, quote, "Naveen Singla", lang="hi")[0] == "narration"
+
+
+def test_the_reporters_own_framing_inside_reported_words_is_narration():
+    """Hand check of recovered claims, 28 Sep: the span ran past what was reported
+    into the reporter's next sentence ("उन्होंने इसे … बताया है" — "he called it…")."""
+    text = ("यूक्रेन के विदेश मंत्री एंड्री सिबिहा ने इन हमलों की निंदा की. उन्होंने X पर पोस्ट करते हुए कहा कि "
+            "यह 'कोलेटरल डैमेज' यानी अनजाने में हुआ नुकसान नहीं है. उन्होंने इसे लोगों को निशाना बनाने की सुनियोजित कोशिश बताया है.")
+    span = "यह 'कोलेटरल डैमेज' यानी अनजाने में हुआ नुकसान नहीं है. उन्होंने इसे लोगों को निशाना बनाने की सुनियोजित कोशिश बताया है."
+    assert check_quote(text, span, "Andrii Sybiha", lang="hi")[0] == "narration"
+    # The same report, stopped where the reporter's voice begins, is kept.
+    why, _, _, speech = check_quote(text, "यह 'कोलेटरल डैमेज' यानी अनजाने में हुआ नुकसान नहीं है.", "Andrii Sybiha", lang="hi")
+    assert (why, speech) == (None, "reported")
+    # "…ಎಂದು ಆರೋಪಿಸಿದರು." copied into the words is the attribution, not the report.
+    kn = "ರೈತ ಮುಖಂಡ ಬೊಕ್ಕಹಳ್ಳಿ ನಂಜುಂಡಸ್ವಾಮಿ ಮಾತನಾಡಿ, ಕಾರ್ಖಾನೆ ಲಿಖಿತ ಭರವಸೆ ಕೊಟ್ಟಿತ್ತು. ಆದರೆ ಈಡೇರಿಸದೇ ನಿರ್ಲಕ್ಷ್ಯ ವಹಿಸಿದೆ ಎಂದು ಆರೋಪಿಸಿದರು. ಸಂಧಾನ ನಡೆಯಿತು."
+    kspan = "ಕಾರ್ಖಾನೆ ಲಿಖಿತ ಭರವಸೆ ಕೊಟ್ಟಿತ್ತು. ಆದರೆ ಈಡೇರಿಸದೇ ನಿರ್ಲಕ್ಷ್ಯ ವಹಿಸಿದೆ ಎಂದು ಆರೋಪಿಸಿದರು."
+    assert check_quote(kn, kspan, "Bokkahalli Nanjundaswamy", lang="kn")[0] == "narration"
+
+
+def test_a_quotative_without_a_speech_verb_is_not_speech():
+    """"…ಎಂದು ಶಂಕಿಸಲಾಗಿದೆ" — "it is suspected that…" — names nobody's words."""
+    text = "ಎಸ್‌ಪಿ ಅನಿತಾ ಹದ್ದಣ್ಣವರ ಸ್ಥಳಕ್ಕೆ ಭೇಟಿ ನೀಡಿದರು. ಅಪಘಾತಕ್ಕೆ ಲಾರಿ ಚಾಲಕನ ಅತಿವೇಗವೇ ಕಾರಣ ಎಂದು ಶಂಕಿಸಲಾಗಿದೆ."
+    assert check_quote(text, "ಅಪಘಾತಕ್ಕೆ ಲಾರಿ ಚಾಲಕನ ಅತಿವೇಗವೇ ಕಾರಣ", "Anita Haddannavar", lang="kn")[0] == "not_quoted"
+
+
+def test_a_speech_verb_in_the_next_sentence_does_not_attribute_the_words():
+    text = "ಬೆಳೆ ಹಾನಿ ಪರಿಹಾರ ಇನ್ನೂ ರೈತರಿಗೆ ತಲುಪಿಲ್ಲ ಎಂದು ವರದಿಯಾಗಿದೆ. ಶಾಸಕ ಕೆ. ವೆಂಕಟೇಶ್ ಸಭೆಯಲ್ಲಿ ಹೇಳಿದರು."
+    assert check_quote(text, "ಬೆಳೆ ಹಾನಿ ಪರಿಹಾರ ಇನ್ನೂ ರೈತರಿಗೆ ತಲುಪಿಲ್ಲ", "K. Venkatesh", lang="kn")[0] == "not_quoted"
+
+
+def test_quoted_words_in_an_indian_language_article_stay_direct():
+    text = 'पत्रकारों से बात करते हुए उन्होंने कहा, "यह फैसला गलत है और हम इसका विरोध करेंगे।" इसके बाद वे चले गए।'
+    why, _, _, speech = check_quote(text, "यह फैसला गलत है और हम इसका विरोध करेंगे।", "Akhilesh Yadav", lang="hi")
+    assert (why, speech) == (None, "direct")
+
+
+def test_reported_words_keep_the_fragment_floor():
+    text = "BMC के उपायुक्त प्रशांत सपकाले ने बताया कि विसर्जन पूरा हुआ। उन्होंने बताया कि भक्त खुश थे।"
+    assert check_quote(text, "विसर्जन पूरा हुआ।", "Prashant Sapkale", lang="hi")[0] == "fragment"
+
+
+def test_the_write_time_gate_keeps_reported_speech_only_for_an_indian_language():
+    text = f"BMC के उपायुक्त प्रशांत सपकाले ने बताया कि {SAPKALE} उन्होंने बताया कि भक्त खुश थे।"
+    kept, _ = verify_claims([claim(speaker="Prashant Sapkale", quote_text=SAPKALE)], text, lang="hi")
+    assert [c.quote_text for c in kept] == [SAPKALE]
+    kept, why = verify_claims([claim(speaker="Prashant Sapkale", quote_text=SAPKALE)], text)
+    assert kept == [] and why["not_quoted"] == 1
+
+
+def test_an_english_name_is_found_in_the_articles_own_script():
+    """Speaker names are canonicalised to English by the extractor; the article
+    prints them in its script. Consonant skeletons compare the two."""
+    assert named_in("Naveen Singla", "डीआईजी नवीन सिंगला ने कहा")
+    assert named_in("H.C. Balakrishna", "ಎಂದು ಶಾಸಕ ಎಚ್.ಸಿ. ಬಾಲಕೃಷ್ಣ ಹೇಳಿದರು")
+    assert named_in("M.K. Stalin", "முதல்வர் மு.க.ஸ்டாலின் தெரிவித்தார்")
+    assert named_in("Pinarayi Vijayan", "മുഖ്യമന്ത്രി പിണറായി വിജയൻ പറഞ്ഞു")
+    assert named_in("Imran Khan", "عمران خان نے کہا")
+    assert named_in("Siddaramaiah", "ಮುಖ್ಯಮಂತ್ರಿ ಸಿದ್ದರಾಮಯ್ಯನವರು ಹೇಳಿದರು")  # a case suffix on the name
+    assert not named_in("Naveen Singla", "एसएसपी गौरव तूरा ने बताया")
+    assert not named_in("Rao", "राव ने कहा")  # one consonant proves nothing
