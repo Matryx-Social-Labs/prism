@@ -49,7 +49,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // freshest hundred records; the news sitemap carries the same window.
     // Page through with an offset if older records need listing.
     const feed = await fetchFeed({ limit: 100 }, revalidate);
-    stories = feed.map((e) => ({
+    // Only what asks to be indexed: two outlets or more, a verified story (lib/seo NOT_INDEXED).
+    stories = feed.filter((e) => e.indexable !== false).map((e) => ({
       url: `${SITE_URL}/story/${e.id}`,
       lastModified: e.last_updated_at,
       changeFrequency: "hourly" as const,
@@ -60,7 +61,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
   try {
     const trending = await fetchTrending({ state: null, sector: null, limit: 100 }, revalidate);
-    arcs = trending.map((s) => ({
+    arcs = trending.filter((s) => s.boundary_status === "verified").map((s) => ({
       url: `${SITE_URL}/trending/${s.slug}`,
       lastModified: s.last_updated_at ?? undefined,
       changeFrequency: "hourly" as const,

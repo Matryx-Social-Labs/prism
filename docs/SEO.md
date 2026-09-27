@@ -20,7 +20,7 @@ day's record, the sector pages and Stories shipped a skeleton and nothing else.
 | `/robots.txt` | Everything public allowed for every agent (AI crawlers included — being cited is the point); account, auth, `/you`, `/search`, `/label/`, `/plus/welcome` disallowed; both sitemaps listed. | `app/robots.ts` |
 | `/llms.txt` | What Prism is, how to cite a record, the live URLs — the emerging convention answer engines read first. | `public/llms.txt` |
 | `/manifest.webmanifest` | Installable: name, icons (brand exports), `start_url` `/feed`, theme. | `app/manifest.ts` |
-| IndexNow | Every hour the worker posts the records and stories that changed to `api.indexnow.org` (Bing → Copilot and ChatGPT search; Yandex; Naver). The key is public by design and served at `/<key>.txt`. Google ignores IndexNow; the sitemaps carry it there. | `common/indexnow.py`, `worker/__main__.py` job `indexnow` |
+| IndexNow | Every hour the worker posts the records and stories that changed (only what asks to be indexed: records from two outlets, verified stories) to `api.indexnow.org` (Bing → Copilot and ChatGPT search; Yandex; Naver). The key is public by design and served at `/<key>.txt`. Google ignores IndexNow; the sitemaps carry it there. | `common/indexnow.py`, `worker/__main__.py` job `indexnow` |
 
 Share cards (OG images) were already the record's own (`lib/ogCard.tsx`);
 nothing here changes them.
@@ -100,6 +100,28 @@ Googlebot and checks the signals we control:
 - Records are not thin (0 of 250, median 465 words), nor are stories (316) or
   subject pages (1,198). What remains is the site's age and duplicate records
   (about 10%, which the verified matching tier addresses).
+
+**The 29 URLs Google skipped** (drilldown export, crawled 2026-09-22; `tools/seo_crawl_audit.py --urls`)
+all pass every technical check today. What they share is content:
+
+- 19 records: 13 from **one outlet** (a rewrite of one article, which Google
+  keeps instead), 3 from two; several are **duplicates of another record** of
+  ours (the Tamil Nadu breakfast scheme twice, cos 0.93, both skipped; Tata Sons
+  twice; the IIT Bombay death across 4-5 records).
+- 4 stories: all **provisional**, and each had drifted from its own URL
+  (`/trending/how-did-bmw-crash-on-mumbai-coastal-road-…` titled "President
+  confers National Film Awards").
+- `/feed`, `/sector/politics`, `/plus`, `/terms`, `/privacy`, `/refunds`: listing
+  and policy pages; commonly not indexed early, nothing to do.
+
+**Fixed (0.0.105.0):** a record asks to be indexed from its second outlet on
+(`common/outlets.record_indexable`, counted by publisher as the page prints it),
+and a story once its boundary is verified (`common/stories.STORY_BOUNDARY_STATUS`,
+provisional for all today). Both stay readable and linked (`noindex, follow`,
+`lib/seo.NOT_INDEXED`); the record page, its quote pages, the feed rows, all
+three sitemaps and IndexNow read the same rule. The records sitemap went from
+~26k URLs to the multi-outlet ~3.6k. The duplicates need the verified matching
+tier live, then the backlog merge with 308s.
 
 Rerun after a change: `uv run python -m tools.seo_crawl_audit --csv .context/review/seo-crawl.csv`.
 For the URLs Google itself skipped, export Pages → "Crawled - currently not

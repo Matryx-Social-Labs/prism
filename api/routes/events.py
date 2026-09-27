@@ -41,6 +41,7 @@ from common.images import hi_res, is_placeholder, placeholders
 from common.lenses import LENSES, PAID_LENS_FIELDS
 from common.locks import single_flight
 from common.logging import get_logger
+from common.outlets import record_indexable
 from common.quota import (
     READER_LENS,
     ask_allowance,
@@ -467,6 +468,7 @@ async def get_event(
     furniture = await placeholders(db)
     return EventDetail(
         id=str(event["id"]),
+        indexable=record_indexable(projection.get("source_slugs") or [], reg),
         title=event["title"],
         headline_by=event["headline_by"],
         summary=event["summary"],

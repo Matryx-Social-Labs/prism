@@ -63,7 +63,12 @@ async def test_changed_urls_are_the_served_records_that_moved_and_never_cve_only
     fresh, stale, cve = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     try:
         async with session_scope() as s:
-            await s.execute(text("INSERT INTO events (id,title,summary,last_updated_at) VALUES (:i,'moved','s',now())"), {"i": str(fresh)})
+            # Two outlets: a one-outlet record asks not to be indexed and is never
+            # announced (tests/test_record_indexing.py).
+            await s.execute(
+                text("INSERT INTO events (id,title,summary,last_updated_at,projection) VALUES (:i,'moved','s',now(), '{\"source_slugs\": [\"zz_a\", \"zz_b\"]}'::jsonb)"),
+                {"i": str(fresh)},
+            )
             await s.execute(text("INSERT INTO events (id,title,summary,last_updated_at) VALUES (:i,'old','s',now() - interval '3 hours')"), {"i": str(stale)})
             await s.execute(
                 text("INSERT INTO events (id,title,summary,last_updated_at,projection) VALUES (:i,'cve','s',now(), '{\"source_slugs\": [\"nvd\"]}'::jsonb)"),

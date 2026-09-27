@@ -9,7 +9,7 @@ from typing import Any
 
 from api.schemas import FeedItem, OutletRef
 from common.lenses import Lens
-from common.outlets import Outlet
+from common.outlets import Outlet, record_indexable
 from personalization.ranking import score_event
 
 
@@ -76,6 +76,7 @@ def build_feed_item(
     title, headline_lang = _pick_headline(projection, row["title"], languages)
     return FeedItem(
         id=str(row["id"]),
+        indexable=record_indexable(projection.get("source_slugs") or [], registry),
         title=title,
         headline_lang=headline_lang,
         available_languages=projection.get("languages") or [],
