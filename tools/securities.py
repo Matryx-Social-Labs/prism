@@ -3,6 +3,8 @@
     uv run python -m tools.securities --load          # refresh NSE + US masters
     uv run python -m tools.securities --audit         # check stored tickers, READ-ONLY
     uv run python -m tools.securities --clean         # strip the invented ones (dry-run)
+    uv run python -m tools.securities --revalidate    # named-company rule + linker (dry-run)
+    uv run python -m tools.securities --score-links   # linker precision on the gold set
 
 WHY THIS EXISTS. `FinanceLens.tickers` is a list of strings an LLM emitted with
 nothing checking them, and they flow into the watchlist join. Measured on
@@ -398,13 +400,170 @@ async def clean(url: str | None = None, apply: bool = False) -> None:
         print("\n  DRY RUN — nothing was written. Re-run with --apply.")
 
 
+async def revalidate(url: str | None = None, apply: bool = False, sample: int = 20) -> None:
+    """Re-apply the write-time rule to what is already stored. DRY-RUN by default.
+
+    `common.securities.choose_tickers` now keeps an extractor's ticker only when
+    the article names its company, and links the listed companies a business or
+    finance article's organisations name exactly. Everything stored before it
+    was judged by listing alone and never linked. This rewrites each article's
+    ticker list, then each touched event's (the ordered union of its articles',
+    as correlation/consumer.py builds it), and prints a sample of both
+    directions to be checked by hand before `--apply`.
+    """
+    import random
+
+    import asyncpg
+
+    from common.securities import LEDE_CHARS, build_master, choose_tickers, company_key
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=120)
+    try:
+        if not apply:
+            await c.execute("SET default_transaction_read_only = on")
+        await _require_loaded(c)
+        listed = build_master(await c.fetch("SELECT symbol, exchange, name FROM securities"))
+        rows = await c.fetch(
+            """
+            SELECT en.id, ri.title, ri.classification ->> 'sector' AS sector,
+                   left(a.clean_text, $1) AS lede, en.shared_fields -> 'entities' AS entities,
+                   en.lens_fields -> 'finance' -> 'tickers' AS tickers
+            FROM enrichments en
+            JOIN articles a ON a.id = en.article_id
+            JOIN raw_items ri ON ri.id = a.raw_item_id
+            WHERE jsonb_array_length(COALESCE(en.lens_fields -> 'finance' -> 'tickers', '[]'::jsonb)) > 0
+               OR ri.classification ->> 'sector' IN ('business', 'finance')
+            """,
+            LEDE_CHARS,
+        )
+        changed: dict = {}
+        dropped: list[tuple] = []
+        replaced: list[tuple] = []  # the same company, now under its primary listing (HDB → HDFCBANK)
+        linked: list[tuple] = []
+        for r in rows:
+            had = [normalize(t) for t in (json.loads(r["tickers"]) if r["tickers"] else [])]
+            ents = json.loads(r["entities"]) if r["entities"] else []
+            now = choose_tickers(listed, had, r["title"], r["lede"], ents, r["sector"])
+            if now == had:
+                continue
+            changed[r["id"]] = now
+            for t in had:
+                if t in now:
+                    continue
+                primary = {listed.by_key.get(company_key(i.name), i).symbol for i in listed.by_symbol.get(t, [])}
+                (replaced if primary & set(now) else dropped).append((t, r["title"]))
+            got = {listed.by_key.get(company_key(i.name), i).symbol for t in had for i in listed.by_symbol.get(t, [])}
+            linked += [(t, r["title"]) for t in now if t not in had and t not in got]
+
+        members = await c.fetch(
+            """
+            SELECT em.event_id, en.id AS enrichment_id, en.lens_fields -> 'finance' -> 'tickers' AS tickers,
+                   ev.sector, ev.last_updated_at > now() - interval '7 days' AS recent,
+                   ev.projection -> 'finance' -> 'tickers' AS shown
+            FROM event_memberships em
+            JOIN events ev ON ev.id = em.event_id
+            JOIN articles a ON a.id = em.article_id
+            JOIN enrichments en ON en.article_id = a.id
+            JOIN raw_items ri ON ri.id = a.raw_item_id
+            WHERE em.event_id IN (
+                SELECT em2.event_id FROM event_memberships em2
+                JOIN enrichments en2 ON en2.article_id = em2.article_id WHERE en2.id = ANY($1::uuid[]))
+            ORDER BY em.event_id, em.created_at, ri.published_at NULLS LAST, a.id
+            """,
+            list(changed),
+        )
+        events: dict = {}
+        for m in members:
+            ev = events.setdefault(m["event_id"], {"tickers": [], "shown": json.loads(m["shown"]) if m["shown"] else [],
+                                                   "sector": m["sector"], "recent": m["recent"]})
+            for t in changed.get(m["enrichment_id"], json.loads(m["tickers"]) if m["tickers"] else []):
+                if t not in ev["tickers"]:
+                    ev["tickers"].append(t)
+        rewrite = {e: v["tickers"] for e, v in events.items() if v["tickers"] != v["shown"]}
+
+        coverage = await c.fetch(
+            """
+            SELECT id, last_updated_at > now() - interval '7 days' AS recent,
+                   jsonb_array_length(COALESCE(projection -> 'finance' -> 'tickers', '[]'::jsonb)) > 0 AS has
+            FROM events WHERE sector IN ('business', 'finance')
+            """
+        )
+        print(f"  articles read: {len(rows)}   ticker lists rewritten: {len(changed)}")
+        print(f"  tickers dropped (company not named): {len(dropped)}   moved to the company's "
+              f"primary listing: {len(replaced)}   linked: {len(linked)}")
+        print(f"  events rewritten: {len(rewrite)}")
+        for label, keep in (("all", lambda r: True), ("last 7 days", lambda r: r["recent"])):
+            scope = [r for r in coverage if keep(r)]
+            before = sum(r["has"] for r in scope)
+            after = sum(bool(rewrite[r["id"]]) if r["id"] in rewrite else r["has"] for r in scope)
+            print(f"  business+finance events with a ticker ({label}): {before} -> {after} of {len(scope)}")
+        rnd = random.Random(20260927)
+        for name, items in (("DROPPED", dropped), ("LINKED", linked)):
+            print(f"\n  {name}, {min(sample, len(items))} of {len(items)} at random:")
+            for t, title in rnd.sample(items, min(sample, len(items))):
+                print(f"    {t:12} {title[:100]}")
+
+        if apply:
+            async with c.transaction():
+                for table, col, ids in (("enrichments", "lens_fields", changed), ("events", "projection", rewrite)):
+                    await c.executemany(
+                        f"UPDATE {table} SET {col} = jsonb_set(COALESCE({col}, '{{}}'::jsonb), '{{finance}}', "
+                        f"COALESCE({col} -> 'finance', '{{}}'::jsonb) || jsonb_build_object('tickers', $1::jsonb)) "
+                        "WHERE id = $2",
+                        [(json.dumps(t), i) for i, t in ids.items()],
+                    )
+    finally:
+        await c.close()
+    if not apply:
+        print("\n  DRY RUN — nothing was written. Re-run with --apply.")
+
+
+GOLD_LINKS = "tools/gold_company_links.jsonl"
+LINK_PRECISION_GATE = 0.95
+
+
+async def score_links(url: str | None = None) -> None:
+    """The linker's precision on `tools/gold_company_links.jsonl`. READ-ONLY.
+
+    150 links drawn at random from business and finance articles 22-150 days old
+    (never used to build ALIASES or AMBIGUOUS when they were labelled), each
+    hand-labelled: is this organisation that listed company? Blind, the first
+    version scored 147 of 150 (0.98). Re-run after any change to the matching
+    rules; the linker must not write below the gate.
+    """
+    import asyncpg
+
+    from common.securities import build_master, linked
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(url or _prod_url(), timeout=90)
+    try:
+        await c.execute("SET default_transaction_read_only = on")
+        await _require_loaded(c)
+        listed = build_master(await c.fetch("SELECT symbol, exchange, name FROM securities"))
+    finally:
+        await c.close()
+    gold = [json.loads(line) for line in open(GOLD_LINKS)]
+    still = [g for g in gold if g["symbol"] in linked(listed, [{"name": g["entity"], "type": g["type"], "role": g["role"]}])]
+    right = sum(g["correct"] for g in still)
+    precision = right / len(still) if still else 0.0
+    print(f"  still linked: {len(still)} of {len(gold)}   correct: {right}   precision: {precision:.3f}")
+    if precision < LINK_PRECISION_GATE:
+        raise SystemExit(f"below the {LINK_PRECISION_GATE} gate: the linker must not write")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--load", action="store_true")
     ap.add_argument("--audit", action="store_true")
     ap.add_argument("--clean", action="store_true",
                     help="strip unverified tickers from stored rows (dry-run)")
-    ap.add_argument("--apply", action="store_true", help="let --clean actually write")
+    ap.add_argument("--revalidate", action="store_true",
+                    help="re-apply the named-company rule and the linker to stored rows (dry-run)")
+    ap.add_argument("--score-links", action="store_true",
+                    help=f"the linker's precision on {GOLD_LINKS} (read-only)")
+    ap.add_argument("--apply", action="store_true", help="let --clean / --revalidate actually write")
     ap.add_argument("--market", choices=("all", "nse", "us"), default="all",
                     help="which symbol master to load (default: all)")
     ap.add_argument("--from-file", metavar="PATH", action="append",
@@ -417,7 +576,11 @@ def main() -> None:
         asyncio.run(audit(a.db))
     if a.clean:
         asyncio.run(clean(a.db, apply=a.apply))
-    if not (a.load or a.audit or a.clean):
+    if a.score_links:
+        asyncio.run(score_links(a.db))
+    if a.revalidate:
+        asyncio.run(revalidate(a.db, apply=a.apply))
+    if not (a.load or a.audit or a.clean or a.revalidate or a.score_links):
         ap.print_help()
 
 
