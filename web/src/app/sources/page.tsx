@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Ago } from "@/components/Ago";
 import { CoverageBar, OutletIcon } from "@/components/Coverage";
 import { PageTitle } from "@/components/reading/parts";
 import { SectionHead } from "@/components/SectionHead";
 import { Alert, BackBar, InShortCard } from "@/components/ui";
 import { fetchSources, type MonitoredFeed, type OutletRef } from "@/lib/api";
 import { ORIGINS, ORIGIN_LABEL } from "@/lib/coverage";
-import { relativeTime } from "@/lib/dateline";
 import { langName } from "@/lib/languages";
 import { stateName } from "@/lib/regions";
 import { missingLanguages } from "@/lib/sources";
@@ -41,7 +41,7 @@ function FeedRow({ feed }: { feed: MonitoredFeed }) {
       <span className="grid justify-items-end gap-0.5 text-right">
         <span className="p-meta__prov" title={langName(lang)}>{lang.toUpperCase()}</span>
         <span className="p-mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>
-          {feed.reachable && feed.checked_at ? `Read ${relativeTime(feed.checked_at)}` : feed.ok_at ? `Not reached since ${relativeTime(feed.ok_at)}` : "Not reached yet"}
+          {feed.reachable && feed.checked_at ? <>Read <Ago iso={feed.checked_at} /></> : feed.ok_at ? <>Not reached since <Ago iso={feed.ok_at} /></> : "Not reached yet"}
         </span>
       </span>
     </li>
@@ -79,7 +79,7 @@ export default async function SourcesPage() {
               <CoverageBar outlets={mastheads} size="lg" width={300} draw className="lg:!hidden" />
               <CoverageBar outlets={mastheads} size="lg" width={520} draw className="!hidden lg:!inline-flex" />
               <p className="p-count whitespace-normal">
-                {set.outlets} outlets · {feeds.length} feeds · {languages} languages{set.checked_at ? ` · checked ${relativeTime(set.checked_at)}` : ""}
+                {set.outlets} outlets · {feeds.length} feeds · {languages} languages{set.checked_at ? <> · checked <Ago iso={set.checked_at} /></> : ""}
               </p>
             </div>
 

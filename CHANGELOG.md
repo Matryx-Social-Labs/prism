@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.103.0] - 2026-09-27
+
+### Changed — a page renders the same bytes whenever it is rendered
+Phase 2 of the caching plan, and a prerequisite for caching record pages.
+
+- **Times on the server are absolute; the age is the browser's.** Every "12m
+  ago" goes through `<Ago>`, which printed the age on the server. Vercel skips
+  a cache write only when a refresh is byte-identical, so every refresh of an
+  unchanged record would have been a paid write. The server now prints the
+  IST time ("27 Sept 09:48"), which also serves crawlers and answer engines
+  better than an age frozen into a cached page. The browser shows the age:
+  hydration swaps it once with no mismatch, and client-side navigation shows
+  it straight away.
+- `/sources` printed its "read 3m ago" lines on the server directly; they go
+  through `<Ago>` now.
+- **Guard:** `components/deterministic.test.tsx` renders the story view, a
+  story's arc, a chart row and the stories list at two times half an hour
+  apart and requires identical HTML. It fails if the server prints an age
+  again. `components/Ago.test.tsx` covers hydration: no mismatch, and the
+  reader ends up seeing the age. Both were mutation-verified.
+
 ## [0.0.102.0] - 2026-09-27
 
 ### Changed — pages keep their cache, and each refreshes on the clock it declares

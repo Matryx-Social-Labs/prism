@@ -30,14 +30,15 @@ describe("/sources — the monitored set, in public", () => {
     expect(heads.slice(0, 4)).toEqual(["English national", "International", "Indian-language", "Wire / agency"]);
     // The denominator the story pages print is this page's own count.
     expect(document.body.textContent).toMatch(/2 of 3 monitored outlets/);
-    expect(screen.getByText(/3 outlets · 4 feeds · 3 languages · checked 3m ago/)).toBeInTheDocument();
+    // The age is its own <time> (components/Ago), so match the whole line.
+    expect(document.body.textContent).toMatch(/3 outlets · 4 feeds · 3 languages · checked 3m ago/);
     expect(screen.getByText("Kerala desk")).toBeInTheDocument();
     // Two feeds from one masthead count once; an origin with none says so.
     const national = screen.getByRole("heading", { name: "English national" }).closest("section")!;
     expect(national.textContent).toMatch(/1 outlet · 2 feeds/);
     expect(within(screen.getByRole("heading", { name: "International" }).closest("section")!).getByText("None read yet.")).toBeInTheDocument();
     const indian = screen.getByRole("heading", { name: "Indian-language" }).closest("section")!;
-    expect(within(indian).getByText(/Not reached since 2d ago/)).toBeInTheDocument();
+    expect(indian.textContent).toMatch(/Not reached since 2d ago/);
     expect(within(indian).getByText("KN")).toBeInTheDocument();
   });
 
