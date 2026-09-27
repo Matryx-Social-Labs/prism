@@ -212,3 +212,28 @@ async def test_search_never_shows_a_fallback_image_as_the_rows_photo():
         rows = {i["id"]: i for i in (await ac.get("/api/v1/search", params={"q": f"Hockey{tag}"})).json()["items"]}
     assert rows[str(hit)]["image_url"] is None, "the outlet's fallback art was served as the story's photo"
     assert rows[str(real)]["image_url"] == own, "a story's own photograph must still show"
+
+
+async def test_search_ranks_a_title_match_above_newer_summary_mentions():
+    # "Sun Pharma" found the TNPCB/Sun Pharma record in the API but ranked it by
+    # recency alone, so a fresher market wrap that only named the company in its
+    # summary could lead (audit 2026-09-27, P0 #7). The record the query names
+    # comes first; recency orders within each tier.
+    if not await _db_reachable():
+        pytest.skip("no database — run `docker compose up -d postgres`")
+    tag = uuid.uuid4().hex[:8]
+    named = await _seed(f"Regulator pauses Quorvex-{tag} plant expansion", "Environmental clearance pending", "business")
+    mention = await _seed("Markets close higher", f"pharma names including Quorvex-{tag} gained", "finance")
+    async with session_scope() as s:
+        await s.execute(
+            text("UPDATE events SET last_updated_at = now() - (CASE WHEN id = :n THEN interval '2 days' ELSE interval '0' END) WHERE id = ANY(:ids)"),
+            {"n": str(named), "ids": [str(named), str(mention)]},
+        )
+    transport = ASGITransport(app=app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://t") as ac:
+            ids = [i["id"] for i in (await ac.get("/api/v1/search", params={"q": f"Quorvex-{tag}"})).json()["items"]]
+        assert ids == [str(named), str(mention)]
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM events WHERE id = ANY(:ids)"), {"ids": [str(named), str(mention)]})

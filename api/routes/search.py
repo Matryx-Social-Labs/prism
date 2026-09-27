@@ -22,7 +22,7 @@ async def search(
 ):
     limit = min(max(limit, 1), 50)
     # Neutral lens for serialization — search spans sectors; results order by
-    # recency, not lens score. No CVE-only filter here: an explicit query is
+    # where the query matched, then recency, never lens score. No CVE-only filter here: an explicit query is
     # intent, so a searched CVE record should surface.
     active_lens = get_lens("reader")
     # Served by the GIN trigram indexes on events.title/summary (migration
@@ -54,7 +54,11 @@ async def search(
                        WHERE ent.name ILIKE :q
                    ))
                   AND e.merged_into IS NULL
-                ORDER BY e.last_updated_at DESC
+                -- The record the query NAMES leads: a title match outranks a
+                -- fresher record that only mentions it in its summary or cast
+                -- ("Sun Pharma" sank below the day's market wraps, audit
+                -- 2026-09-27 P0 #7). Recency orders within each tier.
+                ORDER BY (e.title ILIKE :q) DESC, e.last_updated_at DESC
                 LIMIT :limit
                 """
             ),
