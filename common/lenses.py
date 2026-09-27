@@ -70,21 +70,24 @@ LENSES: dict[str, Lens] = {
     "markets": Lens(
         slug="markets",
         name="Finance / Trader",
-        tagline="Market-moving news with tickers, catalysts, and price-impact reads",
+        # No price data exists: the lens reads what the reports say a story
+        # means for listed companies, never a price.
+        tagline="What the reports say a story means for listed companies, with tickers and catalysts",
         role_interest="markets",
         sectors=["finance", "business"],
         ranking=RankingWeights(recency=1.4, price_impact=0.6),
         suggested_questions=[
             "Which tickers does this move?",
             "What is the catalyst here?",
-            "What's the likely price impact?",
+            "Which listed companies do the reports name?",
             "What are the second-order effects?",
         ],
     ),
     "reader": Lens(
         slug="reader",
         name="General reader",
-        tagline="Every story with both sides, consequences, and answers",
+        # Never "both sides": stance was retired (D4). The record, plainly.
+        tagline="What happened, why it matters, and what the reports leave open",
         role_interest=None,
         sectors=[],
         ranking=RankingWeights(recency=1.2, corroboration=0.1),
@@ -92,7 +95,7 @@ LENSES: dict[str, Lens] = {
             "What led to this?",
             "Who is affected?",
             "What are the likely outcomes?",
-            "How is each side framing it?",
+            "What do the reports not say yet?",
         ],
     ),
     # ── Upcoming (drafted, not yet shipped) ──────────────────────────────

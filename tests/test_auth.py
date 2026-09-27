@@ -63,18 +63,10 @@ async def test_full_magic_link_flow_and_single_use():
             ).scalar_one()
         assert stored != raw and stored == auth._hash(raw)
 
-        # First verify: creates the user, grants samples, returns a user id.
+        # First verify: creates the user, returns a user id.
         async with session_scope() as s:
             user_id = await auth.verify_and_consume(s, raw)
         assert user_id is not None
-        async with session_scope() as s:
-            samples = (
-                await s.execute(
-                    text("SELECT remaining FROM usage_quota WHERE user_id = :u"),
-                    {"u": str(user_id)},
-                )
-            ).scalar_one_or_none()
-        assert samples == 3  # prism_free_markets_samples default
 
         # Single-use: the same token can't be redeemed twice.
         async with session_scope() as s:

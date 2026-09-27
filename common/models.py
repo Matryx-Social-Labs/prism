@@ -453,8 +453,9 @@ class User(TimestampMixin, Base):
 
 
 class UsageQuota(TimestampMixin, Base):
-    """Per-account pro-lens sample cap (freemium D4/D13 — Markets-only, so one
-    counter per user is enough).
+    """RETIRED 2026-09-27: no longer read or written. The lens meter counts
+    lens_unlocks in a rolling day (common/quota.py); drop the table when
+    convenient. Was: a per-account lifetime pro-lens sample cap (D4/D13).
 
     Decremented with a single atomic ``UPDATE ... WHERE remaining > 0 RETURNING``
     (see common/quota.py) so two concurrent viewers of the same event+lens can
@@ -507,16 +508,17 @@ class Session(TimestampMixin, Base):
 class LensUnlock(TimestampMixin, Base):
     """One row per (user, event, lens) a reader has paid to open.
 
-    WHY A ROW AND NOT JUST A DECREMENT. `usage_quota.try_consume_sample` debits
-    unconditionally, so charging per REQUEST means a page refresh costs a sample
-    and three free samples are gone before a reader has seen the feature work.
-    This makes the unit of payment the thing the reader thinks they bought — an
-    unlocked lens on a story — rather than an HTTP call.
+    WHY A ROW AND NOT JUST A DECREMENT. Charging per REQUEST means a page
+    refresh costs a read and the free ones are gone before a reader has seen
+    the feature work. This makes the unit of payment the thing the reader thinks
+    they bought — an unlocked lens on a story — rather than an HTTP call. Since
+    2026-09-27 the rows ARE the meter: common/quota.lens_reads_today counts the
+    ones created in the last day.
 
     It also decouples payment from generation. The brief is generated once and
-    cached on the event projection, shared by every reader; the sample is
-    consumed once per reader. Those are different lifecycles and conflating them
-    is what made the first design charge for a cache hit.
+    cached on the event projection, shared by every reader; the read is spent
+    once per reader. Those are different lifecycles and conflating them is what
+    made the first design charge for a cache hit.
 
     UNIQUE on the triple, and the insert uses ON CONFLICT DO NOTHING: two tabs
     unlocking the same lens race, and the loser must read as "already unlocked",

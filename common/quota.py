@@ -1,14 +1,12 @@
-"""Per-account pro-lens sample quota (freemium D4/D13).
+"""What a reader may spend: professional lens reads and Ask questions.
 
-The cost model rests on this: a free user gets a small, fixed number of
-Markets-lens samples. If the cap could be bypassed or double-spent, on-demand
-LLM generation goes unbounded again — the exact hole the paywall exists to close.
-
-So the decrement is ONE atomic statement — ``UPDATE ... WHERE remaining > 0
-RETURNING`` — not a read-then-write. Two concurrent viewers of the same
-event+lens (two tabs, two replicas) race on the same row; Postgres serializes
-the row-level UPDATEs, so at most `remaining` of them succeed. No app-side lock,
-no read-modify-write window.
+Lens reads are metered like Ask (founder decision, 2026-09-27): a read is one
+professional lens opened on one story, and once opened it stays open for that
+reader on that story, so a refresh or a second tab costs nothing. An account's
+meter is COUNTED from its own lens_unlocks rows (a rolling day), the way Ask
+counts agent_messages, so it cannot drift from the record of what was opened
+and giving a read back is deleting the row. It replaced a lifetime counter of
+three samples (usage_quota), which is no longer read or written.
 """
 
 from uuid import UUID
@@ -19,58 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-async def try_consume_sample(session: AsyncSession, user_id: UUID) -> bool:
-    """Atomically consume one sample.
-
-    Returns True if a sample was available and consumed, False if the cap is
-    exhausted (or the user has no quota row). Never raises on exhaustion — the
-    caller shows the unlock screen on False.
-    """
-    remaining = (
-        await session.execute(
-            text(
-                "UPDATE usage_quota "
-                "SET remaining = remaining - 1, updated_at = now() "
-                "WHERE user_id = :uid AND remaining > 0 "
-                "RETURNING remaining"
-            ),
-            {"uid": str(user_id)},
-        )
-    ).scalar_one_or_none()
-    return remaining is not None
-
-
-async def grant_samples(session: AsyncSession, user_id: UUID, count: int) -> None:
-    """Create or top up a user's sample allowance (idempotent upsert on user_id)."""
-    await session.execute(
-        text(
-            "INSERT INTO usage_quota (id, user_id, remaining) "
-            "VALUES (gen_random_uuid(), :uid, :n) "
-            "ON CONFLICT (user_id) "
-            "DO UPDATE SET remaining = usage_quota.remaining + :n, updated_at = now()"
-        ),
-        {"uid": str(user_id), "n": count},
-    )
-
-
-async def remaining_samples(session: AsyncSession, user_id: UUID) -> int | None:
-    """Current sample count for display (the meter). None when there is NO ROW.
-
-    None is not zero. A user with no quota row has never been granted samples —
-    which is a different fact from having spent them all, and the 402 body says
-    so rather than telling a never-granted account it is out. Absence of
-    evidence must not read as evidence, which is the rule this repo keeps
-    relearning (see content_similarity, backlog(), verify_claims).
-    """
-    return (
-        await session.execute(
-            text("SELECT remaining FROM usage_quota WHERE user_id = :uid"),
-            {"uid": str(user_id)},
-        )
-    ).scalar_one_or_none()
-
 
 READER_LENS = "reader"
 
@@ -96,9 +42,8 @@ async def record_unlock(session: AsyncSession, user_id: UUID, event_id: UUID, le
     them gets True. The loser reads as "already unlocked" rather than as an
     integrity error surfacing to a reader as a 500.
 
-    Claim BEFORE debiting, so the debit can be tied to the winner: the pair
-    (claim, debit) is then at-most-once per reader per lens even under
-    concurrency, without an application lock.
+    The claim IS the read: the meter counts these rows, so a claim that lost
+    the race spends nothing.
     """
     return (
         await session.execute(
@@ -114,13 +59,13 @@ async def record_unlock(session: AsyncSession, user_id: UUID, event_id: UUID, le
 
 
 async def release_unlock(session: AsyncSession, user_id: UUID, event_id: UUID, lens: str) -> None:
-    """Undo a claim that never delivered a brief.
+    """Give back a read that never delivered a brief.
 
-    Generation returns 200 with an EMPTY brief when the model is unavailable
-    (api/routes/events.py — "never a 500"). A reader must not lose a sample for
-    a panel that renders nothing, so the claim is rolled back and no debit
-    happens. Without this the claim would persist and permanently mark an
-    unlock the reader never received.
+    Generation returns 200 with an EMPTY brief when the model is unavailable or
+    writes nothing (api/routes/events.py — "never a 500"). A reader must not
+    lose a read for a panel that renders nothing, and the meter counts these
+    rows, so deleting the claim is the refund. Idempotent: two tabs failing on
+    the same lens give back one read, not two.
     """
     await session.execute(
         text(
@@ -145,6 +90,90 @@ async def unlocked_lenses(session: AsyncSession, user_id: UUID, event_id: UUID) 
         )
     ).scalars().all()
     return set(rows)
+
+
+# Lens reads. Anonymous readers get a few per browser session (a random id the
+# page keeps in sessionStorage) with a per-address ceiling only a script
+# reaches, as Ask does; a free account gets USER_LENS_PER_DAY in any rolling
+# day; Plus reads every lens (api/routes/events._on_plus). Most reads are cache
+# hits (the worker writes every lens a story offers), so this meter is the
+# product's line between free and Plus, not a cost brake.
+ANON_LENS_PER_SESSION = 3
+USER_LENS_PER_DAY = 10
+ANON_LENS_PER_IP_PER_DAY = 60
+ANON_LENS_TTL_S = 60 * 60 * 24  # an idle anonymous session's reads are forgotten after a day
+
+
+# ponytail: count-after-claim, so N simultaneous first opens of N different
+# stories by one account can pass the cap by N-1. Only a script does that;
+# serialise per account (an advisory lock) if it ever shows up.
+async def lens_reads_today(session: AsyncSession, user_id: UUID) -> int:
+    """Lenses this account opened in the last day, counted from its unlocks."""
+    return (
+        await session.execute(
+            text(
+                "SELECT count(*) FROM lens_unlocks "
+                "WHERE user_id = :uid AND created_at > now() - interval '1 day'"
+            ),
+            {"uid": str(user_id)},
+        )
+    ).scalar_one()
+
+
+async def _anon_keys(r, reader: str, ip: str | None) -> tuple[str, str | None]:
+    from datetime import UTC, datetime
+
+    from common.usage import day_salt
+
+    day = datetime.now(UTC).strftime("%Y%m%d")
+    ip_key = f"prism:lens:ip:{_ip_key(ip, await day_salt(r, f'ask-{day}'))}:{day}" if ip else None
+    return f"prism:lens:anon:{reader}", ip_key
+
+
+async def anon_lens_open(reader: str, ip: str | None, event_id: UUID, lens: str) -> tuple[bool, int]:
+    """Open a lens on a story for an anonymous browser session: (allowed, reads
+    this session has used). Add first, then count, so a re-open is free and two
+    tabs racing for the last read cannot both have it. The address set holds
+    stories, not sessions: a fresh session id per request still meets it.
+    Redis unreachable → allowed, as Ask; the read is a cached brief."""
+    from common.stream import get_redis
+
+    member = f"{event_id}:{lens}"
+    try:
+        r = get_redis()
+        key, ip_key = await _anon_keys(r, reader, ip)
+        if not await r.sadd(key, member):
+            return True, await r.scard(key)
+        await r.expire(key, ANON_LENS_TTL_S)
+        used = await r.scard(key)
+        over = used > ANON_LENS_PER_SESSION
+        if not over and ip_key:
+            await r.sadd(ip_key, member)
+            await r.expire(ip_key, 60 * 60 * 26)
+            over = await r.scard(ip_key) > ANON_LENS_PER_IP_PER_DAY
+            if over:
+                await r.srem(ip_key, member)
+        if over:
+            await r.srem(key, member)
+            return False, used - 1
+        return True, used
+    except Exception as exc:  # noqa: BLE001 — a meter that is down must not take the lens down with it
+        logger.warning("lens_meter_check_failed", error_type=type(exc).__name__, error=str(exc)[:200])
+        return True, 0
+
+
+async def anon_lens_release(reader: str, ip: str | None, event_id: UUID, lens: str) -> None:
+    """Give an anonymous read back (the brief came out empty)."""
+    from common.stream import get_redis
+
+    try:
+        r = get_redis()
+        key, ip_key = await _anon_keys(r, reader, ip)
+        await r.srem(key, f"{event_id}:{lens}")
+        if ip_key:
+            await r.srem(ip_key, f"{event_id}:{lens}")
+    except Exception as exc:  # noqa: BLE001 — the read stays spent; say so
+        logger.warning("lens_meter_release_failed", error_type=type(exc).__name__, error=str(exc)[:200])
 
 
 # Ask spend guardrails.

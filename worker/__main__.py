@@ -161,6 +161,22 @@ async def _quote_reconciler() -> None:
             logger.exception("quote_reconciler_error")
 
 
+LENS_SWEEP_INTERVAL_S = int(os.environ.get("PRISM_LENS_SWEEP_INTERVAL_S", "300"))
+
+
+async def _lens_brief_sweeper() -> None:
+    """Write the lenses recent stories offer and still lack, so a tap reads a
+    written brief instead of waiting on the model (correlation/briefs.py)."""
+    from correlation.briefs import sweep_lens_briefs
+
+    while True:
+        await asyncio.sleep(LENS_SWEEP_INTERVAL_S)
+        try:
+            await sweep_lens_briefs()
+        except Exception:
+            logger.exception("lens_brief_sweeper_error")
+
+
 async def _health_server() -> None:
     """Minimal HTTP 200 responder on $PORT.
 
@@ -356,6 +372,7 @@ async def main(stages: list[str]) -> None:
         tasks.append(asyncio.create_task(_partition_reconciler()))
         tasks.append(asyncio.create_task(_veto_reconciler()))
         tasks.append(asyncio.create_task(_quote_reconciler()))
+        tasks.append(asyncio.create_task(_lens_brief_sweeper()))
 
     if len(tasks) <= 1:  # only the health server — no stage selected
         raise SystemExit("no stages selected")

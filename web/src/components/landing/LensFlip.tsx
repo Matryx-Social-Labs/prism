@@ -2,18 +2,16 @@
 
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Lock } from "@/components/icons";
 import { useLenses } from "@/lib/lenses";
 import { flipDuration } from "@/lib/motion";
 import { sentences } from "@/lib/sentences";
-import { useSession } from "@/lib/session";
 
 /**
  * The lens flip on one real story (Design System v2 · LensSwitch + LensBrief):
  * the lenses the story offers, from the live registry; the Reader brief and
- * what to watch as the record printed them. A professional reading is behind a
- * sign-in for a signed-out reader, exactly as on the story page, so its lens
- * flips to the unlock prompt rather than to a written sample. The flip is the
+ * what to watch as the record printed them. A professional reading is read on
+ * the story, where the lens meter is (a few free reads without an account), so
+ * its lens flips to the way there rather than to a written sample. The flip is the
  * scan line and re-ink (`.p-flip`), paced by the block's height; instant under
  * reduced motion.
  */
@@ -25,7 +23,6 @@ export type LensStory = { id: string; title: string; reports: number; brief: str
 export function LensFlip({ story }: { story: LensStory }) {
   const registry = useLenses();
   const offered = story.available.length ? registry.filter((l) => story.available.includes(l.slug)) : registry;
-  const session = useSession();
   const [slug, setSlug] = useState("reader");
   const [flipping, setFlipping] = useState(false);
   const ref = useRef<HTMLElement>(null);
@@ -64,7 +61,6 @@ export function LensFlip({ story }: { story: LensStory }) {
               <button key={l.slug} type="button" role="tab" id={`lens-tab-${l.slug}`} aria-selected={on} aria-controls="lens-brief" onClick={() => setSlug(l.slug)} className="shrink-0" style={{ color: on ? "var(--ink)" : "var(--ink-2)", minHeight: 44 }}>
                 {l.slug !== "reader" && <i aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: l.color }} />}
                 {l.short ?? l.name}
-                {l.slug !== "reader" && !session && <Lock size={12} className="opacity-70" />}
               </button>
             );
           })}
@@ -114,19 +110,10 @@ export function LensFlip({ story }: { story: LensStory }) {
               </div>
             )}
           </div>
-        ) : session ? (
+        ) : (
           <div className="grid justify-items-start gap-3">
             <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>The {label} reading of this story is on the story itself.</p>
             <Link href={`/story/${story.id}`} className="p-btn p-btn--primary">Read it on the story</Link>
-          </div>
-        ) : (
-          <div className="grid justify-items-start gap-3">
-            <div aria-hidden className="grid w-full select-none gap-2" style={{ filter: "blur(4px)", opacity: 0.55 }}>
-              {["90%", "76%", "84%"].map((w) => <span key={w} className="h-3 rounded-[2px]" style={{ width: w, background: meta.color, opacity: 0.25 }} />)}
-            </div>
-            <p className="text-[15px] font-semibold leading-[1.4]">Free with an account</p>
-            <p className="-mt-2" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>The {label} reading of this story: {meta.plain ?? meta.tagline}.</p>
-            <Link href={`/signin?next=/story/${story.id}`} className="p-btn p-btn--primary">Sign in to unlock</Link>
           </div>
         )}
       </section>

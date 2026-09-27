@@ -96,9 +96,10 @@ convenience (whole-story Ask, allowance, later follow and alerts), never a model
   therefore marks it `provisional` and the product shows **related coverage under
   review**, not a development chronology. Branches return only after the held-out
   evaluation explicitly promotes the boundary to `verified`.
-- Lens re-read per story: Reader (free), Markets and Cyber (paid; health and policy
-  drafted, not served). A locked lens still flips — the reader sees what they are
-  missing — and the brief is gated server-side.
+- Lens re-read per story: Reader (free), Markets and Cyber (metered like Ask: 3 a session
+  without an account, 10 a day with one, every lens on Plus; health and policy drafted,
+  not served). A locked lens still flips — the reader sees what they are missing — and
+  the brief and its facts are gated server-side.
 - Verbatim, attributed claims per story ("What was said"), free to all readers,
   grouped by speaker, each cited `[n]` to the source list.
 - Personalisation contract: state (ISO 3166-2), role/lens, interests (sector or

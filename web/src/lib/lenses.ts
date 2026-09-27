@@ -27,7 +27,7 @@ export const LENS_META: Record<string, LensMeta> = {
     slug: "reader",
     name: "General reader",
     short: "Reader",
-    tagline: "Every story with every perspective, consequences, and answers",
+    tagline: "What happened, why it matters, and what the reports leave open",
     plain: "what happened, and why it matters",
     color: "var(--ink)", // the record is neutral: the Reader lens has no hue
     bg: "var(--sunken)",
@@ -45,14 +45,19 @@ export const LENS_META: Record<string, LensMeta> = {
     slug: "markets",
     name: "Finance / Trader",
     short: "Markets",
-    tagline: "Market-moving news with tickers, catalysts, and price reads",
-    plain: "what this moves in the market, and why",
+    tagline: "What the reports say a story means for listed companies, with tickers and catalysts",
+    plain: "what the reports say it means for listed companies",
     color: "var(--lens-markets)",
     bg: "var(--lens-markets-soft)",
   },
 };
 
 export const LENS_ORDER = ["reader", "cyber", "markets"];
+
+/** The lens meter, the web's one copy of common/quota.py (ANON_LENS_PER_SESSION,
+ *  USER_LENS_PER_DAY) for copy that speaks before the server has counted; a 402
+ *  carries the limit it hit. Plus reads every lens. */
+export const LENS_READS = { anonymousPerSession: 3, accountPerDay: 10 } as const;
 
 // Styling for lenses the client doesn't know yet: the next unused stops of the
 // spectrum (DESIGN.md § Lenses — health rose, policy amber), then a repeat.

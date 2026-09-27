@@ -4,14 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { StoryView } from "@/components/StoryView";
 import type { EventDetail } from "@/lib/api";
 
-const fetchBrief = vi.hoisted(() => vi.fn(async () => null));
+const fetchBrief = vi.hoisted(() => vi.fn(async (..._args: unknown[]): Promise<unknown> => null));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, fetchBrief, fetchQuestions: vi.fn(async () => []) };
 });
-vi.mock("@/lib/lenses", () => ({
+vi.mock("@/lib/lenses", async () => ({
+  ...(await vi.importActual<typeof import("@/lib/lenses")>("@/lib/lenses")),
   useLenses: () => [
     { slug: "reader", short: "Reader", color: "#111", bg: "#eee", tagline: "t" },
     { slug: "cyber", short: "Cyber", color: "#06B6D4", bg: "#e0f7fa", tagline: "t" },
@@ -67,7 +68,7 @@ const scrollIntoView = vi.fn();
 
 beforeEach(() => {
   localStorage.clear();
-  fetchBrief.mockClear();
+  fetchBrief.mockReset().mockResolvedValue(null);
   scrollIntoView.mockClear();
   Element.prototype.scrollIntoView = scrollIntoView;
 });
@@ -88,7 +89,7 @@ describe("lens flip — keyboard", () => {
         "true",
       ),
     );
-    expect(screen.getByRole("button", { name: /Sign in to unlock/ })).toBeInTheDocument();
+    await waitFor(() => expect(fetchBrief).toHaveBeenCalledWith("e1", "cyber", undefined, false));
     // "layout never moves": a key press must not yank the page.
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
@@ -160,7 +161,7 @@ describe("lens flip — pinned mobile rail", () => {
     await userEvent.click(screen.getByRole("tab", { name: /Cyber/ }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Sign in to unlock/ })).toBeInTheDocument(),
+      expect(screen.getByRole("tab", { name: /Cyber/ })).toHaveAttribute("aria-selected", "true"),
     );
     expect(scrollIntoView).toHaveBeenCalledWith(
       expect.objectContaining({ behavior: "smooth", block: "start" }),
@@ -184,19 +185,21 @@ describe("lens flip — pinned mobile rail", () => {
 });
 
 describe("locked lens", () => {
-  // Free tier discipline: flipping to a locked lens must not generate a brief.
-  // Every signed-out visitor tapping Cyber would otherwise bill an LLM call.
-  it("generates no brief for a signed-out reader", async () => {
+  // Free tier discipline: past the meter a tap asks once, for what is written,
+  // and never for a brief to be generated. Every signed-out visitor tapping
+  // Cyber would otherwise bill an LLM call.
+  it("asks a signed-out reader past the meter to sign in, and generates nothing", async () => {
     render(<StoryView event={event({ lens_briefs: { reader: READER_BRIEF } } as Partial<EventDetail>)} />);
     await mobile().findByText(READER_BRIEF);
     fetchBrief.mockClear();
+    fetchBrief.mockResolvedValue({ state: "signin_required", used: 3, limit: 3 });
 
     await userEvent.click(screen.getAllByRole("tab", { name: /Cyber/ })[0]);
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Sign in to unlock/ })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "Sign in to keep reading" })).toBeInTheDocument(),
     );
-    expect(fetchBrief).not.toHaveBeenCalled();
+    expect(fetchBrief.mock.calls).toEqual([["e1", "cyber", undefined, false]]);
   });
 });
 

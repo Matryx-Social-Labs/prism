@@ -20,12 +20,10 @@ from sqlalchemy import text
 
 from common.db import session_scope
 from common.quota import (
-    grant_samples,
     has_unlocked,
+    lens_reads_today,
     record_unlock,
     release_unlock,
-    remaining_samples,
-    try_consume_sample,
     unlocked_lenses,
 )
 
@@ -88,52 +86,35 @@ async def _event(s) -> uuid.UUID:
     return eid
 
 
-async def test_a_second_tab_cannot_spend_a_second_sample():
-    """THE RACE. Two tabs opening the same lens both find no unlock row and both
-    try to pay. The claim is the arbiter: exactly one INSERT wins the unique
-    constraint, so exactly one debit happens."""
+async def test_a_second_tab_cannot_spend_a_second_read():
+    """THE RACE. Two tabs opening the same lens both try to claim it. The claim
+    is the arbiter and the meter counts claims: exactly one INSERT wins the
+    unique constraint, so exactly one read is spent."""
     if not await _db():
         pytest.skip("no database")
     async with session_scope() as s:
         uid, eid = await _user(s), await _event(s)
-        await grant_samples(s, uid, 3)
-
         first = await record_unlock(s, uid, eid, "markets")
         second = await record_unlock(s, uid, eid, "markets")
         assert first is True and second is False, "both tabs claimed the same unlock"
-
-        # Only the winner debits.
-        assert await try_consume_sample(s, uid) is True
-        assert await remaining_samples(s, uid) == 2, "a refresh or a second tab charged twice"
+        assert await lens_reads_today(s, uid) == 1, "a refresh or a second tab charged twice"
 
 
-async def test_a_failed_brief_gives_the_sample_back():
+async def test_a_failed_brief_gives_the_read_back():
     """Generation returns 200 with an EMPTY brief when the model is down, by
     design. Nobody pays for a panel that renders nothing."""
     if not await _db():
         pytest.skip("no database")
     async with session_scope() as s:
         uid, eid = await _user(s), await _event(s)
-        await grant_samples(s, uid, 3)
         assert await record_unlock(s, uid, eid, "markets") is True
-        await try_consume_sample(s, uid)
-        # ...generation raises...
+        # ...generation raises, or writes nothing...
         await release_unlock(s, uid, eid, "markets")
-        await grant_samples(s, uid, 1)
-        assert await remaining_samples(s, uid) == 3, "the reader paid for an empty brief"
+        await release_unlock(s, uid, eid, "markets")  # a second tab failing too gives back nothing more
+        assert await lens_reads_today(s, uid) == 0, "the reader paid for an empty brief"
         assert await has_unlocked(s, uid, eid, "markets") is False, (
             "a claim survived for a brief that never materialised"
         )
-
-
-async def test_no_quota_row_is_unknown_not_zero():
-    """Absence of evidence is not evidence. A user who was never granted samples
-    must not be told they have spent them all."""
-    if not await _db():
-        pytest.skip("no database")
-    async with session_scope() as s:
-        uid = await _user(s)
-        assert await remaining_samples(s, uid) is None
 
 
 async def test_unlocked_lenses_is_one_query_for_the_whole_event():

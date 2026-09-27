@@ -18,7 +18,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
-from common.quota import grant_samples
 
 
 class RateLimited(Exception):
@@ -62,7 +61,7 @@ async def request_magic_link(session: AsyncSession, email: str) -> str:
 
 async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | None:
     """Consume a magic token (single-use) and return the authenticated user id,
-    creating the user + granting free Markets samples on first sign-in. Returns
+    creating the user on first sign-in. Returns
     None if the token is unknown, expired, or already consumed.
 
     The UPDATE ... WHERE consumed_at IS NULL ... RETURNING makes consumption
@@ -86,7 +85,7 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
 async def user_for_verified_email(session: AsyncSession, email: str) -> UUID:
     """The account for an email some identity provider has VERIFIED — a consumed
     magic link, or a Google ID token with email_verified. Creates it on first
-    sign-in (no unverified/junk rows) and grants the free Markets samples once;
+    sign-in (no unverified/junk rows);
     a Google sign-in on an address that already has a magic-link account lands
     in the same account, since the verified email is the identity."""
     email = email.strip().lower()
@@ -103,8 +102,6 @@ async def user_for_verified_email(session: AsyncSession, email: str) -> UUID:
         user_id = (
             await session.execute(text("SELECT id FROM users WHERE email = :e"), {"e": email})
         ).scalar_one()
-    else:  # new user — grant the free Markets samples once
-        await grant_samples(session, user_id, get_settings().prism_free_markets_samples)
     return user_id
 
 

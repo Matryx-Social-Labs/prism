@@ -52,8 +52,8 @@ Sources: `PRODUCT.md`, the rebuild plan, `todos.md`, `api/routes/*`, `web/src/li
 |---|---|---|
 | **Lens registry** | LIVE | `/api/v1/lenses`: reader (free), cyber, markets (paid); health, policy are `upcoming=True` (drafted, not served). Never enumerated in copy; UIs render the registry. |
 | **The lens flip** (the signature) | LIVE | Per-story tabs; scan line + re-ink, 500 ms; keys 1/2/3 on desktop; instant under reduced motion. Untouched by the redesign. |
-| Lens brief + "what to watch" points | LIVE (LLM-written, cached) | `/events/{id}/brief` per lens; reader brief free; paid briefs behind sign-in with 3 free Markets samples (`try_consume_sample`). |
-| Lens facts on the record | LIVE, gated | Cyber: CVE ids, CVSS, KEV/exploitation, affected products, remediation, control mapping. Markets: validated tickers (15,701-row securities master, 0 unvalidated), catalyst, price-impact direction. Facts are nulled for a locked lens (paywall gates facts, not only prose). |
+| Lens brief + "what to watch" points | LIVE (LLM-written, cached) | `/events/{id}/brief` per lens, with the lens facts; reader brief free; professional lenses metered like Ask (3 a session anonymous, 10/day signed in, Plus all; `common/quota.py`). Written ahead by the worker for every lens a story offers. |
+| Lens facts on the record | LIVE, gated | Cyber: CVE ids, CVSS, KEV/exploitation, affected products, remediation, control mapping. Markets: validated tickers (15,701-row securities master, 0 unvalidated), catalyst, price-impact direction. Facts are nulled on the record for a lens the reader has not opened, and served with `/brief` behind the same gate (paywall gates facts, not only prose). |
 | Listen (narration) | LIVE | Browser speech synthesis of the brief and points (BriefPlayer). |
 | Lens markers on the chart | LIVE | A 7 px lens-hued dot on a row when a professional read exists for it. |
 | Health / Policy lenses | PLANNED | Registry entries exist as `upcoming`; prompts and fields not built. |
