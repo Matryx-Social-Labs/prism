@@ -3,6 +3,22 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.99.0] - 2026-09-27
+
+### Changed — extraction pinned to one endpoint, so the cache actually hits
+0.0.98.0 moved the schema ahead of the article so the ~8,000-token prompt could be
+cached. On production it hit on 1 of 55 calls: OpenRouter serves Gemini from eight
+endpoints (Vertex global/EU/US and AI Studio, each standard, flex and priority),
+each with its own cache, and unpinned traffic rarely lands on a warm one.
+
+- **Extraction is pinned to `google-ai-studio/flex`** (`PRISM_EXTRACT_PROVIDERS`,
+  comma-separated, empty = OpenRouter's routing). Flex is Google's half-price tier.
+  Measured on 30 articles at production concurrency: **30/30 cache hits, $0.00074 a
+  call (was $0.00288), median 2.1 s, slowest 4 s, 30/30 valid**. Vertex flex was
+  tried and rejected (18 s median). Fallbacks stay on: if flex is unavailable a call
+  goes to a standard endpoint at the normal price, never to a lost article.
+- `llm_call` log lines name the endpoint that served the call.
+
 ## [0.0.98.0] - 2026-09-27
 
 ### Changed — the model bill, cut where it was measured and shown where it goes

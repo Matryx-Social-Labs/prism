@@ -121,6 +121,7 @@ async def handle_classified_item(payload: dict) -> None:
             reasoning=REASONING_OFF,
             metadata=meta,
             langfuse_prompt=prompt if prompt.version else None,
+            providers=[p.strip() for p in settings.prism_extract_providers.split(",") if p.strip()] or None,
             # `impacts` stays pruned: correlation re-derives them in
             # event-analysis and nothing reads the extracted ones, so asking for
             # them costs output tokens on the highest-volume stage for nothing.
