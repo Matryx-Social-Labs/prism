@@ -19,9 +19,10 @@ export const ORIGIN_LABEL: Record<Origin, string> = {
   wire: "Wire / agency",
 };
 
+/** Outlets per slot, by masthead: the bar and its legend add up to the "k outlets" beside them. */
 export function coverageCounts(outlets: OutletRef[]): Record<Origin, number> {
   const c: Record<Origin, number> = { national: 0, intl: 0, regional: 0, wire: 0 };
-  for (const o of outlets) if (o.origin in c) c[o.origin as Origin] += 1;
+  for (const o of publishers(outlets)) if (o.origin in c) c[o.origin as Origin] += 1;
   return c;
 }
 

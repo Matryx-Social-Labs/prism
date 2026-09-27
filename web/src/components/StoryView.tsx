@@ -195,7 +195,8 @@ export function StoryView({ event }: { event: EventDetail }) {
   const boundaryVerified = routeStory?.boundary_status === "verified";
 
   const sourceCount = event.sources.length;
-  const single = sourceCount <= 1;
+  // Corroboration is outlets, not reports: one newsroom's five reports are still one source.
+  const single = outletCount <= 1;
   const group = sectorGroup(event.sector);
   const reports = [...event.sources].sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
 
@@ -299,7 +300,9 @@ export function StoryView({ event }: { event: EventDetail }) {
     ...(developments > 1 ? [{ n: developments, label: "developments", to: "route" }] : []),
   ];
   const reportWord = plural(sourceCount, "report", "reports");
-  const saidOutlets = new Set(claims.flatMap((sp) => sp.claims.map((c) => c.source_name))).size;
+  // By masthead, as the header counts: The Times of India and its Delhi desk are one outlet.
+  const outletOf = (id: string) => event.sources.find((x) => x.article_id === id);
+  const saidOutlets = new Set(claims.flatMap((sp) => sp.claims.map((c) => outletOf(c.article_id)?.publisher ?? c.source_name))).size;
   const saidLangs = new Set(claims.flatMap((sp) => sp.claims.map((c) => c.lang)).filter(Boolean)).size;
 
   // Facts first — they are the record; the brief beneath is a reading of it.
@@ -483,8 +486,8 @@ export function StoryView({ event }: { event: EventDetail }) {
                 everyone who covered it, and when the outlets were last read. */}
             <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-2">
               <MonogramStack outlets={outlets} limit={4} size={24} />
-              <CoverageBar outlets={outlets} fallbackCount={sourceCount} size="lg" width={220} draw className="lg:!hidden" />
-              <CoverageBar outlets={outlets} fallbackCount={sourceCount} size="lg" width={360} draw className="!hidden lg:!inline-flex" />
+              <CoverageBar outlets={outlets} fallbackCount={outletCount} size="lg" width={220} draw className="lg:!hidden" />
+              <CoverageBar outlets={outlets} fallbackCount={outletCount} size="lg" width={360} draw className="!hidden lg:!inline-flex" />
               <span className="font-mono text-[12px] leading-[1.5]" style={{ color: "var(--ink-3)" }}>
                 <Link href="/sources" className="hover:underline">{monitoredText(outletCount, event.monitored_outlets)}</Link> · {sourceCount} {reportWord}
                 {outlets.length > 0 && ` · ${languageNames(languagesOf(outlets))}`}
@@ -531,7 +534,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                 hint="Only words found exactly in the article are shown, attributed and linked to the line they came from."
               />
               <div className="mt-3">
-                <Said claims={claims} sourceIndex={sourceIndex} outletOf={(id) => event.sources.find((x) => x.article_id === id)} eventId={event.id} />
+                <Said claims={claims} sourceIndex={sourceIndex} outletOf={outletOf} eventId={event.id} />
               </div>
             </section>
           )}
