@@ -11,8 +11,8 @@ vi.mock("next/navigation", () => ({ permanentRedirect, notFound }));
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual<typeof import("@/lib/api")>("@/lib/api")), fetchEvent }));
 vi.mock("@/components/StoryView", () => ({ StoryView: () => <main>the record</main> }));
 
-import StoryPage from "@/app/story/[id]/page";
-import QuotePage from "@/app/story/[id]/quote/[n]/page";
+import StoryPage, { generateMetadata } from "@/app/story/[id]/page";
+import QuotePage, { generateMetadata as quoteMetadata } from "@/app/story/[id]/quote/[n]/page";
 
 const record = (id: string) => ({ id, title: "Bridge closes", sector: null, sources: [], claims: [], entities: [] });
 const params = (id: string, n?: string) => ({ params: Promise.resolve({ id, n: n ?? "0-0" }) });
@@ -39,5 +39,26 @@ describe("/story/<id> — a merged record's address", () => {
     fetchEvent.mockResolvedValue(record("survivor"));
     await expect(QuotePage(params("absorbed", "1-2"))).rejects.toThrow("NEXT_REDIRECT");
     expect(permanentRedirect).toHaveBeenCalledWith("/story/survivor");
+  });
+});
+
+describe("/story/<id> — the merged address's metadata", () => {
+  // The page streams (loading.tsx), so Next delivers the redirect as an
+  // instant meta refresh with a 200, not an HTTP 308. The canonical is then the
+  // one signal a crawler reads first: it must name the survivor, never the old
+  // address it is leaving (seen live on the first 20 merges, 2026-09-27).
+  it("names the survivor as canonical, not the absorbed address", async () => {
+    fetchEvent.mockResolvedValue(record("survivor"));
+    const meta = await generateMetadata(params("absorbed"));
+    expect(meta.alternates?.canonical).toBe("/story/survivor");
+    expect((meta.openGraph as { url?: string } | undefined)?.url).toBe("/story/survivor");
+  });
+
+  it("points a merged record's quote page at the survivor's record", async () => {
+    const claim = { id: "q1", quote_text: "The bridge stays shut until the audit is done.", source_name: "The Hindu" };
+    fetchEvent.mockResolvedValue({ ...record("survivor"), claims: [{ speaker: "A Minister", role: null, claims: [claim] }] });
+    const meta = await quoteMetadata(params("absorbed", "q1"));
+    expect(meta.alternates?.canonical).toBe("/story/survivor");
+    expect(JSON.stringify(meta)).not.toContain("absorbed");
   });
 });

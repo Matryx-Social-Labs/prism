@@ -31,9 +31,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description,
-    alternates: { canonical: `/story/${id}` },
+    alternates: { canonical: `/story/${event.id}` }, // the survivor's, if this record was merged
     ...robotsUnless(event.indexable !== false), // as its record
-    openGraph: { type: "article", siteName: "Prism", title, description, url: `/story/${id}/quote/${q.id}` },
+    openGraph: { type: "article", siteName: "Prism", title, description, url: `/story/${event.id}/quote/${q.id}` },
     twitter: { card: "summary_large_image", title, description },
   };
 }
