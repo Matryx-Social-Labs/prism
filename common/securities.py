@@ -98,6 +98,7 @@ ALIASES: dict[str, str] = {
     "ongc": "oil and natural gas",
     "paytm": "one 97 communications",
     "policybazaar": "pb fintech",
+    "sail": "steel authority of india",
     "sbi": "state bank of india",
     "sun pharma": "sun pharmaceutical industries",
     "tcs": "tata consultancy services",

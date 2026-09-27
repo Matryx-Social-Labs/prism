@@ -25,6 +25,12 @@ LISTED = build_master([
     ("BA", "NYSE", "Boeing Company (The) Common Stock"),
     ("INDIGO", "NSE", "InterGlobe Aviation Limited"),
     ("JPM", "NYSE", "JP Morgan Chase & Co. Common Stock"),
+    ("PNB", "NSE", "Punjab National Bank"),
+    ("CANBK", "NSE", "Canara Bank"),
+    ("BANKBARODA", "NSE", "Bank of Baroda"),
+    ("UAL", "NASDAQ", "United Airlines Holdings, Inc. - Common Stock"),
+    ("DAL", "NYSE", "Delta Air Lines, Inc. Common Stock"),
+    ("KTKBANK", "NSE", "The Karnataka Bank Limited"),
 ])
 PUBLISHERS = {"thehindu": "thehindu", "thehindu_tamilnadu": "thehindu", "livemint": "livemint", "ndtv": "ndtv", "economictimes": "economictimes"}
 
@@ -78,6 +84,23 @@ def test_the_company_is_named_as_listed_without_its_share_class():
     assert digest.display_name("Boeing Company (The) Common Stock") == "Boeing"
     assert digest.display_name("Amazon.com, Inc. - Common Stock") == "Amazon.com"
     assert digest.display_name("Mahindra & Mahindra Limited") == "Mahindra & Mahindra"
+    assert digest.display_name("The Karnataka Bank Limited") == "Karnataka Bank"
+
+
+def test_a_record_naming_many_companies_is_about_the_market():
+    """The strike story listed 22 banks; it was 22 of the first board's 76 rows."""
+    banks = ["SBIN", "PNB", "CANBK", "BANKBARODA", "KTKBANK"]
+    strike = event("Banks may shut for five days as unions call a walkout", tickers=banks, slugs=["ndtv", "livemint"])
+    out = board([strike])
+    assert out["companies"] == []
+    assert [r["id"] for r in out["market_wide"]] == [str(strike["id"])]
+
+
+def test_of_many_companies_only_those_the_headline_names_keep_a_row():
+    glitch = event("Boeing flags 737 MAX glitch; airlines refuse deliveries", tickers=["BA", "UAL", "DAL", "INDIGO", "JPM"])
+    out = board([glitch])
+    assert [r["symbol"] for r in out["companies"]] == ["BA"]
+    assert out["market_wide"] == [], "a company has the record"
 
 
 def test_outlets_are_counted_by_masthead():
@@ -98,13 +121,13 @@ def test_the_most_corroborated_company_leads_and_uses_its_best_record():
 
 def test_prisms_reading_is_the_companys_own_impact_when_there_is_one():
     ev = event("Airbus coating issue; Boeing software fix", tickers=["INDIGO", "BA"], slugs=["ndtv", "livemint"],
-               price={"direction": "up", "confidence": 0.4})
+               price={"direction": "up", "confidence": 0.4}, reader=["Watch the FAA"])
     impacts = [{"event_id": ev["id"], "entity": "IndiGo", "effect": "a321neo_repainting_costs", "direction": "negative", "confidence": 0.7}]
     rows = {r["symbol"]: r for r in board([ev], impacts)["companies"]}
     assert (rows["INDIGO"]["reading"], rows["INDIGO"]["confidence"]) == ("negative", 0.7)
     assert rows["INDIGO"]["why"] == "A321neo repainting costs"
-    # The record's one price read is not Boeing's: two companies share it.
-    assert rows["BA"]["reading"] is None and rows["BA"]["confidence"] is None
+    # The record's one price read and point are not Boeing's: two companies share them.
+    assert rows["BA"]["reading"] is None and rows["BA"]["confidence"] is None and rows["BA"]["why"] is None
 
 
 def test_a_records_price_read_speaks_for_its_only_company():
@@ -120,7 +143,9 @@ def test_market_wide_forces_are_their_own_rows():
     upi = event("Mobile retailers warn proposed payment charges could squeeze margins", catalyst="regulatory_action",
                 slugs=["ndtv", "livemint", "economictimes"])
     plain = event("Chennai home buyers prefer 3-BHK homes", catalyst="other")
-    out = board([rbi, upi, plain])
+    amount = event("China and the United States sign a 2.87 trillion rupee deal")  # a sum, not the currency
+    personal = event("Mumbai IT professional gets tax relief after employer error")  # one taxpayer
+    out = board([rbi, upi, plain, amount, personal])
     assert [r["id"] for r in out["market_wide"]] == [str(upi["id"]), str(rbi["id"])]
     assert "symbol" not in out["market_wide"][0]
 

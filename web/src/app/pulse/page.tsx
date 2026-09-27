@@ -35,14 +35,14 @@ export default function PulsePage() {
 
   const follows = useFollows(session);
   const day = board?.generated_at ? shortDate(board.generated_at) : null;
-  const dateline = ["Pulse", day, board?.generated_at ? `updated ${istTime(board.generated_at)} IST` : null].filter(Boolean).join(" · ");
+  const dateline = [day, board?.generated_at ? `updated ${istTime(board.generated_at)} IST` : null].filter(Boolean).join(" · ") || "Market Pulse";
 
   return (
     <div className="mx-auto max-w-[1080px] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-16">
       <Masthead dateline={dateline} />
       <header className="grid gap-1.5 pt-4 lg:pt-8">
         <h1 className="[font:var(--t-display-m)] lg:[font:var(--t-display-l)]" style={{ letterSpacing: "var(--track-display)" }}>Market Pulse</h1>
-        {board && <p className="p-count">{counted(board)}</p>}
+        {board && <p className="p-count" style={{ whiteSpace: "normal" }}>{counted(board)}</p>}
         <p className="max-w-[60ch]" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
           The listed companies and market-wide forces the last 24 hours of business reporting named, most-reported first. Prism&rsquo;s reading is labelled as Prism&rsquo;s; no prices, no advice.
         </p>

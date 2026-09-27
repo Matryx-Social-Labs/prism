@@ -60,10 +60,18 @@ READ_LINE_CHARS = 240
 # Headlines are Prism's own, in English.
 MARKET_WIDE_CATALYSTS = frozenset({"regulatory_action", "rate_decision"})
 _MARKET_WIDE = re.compile(
-    r"\b(?:RBI|repo|MPC|SEBI|IRDAI|GST|tax(?:es)?|TDS|duty|duties|tariffs?|strike|UPI|MDR|rupee|forex|"
+    r"\b(?:RBI|repo|MPC|SEBI|IRDAI|GST|tax (?:cuts?|hikes?|rates?|slabs?|regime|reforms?|rules?)|"
+    r"(?:import|export|customs|excise) dut(?:y|ies)|tariffs?|strike|UPI|MDR|forex|"
+    r"rupee (?:falls|rises|slips|gains|weakens|strengthens|hits|ends|closes|opens|recovers)|"
     r"inflation|Sensex|Nifty|crude|bond yields?|FPIs?|FIIs?|fiscal|budget|monetary|interest rates?)\b",
     re.IGNORECASE,
 )
+# Beyond this many companies a record is about a sector or the market — the
+# strike story that lists 22 banks, the export story that lists four scooter
+# makers. Only the companies its headline names keep a row from it; with none,
+# the record is market-wide. Measured on the first day's board: one record was
+# 22 of 76 company rows.
+MAX_COMPANIES = 3
 # The extractor's labels are snake_case and lowercase; these read as words.
 _ACRONYMS = frozenset({"upi", "mdr", "rbi", "sebi", "gst", "ipo", "ev", "ai", "us", "eu", "psu", "fdi", "fpi", "dgca", "faa", "nclt", "lpg", "cng"})
 _READING = {"up": "positive", "positive": "positive", "down": "negative", "negative": "negative", "mixed": "mixed"}
@@ -84,7 +92,7 @@ def display_name(name: str) -> str:
     own spelling: 'JP Morgan Chase & Co. Common Stock' → 'JP Morgan Chase'."""
     key_words = company_key(name).split()
     kept: list[str] = []
-    for token in re.sub(r"\(the\)", "", name, flags=re.IGNORECASE).split():
+    for token in re.sub(r"\(the\)|^the\s+", "", name, flags=re.IGNORECASE).split():
         if len(fold(" ".join(kept + [token])).split()) > len(key_words):
             break
         kept.append(token)
@@ -166,25 +174,31 @@ def assemble(events, impacts, publishers: dict[str, str], listed: Master, since:
         fin = (e["projection"] or {}).get("finance") or {}
         price = fin.get("price_impact") or {}
         on_record = impacts_of.get(rec["id"], [])
-        shown = [(t, listed.by_symbol[t][0]) for t in fin.get("tickers") or [] if t in listed.by_symbol]
+        named = [(t, listed.by_symbol[t][0]) for t in fin.get("tickers") or [] if t in listed.by_symbol]
+        shown = named
+        if len(named) > MAX_COMPANIES:
+            headline = fold(rec["headline"] or "")
+            shown = [(t, i) for t, i in named if names_company(t, i.name, headline, [])]
         for symbol, listing in shown:
             mine = [
                 i for i in on_record
                 if i["entity"] and names_company(symbol, listing.name, fold(i["entity"]), [company_key(i["entity"])])
             ]
             impact = max(mine, key=lambda i: i["confidence"] or 0, default=None)
+            only = len(named) == 1  # the record's own read and point speak for its only company
             if impact:
-                reading = _reading(impact["direction"], impact["confidence"])
-            elif len(shown) == 1:  # the record's one price read is its only company's
-                reading = _reading(price.get("direction"), price.get("confidence"))
+                reading, why = _reading(impact["direction"], impact["confidence"]), words(impact["effect"])
+            elif only:
+                reading, why = _reading(price.get("direction"), price.get("confidence")), rec["_point"]
             else:
-                reading = _reading(None, None)
+                reading, why = _reading(None, None), None
             row = {**rec, "symbol": symbol, "exchange": listing.exchange, "company": display_name(listing.name),
-                   **reading, "why": words(impact["effect"]) if impact else rec["_point"]}
+                   **reading, "why": why}
             key = company_key(listing.name)
             if key not in best or _order(row) < _order(best[key]):
                 best[key] = row
-        if not shown and (fin.get("catalyst") in MARKET_WIDE_CATALYSTS or _MARKET_WIDE.search(rec["headline"] or "")):
+        wide = len(named) > MAX_COMPANIES or fin.get("catalyst") in MARKET_WIDE_CATALYSTS or _MARKET_WIDE.search(rec["headline"] or "")
+        if not shown and wide:
             top = max(on_record, key=lambda i: i["confidence"] or 0, default=None)
             market_wide.append({**rec, **_reading(price.get("direction"), price.get("confidence")),
                                 "why": words(top["effect"]) if top else rec["_point"]})
