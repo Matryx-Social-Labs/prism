@@ -28,7 +28,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!event) return { title: "Story not found" };
 
   const description = eventDescription(event);
-  const url = `/story/${id}`;
+  // event.id, not the requested id: a merged record's old address answers with
+  // the survivor, and its canonical must name the survivor (the redirect below
+  // reaches a crawler as a streamed meta refresh, not an HTTP 308).
+  const url = `/story/${event.id}`;
   // The share card is always Prism's own (opengraph-image.tsx): a publisher's
   // photograph is never presented as our card (legal review, 2026-09-18).
   return {
