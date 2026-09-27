@@ -578,25 +578,46 @@ export async function fetchEntity(slug: string): Promise<EntityPage | null> {
   return (await res.json()) as EntityPage;
 }
 
-export interface MarketDigest {
+/** A record on Market Pulse. `reading` is Prism's reading of it (a word and
+ *  the model's confidence), never a price; `outlets` counts mastheads. */
+export interface PulseRow {
+  id: string;
   headline: string;
-  narrative: string;
-  movers: { ticker: string; note: string }[];
-  event_ids: string[];
+  catalyst: string | null;
+  reading: "positive" | "negative" | "mixed" | null;
+  confidence: number | null;
+  why: string | null;
+  outlets: number;
+  single_source: boolean;
+  published_at: string | null;
+}
+
+export interface PulseCompany extends PulseRow {
+  symbol: string;
+  exchange: string;
+  company: string;
+}
+
+/** Market Pulse: the last 24 hours of business and finance reporting as a
+ *  ticker board, most-corroborated first, and at most three lines read from it. */
+export interface MarketDigest {
+  window: { start: string; end: string };
+  counts: { companies: number; stories: number; outlets: number };
+  companies: PulseCompany[];
+  market_wide: PulseRow[];
+  read: string[];
   generated_at: string | null;
-  /** The stories the digest was written from, as chart rows; empty on an older payload. */
-  stories?: FeedItem[];
 }
 
 export async function fetchDigest(): Promise<MarketDigest | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/digest/markets`, { next: { revalidate: 900 } });
-    if (!res.ok || res.status === 204) return null; // 204 = synthesis unavailable → hide the card
+    if (!res.ok) return null;
     return (await res.json()) as MarketDigest;
   } catch {
     // A cross-origin 5xx is blocked as a CORS error and rejects the fetch. Return
-    // null instead of throwing so /pulse resolves to its empty state rather than
-    // hanging forever on "Composing today's market pulse…".
+    // null instead of throwing so /pulse says it could not load rather than
+    // hanging on its skeleton.
     return null;
   }
 }

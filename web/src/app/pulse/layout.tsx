@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 // empty shell (crawl of 2026-09-27). It stays readable and linkable.
 export const metadata: Metadata = {
   title: "Market pulse",
-  description: "The day's markets read, written from the stories on the chart.",
+  description: "The listed companies and market-wide forces the last 24 hours of Indian business reporting named, most-reported first.",
   alternates: { canonical: "/pulse" },
   robots: { index: false, follow: true },
 };

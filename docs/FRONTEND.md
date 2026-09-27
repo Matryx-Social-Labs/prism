@@ -69,7 +69,7 @@ terms/  trending/ (+ [slug])  watchlist/  you/
 | `admin/` | `AdminShell` (auth gate + chrome), `AuditItem`, `Dashboard`, `ui`; `charts/` (recharts panels: `Bars`, `ChartPanel`, `CohortGrid`, `DotPlot`, `KpiTile`, `StackedBars`, `TrendChart`); `coverage/` (`CoverageGraph` three.js network, `NetworkFrame`, colours, layout) |
 | `label/` | `BriefLineTask`, `ClaimTask`, `QuoteRenderingTask`, `StoryTask`, `GuideView`, `Workspace`, `parts`, `rounds` — labelling task UI |
 | `landing/` | `IndicName`, `LensFlip`, `ProofTabs`, `parts` — marketing landing page pieces |
-| `reading/` | `PulseRail`, `StoryArc`, `parts`, `QuotePage` — story-reading surfaces |
+| `reading/` | `StoryArc`, `parts`, `QuotePage` — story-reading surfaces |
 | `story/` | `ChangeTimeline`, `Impacts`, `LensBrief`, `Sheet`, `StoryActionBar`, `StoryNav` — story-page sub-components |
 | `tabs/` | `Markets` — the Markets lens tab content |
 | `today/` | `TodayAside`, `TopOfRecord` — feed ("Today") page furniture |
@@ -107,7 +107,7 @@ Root layout (`web/src/app/layout.tsx`, Server Component): loads every font (`nex
 | `/plus` | Pricing/upsell | delegated to `PlusPage` | Server wrapper (`dynamic="force-dynamic"`) + Client, `<Suspense>` | Public |
 | `/plus/welcome` | Post-checkout confirmation | delegated to `PlusWelcome` | Server wrapper + Client, `<Suspense>` | Public. `robots: {index:false}` |
 | `/privacy` | Static legal copy | none (static, `lib/legal.ts`) | Server | Public |
-| `/pulse` | Market Pulse: today's markets read + tickers + source stories | `fetchDigest()` (`GET /api/v1/digest/markets`) | Client | Public (session only affects ticker link targets) |
+| `/pulse` | Market Pulse: the ticker board of the last 24 hours — companies, market-wide rows, at most three lines read from them | `fetchDigest()` (`GET /api/v1/digest/markets`), `getWatchlist`/`follow`/`unfollow` | Client | Public, noindex (a session adds Follow on each company) |
 | `/refunds` | Static legal copy | none (static) | Server | Public |
 | `/search` | Debounced live search + "In the news now" chips | `searchEvents(term)` (`GET /api/v1/search?q=`, `cache:"no-store"`), `fetchTrending({limit:6})` | Client (`SearchInner`), `<Suspense>` | Public. `robots: {index:false, follow:true}` (thin per-query pages) |
 | `/sector/[slug]` | One of six reader-facing subject groups | Server-fetches `fetchFeed({sector, sort:"latest", limit:FEED_WINDOW})`, passed to client `<FrontPage>` | Server (`revalidate=60`, `generateStaticParams()` prerenders all 6 slugs) + Client | Public. `notFound()` for unknown slug |
@@ -119,7 +119,7 @@ Root layout (`web/src/app/layout.tsx`, Server Component): loads every font (`nex
 | `/terms` | Static legal copy | none (static) | Server | Public |
 | `/trending` | "Stories" — the developing-story list | Server-fetches `fetchTrending({limit:24})`, passed to client `<StoriesPage>` | Server (`revalidate=120`) + Client | Public |
 | `/trending/[slug]` | One developing story's detail | `fetchTrendingStory(slug)` | Server (`revalidate=60`) | Public. Redirects to `canonical_slug` if the story has since merged. `noindex, follow` unless `boundary_status` is `verified` (none are yet) |
-| `/watchlist` | Followed tickers/sectors + their events | `getWatchlist`, `watchlistEvents` (`lib/watchlist.ts`), `fetchDigest()` | Client (`WatchlistInner`), `<Suspense>` (`?ticker=`) | Requires session — signed-out renders a `<SignedOut/>` upsell |
+| `/watchlist` | Followed tickers/sectors + their events | `getWatchlist`, `watchlistEvents` (`lib/watchlist.ts`) | Client (`WatchlistInner`), `<Suspense>` (`?ticker=`) | Requires session — signed-out renders a `<SignedOut/>` upsell |
 | `/you` | Profile editor (works with no account) + watchlist/account summary when signed in | `loadProfile`/`saveProfile` (local); `getWatchlist`/`watchlistEvents` only if session present | Client | Not gated — profile section works signed-out; "Following"/"Account" sections show sign-in prompts otherwise |
 
 ### 3.1 Route handlers and special files
