@@ -4,6 +4,7 @@ Drives the real FastAPI app via httpx/ASGITransport against a live Postgres.
 Skips without a database.
 """
 
+import json
 import uuid
 
 import pytest
@@ -26,12 +27,16 @@ async def _db_reachable() -> bool:
         return False
 
 
-async def _seed(title: str, summary: str, sector: str) -> uuid.UUID:
+async def _seed(title: str, summary: str, sector: str, source_slugs: tuple[str, ...] = ("thehindu",)) -> uuid.UUID:
+    # A served record has at least one source, as on every other list.
     eid = uuid.uuid4()
     async with session_scope() as s:
         await s.execute(
-            text("INSERT INTO events (id, title, summary, sector) VALUES (:i, :t, :s, :sec)"),
-            {"i": str(eid), "t": title, "s": summary, "sec": sector},
+            text(
+                "INSERT INTO events (id, title, summary, sector, projection) "
+                "VALUES (:i, :t, :s, :sec, jsonb_build_object('source_slugs', CAST(:slugs AS jsonb)))"
+            ),
+            {"i": str(eid), "t": title, "s": summary, "sec": sector, "slugs": json.dumps(list(source_slugs))},
         )
     return eid
 
@@ -74,7 +79,10 @@ async def test_search_items_carry_their_subject_path():
     eid = uuid.uuid4()
     async with session_scope() as s:
         await s.execute(
-            text("INSERT INTO events (id, title, sector, subject_path) VALUES (:i, :t, 'other', 'education.exams')"),
+            text(
+                "INSERT INTO events (id, title, sector, subject_path, projection) "
+                "VALUES (:i, :t, 'other', 'education.exams', '{\"source_slugs\": [\"thehindu\"]}')"
+            ),
             {"i": str(eid), "t": f"Board exam {tag} postponed"},
         )
     try:
@@ -237,3 +245,22 @@ async def test_search_ranks_a_title_match_above_newer_summary_mentions():
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM events WHERE id = ANY(:ids)"), {"ids": [str(named), str(mention)]})
+
+
+async def test_search_never_returns_a_record_with_no_sources():
+    # tools/repair --fulltext hides a record built from a bio or navigation page
+    # by emptying its sources, which every list filters on — search did not, so
+    # "Journalist Biography Profile" would have stayed findable (audit 2026-09-27).
+    if not await _db_reachable():
+        pytest.skip("no database — run `docker compose up -d postgres`")
+    tag = uuid.uuid4().hex[:8]
+    served = await _seed(f"Velmora-{tag} opens a plant", "Business news", "business")
+    hidden = await _seed(f"Velmora-{tag} journalist profile", "Biographical text", "business", source_slugs=())
+    transport = ASGITransport(app=app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://t") as ac:
+            ids = {i["id"] for i in (await ac.get("/api/v1/search", params={"q": f"Velmora-{tag}"})).json()["items"]}
+        assert ids == {str(served)}
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM events WHERE id = ANY(:ids)"), {"ids": [str(served), str(hidden)]})
