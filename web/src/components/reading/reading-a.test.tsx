@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { attentionDays } from "@/components/Attention";
 import { StoryArc } from "@/components/reading/StoryArc";
-import { PulseRail } from "@/components/reading/PulseRail";
 import type { StoryDevelopment, TrendingStoryDetail } from "@/lib/api";
 
 const dev = (id: string, day: string, title: string, source_count?: number, is_current = false): StoryDevelopment => ({ id, title, sector: "politics", occurred_at: day, image_url: null, is_current, why: null, source_count });
@@ -44,13 +43,5 @@ describe("The story arc — a provisional grouping", () => {
     const { container } = render(<StoryArc s={story()} />);
     expect(screen.getByText("2 records")).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\d+ developments?\b/);
-  });
-});
-
-describe("Market Pulse — the rail signed out", () => {
-  it("says what following does and signs in back to the pulse", () => {
-    render(<PulseRail session={null} named={[]} />);
-    expect(screen.getByText(/Follow a ticker to see its stories/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/signin?next=/pulse");
   });
 });

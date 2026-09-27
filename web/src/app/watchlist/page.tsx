@@ -8,8 +8,7 @@ import { SectionHead } from "@/components/SectionHead";
 import { Close } from "@/components/icons";
 import { Alert, EmptyState, SelectField, TextField } from "@/components/ui";
 import { SignalRow, SubjectChip, splitFollows, tickerHref, type FollowedSubject } from "@/components/accounts/signals";
-import { MarketDigest, MoversList, TickerChip } from "@/components/tabs/Markets";
-import { fetchDigest, type MarketDigest as Digest } from "@/lib/api";
+import { TickerChip } from "@/components/tabs/Markets";
 import { shortDate } from "@/lib/dateline";
 import { SECTOR_GROUPS } from "@/lib/sectors";
 import { useSession } from "@/lib/session";
@@ -17,10 +16,10 @@ import { follow, getWatchlist, unfollow, watchlistEvents, type WatchEvent, type 
 
 /**
  * Watchlist (Design System v2 · Accounts board, flow 05): the reader's followed
- * tickers and subjects as chips with a remove control, the day's markets reading
- * when the API has written one, and the stories on those signals — today's first,
- * then earlier ones. `?ticker=X` (from Market Pulse or a chip) narrows the rows
- * to one ticker. No prices, ever. Free with an account (the API has no plan gate).
+ * tickers and subjects as chips with a remove control, and the stories on those
+ * signals — today's first, then earlier ones. Market Pulse, the day's board, is
+ * one link away. `?ticker=X` (from a chip) narrows the rows to one ticker. No
+ * prices, ever. Free with an account (the API has no plan gate).
  */
 const SHELL = "mx-auto max-w-[var(--reading)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:max-w-[760px] lg:pb-12";
 const TITLE = "text-balance [font:var(--t-display-m)] lg:[font:var(--t-display-l)]";
@@ -42,7 +41,6 @@ function WatchlistInner() {
   const only = useSearchParams().get("ticker");
   const [items, setItems] = useState<WatchItem[]>([]);
   const [events, setEvents] = useState<WatchEvent[]>([]);
-  const [digest, setDigest] = useState<Digest | null>(null);
   const [ready, setReady] = useState(false);
   // A failed call says so; it used to be an unhandled rejection and a list
   // that simply never arrived.
@@ -74,12 +72,6 @@ function WatchlistInner() {
   useEffect(() => {
     refresh();
   }, [refresh]);
-
-  // The markets reading is public (it is Market Pulse's); shown only when the
-  // API has one — fetchDigest resolves null on a 204 or an outage.
-  useEffect(() => {
-    if (session) fetchDigest().then(setDigest);
-  }, [session]);
 
   // Every write returns the whole list; the stories follow what is now followed.
   async function apply(write: () => Promise<WatchItem[]>, failure: string) {
@@ -120,13 +112,6 @@ function WatchlistInner() {
         </div>
 
         {problem && <Alert tone="error">{problem}</Alert>}
-
-        {digest && !only && (
-          <div>
-            <MarketDigest digest={digest} />
-            {digest.movers.length > 0 && <div className="mt-3"><MoversList movers={digest.movers} tickerHref={tickerHref} /></div>}
-          </div>
-        )}
 
         <FollowForm
           following={tickers.map((t) => t.value)}

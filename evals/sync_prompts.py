@@ -26,7 +26,7 @@ PROMPTS = [
     "agent-qa",
     "judge-groundedness",
     "judge-brief-groundedness",
-    "market-digest",
+    "market-read",
 ]
 
 

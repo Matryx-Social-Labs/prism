@@ -25,7 +25,7 @@ from common.logging import get_logger
 from common.models import Article, ArticleChunk, Enrichment, FieldProvenance, RawItem, Source
 from common.observability import fetch_prompt, observe
 from common.schemas import EnrichedItemMessage
-from common.securities import validated
+from common.securities import article_tickers
 from common.text import chunk_text, is_model_commentary, title_share
 from correlation.verify import gist_text
 from enrichment.claims import verify_claims
@@ -210,15 +210,18 @@ async def handle_classified_item(payload: dict) -> None:
         lens_fields = {}
         if extraction.cyber:
             lens_fields["cyber"] = extraction.cyber.model_dump()
-        if extraction.finance:
-            fin = extraction.finance.model_dump()
-            # The one place a ticker enters the database. Everything downstream —
-            # the event projection, the watchlist join, the digest's movers —
-            # reads what is written here, so a symbol that cannot be traced to a
-            # listed security is refused at this line rather than filtered at
-            # each of the places it would later be shown. `raw_model_output`
-            # above keeps the extractor's original list, so nothing is lost.
-            fin["tickers"] = await validated(session, fin.get("tickers") or [])
+        fin = extraction.finance.model_dump() if extraction.finance else {}
+        # The one place a ticker enters the database. Everything downstream —
+        # the event projection, the watchlist join, Market Pulse — reads what
+        # is written here, so a symbol that is not a listed security the
+        # article names is refused at this line rather than filtered at each
+        # of the places it would later be shown, and a listed company the
+        # article names is linked here even when the extractor gave no finance
+        # read. `raw_model_output` above keeps the extractor's original list.
+        fin["tickers"] = await article_tickers(
+            session, fin.get("tickers") or [], title, clean_text, [e.model_dump() for e in shared.entities], sector
+        )
+        if extraction.finance or fin["tickers"]:
             lens_fields["finance"] = fin
         session.add(
             Enrichment(

@@ -432,20 +432,48 @@ class QuestionsResponse(BaseModel):
     questions: list[str]
 
 
-class MoverOut(BaseModel):
-    ticker: str
-    note: str = ""
+class PulseRow(BaseModel):
+    """A record on Market Pulse: what happened, how corroborated, and Prism's
+    reading of it — a word and the model's confidence, never a price."""
+
+    id: str
+    headline: str
+    catalyst: str | None = None  # in words ("Regulatory action")
+    reading: str | None = None  # positive | negative | mixed
+    confidence: float | None = None
+    why: str | None = None
+    outlets: int  # distinct mastheads
+    single_source: bool
+    published_at: str | None = None
+
+
+class PulseCompany(PulseRow):
+    symbol: str
+    exchange: str
+    company: str
+
+
+class PulseWindow(BaseModel):
+    start: str
+    end: str
+
+
+class PulseCounts(BaseModel):
+    companies: int
+    stories: int
+    outlets: int
 
 
 class DigestResponse(BaseModel):
-    headline: str
-    narrative: str = ""
-    movers: list[MoverOut] = []
-    event_ids: list[str] = []
+    """Market Pulse: the last 24 hours of business and finance reporting as a
+    ticker board, most-corroborated first, and at most three lines read from it."""
+
+    window: PulseWindow
+    counts: PulseCounts
+    companies: list[PulseCompany] = []
+    market_wide: list[PulseRow] = []
+    read: list[str] = []
     generated_at: str | None = None
-    # The stories the digest was written from, as chart rows (the record
-    # under the reading); empty when the ids no longer resolve.
-    stories: list[FeedItem] = []
 
 
 class AskRequest(BaseModel):

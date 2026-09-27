@@ -20,6 +20,7 @@ import { AskContext, type AskOpen } from "@/components/AskContext";
 import { SelectionAsk } from "@/components/SelectionAsk";
 import { CoverageBar, CoverageLegend, MonogramStack, coverageText, languageNames, languagesOf, publishers } from "@/components/Coverage";
 import { monitoredText } from "@/lib/coverage";
+import { confidenceWords } from "@/lib/reading";
 import { EntityText } from "@/components/EntityText";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill } from "@/components/StatusPill";
@@ -367,7 +368,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                   {finance.price_impact.direction === "up" ? <ArrowUp /> : finance.price_impact.direction === "down" ? <ArrowDown /> : <Dash />}
                 </span>
                 {finance.price_impact.magnitude ?? ""}
-                {finance.price_impact.confidence != null && ` (${Math.round(finance.price_impact.confidence * 100)}% conf.)`}
+                {finance.price_impact.confidence != null && ` · ${confidenceWords(finance.price_impact.confidence)}`}
               </span>
             )}
           </div>

@@ -227,6 +227,7 @@ async def test_a_fabricated_ticker_never_lands_in_lens_fields(monkeypatch):
     # against, so it cannot be staged in a rolled-back transaction here. Claiming
     # no markets makes the floor vacuously satisfied without weakening it.
     monkeypatch.setattr(cs, "EXPECTED_MARKETS", {})
+    cs.reset_master()
 
     async def _no_embeddings(chunks):
         return [[0.0] * 768 for _ in chunks]
@@ -272,6 +273,56 @@ async def test_a_fabricated_ticker_never_lands_in_lens_fields(monkeypatch):
         assert "HUL" in row["raw_model_output"]["finance"]["tickers"]
     finally:
         await _cleanup(made)
+        cs.reset_master()
+
+
+async def test_a_company_the_article_names_is_linked_without_a_finance_read(monkeypatch):
+    """The extractor gave a finance read on about half of business articles and a
+    ticker on 13.7% of business events. A finance article whose organisations
+    name a listed company exactly gets that company's ticker all the same."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+
+    import common.securities as cs
+    import enrichment.consumer as ec
+
+    monkeypatch.setattr(cs, "EXPECTED_MARKETS", {})
+    cs.reset_master()
+
+    async def _no_embeddings(chunks):
+        return [[0.0] * 768 for _ in chunks]
+
+    async def _no_publish(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(ec, "embed_texts", _no_embeddings)
+    monkeypatch.setattr(ec.stream, "publish", _no_publish)
+
+    url = f"https://example.test/{uuid.uuid4().hex[:8]}/linked"
+    extraction = {
+        "shared": {"event_type": "other", "headline_summary": "Soap prices rise.",
+                   "entities": [{"name": "Hindustan Unilever", "type": "company", "role": "subject"}]},
+    }
+    made: list[tuple] = []
+    try:
+        async with session_scope() as s:
+            made.append(await _seed_prior_enrichment(s, url, extraction))
+            await _seed_security(s, "HINDUNILVR")
+            second = await _seed_raw_item(s, url)
+        made.append(second)
+        await ec.handle_classified_item({"raw_item_id": str(second[1])})
+        async with session_scope() as s:
+            lens = (
+                await s.execute(
+                    text("SELECT e.lens_fields FROM enrichments e JOIN articles a ON a.id = e.article_id "
+                         "WHERE a.raw_item_id = :r"),
+                    {"r": str(second[1])},
+                )
+            ).scalar_one()
+        assert lens == {"finance": {"tickers": ["HINDUNILVR"]}}
+    finally:
+        await _cleanup(made)
+        cs.reset_master()
 
 
 async def _seed_security(s, symbol: str) -> None:
@@ -279,8 +330,8 @@ async def _seed_security(s, symbol: str) -> None:
     real NSE listing, so leaving it is correct and re-running is a no-op."""
     await s.execute(
         text("INSERT INTO securities (id, symbol, exchange, name, series, active) "
-             "VALUES (:i, :sym, 'NSE', :sym, 'EQ', true) "
-             "ON CONFLICT (exchange, symbol) DO NOTHING"),
+             "VALUES (:i, :sym, 'NSE', 'Hindustan Unilever Limited', 'EQ', true) "
+             "ON CONFLICT (exchange, symbol) DO UPDATE SET name = EXCLUDED.name"),
         {"i": str(uuid.uuid4()), "sym": symbol},
     )
 
@@ -298,7 +349,7 @@ async def _seed_prior_enrichment(s, url: str, extraction: dict) -> tuple:
     )
     await s.execute(
         text("INSERT INTO articles (id,raw_item_id,clean_text,retrieval_tier,word_count) "
-             "VALUES (:i,:r,'the body','body',2)"),
+             "VALUES (:i,:r,'Hindustan Unilever raised soap prices.','body',5)"),
         {"i": str(aid), "r": str(rid)},
     )
     await s.execute(

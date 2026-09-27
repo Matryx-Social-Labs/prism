@@ -20,6 +20,9 @@ from a gap in our coverage, and it is a distinction we could not draw before.
 """
 
 import re
+import time
+import unicodedata
+from dataclasses import dataclass
 
 from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +52,77 @@ _NSE_SUFFIX = ".NS"
 # coverage, not a promise — they are mostly ETFs, and no corpus ticker depends
 # on them, so their absence should not stop us judging the rest.
 EXPECTED_MARKETS = {"NSE": 1000, "NASDAQ": 1000, "NYSE": 1000}
+
+# What articles call a company that its listed name does not say → the listed
+# name, both as `company_key` writes them. Hand-listed from the organisations
+# production articles name, like common/entity_aliases.py and for the same
+# reason: an initialism is ambiguous, and a wrong link puts a company on a
+# story it is not in. Add one only after seeing it name that company in real
+# coverage.
+ALIASES: dict[str, str] = {
+    "airtel": "bharti airtel",
+    "amazon": "amazon com",
+    "amazon web services": "amazon com",
+    "amd": "advanced micro devices",
+    "apollo hospitals": "apollo hospitals enterprise",
+    "aws": "amazon com",
+    "bel": "bharat electronics",
+    "bhel": "bharat heavy electricals",
+    "bpcl": "bharat petroleum",
+    "citi": "citigroup",
+    "dr reddy s": "dr reddy s laboratories",
+    "goldman sachs": "goldman sachs group",
+    "google": "alphabet",
+    "hal": "hindustan aeronautics",
+    "hcl tech": "hcl technologies",
+    "hcltech": "hcl technologies",
+    "hdfc life": "hdfc life insurance",
+    "hpcl": "hindustan petroleum",
+    "hsbc": "hsbc holdings",
+    "hul": "hindustan unilever",
+    "ibm": "international business machines",
+    "indianoil": "indian oil",
+    "indigo": "interglobe aviation",
+    "jpmorgan": "jp morgan chase",
+    "kalyan jewellers": "kalyan jewellers india",
+    "klarna": "klarna group",
+    "l and t": "larsen and toubro",
+    "lenskart": "lenskart solutions",
+    "lic": "life insurance corporation of india",
+    "m and m": "mahindra and mahindra",
+    "maruti": "maruti suzuki india",
+    "maruti suzuki": "maruti suzuki india",
+    "meta": "meta platforms",
+    "nykaa": "fsn e commerce ventures",
+    "ola electric": "ola electric mobility",
+    "ongc": "oil and natural gas",
+    "paytm": "one 97 communications",
+    "policybazaar": "pb fintech",
+    "sail": "steel authority of india",
+    "sbi": "state bank of india",
+    "sun pharma": "sun pharmaceutical industries",
+    "tcs": "tata consultancy services",
+    "turtlemint": "turtlemint fintech solutions",
+    "uber": "uber technologies",
+    "united airlines": "united airlines holdings",
+    "warner bros": "warner bros discovery",
+    "youtube": "alphabet",
+    "zomato": "eternal",
+}
+# Listed names the linker must never read as the company, because in the news
+# they are something else first: the venue a share trades on (BSE, NSE, MCX,
+# Nasdaq), the agency whose rating or index is quoted (Moody's, CRISIL), a
+# group rather than its listing ("Reliance" is Reliance, Inc. on NYSE; "Fortis"
+# is a Canadian utility; "Tata Motors" is two listings since the demerger), a
+# namesake ("EQT" the Swedish investor is not EQT Corporation; "Dow" is the
+# index), or a plain word ("People", "Urban"). All seen linked wrongly on
+# production.
+AMBIGUOUS = frozenset({
+    "bse", "nse", "national stock exchange of india", "multi commodity exchange of india", "nasdaq", "cme group",
+    "intercontinental exchange", "indian energy exchange", "moody s", "s and p global",
+    "msci", "crisil", "icra", "reliance", "fortis", "tata motors", "people", "urban", "ats",
+    "dow", "eqt",
+})
 
 
 # MEASURED, not chosen, from the 15,701 symbols in the loaded master: the longest
@@ -149,4 +223,249 @@ async def validated(session: AsyncSession, tickers: list[str]) -> list[str]:
         n = normalize(t)
         if n in known and n not in out:
             out.append(n)
+    return out
+
+
+# ── Does the article name the company? ───────────────────────────────────────
+# A symbol existing is not a symbol belonging: F (Ford) was stored on a US–China
+# summit and TSM on a Japanese earthquake. So a ticker is kept only when the
+# article names its company, and a company a business article names exactly
+# gets its ticker even when the extractor gave none (the linker) — the
+# extractor gave one on 13.7% of business and finance events.
+#
+# WHAT THIS DOES NOT FIX. The audit's other examples (2026-09-27) ARE named in
+# their articles: CVX as the sponsor of a student water project, JPM and GS
+# through their CEOs at a dinner, PFE as a counterfeited brand. Whether a
+# named company is what a story is about is a judgement no name rule makes.
+
+# What a listing's name carries that an article's never does: the share class
+# ("Class A Common Stock", "American Depositary Shares", all after " - ") and
+# the legal form ("Limited", "Inc.", "Corporation", "(The)").
+_SHARE_CLASS = re.compile(
+    r"\s+-\s.*$|\s+(?:class\s+[a-z]\s+)?(?:new\s+)?"
+    r"(?:common stock|common shares|capital stock|ordinary shares?|american depositary shares?)\b.*$",
+    re.IGNORECASE,
+)
+# "and" only ever trails from "& Co." ("JP Morgan Chase & Co.").
+_LEGAL_FORM = frozenset({"limited", "ltd", "inc", "incorporated", "corporation", "corp", "company", "co", "plc", "llc", "the", "and"})
+# Words an article drops from a listed name ("Uber" for Uber Technologies,
+# "Goldman Sachs" for Goldman Sachs Group). The name check only; the linker
+# matches the whole name.
+_DESCRIPTOR = frozenset({"industries", "technologies", "technology", "platforms", "holdings", "group", "enterprises", "international"})
+# The exchanges a ticker is shown on, India first (BSE is not loaded yet).
+EXCHANGE_ORDER = ("NSE", "BSE", "NASDAQ", "NYSE")
+
+
+def fold(text: str) -> str:
+    """Lowercase words, accents off ('Nestlé'), '&' as 'and', punctuation as
+    space: how names are compared."""
+    text = unicodedata.normalize("NFKD", (text or "").lower().replace("&", " and "))
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return " ".join(re.sub(r"[^\w\s]", " ", text).split())
+
+
+def company_key(name: str) -> str:
+    """A listed name as an article writes it: 'Sun Pharmaceutical Industries
+    Limited' → 'sun pharmaceutical industries'; 'Boeing Company (The) Common
+    Stock' → 'boeing'; 'GAIL (India) Limited' → 'gail'."""
+    words = fold(_SHARE_CLASS.sub("", name or "").replace("(India)", "")).split()
+    while words and words[-1] in _LEGAL_FORM:
+        words.pop()
+    while words and words[0] == "the":
+        words.pop(0)
+    return " ".join(words)
+
+
+def _short_key(key: str) -> str:
+    words = key.split()
+    while len(words) > 1 and words[-1] in _DESCRIPTOR:
+        words.pop()
+    return " ".join(words)
+
+
+def _has_words(needle: str, hay: str) -> bool:
+    return bool(needle) and re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", hay) is not None
+
+
+def names_company(symbol: str, name: str, text: str, entity_keys: list[str]) -> bool:
+    """Does an article (its `fold`ed headline and opening, and the `company_key`s
+    of the organisations extracted from it) name this listing?
+
+    Three ways, each measured on the production tickers it must keep:
+    - the name, less its legal form and descriptor words, in the text ("Uber");
+    - an organisation that IS the name, its start ("Adani Ports" for Adani
+      Ports and Special Economic Zone; "Sun Pharma" for Sun Pharmaceutical
+      Industries, compared without spaces from six letters up, so "Tata" is never
+      Tata Motors) or a unit of it ("Bharat Petroleum Corporation Limited-Kochi
+      Refinery"), or the symbol itself ("TCS", "ONGC");
+    - a curated alias (ALIASES), in the text or as an organisation.
+    Indian-language articles are covered by the organisations, which the
+    extractor writes in English.
+    """
+    key = company_key(name)
+    if _has_words(_short_key(key), text):
+        return True
+    squashed = key.replace(" ", "")
+    for ek in entity_keys:
+        e = ek.replace(" ", "")
+        if ek == key or key.startswith(ek + " ") or ek.startswith(key + " ") or e == symbol.lower() or (len(e) >= 6 and squashed.startswith(e)):
+            return True
+    return any(_has_words(a, text) or a in entity_keys for a, k in ALIASES.items() if k == key)
+
+
+# The organisations the linker reads: companies and organisations, never a
+# source the article quotes ("Goldman Sachs analysts said") — named, but not
+# what the story is about. 1,444 of 10,711 in three weeks of business news.
+_LINKABLE = frozenset({"company", "organization"})
+
+
+def link_keys(entities: list[dict]) -> list[str]:
+    """The listed names an article's organisations ARE, exactly, aliases resolved.
+    Exact on purpose: the linker's precision gate is 0.95, and "Sun", "India",
+    "State Bank" and "Reliance" name no listing exactly."""
+    out: list[str] = []
+    for e in entities:
+        if e.get("type") not in _LINKABLE or e.get("role") == "source_cited":
+            continue
+        k = company_key(e.get("name") or "")
+        k = ALIASES.get(k, k)
+        if k and k not in AMBIGUOUS and k not in out:
+            out.append(k)
+    return out
+
+
+@dataclass(frozen=True)
+class Listing:
+    symbol: str
+    exchange: str
+    name: str
+
+
+@dataclass(frozen=True)
+class Master:
+    by_symbol: dict[str, list[Listing]]  # every listing, India first
+    by_key: dict[str, Listing]  # the one listing a name links to
+    short: bool  # a market below its floor: nothing can be judged
+
+
+_master: tuple[float, Master] | None = None
+MASTER_TTL_S = 3600  # the master changes when someone runs `tools.securities --load`
+# Lines a name never links to: preference shares, notes, warrants, units,
+# rights, funds. A company listed only through one (Medallion Bank's
+# preferreds) is not a listed company to a reader. Worded as the share class,
+# not the company: Preferred Bank's common stock is a company.
+_NOT_SHARES = re.compile(
+    r"preferred (?:stock|shares?|securities)|\bwarrants?\b|\bunits?\b|\brights?\b|\bnotes? due\b|debenture|\betf\b|closed end fund|%",
+    re.IGNORECASE,
+)
+
+
+def _link_rank(item: Listing) -> tuple:
+    # India first; then the common share over a preference line (BA$A), a
+    # depositary note (GOOGM) or a non-voting class (GOOG); then the shortest.
+    plain = item.exchange == "NSE" or re.search(r"common|ordinary", item.name, re.IGNORECASE)
+    return (EXCHANGE_ORDER.index(item.exchange), not plain, len(item.symbol), item.symbol)
+
+
+async def master(session: AsyncSession) -> Master:
+    """The shown exchanges' listings, indexed by symbol and by name. One query an
+    hour: 11k rows, and the names are folded once rather than per article."""
+    global _master
+    now = time.monotonic()
+    if _master and now - _master[0] < MASTER_TTL_S:
+        return _master[1]
+    rows = await session.execute(sa_text("SELECT symbol, exchange, name FROM securities"))
+    _master = (now, build_master(rows))
+    return _master[1]
+
+
+def build_master(rows) -> Master:
+    """(symbol, exchange, name) rows → the two indexes. Split from `master` so the
+    linker's evaluation can run on an exported master. Only the exchanges a
+    ticker is shown on: an ETF on NYSE Arca names no company."""
+    by_symbol: dict[str, list[Listing]] = {}
+    by_key: dict[str, list[Listing]] = {}
+    held: dict[str, int] = {}
+    for symbol, exchange, name in rows:
+        held[exchange] = held.get(exchange, 0) + 1
+        if exchange not in EXCHANGE_ORDER:
+            continue
+        item = Listing(symbol, exchange, name)
+        by_symbol.setdefault(symbol, []).append(item)
+        if not _NOT_SHARES.search(name):
+            by_key.setdefault(company_key(name), []).append(item)
+    for items in by_symbol.values():
+        items.sort(key=lambda i: EXCHANGE_ORDER.index(i.exchange))
+    short = any(held.get(m, 0) < floor for m, floor in EXPECTED_MARKETS.items())
+    return Master(by_symbol, {k: min(v, key=_link_rank) for k, v in by_key.items() if k}, short)
+
+
+def reset_master() -> None:
+    """Tests seed the master mid-run; the process cache would pin the old one."""
+    global _master
+    _master = None
+
+
+async def article_tickers(
+    session: AsyncSession, tickers: list[str], title: str, text: str, entities: list[dict], sector: str | None
+) -> list[str]:
+    """The tickers an article carries: the extractor's, if listed AND named by
+    the article; then, for business and finance, every listed company its
+    organisations name exactly (`link_keys`)."""
+    kept = await validated(session, tickers)
+    listed = await master(session)
+    if listed.short:
+        return kept  # validated() has said why, loudly; nothing here can be judged
+    return choose_tickers(listed, kept, title, text, entities, sector)
+
+
+# "Named" means in the headline or the opening (about two paragraphs), or as an
+# organisation the article is about. Deeper in, a listing is mostly incidental:
+# the six banks whose economists an RBI preview quotes, the Tata companies a
+# Tata Sons explainer lists. Measured on 1,437 stored ticker mentions, reading
+# the whole text kept 39 more, almost all of that kind.
+LEDE_CHARS = 600
+
+
+def choose_tickers(
+    listed: Master, tickers: list[str], title: str, text: str, entities: list[dict], sector: str | None
+) -> list[str]:
+    lede = fold(f"{title} {(text or '')[:LEDE_CHARS]}")
+    keys = [
+        company_key(e.get("name") or "")
+        for e in entities
+        if e.get("type") not in ("person", "place") and e.get("role") != "source_cited"
+    ]
+    out: list[str] = []
+    for t in tickers:
+        named = next((i for i in listed.by_symbol.get(t, []) if names_company(t, i.name, lede, keys)), None)
+        if named:
+            # One company, one ticker, India's listing first — the one the linker
+            # would give: HDB (the NYSE receipt) is HDFCBANK, and the "Pfizer Ltd"
+            # of a Karnataka licence story is PFIZER, not PFE.
+            symbol = listed.by_key.get(company_key(named.name), named).symbol
+            if symbol not in out:
+                out.append(symbol)
+    if sector in ("business", "finance"):
+        out += [s for s in linked(listed, entities) if s not in out]
+    return out
+
+
+def linked(listed: Master, entities: list[dict]) -> list[str]:
+    out: list[str] = []
+    for k in link_keys(entities):
+        item = listed.by_key.get(k)
+        if not item or item.symbol in out:
+            continue
+        # A US listing whose symbol an Indian one also uses (HAL is Hindustan
+        # Aeronautics on NSE, Halliburton on NYSE) would be shown as the Indian
+        # company, so it is not linked.
+        if listed.by_symbol[item.symbol][0] != item:
+            continue
+        # Three letters name an Indian company in Indian news (DLF, UPL, ITC);
+        # abroad they were EQT the Swedish investor and CHS in Sharjah. US
+        # initialisms link through ALIASES ("ibm") or not at all.
+        if len(k) <= 3 and item.exchange != "NSE":
+            continue
+        out.append(item.symbol)
     return out
