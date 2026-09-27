@@ -306,6 +306,13 @@ def _export_langfuse_env(settings: Settings) -> None:
     keys in .env leave the SDK silently disabled. Existing env vars win.
     """
     if not settings.langfuse_enabled:
+        # Off means off for the SDK too. langfuse.openai (common/llm.py) builds
+        # its own client from the raw LANGFUSE_* keys, outside observe()'s gate,
+        # so with the flag off and the keys still set every model call exported
+        # spans — to a Langfuse that no longer exists: "Failed to export span
+        # batch code: 404" every few seconds in the worker (2026-09-28).
+        # Assigned, not setdefault: the flag is the one switch.
+        os.environ["LANGFUSE_TRACING_ENABLED"] = "false"
         return
     os.environ.setdefault("LANGFUSE_PUBLIC_KEY", settings.langfuse_public_key)
     os.environ.setdefault("LANGFUSE_SECRET_KEY", settings.langfuse_secret_key)
