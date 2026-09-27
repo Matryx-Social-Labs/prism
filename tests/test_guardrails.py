@@ -149,6 +149,43 @@ def test_both_together_enable_it(monkeypatch):
     assert get_settings().langfuse_enabled is True
 
 
+def test_disabled_tracing_stops_the_openai_wrapper_exporting(monkeypatch):
+    """common/llm.py wraps every model call with langfuse.openai, which builds its
+    OWN client from the raw LANGFUSE_* keys, outside observe()'s gate. With the
+    flag off but the keys still in Railway, every call exported spans to a
+    Langfuse that no longer exists: "Failed to export span batch code: 404"
+    every few seconds in the worker log (2026-09-28). Off must mean off."""
+    from langfuse import Langfuse
+
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
+    monkeypatch.setenv("LANGFUSE_HOST", "http://127.0.0.1:9")
+    monkeypatch.delenv("PRISM_LANGFUSE_ENABLED", raising=False)
+    # Explicitly on, so the app's flag has to win over it (and monkeypatch
+    # restores the variable after, whatever the code under test writes).
+    monkeypatch.setenv("LANGFUSE_TRACING_ENABLED", "true")
+    get_settings.cache_clear()
+    get_settings()
+    client = Langfuse()
+    try:
+        assert client._tracing_enabled is False
+    finally:
+        client.shutdown()
+
+
+def test_enabled_tracing_leaves_the_sdk_on(monkeypatch):
+    """Counterpart: the switch must not turn tracing off when it is on."""
+    monkeypatch.setenv("PRISM_LANGFUSE_ENABLED", "true")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
+    monkeypatch.setenv("LANGFUSE_TRACING_ENABLED", "true")
+    get_settings.cache_clear()
+    get_settings()
+    import os
+
+    assert os.environ.get("LANGFUSE_TRACING_ENABLED", "true").lower() != "false"
+
+
 async def test_disabled_observe_never_touches_the_sdk(monkeypatch):
     """The cost-critical assertion. If the SDK decorator is reached at all, a
     client is constructed and an exporter thread starts — which wakes the stack."""
