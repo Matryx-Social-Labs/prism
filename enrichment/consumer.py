@@ -61,6 +61,7 @@ async def handle_classified_item(payload: dict) -> None:
         raw = dict(item.raw)
         published_at = item.published_at
         sector = (item.classification or {}).get("sector")
+        cyber_ok = cyber_classified(item.classification or {})
         has_image = item.image_url is not None
         image_url = item.image_url
 
@@ -208,7 +209,7 @@ async def handle_classified_item(payload: dict) -> None:
             logger.info("claims_rejected", raw_item_id=str(raw_item_id), **claim_rejects)
 
         lens_fields = {}
-        if extraction.cyber:
+        if extraction.cyber and cyber_ok:
             lens_fields["cyber"] = extraction.cyber.model_dump()
         if extraction.finance:
             fin = extraction.finance.model_dump()
@@ -264,6 +265,19 @@ async def handle_classified_item(payload: dict) -> None:
             article_id=str(article_id),
             enrichment_id=str(enrichment_id),
         ).model_dump(),
+    )
+
+
+def cyber_classified(classification: dict) -> bool:
+    """Whether an article's cyber lens facts are worth storing: the classifier
+    filed it under tech or cyber (the sector is the subject path's), or said it
+    matters to a security professional. The extractor fills the cyber lens on
+    anything — a child's burn death carried CWE-284 and a pooja NIST AC-6, 260
+    events in 7 days (audit, 2026-09-27). `raw_model_output` still keeps what
+    it said."""
+    return (
+        classification.get("sector") in ("cybersecurity", "technology")
+        or "cyber" in (classification.get("role_interests") or [])
     )
 
 
