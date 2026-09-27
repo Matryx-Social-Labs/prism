@@ -561,7 +561,13 @@ async def _rebuild_projection(event_id: uuid.UUID) -> None:
         # again. `||` in one UPDATE reads the row as it is when the write lands.
         computed = {
             "event_type": max(set(event_types), key=event_types.count) if event_types else None,
-            "source_count": len(rows),
+            # Corroboration: distinct MASTHEADS, the unit /sources counts and the
+            # row prints as "k outlets". It was len(rows), the member articles,
+            # so one outlet re-filing or carrying a story on three section feeds
+            # read as three outlets, and a five-article Indian Express record led
+            # the front page (audit P0 #8). Ranking, chart order, the one-source
+            # style and Top of the record all read this.
+            "source_count": len(publishers),
             # The newest member's publication time. events.last_updated_at is
             # set to now() on every projection rebuild, so it records when the
             # INGEST ran, not when the news happened — the feed printed one
