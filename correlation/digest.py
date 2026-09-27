@@ -7,6 +7,7 @@ No table/migration — the digest is derived and cheap to regenerate.
 """
 
 import asyncio
+import contextlib
 import json
 import time
 from datetime import UTC, datetime
@@ -141,19 +142,25 @@ def _read(raw: str) -> tuple[dict, float]:
 
 
 async def _refresh() -> None:
-    """One refresh across requests and replicas; a failure keeps the old digest."""
-    redis = get_redis()
+    """One refresh across requests and replicas. Never raises: it runs detached,
+    and any failure (the model, or Redis on the lock) leaves the stale digest."""
     lock = f"refresh:{CACHE_KEY}"
-    if not await redis.set(lock, "1", nx=True, ex=120):
+    try:
+        redis = get_redis()
+        if not await redis.set(lock, "1", nx=True, ex=120):
+            return
+    except Exception as exc:  # noqa: BLE001 — a background refresh must never surface
+        logger.warning("digest_refresh_failed", stage="lock", error=str(exc)[:160])
         return
     try:
         digest = await _generate()
         if digest is not None:
             await _store(redis, digest)
     except Exception as exc:  # noqa: BLE001 — a background refresh must never surface; the stale digest stands
-        logger.warning("digest_refresh_failed", error=str(exc)[:160])
+        logger.warning("digest_refresh_failed", stage="generate", error=str(exc)[:160])
     finally:
-        await redis.delete(lock)
+        with contextlib.suppress(Exception):  # the lock's TTL reaps it, as in common/locks.single_flight
+            await redis.delete(lock)
 
 
 async def get_market_digest() -> dict | None:

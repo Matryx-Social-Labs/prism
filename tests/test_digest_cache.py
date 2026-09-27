@@ -110,3 +110,23 @@ async def test_an_empty_cache_still_generates_in_the_request(key, monkeypatch):
     monkeypatch.setattr(digest, "_generate", fake)
     assert await digest.get_market_digest() == {"summary": "first"}
     assert len(calls) == 1
+
+
+async def test_a_redis_error_in_the_refresh_never_escapes_the_task(monkeypatch):
+    """The refresh runs detached; nothing awaits it. A Redis blip on the lock must
+    be logged, not left as an unretrieved task exception (review of #215)."""
+    stale = json.dumps({"digest": {"summary": "old"}, "fresh_until": time.time() - 1})
+
+    class _Flaky:
+        async def get(self, _key):
+            return stale
+
+        async def set(self, *_a, **_k):
+            raise ConnectionError("redis blip")
+
+        async def delete(self, *_a):
+            raise ConnectionError("redis blip")
+
+    monkeypatch.setattr(digest, "get_redis", lambda: _Flaky())
+    assert await digest.get_market_digest() == {"summary": "old"}
+    await _settle()  # raises if the task did
