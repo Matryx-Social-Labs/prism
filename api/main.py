@@ -8,6 +8,7 @@ middleware, and routers. Response models live in api/schemas.py.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.cache_headers import PublicCacheHeaders
 from api.deps import PREVIEW_ORIGIN, assert_admin_token_configured
 from api.routes import (
     admin,
@@ -59,6 +60,9 @@ app.add_middleware(
 
 # One router per concern. Paths are absolute in each router, so the app's
 # route set is identical to the pre-split single-file version.
+# Browser cache headers on the public reads (api/cache_headers.py).
+app.add_middleware(PublicCacheHeaders)
+
 app.include_router(meta.router)
 app.include_router(auth.router)
 app.include_router(billing.router)

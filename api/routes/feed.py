@@ -25,6 +25,22 @@ router = APIRouter()
 CVE_ONLY_SOURCES = frozenset({"nvd", "cisa_kev"})
 CVE_ONLY_JSON = json.dumps(sorted(CVE_ONLY_SOURCES))
 
+# The candidate window, per sector (see get_feed). Constants, never input.
+_PER_SECTOR = 120
+_WINDOW_COLS = ("e.id, e.title, e.summary, e.sector, e.subsector, e.regions, e.image_url, "
+                "e.projection, e.last_updated_at, e.occurred_at")
+_WINDOW_FILTERS = """
+    AND NOT (
+        COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
+        AND (e.projection->'source_slugs') <@ CAST(:cve_only AS jsonb)
+    )
+    AND (CAST(:state_only AS text) IS NULL OR :state_only = ANY(e.regions))
+    AND (NOT :national OR (
+        'IN' = ANY(e.regions)
+        AND NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r LIKE 'IN-%')
+    ))
+    AND (NOT :world OR NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r = 'IN' OR r LIKE 'IN-%'))"""
+
 
 @router.get("/api/v1/feed", response_model=FeedResponse)
 async def get_feed(
@@ -99,6 +115,14 @@ async def get_feed(
     # still rides ix_events_sector_last_updated — putting the record test in the
     # PARTITION BY instead cost an index scan and spilled ~10MB of temp files per
     # request (measured: 5ms index scan → 29ms parallel seq scan + external merge).
+    #
+    # The window is taken per sector with an index walk, not ROW_NUMBER() over
+    # the table: the window function read every event (26,727 on 2026-09-27),
+    # unpacking each one's projection to test it, to keep 120 a sector — 663 ms
+    # of an API call that took 1.0-1.6 s. Walking (sector, last_updated_at DESC)
+    # stops at 120 per sector: 48 ms, the same rows (checked on production
+    # across default, two sectors, national, world and one state).
+    # NULL-sector events keep their own group of 120, as PARTITION BY gave them.
     reg = await outlets.registry(db)
     rows = (
         await db.execute(
@@ -108,25 +132,22 @@ async def get_feed(
                        img.image_url AS image_url,
                        projection, last_updated_at, occurred_at, img.slug AS image_source_slug
                 FROM (
-                    SELECT e.*, ROW_NUMBER() OVER (
-                        PARTITION BY e.sector ORDER BY e.last_updated_at DESC
-                    ) AS rn
-                    FROM events e
-                    WHERE (CAST(:sectors AS text[]) IS NULL
-                           OR e.sector = ANY(CAST(:sectors AS text[])))
-                      AND NOT (
-                          COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
-                          AND (e.projection->'source_slugs') <@ CAST(:cve_only AS jsonb)
-                      )
-                      AND (CAST(:state_only AS text) IS NULL OR :state_only = ANY(e.regions))
-                      AND (NOT :national OR (
-                          'IN' = ANY(e.regions)
-                          AND NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r LIKE 'IN-%')
-                      ))
-                      AND (NOT :world OR NOT EXISTS (SELECT 1 FROM unnest(e.regions) r WHERE r = 'IN' OR r LIKE 'IN-%'))
+                    SELECT top.* FROM (
+                        SELECT DISTINCT sector FROM events
+                        WHERE sector IS NOT NULL
+                          AND (CAST(:sectors AS text[]) IS NULL OR sector = ANY(CAST(:sectors AS text[])))
+                    ) s
+                    CROSS JOIN LATERAL (
+                        SELECT {_WINDOW_COLS} FROM events e
+                        WHERE e.sector = s.sector {_WINDOW_FILTERS}
+                        ORDER BY e.last_updated_at DESC LIMIT {_PER_SECTOR}
+                    ) top
+                    UNION ALL
+                    (SELECT {_WINDOW_COLS} FROM events e
+                     WHERE e.sector IS NULL AND CAST(:sectors AS text[]) IS NULL {_WINDOW_FILTERS}
+                     ORDER BY e.last_updated_at DESC LIMIT {_PER_SECTOR})
                 ) windowed
                 {report_photo_join("windowed")}
-                WHERE rn <= 120
                 """
             ),
             {
