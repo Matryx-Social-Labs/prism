@@ -5,7 +5,11 @@ import QuotePage from "@/app/story/[id]/quote/[n]/page";
 
 const fetchEvent = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual<typeof import("@/lib/api")>("@/lib/api")), fetchEvent }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+vi.mock("next/navigation", () => ({
+  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+  redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); },
+  permanentRedirect: (to: string) => { throw new Error(`NEXT_PERMANENT_REDIRECT ${to}`); },
+}));
 
 const claim = (over: Partial<ClaimOut> = {}): ClaimOut => ({
   quote_text: "We will reopen the bridge on Monday.",
@@ -75,10 +79,36 @@ describe("/story/[id]/quote/[n] — the quote's own page", () => {
     expect(screen.getByText("translation")).toBeInTheDocument();
   });
 
-  it("leaves out the article's words when the span could not be re-verified, and 404s an unknown quote", async () => {
+  it("leaves out the article's words when the span could not be re-verified", async () => {
     fetchEvent.mockResolvedValue(event(claim({ context_before: "", context_after: "" })));
     await open();
     expect(screen.queryByRole("heading", { name: "In the article" })).not.toBeInTheDocument();
-    await expect(open("3-0")).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  it("opens a quote at its words' address, and shares that address", async () => {
+    fetchEvent.mockResolvedValue(event(claim({ id: "a1b2c3d4e5f6" })));
+    await open("a1b2c3d4e5f6");
+    expect(screen.getByText("“We will reopen the bridge on Monday.”")).toBeInTheDocument();
+  });
+
+  it("keeps a link shared before the quote checks working", async () => {
+    // 1-0 was this quote's position on the card before a withdrawn speaker
+    // (0) left it; the API maps the old position to the words' id.
+    fetchEvent.mockResolvedValue({ ...event(claim({ id: "a1b2c3d4e5f6" })), quote_aliases: { "1-0": "a1b2c3d4e5f6" } });
+    await open("1-0");
+    expect(screen.getByText("“We will reopen the bridge on Monday.”")).toBeInTheDocument();
+  });
+
+  it("follows a merged record by the quote's words; an old position can only follow to the record", async () => {
+    // The record e1 was folded into e9: fetchEvent answers with the survivor.
+    fetchEvent.mockResolvedValue({ ...event(claim({ id: "a1b2c3d4e5f6" })), id: "e9" });
+    await expect(open("a1b2c3d4e5f6")).rejects.toThrow("NEXT_PERMANENT_REDIRECT /story/e9/quote/a1b2c3d4e5f6");
+    await expect(open("0-0")).rejects.toThrow(/^NEXT_PERMANENT_REDIRECT \/story\/e9$/);
+  });
+
+  it("sends a link to a withdrawn or unknown quote to its story, never a 404", async () => {
+    fetchEvent.mockResolvedValue({ ...event(claim({ id: "a1b2c3d4e5f6" })), quote_aliases: { "1-0": "a1b2c3d4e5f6" } });
+    await expect(open("0-0")).rejects.toThrow(/^NEXT_REDIRECT \/story\/e1$/);
+    await expect(open("ffffffffffff")).rejects.toThrow(/^NEXT_REDIRECT \/story\/e1$/);
   });
 });

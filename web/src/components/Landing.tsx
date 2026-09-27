@@ -23,6 +23,7 @@ import {
 import { fetchPlans, rupees } from "@/lib/billing";
 import { chartOrder } from "@/lib/chart";
 import { coverageText, monitoredText, publishers } from "@/lib/coverage";
+import { showcaseQuote } from "@/lib/quotes";
 import { indexSources } from "@/lib/sources";
 import { spanDays, spineLength } from "@/lib/spine";
 import { Ago } from "@/components/Ago";
@@ -175,7 +176,7 @@ function Hero({ evidence, leadRow }: { evidence: Evidence | null; leadRow: FeedI
 /* ── The record, not a verdict: three things on ONE real story ──── */
 function Proof({ event, monitored }: { event: EventDetail; monitored: number | null }) {
   const outlets = outletsOf(event);
-  const quote = event.claims?.[0] ?? null;
+  const quote = showcaseQuote(event.claims);
   const panels = [
     { key: "changed", title: "What changed", desc: "The three newest reports, newest first.", body: <ChangeTimeline event={event} /> },
     quote && {

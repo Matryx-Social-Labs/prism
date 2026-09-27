@@ -286,6 +286,16 @@ class EntityPage(BaseModel):
     records: list[FeedItem]
 
 
+class QuoteSource(BaseModel):
+    """Another report that printed the same words (enrichment/claims.collapse_repeats)."""
+
+    id: str
+    article_id: str
+    source_name: str
+    url: str | None
+    published_at: str | None
+
+
 class ClaimOut(BaseModel):
     """One thing somebody said, as the article said it.
 
@@ -298,6 +308,9 @@ class ClaimOut(BaseModel):
     is the whole point of the section.
     """
 
+    # The quote's address, /story/<event>/quote/<id>: a hash of its words, so a
+    # newer report cannot renumber a link someone already shared.
+    id: str
     quote_text: str
     quote_start: int | None
     quote_end: int | None
@@ -328,6 +341,9 @@ class ClaimOut(BaseModel):
     # D-quote-4 — a model may downgrade a claim, never assert which language was
     # spoken — so false means "not shown to be a translation", never "original".
     translated: bool = False
+    # The other reports that printed these words, earliest first. This row's
+    # own report is the earliest of all of them.
+    also_in: list[QuoteSource] = []
 
 
 class SpeakerClaims(BaseModel):
@@ -391,6 +407,10 @@ class EventDetail(BaseModel):
     # (measured: 3% of events carry one person under two strings, all
     # punctuation variants); folding across a story is the QID ledger's job.
     claims: list[SpeakerClaims]
+    # Quote links shared before 2026-09-27 addressed a quote by its position,
+    # `<speaker>-<quote>`, in the unchecked card; each maps to the id of the row
+    # now holding its words. A withdrawn quote has no entry.
+    quote_aliases: dict[str, str] = {}
     # READER-TIER too, for the same reason: what the news podcasts said about
     # this story, in their own words, is evidence. Empty unless the pipeline is
     # on and the gold_clips gate has been passed.

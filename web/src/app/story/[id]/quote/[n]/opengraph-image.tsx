@@ -19,11 +19,11 @@ export const contentType = "image/png";
 
 async function quoteCard(id: string, n: string, host: string) {
   const e = await fetchEvent(id);
-  const q = findQuote(e.claims, n);
+  const q = findQuote(e.claims, n, e.quote_aliases);
   if (!q) return null;
   const cite = indexSources(e.sources).get(q.claim.article_id);
   const meta = [q.claim.source_name, cite ? `[${cite}]` : "", q.claim.published_at ? stamp(q.claim.published_at) : "", q.claim.lang ? langName(q.claim.lang) : ""];
-  const address = `${host}/story/${id}/quote/${n}`;
+  const address = `${host}/story/${id}/quote/${q.id}`;
   const fonts = await ogFonts(q.claim.quote_text, q.speaker, q.role ?? "", ...meta, e.title, address, CARD_TEXT);
   return new ImageResponse(
     <QuoteCard address={address} quote={q.claim.quote_text} speaker={q.speaker} role={q.role} meta={meta} translated={q.claim.translated ?? false} storyTitle={e.title} />,

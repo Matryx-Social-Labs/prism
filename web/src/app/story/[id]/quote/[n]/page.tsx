@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
 import { ArrowUpRight, Check } from "@/components/icons";
 import { SectionHead } from "@/components/SectionHead";
@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   } catch {
     return { title: "Story not found" };
   }
-  const q = findQuote(event.claims, n);
+  const q = findQuote(event.claims, n, event.quote_aliases);
   if (!q) return { title: event.title };
   const title = `“${q.claim.quote_text.length > 90 ? `${q.claim.quote_text.slice(0, 89)}…` : q.claim.quote_text}” — ${q.speaker}`;
   const description = `${q.speaker}${q.role ? `, ${q.role}` : ""}, as reported by ${q.claim.source_name}. On Prism: ${event.title}`;
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     description,
     alternates: { canonical: `/story/${id}` },
     ...robotsUnless(event.indexable !== false), // as its record
-    openGraph: { type: "article", siteName: "Prism", title, description, url: `/story/${id}/quote/${n}` },
+    openGraph: { type: "article", siteName: "Prism", title, description, url: `/story/${id}/quote/${q.id}` },
     twitter: { card: "summary_large_image", title, description },
   };
 }
@@ -90,11 +90,17 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   } catch {
     notFound();
   }
-  // Merged into another record (see ../../page.tsx): a quote's number is its
-  // place in ONE record's list, so it cannot follow — the record can.
-  if (event.id !== id) permanentRedirect(`/story/${event.id}`);
-  const q = findQuote(event.claims, n);
-  if (!q) notFound();
+  // Merged into another record (see ../../page.tsx). A quote's address is its
+  // words, so it follows to the record that now holds them; a pre-27-Sep
+  // position named a place in ONE record's list and cannot — the record can.
+  if (event.id !== id) {
+    const moved = /^\d+-\d+$/.test(n) ? null : findQuote(event.claims, n);
+    permanentRedirect(moved ? `/story/${event.id}/quote/${moved.id}` : `/story/${event.id}`);
+  }
+  const q = findQuote(event.claims, n, event.quote_aliases);
+  // A withdrawn quote (the direct-speech checks, 27 Sep 2026) or an unknown
+  // address: the link was shared, so it lands on the story rather than a 404.
+  if (!q) redirect(`/story/${event.id}`);
   const { claim, speaker, role } = q;
   const index = indexSources(event.sources).get(claim.article_id);
   const when = claim.published_at ? `${shortDate(claim.published_at)} ${istTime(claim.published_at)} IST` : null;
@@ -145,7 +151,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             </a>
           )}
           <div className="inline-flex">
-            <ShareButton url={`/story/${event.id}/quote/${n}`} title={`“${claim.quote_text}” — ${speaker}`} label="Share this quote" fill />
+            <ShareButton url={`/story/${event.id}/quote/${q.id}`} title={`“${claim.quote_text}” — ${speaker}`} label="Share this quote" fill />
           </div>
         </div>
 
