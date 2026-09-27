@@ -98,7 +98,7 @@ async def test_a_subscription_carries_the_owner_the_plan_and_the_price_for_the_w
     assert sub["id"] == "sub_1"
     body = next(b for m, p, b in calls if p == "/v1/subscriptions")
     assert body["notes"] == {"user_id": "user-1", "plan": "founding", "price_paise": "99900"}
-    assert body["total_count"] == razorpay.TOTAL_COUNT["founding"] == 3
+    assert body["total_count"] == razorpay.TOTAL_COUNT["founding"] == 30
     # Off the offer, the key says so but the webhook still files it under the plan.
     calls.clear()
     razorpay._plan_cache.clear()
@@ -265,6 +265,19 @@ def test_the_status_map_keeps_a_paid_up_completed_subscription_active():
     assert razorpay.STATUS["pending"] == "past_due"
     assert razorpay.STATUS["expired"] == "expired"
     assert razorpay.TOTAL_COUNT["plus_yearly"] > 1, "a one-charge subscription completes on payment and never reads as active"
+
+
+def test_every_plan_renews_until_the_reader_cancels():
+    """Founder, 2026-09-28: charge automatically until the reader cancels. The
+    offer monthly used to stop after 12 charges and founding after 3, and
+    nothing re-offered them, so a paying reader silently lost Plus. "Until
+    cancelled" is the longest a UPI Autopay mandate may run (NPCI: 30 years),
+    inside Razorpay's own 100-year ceiling."""
+    per_year = {"plus_monthly": 12, "plus_monthly_regular": 12, "plus_yearly": 1, "plus_yearly_regular": 1, "founding": 1}
+    assert set(razorpay.TOTAL_COUNT) == set(per_year)
+    for plan, n in per_year.items():
+        assert razorpay.TOTAL_COUNT[plan] == 30 * n, plan
+        assert razorpay.TOTAL_COUNT[plan] <= 100 * n, plan
 
 
 def test_the_refund_window_is_seven_days_on_yearly_and_founding_and_nothing_else():

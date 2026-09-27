@@ -126,7 +126,7 @@ export function UpgradeSheet({
             {action}
             <Link href={next} className="inline-flex min-h-[44px] items-center justify-self-center text-[14px] font-semibold" style={{ color: "var(--accent)" }} onClick={onClose}>All plans →</Link>
             <p className="text-center text-[12.5px] leading-[1.45]" style={{ color: "var(--ink-3)" }}>
-              {plans?.offer ? "Launch offer. " : ""}GST included. Cancel any time; paid time is kept.
+              {plans?.offer ? "Launch offer. " : ""}GST included. Renews until you cancel, any time; paid time is kept.
             </p>
           </>
         )}

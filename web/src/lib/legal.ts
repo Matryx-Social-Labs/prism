@@ -146,7 +146,7 @@ export const TERMS: LegalDoc = {
     "Prism indexes published reports and links every one of them.",
     "Reading is free; be 18, keep your sign-in email safe, do not scrape.",
     "Briefs and answers are written by a machine from the reports — check them.",
-    "Paid plans renew until you cancel, in one click, with access to the period's end.",
+    "Paid plans are charged automatically until you cancel, at the price you joined at; cancel in one click, with access to the period's end.",
   ],
   lede: `These are the terms between you and ${LEGAL_ENTITY}, which owns and operates Prism at readprism.news (built and run with ${LEGAL_PARTNER}). They are short on purpose. Using Prism means you accept them.`,
   sections: [
@@ -188,9 +188,9 @@ export const TERMS: LegalDoc = {
     },
     {
       heading: "Paid plans",
-      short: "GST-inclusive prices, renewing until you cancel; refunds per the Refund policy.",
+      short: "GST-inclusive prices, charged automatically until you cancel; refunds per the Refund policy.",
       blocks: [
-        "The price you see when you subscribe includes GST. A plan renews at the end of each period until you cancel; cancelling takes one click on your account page and access continues to the end of the period you paid for. Refunds follow the Refund policy. If a price changes, we tell you before the renewal it applies to.",
+        "The price you see when you subscribe includes GST. Subscribing authorises Razorpay to charge that price automatically at the start of every period, monthly or yearly, through UPI Autopay, your card or a netbanking mandate, until you cancel. Cancelling takes one click on your account page and stops the next charge; access continues to the end of the period you paid for. You can also end a UPI Autopay mandate from your UPI app. A plan keeps the price you joined at for as long as it renews: a new price applies only to a new subscription. Where your payment method allows it, a monthly plan can be paused for one to three months from your account page. Refunds follow the Refund policy.",
         `Payments are processed by Razorpay and collected by ${LEGAL_PARTNER} on behalf of ${LEGAL_ENTITY} until the LLP's own merchant account is live; that is the name you may see on your statement.`,
       ],
     },
@@ -236,7 +236,7 @@ export const REFUNDS: LegalDoc = {
     "Monthly: not refunded; cancelling stops the next charge.",
     "Yearly and founding: refunded in full within 7 days of any charge — one click on your account page.",
     "Refunds go back the way you paid, through Razorpay, in 5–7 working days.",
-    "Mistakes and duplicates: refunded whenever you tell us.",
+    "Mistakes and duplicates: refunded in full when you tell us within six months.",
   ],
   lede: `Paid plans are not yet on sale. This policy applies from the day they are. Payments are processed by Razorpay and collected by ${LEGAL_PARTNER} on behalf of ${LEGAL_ENTITY}.`,
   sections: [
@@ -259,14 +259,14 @@ export const REFUNDS: LegalDoc = {
       heading: "How a refund reaches you",
       short: "Razorpay returns it to the card, account or UPI app you paid with; banks take 5–7 working days.",
       blocks: [
-        "Every refund is made through Razorpay against the original payment, so it goes back to the same card, bank account or UPI app. Razorpay hands it to your bank the same day; most banks show it within 5–7 working days, and a few take up to 10. You get an email from us with the refund reference the moment it is made, and Razorpay's own confirmation follows.",
+        "Every refund is made through Razorpay against the original payment, so it goes back to the same card, bank account or UPI app. It reaches you within 5–7 working days, and a few banks take a little longer. You get an email from us with the refund reference the moment it is made, and Razorpay's own confirmation follows.",
         "We cannot send a refund to a different account, and we cannot make it arrive faster than your bank does.",
       ],
     },
     {
       heading: "Mistaken and duplicate charges",
-      short: "Told us? Refunded, whenever it happened.",
-      blocks: ["A charge made in error, a duplicate, or a charge after you cancelled is refunded in full whenever you tell us, with no time limit."],
+      short: "Told us within six months? Refunded in full.",
+      blocks: ["A charge made in error, a duplicate, or a charge after you cancelled is refunded in full when you tell us within six months of it, the longest Razorpay can return a payment the way it was paid."],
     },
     {
       heading: "How to ask",

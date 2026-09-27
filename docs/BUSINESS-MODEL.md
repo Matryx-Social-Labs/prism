@@ -87,7 +87,7 @@ already pay for: ₹300–1,000/month.
 |---|---|---|---|
 | **Reader** | ₹0, no account needed | — | Today · Stories · Search · the full record (brief, who said what, coverage, reports, photos, clips, route) · Ask **10 questions/day** signed-in (3/day anonymous) · Watchlist (account) · lens readings: 3 a session anonymous, 10/day signed in |
 | **Prism Plus** | **₹199/month** or **₹1,499/year** (₹125/month effective) | ₹165 / ₹1,241 | Markets and Cyber readings on every story · Market Pulse in full · Ask **100/day** on the stronger model · watchlist alerts (email; push when the app exists) · "what changed since you last read" · original-language quotes beside the translation when built |
-| **Founding member** (first 500, then closed) | **₹999/year, price locked 3 years** | ₹827 | Plus, a name on /about, a say in the roadmap |
+| **Founding member** (first 500, then closed) | **₹999/year, renews at that price until cancelled** | ₹827 | Plus, a name on /about, a say in the roadmap |
 | **Teams / API** (from month 6+) | quote, from ₹4,999/month | — | seats, Slack/email alerts, the events + claims API |
 
 ¹ Net after GST (÷1.18) and payment fees (Razorpay UPI Autopay 2% + GST on the

@@ -18,14 +18,16 @@ import { fetchMe, useSession } from "@/lib/session";
 // pay" in two columns. Every number is the API's or the cap the server
 // enforces; nothing here is a promise the product does not keep today. Plus
 // sells the lenses and Ask, never a model (PRODUCT.md; founder decision #2,
-// 27 Sep), and no line says how a plan ends, renews or what it will cost later:
-// renewal terms are undecided (D-b).
+// 27 Sep). A plan is charged automatically until the reader cancels, at the
+// price they joined at (founder, 28 Sep; common/razorpay.TOTAL_COUNT); no line
+// promises a lock or what a plan will cost later.
 const ASK = { anon: 3, free: 10, plus: 100 }; // common/quota.py
 const FOUNDING_SEATS = 500; // common/billing.FOUNDING_CAP
 
 type Period = "month" | "year";
 
 const FAQ: { q: string; a: string }[] = [
+  { q: "Does it renew on its own?", a: "Yes. Razorpay charges the price you joined at, at the start of every month or year, until you cancel. A new price only ever applies to a new subscription." },
   { q: "Can I cancel?", a: "Yes, in one click from your account, any time. You keep Plus until the end of the period you paid for and are not charged again." },
   { q: "What if I change my mind?", a: "A yearly or founding charge is refunded in full if you ask within 7 days — no questions. Monthly charges are not refunded; cancelling stops the next one." },
   { q: "Who charges me, and how?", a: "Razorpay processes the payment (UPI Autopay, cards, net banking). It is collected by Matryx Social Labs Private Limited on behalf of Prism Media Intelligence LLP until the LLP's own merchant account is live, so that is the name you may see on your statement." },
@@ -214,7 +216,7 @@ export function PlusPage() {
             name="Plus"
             price={plus ? rupees(plus.amount_paise) : <span className="p-skel inline-block h-9 w-28 align-middle" aria-hidden />}
             per={period === "year" ? "/ year" : "/ month"}
-            note={plus ? (period === "year" && perMonth ? `≈ ${rupees(perMonth)} a month, GST included.` : "GST included; cancel any time.") : null}
+            note={plus ? (period === "year" && perMonth ? `≈ ${rupees(perMonth)} a month, GST included. Renews until you cancel.` : "GST included. Renews until you cancel.") : null}
             action={<Action plan={plusPlan} primary label={plusCta} />}
           >
             <Feature><b className="font-semibold">Every lens on every story</b>, as often as you like</Feature>
