@@ -3,6 +3,29 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.107.0] - 2026-09-27
+
+### Fixed — Plus subscribers read every lens
+A reader on an active yearly plan saw "You've used your free Markets reads, 0
+left". None of the three lens gates asked for the plan. The brief spent a free
+sample from every signed-in reader, the record served paid lens fields only
+for per-story unlocks, and the Cyber question did the same. So a subscriber
+spent the 3 signup samples like a free reader and was then locked out. This
+has been the case since the paywall shipped.
+
+- **Plus opens Markets and Cyber on every story and never spends a sample**
+  (`_on_plus` → `common/billing.plan_for`), on the brief, the record and the
+  question, as `docs/BUSINESS-MODEL.md` §3 says. Free accounts keep their
+  samples and the upgrade prompt; a lapsed Plus is a free account again.
+- `tests/test_plus_lens_access.py` reproduces the report (402, "remaining": 0
+  for an active `plus_yearly`) and covers free and lapsed readers. It was
+  mutation-verified both ways.
+- Checked against the business model: Ask limits already match (3 per session
+  anonymous, 10 a day free, 100 a day Plus). Two differences are left for a
+  decision rather than changed: free accounts get 3 samples in one counter
+  (§2 says 3 Markets + 1 Cyber), and Market Pulse is served in full to
+  everyone (§3 gates it by plan).
+
 ## [0.0.106.0] - 2026-09-27
 
 ### Fixed — indexable pages lost the site's Google directives

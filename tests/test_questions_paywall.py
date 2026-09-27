@@ -88,6 +88,11 @@ async def test_THE_ROUTE_gates_it(monkeypatch):
             # has_unlocked: this reader HAS paid for cyber on this story.
             return 1
 
+        def all(self):
+            # plan_for: no subscription rows, so a free reader — the question
+            # comes from the unlock, not from Plus (tests/test_plus_lens_access).
+            return []
+
     class _S:
         async def execute(self, *a, **kw):
             return _R()
