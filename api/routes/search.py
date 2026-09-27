@@ -54,6 +54,7 @@ async def search(
                        WHERE ent.name ILIKE :q
                    ))
                   AND e.merged_into IS NULL
+                  AND COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
                 -- The record the query NAMES leads: a title match outranks a
                 -- fresher record that only mentions it in its summary or cast
                 -- ("Sun Pharma" sank below the day's market wraps, audit
