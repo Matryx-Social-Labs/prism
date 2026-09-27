@@ -64,6 +64,14 @@ class Settings(BaseSettings):
     # returns nothing at all. Re-measure before trusting either direction again.
     prism_model_extract: str = "google/gemini-3.1-flash-lite"
     prism_model_extract_light: str = "google/gemini-3.1-flash-lite"
+    # OpenRouter endpoints extraction is pinned to, in order (comma-separated;
+    # empty = OpenRouter's own routing). Measured 2026-09-27 on production-shape
+    # traffic, 30 articles at concurrency 6: google-ai-studio/flex cached the
+    # ~8k-token prompt prefix 30/30 at $0.00074 a call, median 2.1 s — against
+    # $0.00288 and 1 cache hit in 55 unpinned. Flex is Google's half-price tier;
+    # a failure there falls back to standard endpoints (allow_fallbacks), never
+    # to a lost article. Vertex flex was 18 s median: not that one.
+    prism_extract_providers: str = "google-ai-studio/flex"
     # analysis / briefs / thread-link / digest. Bake-off 2026-09-17 on 30 live
     # multi-source events, judged blind (tools/bakeoff_brief): glm-5.3-flash
     # grounded 0.92 vs qwen3.7-plus 0.91, complete 0.99 vs 0.98, neutral 0.98

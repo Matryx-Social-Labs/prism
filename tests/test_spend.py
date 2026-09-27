@@ -190,3 +190,42 @@ async def test_only_a_founder_reads_the_spend_and_uncounted_days_say_so(monkeypa
         async with session_scope() as s:
             await s.execute(text("DELETE FROM sessions WHERE user_id = ANY(:u)"), {"u": [founder, reader]})
             await s.execute(text("DELETE FROM users WHERE id = ANY(:u)"), {"u": [founder, reader]})
+
+
+async def test_pinned_endpoints_are_tried_in_order_and_fall_back(monkeypatch):
+    """A cache lives per endpoint. Unpinned, production extraction hit it on 1 of
+    55 calls; pinned to google-ai-studio/flex, 30 of 30 (2026-09-27). Fallbacks
+    stay on: a flex outage must cost the discount, never the article."""
+    sent: list = []
+    monkeypatch.setattr(llm, "get_llm", lambda: _client(sent))
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setattr(spend, "record_response", _noop)
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    from common.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t",
+                                  providers=["google-ai-studio/flex"])
+        await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t",
+                                  providers=["google-ai-studio/flex"], private=True)
+        await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t")
+    finally:
+        get_settings.cache_clear()
+    assert sent[0]["extra_body"]["provider"] == {"order": ["google-ai-studio/flex"], "allow_fallbacks": True}
+    # A reader's words keep their no-retention rule when the call is also pinned.
+    assert sent[1]["extra_body"]["provider"] == {"order": ["google-ai-studio/flex"], "allow_fallbacks": True,
+                                                  **llm.PRIVATE_PROVIDERS}
+    assert "provider" not in sent[2]["extra_body"], "an unpinned call must keep OpenRouter's own routing"
+
+
+def test_extraction_is_pinned_from_the_setting():
+    """Source assertion, as in test_guardrails: driving handle_classified_item needs
+    network, a model and a database to reach one keyword argument."""
+    import inspect
+
+    import enrichment.consumer as ec
+    from common.config import Settings
+
+    assert "providers=" in inspect.getsource(ec) and "prism_extract_providers" in inspect.getsource(ec)
+    assert Settings.model_fields["prism_extract_providers"].default == "google-ai-studio/flex"

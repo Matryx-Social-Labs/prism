@@ -66,7 +66,10 @@ async def record_response(response: Any, stage: str, model: str) -> None:
     """Log one chat call's usage and add it to the day's ledger."""
     inp, cached, out, cost = usage_of(response)
     served = getattr(response, "model", None) or model
-    logger.info("llm_call", trace=stage, model=served, input_tokens=inp, cached_tokens=cached,
+    # Which endpoint served it: a cache lives per endpoint, so this is what
+    # explains a cached share that suddenly drops.
+    provider = (getattr(response, "model_extra", None) or {}).get("provider")
+    logger.info("llm_call", trace=stage, model=served, provider=provider, input_tokens=inp, cached_tokens=cached,
                 output_tokens=out, cost=cost)
     await record(stage, served, input_tokens=inp, cached_tokens=cached, output_tokens=out, cost=cost)
 

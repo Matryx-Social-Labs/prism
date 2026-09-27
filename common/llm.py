@@ -214,6 +214,7 @@ async def _structured_chat[T: BaseModel](
     prune_fields: set[str] | None = None,
     reasoning: dict[str, Any] | None = None,
     private: bool = False,
+    providers: list[str] | None = None,
 ) -> T:
     """Chat completion constrained to a JSON schema, validated into a Pydantic model.
 
@@ -237,6 +238,13 @@ async def _structured_chat[T: BaseModel](
 
     private routes the request only to providers that neither retain nor train
     on it (PRIVATE_PROVIDERS): pass it whenever a reader's own words are in it.
+
+    providers pins the OpenRouter endpoints to try, in order, falling back to
+    the default routing if all of them fail. It exists for caching: a provider
+    caches a prompt prefix per endpoint, and a model served from eight endpoints
+    (Gemini: Vertex global/EU/US, AI Studio, each standard/flex/priority) rarely
+    lands on a warm one — production extraction hit the cache on 1 of 55 calls
+    until it was pinned (2026-09-27).
     """
     client = get_llm()
     schema = output_model.model_json_schema()
@@ -282,8 +290,13 @@ async def _structured_chat[T: BaseModel](
         body: dict[str, Any] = {"usage": {"include": True}}
         if reasoning is not None:
             body["reasoning"] = _reasoning_payload(model, reasoning)
+        routing: dict[str, Any] = {}
+        if providers:
+            routing = {"order": providers, "allow_fallbacks": True}
         if private:
-            body["provider"] = PRIVATE_PROVIDERS
+            routing = {**routing, **PRIVATE_PROVIDERS}
+        if routing:
+            body["provider"] = routing
         if body:
             kwargs["extra_body"] = body
 
