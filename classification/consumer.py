@@ -34,7 +34,7 @@ from common.models import RawItem, Source
 from common.observability import fetch_prompt, observe
 from common.schemas import ClassifiedItemMessage
 from common.taxonomy import prompt_menu, valid_subsector
-from ingestion.rss import SPEC_BY_SLUG, FeedSpec
+from ingestion.rss import SPEC_BY_SLUG
 
 logger = get_logger(__name__)
 
@@ -82,9 +82,6 @@ async def handle_raw_item(payload: dict) -> None:
     else:
         gate, classification = await _gate_and_classify(title, body, source_country, meta)
 
-    if classification is not None:
-        classification = _apply_feed_state(classification, feed_spec)
-
     relevant = gate.is_relevant and classification is not None
     values = (
         {"relevance": "relevant", "classification": classification.model_dump()}
@@ -107,21 +104,6 @@ async def handle_raw_item(payload: dict) -> None:
             stream.CLASSIFIED_ITEMS,
             ClassifiedItemMessage(raw_item_id=str(raw_item_id)).model_dump(),
         )
-
-
-def _apply_feed_state(classification: ClassificationResult, feed_spec: FeedSpec | None) -> ClassificationResult:
-    """Stamp the state (ISO 3166-2) from a state-edition feed onto the regions, so
-    the feed can tier local(state) -> national. Deterministic from the feed, no
-    LLM — but only where the feed's state can be the story's: not when the
-    classifier already placed the event in a state, and not when the article
-    is about another country. Prajavani's whole-site feed is IN-KA and printed
-    the US Senate's Russia-sanctions bill; the stamp put it under Karnataka
-    (founder, 2026-09-20)."""
-    if feed_spec is None or not feed_spec.state:
-        return classification
-    if feed_spec.state in classification.regions or not feed_state_applies(classification.regions):
-        return classification
-    return classification.model_copy(update={"regions": [*classification.regions, feed_spec.state]})
 
 
 async def _gate_and_classify(
@@ -266,14 +248,6 @@ async def _run_classifier(
         "subsector": valid_subsector(result.sector, result.subsector),
         "regions": result.regions or ([source_country] if source_country else []),
     })
-
-
-def feed_state_applies(regions: list[str]) -> bool:
-    """A feed's state stamp holds only when nothing says otherwise: the
-    classifier named no state of its own, and no foreign country is involved."""
-    if any(r.startswith("IN-") for r in regions):
-        return False
-    return all(r == "IN" for r in regions)
 
 
 def _classify_cve_feed(source_slug: str, title: str, body: str | None) -> ClassificationResult:

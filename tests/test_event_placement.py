@@ -20,7 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from classification import consumer as classification_consumer
 from classification.schemas import ClassificationResult, GateResult
 from common.db import session_scope
-from correlation.consumer import _rebuild_projection, placement
+from correlation.consumer import _rebuild_projection, chosen_states, placement
 from ingestion.rss import SPEC_BY_SLUG
 
 
@@ -69,6 +69,17 @@ def test_with_no_path_anywhere_the_sector_majority_stands():
 
 def test_nothing_to_go_on_changes_nothing():
     assert placement([{}, {}], None, None) is None
+
+
+def test_a_state_is_kept_only_when_at_least_half_the_members_chose_it():
+    """A national bank strike was tagged Kerala because one member said so; the
+    feed's stamp and the union of every member's states both did it."""
+    strike = [_c(regions=["IN"]), _c(regions=["IN", "IN-KL"]), _c(regions=["IN"])]
+    assert chosen_states(strike) == []
+    dispute = [_c(regions=["IN", "IN-KA"]), _c(regions=["IN", "IN-TN"]),
+               _c(regions=["IN", "IN-KA", "IN-TN"]), _c(regions=["IN"])]
+    assert chosen_states(dispute) == ["IN-KA", "IN-TN"]
+    assert chosen_states([_c(regions=["IN", "IN-PB"])]) == ["IN-PB"]
 
 
 # ── the feeds ───────────────────────────────────────────────────────────────
@@ -144,6 +155,28 @@ async def test_the_projection_rebuild_refiles_the_event_by_its_members():
         row = (await s.execute(text("SELECT sector, subsector, subject_path, subject_confidence FROM events "
                                     "WHERE id = :i"), {"i": str(eid)})).one()
     assert tuple(row) == ("politics", "governance_policy", "politics.protest", 0.9)
+
+
+async def test_the_rebuild_takes_states_from_the_classifier_and_keeps_the_countries():
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid = uuid.uuid4()
+    async with session_scope() as s:
+        src = await _source(s, f"t-{eid.hex[:8]}")
+        # Stamped Kerala by the old rule; the extraction named the US too.
+        await s.execute(
+            text("INSERT INTO events (id, title, sector, regions, last_updated_at) "
+                 "VALUES (:i, 'Bank unions strike nationwide', 'business', '{IN,US,IN-KL}', now())"),
+            {"i": str(eid)},
+        )
+        for minutes, regions in ((90, ["IN"]), (60, ["IN", "IN-KL"]), (30, ["IN"])):
+            await _member(s, eid, src, _c("business.banking", "finance", regions=regions), minutes_ago=minutes)
+
+    await _rebuild_projection(eid)
+
+    async with session_scope() as s:
+        regions = (await s.execute(text("SELECT regions FROM events WHERE id = :i"), {"i": str(eid)})).scalar_one()
+    assert regions == ["IN", "US"]
 
 
 async def test_a_general_feed_item_goes_through_the_gate_and_the_classifier(monkeypatch):

@@ -4,8 +4,9 @@ The Hindu's six state pages and TOI's city pages carry one article under one
 URL. Each copy used to be a new raw item under its own source — gated,
 extracted and listed as its own report: 432 of 6,717 articles in the week to
 2026-09-20 were such copies. The second observation is kept (relevance =
-'duplicate') for provenance and never published; if it came through a state
-page, the state goes onto the article's event.
+'duplicate') for provenance and never published. Which state the story is
+local to is the classifier's call, not the page's: a state page carrying a
+national story does not make it a state story.
 """
 
 import uuid
@@ -76,7 +77,7 @@ async def test_the_same_url_through_a_second_feed_of_the_publisher_is_not_re_ing
     assert rows == ["pending", "duplicate"], "the observation is kept, marked, never queued"
 
 
-async def test_a_state_pages_copy_places_the_existing_event(monkeypatch):
+async def test_a_state_pages_copy_does_not_stamp_its_state_on_the_event(monkeypatch):
     if not await _db():
         pytest.skip("no local database")
 
@@ -95,4 +96,4 @@ async def test_a_state_pages_copy_places_the_existing_event(monkeypatch):
     await base.persist_envelopes([env("thehindu_karnataka", "b-2")])
     async with session_scope() as s:
         regions = (await s.execute(text("SELECT regions FROM events WHERE id = :e"), {"e": ev_id})).scalar_one()
-    assert regions == ["IN", "IN-KA"], "the Karnataka page carrying it is the signal that it is a Karnataka story"
+    assert regions == ["IN"], "a national story on the Karnataka page is still national (audit 2026-09-27)"

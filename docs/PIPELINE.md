@@ -296,11 +296,10 @@ change to the algorithm doesn't silently reinterpret old rows.
    as their own report before this existed (`ingestion/base.py:126-136`). `external_id` alone was
    not a reliable document key — *"BBC has changed only its URL fragment as an article moves
    through the feed (#0 → #2 → #5)"* (`ingestion/base.py:126-128`).
-3. A duplicate that carries a **state-edition** feed's signal still calls `note_edition()`
-   (`ingestion/base.py:72-101`, `ingestion/base.py:198`) to stamp the state onto the event the
-   article already belongs to — the article is the same, but the state page carrying it is real
-   evidence of regional relevance, applied only when
-   `classification/consumer.feed_state_applies()` says the event isn't already foreign or placed.
+3. A duplicate from a **state-edition** feed no longer stamps that state onto the event (the
+   `note_edition()` stamp was removed 2026-09-27): a state page carrying a national story does
+   not make it a state story. Which state an event is local to is the classifier's call alone —
+   see `correlation/consumer.chosen_states()`.
 
 **Language is stamped from the source, not the collector.** `ingestion/base.py:177-185`:
 `language=source.language or env.language` — `ingestion/rss.py` used to hardcode `"en"` on every

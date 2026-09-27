@@ -37,7 +37,7 @@ class FeedSpec:
     url: str
     sector: str | None = None  # set => deterministic classification, no LLM
     subsector: str | None = None
-    state: str | None = None  # ISO 3166-2 (e.g. IN-KA) => stamped on the event's regions
+    state: str | None = None  # ISO 3166-2 (e.g. IN-KA): the feed's desk, shown on /sources — never stamped on an event
     # Kept in the list rather than deleted when a feed goes dark, so the reason
     # survives and re-enabling is a one-word change.
     enabled: bool = True
@@ -45,8 +45,9 @@ class FeedSpec:
 
 # India-first scope: national + state general news, plus the cyber lens beachhead.
 # International general news is intentionally out for now (start focused on India,
-# scale geography vertically later). State feeds carry an ISO 3166-2 code so the
-# feed can tier local(state) -> national.
+# scale geography vertically later). State feeds carry an ISO 3166-2 code for
+# /sources ("Karnataka desk"); which state a story is local to is the
+# classifier's call, never the feed's.
 FEEDS: list[FeedSpec] = [
     # ── India national (general — LLM gate + classifier) ──
     FeedSpec("thehindu", "https://www.thehindu.com/news/national/feeder/default.rss"),

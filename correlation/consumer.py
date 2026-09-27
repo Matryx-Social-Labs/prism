@@ -113,6 +113,15 @@ def placement(classifications: list[dict], event_path: str | None, event_confide
     }
 
 
+def chosen_states(classifications: list[dict]) -> list[str]:
+    """The states (ISO 3166-2) the classifier placed the event in: each one
+    chosen for at least half its members, earliest first. Never a feed's stamp,
+    and never one member's state over the rest — a national bank strike was
+    filed under Kerala because one member said so (audit, 2026-09-27)."""
+    votes = Counter(r for c in classifications for r in dict.fromkeys(c.get("regions") or []) if "-" in r)
+    return [state for state, n in votes.items() if 2 * n >= len(classifications)]
+
+
 async def _has_reader_brief(event_id: uuid.UUID) -> bool:
     async with session_scope() as session:
         return bool(
@@ -238,17 +247,6 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
         )
         session.add(event)
         is_new_event = True
-
-    # State codes (ISO 3166-2, e.g. IN-KA) from a state-edition feed must
-    # survive into the event's regions — even when a new event's shared
-    # extraction returned only country-level regions, or an existing event
-    # was matched — so the feed can tier local(state) -> national.
-    state_codes = [r for r in (classification.get("regions") or []) if "-" in r]
-    if state_codes:
-        merged = list(event.regions or [])
-        merged += [c for c in state_codes if c not in merged]
-        if merged != list(event.regions or []):
-            event.regions = merged
 
     if event.image_url is None and raw_item is not None and raw_item.image_url:
         event.image_url = raw_item.image_url
@@ -592,9 +590,12 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
         # newest member would also be coherent, but it rewrites the headline a
         # reader may have arrived on, which is a bigger product change than this.
         event.summary = summaries[0] if summaries else event.summary
-        for key, value in (placement([r["classification"] or {} for r in rows], event.subject_path,
-                                     event.subject_confidence) or {}).items():
+        classifications = [r["classification"] or {} for r in rows]
+        for key, value in (placement(classifications, event.subject_path, event.subject_confidence) or {}).items():
             setattr(event, key, value)
+        # Countries stay as the founder's extraction gave them; states are the
+        # classifier's, re-read from every member on every rebuild.
+        event.regions = [r for r in (event.regions or []) if "-" not in r] + chosen_states(classifications)
         # Merged at WRITE time, never replaced (audit H11). This rebuild owns
         # the keys below and nothing else: lens_briefs and lens_points belong to
         # persist_briefs (the analysis pass, the extractor, and the API's
