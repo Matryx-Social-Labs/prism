@@ -3,6 +3,33 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.109.0] - 2026-09-28
+
+### Added — duplicate records merge record to record
+`tools/merge_duplicates --events` judges pairs of records rather than single
+articles. Candidates come from the founding articles' English gists, Jev
+judges each pair's founding headline + summary, and groups are star-shaped: a
+record joins the survivor (most publishers, then earliest) only on its own
+verdict, first seen within 72h. Verdicts are stored (`mode='pair'`), so a
+re-run pays nothing. Applied on production at 0.87 rather than the tier's 0.85:
+the 0.85–0.87 band held two different daily RBI auctions and a second gold
+folded into the first. 907 merges into 579 survivors for $0.22 of judge calls;
+the Parvesh Verma slap went from six records to one of 15 outlets, and the
+Yamuna Expressway bus fire from 23 to one. (#236)
+
+### Fixed
+- **A merged record's old address names the survivor as canonical** on the
+  story and quote pages. The story page streams (`loading.tsx`), so the merge
+  redirect reaches a crawler as an instant meta refresh with a 200, and the
+  canonical was still naming the old address. (#233)
+- **"CESC" is never linked to a ticker**: it names Kolkata's listed utility
+  and Mysuru's state discom, which Kannada papers name weekly. Caught in the
+  production revalidation dry run, before it wrote. (#234)
+- `tools.securities --revalidate --apply` writes into records whose JSON is
+  null; the first production apply failed in one transaction and wrote
+  nothing. Applied after the fix: business and finance records with a ticker
+  went from 451 to 915. (#235)
+
 ## [0.0.108.0] - 2026-09-27
 
 The product audit of 27 Sep 2026: every surface walked on the live site, prod data measured, and the founder's decisions on it (Pulse is a ticker board; Plus sells every lens and more Ask; lens reads metered like Ask; quotes are direct speech only; Stories are related coverage; the duplicate backlog merges now; no vulnerability-record feeds).
