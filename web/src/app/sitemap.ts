@@ -4,6 +4,8 @@ import { SECTOR_GROUPS } from "@/lib/sectors";
 import { SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
+// Every fetch below is asked for the same hour: a shorter one would set the
+// sitemap's clock instead (scripts/check-cache-windows.mjs).
 
 // Every public address: the static pages, the six subjects, the developing
 // stories and the day's records. Search engines discover the records here;
@@ -12,7 +14,7 @@ export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let subjectNodes: { path: string; depth: number }[] = [];
   try {
-    const tree = await fetchSubjects();
+    const tree = await fetchSubjects(revalidate);
     subjectNodes = (tree?.nodes ?? []).filter((n) => (n.story_count ?? 0) > 0);
   } catch {
     // API down → the rest of the sitemap still serves.
@@ -45,7 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // ponytail: one feed page — the API caps a page at 100, so this is the
     // freshest hundred records; the news sitemap carries the same window.
     // Page through with an offset if older records need listing.
-    const feed = await fetchFeed({ limit: 100 });
+    const feed = await fetchFeed({ limit: 100 }, revalidate);
     stories = feed.map((e) => ({
       url: `${SITE_URL}/story/${e.id}`,
       lastModified: e.last_updated_at,
@@ -56,7 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // API down → still serve the static pages rather than a 500.
   }
   try {
-    const trending = await fetchTrending({ state: null, sector: null, limit: 100 });
+    const trending = await fetchTrending({ state: null, sector: null, limit: 100 }, revalidate);
     arcs = trending.map((s) => ({
       url: `${SITE_URL}/trending/${s.slug}`,
       lastModified: s.last_updated_at ?? undefined,

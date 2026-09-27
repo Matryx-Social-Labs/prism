@@ -4,7 +4,8 @@ import { SITE_URL } from "@/lib/site";
 // Google News sitemap: the records of the last two days (Google reads no
 // older), each with its first-reported date and headline under the
 // publication "Prism". Next's MetadataRoute.Sitemap has no news namespace, so
-// this is a plain XML route. Revalidated with the feed's own cache.
+// this is a plain XML route, on its own fifteen minutes (the feed fetch is asked
+// for the same, or its 60 s would set this route's clock).
 export const revalidate = 900;
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -12,7 +13,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export async function GET() {
   let items: FeedItem[] = [];
   try {
-    items = await fetchFeed({ sort: "latest", limit: 100 }); // the API's page cap
+    items = await fetchFeed({ sort: "latest", limit: 100 }, revalidate); // the API's page cap
   } catch {
     // API down: an empty, valid sitemap rather than a 500.
   }

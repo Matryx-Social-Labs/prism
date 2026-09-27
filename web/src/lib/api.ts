@@ -359,7 +359,8 @@ export async function fetchRegions(): Promise<RegionState[]> {
   return ((await res.json()) as { states: RegionState[] }).states;
 }
 
-export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
+/** `revalidate` is the caller's clock: a route re-renders at its shortest fetch (scripts/check-cache-windows.mjs). */
+export async function fetchFeed(query: FeedQuery = {}, revalidate = 60): Promise<FeedItem[]> {
   const params = new URLSearchParams();
   if (query.lens) params.set("lens", query.lens);
   if (query.sector) params.set("sector", query.sector);
@@ -371,7 +372,7 @@ export async function fetchFeed(query: FeedQuery = {}): Promise<FeedItem[]> {
   if (query.sort) params.set("sort", query.sort);
   if (query.limit) params.set("limit", String(query.limit));
   const res = await fetch(`${API_URL}/api/v1/feed?${params}`, {
-    next: { revalidate: 60 },
+    next: { revalidate },
   });
   if (!res.ok) throw new Error(`feed failed: ${res.status}`);
   const data = (await res.json()) as { items: FeedItem[] };
@@ -417,12 +418,13 @@ export interface RouteData {
 
 export async function fetchTrending(
   opts: { state?: string | null; sector?: string | null; limit?: number } = {},
+  revalidate = 120,
 ): Promise<TrendingStory[]> {
   const p = new URLSearchParams();
   if (opts.state) p.set("state", opts.state);
   if (opts.sector) p.set("sector", opts.sector);
   if (opts.limit) p.set("limit", String(opts.limit));
-  const res = await fetch(`${API_URL}/api/v1/trending?${p}`, { next: { revalidate: 120 } });
+  const res = await fetch(`${API_URL}/api/v1/trending?${p}`, { next: { revalidate } });
   if (!res.ok) return [];
   return ((await res.json()) as { stories: TrendingStory[] }).stories;
 }
@@ -518,8 +520,8 @@ export interface SubjectTree {
   nodes: SubjectNode[];
 }
 
-export async function fetchSubjects(): Promise<SubjectTree | null> {
-  const res = await fetch(`${API_URL}/api/v1/subjects`, { next: { revalidate: 900 } });
+export async function fetchSubjects(revalidate = 900): Promise<SubjectTree | null> {
+  const res = await fetch(`${API_URL}/api/v1/subjects`, { next: { revalidate } });
   if (!res.ok) return null;
   return (await res.json()) as SubjectTree;
 }
@@ -713,9 +715,10 @@ export async function fetchQuestions(
   const res = await fetch(`${API_URL}/api/v1/events/${encodeURIComponent(id)}/questions${params}`, {
     // The one data-derived question (cyber KEV) is served only to a reader who
     // unlocked that lens, so the token has to come along or the paying reader
-    // gets the free copy. Already `no-store`, so unlike fetchEvent there is no
-    // shared cache entry for identity to poison.
-    cache: "no-store",
+    // gets the free copy — and that answer is never shared. Without a token the
+    // questions are the same for everyone, and caching them is what lets /about
+    // (HowItWorks) be cached instead of rendered per request.
+    ...(token ? { cache: "no-store" as const } : { next: { revalidate: 300 } }),
     headers: authHeaders(token),
     credentials: "include",
   });

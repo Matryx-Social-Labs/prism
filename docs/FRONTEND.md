@@ -26,6 +26,7 @@ the product/design decisions this code implements, and `docs/API.md` for the bac
 | `test:watch` | `vitest` | Watch mode |
 | `check:guides` | `node scripts/check-no-guides.mjs` | Repo-specific guard (labelling guides) |
 | `check:charts` | `node scripts/check-admin-only.mjs` | Repo-specific guard (chart library confined to admin) |
+| `check:cache` | `node scripts/check-cache-windows.mjs` | Every cached route refreshes on its declared clock, read from `.next/prerender-manifest.json` (a route re-renders at its shortest fetch, so a page's own `revalidate` can be undercut silently; both sitemaps were, to 60 s) |
 
 There is no `test:coverage` script in `package.json` — coverage tooling is not currently wired into an npm script (flagged in Open Questions).
 
@@ -83,7 +84,7 @@ Root layout (`web/src/app/layout.tsx`, Server Component): loads every font (`nex
 | Path | Shows | Data fetched | Component | Auth |
 |---|---|---|---|---|
 | `/` | Landing page (first-time visitors only) | none directly | Server, async | Public. Checks `(await cookies()).has("prism.returning")` and `redirect("/feed")` if present; else renders `Landing()`. |
-| `/about` | "How it works" explainer, worked example | delegated to `HowItWorks()` | Server, async, `dynamic="force-dynamic"` | Public |
+| `/about` | "How it works" explainer, worked example | delegated to `HowItWorks()` | Server, async, `revalidate=60` (was force-dynamic until 2026-09-27; needs `fetchQuestions` cacheable when anonymous) | Public |
 | `/account` | Plan/payments, profile/watchlist links, theme toggle, sign-out | `PlanCard`/`Payments` fetch their own data | Client (`"use client"`) | Requires session — client-side `useSession()`/`localStorage["prism.session.v1"]` check; `router.replace("/signin?next=/account")` if absent; renders `null` until confirmed |
 | `/admin` | Founders' dashboard: KPI tiles, "Needs you" list, section charts | `fetchMetrics`, `fetchLabellers`, `fetchBatches` (`lib/admin.ts`) | Client | `require_admin_user`-equivalent client gate: `AdminShell` calls `GET /api/v1/admin/me`; states `checking`/`ok`/`signed-out`/`forbidden`/`error`. This gate is UX only — the API re-checks admin on every call. |
 | `/admin/audit` | Read-only audit log, IST-day grouped | `fetchAudit(session, 100)` | Client | Same admin gate |
@@ -126,9 +127,9 @@ Root layout (`web/src/app/layout.tsx`, Server Component): loads every font (`nex
 | Path / file | Behavior |
 |---|---|
 | `entities-sitemap.xml` (`route.ts`) | `GET`, `dynamic="force-dynamic"`. Proxies `${API_URL}/api/v1/sitemap/entities` server-side (`cache:"no-store"`); `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`; `503` + `Retry-After: 300` on API failure (avoids baking an empty sitemap mid-deploy) |
-| `news-sitemap.xml` (`route.ts`) | `revalidate=900`. Calls `fetchFeed({sort:"latest", limit:100})`, filters to the last 2 days, emits a Google News sitemap (`news:` namespace) |
+| `news-sitemap.xml` (`route.ts`) | `revalidate=900`. Calls `fetchFeed({sort:"latest", limit:100}, 900)` (the fetch is asked for the route's own clock), filters to the last 2 days, emits a Google News sitemap (`news:` namespace) |
 | `records-sitemap.xml` (`route.ts`) | `dynamic="force-dynamic"`. Same proxy pattern as entities-sitemap, against `/api/v1/sitemap/records` — the full archive beyond the freshest hundred |
-| `sitemap.ts` | Default Next.js sitemap (`revalidate=3600`): static pages, the six sector groups, every subject-tree node with `story_count>0`, the freshest 100 stories (`fetchFeed`) and 100 trending arcs (`fetchTrending`). Degrades to static-pages-only if the API is down |
+| `sitemap.ts` | Default Next.js sitemap (`revalidate=3600`, and every fetch in it is asked for 3600): static pages, the six sector groups, every subject-tree node with `story_count>0`, the freshest 100 stories (`fetchFeed`) and 100 trending arcs (`fetchTrending`). Degrades to static-pages-only if the API is down |
 | `robots.ts` | Allows `*` except a `PRIVATE` list (`/account`, `/signin`, `/auth/`, `/onboarding`, `/interests`, `/watchlist`, `/you`, `/search`, `/label`, `/admin`, `/plus/welcome`). Explicitly disallows AI-training-only crawlers (`Google-Extended`, `CCBot`, `Applebot-Extended`, `Bytespider`, `meta-externalagent`) while leaving citing crawlers (GPTBot, ClaudeBot, PerplexityBot, OAI-SearchBot) free — a deliberate founder decision (2026-09-22), not an oversight. Lists all four sitemaps |
 | `manifest.ts` | PWA manifest: `start_url:"/feed"`, `display:"standalone"`, warm-paper theme color `#F7F6F2` |
 | `opengraph-image.tsx` | The default brand OG card (1200×630) for any route without its own — `SiteCard` component + `ogFonts()`. A story/entity page whose own card can't be built falls back to this, never an invented one |
@@ -162,7 +163,7 @@ Env var `NEXT_PUBLIC_API_URL`; defaults to `http://localhost:8000` locally. Prod
 
 Notably: `fetchBrief` treats `401`/`402` as *product states* (`signin_required`/`no_samples`), not failures — the file comments this explicitly.
 
-**Auth attachment**: cookie-based via `credentials: "include"` (on `fetchEvent`, `fetchQuestions`, `fetchBrief`, `askQuestion`, and the `lib/admin.ts`/`lib/labeller.ts`/`lib/watchlist.ts` clients), plus an optional `Authorization: Bearer <token>` from `authHeaders(token)` for pages still holding a pre-cookie bearer token. `fetchEvent` caches conditionally: `cache:"no-store"` when a token is present (a paywalled unlock must never be cached-and-shared), `revalidate:60` when anonymous. The `/label/*` endpoints use a separate scheme entirely — an `X-Label-Token` header (or a body field), never a cookie or account session, since labellers can be anonymous/invited.
+**Auth attachment**: cookie-based via `credentials: "include"` (on `fetchEvent`, `fetchQuestions`, `fetchBrief`, `askQuestion`, and the `lib/admin.ts`/`lib/labeller.ts`/`lib/watchlist.ts` clients), plus an optional `Authorization: Bearer <token>` from `authHeaders(token)` for pages still holding a pre-cookie bearer token. `fetchEvent` and `fetchQuestions` cache conditionally: `cache:"no-store"` when a token is present (a paywalled unlock must never be cached-and-shared), `revalidate` (60 / 300) when anonymous. `fetchFeed`, `fetchTrending` and `fetchSubjects` take an optional `revalidate` so a route can ask for its own clock. The `/label/*` endpoints use a separate scheme entirely — an `X-Label-Token` header (or a body field), never a cookie or account session, since labellers can be anonymous/invited.
 
 ## 5. State and persistence
 

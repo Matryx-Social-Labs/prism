@@ -3,6 +3,34 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.102.0] - 2026-09-27
+
+### Changed — pages keep their cache, and each refreshes on the clock it declares
+Phase 1 of the caching plan, web and CI half.
+
+- **A backend-only promote no longer redeploys the web.** Every Vercel
+  deployment starts with an empty page cache, and promotes redeployed the web
+  3–11 times a day even when nothing in `web/` had changed. The deploy job now
+  diffs `web/`, `vercel.json` and the workflow against the commit that is
+  **live**, which is stamped on each deployment as `meta.prismSha`. It skips
+  when nothing changed and deploys when the live commit is unknown. The run
+  summary says which.
+- **Both sitemaps re-rendered every minute.** A route refreshes at its
+  shortest fetch, and they read the feed at the feed's 60 s, overriding their
+  own 1 h and 15 min. `fetchFeed`, `fetchTrending` and `fetchSubjects` now take
+  the caller's interval.
+- **`/about` is cached (60 s) instead of rendered per visit.** Its live example
+  needed `fetchQuestions` to be cacheable when anonymous. With a token it is
+  still never cached, so a paid question can't be shared.
+- **`check:cache` in CI** (`scripts/check-cache-windows.mjs`) reads the build's
+  prerender manifest and fails when a cached route's refresh interval
+  differs from the declared table. It failed on the previous code: both
+  sitemaps at 60 s, `/about` uncached.
+- The Vercel function region moves from `iad1` (Washington) to `sin1`
+  (Singapore), next to the API, database and Redis on Railway
+  `asia-southeast1`. This is a project setting, applied with this deploy and
+  recorded in `docs/DEPLOYMENT.md`.
+
 ## [0.0.101.0] - 2026-09-27
 
 ### Changed — the API answers faster, and never makes a reader wait for a model
