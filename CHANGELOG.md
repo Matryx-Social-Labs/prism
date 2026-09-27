@@ -3,6 +3,230 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.108.0] - 2026-09-27
+
+The product audit of 27 Sep 2026: every surface walked on the live site, prod data measured, and the founder's decisions on it (Pulse is a ticker board; Plus sells every lens and more Ask; lens reads metered like Ask; quotes are direct speech only; Stories are related coverage; the duplicate backlog merges now; no vulnerability-record feeds).
+
+### Fixed — a quote is the speaker's words inside the article's quotation marks, once, under one speaker
+The verbatim check proved the words were in the article, not that the speaker
+said them. The live LPU record printed a reporter's sentence as DIG Singla's
+quote, gave Majithia's post on X to SSP Toora (and the landing page showcased
+it as Toora's), printed one Toora sentence four times, and split "Saheb" from
+"Saheb Singh". Founder decision 27 Sep: quotes are direct speech only.
+
+- **Direct speech only** (`enrichment/claims.check_quote`): a quote is shown
+  only when the article prints its words inside quotation marks. Fragments
+  (under 4 words, or a list of words) and the reporter's attribution inside the
+  marks are dropped too. The rules run when the card is built, so every stored
+  claim is served under them without a backfill, and at write time for new
+  ones.
+- **One quote, one speaker**: words given to two speakers stay with the one the
+  article names beside them, or with nobody.
+- **One row per thing said**: the same words from several outlets are one quote
+  citing the earliest report, with "Also in" for the rest. "Saheb" folds into
+  "Saheb Singh" on one record; bodies never fold.
+- **Quote links keep working**: a quote's address is now its words. Links
+  shared before this map to the quote now holding their words, and a withdrawn
+  quote's link opens its story.
+- The landing and How it works showcase a quote several outlets carried,
+  never the record's first.
+- Measured: on the adjudicated gold set, precision went from 0.983 to 1.000
+  and recall to 0.793 (all 12 losses are unquoted in their article). On the
+  live window, 28.6% of claims are not direct speech: 16% of English claims
+  and 55% of Indian-language claims. Events with a quote fell from 48% to 32%.
+
+(#226)
+
+### Added — duplicate records merge into the record they copy
+The verified tier ran in shadow for 33 hours. In that time it judged about 750
+new records to be copies of an existing one: the same happening, Jev ≥ 0.85.
+Each was still served on its own, so one incident appeared as several rows,
+each with fewer outlets than it really had.
+
+- **`tools/merge_duplicates.py` folds each copy into the record Jev compared it
+  against** (`correlation/merge.py`). If that record is itself a copy, the fold
+  goes to the record it copies, never to a copy. The copy's reports, entities,
+  paid lens unlocks, Ask sessions, thread links and story membership move with
+  it. The survivor's counts are rebuilt in the same transaction, and its
+  analysis is re-queued. A copy holding any report nobody judged the same
+  happening is listed, not merged. Dry run by default; `--apply --limit N` for a
+  canary. Safe to re-run.
+- **A merged record's address redirects permanently to the survivor**
+  (`events.merged_into`; the API answers 308, the story page redirects). The
+  feed, search, subjects, sitemaps, watchlist, Pulse and the matcher skip it.
+- Dry run on production, 2026-09-27: 591 merges into 409 records, 158 copies
+  held back for reports nobody judged.
+
+(#224)
+
+### Fixed — a byline bio is never an article, and identical text is never a story
+"Journalist Biography Profile" led the front page. Full-text extraction had
+returned the author's bio for 56 of 255 Indian Express articles in 30 days,
+and the site navigation for 11 of 47 RBI releases. Identical bodies embed
+identically, so unrelated stories joined one record at score 1.000 (14
+Madhya Pradesh stories in one, 11 railway stories in another, 7 RBI
+releases in a third). The extractor then summarised the bio: "The provided
+text contains the biographical profile of a journalist and does not report
+on…".
+
+- **A fetched page must be about its headline** (`enrichment/fulltext.py`).
+  Under 15% of the title's content words, it falls back to the feed's own
+  description. A page that opens exactly like another URL's on the same
+  site, without opening on its own headline, is boilerplate
+  (`enrichment/consumer.py`). Each refusal is logged with its reason.
+- **Identical text under an unrelated headline is not one story**
+  (`correlation/clustering.py`). Neither body-vector tier may use it.
+- **Commentary about the input is not news.** Such an extraction is rejected
+  like any non-news item, and such a brief is never served or stored.
+- **`tools/repair --fulltext`** finds 145 affected articles and 95 events in
+  production. The articles are re-enriched through the guarded path; junk
+  records are dissolved and real ones trimmed. Dry run by default.
+
+(#227)
+
+### Fixed — "most-corroborated first" counted reports, not outlets
+The front page's lead was five Indian Express reports of one story, from one
+newsroom. A record's corroboration count was its number of articles, so an
+outlet re-filing a story, or carrying it on several section feeds, read as
+several outlets agreeing. In the live window 148 of 1,200 records overstated
+it, and 82 passed as multi-source with a single publisher.
+
+- **Corroboration is distinct publishers (mastheads), the unit /sources
+  counts** (`correlation/consumer.py`). The chart order, Top of the record, the
+  ranking boost and the one-source style now agree with the "k outlets" each
+  row prints. Indexing and trending stories already counted publishers.
+- **The record page counts outlets one way everywhere.** The header said "3
+  outlets" while Who said what said "4", because The Times of India and its Delhi
+  desk were two outlets there. The coverage bar and legend counted one per
+  report. "Single source · not yet corroborated" now shows for one newsroom's
+  five reports.
+- `tools/backfill_source_count.py` recounts existing records. The default is a
+  dry run; `--apply` writes only the count. Prod dry run: 3,363 of 26,701
+  records change.
+
+(#222)
+
+### Fixed — the lens opens in a second and is metered like Ask
+A Markets or Cyber tap took ~30 s: the brief was written on the tap (92% of
+taps found none) by a model that spent 2,758 of 3,000 tokens thinking. The lens
+facts (tickers, catalyst, CVSS, KEV, affected products) were shown to nobody,
+an empty brief kept the reader's sample, and the out-of-samples card had no
+way to Plus.
+
+- **Written before the tap.** The analysis pass writes every lens a story
+  offers, and a worker sweep writes the ones recent (mostly single-source)
+  stories still lack: ~$4/month. A written lens opens in under a second.
+- **When one is written on a tap, ~5 s, not 25 s:** minimal reasoning, pinned
+  to Together. Bake-off on 20 live briefs: no steady grounding cost, a quarter
+  of the price.
+- **The facts come with the brief** (`/brief` → `facts`, behind the same gate)
+  and print first; only the prose waits.
+- **Free lens readings are metered like Ask:** 3 a session without an account
+  (plus a per-address ceiling), 10 a day with one, every lens on Plus. The
+  limit card says what would open it: an account, or Plus.
+- **Nobody pays for an empty panel** (refund on an empty result, not only an
+  error). A re-tap no longer pays the model twice (lock and wait above the
+  deadline). Health/policy are refused before any gate or model call.
+- The Reader lens no longer promises "both sides", and Markets no longer
+  promises price reads: there is no price data.
+
+(#228)
+
+### Added — Market Pulse is a ticker board
+Founder decision 1 (audit 2026-09-27). The Pulse was an essay the model wrote
+over the 12 most recently touched business stories, with no time window; on
+the day it was audited it named one ticker. It is now a board of the last 24
+hours of business and finance reporting: the listed companies the record
+named and the market-wide forces (RBI, SEBI, tax, duty, strikes, the rupee),
+most-corroborated first, each row a record with its outlets counted by
+masthead. Prism's reading is labelled as Prism's and is never a price. The
+model may add three lines read from the rows, after them, and a line with a
+number no row prints is dropped.
+
+- **A ticker must name its company** (`common/securities.choose_tickers`): an
+  extractor ticker is kept only when the headline, the opening or an
+  organisation the article is about names it; one company, one ticker, India's
+  listing first. Prod dry-run: 99 of ~1,440 stored tickers dropped, 28 moved to
+  the primary listing. It does not catch a company that is named but not the
+  story (the audit's CVX, JPM, GS): that needs more than names.
+- **Company names become tickers**: organisations a business article is about
+  that exactly match a listed name or alias are linked (venues, rating houses,
+  groups and plain words never are). Precision 0.98 blind on 150 labelled
+  held-out links (`tools/gold_company_links.jsonl`, `--score-links` gates at
+  0.95); business and finance events with a ticker 462 → 965 of 4,336.
+- **Backfill**: `python -m tools.securities --revalidate` (dry-run; `--apply`).
+- `/pulse` rebuilt as the board, Follow on every company; the essay card,
+  movers list and "Your tickers" rail are gone, and the watchlist no longer
+  embeds the essay. Still free and noindex.
+
+(#231)
+
+### Fixed — a record is filed where its reports put it, and cyber means cyber news
+The lead story, a Punjab campus protest, was filed under Business & Markets.
+About half the business records that Mint, BusinessLine and ET's general feeds
+started were not business: those feeds were declared business, so their items
+skipped the gate and the classifier. A record also kept the sector of whichever
+report founded it, and sector and subject disagreed on 6.4% of records. A
+national bank strike was tagged Kerala. A child's burn death carried CWE-284.
+
+- **General feeds go through the gate and the classifier.** Only genuinely
+  single-topic feeds (ESPNcricinfo, RBI) declare a sector.
+- **A record is filed by its reports:** the majority's sector, with ties going
+  to the earliest report. The sector is always the subject path's, so sector
+  pages and subject pages agree.
+- **States are the classifier's call:** kept only when at least half the reports
+  chose it. A feed's own state is never stamped on a record, and a merge no
+  longer unions them.
+- **Cyber facts are stored only on articles classified tech or cyber.**
+- **The gate turns away live blogs, headline roundups and explainers that
+  report no event.**
+- **No vulnerability-record feeds** (founder, 2026-09-27). The NVD and CISA KEV
+  collectors are removed. Cyber and tech now come from news: ETtech, ETCISO,
+  MediaNama, Inc42, Entrackr, The Hindu and Mint technology, The Record,
+  SecurityWeek, Krebs on Security, CyberScoop, The Register and BleepingComputer
+  (back on). Each was verified from the production worker's own egress.
+- `tools/backfill_classification` re-files the last 7 days. It is a dry run by
+  default, and never re-dates a record.
+
+(#229)
+
+### Fixed — the pages say what the product does
+The product audit (27 Sep) found copy promising what the code does not do,
+and two subject chips that did nothing.
+
+- **Search keeps the API's order.** It re-sorted most-outlets-first, so the
+  exact "Sun Pharma" record sank below broad stories that mention it.
+- **Every subject chip filters.** Education and Civic & Safety lit up on
+  /search and /trending and left the list unfiltered: their records are
+  sector `other`. Search results carry `subject_path`; /api/v1/trending takes
+  `?subject=` (the hero record's subject, node or below).
+- **Stories are related coverage** (founder decision #5). "Provisional" is
+  said once above the list instead of on all 24 rows; a provisional grouping
+  counts "N records", never "N developments"; "developments in order", "how
+  it unfolded" and the developer note under the list are gone. An arc is
+  titled with its hero record's Prism headline, not an outlet's.
+- **Plus sells every lens and more of Ask, never a model** (decision #2). The
+  free lens meter is printed (10 a day with an account, 3 without, decision
+  #3); "A larger model on every answer" and "The model" row are gone.
+- **No renewal or future-price promise** (D-b): "Are the prices final? Yes",
+  "yours for 12 months", "held for 12 months" and "price locked 3 years" are
+  removed. "500 of 500 seats" reads "500 seats left"; the offer badge gives
+  the date it ends by instead of "first 1,000 readers".
+- **"Back at midnight UTC" is "Back at 5:30 am IST"** on /plus and in Ask.
+- **The profile copy says what the profile does** (D2): For you, a state
+  scope and the reading a story opens in; nothing "re-sorts" Today.
+- **/about and page descriptions promise only the outlets read** (no
+  international press or wires), name no lens, and no longer sell watchlists
+  (free) or alerts (not built). /sources leaves out an origin with no outlet.
+- **The out-link arrow is the icon**, not a "↗" glyph, in six places;
+  `components/icons.test.ts` guards it.
+
+(#223)
+
+### Fixed — search
+- **Search leads with the record your words name.** A title match ranks above newer records that only mention the query in their summary or cast; recency orders within each group. (#225)
+- **Search shows only served records.** A record hidden for having no sources (a bio or navigation page repaired away) no longer appears in search results. (#230)
+
 ## [0.0.107.0] - 2026-09-27
 
 ### Fixed — Plus subscribers read every lens
