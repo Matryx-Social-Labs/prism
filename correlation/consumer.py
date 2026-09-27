@@ -9,11 +9,13 @@ runs perspective grouping + impact propagation and emits event.updates.
 import json
 import time
 import uuid
+from collections import Counter
 from contextlib import nullcontext
 
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from common import subjects
 from common.config import get_settings
 from common.countries import gdelt_country_to_iso
 from common.db import session_scope
@@ -75,6 +77,40 @@ def extracted_reader_brief(shared: dict) -> dict | None:
         return None
     points = [str(p).strip() for p in (shared.get("watch_points") or []) if str(p).strip()][:3]
     return {"text": text, "points": points}
+
+
+def placement(classifications: list[dict], event_path: str | None, event_confidence: float | None) -> dict | None:
+    """The event's sector and subject, from its members' classifications
+    (earliest first): the majority's sector, ties to the earliest member, and
+    that member's path. No model call — the classifier already answered.
+
+    The founding article used to file the event for good, so one general-feed
+    report forced to business kept a Punjab campus protest under Business &
+    Markets however many political reports joined it. And the path is primary
+    (classification/decide.py derives the sector from it), so the sector is
+    always the path's: two sources of truth disagreed on 6.4% of events. A
+    member classified before the subject tree has no path and does not outvote
+    one that has; an event placed on the tree after the fact
+    (tools/backfill_subjects) keeps that placement while no member has one."""
+    placed = [c for c in classifications if c.get("subject_path")]
+    if not placed and event_path:
+        placed = [{"subject_path": event_path, "subject_confidence": event_confidence}]
+    votes = (
+        [(subjects.legacy_for(c["subject_path"])[0], c) for c in placed]
+        if placed else [(c["sector"], c) for c in classifications if c.get("sector")]
+    )
+    if not votes:
+        return None
+    # most_common keeps first-encountered order on a tie: the earliest member.
+    sector = Counter(s for s, _ in votes).most_common(1)[0][0]
+    chosen = next(c for s, c in votes if s == sector)
+    path = chosen.get("subject_path")
+    return {
+        "sector": sector,
+        "subsector": subjects.legacy_for(path)[1] if path else chosen.get("subsector"),
+        "subject_path": path,
+        "subject_confidence": chosen.get("subject_confidence"),
+    }
 
 
 async def _has_reader_brief(event_id: uuid.UUID) -> bool:
@@ -556,6 +592,9 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None) -> None:
         # newest member would also be coherent, but it rewrites the headline a
         # reader may have arrived on, which is a bigger product change than this.
         event.summary = summaries[0] if summaries else event.summary
+        for key, value in (placement([r["classification"] or {} for r in rows], event.subject_path,
+                                     event.subject_confidence) or {}).items():
+            setattr(event, key, value)
         # Merged at WRITE time, never replaced (audit H11). This rebuild owns
         # the keys below and nothing else: lens_briefs and lens_points belong to
         # persist_briefs (the analysis pass, the extractor, and the API's

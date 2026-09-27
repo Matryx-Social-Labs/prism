@@ -62,14 +62,18 @@ FEEDS: list[FeedSpec] = [
     # Telangana Today is a single-state masthead, not a section of a bigger one —
     # same treatment as prajavani/tv9kannada below.
     FeedSpec("telanganatoday", "https://telanganatoday.com/feed", state="IN-TG"),
-    # ── India national (single-topic — deterministic, zero LLM) ──
-    FeedSpec("livemint", "https://www.livemint.com/rss/news", sector="business"),
-    FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss", sector="business"),
+    # Business papers, but these are their GENERAL feeds (top stories, latest
+    # news): declared business, they skipped the gate and the classifier and
+    # filed a Punjab campus protest, Afghan fighters and a nor'easter under
+    # Business & Markets — about half of what they started (audit, 2026-09-27).
+    FeedSpec("livemint", "https://www.livemint.com/rss/news"),
+    FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss"),
     # 403 Forbidden from Railway's egress on every cycle since it was added
     # (2026-09-24, never one success); it answered from a laptop. Off until a
     # licensed or allowlisted feed exists, like bleepingcomputer.
-    FeedSpec("businessstandard", "https://www.business-standard.com/rss/latest.rss", sector="business", enabled=False),
-    FeedSpec("economictimes", "https://economictimes.indiatimes.com/rssfeedstopstories.cms", sector="business"),
+    FeedSpec("businessstandard", "https://www.business-standard.com/rss/latest.rss", enabled=False),
+    FeedSpec("economictimes", "https://economictimes.indiatimes.com/rssfeedstopstories.cms"),
+    # ── India national (single-topic — deterministic, zero LLM) ──
     FeedSpec("espncricinfo", "https://www.espncricinfo.com/rss/content/story/feeds/0.xml", sector="sports", subsector="cricket"),
     # ── Origin feeds: the institution's own release, not an outlet's report of it.
     # Measured 2026-09-21 with this User-Agent: RBI answers 200, entries are dated
