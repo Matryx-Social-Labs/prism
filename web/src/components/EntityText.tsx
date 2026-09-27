@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useAsk } from "@/components/AskContext";
 import type { EntityOut, SpeakerClaims } from "@/lib/api";
 import { entityKind, entityRel, markEntities, type Segment } from "@/lib/entities";
+import { saidCount } from "@/lib/quotes";
 
 /**
  * Prose with the story's named entities marked (DESIGN.md § Entity marks).
@@ -122,7 +123,7 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
           </span>
           {said && (
             <a href="#said" className="font-semibold" style={{ color: "var(--accent)" }} onClick={() => setOpen(false)}>
-              Quoted {said.claims.length} {said.claims.length === 1 ? "time" : "times"} on this story ↓
+              {saidCount(said.claims)} on this story ↓
             </a>
           )}
           {ask && (

@@ -4,6 +4,8 @@ Split out of api/main.py so route modules (api/routes/*) share one schema
 source and main.py only wires the app. Pure Pydantic — no DB or app deps.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -344,6 +346,11 @@ class ClaimOut(BaseModel):
     # The other reports that printed these words, earliest first. This row's
     # own report is the earliest of all of them.
     also_in: list[QuoteSource] = []
+    # How the article gives the words. "direct": inside its quotation marks, the
+    # only kind an English article is shown. "reported": an Indian-language
+    # article's "X said that…" (founder decision 28 Sep), the article's report of
+    # what was said — the web never prints it inside quotation marks.
+    speech: Literal["direct", "reported"] = "direct"
 
 
 class SpeakerClaims(BaseModel):

@@ -106,6 +106,18 @@ describe("/story/[id]/quote/[n] — the quote's own page", () => {
     await expect(open("0-0")).rejects.toThrow(/^NEXT_PERMANENT_REDIRECT \/story\/e9$/);
   });
 
+  it("prints reported words as the article's report, never inside quotation marks", async () => {
+    fetchEvent.mockResolvedValue(event(claim({ id: "r1", lang: "kn", speech: "reported", quote_text: "ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ ಅತ್ಯಂತ ಮಹತ್ವದ್ದಾಗಿದೆ" })));
+    await open("r1");
+    // The words as the page's lead (the "In the article" passage marks them too).
+    const [lead] = screen.getAllByText("ಪೌರಕಾರ್ಮಿಕ ಪಾತ್ರ ಅತ್ಯಂತ ಮಹತ್ವದ್ದಾಗಿದೆ");
+    expect(lead.closest("blockquote")).toBeNull();
+    expect(screen.queryByText(/“ಪೌರಕಾರ್ಮಿಕ/)).not.toBeInTheDocument();
+    expect(screen.getByText("reported")).toBeInTheDocument();
+    expect(screen.getByText("The article's report of what was said, checked against the article. Not a quote.")).toBeInTheDocument();
+    expect(screen.queryByText("Word for word, checked against the article.")).not.toBeInTheDocument();
+  });
+
   it("sends a link to a withdrawn or unknown quote to its story, never a 404", async () => {
     fetchEvent.mockResolvedValue({ ...event(claim({ id: "a1b2c3d4e5f6" })), quote_aliases: { "1-0": "a1b2c3d4e5f6" } });
     await expect(open("0-0")).rejects.toThrow(/^NEXT_REDIRECT \/story\/e1$/);

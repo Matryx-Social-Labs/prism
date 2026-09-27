@@ -53,6 +53,23 @@ describe("Ask entry points", () => {
     expect(q.submit).toBeUndefined();
   });
 
+  it("reported words go into the question without quotation marks, as the article's report", async () => {
+    const open = vi.fn();
+    const reported = [{ speaker: "Priya Rao", role: "engineer", claims: [{ ...(claim as object), speech: "reported" }] }] as never;
+    render(<AskContext.Provider value={open}><Said claims={reported} sourceIndex={new Map([["a1", 1]])} /></AskContext.Provider>);
+    await userEvent.click(screen.getByRole("button", { name: "Ask about this" }));
+    const q = open.mock.calls[0][0];
+    expect(q.prefill).toContain("what the article reports The bridge was inspected in March.");
+    expect(q.prefill).not.toMatch(/[“”]/);
+  });
+
+  it("an entity card counts the speaker's quotes and reported words apart", async () => {
+    const said = [{ speaker: "Priya Rao", role: null, claims: [claim, { ...(claim as object), speech: "reported" }] }] as never;
+    render(<p><EntityMark label="Priya Rao" entity={entity} claims={said} /></p>);
+    await userEvent.click(screen.getByText("Priya Rao"));
+    expect(await screen.findByText(/1 quote · 1 reported on this story/)).toBeInTheDocument();
+  });
+
   it("an entity card offers to ask about the entity on this story", async () => {
     const open = vi.fn();
     render(<AskContext.Provider value={open}><p><EntityMark label="Priya Rao" entity={entity} /></p></AskContext.Provider>);

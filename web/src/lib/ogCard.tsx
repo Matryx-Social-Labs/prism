@@ -64,10 +64,14 @@ export const stamp = (iso: string) => `${shortDate(iso)} ${istTime(iso)} IST`;
  * The quote card's check line. "Word for word" is true of the ARTICLE — the
  * check (enrichment/claims.py) asks whether these words are in it — so it
  * holds for every quote the record prints; over an outlet's own translation
- * the card says so instead, and never "word for word" on its own.
+ * the card says so instead, and never "word for word" on its own. Words an
+ * Indian-language article reported ("X said that…") are its report of what
+ * was said, and the card says that.
  */
-export const quoteCheckLine = (translated: boolean) =>
-  translated ? "Checked against the article · the outlet translated these words" : "Word for word, checked against the article";
+export const quoteCheckLine = (translated: boolean, reported = false) =>
+  reported
+    ? "Checked against the article · its report of what was said, not a quote"
+    : translated ? "Checked against the article · the outlet translated these words" : "Word for word, checked against the article";
 
 export type PillSpec = { label: string; dashed?: boolean; check?: boolean };
 
@@ -206,13 +210,15 @@ export function StoryCard({ address, pill, meta, headline, tally: t, count, sing
  * The quote card: the words as the article printed them under a 6px ink rule,
  * who said it, where and when it was printed, and what the check proved.
  */
-export function QuoteCard({ address, quote, speaker, role, meta, translated, storyTitle }: {
+export function QuoteCard({ address, quote, speaker, role, meta, translated, reported = false, storyTitle }: {
   address: string;
   quote: string;
   speaker: string;
   role?: string | null;
   meta: string[];
   translated: boolean;
+  /** Reported words: printed without quotation marks, in the upright voice, on a dashed rule. */
+  reported?: boolean;
   storyTitle?: string | null;
 }) {
   const q = fit(quote, 240);
@@ -220,8 +226,8 @@ export function QuoteCard({ address, quote, speaker, role, meta, translated, sto
   const provenance = meta.filter(Boolean).join(" · ").toUpperCase();
   return (
     <Frame address={address}>
-      <div style={{ display: "flex", flexDirection: "column", marginTop: "auto", borderLeft: `6px solid ${c.ink}`, paddingLeft: 34 }}>
-        <div style={{ display: "flex", fontFamily: displayStack(q), fontStyle: "italic", fontSize: size, lineHeight: 1.26 }}>“{q}”</div>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: "auto", borderLeft: `6px ${reported ? "dashed" : "solid"} ${c.ink}`, paddingLeft: 34 }}>
+        <div style={{ display: "flex", fontFamily: displayStack(q), fontStyle: reported ? "normal" : "italic", fontSize: size, lineHeight: 1.26 }}>{reported ? q : `“${q}”`}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 24, fontFamily: bodyStack(speaker + (role ?? "")) }}>
           <span style={{ fontSize: 27, fontWeight: 600, lineHeight: 1.3 }}>{fit(speaker, 48)}</span>
           {role && <span style={{ fontSize: 22, color: c.inkMuted }}>{fit(role, 56)}</span>}
@@ -229,12 +235,13 @@ export function QuoteCard({ address, quote, speaker, role, meta, translated, sto
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 8, fontFamily: monoStack(provenance), fontSize: 21, letterSpacing: 0.63, color: c.inkMuted }}>
           <span>{provenance}</span>
           {translated && <Pill label="translation" dashed small />}
+          {reported && <Pill label="reported" dashed small />}
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 30 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, fontFamily: OG_SANS, fontSize: 21, fontWeight: 600, color: c.ink }}>
           <Check size={22} />
-          <span>{quoteCheckLine(translated)}</span>
+          <span>{quoteCheckLine(translated, reported)}</span>
         </div>
         {storyTitle && !translated && (
           <span style={{ marginLeft: "auto", fontFamily: bodyStack(storyTitle), fontSize: 20, color: c.inkMuted, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>

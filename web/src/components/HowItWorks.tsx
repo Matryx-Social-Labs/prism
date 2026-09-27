@@ -218,6 +218,7 @@ export async function HowItWorks() {
               <Said claims={[{ ...quote, claims: quote.claims.slice(0, 2) }]} sourceIndex={indexSources(event.sources)} />
             ) : <Unavailable what="A verified quote" />}>
             <p>Prism pulls out what named people and bodies said, and keeps a quote only if the article prints the same words inside quotation marks. Each one names the speaker and their office as the article gave it, the outlet that carried it, and opens the article at that line.</p>
+            <p>Many Indian-language reports print what was said without quotation marks. Prism shows those words when the article names who said them, labelled <em>reported</em> and never set as a quote.</p>
             {quote?.role && <p>Here: {quote.speaker}, {quote.role}.</p>}
           </Step>
 

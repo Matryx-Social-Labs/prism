@@ -57,6 +57,7 @@ async def handle_classified_item(payload: dict) -> None:
         url = item.url
         url_canonical = item.url_canonical or item.url
         published_at = item.published_at
+        language = item.language  # an Indian language admits reported speech (enrichment/claims.py)
         sector = (item.classification or {}).get("sector")
         cyber_ok = cyber_classified(item.classification or {})
         has_image = item.image_url is not None
@@ -189,7 +190,7 @@ async def handle_classified_item(payload: dict) -> None:
         # VERBATIM OR NOT STORED. The model is asked for a quote; whether it
         # actually copied one is checked here against the article, because a
         # fabricated quote renders exactly like a real one and no reader can tell.
-        verified, claim_rejects = verify_claims(shared.claims, clean_text)
+        verified, claim_rejects = verify_claims(shared.claims, clean_text, language)
         shared = shared.model_copy(update={"claims": verified})
         if any(claim_rejects.values()):
             logger.info("claims_rejected", raw_item_id=str(raw_item_id), **claim_rejects)

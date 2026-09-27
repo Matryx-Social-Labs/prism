@@ -266,7 +266,8 @@ def _offset(v: object) -> int | None:
 
 def _said(sources: list[dict], checked: bool) -> list[Said]:
     """Every quote on the event's articles, in article order. `checked` keeps
-    only direct speech (enrichment/claims.check_quote), its span re-verified.
+    only direct speech (enrichment/claims.check_quote), its span re-verified —
+    or, in an Indian-language article, speech the article reports.
 
     Defensive on shape by design: this runs on the most-viewed route, and a row
     written by an older extractor could hold a dict or a string where a list is
@@ -291,16 +292,17 @@ def _said(sources: list[dict], checked: bool) -> list[Said]:
             if not speaker or not quote:
                 continue  # verified at write time; belt and braces
             start, end = _offset(c.get("quote_start")), _offset(c.get("quote_end"))
+            speech = "direct"
             if checked:
                 # Stored before the direct-speech rule, so checked here too:
                 # every claim already on the record is served under it.
-                why, quote, start = check_quote(src.get("clean_text") or "", quote, speaker, start)
+                why, quote, start, speech = check_quote(src.get("clean_text") or "", quote, speaker, start, src.get("lang"))
                 if why:
                     continue
                 end = start + len(quote)
             role = c.get("speaker_role")
             role = role.strip() if isinstance(role, str) and role.strip() else None
-            out.append(Said(speaker, quote, start, end, src, role))
+            out.append(Said(speaker, quote, start, end, src, role, speech=speech))
     return out
 
 
@@ -319,6 +321,7 @@ def _claim_out(s: Said) -> ClaimOut:
         url=src["url"],
         published_at=pub.isoformat() if pub else None,
         lang=src.get("lang"),
+        speech=s.speech,
         also_in=[
             QuoteSource(
                 id=quote_id(a.quote), article_id=str(a.src["article_id"]), source_name=a.src["source_name"],

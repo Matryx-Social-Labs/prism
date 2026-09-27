@@ -37,6 +37,26 @@ export function findQuote(
   return null;
 }
 
+/** Words an Indian-language article reported ("X said that…") rather than quoted. */
+export const isReported = (claim: ClaimOut) => claim.speech === "reported";
+
+/**
+ * The words as the record may print them in a line of text (a share title, an
+ * Ask prompt): a quote inside its quotation marks, reported words never —
+ * marks would claim they are the speaker's exact words.
+ */
+export function saidWords(claim: ClaimOut, max?: number): string {
+  const t = max && claim.quote_text.length > max ? `${claim.quote_text.slice(0, max - 1)}…` : claim.quote_text;
+  return isReported(claim) ? t : `“${t}”`;
+}
+
+/** "2 quotes · 1 reported": what a card or the section holds, each kind counted apart. */
+export function saidCount(claims: ClaimOut[]): string {
+  const reported = claims.filter(isReported).length;
+  const quotes = claims.length - reported;
+  return [quotes && `${quotes} ${quotes === 1 ? "quote" : "quotes"}`, reported && `${reported} reported`].filter(Boolean).join(" · ");
+}
+
 /**
  * How many outlets printed these quotes: the one each cites and every other
  * that carried the same words. Counted by masthead when the caller knows it
@@ -48,9 +68,9 @@ export function quoteOutlets(claims: ClaimOut[], masthead: (articleId: string) =
 
 /**
  * The quote a showcase leads with (the landing's "Exact words", How it works'
- * step 04), with its speaker's other quotes after it. Every quote the API
- * returns has passed the direct-speech checks, but not every one is a good
- * example: prefer words two or more outlets printed, then a speaker the
+ * step 04), with its speaker's other quotes after it. A quote only — words an
+ * article reported are shown on the record, never as the showcase of "exact
+ * words". Prefer words two or more outlets printed, then a speaker the
  * articles name an office for. Never simply the record's first — that showed
  * Majithia's post on X as the SSP's on the landing (audit P0 #2).
  */
@@ -62,7 +82,7 @@ export function showcaseQuote(groups: SpeakerClaims[] | null | undefined): Speak
   };
   let best: { sp: SpeakerClaims; claim: ClaimOut; rank: number[] } | null = null;
   for (const sp of groups ?? []) {
-    for (const claim of sp.claims) {
+    for (const claim of sp.claims.filter((c) => !isReported(c))) {
       const outlets = quoteOutlets([claim]);
       const rank = [outlets > 1 ? 1 : 0, sp.role ? 1 : 0, outlets];
       if (!best || beats(rank, best.rank)) best = { sp, claim, rank };

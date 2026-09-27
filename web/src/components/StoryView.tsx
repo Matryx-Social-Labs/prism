@@ -46,7 +46,7 @@ import { StoryActionBar } from "@/components/story/StoryActionBar";
 import { shortDate } from "@/lib/dateline";
 import { entityRel } from "@/lib/entities";
 import { sectorGroup } from "@/lib/sectors";
-import { quoteOutlets } from "@/lib/quotes";
+import { isReported, quoteOutlets, saidCount } from "@/lib/quotes";
 import { sentences } from "@/lib/sentences";
 
 /**
@@ -86,6 +86,9 @@ export function StoryView({ event }: { event: EventDetail }) {
   // /events is cached 60s, so a new page meets an old payload for a window.
   const claims = event.claims ?? [];
   const quoteCount = claims.reduce((n, sp) => n + sp.claims.length, 0);
+  // Quotes and reported words are counted apart (founder decision 28 Sep): the
+  // header's stat counts the quotes, or the reported words when there are none.
+  const reportedCount = claims.reduce((n, sp) => n + sp.claims.filter(isReported).length, 0);
   const outlets = outletsOf(event);
   const outletCount = outlets.length ? publishers(outlets).length : new Set(event.sources.map((s) => s.source_slug)).size;
 
@@ -304,7 +307,9 @@ export function StoryView({ event }: { event: EventDetail }) {
     { n: outletCount, label: plural(outletCount, "outlet", "outlets"), to: "sources" },
     ...(langCount > 0 ? [{ n: langCount, label: plural(langCount, "language", "languages"), to: "sources" }] : []),
     { n: sourceCount, label: plural(sourceCount, "report", "reports"), to: reports.length > 1 ? "changed" : "sources" },
-    ...(quoteCount > 0 ? [{ n: quoteCount, label: plural(quoteCount, "quote", "quotes"), to: "said" }] : []),
+    ...(quoteCount > reportedCount
+      ? [{ n: quoteCount - reportedCount, label: plural(quoteCount - reportedCount, "quote", "quotes"), to: "said" }]
+      : quoteCount > 0 ? [{ n: reportedCount, label: "reported", to: "said" }] : []),
     ...(developments > 1 ? [{ n: developments, label: "developments", to: "route" }] : []),
   ];
   const reportWord = plural(sourceCount, "report", "reports");
@@ -542,7 +547,7 @@ export function StoryView({ event }: { event: EventDetail }) {
                 id="said-title"
                 title="Who said what"
                 // One speaker's card already counts the same; the strip is for the section.
-                sub={claims.length > 1 ? `${quoteCount} ${plural(quoteCount, "quote", "quotes")} · ${saidOutlets} ${plural(saidOutlets, "outlet", "outlets")}${saidLangs > 1 ? ` · ${saidLangs} languages` : ""}` : undefined}
+                sub={claims.length > 1 ? `${saidCount(claims.flatMap((sp) => sp.claims))} · ${saidOutlets} ${plural(saidOutlets, "outlet", "outlets")}${saidLangs > 1 ? ` · ${saidLangs} languages` : ""}` : undefined}
                 hint="Only words found exactly in the article are shown, attributed and linked to the line they came from."
               />
               <div className="mt-3">

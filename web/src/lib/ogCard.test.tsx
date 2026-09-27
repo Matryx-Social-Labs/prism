@@ -9,6 +9,11 @@ describe("the quote card's check line", () => {
     expect(quoteCheckLine(true)).not.toMatch(/word for word/i);
     expect(quoteCheckLine(false)).toBe("Word for word, checked against the article");
   });
+
+  it("says reported words are the article's report of what was said, never word for word", () => {
+    expect(quoteCheckLine(false, true)).toBe("Checked against the article · its report of what was said, not a quote");
+    expect(quoteCheckLine(false, true)).not.toMatch(/word for word/i);
+  });
 });
 
 describe("the card's coverage tally", () => {
