@@ -62,8 +62,8 @@ describe("Market Pulse — the ticker board", () => {
     expect(r.getByRole("link", { name: "Bank strike deferred after talks" })).toHaveAttribute("href", "/story/e1");
     expect(r.getByText("Regulatory action")).toBeInTheDocument();
     expect(r.getByText("Prism’s reading")).toBeInTheDocument();
-    expect(r.getByText(/positive/)).toBeInTheDocument();
-    expect(r.getByText("0.6")).toBeInTheDocument();
+    expect(r.getByText(/positive · moderate confidence/)).toBeInTheDocument();
+    expect(row.textContent).not.toMatch(/0\.6|60/); // the model's float is never printed
     expect(r.getByText(/Service disruption averted/)).toBeInTheDocument();
     expect(r.getByText(/4 outlets/)).toBeInTheDocument();
     expect(row.textContent).not.toMatch(/₹|%|price/i);

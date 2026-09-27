@@ -9,6 +9,7 @@ import { TickerChip } from "@/components/tabs/Markets";
 import { Alert, EmptyState } from "@/components/ui";
 import { fetchDigest, type MarketDigest, type PulseCompany, type PulseRow } from "@/lib/api";
 import { istTime, shortDate } from "@/lib/dateline";
+import { confidenceWords } from "@/lib/reading";
 import { useSession, type Session } from "@/lib/session";
 import { follow, getWatchlist, unfollow, type WatchItem } from "@/lib/watchlist";
 
@@ -189,7 +190,7 @@ function Row({ row, children }: { row: PulseRow; children?: React.ReactNode }) {
     meta.push(
       <span key="r" style={{ font: "400 12.5px/1.3 var(--font-read)", color: "var(--ink-2)" }}>
         <span>Prism&rsquo;s reading</span>: {row.reading}
-        {row.confidence != null && <>, confidence <span className="font-mono">{row.confidence}</span></>}
+        {row.confidence != null && ` · ${confidenceWords(row.confidence)}`}
       </span>,
     );
   }
