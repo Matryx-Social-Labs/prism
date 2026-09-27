@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
 import { ArrowUpRight, Check } from "@/components/icons";
 import { SectionHead } from "@/components/SectionHead";
@@ -90,6 +90,9 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   } catch {
     notFound();
   }
+  // Merged into another record (see ../../page.tsx): a quote's number is its
+  // place in ONE record's list, so it cannot follow — the record can.
+  if (event.id !== id) permanentRedirect(`/story/${event.id}`);
   const q = findQuote(event.claims, n);
   if (!q) notFound();
   const { claim, speaker, role } = q;

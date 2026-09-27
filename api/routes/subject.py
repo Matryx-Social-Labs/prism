@@ -52,7 +52,7 @@ async def get_subjects(response: Response, db: AsyncSession = Depends(get_db)) -
             text(
                 """
                 SELECT subject_path, count(*) AS n FROM events
-                WHERE subject_path IS NOT NULL
+                WHERE subject_path IS NOT NULL AND merged_into IS NULL
                   AND COALESCE(jsonb_array_length(projection->'source_slugs'), 0) > 0
                   AND last_updated_at > now() - interval '30 days'
                 GROUP BY subject_path
@@ -100,6 +100,7 @@ async def get_subject(
                 -- the property and the ones we could not split.
                 WHERE (e.subject_path = :path OR e.subject_path LIKE :prefix)
                   AND COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
+                  AND e.merged_into IS NULL
                 ORDER BY e.last_updated_at DESC
                 LIMIT :limit
                 """
@@ -121,6 +122,7 @@ async def get_subject(
                 SELECT count(*) FROM events
                 WHERE (subject_path = :path OR subject_path LIKE :prefix)
                   AND COALESCE(jsonb_array_length(projection->'source_slugs'), 0) > 0
+                  AND merged_into IS NULL
                 """
             ),
             {"path": path, "prefix": f"{path}.%"},

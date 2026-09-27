@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { fetchEvent, type EventDetail } from "@/lib/api";
 import { StoryView } from "@/components/StoryView";
 import { sectorGroup } from "@/lib/sectors";
@@ -60,6 +60,9 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const event = await load(id);
   if (!event) notFound();
+  // A record merged into the one it duplicated: the API's 308 was followed, so
+  // this is the survivor. Its address is the one to share and index.
+  if (event.id !== id) permanentRedirect(`/story/${event.id}`);
 
   // NewsArticle structured data (lib/seo): headline, dates, the reports it is
   // based on and the entities it is about — so search and answer engines see

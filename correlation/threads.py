@@ -134,7 +134,7 @@ async def _find_candidates(event_id: uuid.UUID) -> list[dict]:
                                (e.embedding <=> (SELECT embedding FROM events WHERE id = :eid)) AS dist
                         FROM events e
                         WHERE e.id != :eid
-                          AND e.embedding IS NOT NULL
+                          AND e.embedding IS NOT NULL AND e.merged_into IS NULL
                           AND (SELECT embedding FROM events WHERE id = :eid) IS NOT NULL
                           AND e.last_updated_at > now() - interval '{WINDOW_DAYS} days'
                           AND (e.embedding <=> (SELECT embedding FROM events WHERE id = :eid))

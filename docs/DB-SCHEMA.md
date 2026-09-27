@@ -142,7 +142,11 @@ serve. Columns: `id` PK, `title`, `headline_by` nullable (NULL = first report's 
 derived from it), `subject_confidence`, `regions` text[], `image_url`, `occurred_at` date,
 `first_seen_at`/`last_updated_at`, `story_visible_at` nullable (first instant a published partition
 made this event addressable, NULL = not yet published), `projection` JSONB (promoted serving
-fields — also what `event_revisions`/`event_corrections` diff against), `embedding vector(768)`.
+fields — also what `event_revisions`/`event_corrections` diff against), `embedding vector(768)`,
+`merged_into` nullable FK → `events.id` (`ON DELETE SET NULL`; set when `correlation/merge.py` folded
+this record into the one it duplicates — the row stays, its URL 308s to the survivor, every list and
+matcher skips it; always names a record that is not itself merged). Added by
+`db/versions/f6b2d8e4a915_events_merged_into.py`, partial index `ix_events_merged_into`.
 
 Indexes worth knowing: `ix_events_sector_last_updated (sector, last_updated_at DESC)` — the feed
 candidate window; `ix_events_embedding_hnsw` (cosine); `ix_events_subject_path` /

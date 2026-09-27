@@ -35,7 +35,7 @@ async def market_digest(db: AsyncSession = Depends(get_db)):
                            e.projection, e.last_updated_at, e.occurred_at
                     FROM events e
                     {report_photo_join("e")}
-                    WHERE e.id = ANY(CAST(:ids AS uuid[]))
+                    WHERE e.id = ANY(CAST(:ids AS uuid[])) AND e.merged_into IS NULL
                     """
                 ),
                 {"ids": ids, "placeholders": list(await placeholders(db))},

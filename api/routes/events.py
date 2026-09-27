@@ -318,9 +318,30 @@ def group_claims(sources: list[dict], verdicts: dict[str, dict] | None = None) -
     return out
 
 
+def _moved(request: Request, into) -> HTTPException:
+    """A record folded into the one it duplicated (correlation/merge.py)
+    answers with a permanent redirect to that record, path and query kept, so a
+    shared link lands on the record that now holds its reports and its paid
+    unlocks. `merged_into` never chains, so one hop."""
+    path = request.url.path.replace(request.path_params["event_id"], str(into), 1)
+    query = f"?{request.url.query}" if request.url.query else ""
+    return HTTPException(status_code=308, detail="merged", headers={"Location": path + query})
+
+
+async def follow_merge(event_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db)) -> None:
+    """The same redirect ahead of a route's own reads — for the paid brief, whose
+    gate would otherwise charge a stale tab a sample on the absorbed record."""
+    into = (
+        await db.execute(text("SELECT merged_into FROM events WHERE id = :eid"), {"eid": str(event_id)})
+    ).scalar_one_or_none()
+    if into is not None:
+        raise _moved(request, into)
+
+
 @router.get("/api/v1/events/{event_id}", response_model=EventDetail)
 async def get_event(
     event_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user_id: uuid.UUID | None = Depends(get_current_user_optional),
 ):
@@ -329,7 +350,7 @@ async def get_event(
             text(
                 """
                 SELECT id, title, headline_by, summary, sector, subsector, image_url, regions,
-                       occurred_at, last_updated_at, projection
+                       occurred_at, last_updated_at, projection, merged_into
                 FROM events WHERE id = :eid
                 """
             ),
@@ -338,6 +359,8 @@ async def get_event(
     ).mappings().first()
     if event is None:
         raise HTTPException(status_code=404, detail="event not found")
+    if event.get("merged_into"):
+        raise _moved(request, event["merged_into"])
 
     source_rows = (
         await db.execute(
@@ -568,7 +591,7 @@ async def _read_cached_brief(db: AsyncSession, event_id: uuid.UUID, lens: str) -
 # breach. Generated once, cached on the event projection. A Redis single-flight
 # per (event, lens) holds across API replicas so a burst of viewers (and, once
 # the paywall lands, a burst of sample-spenders) costs exactly one LLM call.
-@router.get("/api/v1/events/{event_id}/brief", response_model=BriefResponse)
+@router.get("/api/v1/events/{event_id}/brief", response_model=BriefResponse, dependencies=[Depends(follow_merge)])
 async def get_brief(
     event_id: uuid.UUID,
     lens: str,

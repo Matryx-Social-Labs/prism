@@ -50,6 +50,7 @@ async def changed_urls(db, *, since_minutes: int = 70) -> list[str]:
                 """
                 SELECT e.id, e.projection->'source_slugs' FROM events e
                 WHERE e.last_updated_at >= now() - make_interval(mins => :m)
+                  AND e.merged_into IS NULL
                   AND NOT (
                       COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
                       AND (e.projection->'source_slugs') <@ CAST(:cve_only AS jsonb)

@@ -59,6 +59,7 @@ async def _top_stories() -> list[dict]:
                     FROM events
                     WHERE sector IN ('finance', 'business')
                       AND summary IS NOT NULL
+                      AND merged_into IS NULL
                     ORDER BY last_updated_at DESC
                     LIMIT :n
                     """

@@ -145,6 +145,7 @@ async def sitemap_records(db: AsyncSession = Depends(get_db)):
                 """
                 SELECT id, last_updated_at, projection->'source_slugs' FROM events
                 WHERE COALESCE(jsonb_array_length(projection->'source_slugs'), 0) >= 2
+                  AND merged_into IS NULL
                 ORDER BY last_updated_at DESC LIMIT 50000
                 """
             )
