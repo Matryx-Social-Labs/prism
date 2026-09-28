@@ -1,5 +1,6 @@
+import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { quoteCheckLine, tally } from "@/lib/ogCard";
+import { SiteCard, StoryCard, quoteCheckLine, tally } from "@/lib/ogCard";
 
 describe("the quote card's check line", () => {
   // Moved from quotes.test.ts with the v3 card: the card is shared alone, so the
@@ -33,5 +34,18 @@ describe("the card's coverage tally", () => {
   it("reads a report with no language as English and one with no origin as uncounted", () => {
     const t = tally([{ publisher: "Mint", origin: null, language: null }]);
     expect(t).toEqual({ counts: { national: 0, intl: 0, regional: 0, wire: 0 }, outlets: 1, languages: ["en"] });
+  });
+});
+
+describe("the card's frame", () => {
+  // The lockup is readPrism.news, so the mono line beside it prints only the path
+  // (screens/Wordmark.html); the site card has no path, so it prints none.
+  const head = (c: HTMLElement) => c.firstElementChild!.firstElementChild!.textContent;
+
+  it("prints the path beside the lockup, and nothing on the site card", () => {
+    const story = render(<StoryCard path="/story/e1" meta={[]} headline="A story" tally={tally([])} count="0 outlets" />);
+    expect(head(story.container)).toBe("readPrism.news/story/e1");
+    const site = render(<SiteCard headline="Follow the story" line="One record" />);
+    expect(head(site.container)).toBe("readPrism.news");
   });
 });

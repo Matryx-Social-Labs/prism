@@ -1,7 +1,7 @@
 """Branded email — the record's own voices in a mail client (Design System v2).
 
 The layout is Claude Design's (outside/emails, 2026-09-24): a paper ground, a
-white 520px card, the masthead (the mark and "Prism", the host in mono), a 3px
+white 520px card, the masthead (the mark and the lockup, readPrism.news), a 3px
 ink rule, a mono meta line in caps, the title in the record voice, the
 paragraphs in the reading voice, a facts table on hairlines with mono caps
 labels, ONE cobalt button (with Outlook's VML fallback), an optional mono note,
@@ -56,10 +56,6 @@ _E = _html.escape
 
 def _web() -> str:
     return get_settings().prism_web_url.rstrip("/")
-
-
-def _host() -> str:
-    return _web().split("://", 1)[-1].removeprefix("www.")
 
 
 def _button(label: str, href: str) -> str:
@@ -133,7 +129,7 @@ def shell(
 {pre}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{PAPER}" style="background:{PAPER}"><tr><td align="center" style="padding:32px 12px">
 <table role="presentation" class="card" width="520" cellpadding="0" cellspacing="0" border="0" bgcolor="{SURFACE}" style="width:520px;max-width:520px;background:{SURFACE};border:1px solid {LINE};border-radius:8px">
-<tr><td {_PX} style="padding:24px 28px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="middle" style="font-family:{RECORD};font-size:22px;line-height:24px;font-weight:bold;color:{INK}"><img src="{_web()}/brand/prism-mark-64.png" width="22" height="22" alt="" style="display:inline-block;vertical-align:-3px;margin-right:8px;border:0">Prism</td><td align="right" valign="middle" style="font-family:{MONO};font-size:12px;line-height:16px;color:{INK_3}">{_E(_host())}</td></tr></table></td></tr>
+<tr><td {_PX} style="padding:24px 28px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="middle" style="font-family:{RECORD};font-size:21px;line-height:24px;letter-spacing:-0.01em;font-weight:bold;color:{INK}"><img src="{_web()}/brand/prism-mark-64.png" width="22" height="22" alt="" style="display:inline-block;vertical-align:-3px;margin-right:9px;border:0"><span style="font-weight:normal;color:{INK_3}">read</span>Prism<span style="font-weight:normal;color:{INK_3}">.news</span></td></tr></table></td></tr>
 <tr><td {_PX} style="padding:0 28px">{_rule(3, INK)}</td></tr>
 <tr><td {_PX} style="padding:20px 28px 0;font-family:{MONO};font-size:12px;line-height:18px;letter-spacing:.4px;color:{INK_3}">{_E(meta.upper())}</td></tr>
 <tr><td {_PX} style="padding:8px 28px 0"><h1 style="margin:0;font-family:{RECORD};font-size:28px;line-height:34px;font-weight:bold;color:{INK}">{_E(title)}</h1></td></tr>

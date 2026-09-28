@@ -24,11 +24,19 @@ const BARE_ROUTES = ["/signin", "/auth", "/onboarding"];
 // middle of a judgement. No reader top bar over them, no reader footer under them.
 export const OWN_CHROME = ["/admin", "/label"];
 
+const under = (pathname: string, routes: string[]) => routes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+/**
+ * Pages whose phone chrome is this bar (the landing, /about, /plus): lockup · one control,
+ * no theme toggle (Claude Design · screens/PhoneBar.html). The footer shows on a phone
+ * exactly here, because its Appearance row is where the theme control went.
+ */
+export const hasPhoneBar = (pathname: string) => !under(pathname, [...APP_ROUTES, ...BARE_ROUTES, ...OWN_CHROME]);
+
 export function SiteHeader() {
   const pathname = usePathname();
-  if (OWN_CHROME.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
-  const under = (routes: string[]) => routes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (under(BARE_ROUTES)) {
+  if (under(pathname, OWN_CHROME)) return null;
+  if (under(pathname, BARE_ROUTES)) {
     return (
       <header className="glass sticky top-0 z-40 h-[var(--masthead)] border-b lg:h-[var(--topbar)]" style={{ borderColor: "var(--line)" }}>
         <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-2 px-[var(--gutter)]">
@@ -39,14 +47,16 @@ export function SiteHeader() {
       </header>
     );
   }
-  const isApp = under(APP_ROUTES);
+  const isApp = under(pathname, APP_ROUTES);
   return (
     <header
-      className={`${isApp ? "hidden lg:block" : ""} glass sticky top-0 z-40 border-b`}
-      style={{ borderColor: "var(--line)", height: "var(--topbar)" }}
+      className={`${isApp ? "hidden lg:block" : ""} glass sticky top-0 z-40 h-[var(--masthead)] border-b sm:h-[var(--topbar)]`}
+      style={{ borderColor: "var(--line)" }}
     >
-      <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-5 px-[var(--gutter)]">
-        <Brand size={24} />
+      <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-3 px-[var(--gutter)] sm:gap-5">
+        {/* The phone bar (below 640) sets the lockup at 20, the tablet and desk bar at 24 (screens/PhoneBar.html). */}
+        <span className="sm:hidden"><Brand size={20} /></span>
+        <span className="hidden sm:block"><Brand size={24} /></span>
         <HeaderNav />
       </div>
     </header>

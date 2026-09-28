@@ -3,6 +3,32 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.112.0] - 2026-09-28
+
+### Changed — the wordmark is the address: readPrism.news
+prism.news is not ours (parked, for sale), and a reader who remembers only
+"Prism" types the bare name and lands on someone else's page. The lockup now
+spells what to type: the mark, then **readPrism.news** as one word, "read" and
+".news" quiet in the muted ink, "Prism" in full ink and weight so it is still
+the name you remember. Direction A of six on Claude Design's Wordmark board,
+the only one that held on every surface.
+
+- **Everywhere the brand appears**: the desktop bar, the phone masthead, admin,
+  the labeller bar, the footer, every share card and every email. Screen
+  readers say the address too ("read Prism dot news"); the name in running
+  text stays Prism.
+- **Phone datelines step down instead of clipping.** The wider lockup left the
+  masthead's date as "MON 28 SE…" on a 320px phone; now narrower phones get a
+  shorter form of the same line (Today drops the weekday, Stories its label,
+  Pulse the word "updated"), and a quiet feed's "quiet since" is never cut.
+- **Share cards and emails print the path, not the host**, since the lockup
+  already says where you are.
+- **A phone top bar that fits.** On the landing, How it works and Plus, a
+  phone's top bar is now the lockup and one button. The theme follows your
+  device, and Appearance (System · Light · Dark) moves to the footer, which
+  now shows on a phone on those pages. On the landing the bar's "Today's
+  record" appears once the big button in the hero has scrolled away.
+
 ## [0.0.111.0] - 2026-09-28
 
 ### Added — reported speech for Indian-language articles, labelled "reported"

@@ -8,7 +8,7 @@ import { OG_COLORS, OG_DISPLAY, OG_MONO, OG_SANS, bodyStack, displayStack, indic
 
 // Share cards v3 (Claude Design, outside/ShareCards.html): 1200 × 630, the
 // record's voices, a 3px rule under the masthead, the coverage bar in its slot
-// colours with its counts, the address the card opens. Never a photograph.
+// colours with its counts, the path the card opens. Never a photograph.
 
 /** The mark as PrismMark draws it, for Satori: a solid triangle on the spectrum bar. */
 export function PrismMarkSvg({ size, ink }: { size: number; ink: string }) {
@@ -90,15 +90,22 @@ function Pill({ label, dashed, check, small }: PillSpec & { small?: boolean }) {
   );
 }
 
-/** The frame every card shares: the ground, the mark and "Prism", the address, the 3px rule. */
-function Frame({ address, ink, children }: { address: string; ink?: boolean; children: ReactNode }) {
+/**
+ * The frame every card shares: the ground, the lockup (readPrism.news, Brand's
+ * tonal frame), the path, the 3px rule. The lockup already carries the host, so
+ * the mono line prints only the path (screens/Wordmark.html); the site card has none.
+ */
+function Frame({ path, ink, children }: { path?: string; ink?: boolean; children: ReactNode }) {
   const fg = ink ? c.onInk : c.ink;
+  const quiet = { fontWeight: 400, color: ink ? c.onInkMuted : c.inkFaint };
   return (
     <div style={{ width: W, height: H, display: "flex", flexDirection: "column", background: ink ? c.inkGround : c.ground, color: fg, padding: "56px 72px 60px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 22, borderBottom: `3px solid ${fg}` }}>
-        <PrismMarkSvg size={44} ink={fg} />
-        <span style={{ fontFamily: OG_DISPLAY, fontSize: 34, fontWeight: 600, letterSpacing: -0.34, lineHeight: 1 }}>Prism</span>
-        <span style={{ marginLeft: "auto", fontFamily: OG_MONO, fontSize: 20, letterSpacing: 0.4, opacity: 0.72 }}>{fit(address, 72)}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 15, paddingBottom: 22, borderBottom: `3px solid ${fg}` }}>
+        <PrismMarkSvg size={36} ink={fg} />
+        <div style={{ display: "flex", fontFamily: OG_DISPLAY, fontSize: 34, fontWeight: 600, letterSpacing: -0.34, lineHeight: 1 }}>
+          <span style={quiet}>read</span><span>Prism</span><span style={quiet}>.news</span>
+        </div>
+        {path && <span style={{ marginLeft: "auto", fontFamily: OG_MONO, fontSize: 20, letterSpacing: 0.4, opacity: 0.72 }}>{fit(path, 56)}</span>}
       </div>
       {children}
     </div>
@@ -181,8 +188,8 @@ function RouteLine({ dates }: { dates: string[] }) {
  * A record or a trending group: the status pill and the mono meta line, the
  * headline in the record voice, a verified arc's route, the counted bar.
  */
-export function StoryCard({ address, pill, meta, headline, tally: t, count, single, route }: {
-  address: string;
+export function StoryCard({ path, pill, meta, headline, tally: t, count, single, route }: {
+  path: string;
   pill?: PillSpec | null;
   meta: string[];
   headline: string;
@@ -195,7 +202,7 @@ export function StoryCard({ address, pill, meta, headline, tally: t, count, sing
   const title = fit(headline, hasRoute ? 90 : 120);
   const size = hasRoute ? (title.length > 60 ? 52 : 62) : title.length > 95 ? 54 : title.length > 75 ? 60 : 66;
   return (
-    <Frame address={address}>
+    <Frame path={path}>
       <MetaLine pill={pill} parts={meta} />
       <div style={{ display: "flex", marginTop: hasRoute ? 20 : 22, fontFamily: displayStack(title), fontSize: size, fontWeight: 600, lineHeight: 1.06, letterSpacing: -0.022 * size }}>
         {title}
@@ -210,8 +217,8 @@ export function StoryCard({ address, pill, meta, headline, tally: t, count, sing
  * The quote card: the words as the article printed them under a 6px ink rule,
  * who said it, where and when it was printed, and what the check proved.
  */
-export function QuoteCard({ address, quote, speaker, role, meta, translated, reported = false, storyTitle }: {
-  address: string;
+export function QuoteCard({ path, quote, speaker, role, meta, translated, reported = false, storyTitle }: {
+  path: string;
   quote: string;
   speaker: string;
   role?: string | null;
@@ -225,7 +232,7 @@ export function QuoteCard({ address, quote, speaker, role, meta, translated, rep
   const size = q.length > 180 ? 40 : q.length > 120 ? 46 : indicBodyFamilyFor(q) ? 50 : 54;
   const provenance = meta.filter(Boolean).join(" · ").toUpperCase();
   return (
-    <Frame address={address}>
+    <Frame path={path}>
       <div style={{ display: "flex", flexDirection: "column", marginTop: "auto", borderLeft: `6px ${reported ? "dashed" : "solid"} ${c.ink}`, paddingLeft: 34 }}>
         <div style={{ display: "flex", fontFamily: displayStack(q), fontStyle: reported ? "normal" : "italic", fontSize: size, lineHeight: 1.26 }}>{reported ? q : `“${q}”`}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 24, fontFamily: bodyStack(speaker + (role ?? "")) }}>
@@ -259,15 +266,15 @@ export const SITE_LINE = "One record per story, from monitored outlets across In
 
 /** Every word a card draws that its route does not pass in, for the font subset (ogFonts). */
 export const CARD_TEXT = [
-  "Prism", ...Object.values(SLOT), "Verified record", "Verified", "Provisional grouping", "Grouping under review",
+  "readPrism.news", ...Object.values(SLOT), "Verified record", "Verified", "Provisional grouping", "Grouping under review",
   "One source so far", "translation", quoteCheckLine(true), quoteCheckLine(false), "…",
 ].join(" ");
 
 /** The site card, on the ink ground: the promise, one sentence, the slot colours. */
-export function SiteCard({ headline, line, host }: { headline: string; line: string; host: string }) {
+export function SiteCard({ headline, line }: { headline: string; line: string }) {
   const slots: [Origin, number, number][] = [["national", 5, 1], ["intl", 1.2, 1], ["regional", 4, 1], ["wire", 0.6, 0.6]];
   return (
-    <Frame address={host} ink>
+    <Frame ink>
       <div style={{ display: "flex", marginTop: "auto", maxWidth: 760, fontFamily: OG_DISPLAY, fontSize: 92, fontWeight: 600, lineHeight: 1.06, letterSpacing: -2 }}>{headline}</div>
       <div style={{ display: "flex", marginTop: 22, maxWidth: 860, fontFamily: OG_SANS, fontSize: 28, lineHeight: 1.4, color: c.onInkMuted }}>{line}</div>
       <div style={{ display: "flex", gap: 6, height: 22, marginTop: 34 }}>

@@ -126,9 +126,11 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
   const dateline = useMemo(() => {
     const d = new Date();
     const day = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
-    if (!items) return day;
-    const quiet = staleSince(items);
-    return quiet ? `${day} · quiet since ${shortDate(quiet)} ${istTime(quiet)}` : day;
+    const quiet = items ? staleSince(items) : null;
+    // Narrower phones drop the weekday, and when quiet the time, never the "quiet".
+    if (!quiet) return { l: day, s: shortDate(d.toISOString()) };
+    const since = `quiet since ${shortDate(quiet)}`;
+    return { l: `${day} · ${since} ${istTime(quiet)}`, m: since };
   }, [items]);
 
   // The counts under the head and at the end of the list. The list is ordered by
@@ -187,7 +189,7 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
 
   return (
     <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
-      <Masthead dateline={dateline} />
+      <Masthead dateline={dateline.l} datelineM={dateline.m} datelineS={dateline.s} />
       <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)]">
         <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
 

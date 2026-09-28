@@ -109,7 +109,7 @@ export function StoriesPage({ initial = null }: { initial?: TrendingStory[] | nu
 
   return (
     <div className="mx-auto max-w-[760px] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-16">
-      <Masthead dateline={clock ? `Stories · ${clock} IST` : "Stories"} />
+      <Masthead dateline={clock ? `Stories · ${clock} IST` : "Stories"} datelineM={clock ? `${clock} IST` : null} />
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 pt-4 lg:gap-5 lg:pt-8">
         <div className="grid gap-2">
           <h1 id="stories-title" className="[font:var(--t-display-m)] lg:[font:var(--t-display-l)]" style={{ letterSpacing: "var(--track-display)", textWrap: "balance" }}>

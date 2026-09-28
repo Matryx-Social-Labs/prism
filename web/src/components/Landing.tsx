@@ -152,7 +152,7 @@ function Hero({ evidence, leadRow }: { evidence: Evidence | null; leadRow: FeedI
           Prism assembles each story once from the outlets it monitors and keeps the evidence attached: every report, the exact words said, which outlets covered it and how many have not yet.
         </p>
         <div className="mt-[22px] flex flex-col gap-2.5 lg:flex-row">
-          <Link href="/feed" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">{CTA}</Link>
+          <Link id="hero-cta" href="/feed" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">{CTA}</Link>
           <a href={evidence?.proof ? "#how" : "/about"} className="p-btn p-btn--secondary p-btn--lg w-full lg:w-auto">How it works</a>
         </div>
         {figures.length > 0 && (

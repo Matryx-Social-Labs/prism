@@ -64,6 +64,8 @@ def test_the_shell_speaks_design_system_v2_and_none_of_the_retired_worlds():
     assert "gradient" not in low
     assert "georgia" in low and "anek latin" in low and "geist mono" in low
     assert "/brand/prism-mark-64.png" in html, "the masthead carries the mark"
+    # The lockup is the address: prism.news is someone else's (screens/Wordmark.html).
+    assert '<span style="font-weight:normal;color:#5B6069">read</span>Prism<span style="font-weight:normal;color:#5B6069">.news</span>' in html
     assert "color-scheme\" content=\"light only" in html
     assert "Follow the story, not the headlines." in html
 
