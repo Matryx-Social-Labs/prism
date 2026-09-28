@@ -161,6 +161,8 @@ ledger in `.claude/plans/trust-india-indic.plan.md`
 ## Brand Commitments
 
 - **Name and mark: Prism, and the existing logo — unchanged** (founder, 2026-09-15).
+  The wordmark is the address, readPrism.news (2026-09-28): the name stays Prism; the lockup
+  spells readprism.news because prism.news is not ours.
   The mark is a bracketed record holding three rules: one record, three readings.
 - **The lens flip is the memorable thing.** Every design decision serves it. It is a
   re-typeset — a scan line and re-ink, ~500ms, collapsing to an instant swap under

@@ -5,7 +5,6 @@ import { CARD_TEXT, SITE_HEADLINE, SITE_LINE, SiteCard, StoryCard, tally } from 
 import { ogFonts } from "@/lib/ogFonts";
 import { spanDays } from "@/lib/spine";
 import { sectorGroup } from "@/lib/sectors";
-import { SITE_URL } from "@/lib/site";
 
 // A trending group's card (share cards v3): its status, subject and span, its
 // headline, and — for a VERIFIED arc only — the route of its developments; a
@@ -16,12 +15,11 @@ export const contentType = "image/png";
 
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const host = SITE_URL.replace(/^https?:\/\//, "");
   const s = await fetchTrendingStory(slug).catch(() => null);
   if (!s) {
     // A generic card served as a 200 would be cached by the scraper for days.
-    const fonts = await ogFonts(SITE_HEADLINE, SITE_LINE, host, CARD_TEXT);
-    return new ImageResponse(<SiteCard headline={SITE_HEADLINE} line={SITE_LINE} host={host} />, { ...size, fonts: fonts.length ? fonts : undefined, headers: { "cache-control": "no-store" } });
+    const fonts = await ogFonts(SITE_HEADLINE, SITE_LINE, CARD_TEXT);
+    return new ImageResponse(<SiteCard headline={SITE_HEADLINE} line={SITE_LINE} />, { ...size, fonts: fonts.length ? fonts : undefined, headers: { "cache-control": "no-store" } });
   }
   const verified = s.boundary_status === "verified";
   const t = tally((s.outlets ?? []).map((o) => o.outlet));
@@ -32,11 +30,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const meta = [sectorGroup(s.sector)?.name ?? "", days ? `${days} ${days === 1 ? "day" : "days"}` : ""];
   const unit = verified ? (devs === 1 ? "development" : "developments") : devs === 1 ? "record" : "records";
   const count = `${devs} ${unit} · ${t.outlets} ${t.outlets === 1 ? "outlet" : "outlets"}`;
-  const address = `${host}/trending/${slug}`;
-  const fonts = await ogFonts(s.label, ...meta, count, address, CARD_TEXT, route ? "JANFEBMARAPRMAYJUNJULAUGSEPTOCTNOVDEC" : "");
+  const path = `/trending/${slug}`;
+  const fonts = await ogFonts(s.label, ...meta, count, path, CARD_TEXT, route ? "JANFEBMARAPRMAYJUNJULAUGSEPTOCTNOVDEC" : "");
   return new ImageResponse(
     <StoryCard
-      address={address}
+      path={path}
       pill={verified ? { label: "Verified", check: true } : { label: "Grouping under review", dashed: true }}
       meta={meta}
       headline={s.label}

@@ -83,6 +83,19 @@ attached to the base, exactly its width, 2.75 tall, stops #EF4444 · #F59E0B · 
 lives once in `web/src/lib/mark.ts`. The triangle takes `currentColor`; the band is the only gradient in
 the product — no background gradients, gradient text or gradient rules anywhere, the header included.
 
+## The wordmark
+
+The lockup is the address: the mark, then **readPrism.news** as one word in Newsreader — "read" and
+".news" at 400 in `--ink-3`, "Prism" at 600 in `--ink`; one size (0.95 × the mark), −0.01em, no spaces,
+0.42 × the mark to the mark. prism.news is not ours (parked, for sale), and a prefix the lockup hides is a
+prefix readers drop when they type (getdropbox.com), so the lockup spells what to type while the weight
+makes Prism what they remember. The link's name is its visible text — no aria-label. Mark sizes: desktop
+bar 24, phone masthead, admin and labeller 20, sign-in bar and email 22, share card 36, footer 18; below 16 the mark
+alone. Never cobalt, never a second line, never a space or capital R. In running text the name stays
+**Prism**; the address is written `readprism.news`, lowercase. Where the lockup already carries the host
+(share cards, email masthead) the mono line beside it prints the path only. Source: Claude Design ·
+screens/Wordmark.html.
+
 ## Colour
 
 Neutral warm paper and carbon ink; colour appears only where the prism "splits light":
@@ -186,6 +199,7 @@ Historical entries were written under whichever name and world was current; the 
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-28 | The wordmark becomes the address, readPrism.news (tonal frame: read and .news regular ink-3, Prism semibold ink); phone masthead mark 22 → 20 and its dateline steps down by the masthead's content width (≥420 full · 340–419 · <340) instead of clipping; share cards and the email masthead drop the host the lockup now spells | prism.news is parked and for sale ($6.5k) and readers who remember only "Prism" type the bare name; Claude Design's Wordmark board judged six directions on nine surfaces and this was the only one that passed all four tests (typeable at a glance, Prism remembered, holds at 20px and 320, inside the rules) |
 | 2026-09-28 | Reported speech on the record, Indian-language articles only: words an article attributes with a speech verb ("X ने कहा कि…", "…ಎಂದು X ಹೇಳಿದರು") and no quotation marks are printed upright in the reading voice on a dashed rule, never inside quotation marks or in the record's italic; "reported" in the provenance line; counted apart ("2 quotes · 1 reported"); the quote page and share card say "the article's report of what was said, not a quote"; showcases stay quotes | Founder decision (option c, 28 Sep): direct-only dropped 55% of Indian-language claims against 16% of English. "Verbatim or nothing" stands for quotes; a report is shown as what it is, in line form and words, never styled as a quote |
 | 2026-09-27 | Market Pulse is a ticker board, not an essay: a counted line (companies named · market stories · outlets · last 24 hours), "Companies in today's reporting" as record rows (the ticker chip and exchange in mono, the company in the reading voice, the Prism headline linking to the story, the catalyst in words, "Prism's reading" as a word and its confidence in words (low below 0.5, moderate below 0.75, high; the model's number is never printed, here or in the story's Markets facts) — never a price — "Why notice", outlets and time, a dashed rule for one source, Follow on each), "Market-wide" rows beside them on a desk, and the model's three lines, when it wrote any, last as "The read". The essay card and the "Your tickers" rail are gone | Founder decision 1 (audit 2026-09-27): the essay named one ticker from 12 unwindowed stories; a markets reader needs the companies and what happened, counted and sourced, with the read subordinate to the rows |
 | 2026-09-25 | Wave 2 from the Claude Design flow boards (Reading, Accounts, Money, Legal, Labeller, Admin, emails, share cards, icons): every remaining route built state by state; lens-mark shapes (circle · square · diamond · triangle) and Today's "Has a professional read" filter ADOPTED (the design adopted both on 25 Sep); Gurmukhi, Malayalam and Odia faces added; chips keep 36px but get a 44px tap area; the record's own 404 and error pages (SystemPage) replace Next's; the favicon is the design's adaptive SVG; Stories rows follow the v3 board — developing-story rows with a one-ink bar and no photo pile (reverses 2026-09-21). Still not built: the onboarding languages step and the offline page (PROPOSED in the design), and anything a board draws that the product has no data for | Founder asked for every unplaced design component used and the whole product designed; the design's own adoption log decided the two PROPOSED items that 2026-09-24 had left out |

@@ -112,6 +112,7 @@ export async function ogFonts(...text: string[]): Promise<OgFont[]> {
   const script = scriptOf(all);
   const wanted: [string, 400 | 600, boolean][] = [
     ["Newsreader", 600, false],
+    ["Newsreader", 400, false], // the lockup's quiet "read" and ".news"
     ["Newsreader", 400, true],
     ["Anek Latin", 400, false],
     ["Anek Latin", 600, false],

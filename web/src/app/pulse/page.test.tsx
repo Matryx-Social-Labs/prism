@@ -105,6 +105,21 @@ describe("Market Pulse — the ticker board", () => {
     expect(await screen.findByText("Market Pulse could not load")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /today’s record/ })).toHaveAttribute("href", "/feed");
   });
+
+  // The phone dateline ladder (Masthead): narrower mastheads drop "updated", then the
+  // time, never the day (a stalled board must not read as today's); with no board it names the page.
+  it("steps the masthead down to the board's day, and names the page when there is no board", async () => {
+    const rungs = (c: HTMLElement) => ["l", "m", "s"].map((k) => c.querySelector(`.p-dateline__${k}`)!.textContent);
+    const { container, unmount } = render(<PulsePage />);
+    await screen.findByText("State Bank of India");
+    expect(rungs(container)).toEqual(["27 Sept · updated 23:17 IST", "27 Sept · 23:17 IST", "27 Sept"]);
+    unmount();
+
+    fetchDigest.mockResolvedValue(null);
+    const empty = render(<PulsePage />);
+    await screen.findByText("Market Pulse could not load");
+    expect(rungs(empty.container)).toEqual(["Market Pulse", "Market Pulse", "Pulse"]);
+  });
 });
 
 describe("Following a company from the board", () => {

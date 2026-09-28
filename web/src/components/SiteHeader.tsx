@@ -45,8 +45,10 @@ export function SiteHeader() {
       className={`${isApp ? "hidden lg:block" : ""} glass sticky top-0 z-40 border-b`}
       style={{ borderColor: "var(--line)", height: "var(--topbar)" }}
     >
-      <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-5 px-[var(--gutter)]">
-        <Brand size={24} />
+      <div className="mx-auto flex h-full max-w-[var(--shell)] items-center gap-3 px-[var(--gutter)] lg:gap-5">
+        {/* The spec's phone size below lg, the desk bar's from it (screens/Wordmark.html). */}
+        <span className="lg:hidden"><Brand size={20} /></span>
+        <span className="hidden lg:block"><Brand size={24} /></span>
         <HeaderNav />
       </div>
     </header>

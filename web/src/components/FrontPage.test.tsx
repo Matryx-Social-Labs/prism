@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FrontPage } from "@/components/FrontPage";
 import type { FeedItem } from "@/lib/api";
+import { shortDate } from "@/lib/dateline";
 
 const fetchFeed = vi.hoisted(() => vi.fn());
 const fetchTrending = vi.hoisted(() => vi.fn());
@@ -216,7 +217,21 @@ describe("the masthead says when the record went quiet", () => {
     const old = new Date(Date.now() - 20 * 3_600_000).toISOString();
     fetchFeed.mockResolvedValue([item({ latest_published_at: old, last_updated_at: old })]);
     render(<FrontPage />);
-    expect(await screen.findByText(/quiet since/i)).toBeInTheDocument();
+    // Every rung of the phone dateline ladder keeps it: narrower phones drop the day and the time, never the "quiet".
+    expect(await screen.findAllByText(/quiet since/i)).toHaveLength(3);
+  });
+
+  // The common case: nothing quiet to say, so the middle rung keeps the day and
+  // the narrowest phone gets the date alone, on the newsroom (IST) calendar.
+  it("prints the day, and the short date on the narrowest phone, while the record is live", async () => {
+    const fresh = new Date(Date.now() - 3_600_000).toISOString();
+    fetchFeed.mockResolvedValue([item({ latest_published_at: fresh, last_updated_at: fresh })]);
+    const { container } = render(<FrontPage />);
+    await screen.findByRole("list");
+    const [l, m, s] = ["l", "m", "s"].map((k) => container.querySelector(`.p-dateline__${k}`)!.textContent);
+    expect(m).toBe(l);
+    expect(s).toBe(shortDate(new Date().toISOString()));
+    expect(container).not.toHaveTextContent(/quiet since/i);
   });
 });
 

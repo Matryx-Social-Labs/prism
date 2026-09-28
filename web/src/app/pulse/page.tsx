@@ -36,11 +36,13 @@ export default function PulsePage() {
 
   const follows = useFollows(session);
   const day = board?.generated_at ? shortDate(board.generated_at) : null;
-  const dateline = [day, board?.generated_at ? `updated ${istTime(board.generated_at)} IST` : null].filter(Boolean).join(" · ") || "Market Pulse";
+  const time = board?.generated_at ? `${istTime(board.generated_at)} IST` : null;
+  const dateline = [day, time && `updated ${time}`].filter(Boolean).join(" · ") || "Market Pulse";
 
   return (
     <div className="mx-auto max-w-[1080px] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-16">
-      <Masthead dateline={dateline} />
+      {/* Narrower phones drop "updated", then the time, never the day: a stalled board must not read as today's. */}
+      <Masthead dateline={dateline} datelineM={day && `${day} · ${time}`} datelineS={day ?? "Pulse"} />
       <header className="grid gap-1.5 pt-4 lg:pt-8">
         <h1 className="[font:var(--t-display-m)] lg:[font:var(--t-display-l)]" style={{ letterSpacing: "var(--track-display)" }}>Market Pulse</h1>
         {board && <p className="p-count" style={{ whiteSpace: "normal" }}>{counted(board)}</p>}

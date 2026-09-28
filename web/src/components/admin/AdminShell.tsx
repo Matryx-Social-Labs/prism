@@ -196,7 +196,7 @@ export function AdminFrame({ session, email, path, children }: Admin & { path: s
         {/* The rule runs the page's full height; the sidebar sticks inside it. */}
         <div className="border-b lg:border-b-0 lg:border-r" style={{ borderColor: "var(--line)" }}>
           <div className="lg:sticky lg:top-0 lg:grid lg:max-h-dvh lg:content-start lg:gap-4 lg:overflow-y-auto lg:px-3 lg:py-[18px]">
-            <div className="flex h-[52px] min-w-0 items-center gap-2 px-[var(--gutter)] lg:h-auto lg:px-2">
+            <div className="flex h-[52px] min-w-0 items-center gap-2 px-[var(--gutter)] lg:h-auto lg:flex-wrap lg:px-2">
               <Brand size={20} />
               <span className="p-badge p-badge--outline">Admin</span>
               <span className="min-w-0 flex-1 truncate text-right font-mono text-[11px] lg:hidden" style={{ color: "var(--ink-3)" }}>

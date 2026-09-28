@@ -4,7 +4,6 @@ import { type EventDetail, fetchEvent, fetchTrendingStory } from "@/lib/api";
 import { CARD_TEXT, type PillSpec, SITE_HEADLINE, SITE_LINE, SiteCard, StoryCard, stamp, tally } from "@/lib/ogCard";
 import { ogFonts } from "@/lib/ogFonts";
 import { sectorGroup } from "@/lib/sectors";
-import { SITE_URL } from "@/lib/site";
 
 // Social card for a shared /story/<id> link (share cards v3): the record's
 // status as its page prints it, the mono meta line, the headline at poster
@@ -23,14 +22,13 @@ async function statusOf(e: EventDetail, single: boolean): Promise<PillSpec | nul
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const host = SITE_URL.replace(/^https?:\/\//, "");
   let e: EventDetail;
   try {
     e = await fetchEvent(id);
   } catch {
     // A generic card served as a 200 would be cached by the scraper for days.
-    const fonts = await ogFonts(SITE_HEADLINE, SITE_LINE, host, CARD_TEXT);
-    return new ImageResponse(<SiteCard headline={SITE_HEADLINE} line={SITE_LINE} host={host} />, { ...size, fonts: fonts.length ? fonts : undefined, headers: { "cache-control": "no-store" } });
+    const fonts = await ogFonts(SITE_HEADLINE, SITE_LINE, CARD_TEXT);
+    return new ImageResponse(<SiteCard headline={SITE_HEADLINE} line={SITE_LINE} />, { ...size, fonts: fonts.length ? fonts : undefined, headers: { "cache-control": "no-store" } });
   }
   const t = tally(e.sources.map((s) => ({ publisher: s.publisher ?? s.source_name, origin: s.origin, language: s.language })));
   const single = e.sources.length === 1;
@@ -41,10 +39,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const count = single
     ? "1 outlet · the record grows as others report"
     : `${t.outlets} ${t.outlets === 1 ? "outlet" : "outlets"}${t.languages.length > 1 ? ` · ${t.languages.length} languages` : ""}`;
-  const address = `${host}/story/${id}`;
-  const fonts = await ogFonts(e.title, ...meta, count, address, CARD_TEXT);
+  const path = `/story/${id}`;
+  const fonts = await ogFonts(e.title, ...meta, count, path, CARD_TEXT);
   return new ImageResponse(
-    <StoryCard address={address} pill={pill} meta={meta} headline={e.title} tally={t} count={count} single={single} />,
+    <StoryCard path={path} pill={pill} meta={meta} headline={e.title} tally={t} count={count} single={single} />,
     { ...size, fonts: fonts.length ? fonts : undefined },
   );
 }

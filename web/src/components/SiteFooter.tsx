@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Brand } from "@/components/Brand";
 import { OWN_CHROME } from "@/components/SiteHeader";
 
 const LINKS: [string, string][] = [
@@ -25,7 +26,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-auto hidden border-t lg:block" style={{ borderColor: "var(--line)", background: "var(--sunken)" }}>
       <div className="mx-auto flex max-w-[var(--shell)] flex-wrap items-center gap-x-6 gap-y-2.5 px-[var(--gutter)] py-5 text-[13.5px] leading-[1.4]" style={{ color: "var(--ink-2)" }}>
-        <span className="flex-[1_1_320px]">Prism · Prism Media Intelligence LLP · built with Matrix Social Labs</span>
+        <span className="flex flex-[1_1_320px] flex-wrap items-center gap-3"><Brand size={18} /><span>Prism Media Intelligence LLP · built with Matrix Social Labs</span></span>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
           {LINKS.map(([href, label]) => (
             <Link key={href} href={href} className="inline-flex min-h-8 items-center hover:underline" style={{ color: "var(--ink-2)" }}>{label}</Link>
