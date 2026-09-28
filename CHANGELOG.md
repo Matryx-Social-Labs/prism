@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.113.0] - 2026-09-28
+
+### Changed — the record's phone bar carries the brand
+A screenshot of a story on a phone now shows readPrism.news: the bar across the
+top of the record, a story arc, a quote, a topic or person page, Sources, the
+legal pages and Corrections is a back arrow on the left and the lockup centred.
+The arrow still takes you back where you came from, and tells a screen reader
+where that is ("Back to today").
+
 ## [0.0.112.0] - 2026-09-28
 
 ### Changed — the wordmark is the address: readPrism.news

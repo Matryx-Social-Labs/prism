@@ -23,6 +23,7 @@ import { monitoredText } from "@/lib/coverage";
 import { confidenceWords } from "@/lib/reading";
 import { EntityText } from "@/components/EntityText";
 import { ShareButton } from "@/components/ShareButton";
+import { CentredBrand } from "@/components/ui";
 import { StatusPill } from "@/components/StatusPill";
 import { ReportProblem } from "@/components/ReportProblem";
 import { RecordHistory } from "@/components/RecordHistory";
@@ -430,9 +431,10 @@ export function StoryView({ event }: { event: EventDetail }) {
   return (
     <AskContext.Provider value={openAsk}>
       <ReadProgress />
-      {/* Phone back bar: the way back. The thumb bar carries Ask and Share;
-          the tab bar is hidden on the record. Full-bleed by being OUTSIDE the
-          padded shell, never by negative margins (a sideways scroll, 2026-09-21). */}
+      {/* Phone back bar: the way back as an arrow, the lockup centred (marketing
+          screenshots the record; founder pick B, 2026-09-28). The thumb bar carries
+          Ask and Share; the tab bar is hidden on the record. Full-bleed by being
+          OUTSIDE the padded shell, never by negative margins (a sideways scroll, 2026-09-21). */}
       <div
         className="sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 border-b px-2 lg:hidden"
         style={{ borderColor: "var(--line)", background: "color-mix(in srgb, var(--paper) 92%, transparent)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
@@ -440,7 +442,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         <Link
           href="/feed"
           scroll={false}
-          className="inline-flex min-h-[44px] items-center gap-1.5 px-2 text-[15px] font-semibold"
+          className="inline-flex h-11 w-11 items-center justify-center"
           style={{ color: "var(--ink)" }}
           aria-label="Back to today"
           onClick={(e) => {
@@ -452,8 +454,9 @@ export function StoryView({ event }: { event: EventDetail }) {
             }
           }}
         >
-          <ArrowLeft size={18} /> Today
+          <ArrowLeft size={18} />
         </Link>
+        <CentredBrand />
       </div>
       <SectionTabs items={navItems} />
 

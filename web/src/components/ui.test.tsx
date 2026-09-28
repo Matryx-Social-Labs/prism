@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { StepIndicator, SystemPage, TextField } from "@/components/ui";
+import { BackBar, StepIndicator, SystemPage, TextField } from "@/components/ui";
 
 describe("SystemPage", () => {
   it("404 names what is missing and offers only today's record", () => {
@@ -37,5 +37,25 @@ describe("StepIndicator", () => {
     expect(pick).toHaveBeenCalledWith(0);
     expect(screen.getByRole("button", { name: /What you follow/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /What you do/ })).toHaveAttribute("aria-current", "step");
+  });
+});
+
+// The phone's back bars (founder pick B, 2026-09-28): an arrow that tells a screen reader
+// where it goes, and the readPrism.news lockup centred, so a screenshot of any page under a
+// back bar carries the brand.
+describe("BackBar", () => {
+  it("is an arrow back, named for where it goes, with the lockup centred", () => {
+    render(<BackBar label="Today" href="/feed" />);
+    const back = screen.getByRole("link", { name: "Back to Today" });
+    expect(back).toHaveAttribute("href", "/feed");
+    expect(back).not.toHaveTextContent("Today");
+    expect(screen.getByRole("link", { name: "readPrism.news" })).toHaveAttribute("href", "/");
+  });
+
+  it("keeps the lockup when the page puts its own control on the right", () => {
+    render(<BackBar label="Story" onBack={() => {}} right={<button type="button">Share</button>} />);
+    expect(screen.getByRole("button", { name: "Back to Story" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "readPrism.news" })).toBeInTheDocument();
   });
 });
