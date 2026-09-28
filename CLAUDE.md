@@ -8,6 +8,7 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 
 Core rules worth restating (the system is Design System v2, 2026-09-24, from the Claude Design project
 "Prism Design System"; PRODUCT.md holds the product truth and the founder decisions D1–D6):
+- The wordmark is the address: the mark + **readPrism.news** ("read" and ".news" quiet, Prism heavy; `Brand`, share cards, email). prism.news is not ours, so never render "Prism" alone or "Prism.news" as the lockup; in running text the name stays Prism (DESIGN.md · The wordmark).
 - Product promise is "Follow the story, not the headlines." Never enumerate lens names in generic/marketing copy — the lens set grows (pickers render whatever /api/v1/lenses returns).
 - Chrome is neutral warm paper and carbon ink with ONE interactive accent (cobalt). Other colour appears only where the prism splits light: the coverage bar (navy · blue-green · orange · hatched grey, fixed slot order, always with its count) and a lens (one discrete hue and one shape each — Markets circle, Cyber square, Health diamond, Policy triangle; Reader has none). The mark's band is the only gradient.
 - Three type voices: Newsreader + per-script Noto Serif (the record: headlines, titles, quotes, hero figures), Anek (everything read or tapped, eyebrows included), Geist Mono (provenance only: counts, times, codes, [n], tickers, CVE ids — never prose, a heading or a label). 11px floor for mono; 4.5:1 on both grounds.
