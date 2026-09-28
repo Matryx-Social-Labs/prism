@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useId } from "react";
+import { Brand } from "@/components/Brand";
 import { ArrowLeft, Check } from "@/components/icons";
 
 /**
@@ -197,23 +198,26 @@ export function StepIndicator({ steps, current, onPick }: { steps: readonly stri
   );
 }
 
-/** The phone's way back: a sticky 52px bar with the place it returns to, and room for one action. */
+/**
+ * The phone's way back: a sticky 52px bar, an arrow named for the place it returns to, the
+ * readPrism.news lockup centred (so a screenshot of any page under it carries the brand;
+ * founder pick B, 2026-09-28), and room for one action on the right.
+ */
 export function BackBar({ label, href, onBack, right }: { label: string; href?: string; onBack?: () => void; right?: React.ReactNode }) {
-  const inner = (
-    <>
-      <ArrowLeft size={18} />
-      {label}
-    </>
-  );
-  const cls = "inline-flex min-h-11 items-center gap-1.5 px-2";
-  const style = { font: "600 15px/1 var(--font-read)", color: "var(--ink)" } as const;
+  const back = { className: "inline-flex h-11 w-11 items-center justify-center", style: { color: "var(--ink)" }, "aria-label": `Back to ${label}` };
   return (
     <header className="glass sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 border-b px-2" style={{ borderColor: "var(--line)" }}>
-      {href ? <Link href={href} className={cls} style={style}>{inner}</Link> : <button type="button" onClick={onBack} className={cls} style={style}>{inner}</button>}
+      {href ? <Link href={href} {...back}><ArrowLeft size={18} /></Link> : <button type="button" onClick={onBack} {...back}><ArrowLeft size={18} /></button>}
+      <CentredBrand />
       <span className="flex-1" />
       {right}
     </header>
   );
+}
+
+/** The lockup at the phone size (20), centred on its bar whatever sits either side. */
+export function CentredBrand() {
+  return <span className="absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center"><Brand size={20} /></span>;
 }
 
 /** A long page's sections, numbered, with the one in view marked by an ink edge. */

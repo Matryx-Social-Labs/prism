@@ -106,6 +106,11 @@ On the landing the bar's button waits until the hero's own button has scrolled o
 (120ms): never two primaries while the hero's button is on screen. At 320 it leaves 3px. 640 and up keeps the bar as it was.
 Source: Claude Design · screens/PhoneBar.html (direction D).
 
+**Back bars** (a phone's bar on the record, a story arc, a quote, a topic or person page, Sources, legal,
+Corrections) are the way back as an arrow alone, a 44 target named "Back to …" for where it goes, and
+the lockup at 20 centred on the bar. The record is what gets screenshotted, so every one of these
+carries readPrism.news; a page's own action, if it has one, sits on the right.
+
 ## Colour
 
 Neutral warm paper and carbon ink; colour appears only where the prism "splits light":
@@ -209,6 +214,7 @@ Historical entries were written under whichever name and world was current; the 
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-28 | Back bars carry the lockup centred, and the way back becomes an arrow alone (named "Back to …") | Marketing screenshots the record on a phone, and its bar showed only "← Today"; founder picked the centred lockup (B) over a labelled back link with the lockup on the right (A) |
 | 2026-09-28 | The phone top bar on the landing, /about and /plus is lockup · one control: the theme toggle leaves it for a footer Appearance row (the footer now shows on a phone there), and the landing's bar button waits for the hero's button to scroll out | The readPrism.news lockup left no room for lockup, toggle and "Today's record" at 320–360; founder sent it back to Claude Design (PhoneBar board, five directions measured at five widths) rather than shorten the label; consumer sites follow the system theme and keep the control out of the bar |
 | 2026-09-28 | The wordmark becomes the address, readPrism.news (tonal frame: read and .news regular ink-3, Prism semibold ink); phone masthead mark 22 → 20 and its dateline steps down by the masthead's content width (≥420 full · 340–419 · <340) instead of clipping; share cards and the email masthead drop the host the lockup now spells | prism.news is parked and for sale ($6.5k) and readers who remember only "Prism" type the bare name; Claude Design's Wordmark board judged six directions on nine surfaces and this was the only one that passed all four tests (typeable at a glance, Prism remembered, holds at 20px and 320, inside the rules) |
 | 2026-09-28 | Reported speech on the record, Indian-language articles only: words an article attributes with a speech verb ("X ने कहा कि…", "…ಎಂದು X ಹೇಳಿದರು") and no quotation marks are printed upright in the reading voice on a dashed rule, never inside quotation marks or in the record's italic; "reported" in the provenance line; counted apart ("2 quotes · 1 reported"); the quote page and share card say "the article's report of what was said, not a quote"; showcases stay quotes | Founder decision (option c, 28 Sep): direct-only dropped 55% of Indian-language claims against 16% of English. "Verbatim or nothing" stands for quotes; a report is shown as what it is, in line form and words, never styled as a quote |

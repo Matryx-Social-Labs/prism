@@ -240,3 +240,15 @@ describe("story timeline ownership", () => {
     expect(within(nav).queryByRole("link", { name: /The story so far/ })).not.toBeInTheDocument();
   });
 });
+
+// Marketing screenshots the record on a phone, so its bar carries the lockup (founder pick B,
+// 2026-09-28): the way back is an arrow named for Today, and readPrism.news sits centred.
+describe("the record's phone bar", () => {
+  it("is an arrow back to Today and the lockup", () => {
+    render(<StoryView event={event()} />);
+    const back = screen.getByRole("link", { name: "Back to today" });
+    expect(back).toHaveAttribute("href", "/feed");
+    expect(back).not.toHaveTextContent("Today");
+    expect(back.parentElement).toContainElement(screen.getAllByRole("link", { name: "readPrism.news" })[0]);
+  });
+});
