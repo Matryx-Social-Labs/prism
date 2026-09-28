@@ -12,7 +12,7 @@ function systemPrefersDark(): boolean {
 export function ThemeToggle() {
   const [mode, setMode] = useState<Mode>(null);
 
-  // Re-read when the theme setting on You changes it (it fires "prism-theme").
+  // Re-read when a theme setting (You, the footer's Appearance row) changes it: they fire "prism-theme".
   useEffect(() => {
     const read = () => setMode((localStorage.getItem("prism.theme") as Mode) ?? null);
     read();
@@ -26,6 +26,7 @@ export function ThemeToggle() {
     setMode(next);
     localStorage.setItem("prism.theme", next);
     document.documentElement.dataset.theme = next;
+    window.dispatchEvent(new Event("prism-theme")); // the footer's Appearance row follows
   }
 
   // Known only after mount: the server cannot see the reader's preference, so the first

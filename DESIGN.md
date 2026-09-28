@@ -96,6 +96,16 @@ alone. Never cobalt, never a second line, never a space or capital R. In running
 (share cards, email masthead) the mono line beside it prints the path only. Source: Claude Design ·
 screens/Wordmark.html.
 
+**The phone top bar** (below 640, the pages without the app masthead: the landing, /about, /plus and
+its welcome, the 404) is
+52 tall and holds the lockup at 20 and one control: the primary "Today's record" on the landing and
+/about, "Sign in" or the 34 avatar elsewhere; buttons are 36 inside a 44 link, the avatar sits in a
+44 box at every width. No theme toggle there: the theme follows the system and the control is the
+footer's Appearance row (System · Light · Dark), so the footer shows on a phone on exactly these pages.
+On the landing the bar's button waits until the hero's own button has scrolled out, then fades in
+(120ms): never two primaries while the hero's button is on screen. At 320 it leaves 3px. 640 and up keeps the bar as it was.
+Source: Claude Design · screens/PhoneBar.html (direction D).
+
 ## Colour
 
 Neutral warm paper and carbon ink; colour appears only where the prism "splits light":
@@ -199,6 +209,7 @@ Historical entries were written under whichever name and world was current; the 
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-28 | The phone top bar on the landing, /about and /plus is lockup · one control: the theme toggle leaves it for a footer Appearance row (the footer now shows on a phone there), and the landing's bar button waits for the hero's button to scroll out | The readPrism.news lockup left no room for lockup, toggle and "Today's record" at 320–360; founder sent it back to Claude Design (PhoneBar board, five directions measured at five widths) rather than shorten the label; consumer sites follow the system theme and keep the control out of the bar |
 | 2026-09-28 | The wordmark becomes the address, readPrism.news (tonal frame: read and .news regular ink-3, Prism semibold ink); phone masthead mark 22 → 20 and its dateline steps down by the masthead's content width (≥420 full · 340–419 · <340) instead of clipping; share cards and the email masthead drop the host the lockup now spells | prism.news is parked and for sale ($6.5k) and readers who remember only "Prism" type the bare name; Claude Design's Wordmark board judged six directions on nine surfaces and this was the only one that passed all four tests (typeable at a glance, Prism remembered, holds at 20px and 320, inside the rules) |
 | 2026-09-28 | Reported speech on the record, Indian-language articles only: words an article attributes with a speech verb ("X ने कहा कि…", "…ಎಂದು X ಹೇಳಿದರು") and no quotation marks are printed upright in the reading voice on a dashed rule, never inside quotation marks or in the record's italic; "reported" in the provenance line; counted apart ("2 quotes · 1 reported"); the quote page and share card say "the article's report of what was said, not a quote"; showcases stay quotes | Founder decision (option c, 28 Sep): direct-only dropped 55% of Indian-language claims against 16% of English. "Verbatim or nothing" stands for quotes; a report is shown as what it is, in line form and words, never styled as a quote |
 | 2026-09-27 | Market Pulse is a ticker board, not an essay: a counted line (companies named · market stories · outlets · last 24 hours), "Companies in today's reporting" as record rows (the ticker chip and exchange in mono, the company in the reading voice, the Prism headline linking to the story, the catalyst in words, "Prism's reading" as a word and its confidence in words (low below 0.5, moderate below 0.75, high; the model's number is never printed, here or in the story's Markets facts) — never a price — "Why notice", outlets and time, a dashed rule for one source, Follow on each), "Market-wide" rows beside them on a desk, and the model's three lines, when it wrote any, last as "The read". The essay card and the "Your tickers" rail are gone | Founder decision 1 (audit 2026-09-27): the essay named one ticker from 12 unwindowed stories; a markets reader needs the companies and what happened, counted and sourced, with the read subordinate to the rows |
