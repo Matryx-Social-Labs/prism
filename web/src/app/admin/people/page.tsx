@@ -117,7 +117,7 @@ export default function PeoplePage() {
       {data?.people.length === 0 && <Quiet>No accounts yet.</Quiet>}
       {people.length > 0 && shown.length === 0 && <Quiet>Nobody matches.</Quiet>}
       {data && shown.length > 0 && (
-        <div className="admin-people min-w-0 overflow-x-auto">
+        <div className="admin-people min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain">
           <table className="p-table">
             <thead>
               <tr>

@@ -41,12 +41,16 @@ export function IndicName({ languages }: { languages: string[] | null }) {
   const [code, word, label] = names[i] ?? NAMES[0];
   return (
     <span className="inline-grid gap-1.5 align-baseline" role="img" aria-label="Prism, in the scripts it reads">
-      <span className="relative inline-block overflow-hidden" style={{ padding: "0.06em 0.04em 0.12em", minWidth: "3.2em" }}>
+      {/* The clip box carries the word's size so its em padding scales with it: Devanagari,
+          Bengali, Gujarati and Telugu marks rise ~0.19em above a 1.08 line. */}
+      <span
+        className="relative inline-block overflow-hidden text-[64px] lg:text-[104px]"
+        style={{ fontFamily: "var(--font-record)", fontWeight: 600, lineHeight: 1.08, padding: "0.24em 0.04em 0.06em" }}
+      >
         <span
           aria-hidden
-          className="inline-block text-[64px] lg:text-[104px]"
+          className="inline-block"
           style={{
-            fontFamily: "var(--font-record)", fontWeight: 600, lineHeight: 1.08,
             letterSpacing: code === "en" ? "-0.025em" : 0, direction: code === "ur" ? "rtl" : "ltr",
             opacity: flip ? 0.12 : 1, filter: flip ? "blur(2px)" : "none",
             transition: "opacity 360ms var(--ease), filter 360ms var(--ease)",

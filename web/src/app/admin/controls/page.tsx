@@ -124,7 +124,7 @@ export default function ControlsPage() {
 
       {numbers.length > 0 && (
         <AdminSection title="Limits" sub="NUMBERS, LISTED APART">
-          <div className="min-w-0 overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain">
             <table className="p-table">
               <thead>
                 <tr>

@@ -94,7 +94,7 @@ export default async function GrievancePage({ searchParams }: { searchParams: Pr
 
 function ReportTable({ months }: { months: GrievanceMonth[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overflow-y-hidden overscroll-x-contain">
       <table className="p-table">
         <thead>
           <tr>

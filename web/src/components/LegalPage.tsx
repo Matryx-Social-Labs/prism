@@ -108,7 +108,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
           </header>
 
           {/* Phone: the sections as a numbered chip rail, and the short version first. */}
-          <nav ref={chipRail} className="p-hide-scroll -mx-[var(--gutter)] flex gap-1.5 overflow-x-auto px-[var(--gutter)] lg:hidden" aria-label="Sections">
+          <nav ref={chipRail} className="p-hide-scroll -mx-[var(--gutter)] -my-1 flex gap-1.5 overflow-x-auto px-[var(--gutter)] py-1 lg:hidden" aria-label="Sections">
             {doc.sections.map((s, i) => {
               const id = anchor(s.heading);
               return (

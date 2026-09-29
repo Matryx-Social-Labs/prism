@@ -15,4 +15,18 @@ describe("IndicName — the name in each script Prism reads", () => {
     expect(container.querySelectorAll("i")).toHaveLength(0);
     expect(container.textContent).toBe("Prism");
   });
+
+  // REGRESSION: the 64/104px size sat on the inner word, so the clip box's em padding resolved
+  // against 16px (1-2px) and Devanagari, Bengali, Gujarati and Telugu marks above the letters
+  // were cut off by up to 19px. The box carries the word's size, so its padding scales with it.
+  it("gives the clip box room above and below in the word's own em", () => {
+    render(<IndicName languages={["en", "hi"]} />);
+    const box = screen.getByRole("img", { name: "Prism, in the scripts it reads" }).firstElementChild as HTMLElement;
+    expect(box.className).toMatch(/text-\[64px\]/);
+    expect(box.firstElementChild?.className ?? "").not.toMatch(/text-\[/);
+    const [top, , bottom] = box.style.padding.split(" ");
+    expect(top).toMatch(/em$/);
+    expect(parseFloat(top)).toBeGreaterThanOrEqual(0.2);
+    expect(parseFloat(bottom)).toBeGreaterThanOrEqual(0.05);
+  });
 });
