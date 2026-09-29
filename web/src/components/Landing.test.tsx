@@ -55,9 +55,9 @@ beforeEach(() => {
 });
 
 describe("Landing", () => {
-  it("sends every 'Open today’s record' action to /feed, never to /", async () => {
+  it("sends every 'Read today’s record' action to /feed, never to /", async () => {
     render(await Landing());
-    const actions = screen.getAllByRole("link", { name: /Open today’s record/ });
+    const actions = screen.getAllByRole("link", { name: /Read today’s record/ });
     expect(actions.length).toBeGreaterThan(0);
     for (const a of actions) expect(a).toHaveAttribute("href", "/feed");
   });
@@ -67,8 +67,8 @@ describe("Landing", () => {
     fetchEvent.mockImplementation(async (id: string) => record(id));
     render(await Landing());
     expect(screen.queryByText(/illustration/i)).toBeNull();
-    expect(screen.getByRole("heading", { name: "Honest about what’s live" })).toBeInTheDocument();
-    for (const t of ["Available now", "In validation", "Next"]) {
+    expect(screen.getByRole("heading", { name: "What works today, and what’s next" })).toBeInTheDocument();
+    for (const t of ["Working now", "Being checked", "Next"]) {
       expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
     }
   });
@@ -77,7 +77,7 @@ describe("Landing", () => {
     render(await Landing());
     expect(screen.getByRole("heading", { name: "Follow the story, not the headlines." })).toBeInTheDocument();
     // Evidence first (strategy report, 2026-09-24): what is kept, not what is summarised.
-    expect(screen.getByText(/keeps the evidence attached: every report, the exact words said, which outlets covered it and how many have not yet/)).toBeInTheDocument();
+    expect(screen.getByText(/See who said what, word for word, and which outlets covered it/)).toBeInTheDocument();
     // The truth layer is never the premium feature.
     expect(screen.getByText(/The evidence is free and stays free/)).toBeInTheDocument();
   });
@@ -139,6 +139,43 @@ describe("Landing", () => {
     const card = screen.getByRole("heading", { name: "Prism Plus" }).parentElement!;
     expect(card).toHaveTextContent(/Every lens on every story/);
     expect(card.textContent).not.toMatch(/model/i);
+  });
+
+  // The FAQ's JSON-LD must say exactly what the page shows: markup that
+  // differs from the visible text is what search engines penalise.
+  it("carries FAQPage JSON-LD whose answers are the visible answers", async () => {
+    const { container } = render(await Landing());
+    const ld = [...container.querySelectorAll('script[type="application/ld+json"]')]
+      .map((el) => JSON.parse(el.textContent ?? "{}"))
+      .find((d) => d["@type"] === "FAQPage");
+    expect(ld).toBeDefined();
+    expect(ld.mainEntity.length).toBeGreaterThan(0);
+    for (const q of ld.mainEntity) {
+      const summary = screen.getByText(q.name, { selector: "summary span" });
+      expect(summary.closest("details")).toHaveTextContent(q.acceptedAnswer.text);
+    }
+  });
+
+  // Audit 2026-09-29: the hero said "Live · updated 1d ago" with a pulsing dot
+  // while ingestion had been paused for a day.
+  it("calls the lead live only while its newest report is recent", async () => {
+    const recent = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    fetchFeed.mockResolvedValue([row("lead", { latest_published_at: recent } as Partial<FeedItem>)]);
+    render(await Landing());
+    expect(screen.getByText(/Live · updated/)).toBeInTheDocument();
+
+    fetchFeed.mockResolvedValue([row("lead", { latest_published_at: "2026-09-01T00:00:00Z" } as Partial<FeedItem>)]);
+    const { container } = render(await Landing());
+    expect(within(container).queryByText(/Live · updated/)).toBeNull();
+    expect(within(container).getByText(/^Updated/)).toBeInTheDocument();
+  });
+
+  it("prints no typed figure among the counted ones", async () => {
+    fetchFeed.mockResolvedValue([row("a")]);
+    fetchSources.mockResolvedValue({ outlets: 27, checked_at: null, feeds: [{ language: "en" }, { language: "hi" }] });
+    render(await Landing());
+    expect(screen.queryByText("record per story")).toBeNull();
+    expect(screen.getByText("of 2 monitored languages in today's record")).toBeInTheDocument();
   });
 
   it("falls back to the live lens registry when no record carries a brief", async () => {

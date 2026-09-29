@@ -8,7 +8,7 @@ import { OWN_CHROME, hasPhoneBar } from "@/components/SiteHeader";
 import { ThemeSeg } from "@/components/accounts/ThemeChoice";
 
 const LINKS: [string, string][] = [
-  ["/about", "About"],
+  ["/about", "How it works"],
   ["/about#status", "What\u2019s live"],
   ["/sources", "Sources"],
   ["/corrections", "Corrections"],

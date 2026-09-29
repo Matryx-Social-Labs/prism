@@ -17,13 +17,23 @@ export function outletsOf(event: EventDetail | null): OutletRef[] {
     .map((s) => ({ slug: s.source_slug, publisher: s.publisher ?? s.source_slug, name: s.source_name, code: s.code!, origin: s.origin as Origin, language: s.language ?? null, domain: s.domain ?? null }));
 }
 
-/** The live lead: a mono "live · updated" strip over the story as the chart's lead row. */
+/** A lead whose newest report is older than this is not called live. */
+export const LIVE_WITHIN_MS = 3 * 60 * 60 * 1000;
+
+/** Whether a report published at `iso` is recent enough to call the story live. */
+export function isLive(iso: string, now = Date.now()): boolean {
+  return now - Date.parse(iso) < LIVE_WITHIN_MS;
+}
+
+/** The live lead: a mono "updated" strip over the story as the chart's lead row, "live" and pulsing only while it is. */
 export function LiveLead({ row, outlets }: { row: FeedItem; outlets: OutletRef[] }) {
+  const updated = row.latest_published_at ?? row.last_updated_at;
+  const live = isLive(updated);
   return (
     <div className="min-w-0">
       <p className="mb-2.5 flex items-center gap-2">
-        <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: "var(--coverage-regional)", animation: "p-pulse 1.6s ease-in-out infinite" }} />
-        <span className="p-count uppercase">Live · updated <Ago iso={row.latest_published_at ?? row.last_updated_at} /></span>
+        {live && <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: "var(--coverage-regional)", animation: "p-pulse 1.6s ease-in-out infinite" }} />}
+        <span className="p-count uppercase">{live ? "Live · updated" : "Updated"} <Ago iso={updated} /></span>
       </p>
       <ol aria-label={`Open live record: ${row.title}`}>
         <ChartRow item={{ ...row, outlets: row.outlets?.length ? row.outlets : outlets }} lead />
