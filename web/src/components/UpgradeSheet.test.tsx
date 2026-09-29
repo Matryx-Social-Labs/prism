@@ -61,6 +61,40 @@ describe("UpgradeSheet", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Plus is 100 a day →" }));
     expect(screen.getByRole("dialog", { name: "Ask more of this story" })).toBeInTheDocument();
     expect(screen.getByText("10 of 10 today")).toBeInTheDocument();
+    // /plus, and sign-in through it, bring the reader back to this story (audit 2026-09-29, P1-3).
+    expect(screen.getByRole("link", { name: "All plans →" })).toHaveAttribute("href", "/plus?from=ask-limit&next=%2Fstory%2Fe1");
+  });
+
+  // COMPLIANCE-INDIA N7: what renews, how often and at what price is said
+  // BEFORE the button that opens the mandate, in the API's figures.
+  it("says what renews, at the API's price, above the button that opens the mandate", async () => {
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.fetchPlans.mockResolvedValue({ ...PLANS, plans: [{ ...PLANS.plans[0], amount_paise: 19900 }] });
+    render(<UpgradeSheet open onClose={() => {}} reason="ask-limit" />);
+    const button = await screen.findByRole("button", { name: "Get Plus · ₹199 a month" });
+    const terms = screen.getByText(/₹199 today, then ₹199 every month until you cancel/);
+    expect(terms).toHaveTextContent("Cancel in one click from your account; paid time is kept.");
+    expect(terms.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // Audit 2026-09-29 P1-2/P1-3: the lens wall sells the lens first, and every
+  // door carries the story the reader was on.
+  it("at the lens wall leads with the lens, keeps the way back to the story, and says the lens is open", async () => {
+    const stranger = render(<UpgradeSheet open onClose={() => {}} reason="lens-limit" used={10} limit={10} lensName="Markets" back="/story/e1" />);
+    expect(screen.getByRole("link", { name: "All plans →" })).toHaveAttribute("href", "/plus?from=lens-limit&next=%2Fstory%2Fe1");
+    expect(await screen.findByRole("link", { name: "Sign in to get Plus" })).toHaveAttribute(
+      "href", `/signin?next=${encodeURIComponent("/plus?from=lens-limit&next=%2Fstory%2Fe1")}`);
+    stranger.unmount();
+
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.subscribe.mockResolvedValue({ plan: "plus_monthly", status: "active", entitled: true });
+    const onSubscribed = vi.fn();
+    render(<UpgradeSheet open onClose={() => {}} reason="lens-limit" used={10} limit={10} lensName="Markets" back="/story/e1" onSubscribed={onSubscribed} />);
+    const dialog = screen.getByRole("dialog", { name: "Every lens on this story" });
+    expect(dialog.querySelector("li")).toHaveTextContent("Every lens on every story that earns one, as often as you like");
+    await userEvent.click(await screen.findByRole("button", { name: /Get Plus · ₹149 a month/ }));
+    expect(await screen.findByRole("status")).toHaveTextContent("The Markets read is open.");
+    expect(onSubscribed).toHaveBeenCalled();
   });
 
   it("a declined payment is said inside the sheet, and the purchase waits for the next try", async () => {

@@ -33,6 +33,29 @@ describe("the usage beacon", () => {
     expect(JSON.stringify(send.mock.calls)).not.toContain("private");
   });
 
+  // Audit 2026-09-29 §2.5: does a visit go past one story? The 2nd and 5th, per tab.
+  it("counts the second and fifth story read in a tab, and no other", () => {
+    const depth = () => send.mock.calls.filter(([e]) => e === "depth");
+    const { rerender } = render(<UsageBeacon />);
+    pathname.current = "/feed";
+    rerender(<UsageBeacon />);
+    expect(depth()).toEqual([]); // a page that is not a story is not a story read
+    for (const path of ["/story/b", "/story/c", "/story/d", "/story/e", "/story/f"]) {
+      pathname.current = path;
+      rerender(<UsageBeacon />);
+    }
+    expect(depth()).toEqual([["depth", "2"], ["depth", "5"]]);
+  });
+
+  it("counts a click on a marked button by its word, and nothing else", async () => {
+    render(<UsageBeacon />);
+    document.body.insertAdjacentHTML("beforeend", '<a href="#" data-cta="landing:hero"><span>Read</span></a><a href="#">Other</a>');
+    document.querySelector("[data-cta] span")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    (document.body.lastElementChild as HTMLElement).click();
+    expect(send.mock.calls.filter(([e]) => e === "cta")).toEqual([["cta", "landing:hero"]]);
+    document.body.innerHTML = "";
+  });
+
   it("never counts the founders reading /admin", () => {
     pathname.current = "/admin/labellers";
     render(<UsageBeacon />);

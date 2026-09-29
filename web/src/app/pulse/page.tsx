@@ -59,7 +59,7 @@ export default function PulsePage() {
         </div>
       ) : !board ? (
         <div className="pt-6">
-          <EmptyState title="Market Pulse could not load" action={<Link href="/feed" className="p-link">Open today&rsquo;s record →</Link>}>
+          <EmptyState title="Market Pulse could not load" action={<Link href="/feed" className="p-link">Read today&rsquo;s record →</Link>}>
             The board is built from the record every half hour. Try again in a minute.
           </EmptyState>
         </div>

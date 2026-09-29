@@ -105,6 +105,22 @@ async def test_bots_unknown_words_and_questions_are_not_counted():
     assert await _leaked() == leaked
 
 
+async def test_the_funnel_before_paying_is_counted_in_closed_words():
+    """Audit 2026-09-29 §2.5: a landing button, a link asked for, an onboarding
+    step, the For you tab and reading depth — each one of a fixed list."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    words = [("cta", "landing:hero"), ("signin", "sent:link"), ("onboarding", "skip:2"), ("tab", "foryou"), ("depth", "5")]
+    before = [await _count(e, d) for e, d in words]
+    stray = await _count("onboarding", "step:9")
+    async with _client() as c:
+        for e, d in words:
+            assert (await c.post("/api/v1/beacon", json={"e": e, "d": d}, headers=_reader())).status_code == 204
+        await c.post("/api/v1/beacon", json={"e": "onboarding", "d": "step:9"}, headers=_reader())
+    assert [await _count(e, d) for e, d in words] == [n + 1 for n in before]
+    assert await _count("onboarding", "step:9") == stray
+
+
 async def test_arrivals_are_counted_by_where_they_came_from():
     if not await _db_reachable():
         pytest.skip("no database")

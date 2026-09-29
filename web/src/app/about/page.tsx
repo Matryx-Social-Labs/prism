@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "@/lib/seo";
 import { HowItWorks } from "@/components/HowItWorks";
 
 // "How Prism works": one live story followed through the product step by
@@ -9,10 +10,13 @@ import { HowItWorks } from "@/components/HowItWorks";
 // visit to the page the site's structured data names as its principles.
 export const revalidate = 60;
 
+const title = "How Prism works: one record per story";
+const description = "How Prism turns reports from a public list of Indian outlets into one record per story: who covered it, verbatim quotes, the brief, and how to correct it.";
 export const metadata: Metadata = {
-  title: "How Prism works",
-  description: "One story from today's record, followed through Prism step by step: the reports, the record, who covered it, who said what, the brief, the lens, the question box.",
+  title,
+  description,
   alternates: { canonical: "/about" },
+  ...social(title, description, "/about"),
 };
 
 export default async function AboutPage() {

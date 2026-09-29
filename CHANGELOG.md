@@ -3,6 +3,62 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.114.0] - 2026-09-29
+
+### Changed — the landing says what Prism is, and answers a first visit
+- **A plain first screen.** "India's verifiable news record" above the promise;
+  a subhead that says what the page is ("each story's reports … onto one page");
+  one label for the way in, **Read today's record**, everywhere; "Free to read.
+  No account, no sign-up." beside the buttons; and the checks a cautious reader
+  can make: the public outlet list, the public corrections log, the LLP.
+- **Counted, never typed.** The "1 record per story" figure is gone; languages
+  are counted out of the monitored set, like outlets. The lead says **Live**
+  and pulses only while its newest report is under three hours old.
+- **New sections:** what Prism won't do (three refusals, shared with How it
+  works), Free vs Plus on its own, and nine questions a first visit asks, with
+  FAQPage structured data built from the same words the page shows.
+
+### Fixed — search engines read the record's address from <head>
+- Story and story-arc pages streamed their title, canonical and robots tags
+  into <body>, where Google ignores a canonical, and answered a missing or
+  merged record with a 200. Both routes stopped streaming: a missing record is
+  a real 404, a merged one a real redirect, and metadata is never streamed.
+- Every page shares its own card and address; eleven kinds of page used to
+  share as the homepage.
+- A record's publication date is its first report's time, the same in the
+  news sitemap and the structured data, and it no longer moves forward as
+  outlets are added. The news sitemap lists every record from the last 48
+  hours that asks to be indexed, not the ten in the newest hundred rows.
+- Links to pages that ask not to be indexed (one-outlet records, provisional
+  groupings) are `nofollow`, so hubs spend their links on pages that can rank.
+- Sector pages list their sub-topics and a story links its subject, so 37
+  subject pages that nothing linked to are reachable.
+- GPTBot and ClaudeBot are refused with the other training crawlers; their
+  vendors' search and user agents stay allowed. `llms.txt` no longer claims
+  more than is true.
+
+### Added — "What <name> said" on a person's page
+Quotes from the person across their records, checked against the article
+exactly as the story page checks them, reported speech labelled, "k of n"
+counted; absent when there are none.
+
+### Changed — Plus and signing in
+- The renewal terms sit beside the founding price and above the button that
+  opens the payment mandate. The welcome email sells the lenses and Ask, never
+  a model. "3 without an account" says what it is: 3 a visit.
+- At the lens limit an account gets the upgrade sheet on the story, and Plus
+  returns a buyer to the story they came from. Signing up at a story or at
+  Plus skips onboarding; "Skip for now" keeps the subjects already picked.
+- A crafted sign-in link can no longer send a reader to another site after
+  they sign in.
+- Aggregate counts for the landing's buttons, onboarding steps, the For you
+  tab, a visit's second and fifth story, and the lens limit; the privacy
+  policy lists them.
+
+### Performance
+- An index on enrichments by article: the story page's lookup was a 21 ms full
+  scan on production.
+
 ## [0.0.113.0] - 2026-09-28
 
 ### Changed — the record's phone bar carries the brand

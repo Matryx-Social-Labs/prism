@@ -8,8 +8,9 @@ import { Reveal } from "@/components/Reveal";
 import { SectionHead } from "@/components/SectionHead";
 import { Alert } from "@/components/ui";
 import { track } from "@/lib/analytics";
-import { fetchPlans, LENS_READS, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
+import { ASK_QUESTIONS as ASK, fetchPlans, LENS_READS, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
+import { safeNext } from "@/lib/next";
 import { fetchMe, useSession } from "@/lib/session";
 
 // The pricing page (Design System v2 · Plus): a provenance strip, the headline,
@@ -21,7 +22,6 @@ import { fetchMe, useSession } from "@/lib/session";
 // 27 Sep). A plan is charged automatically until the reader cancels, at the
 // price they joined at (founder, 28 Sep; common/razorpay.TOTAL_COUNT); no line
 // promises a lock or what a plan will cost later.
-const ASK = { anon: 3, free: 10, plus: 100 }; // common/quota.py
 const FOUNDING_SEATS = 500; // common/billing.FOUNDING_CAP
 
 type Period = "month" | "year";
@@ -102,10 +102,13 @@ export function PlusPage() {
   const router = useRouter();
   const params = useSearchParams();
   const from = params.get("from");
+  // Where the buyer came from (a story, by the door they used): the welcome
+  // page's way on, and sign-in's way back here (audit 2026-09-29, P1-3).
+  const back = safeNext(params.get("next"));
   const [plans, setPlans] = useState<PlansOut | null>(null);
   const [plansFailed, setPlansFailed] = useState(false);
   const [myPlan, setMyPlan] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>("year");
+  const [period, setPeriod] = useState<Period>(params.get("period") === "month" ? "month" : "year");
   const [busy, setBusy] = useState<string | null>(null);
   const [declined, setDeclined] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ plan: string; message: string } | null>(null);
@@ -138,6 +141,8 @@ export function PlusPage() {
   const offerEnds = plans?.offer_ends ? billingDay(plans.offer_ends, { long: true }) : null;
   const plusPlan = period === "year" ? "plus_yearly" : "plus_monthly";
   const plusCta = period === "year" ? "Get Plus yearly" : "Get Plus monthly";
+  // Sign-in returns here with the door, the way on and the period the reader chose.
+  const signinBack = new URLSearchParams({ ...(from && { from }), ...(back && { next: back }), period }).toString();
 
   async function buy(plan: string) {
     if (!session) return;
@@ -147,7 +152,7 @@ export function PlusPage() {
     try {
       await subscribe(plan, session.token, session.email, (_kind, detail) => setDeclined(detail));
       setMyPlan("plus");
-      router.push(`/plus/welcome${from ? `?next=${encodeURIComponent(from.startsWith("/") ? from : "/feed")}` : ""}`);
+      router.push(`/plus/welcome${back ? `?next=${encodeURIComponent(back)}` : ""}`);
     } catch (e) {
       const m = e instanceof Error ? e.message : "";
       if (m !== "dismissed") setFailed({ plan, message: m || "Nothing was charged." });
@@ -162,7 +167,7 @@ export function PlusPage() {
     if (onPlus) return <StateBox>Your plan</StateBox>;
     if (!plans || (session && myPlan === null)) return <button type="button" disabled className={cls}>Loading…</button>;
     if (!ready) return <StateBox dashed>Opens soon</StateBox>;
-    if (!session) return <Link href="/signin?next=/plus" className={cls}>Sign in to continue</Link>;
+    if (!session) return <Link href={`/signin?next=${encodeURIComponent(`/plus?${signinBack}`)}`} className={cls}>Sign in to continue</Link>;
     return (
       <button type="button" disabled={busy !== null} onClick={() => buy(plan)} className={cls}>
         {busy === plan ? "Opening…" : label}
@@ -237,8 +242,9 @@ export function PlusPage() {
             action={session ? <StateBox>{onPlus ? "Included" : "Your plan"}</StateBox> : <Link href="/feed" className="p-btn p-btn--secondary p-btn--block">Keep reading free</Link>}
           >
             <Feature>Every record, source, verified quote, coverage count and clip, forever</Feature>
-            <Feature><b className="font-semibold">{LENS_READS.free} lens readings a day</b> with an account, {LENS_READS.anon} without</Feature>
-            <Feature><b className="font-semibold">{ASK.free} questions a day</b> with an account, {ASK.anon} without</Feature>
+            {/* Without an account the count is per visit (a browser session), not per day. */}
+            <Feature><b className="font-semibold">{LENS_READS.free} lens readings a day</b> with an account, {LENS_READS.anon} a visit without</Feature>
+            <Feature><b className="font-semibold">{ASK.free} questions a day</b> with an account, {ASK.anon} a visit without</Feature>
             <Feature ok={false}>Answers from this record only</Feature>
             <Feature ok={false}>Ask rests for the day when the free box is spent</Feature>
           </PlanColumn>
@@ -252,6 +258,8 @@ export function PlusPage() {
               price={rupees(founding.amount_paise)}
               per="/ year"
               sub={`${plans!.founding_left} ${plans!.founding_left === 1 ? "seat" : "seats"} left`}
+              // Its renewal beside its price (docs/COMPLIANCE-INDIA.md N7(a)): the price joined at, until cancelled.
+              note={`Renews at ${rupees(founding.amount_paise)} a year until you cancel. 7-day full refund.`}
               action={onPlus ? null : <Action plan="founding" primary={false} label="Become a founding member" />}
             >
               <Feature>Everything in Plus</Feature>
@@ -307,8 +315,8 @@ export function PlusPage() {
             <tbody>
               {[
                 ["Reading the record", "Everything", "Everything"],
-                ["Lens readings", `${LENS_READS.free} a day · ${LENS_READS.anon} without an account`, "Every lens, every story"],
-                ["Questions a day", `${ASK.free} · ${ASK.anon} without an account`, String(ASK.plus)],
+                ["Lens readings", `${LENS_READS.free} a day · ${LENS_READS.anon} a visit without an account`, "Every lens, every story"],
+                ["Questions a day", `${ASK.free} · ${ASK.anon} a visit without an account`, String(ASK.plus)],
                 ["Answers drawn from", "This record", "The whole story"],
                 // The shared free budget is counted per UTC day (common/quota.ask_burst_ok).
                 ["When the free box rests", "Back at 5:30 am IST", "Stays on"],

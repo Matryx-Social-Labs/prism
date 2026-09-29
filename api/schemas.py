@@ -286,6 +286,18 @@ class EntityPage(BaseModel):
     # liability to the crawl budget, not an asset.
     indexable: bool
     records: list[FeedItem]
+    # Who they are, as the articles put it: the role their quoted records repeat
+    # most (enrichment/claims.faithful_role), null when none. Never a title we supply.
+    role: str | None = None
+    # "What <name> said" (api/routes/entity.py): newest first, capped, each passed
+    # by the story page's own checks. The counts are of everything that passed in
+    # the `quotes_window` newest records, not only the rows sent, so the page can
+    # print "k of n", and quotes apart from reported speech, honestly.
+    quote_count: int = 0
+    reported_count: int = 0
+    quoted_records: int = 0
+    quotes_window: int = 0
+    quotes: list["EntityQuote"] = []
 
 
 class QuoteSource(BaseModel):
@@ -353,6 +365,16 @@ class ClaimOut(BaseModel):
     speech: Literal["direct", "reported"] = "direct"
 
 
+class EntityQuote(ClaimOut):
+    """A quote on an actor's page: the story page's row for it, unchanged, plus
+    the record it is on and its `[n]` there (the index the record's own
+    Coverage list and quotes print)."""
+
+    event_id: str
+    event_title: str
+    source_index: int | None = None
+
+
 class SpeakerClaims(BaseModel):
     speaker: str
     # Who they are, as the articles put it ("Vice President of the United
@@ -377,6 +399,9 @@ class EventDetail(BaseModel):
     summary: str | None
     sector: str | None
     subsector: str | None
+    # The subject node (`politics.elections`): the record links it and its trail
+    # follows it, so the subject pages under the six groups are reachable.
+    subject_path: str | None = None
     image_url: str | None
     regions: list[str]
     occurred_at: str | None

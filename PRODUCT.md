@@ -135,8 +135,10 @@ convenience (whole-story Ask, allowance, later follow and alerts), never a model
 ledger in `.claude/plans/trust-india-indic.plan.md`
 - **D-a** The extraction's tone label (critical/neutral/supportive) is removed from
   report cards and from the payload; D4 already said an LLM's stance never reaches it.
-- **D-b** Plan renewal terms are undecided and are settled at the paid launch; until
-  then no page promises how a plan ends or renews.
+- **D-b** Plan renewal terms, decided 2026-09-28 (founder): every plan is charged
+  automatically until the reader cancels, at the price they joined at
+  (`common/razorpay.TOTAL_COUNT`). The Plus page, its FAQ and the Terms say so beside the
+  price; no page promises a lock or what a plan will cost later.
 - **D-c** India compliance (IT Rules digital-media code, DPDP, CERT-In, consumer
   protection) is a team decision on `docs/COMPLIANCE-INDIA.md`.
 - **D-d** Translation of Prism's own writing into Indian languages is held until the
@@ -155,8 +157,9 @@ ledger in `.claude/plans/trust-india-indic.plan.md`
 - Whether the LLM "Perspectives" cards on the story page are retired now that verbatim
   claims exist beside them.
 - Whether reported (indirect) speech should display as a claim.
-- Pricing UI and the payment provider (UPI Autopay via a PSP) — the paywall boundary
-  exists; the checkout does not.
+- When to go on sale. The pricing page and the Razorpay checkout (UPI Autopay, cards,
+  net banking) are built and run in test mode; selling waits on the launch gates in
+  `docs/COMPLIANCE-INDIA.md` (N6–N9).
 
 ## Brand Commitments
 

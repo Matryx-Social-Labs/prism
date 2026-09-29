@@ -25,7 +25,7 @@ from sqlalchemy import text
 from common.config import get_settings
 from common.email import get_email_sender
 from common.email_templates import IST, render
-from common.quota import PLUS_ASK_PER_DAY, USER_ASK_PER_DAY
+from common.quota import PLUS_ASK_PER_DAY, USER_ASK_PER_DAY, USER_LENS_PER_DAY
 from common.razorpay import REFUND_DAYS, REFUNDABLE_PLANS, refundable_until
 
 PLAN_LABEL = {"plus_monthly": "Plus · monthly", "plus_yearly": "Plus · yearly", "founding": "Founding member"}
@@ -38,7 +38,8 @@ PER = {"plus_monthly": "a month", "plus_yearly": "a year"}
 # 20th, 2026-09-21). Dates in the meta line are the same day, untagged.
 
 PLUS_IS = f"{PLUS_ASK_PER_DAY} questions a day, answered from the whole story"
-FREE_KEEPS = f"The record stays free: every story, source, quote and clip, your watchlist, and {USER_ASK_PER_DAY} questions a day."
+FREE_KEEPS = (f"The record stays free: every story, source, quote and clip, your watchlist, "
+              f"{USER_LENS_PER_DAY} lens readings and {USER_ASK_PER_DAY} questions a day.")
 
 
 def _day(d: datetime | None, *, tag: bool = True) -> str | None:
@@ -150,7 +151,8 @@ async def notify_transition(db, user_id: str, before: str, after: str, sub: dict
             user_id,
             subject="You're on Prism Plus",
             meta=meta,
-            lines=[f"Ask is on at {PLUS_IS}, on a larger model."],
+            # Plus sells the lenses and Ask, never a model (PRODUCT.md; founder, 27 Sep).
+            lines=[f"Every lens is open on every story that earns one, and Ask is on at {PLUS_IS}."],
             facts=[
                 ("Plan", _plan_fact(plan, price)),
                 ("Next charge", renews) if renews else ("Paid through", _day(end)),

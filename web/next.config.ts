@@ -28,6 +28,13 @@ export const CSP = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
+  // Metadata is never streamed: every user agent gets title, canonical and
+  // robots in <head>, where Google accepts a canonical at all. A route-level
+  // loading.tsx streamed them into <body> for Googlebot and every answer
+  // engine on /story and /trending, and flushed a 200 before notFound()
+  // (audit 2026-09-29) — both routes dropped theirs; this keeps it so.
+  htmlLimitedBots: /.*/,
   images: {
     // Thumbnails come from arbitrary news CDNs discovered at ingest time. Vercel's
     // server-side optimizer gets blocked by those CDNs (datacenter IP / hotlink

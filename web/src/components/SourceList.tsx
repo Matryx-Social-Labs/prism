@@ -49,6 +49,7 @@ export function ReportCard({ source, n, compact = false }: { source: SourceRef; 
         {n != null && <span className="p-count ml-auto shrink-0 font-mono">[{n}]</span>}
       </span>
       <span
+        lang={s.language ?? undefined}
         className="p-row__title block [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden"
         style={{ font: compact ? "500 14px/1.35 var(--font-read)" : "var(--t-title-s)", color: "var(--ink)", overflowWrap: "anywhere" }}
       >

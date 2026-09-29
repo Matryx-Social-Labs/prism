@@ -109,6 +109,8 @@ describe("Trending — the chart of arcs", () => {
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(r).toHaveAttribute("href", "/trending/kerala-power");
+    // The group page asks not to be indexed while provisional; the hub does not follow it (audit A5).
+    expect(r).toHaveAttribute("rel", "nofollow");
     expect(r.textContent).toMatch(/5 records · 4 outlets/);
     expect(r.textContent).not.toMatch(/development/);
     expect(r.textContent).toMatch(/5 days/); // 6 days less two hours, floored
@@ -130,6 +132,7 @@ describe("Trending — the chart of arcs", () => {
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
     expect(r).toHaveAttribute("href", "/story/ev-1#route");
+    expect(r).not.toHaveAttribute("rel");
     expect(r.textContent).toMatch(/5 developments/);
     expect(r.textContent).toMatch(/Verified/);
     // Nothing on a page of verified stories is called provisional.

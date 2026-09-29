@@ -6,6 +6,7 @@ import { CoverageBar, CoverageLegend } from "@/components/Coverage";
 import { Reveal } from "@/components/Reveal";
 import { StatusPill } from "@/components/StatusPill";
 import { Ago } from "@/components/Ago";
+import { followRel } from "@/lib/seo";
 
 // One outlet of each origin: the key's colours only. Nothing here prints a count.
 const KEY: OutletRef[] = (["national", "intl", "regional"] as const).map((origin, i) => ({ slug: origin, publisher: origin, name: "", code: "", origin, language: i === 2 ? "hi" : "en" }));
@@ -26,7 +27,7 @@ export function TodayAside({ developing }: { developing: TrendingStory[] }) {
             {developing.map((s, i) => (
               <li key={s.slug}>
                 <Reveal delay={i * 60}>
-                  <Link href={`/trending/${s.slug}`} className="group grid gap-1.5 border-b py-3" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
+                  <Link href={`/trending/${s.slug}`} rel={followRel(s.boundary_status === "verified")} className="group grid gap-1.5 border-b py-3" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
                     <span className="underline-offset-4 group-hover:underline" style={{ font: "var(--t-title-s)" }}>{s.hero_title ?? s.label}</span>
                     <span className="flex min-w-0 items-center gap-2">
                       {/* /trending carries no outlet origins, so the bar is drawn mono, never a guessed split. */}

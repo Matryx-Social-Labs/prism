@@ -15,7 +15,7 @@ import { API_URL } from "@/lib/api";
 import { authHeader, loadSession } from "@/lib/session";
 
 type Props = Record<string, string | number | boolean | undefined>;
-type Event = "Sign in" | "Ask" | "Lens" | "Subscribe" | "Share";
+type Event = "Sign in" | "Ask" | "Lens" | "Subscribe" | "Share" | "Onboarding" | "Tab";
 
 const ACTIVE = "prism.active";
 
@@ -34,7 +34,9 @@ function onceADay(): boolean {
   return true;
 }
 
-const NAME: Record<Event, string> = { "Sign in": "signin", Ask: "ask", Lens: "lens", Subscribe: "subscribe", Share: "share" };
+const NAME: Record<Event, string> = {
+  "Sign in": "signin", Ask: "ask", Lens: "lens", Subscribe: "subscribe", Share: "share", Onboarding: "onboarding", Tab: "tab",
+};
 
 /** The one word the API keeps for an event: lowercase, a short slug. The API
  *  checks it again against its own lists and drops anything else. */
@@ -59,7 +61,13 @@ function dimension(event: Event, p: Props): string {
     case "Share":
       return word(p.surface ?? "other");
     case "Sign in":
-      return word(p.method);
+      // "sent:link" when a link is asked for; the method alone once it is used.
+      return word(p.stage, p.method);
+    case "Onboarding":
+      // The step reached or skipped at (1–3), or how it finished (account | local).
+      return word(p.stage, p.step ?? p.saved);
+    case "Tab":
+      return word(p.tab);
   }
 }
 

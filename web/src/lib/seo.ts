@@ -2,7 +2,8 @@
 // page says the same thing about who Prism is. Nothing here invents a fact:
 // every field is read from the API payload the page already renders, and a
 // publisher's photograph is never declared as ours (DESIGN.md § Images).
-import type { EntityRef, EventDetail, FeedItem, TrendingStory, TrendingStoryDetail } from "@/lib/api";
+import type { EntityQuote, EntityRef, EventDetail, FeedItem, TrendingStory, TrendingStoryDetail } from "@/lib/api";
+import { isReported } from "@/lib/quotes";
 import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site";
 
@@ -26,6 +27,19 @@ export const NOT_INDEXED = { index: false, follow: true } as const;
 export function robotsUnless(indexable: boolean): { robots?: typeof NOT_INDEXED } {
   return indexable ? {} : { robots: NOT_INDEXED };
 }
+
+/**
+ * rel for a link to a record or a story: "nofollow" where that page asks not
+ * to be indexed, so a hub spends its follow links on pages that can rank
+ * (entityRel is the same rule for actors). A record asks from its second
+ * outlet (`indexable`); a story once its boundary is verified. Unknown (an
+ * older payload): plain. 49–58 of a hub's 60 row links pointed at one-outlet
+ * records Google then drops (audit A3). Records that gain an outlet are still
+ * found through records-sitemap.xml and IndexNow, which read the same rule.
+ */
+export function followRel(indexable: boolean | undefined): "nofollow" | undefined {
+  return indexable === false ? "nofollow" : undefined;
+}
 export const SITE_ID = `${SITE_URL}/#website`;
 
 /** Who publishes this. `legalName` is the LLP; the brand is Prism. */
@@ -33,16 +47,23 @@ export const ORGANIZATION = {
   "@type": "NewsMediaOrganization",
   "@id": ORG_ID,
   name: "Prism",
+  // "Prism" alone names several products; the address is ours alone.
+  alternateName: "readprism.news",
   legalName: LEGAL_ENTITY,
   url: `${SITE_URL}/`,
   logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/prism-mark-512.png`, width: 512, height: 512 },
-  description: "One live story record from monitored Indian outlets: every development, verified quote and source open to inspection.",
+  description: "India's verifiable news record: one record per story from a public list of monitored Indian outlets, with every report, verbatim quote and source open to inspection.",
   areaServed: { "@type": "Country", name: "India" },
-  knowsLanguage: ["en", "hi", "kn", "ta", "te"],
   // What we do and refuse to do, in the vocabulary engines read: no invented
   // numbers, quotes verbatim or absent — the /about page says it at length.
+  // "Who writes this, and how to correct it" answers all three: records are
+  // written by machine and say so, and a mistake has a public way in. No
+  // verificationFactCheckingPolicy: Prism checks quotes are verbatim, not that
+  // claims are true. No knowsLanguage: a typed list drifts from /sources.
   publishingPrinciples: `${SITE_URL}/about`,
   correctionsPolicy: `${SITE_URL}/about#accountability`,
+  actionableFeedbackPolicy: `${SITE_URL}/about#accountability`,
+  noBylinesPolicy: `${SITE_URL}/about#accountability`,
   contactPoint: { "@type": "ContactPoint", email: CONTACT_EMAIL, contactType: "editorial" },
 };
 
@@ -51,6 +72,7 @@ export const WEBSITE = {
   "@id": SITE_ID,
   url: `${SITE_URL}/`,
   name: "Prism",
+  alternateName: "readprism.news",
   publisher: { "@id": ORG_ID },
   inLanguage: "en-IN",
   potentialAction: {
@@ -60,11 +82,29 @@ export const WEBSITE = {
   },
 };
 
+/**
+ * A page's own share card: its title, description and address. The layout
+ * sets only the site name and card type, so a page that forgets this falls
+ * back to its own <title> instead of claiming to be the homepage (audit
+ * 2026-09-29: eleven page types shared as the landing).
+ */
+export function social(title: string, description: string, path: string) {
+  return {
+    openGraph: { type: "website" as const, siteName: "Prism", locale: "en_IN", title, description, url: path },
+    twitter: { card: "summary_large_image" as const, title, description },
+  };
+}
+
 export function siteGraph() {
   return { "@context": "https://schema.org", "@graph": [ORGANIZATION, WEBSITE] };
 }
 
 const clip = (s: string, n = 200) => (s.length > n ? `${s.slice(0, n - 3).trimEnd()}…` : s);
+
+/** When the first of a record's reports was published, or null. */
+export function firstReportedAt(event: EventDetail): string | null {
+  return (event.sources ?? []).map((s) => s.published_at).filter((t): t is string => Boolean(t)).sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
+}
 
 export function eventDescription(event: EventDetail): string {
   return clip(event.summary ?? event.lens_briefs?.reader ?? event.title);
@@ -97,7 +137,9 @@ export function newsArticleLd(event: EventDetail) {
     url,
     headline: clip(event.title, 110),
     description: eventDescription(event),
-    datePublished: event.occurred_at ?? event.last_updated_at,
+    // The first report's time: a timestamp, not occurred_at's bare date, and it
+    // never moves forward as outlets are added (the news sitemap uses the same).
+    datePublished: firstReportedAt(event) ?? event.occurred_at ?? event.last_updated_at,
     dateModified: event.last_updated_at,
     inLanguage: "en-IN",
     isAccessibleForFree: true,
@@ -115,7 +157,8 @@ export function newsArticleLd(event: EventDetail) {
       // `publisher` is the registry key and reads as a slug.
       publisher: { "@type": "Organization", name: s.source_name, ...(s.domain ? { url: `https://${s.domain}/` } : {}) },
     })),
-    author: { "@id": ORG_ID },
+    // Named inline as well: a reader of this block alone still gets the author.
+    author: { "@type": "Organization", "@id": ORG_ID, name: "Prism", url: `${SITE_URL}/about` },
     publisher: { "@id": ORG_ID },
   };
 }
@@ -138,6 +181,36 @@ export function entityLd(entity: EntityRef, url: string, recordCount: number) {
     ...(entity.qid ? { sameAs: [`https://www.wikidata.org/wiki/${entity.qid}`] } : {}),
     description: `${recordCount} Prism ${recordCount === 1 ? "record names" : "records name"} ${entity.name}.`,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
+  };
+}
+
+/**
+ * "What <name> said" for answer engines, as entityLd's `subjectOf`: the direct
+ * quotes the page prints, each a Quotation attributed to the entity's @id and
+ * grounded in the article that printed it. Words an article only REPORTED are
+ * not quotations and are left out, as the page never styles them as one. Null
+ * when no quote is left.
+ */
+export function quotationsLd(quotes: EntityQuote[], url: string) {
+  const said = quotes.filter((q) => !isReported(q));
+  if (said.length === 0) return null;
+  return {
+    "@type": "ItemList",
+    "@id": `${url}#quotes`,
+    numberOfItems: said.length,
+    itemListElement: said.map((q, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item: {
+        "@type": "Quotation",
+        text: q.quote_text,
+        spokenByCharacter: { "@id": `${url}#entity` },
+        ...(q.id ? { url: `${SITE_URL}/story/${q.event_id}/quote/${q.id}` } : {}),
+        ...(q.url ? { isBasedOn: q.url } : {}),
+        ...(q.published_at ? { datePublished: q.published_at } : {}),
+        ...(q.lang ? { inLanguage: q.lang } : {}),
+      },
+    })),
   };
 }
 
@@ -205,4 +278,13 @@ export const storyListItems = (stories: TrendingStory[]) => stories.map((s) => (
  */
 export function jsonLd(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
+/** Questions and answers exactly as the page shows them (lib/faq). */
+export function faqLd(items: { q: string; a: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map(({ q, a }) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+  };
 }

@@ -12,6 +12,8 @@ vi.mock("@/lib/api", () => ({ fetchFeed, fetchTrending, fetchRegions: () => Prom
 vi.mock("@/lib/profile", () => ({ loadProfile }));
 const useScrollRestore = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/useScrollRestore", () => ({ useScrollRestore }));
+const track = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({ track }));
 // @/lib/scope stays real — the persisted value is the thing under test.
 
 const item = (over: Partial<FeedItem> = {}): FeedItem =>
@@ -78,6 +80,9 @@ describe("FrontPage — one chart for everyone (D2)", () => {
     render(<FrontPage />);
     await userEvent.click(await screen.findByRole("tab", { name: "For you" }));
     await waitFor(() => expect(lastQuery().interests).toEqual(["sports"]));
+    // Counted once, on the switch to it (audit 2026-09-29, §2.5).
+    await userEvent.click(screen.getByRole("tab", { name: "For you" }));
+    expect(track.mock.calls).toEqual([["Tab", { tab: "foryou" }]]);
   });
 
   it("asks the API for the whole group when a sector is chosen — BIZ is business AND finance", async () => {

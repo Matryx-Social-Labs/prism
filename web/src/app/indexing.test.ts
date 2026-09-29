@@ -29,6 +29,8 @@ const story = (slug: string, boundary_status: string) => ({
 function stubApi() {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     if (url.includes("/api/v1/subjects")) return json({ nodes: [node("business"), node("business.markets"), node("civic"), node("education")] });
+    // The API applies the indexable rule and the 48-hour bound (tests/test_site_architecture.py).
+    if (url.includes("/api/v1/sitemap/news")) return json({ records: [{ id: "multi", title: "Record multi", published_at: new Date().toISOString() }] });
     if (url.includes("/api/v1/subject/")) {
       const path = decodeURIComponent(url.split("/api/v1/subject/")[1]).split("/").join(".");
       const ancestors = path.split(".").slice(0, -1).map((_, i, all) => node(all.slice(0, i + 1).join(".")));
@@ -138,5 +140,12 @@ describe("records and stories that should not be indexed say so", () => {
     const news = await (await newsSitemap()).text();
     expect(news).toContain("/story/multi");
     expect(news).not.toContain("/story/single");
+  });
+
+  it("the news sitemap is a 503 to come back to when the API is down, never an empty file", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("api down"); }));
+    const res = await newsSitemap();
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("300");
   });
 });

@@ -432,7 +432,7 @@ async def get_event(
         await db.execute(
             text(
                 """
-                SELECT id, title, headline_by, summary, sector, subsector, image_url, regions,
+                SELECT id, title, headline_by, summary, sector, subsector, subject_path, image_url, regions,
                        occurred_at, last_updated_at, projection, merged_into
                 FROM events WHERE id = :eid
                 """
@@ -463,7 +463,7 @@ async def get_event(
                 JOIN sources s ON s.id = ri.source_id
                 LEFT JOIN enrichments e ON e.article_id = a.id
                 WHERE em.event_id = :eid
-                ORDER BY ri.published_at DESC NULLS LAST
+                ORDER BY ri.published_at DESC NULLS LAST, a.id
                 """
             ),
             {"eid": str(event_id)},
@@ -590,6 +590,7 @@ async def get_event(
         summary=event["summary"],
         sector=event["sector"],
         subsector=event["subsector"],
+        subject_path=event.get("subject_path"),
         image_url=event["image_url"],
         regions=event["regions"] or [],
         occurred_at=event["occurred_at"].isoformat() if event["occurred_at"] else None,
@@ -697,6 +698,9 @@ async def _open_lens(
             raise HTTPException(status_code=401, detail="sign in to open this lens")
         allowed, used = await anon_lens_open(anon, ip, event_id, lens)
         if not allowed:
+            # The lens wall, counted as Ask's is (ask_limit): the demand signal
+            # the admin reads, in a transaction the 402 does not roll back.
+            await usage.bump_detached("lens_limit", "anonymous")
             raise _lens_limit(lens, used, ANON_LENS_PER_SESSION, anonymous=True)
         return
     # The claim is the read; a claim that already existed (this story, an
@@ -706,6 +710,7 @@ async def _open_lens(
     used = await lens_reads_today(db, user_id)
     if used > USER_LENS_PER_DAY:
         await release_unlock(db, user_id, event_id, lens)
+        await usage.bump_detached("lens_limit", "free")
         raise _lens_limit(lens, used - 1, USER_LENS_PER_DAY, anonymous=False)
 
 

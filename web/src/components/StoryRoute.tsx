@@ -6,6 +6,7 @@ import { ChevronDown } from "@/components/icons";
 import { RouteMap } from "@/components/RouteMap";
 import { StoryTimeline } from "@/components/StoryTimeline";
 import { fetchTrendingStory, type TrendingStoryDetail } from "@/lib/api";
+import { followRel } from "@/lib/seo";
 
 /**
  * The route on the ticket: this development's place on its story, drawn as
@@ -49,7 +50,7 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
     return (
       <div>
         <StoryTimeline story={{ developments: story.developments, cast: [] }} mode="related" />
-        <a href={`/trending/${story.canonical_slug ?? slug}`} className="p-link mt-2.5 inline-flex min-h-[44px] items-center text-[14.5px]">
+        <a href={`/trending/${story.canonical_slug ?? slug}`} rel={followRel(false)} className="p-link mt-2.5 inline-flex min-h-[44px] items-center text-[14.5px]">
           Open this coverage group →
         </a>
       </div>

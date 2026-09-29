@@ -41,7 +41,7 @@ const STEPS = [
   { id: "accountability", n: "10", label: "Who answers for it" },
 ];
 
-const REFUSALS: [string, string][] = [
+export const REFUSALS: [string, string][] = [
   ["No invented numbers.", "Every count on a page is counted from the reports: outlets, languages, quotes, developments. If it is not countable, it is not printed."],
   ["No count without its denominator.", "\u201C2 outlets\u201D means 2 of the outlets Prism monitors, never everyone who covered the story. The list of them is public, with when each was last read."],
   ["No quote that is not in the article.", "A quote appears only when the article it came from prints the same words inside quotation marks. When the check fails the quote is dropped, never paraphrased."],
@@ -124,7 +124,7 @@ function Closing({ id, n, title, children }: { id: string; n?: string; title: st
 }
 
 /** Heads and bodies on top rules, two columns on a desk: refusals, accountability. */
-function RuledList({ items }: { items: [string, string][] }) {
+export function RuledList({ items }: { items: [string, string][] }) {
   return (
     <ul className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
       {items.map(([head, body], i) => (
@@ -162,7 +162,7 @@ export async function HowItWorks() {
           </p>
           <div className="mt-[22px] flex flex-col gap-2.5 lg:flex-row">
             <a href="#reports" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">Start with the reports</a>
-            <Link href="/feed" className="p-btn p-btn--secondary p-btn--lg w-full lg:w-auto">Open today&rsquo;s record</Link>
+            <Link href="/feed" className="p-btn p-btn--secondary p-btn--lg w-full lg:w-auto">Read today&rsquo;s record</Link>
           </div>
         </div>
         <Reveal delay={120} className="min-w-0">
@@ -307,7 +307,7 @@ export async function HowItWorks() {
           <section className="grid justify-items-start gap-3.5 border-t pb-6 pt-12" style={{ borderColor: "var(--line)" }} aria-labelledby="final-title">
             <h2 id="final-title" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>Now read one for yourself.</h2>
             <div className="flex flex-wrap gap-2.5">
-              {event ? <Link href={`/story/${event.id}`} className="p-btn p-btn--primary p-btn--lg">Open the example story</Link> : <Link href="/feed" className="p-btn p-btn--primary p-btn--lg">Open today&rsquo;s record</Link>}
+              {event ? <Link href={`/story/${event.id}`} className="p-btn p-btn--primary p-btn--lg">Open the example story</Link> : <Link href="/feed" className="p-btn p-btn--primary p-btn--lg">Read today&rsquo;s record</Link>}
               <Link href="/onboarding" className="p-btn p-btn--secondary p-btn--lg">Set up my feed</Link>
             </div>
             <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>Free. No account needed to read.</p>

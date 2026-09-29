@@ -82,6 +82,30 @@ export function sectorPageFor(subjectPath: string): string | null {
   return BY_SLUG.has(subjectPath) ? `/sector/${subjectPath}` : null;
 }
 
+/** A subject node's own page: `civic.crime` → /subject/civic/crime. */
+export const subjectHref = (path: string) => `/subject/${path.split(".").join("/")}`;
+
+export type TrailStep = { name: string; href: string };
+
+/**
+ * Where a record sits, root first, each step linked to the page that lists it:
+ * `politics.elections` → Politics (/sector/politics, the page a group root
+ * defers to) › Elections (/subject/politics/elections). Labels come from the
+ * subject tree; without it, or without a path, the record's sector group alone.
+ * The record page links these so the subject pages under the six groups are
+ * reachable from the records they list (audit A1–A2: 37 were in the sitemap only).
+ */
+export function subjectTrail(path: string | null | undefined, nodes: { path: string; label: string }[] | null, sector: string | null): TrailStep[] {
+  const labels = new Map((nodes ?? []).map((n) => [n.path, n.label]));
+  const parts = path ? path.split(".") : [];
+  const steps = parts.map((_, i) => parts.slice(0, i + 1).join("."));
+  if (steps.length > 0 && steps.every((p) => labels.has(p))) {
+    return steps.map((p) => ({ name: labels.get(p)!, href: sectorPageFor(p) ?? subjectHref(p) }));
+  }
+  const g = sectorGroup(sector);
+  return g ? [{ name: g.name, href: `/sector/${g.slug}` }] : [];
+}
+
 /** The `?sector=` parameter the feed API expects for a group. */
 export function sectorParam(group: SectorGroup): string {
   return group.sectors.join(",");

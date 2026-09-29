@@ -110,7 +110,7 @@ export function HeaderNav() {
             href="/feed"
             className={`${LINK_44} inline-flex min-h-11 items-center no-underline transition-[opacity,visibility] duration-[120ms] motion-reduce:transition-none ${heroInView ? "max-sm:invisible max-sm:opacity-0" : ""}`}
           >
-            <span className={`btn btn-primary btn-sm ${RING}`}><span className="sm:hidden">Today&rsquo;s record</span><span className="hidden sm:inline">Open today&rsquo;s record</span></span>
+            <span className={`btn btn-primary btn-sm ${RING}`}><span className="sm:hidden">Today&rsquo;s record</span><span className="hidden sm:inline">Read today&rsquo;s record</span></span>
           </Link>
         ) : session ? (
           <Link href="/account" className={`${LINK_44} flex h-11 w-11 items-center justify-center no-underline`} title={`Signed in as ${session.email}`} aria-label={`Account for ${session.email}`}>
@@ -127,7 +127,7 @@ export function HeaderNav() {
 }
 
 /**
- * Whether the landing hero's own "Open today's record" (#hero-cta) is on screen. The phone
+ * Whether the landing hero's own "Read today's record" (#hero-cta) is on screen. The phone
  * bar holds its button back until it is not, so no view shows two primaries (Claude Design ·
  * screens/PhoneBar.html). Starts true on the landing so the first paint has one primary; the
  * top margin is the bar's height, since a button under the bar is out of sight.

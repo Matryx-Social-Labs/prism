@@ -213,6 +213,8 @@ export interface EventDetail {
   summary: string | null;
   sector: string | null;
   subsector: string | null;
+  /** The subject node (`politics.elections`) the record links and its trail follows. Optional: an older payload has none. */
+  subject_path?: string | null;
   image_url: string | null;
   regions: string[];
   occurred_at: string | null;
@@ -573,6 +575,23 @@ export interface EntityPage {
   /** False for a stub: the page renders, but asks not to be indexed. */
   indexable: boolean;
   records: FeedItem[];
+  /** Who they are, as the articles put it: the role their quoted records repeat most; null when none. */
+  role?: string | null;
+  /** "What <name> said": every quote (direct) and report (reported) that passed the
+   *  story page's checks in the `quotes_window` newest records, the records they are
+   *  in, and the newest `quotes`. Absent on an older payload. */
+  quote_count?: number;
+  reported_count?: number;
+  quoted_records?: number;
+  quotes_window?: number;
+  quotes?: EntityQuote[];
+}
+
+/** A quote on an actor's page: the story page's row for it, the record it is on, and its [n] there. */
+export interface EntityQuote extends ClaimOut {
+  event_id: string;
+  event_title: string;
+  source_index: number | null;
 }
 
 export async function fetchEntity(slug: string): Promise<EntityPage | null> {

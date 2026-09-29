@@ -6,6 +6,7 @@
 // now holding its words (`quote_aliases`), and an older payload without the
 // map is still read by position.
 import type { ClaimOut, SpeakerClaims } from "@/lib/api";
+import { istTime, shortDate } from "@/lib/dateline";
 
 export const quoteId = (speakerIdx: number, claimIdx: number) => `${speakerIdx}-${claimIdx}`;
 
@@ -53,8 +54,18 @@ export function saidWords(claim: ClaimOut, max?: number): string {
 /** "2 quotes · 1 reported": what a card or the section holds, each kind counted apart. */
 export function saidCount(claims: ClaimOut[]): string {
   const reported = claims.filter(isReported).length;
-  const quotes = claims.length - reported;
+  return saidTally(claims.length - reported, reported);
+}
+
+/** saidCount from counts the server made (the entity page counts more than it sends). */
+export function saidTally(quotes: number, reported: number): string {
   return [quotes && `${quotes} ${quotes === 1 ? "quote" : "quotes"}`, reported && `${reported} reported`].filter(Boolean).join(" · ");
+}
+
+/** "THE HINDU · [2] · 24 SEPT 11:30 IST": where and when, in the provenance voice. `n` is the report's [n] on its record. */
+export function quoteProvenance(claim: ClaimOut, n: number | null | undefined): string {
+  const when = claim.published_at ? `${shortDate(claim.published_at)} ${istTime(claim.published_at)} IST` : null;
+  return [claim.source_name.toUpperCase(), n != null ? `[${n}]` : null, when?.toUpperCase()].filter(Boolean).join(" · ");
 }
 
 /**

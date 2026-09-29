@@ -7,7 +7,9 @@
 const KEY = "prism.next.v1";
 
 export function safeNext(value: string | null | undefined): string | null {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.length > 500) return null;
+  // "/\\host" is protocol-relative to a browser, as "//host" is; and a URL
+  // parser strips tab, CR and LF anywhere, so "/\t/host" becomes "//host".
+  if (!value || !/^\/(?![/\\])[^\u0000-\u001f\u007f]*$/.test(value) || value.length > 500) return null;
   return value;
 }
 
@@ -33,7 +35,11 @@ export function takeNext(fallback = "/feed", fromQuery?: string | null): string 
   return q ?? stored ?? fallback;
 }
 
-/** Where to send a new reader: onboarding first, then on to `next`. */
+// A reader who signed in at a gate came for one story or to pay: onboarding
+// waits for another visit rather than stand between them and it (audit 2026-09-29, P1-8).
+const STRAIGHT_ON = /^\/(story|plus)(\/|\?|$)/;
+
+/** Where to send a new reader: onboarding first, then on to `next` — unless `next` is a story or /plus. */
 export function afterSignIn(needsProfile: boolean, next: string): string {
-  return needsProfile ? `/onboarding?next=${encodeURIComponent(next)}` : next;
+  return needsProfile && !STRAIGHT_ON.test(next) ? `/onboarding?next=${encodeURIComponent(next)}` : next;
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "@/lib/seo";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Landing } from "@/components/Landing";
@@ -12,7 +13,15 @@ import { RETURNING_COOKIE } from "@/lib/returning";
 // (no cookie) always gets the landing.
 // The one address a first crawl lands on had no canonical while every other
 // route did (audit); the landing is `/`, the chart is `/feed`.
-export const metadata: Metadata = { alternates: { canonical: "/" } };
+// The search title names the category (several products are called Prism);
+// the share card keeps the promise, as the landing's H1 does.
+const DESCRIPTION = "One page per Indian news story, from a public list of outlets in English and Indian languages: every report, who covered it, and who said what, word for word.";
+export const metadata: Metadata = {
+  title: { absolute: "Prism: India's verifiable news record" },
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  ...social("Prism: Follow the story, not the headlines.", DESCRIPTION, "/"),
+};
 
 export default async function Page() {
   if ((await cookies()).has(RETURNING_COOKIE)) redirect("/feed");

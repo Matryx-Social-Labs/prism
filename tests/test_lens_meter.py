@@ -21,7 +21,7 @@ from sqlalchemy import text
 
 import api.routes.events as events_route
 from api.main import app
-from common import auth
+from common import auth, usage
 from common import quota as quota_mod
 from common.db import session_scope
 from common.quota import has_unlocked, lens_reads_today
@@ -155,6 +155,31 @@ async def test_a_free_account_reads_ten_a_day_then_meets_plus(world, monkeypatch
     assert (await _brief(written[0], token=token)).status_code == 200, "an opened lens stays open"
     async with session_scope() as s:
         assert await lens_reads_today(s, uid) == 10
+
+
+async def _lens_limits(who: str) -> int:
+    async with session_scope() as s:
+        return (await s.execute(text("SELECT coalesce(sum(count), 0) FROM usage_daily "
+                                     "WHERE day = :d AND event = 'lens_limit' AND dim = :w"),
+                                {"d": usage.today(), "w": who})).scalar()
+
+
+async def test_a_refused_lens_is_counted_as_demand(world, monkeypatch):
+    """The lens wall had no server count (Ask's has ask_limit), so the admin's
+    demand read nothing for the one wall Plus answers (audit 2026-09-29, §2.5).
+    The 402 rolls the request back; the count must survive it."""
+    written, _, users = world
+    _no_model(monkeypatch)
+    anon, (_, token) = str(uuid.uuid4()), users["free"]
+    before = await _lens_limits("anonymous"), await _lens_limits("free")
+    for eid in written[:3]:
+        assert (await _brief(eid, anon=anon)).status_code == 200
+    for eid in written[:10]:
+        assert (await _brief(eid, token=token)).status_code == 200
+    assert (await _lens_limits("anonymous"), await _lens_limits("free")) == before, "a read is not a refusal"
+    assert (await _brief(written[3], anon=anon)).status_code == 402
+    assert (await _brief(written[10], token=token)).status_code == 402
+    assert (await _lens_limits("anonymous"), await _lens_limits("free")) == (before[0] + 1, before[1] + 1)
 
 
 async def test_reads_older_than_a_day_do_not_count(world, monkeypatch):

@@ -59,28 +59,20 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: "Prism",
   title: {
-    default: "Prism: Follow the story, not the headlines.",
+    default: "Prism: India's verifiable news record",
     template: "%s | Prism",
   },
   description:
-    "One live story record from monitored outlets, with every development, verified quote and source open to inspection.",
+    "One page per Indian news story, from a public list of outlets in English and Indian languages: every report, who covered it, and who said what, word for word.",
   // Let search show the full snippet and the share card at full size; a news
   // result cut to 160 characters or a thumbnail loses the record's point.
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large", "max-video-preview": -1 } },
   category: "news",
   publisher: "Prism Media Intelligence LLP",
-  openGraph: {
-    type: "website",
-    siteName: "Prism",
-    title: "Prism: Follow the story, not the headlines.",
-    description: "One live story record from monitored outlets, with every development, verified quote and source open to inspection.",
-    url: "/",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Prism: Follow the story, not the headlines.",
-    description: "One live story record from monitored outlets, with every development, verified quote and source open to inspection.",
-  },
+  // Site-level only. A page names itself with lib/seo social(); one that does
+  // not falls back to its own <title>, never to the homepage's card and URL.
+  openGraph: { type: "website", siteName: "Prism", locale: "en_IN" },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {

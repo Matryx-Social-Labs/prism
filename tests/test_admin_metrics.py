@@ -57,6 +57,7 @@ async def seeded():
         for day, event, dim, n in [
             (date(2031, 1, 30), "view", "story", 5), (TODAY, "view", "feed", 2), (TODAY, "visitors", "", 3),
             (date(2031, 1, 2), "view", "story", 4),  # the period before
+            (TODAY, "lens_limit", "free", 2), (TODAY, "lens_limit", "anonymous", 1),
         ]:
             await s.execute(text("INSERT INTO usage_daily (day, event, dim, count) VALUES (:d, :e, :m, :n) "
                                  "ON CONFLICT (day, event, dim) DO UPDATE SET count = EXCLUDED.count"),
@@ -84,6 +85,17 @@ async def test_a_period_is_read_against_the_one_before_and_by_kind(seeded):
     assert _row(visits, "visitor_days")["current"] == 3
     pages = {r["label"]: (r["current"], r["previous"]) for r in visits["breakdowns"][1]["rows"]}
     assert pages == {"story": (5, 4), "feed": (2, 0)}
+
+
+async def test_the_lens_wall_is_demand_beside_the_question_limit(seeded):
+    """Audit 2026-09-29 §2.5: the one wall Plus answers was counted nowhere."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    async with session_scope() as s:
+        demand = await metrics.demand(s, metrics.window(28, TODAY), since=date(2031, 1, 1))
+    assert _row(demand, "lens_limit")["current"] == 3
+    by = next(b for b in demand["breakdowns"] if b["key"] == "lens_limit_by")
+    assert {r["label"]: r["current"] for r in by["rows"]} == {"free": 2, "anonymous": 1}
 
 
 async def test_a_day_before_counting_began_is_not_a_zero(seeded):

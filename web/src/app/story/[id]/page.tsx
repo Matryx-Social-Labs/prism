@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { fetchEvent, type EventDetail } from "@/lib/api";
+import { fetchEvent, fetchSubjects, type EventDetail } from "@/lib/api";
 import { StoryView } from "@/components/StoryView";
-import { sectorGroup } from "@/lib/sectors";
+import { subjectTrail } from "@/lib/sectors";
 import { breadcrumbLd, eventDescription, jsonLd, newsArticleLd, robotsUnless } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const description = eventDescription(event);
   // event.id, not the requested id: a merged record's old address answers with
-  // the survivor, and its canonical must name the survivor (the redirect below
-  // reaches a crawler as a streamed meta refresh, not an HTTP 308).
+  // the survivor, and its canonical must name the survivor as well as the
+  // redirect below does (an HTTP 308 since the route stopped streaming, 2026-09-29).
   const url = `/story/${event.id}`;
   // The share card is always Prism's own (opengraph-image.tsx): a publisher's
   // photograph is never presented as our card (legal review, 2026-09-18).
@@ -70,17 +70,21 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   // NewsArticle structured data (lib/seo): headline, dates, the reports it is
   // based on and the entities it is about — so search and answer engines see
   // a grounded record, not a bare link. The image is the record's own card.
-  const group = sectorGroup(event.sector);
+  // The trail follows the subject path (Politics › Elections), not just the
+  // group; the page prints it and links the subject (audit A2, A9). Without
+  // the tree it is the sector group, as before.
+  const tree = await fetchSubjects().catch(() => null);
+  const place = subjectTrail(event.subject_path, tree?.nodes ?? null, event.sector);
   const trail = [
     { name: "Prism", url: `${SITE_URL}/` },
-    ...(group ? [{ name: group.name, url: `${SITE_URL}/sector/${group.slug}` }] : []),
+    ...place.map((s) => ({ name: s.name, url: `${SITE_URL}${s.href}` })),
     { name: event.title, url: `${SITE_URL}/story/${event.id}` },
   ];
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(newsArticleLd(event)) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbLd(trail)) }} />
-      <StoryView event={event} />
+      <StoryView event={event} trail={place} />
     </>
   );
 }

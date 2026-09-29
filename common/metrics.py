@@ -314,6 +314,7 @@ async def money(db: AsyncSession, w: dict[str, date], since: date | None) -> dic
 async def demand(db: AsyncSession, w: dict[str, date], since: date | None) -> dict[str, Any]:
     src = f"usage_daily · {_since_label(since)}"
     limit = await _usage(db, w, "ask_limit", since)
+    lens_limit = await _usage(db, w, "lens_limit", since)
     lens = await _usage(db, w, "lens", since)
     sub = await _usage(db, w, "subscribe", since)
     locked = [r for r in lens["split"] if r["label"].endswith(":locked")]
@@ -325,6 +326,9 @@ async def demand(db: AsyncSession, w: dict[str, date], since: date | None) -> di
             _row("ask_limit", "Hit the free question limit", limit["current"], limit["previous"], src, series=limit["series"],
                  prev_series=limit["prev_series"],
                  note="Asked for another answer and could not have one."),
+            _row("lens_limit", "Hit the free lens limit", lens_limit["current"], lens_limit["previous"], src,
+                 series=lens_limit["series"], prev_series=lens_limit["prev_series"],
+                 note="Asked for another lens reading and could not have one."),
             _row("locked_lens", "Opened a locked lens", sum(r["current"] for r in locked) if since else None, None, src),
             _row("prompts", "Saw the upgrade prompt", sum(r["current"] for r in prompts) if since else None, None, src),
             _row("applications", "Applied to label", await _count(db, "labellers", "created_at", w["start"], w["end"]),
@@ -332,6 +336,7 @@ async def demand(db: AsyncSession, w: dict[str, date], since: date | None) -> di
         ],
         "breakdowns": [
             {"key": "limit_by", "title": "Who hit the limit", "rows": limit["split"], "source": src},
+            {"key": "lens_limit_by", "title": "Who hit the lens limit", "rows": lens_limit["split"], "source": src},
             {"key": "locked_lenses", "title": "Locked lenses opened", "rows": locked, "source": src},
             {"key": "languages", "title": "Languages accounts read", "source": "users · every account since launch",
              "rows": await _split(db, "SELECT l, count(*) FROM users, unnest(coalesce(languages, ARRAY[]::text[])) AS l "

@@ -3,19 +3,19 @@ import { Reveal } from "@/components/Reveal";
 
 /** Where Prism stands: what is live, what is being validated, what is next. Shared by the landing and the walkthrough. */
 export const AVAILABLE = [
-  "One record per story from monitored outlets, across languages",
-  "Every count out of the public list of monitored outlets, with when they were last read",
-  "Single-source stories marked as not yet corroborated",
-  "Verbatim quotes with the source and the article context",
-  "Coverage by outlet origin on every story",
-  "Professional readings of the same facts",
-  "Ask, cited to the story's own reports",
-  "A public corrections log, and every earlier version of a record",
+  "One page per story, from outlets in English and Indian languages",
+  "Every count is out of a public list of outlets, with when each was last read",
+  "A story only one outlet has is marked as not yet corroborated",
+  "Quotes in their exact words, linked to the line in the article",
+  "Which kinds of outlet have each story, and how many",
+  "Lenses: the same story read for a kind of work",
+  "Ask a story a question; the answer cites its reports",
+  "A public corrections log, and every earlier version of a story page",
 ];
 export const VALIDATION = [
-  "Story timelines across days (two-reviewer gate)",
-  "Freshness targets on a clean 72-hour cohort",
-  "Coverage gaps stated against the monitored set",
+  "Timelines of stories that run for days (two reviewers check each)",
+  "How quickly new reports reach a story page",
+  "Saying which monitored outlets have not covered a story",
 ];
 // Translation of Prism's own writing is held until the record and its data
 // quality are complete (founder D-d, 2026-09-24), so it is not promised here.
@@ -49,9 +49,9 @@ export function StatusColumn({ tone, label, items }: { tone: keyof typeof RULE; 
   );
 }
 
-/** Available now · In validation · Next, each printing in as it is reached. */
+/** Working now · Being checked · Next, each printing in as it is reached. */
 export function StatusColumns() {
-  const cols = [["now", "Available now", AVAILABLE], ["val", "In validation", VALIDATION], ["next", "Next", NEXT]] as const;
+  const cols = [["now", "Working now", AVAILABLE], ["val", "Being checked", VALIDATION], ["next", "Next", NEXT]] as const;
   return (
     <div className="mt-[18px] grid gap-5 lg:grid-cols-3">
       {cols.map(([tone, label, items], i) => (
@@ -71,7 +71,7 @@ export function PlanCards({ plusFrom }: { plusFrom: string | null }) {
       </div>
       <div className="p-card" style={{ borderTop: "3px solid var(--accent)" }}>
         <h3 className="p-eyebrow" style={{ color: "var(--accent)" }}>Prism Plus{plusFrom ? ` · from ${plusFrom} a month` : ""}</h3>
-        <p className="mt-1.5" style={{ font: "var(--t-body-s)" }}>{PLUS_LINE} <Link href="/plus" className="p-link">See Plus</Link></p>
+        <p className="mt-1.5" style={{ font: "var(--t-body-s)" }}>{PLUS_LINE} <Link href="/plus?from=landing" data-cta="landing:plans" className="p-link">See Plus</Link></p>
       </div>
     </div>
   );

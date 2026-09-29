@@ -154,8 +154,10 @@ export function CancelSheet({
   const small = { font: "400 12px/1.35 var(--font-read)", color: "var(--ink-3)" } as const;
   const title = { font: "var(--t-display-m)", letterSpacing: "var(--track-display)" } as const;
   const footnote = <span style={small}>One click, any time · no calls, no forms</span>;
-  const cancelAnyway = (variant: "ghost" | "secondary") => (
-    <button type="button" disabled={busy !== null} onClick={cancelNow} className={`${btn} p-btn--${variant}`}>{busy === "cancel" ? "Cancelling…" : "Cancel anyway"}</button>
+  // A real button beside any offer, never a ghost (COMPLIANCE §3.4: the declined
+  // choice must not be greyed out beside a prominent save).
+  const cancelAnyway = (
+    <button type="button" disabled={busy !== null} onClick={cancelNow} className={`${btn} p-btn--secondary`}>{busy === "cancel" ? "Cancelling…" : "Cancel anyway"}</button>
   );
 
   const doneCopy = done && {
@@ -248,11 +250,11 @@ export function CancelSheet({
                   )}
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-3" style={{ borderTop: "1px solid var(--line)" }}>
                     {footnote}
-                    {cancelAnyway("ghost")}
+                    {cancelAnyway}
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center justify-between gap-2.5">{footnote}{cancelAnyway("secondary")}</div>
+                <div className="flex flex-wrap items-center justify-between gap-2.5">{footnote}{cancelAnyway}</div>
               )}
               {note && <p role="status" style={{ font: "500 13.5px/1.45 var(--font-read)", color: "var(--danger)" }}>{note}</p>}
             </div>

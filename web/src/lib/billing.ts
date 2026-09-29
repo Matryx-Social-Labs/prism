@@ -11,6 +11,10 @@ import { track } from "@/lib/analytics";
  *  common/quota.py ANON_LENS_PER_SESSION / USER_LENS_PER_DAY, for copy that
  *  speaks before the server has counted; a 402 carries the limit it hit. */
 export const LENS_READS = { anon: 3, free: 10 } as const;
+/** Questions a day in Ask: per conversation without an account, per day with
+ *  one, and on Plus — common/quota.py ANON_ASK_PER_SESSION / USER_ASK_PER_DAY /
+ *  PLUS_ASK_PER_DAY, for copy that speaks before the server has counted. */
+export const ASK_QUESTIONS = { anon: 3, free: 10, plus: 100 } as const;
 
 export interface PlanOut {
   plan: "plus_monthly" | "plus_yearly" | "founding" | string;
@@ -173,9 +177,16 @@ export async function subscribe(
       readonly: email ? { email: true } : undefined,
       theme: { color: ink },
       handler: (r: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => { done = true; resolve(r); },
-      modal: { ondismiss: () => { if (!done) reject(new Error("dismissed")); } },
+      modal: {
+        ondismiss: () => {
+          if (done) return;
+          track("Subscribe", { plan, stage: "dismissed" });
+          reject(new Error("dismissed"));
+        },
+      },
     });
     rz.on("payment.failed", (r: unknown) => {
+      track("Subscribe", { plan, stage: "declined" });
       const d = (r as { error?: { description?: string } })?.error?.description ?? "That payment did not go through";
       onEvent?.("payment_failed", d);
     });
@@ -187,7 +198,10 @@ export async function subscribe(
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify(paid),
   });
-  if (!v.ok) throw new Error(`We could not confirm the payment (ref ${paid.razorpay_payment_id}). It is recorded on Razorpay's side; write to us with that reference and we will set it right.`);
+  if (!v.ok) {
+    track("Subscribe", { plan, stage: "unverified" });
+    throw new Error(`We could not confirm the payment (ref ${paid.razorpay_payment_id}). It is recorded on Razorpay's side; write to us with that reference and we will set it right.`);
+  }
   track("Subscribe", { plan, stage: "paid" });
   return (await v.json()) as Subscribed;
 }

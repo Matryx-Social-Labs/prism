@@ -52,14 +52,15 @@ describe("GoogleSignIn", () => {
   });
 
   it("after Google answers, sends the access token up and finishes the trip — via onboarding for a new reader", async () => {
-    window.history.replaceState(null, "", "/signin?next=%2Fplus");
+    // Not /plus or a story: a reader a gate sent goes straight back (lib/next.afterSignIn, audit P1-8).
+    window.history.replaceState(null, "", "/signin?next=%2Fwatchlist");
     session.signInWithGoogle.mockResolvedValue({ session: { token: "t", userId: "u", email: "a@b.c" }, needsProfile: true });
     render(<GoogleSignIn />);
     await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
     await waitFor(() => expect(gis.cb).not.toBeNull());
     await act(async () => { gis.cb!({ access_token: "ya29.x" }); });
     expect(session.signInWithGoogle).toHaveBeenCalledWith("ya29.x");
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/onboarding?next=%2Fplus"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/onboarding?next=%2Fwatchlist"));
   });
 
   it("a returning reader goes straight back; a closed chooser just re-enables the button", async () => {

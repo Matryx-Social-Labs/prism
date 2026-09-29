@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
+import { social } from "@/lib/seo";
 import { Suspense } from "react";
 import { PlusPage } from "@/components/PlusPage";
 
+const title = "Plus: professional readings and more questions";
+const description = "The record stays free. Plus opens the professional readings of a story and more questions a day, answered from the whole story.";
 export const metadata: Metadata = {
-  title: "Plus",
-  description: "The evidence stays free. Plus is for the reader who asks more of it: answers from the whole story, 100 questions a day.",
+  title,
+  description,
   alternates: { canonical: "/plus" },
+  ...social(title, description, "/plus"),
 };
 
 // Rendered per request: statically, useSearchParams (the `from` label) bailed

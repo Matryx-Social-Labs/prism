@@ -5,6 +5,8 @@ import SignInPage from "@/app/signin/page";
 
 const requestMagicLink = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/session", () => ({ requestMagicLink, saveSession: vi.fn(), signInWithGoogle: vi.fn() }));
+const track = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({ track }));
 const params = vi.hoisted(() => new URLSearchParams());
 vi.mock("next/navigation", () => ({ useSearchParams: () => params, useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 
@@ -24,6 +26,7 @@ async function submit(address = EMAIL) {
 
 beforeEach(() => {
   requestMagicLink.mockReset().mockResolvedValue(undefined);
+  track.mockReset();
 });
 
 describe("Sign in — sending the link", () => {
@@ -130,6 +133,41 @@ describe("Sign in — failure", () => {
 
     expect(requestMagicLink).toHaveBeenCalledTimes(2);
     expect(await screen.findByText("Check your inbox")).toBeInTheDocument();
+  });
+});
+
+// Audit 2026-09-29 P1-7: on a phone the reason to sign up was hidden, and a
+// reader a story's gate sent here was greeted as a returning one.
+describe("Sign in — why an account", () => {
+  it("says what an account adds at every width, counted from the caps (per visit without one)", () => {
+    render(<SignInPage />);
+    const adds = screen.getByText("An account adds").parentElement!;
+    expect(adds).not.toHaveClass("hidden");
+    expect(adds).toHaveTextContent("10 questions a day in Ask, instead of 3 a visit without an account");
+    expect(adds).toHaveTextContent("10 professional lens readings a day, instead of 3 a visit without an account");
+  });
+
+  it("greets a reader a story sent here as new, and anyone else as signing in", () => {
+    params.set("next", "/story/e1");
+    const { unmount } = render(<SignInPage />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Keep reading, free");
+    expect(screen.getByText("An account is free. We email you a one-time link; no password.")).toBeInTheDocument();
+    unmount();
+    params.delete("next");
+    render(<SignInPage />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Sign in to Prism");
+  });
+
+  // Asked for vs used: without this the mail that never arrived is invisible (§2.5).
+  it("counts a link asked for, and not one that failed to send", async () => {
+    requestMagicLink.mockRejectedValueOnce(new Error("Mailer unavailable"));
+    render(<SignInPage />);
+    await submit();
+    await screen.findByText("Mailer unavailable");
+    expect(track).not.toHaveBeenCalled();
+    await userEvent.click(submitButton());
+    await screen.findByText("Check your inbox");
+    expect(track).toHaveBeenCalledWith("Sign in", { stage: "sent", method: "link" });
   });
 });
 

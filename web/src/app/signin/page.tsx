@@ -8,7 +8,8 @@ import { type FormEvent, Suspense, useEffect, useState } from "react";
 import { Check } from "@/components/icons";
 import { Alert, TextField } from "@/components/ui";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
-import { LENS_READS } from "@/lib/billing";
+import { track } from "@/lib/analytics";
+import { ASK_QUESTIONS, LENS_READS } from "@/lib/billing";
 import { requestMagicLink } from "@/lib/session";
 
 // Server truths the copy leans on (common/config.py): a link lives 15 minutes
@@ -18,13 +19,13 @@ import { requestMagicLink } from "@/lib/session";
 const LINK_TTL_MIN = 15;
 const RESEND_COOLDOWN_S = 30;
 
-// What an account adds, from the code that enforces it: common/quota.py
-// (USER_ASK_PER_DAY 10, ANON_ASK_PER_SESSION 3; the lens meter via LENS_READS),
-// and the watchlist API has no plan gate.
+// What an account adds, from the code that enforces it: common/quota.py (via
+// ASK_QUESTIONS and LENS_READS), and the watchlist API has no plan gate.
+// Without an account the counts are per visit (a browser session), not per day.
 const ACCOUNT_ADDS = [
   "A watchlist of tickers and subjects, free",
-  "10 questions a day in Ask, instead of 3 without an account",
-  `${LENS_READS.free} professional lens readings a day, instead of ${LENS_READS.anon} without an account`,
+  `${ASK_QUESTIONS.free} questions a day in Ask, instead of ${ASK_QUESTIONS.anon} a visit without an account`,
+  `${LENS_READS.free} professional lens readings a day, instead of ${LENS_READS.anon} a visit without an account`,
 ];
 
 /** A reader's words for what is wrong with an address, or null when it will do. */
@@ -78,6 +79,8 @@ function SignIn() {
     setBusy(true);
     try {
       await requestMagicLink(email.trim(), next);
+      // Asked for, not yet used: the gap between the two is the mail that never arrived.
+      track("Sign in", { stage: "sent", method: "link" });
       return true;
     } catch (err) {
       setError(failure(err));
@@ -120,9 +123,10 @@ function SignIn() {
   return (
     <div className={col}>
       <div>
-        <h1 className="text-balance" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>Sign in to Prism</h1>
+        {/* A reader a story's gate sent here is almost always new: the page speaks to them. */}
+        <h1 className="text-balance" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>{fromStory ? "Keep reading, free" : "Sign in to Prism"}</h1>
         <p className="mt-2" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-          Enter your email and we&apos;ll send a one-time sign-in link. No password.
+          {fromStory ? "An account is free. We email you a one-time link; no password." : "Enter your email and we’ll send a one-time sign-in link. No password."}
         </p>
       </div>
 
@@ -159,7 +163,8 @@ function SignIn() {
         {fromStory ? "← Back to the story, without an account" : "Keep reading without an account"}
       </Link>
 
-      <div className="hidden gap-1.5 border-t pt-3.5 lg:grid" style={{ borderColor: "var(--line)" }}>
+      {/* At every width: on a phone this is the only reason given to sign up. */}
+      <div className="grid gap-1.5 border-t pt-3.5" style={{ borderColor: "var(--line)" }}>
         <p className="p-field__label">An account adds</p>
         <ul className="grid gap-1.5">
           {ACCOUNT_ADDS.map((x) => (
