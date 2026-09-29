@@ -3,6 +3,49 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.118.0] - 2026-09-29
+
+Phase 1 of the data plan (`.claude/plans/data-accuracy-and-sources.plan.md`): every
+article a fuzzy rule matched is confirmed before it joins a record. Founder decisions
+2026-09-29: a record is one happening, follow-ups show as earlier/later links, the
+backlog is repaired from a reviewed dry run, and two labellers check the verifier.
+
+### Changed — every match is confirmed (`PRISM_EVENT_VERIFY=confirm`)
+- The title, embedding and entity rules now only propose a record; the verifier decides,
+  asking of each candidate whether the article reports the same happening and whether it
+  is a later development of it. Measured against that same test on 781 production
+  matches, the entity rule was right 44% of the time (it made 19% of all matches, and
+  56% of the records shown as covered by two or more outlets were covered only through
+  it or the embedding rule), the embedding rule 76%, the title rule 92%, the verifier
+  100%.
+- A later development founds its own record, linked to the one before it. The record
+  page lists these under "Earlier and later" (`follow_ups` on the record API).
+- If the verifier cannot answer, a title match still attaches (92% right) so an outage
+  does not split every retelling; an embedding or entity match does not, since a new
+  record that the merge folds later is the cheaper mistake. `PRISM_EVENT_VERIFY=live`
+  restores the old rules exactly.
+
+### Added — repairing what the old rules matched
+- `tools/repair_attaches`: re-judges every fuzzy match in a window (answers kept in
+  `event_match_verdicts`, mode `repair`); a dry run writes a CSV and moves nothing;
+  `--apply` moves what the verifier rejects back through the live path. A moved article
+  keeps the time it first arrived (so trending does not read it as new coverage), the
+  record it left is rebuilt without moving up the feed, and its brief is rewritten. Dry run, 7 days: 4,217 matches, 1,891 under 0.5,
+  452 of them follow-ups.
+- `tools/gold_attaches`: two blind labelling sheets (300 article-vs-record pairs, 100
+  read twice) and the scorer that checks the verifier against people rather than itself.
+- `tools/score_cascade --confirm` replays the new mode on the labelled sets.
+
+### Fixed
+- A merged record could show the absorbed record's summary under its own headline (144 of
+  878): the record's own founding article now always comes first.
+  `tools/merge_duplicates --resummarise --apply` rebuilds them, and gives the 25 records
+  an older fold left with two founders one.
+- An article naming a folded spelling of an actor ("JP Nadda" for Jagat Prakash Nadda)
+  brought no evidence for that actor to the entity rule.
+- The record-merge floor has its own `--min`; merging at 0.87 no longer means raising the
+  live attach floor for the whole service.
+
 ## [0.0.117.0] - 2026-09-29
 
 Phase 0 of the data plan (`.claude/plans/data-accuracy-and-sources.plan.md`): what had to be

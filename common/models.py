@@ -226,6 +226,9 @@ class EventLink(TimestampMixin, Base):
     relation: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float | None] = mapped_column(Float)
     rationale: Mapped[str | None] = mapped_column(Text)
+    # 'thread' (the LLM thread-linker) or 'verified' (a follow-up Jev confirmed
+    # at attach, correlation/consumer._link_follow_up).
+    method: Mapped[str] = mapped_column(Text, nullable=False, server_default="thread")
 
 
 # ── Perspective and impact graph ─────────────────────────────────────

@@ -141,8 +141,16 @@ class Settings(BaseSettings):
     # Jev call, attach at >= the floor. off | shadow (ask, record, never attach) |
     # live. 0.85 held precision 1.00 on the hard same-language labels and 20/20
     # in a week of production pairs (2026-09-25); lower it only on labels.
+    #
+    # confirm (2026-09-29): live, and the title, embedding and entity tiers only
+    # PROPOSE — Jev decides every attach they would have made (measured against
+    # its own test: entity_overlap 44% the same happening, embedding 76%, title
+    # 92%, the verified tier 100%, on 781 production attaches). An article that
+    # is a later development instead founds its own record, linked as a follow-up
+    # at >= prism_follow_up_min. Back to `live` restores the old tiers exactly.
     prism_event_verify: str = "off"
     prism_event_verify_min: float = 0.85
+    prism_follow_up_min: float = 0.85
     prism_ingest_max_articles: int = 0
     # Stop COLLECTING when the recorded OpenRouter balance is under this many
     # dollars, so a stalled enrichment never grows a backlog that becomes a bill

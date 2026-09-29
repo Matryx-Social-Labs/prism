@@ -16,6 +16,9 @@
   --apply     fold them, most certain first, one transaction each
   --limit N   only the first N merges (a canary: --apply --limit 20, then read
               the survivors before running the rest)
+  --resummarise  rebuild merged records whose summary is not their own founder's
+              (before 0.0.118.0 a merge could hand a survivor the absorbed
+              record's summary: 144 of 878 on 2026-09-29); dry run unless --apply
 
 Idempotent and resumable: a merged copy leaves the plan, and every merge
 re-checks itself under the correlation consumer's lock, so a run that stops
@@ -108,13 +111,72 @@ async def _plan_events(days: int) -> merge.PairPlan:
     return p
 
 
+MISMATCHED = """
+    SELECT e.id FROM events e
+    JOIN event_memberships m ON m.event_id = e.id AND m.match_type = 'new_event'
+    JOIN enrichments en ON en.article_id = m.article_id
+    WHERE e.merged_into IS NULL
+      AND EXISTS (SELECT 1 FROM events c WHERE c.merged_into = e.id)
+      AND e.summary IS DISTINCT FROM en.summary
+    ORDER BY e.id
+"""
+
+
+# Records an older fold left with two or more founders: the rebuild orders the
+# founder first, so a record must have one. The one whose English headline IS
+# the record's title keeps it (the title was copied from it), else the earliest.
+MULTI_FOUNDER = """
+    SELECT m.id, m.event_id,
+           row_number() OVER (PARTITION BY m.event_id
+                              ORDER BY (en.shared_fields->>'headline' = e.title) DESC NULLS LAST, m.created_at, m.id) AS rank
+    FROM event_memberships m
+    JOIN events e ON e.id = m.event_id AND e.merged_into IS NULL
+    LEFT JOIN enrichments en ON en.article_id = m.article_id
+    WHERE m.match_type = 'new_event'
+      AND m.event_id IN (SELECT event_id FROM event_memberships WHERE match_type = 'new_event'
+                         GROUP BY event_id HAVING count(*) > 1)
+"""
+
+
+async def _resummarise(apply: bool) -> int:
+    from correlation.consumer import _rebuild_projection
+
+    async with session_scope() as s:
+        multi = (await s.execute(text(MULTI_FOUNDER))).all()
+        ids = set((await s.execute(text(MISMATCHED))).scalars().all())
+    retag = [r.id for r in multi if r.rank > 1]
+    ids |= {r.event_id for r in multi}
+    print(f"{len({r.event_id for r in multi})} records have more than one founder ({len(retag)} to retag 'merged'); "
+          f"{len(ids)} records to rebuild in all")
+    if not apply:
+        print("dry run — pass --apply to rebuild them (without moving them up the feed)")
+        return 0
+    async with session_scope() as s:
+        await s.execute(text("UPDATE event_memberships SET match_type = 'merged' WHERE id = ANY(CAST(:i AS uuid[]))"),
+                        {"i": [str(i) for i in retag]})
+    for eid in sorted(ids):
+        await _rebuild_projection(eid, touch=False)
+    async with session_scope() as s:
+        left = len((await s.execute(text(MISMATCHED))).scalars().all())
+    print(f"rebuilt {len(ids)}; {left} still differ")
+    return 0
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--events", action="store_true", help="judge records against records (calls Jev, < $1)")
     ap.add_argument("--days", type=int, default=7, help="with --events: records first seen in the last N days")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--resummarise", action="store_true")
+    ap.add_argument("--min", type=float, default=None,
+                    help="merge floor (default: PRISM_EVENT_VERIFY_MIN); never changes the live attach floor")
     a = ap.parse_args()
+    if a.min is not None and not 0.5 <= a.min <= 1.0:
+        ap.error("--min is a Jev probability floor between 0.5 and 1.0")
+    merge.MERGE_MIN = a.min
+    if a.resummarise:
+        return await _resummarise(a.apply)
 
     pairs = None
     if a.events:

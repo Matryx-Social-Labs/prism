@@ -59,11 +59,32 @@ SAME_HAPPENING = (
     "Adalat, another day's prices or weather)"
 )
 
+# Asked beside SAME_HAPPENING when the other tiers only propose (mode "confirm"):
+# an article that is not the same happening but a later development of it founds
+# its own record, linked to this one as a follow-up. Measured 2026-09-29 on 60
+# production attaches judged not-the-same-happening: every pair at >= 0.85 read
+# as a real follow-up (a Supreme Court ruling upholding a High Court's, a player
+# declared fit after the injury, the accused produced in court); below 0.5 they
+# were different matters (another meeting, another semifinal).
+SAME_STORY = (
+    "{a} reports a later development of the specific happening in {b}: a follow-up, consequence, official "
+    "response or reaction to it, or a later stage of the same case, dispute, investigation, contest or disaster (the "
+    "probe after a death, the verdict after a trial, the final after the semifinal, protests over a decision). Not when "
+    "they only share a topic, a place, a person or an organisation in different matters"
+)
+
 
 @dataclass(frozen=True)
 class Candidate:
     event_id: uuid.UUID
-    distance: float  # nearest member article's gist, cosine distance
+    distance: float | None  # nearest member article's gist, cosine distance; None when proposed without one
+
+
+@dataclass(frozen=True)
+class Verdict:
+    candidate: Candidate
+    same: float  # the same happening
+    follows: float | None = None  # a later development of it (SAME_STORY); None when not asked
 
 
 def gist_text(shared: dict, raw_title: str) -> str | None:
@@ -82,6 +103,10 @@ def article_block(*, source: str, published_at, headline: str, summary: str) -> 
     return f"Published {when} by {source}.\nHeadline: {headline}\nSummary: {summary}"
 
 
+def event_block(title: str, summary: str | None, first_seen_at) -> str:
+    return f"First reported {first_seen_at:%Y-%m-%d %H:%M}.\nHeadline: {title}\nSummary: {summary or ''}"
+
+
 async def event_blocks(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
     """Each candidate's FOUNDING headline and summary — what the judge reads."""
     rows = (
@@ -90,10 +115,7 @@ async def event_blocks(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid
             {"ids": [str(i) for i in ids]},
         )
     ).all()
-    return {
-        r.id: f"First reported {r.first_seen_at:%Y-%m-%d %H:%M}.\nHeadline: {r.title}\nSummary: {r.summary or ''}"
-        for r in rows
-    }
+    return {r.id: event_block(r.title, r.summary, r.first_seen_at) for r in rows}
 
 
 async def judge(
@@ -104,37 +126,61 @@ async def judge(
     call only — no database: a Jev failure or timeout raises, and the caller
     treats that as no match, which is only safe because nothing here can leave
     the transaction aborted."""
+    verdicts, model, cost = await judge_story(
+        article_id=article_id, block=block, candidates=candidates, blocks=blocks, follows=False
+    )
+    return [(v.candidate, v.same) for v in verdicts], model, cost
+
+
+async def judge_story(
+    *, article_id: uuid.UUID, block: str, candidates: list[Candidate], blocks: dict[uuid.UUID, str],
+    follows: bool = True,
+) -> tuple[list[Verdict], str, float]:
+    """judge(), asking also whether the article is a later development of each
+    event (SAME_STORY) — one call either way. Network only, as judge()."""
     asked = [c for c in candidates if c.event_id in blocks]
     if not asked:
         return [], "", 0.0
     state = {"ARTICLE": block, **{f"EVENT_{k}": blocks[c.event_id] for k, c in enumerate(asked, 1)}}
     questions = {f"same_{k}": Noul(instructions=SAME_HAPPENING.format(a="ARTICLE", b=f"EVENT_{k}"))
                  for k in range(1, len(asked) + 1)}
+    if follows:
+        questions |= {f"story_{k}": Noul(instructions=SAME_STORY.format(a="ARTICLE", b=f"EVENT_{k}"))
+                      for k in range(1, len(asked) + 1)}
     d = await asyncio.wait_for(
         decide(state, questions, trace_name="event-verify", metadata={"stage": "correlation", "article_id": str(article_id)}),
         VERIFY_TIMEOUT_S,
     )
-    scored = []
+    verdicts = []
     for k, c in enumerate(asked, 1):
-        answer = d.answers[f"same_{k}"]
-        assert isinstance(answer, NoulAnswer)
-        scored.append((c, answer.noul))
-    return scored, d.model or get_settings().prism_model_decide, d.usage.cost
+        same = d.answers[f"same_{k}"]
+        assert isinstance(same, NoulAnswer)
+        story = d.answers.get(f"story_{k}") if follows else None
+        verdicts.append(Verdict(c, same.noul, story.noul if isinstance(story, NoulAnswer) else None))
+    return verdicts, d.model or get_settings().prism_model_decide, d.usage.cost
 
 
 async def record(
-    session: AsyncSession, *, article_id: uuid.UUID, scored: list[tuple[Candidate, float]], model: str, mode: str
+    session: AsyncSession, *, article_id: uuid.UUID, scored: list[tuple[Candidate, float]] | list[Verdict],
+    model: str, mode: str,
 ) -> None:
     """Every answer, matched or not, into event_match_verdicts — the audit trail
     and the replay cache. A failure here is a database failure and propagates."""
     if not scored:
         return
-    await session.execute(
-        text(
-            "INSERT INTO event_match_verdicts (article_id, event_id, noul, gist_distance, model, mode) "
-            "VALUES (:a, :e, :n, :d, :m, :mode) "
-            "ON CONFLICT (article_id, event_id) DO UPDATE SET noul = EXCLUDED.noul, model = EXCLUDED.model, mode = EXCLUDED.mode"
-        ),
-        [{"a": str(article_id), "e": str(c.event_id), "n": p, "d": c.distance, "m": model, "mode": mode}
-         for c, p in scored],
-    )  # executemany — one round trip
+    verdicts = [v if isinstance(v, Verdict) else Verdict(v[0], v[1]) for v in scored]
+    rows = [{"a": str(article_id), "e": str(v.candidate.event_id), "n": v.same, "s": v.follows,
+             "d": v.candidate.distance, "m": model, "mode": mode} for v in verdicts]
+    if all(v.follows is None for v in verdicts):
+        # The pre-0.0.118 shape: a worker on this code must not need story_noul
+        # until the API has migrated (review, 2026-09-29).
+        sql = ("INSERT INTO event_match_verdicts (article_id, event_id, noul, gist_distance, model, mode) "
+               "VALUES (:a, :e, :n, :d, :m, :mode) "
+               "ON CONFLICT (article_id, event_id) DO UPDATE SET noul = EXCLUDED.noul, model = EXCLUDED.model, "
+               "mode = EXCLUDED.mode")
+    else:
+        sql = ("INSERT INTO event_match_verdicts (article_id, event_id, noul, story_noul, gist_distance, model, mode) "
+               "VALUES (:a, :e, :n, :s, :d, :m, :mode) "
+               "ON CONFLICT (article_id, event_id) DO UPDATE SET noul = EXCLUDED.noul, story_noul = EXCLUDED.story_noul, "
+               "model = EXCLUDED.model, mode = EXCLUDED.mode")
+    await session.execute(text(sql), rows)  # executemany — one round trip

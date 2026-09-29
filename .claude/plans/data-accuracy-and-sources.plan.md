@@ -202,6 +202,16 @@ only helps unpinned calls and expires after 10 minutes idle.
 **Exit:** tier precision ≥ 0.95 on every attaching path; residual copies stay ≤ 2% of new records (1.2%
 today — the verifier must not trade precision for new duplicates); multi-outlet records re-counted.
 
+**Phase 1 status (2026-09-29): built in 0.0.118.0**, founder decisions 1A 2A 3A 4A 5A.
+- 1.1 `PRISM_EVENT_VERIFY=confirm` (propose → verify, two questions, follow-up links; on
+  a Jev failure only a title proposal still attaches). 1.3 dropped: the prompt only asks
+  for actors the article names, and under confirm shared actors just propose.
+- 1.2 dropped for now: candidates already come from gists in the verifier.
+- 1.4 `tools/repair_attaches` (dry run 7 days: 1,891 of 4,217 under 0.5, 452 follow-ups).
+- 1.5 both bugs fixed (`--resummarise`: 169 records). 1.6 `merge_duplicates --min`.
+- 1.7 labels: `/label` shows records against records only, so `tools/gold_attaches`
+  writes two blind sheets (300 article-vs-record pairs, 100 read twice) instead.
+
 ### Phase 2 — signals and identity (week 2)
 
 2.1 Keep what we already fetch: `og:url`/canonical, `datePublished`/`dateModified`, author,

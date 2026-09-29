@@ -388,6 +388,21 @@ class SpeakerClaims(BaseModel):
     languages: list[str] = []
 
 
+class FollowUpRef(BaseModel):
+    id: str
+    title: str
+    first_seen_at: str
+    source_count: int | None = None
+
+
+class FollowUps(BaseModel):
+    """Records the verifier judged to be earlier or later developments of this
+    one (correlation/consumer._link_follow_up; event_links method 'verified'),
+    oldest first. Never the LLM thread-linker's links, never shared actors alone."""
+    earlier: list[FollowUpRef] = []
+    later: list[FollowUpRef] = []
+
+
 class EventDetail(BaseModel):
     id: str
     # Asks to be indexed: two outlets or more (common/outlets.record_indexable).
@@ -423,6 +438,9 @@ class EventDetail(BaseModel):
     # route from /trending/{slug} — the same arc the share page shows. None when
     # no story holds the event.
     story_slug: str | None = None
+    # "Earlier / Later in this story": follow-ups on the verifier's word, until
+    # the story layer itself is verified (common/stories.STORY_BOUNDARY_STATUS).
+    follow_ups: FollowUps = FollowUps()
     # The denominator: how many outlets Prism monitors, and when the collector
     # last polled them, so "2 outlets" reads as "2 of 27 monitored · checked
     # 4 min ago" and never as everyone who covered it.

@@ -242,6 +242,9 @@ export interface EventDetail {
   monitored_checked_at?: string | null;
   /** Editorial corrections, newest first. Optional: an older payload has none. */
   corrections?: RecordCorrection[];
+  /** Records a verifier judged to be earlier or later developments of this
+   *  one, oldest first, at most 5 a side. Optional: an older payload has none. */
+  follow_ups?: { earlier: FollowUpRef[]; later: FollowUpRef[] };
   projection: {
     event_type?: string | null;
     source_count?: number;
@@ -258,6 +261,14 @@ export interface EventDetail {
   // Reader-tier signal: what the official accounts said on X, as written. Never
   // in `sources`, never counted. Empty until PRISM_X_ENABLED on the API.
   x_posts?: XPostOut[];
+}
+
+/** Another record linked to this one as an earlier or later development (api/schemas.FollowUpRef). */
+export interface FollowUpRef {
+  id: string;
+  title: string;
+  first_seen_at: string;
+  source_count: number | null;
 }
 
 /** A post from an official account on X about this story, as written. */

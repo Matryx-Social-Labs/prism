@@ -35,7 +35,7 @@ async def _db_reachable() -> bool:
         return False
 
 
-async def _add_member(s, event_id, *, title, summary, source_id, minutes_ago=0):
+async def _add_member(s, event_id, *, title, summary, source_id, minutes_ago=0, match_type="entity_overlap"):
     """One article joining an event, as the correlation consumer writes it.
 
     `minutes_ago` is not decoration. Without it every member inserted in one
@@ -65,8 +65,8 @@ async def _add_member(s, event_id, *, title, summary, source_id, minutes_ago=0):
     )
     await s.execute(
         text("INSERT INTO event_memberships (id, event_id, article_id, match_type, is_survivor) "
-             "VALUES (:i, :e, :a, 'entity_overlap', false)"),
-        {"i": str(uuid.uuid4()), "e": str(event_id), "a": str(art_id)},
+             "VALUES (:i, :e, :a, :mt, false)"),
+        {"i": str(uuid.uuid4()), "e": str(event_id), "a": str(art_id), "mt": match_type},
     )
     return raw_id, art_id
 
@@ -250,6 +250,42 @@ async def test_single_origin_DOES_fire_for_one_masthead_across_its_own_feeds():
                             {"ids": [str(src_a), str(src_b)]})
 
 
+async def test_a_merged_record_keeps_its_own_founders_summary():
+    """REGRESSION 2026-09-29: a merge moves the absorbed record's members in,
+    its founder among them (as 'merged'). When that founder was the OLDER
+    article it sorted first, and 144 of 878 merged records showed its summary
+    under their own headline."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid, src, created = uuid.uuid4(), uuid.uuid4(), []
+    try:
+        async with session_scope() as s:
+            await s.execute(text("INSERT INTO sources (id, slug, name, source_type) VALUES (:i, :s, 'test', 'rss')"),
+                            {"i": str(src), "s": f"t-{eid.hex[:8]}"})
+            await s.execute(text("INSERT INTO events (id, title, summary, sector, regions, last_updated_at) "
+                                 "VALUES (:i, 'India choose to bowl first', 'x', 'sports', ARRAY['IN'], now())"),
+                            {"i": str(eid)})
+            created.append(await _add_member(s, eid, minutes_ago=30, match_type="new_event",
+                                             title="India choose to bowl first", summary="India won the toss and bowled.",
+                                             source_id=src))
+            created.append(await _add_member(s, eid, minutes_ago=120, match_type="merged",
+                                             title="Toss: India to field", summary="The absorbed record's founder.",
+                                             source_id=src))
+        await _rebuild_projection(eid)
+        async with session_scope() as s:
+            summary = (await s.execute(text("SELECT summary FROM events WHERE id = :i"), {"i": str(eid)})).scalar_one()
+        assert summary == "India won the toss and bowled."
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_memberships WHERE event_id = :e"), {"e": str(eid)})
+            for raw_id, art_id in created:
+                await s.execute(text("DELETE FROM enrichments WHERE article_id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM articles WHERE id = :a"), {"a": str(art_id)})
+                await s.execute(text("DELETE FROM raw_items WHERE id = :r"), {"r": str(raw_id)})
+            await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
+            await s.execute(text("DELETE FROM sources WHERE id = :s"), {"s": str(src)})
+
+
 def test_the_member_ordering_has_a_deterministic_tiebreaker():
     """`ORDER BY em.created_at` alone is not a total order, and the tie is real.
 
@@ -278,7 +314,7 @@ def test_the_member_ordering_has_a_deterministic_tiebreaker():
     assert "ORDER BY em.created_at\n" not in src, (
         "member ordering must not rely on created_at alone — it ties inside a transaction"
     )
-    assert src.count("ORDER BY em.created_at, ri.published_at NULLS LAST, a.id") == 2, (
+    assert src.count("ORDER BY (em.match_type = 'new_event') DESC, em.created_at, ri.published_at NULLS LAST, a.id") == 2, (
         "both member queries need the same deterministic order"
     )
 
