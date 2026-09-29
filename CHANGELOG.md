@@ -3,6 +3,56 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.115.0] - 2026-09-29
+
+### Added — a Grievance Officer, and a queue behind "Something wrong?"
+- `/grievance` names the Grievance Officer (Tejas ShylaShashidhara, Chief Executive
+  Officer, grievance@readprism.news), takes a complaint with a reference number, emails
+  an acknowledgement with a copy of the complaint as recorded, and publishes a monthly
+  count of complaints received and decided, zeros included. A decision is due within
+  15 days; the founders decide at `/admin/grievances`.
+- "Something wrong?" on every story opens the same form, filled in.
+- `/delivery`, `/press` (with the readPrism.news lockup and mark as SVG and PNG, and how
+  to cite a record), and `/for-publishers` (what Prism takes from an outlet and gives
+  back, each line checked in the code). The footer links them all.
+
+### Added — pages for every state and every day
+- `/state/<name>`: the stories placed in a state that two or more monitored outlets
+  reported, with the outlets that have a desk there. Indexed from 20 such stories in 30
+  days (15 states today). A person page named after a state now points to its state page.
+- `/feed/<date>` and `/archive`: the record for each day Prism read. A day Prism did not
+  read says so; a day it read in part prints the hours.
+
+### Added — the week's record by email, and a welcome note
+- An opt-in email on Sunday mornings (IST): the week's stories from two or more outlets,
+  counted, and the week's corrections. Off by default; nothing is sent until you tick the
+  box in your account. The unsubscribe link asks once, then stops it.
+- A new account gets one short note on what it adds and how to delete it.
+
+### Changed — Plus
+- Checkout stays closed until the live payment keys are in (this site runs on test keys).
+- Every price shows its GST: "₹149 a month, including ₹22.73 GST (18%)".
+- Founding membership (500 members, ₹999 a year) is the recommended plan while seats
+  last; the price you join at is kept for as long as you stay subscribed.
+- The Plus page's prices and questions are in the HTML search engines read.
+
+### Changed — search, sharing and measuring the launch
+- Story share cards print "k of n monitored outlets"; every share card has alt text.
+- Each story shows when it was first reported, in IST.
+- `/llms-full.txt` (for answer engines), an Atom feed at `/feed.xml`, `lang="en-IN"`,
+  entity pages as collections with breadcrumbs, sitemap dates from the newest report.
+- Launch links carry a channel word (`?ref=producthunt`), counted once and removed from
+  the address bar. One inline question asks where you heard about Prism; another asks
+  whether you could check the story for yourself. Aggregates only; the privacy policy
+  names them.
+- For you invites readers who have not picked subjects; sign-in suggests a fix for a
+  mistyped email address.
+
+### Fixed
+- `/healthz` said the pipeline was fine while it had read nothing for a day; it now
+  reports it stalled (liveness stays up).
+- Uttarakhand's rows printed "India" (its code was keyed IN-UT; the API uses IN-UK).
+
 ## [0.0.114.0] - 2026-09-29
 
 ### Changed — the landing says what Prism is, and answers a first visit
