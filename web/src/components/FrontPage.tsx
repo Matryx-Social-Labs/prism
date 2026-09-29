@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { track } from "@/lib/analytics";
 import { Chart } from "@/components/Chart";
 import { lensMarkers } from "@/components/ChartRow";
 import { EmptyState } from "@/components/ui";
+import { SubtopicNav } from "@/components/reading/parts";
 import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { TodayAside } from "@/components/today/TodayAside";
 import { TopOfRecord } from "@/components/today/TopOfRecord";
-import { fetchFeed, fetchTrending, type FeedItem, type TrendingStory } from "@/lib/api";
+import { fetchFeed, fetchTrending, type FeedItem, type SubjectNode, type TrendingStory } from "@/lib/api";
 import { chartOrder } from "@/lib/chart";
 import { staleSince } from "@/lib/staleness";
 import { istTime, shortDate } from "@/lib/dateline";
@@ -39,15 +41,18 @@ import { useStateName } from "@/lib/useStateName";
  * when none do.
  *
  * `initial` is the ALL list the server already fetched, so the rows are in the
- * HTML a crawler receives (Google renders JS late; GPTBot, ClaudeBot and
+ * HTML a crawler receives (Google renders JS late; OAI-SearchBot, Claude-SearchBot and
  * PerplexityBot never do — the day's record was invisible to all of them,
  * 2026-09-21). The first client fetch is skipped when the reader's slice IS
  * that default; a state, a language or FOR YOU re-fetches as before.
+ *
+ * `subtopics`, on a sector page, are its group's sub-topics as chips under the
+ * H1: the subject pages under the six groups had no other link (audit A1).
  */
 type Tab = "today" | "foryou";
 const WINDOW = FEED_WINDOW;
 
-export function FrontPage({ sector = null, initial = null }: { sector?: string | null; initial?: FeedItem[] | null }) {
+export function FrontPage({ sector = null, initial = null, subtopics = [] }: { sector?: string | null; initial?: FeedItem[] | null; subtopics?: SubjectNode[] }) {
   const group = sectorGroup(sector);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
@@ -205,7 +210,15 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
                 hasInterests && !group ? (
                   <div role="tablist" aria-label="Which record" className="p-seg">
                     {(["today", "foryou"] as Tab[]).map((t) => (
-                      <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
+                      <button
+                        key={t}
+                        role="tab"
+                        aria-selected={tab === t}
+                        onClick={() => {
+                          if (t === "foryou" && tab !== t) track("Tab", { tab: t });
+                          setTab(t);
+                        }}
+                      >
                         {t === "today" ? "Today" : "For you"}
                       </button>
                     ))}
@@ -213,6 +226,7 @@ export function FrontPage({ sector = null, initial = null }: { sector?: string |
                 ) : undefined
               }
             />
+            {group && <SubtopicNav all={`/sector/${group.slug}`} nodes={subtopics} />}
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
                 {scopes.map(([s, l]) => (

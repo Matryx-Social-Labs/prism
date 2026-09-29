@@ -4,6 +4,7 @@ The email delivery backend is pluggable (common/email.py) and defaults to a
 console sender, so the flow works end-to-end in dev with no provider configured.
 """
 
+import re
 from urllib.parse import quote
 from uuid import UUID
 
@@ -34,7 +35,9 @@ class MagicLinkRequest(BaseModel):
 
 def safe_next(value: str | None) -> str | None:
     """A same-site path or nothing: never an open redirect off readprism.news."""
-    if not value or not value.startswith("/") or value.startswith("//") or len(value) > 500:
+    # "/\\host" is protocol-relative to a browser, as "//host" is; and a URL
+    # parser strips tab, CR and LF anywhere, so "/\t/host" becomes "//host".
+    if not value or len(value) > 500 or not re.fullmatch(r"/(?![/\\])[^\x00-\x1f\x7f]*", value):
         return None
     return value
 

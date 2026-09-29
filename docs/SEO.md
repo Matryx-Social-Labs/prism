@@ -2,8 +2,8 @@
 
 What is in place as of 2026-09-21, why, and what only the founder's accounts can
 do. The principle: **the record must be in the HTML.** Google renders JavaScript
-late and on a budget; the answer engines' crawlers (GPTBot, ClaudeBot,
-PerplexityBot, Google-Extended) do not render it at all. Before this work the
+late and on a budget; the answer engines' crawlers (OAI-SearchBot,
+Claude-SearchBot, PerplexityBot) do not render it at all. Before this work the
 day's record, the sector pages and Stories shipped a skeleton and nothing else.
 
 ## In the code
@@ -51,8 +51,10 @@ nothing here changes them.
 5. ~~**The mailbox** `hello@readprism.news`~~ — DONE 2026-09-22: a forwarding alias at the registrar. It is named in `llms.txt`, the policies, the refund flow and the organisation schema, and now reaches a person.
 6. ~~**Google-Extended / CCBot**~~ — DECIDED and SHIPPED in 0.0.86.0: the
    training-only crawlers (`Google-Extended`, `CCBot`, `Applebot-Extended`,
-   `Bytespider`, `meta-externalagent`) are disallowed; the citing crawlers
-   (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `OAI-SearchBot`) stay allowed. The
+   `Bytespider`, `meta-externalagent`, and since 2026-09-29 `GPTBot` and
+   `ClaudeBot`, which their vendors document as training crawlers) are
+   disallowed; the citing crawlers (`OAI-SearchBot`, `ChatGPT-User`,
+   `Claude-SearchBot`, `Claude-User`, `PerplexityBot`) stay allowed. The
    trade-off is written beside the rule in `app/robots.ts`.
 
 ## Rank sooner — the order that matters (2026-09-22)
@@ -130,7 +132,9 @@ indexed" from Search Console.
 ## How to check it is working
 
 ```
-curl -sA "Mozilla/5.0 (compatible; GPTBot/1.0)" https://www.readprism.news/feed | grep -c row-card   # 60
+curl -sA "Mozilla/5.0 (compatible; OAI-SearchBot/1.0)" https://www.readprism.news/feed | grep -c row-card   # 60
+curl -s https://www.readprism.news/story/00000000-0000-0000-0000-000000000000 -o /dev/null -w "%{http_code}\n"   # 404, not 200
+curl -s https://www.readprism.news/about | sed 's#</head>.*##' | grep -c 'rel="canonical"'   # 1: metadata in <head>
 curl -s https://www.readprism.news/news-sitemap.xml | grep -c "<news:news>"
 curl -s https://www.readprism.news/llms.txt | head -3
 ```

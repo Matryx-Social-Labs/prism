@@ -197,7 +197,7 @@ export function AskPanel({
           />
         </Sheet>
       )}
-      <UpgradeSheet open={upgrade !== null} onClose={() => setUpgrade(null)} reason={upgrade?.reason} used={upgrade?.used} limit={upgrade?.limit} />
+      <UpgradeSheet open={upgrade !== null} onClose={() => setUpgrade(null)} reason={upgrade?.reason} used={upgrade?.used} limit={upgrade?.limit} back={`/story/${eventId}`} />
     </>
   );
 }

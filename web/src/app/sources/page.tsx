@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "@/lib/seo";
 import Link from "next/link";
 import { Ago } from "@/components/Ago";
 import { CoverageBar, OutletIcon } from "@/components/Coverage";
@@ -18,10 +19,13 @@ import { missingLanguages } from "@/lib/sources";
 // slot order, each group counted, the whole set drawn as one bar on top.
 export const revalidate = 300;
 
+const title = "The outlets Prism reads";
+const description = "Every outlet Prism monitors, by origin and language, with when each was last read. Every count on a Prism record is out of this list.";
 export const metadata: Metadata = {
-  title: "The outlets Prism reads",
-  description: "Every outlet Prism monitors, by origin and language, with when each was last read. Every count on a Prism record is out of this list.",
+  title,
+  description,
   alternates: { canonical: "/sources" },
+  ...social(title, description, "/sources"),
 };
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;

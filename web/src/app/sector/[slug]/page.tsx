@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FrontPage } from "@/components/FrontPage";
-import { fetchFeed, type FeedItem } from "@/lib/api";
+import { fetchFeed, fetchSubjects } from "@/lib/api";
 import { FEED_WINDOW } from "@/lib/feedWindow";
 import { SECTOR_GROUPS, sectorGroup, sectorParam } from "@/lib/sectors";
-import { feedListItems, itemListLd, jsonLd } from "@/lib/seo";
+import { feedListItems, itemListLd, jsonLd, social } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // The chart filtered to one of the reader's six subjects, its code active in
@@ -23,29 +23,30 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const group = sectorGroup(slug);
   if (!group) return { title: "Not found" };
-  return {
-    title: `${group.name} — today's record`,
-    description: `Today's ${group.name} stories from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`,
-    alternates: { canonical: `/sector/${group.slug}` },
-  };
+  const title = `${group.name} — today's record`;
+  const description = `Today's ${group.name} stories from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`;
+  return { title, description, alternates: { canonical: `/sector/${group.slug}` }, ...social(title, description, `/sector/${group.slug}`) };
 }
 
 export default async function SectorPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const group = sectorGroup(slug);
   if (!group) notFound();
-  let initial: FeedItem[] | null = null;
-  try {
-    initial = await fetchFeed({ sector: sectorParam(group), sort: "latest", limit: FEED_WINDOW });
-  } catch {
+  const [initial, tree] = await Promise.all([
     // API unreachable at render: the client fetches as before.
-  }
+    fetchFeed({ sector: sectorParam(group), sort: "latest", limit: FEED_WINDOW }).catch(() => null),
+    // The group's sub-topics, chips under the H1: without them the subject pages
+    // under the six groups were in the sitemap and nowhere else (audit A1).
+    // Best effort — without the tree the page renders as before.
+    fetchSubjects().catch(() => null),
+  ]);
+  const subtopics = tree?.nodes.filter((n) => n.depth === 2 && n.path.startsWith(`${group.slug}.`)) ?? [];
   return (
     <>
       {initial && initial.length > 0 && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(`${group.name} — today's record`, `${SITE_URL}/sector/${group.slug}`, feedListItems(initial))) }} />
       )}
-      <FrontPage sector={slug} initial={initial} />
+      <FrontPage sector={slug} initial={initial} subtopics={subtopics} />
     </>
   );
 }

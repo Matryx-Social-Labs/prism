@@ -32,32 +32,3 @@ export function RowListSkeleton({ n = 6, label = "Loading" }: { n?: number; labe
     </div>
   );
 }
-
-/** A record or a story page: meta line, title, lede, coverage, the photo stage, three blocks. */
-export function RecordSkeleton() {
-  return (
-    <div className="mx-auto max-w-[var(--shell)] px-5 pt-6 sm:px-8 xl:px-10" aria-busy="true" aria-label="Loading" role="status">
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-x-10 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)]">
-        <div className="hidden lg:block">{[0, 1, 2, 3].map((i) => <span key={i} className="block border-t py-3" style={{ borderColor: "var(--line)" }}>{bar([120, 90, 110, 60][i], 12)}</span>)}</div>
-        <div className="min-w-0 lg:max-w-[var(--reading)]">
-          {bar(160, 10)}
-          {bar("92%", 34, "mt-4")}
-          {bar("70%", 34, "mt-2")}
-          {bar("100%", 14, "mt-5")}
-          {bar("84%", 14, "mt-2")}
-          <span className="mt-5 flex items-center gap-3">{bar(120, 8)}{bar(150, 10)}</span>
-          <span className="pulse-skel mt-6 block aspect-[16/10] w-full rounded-[var(--r-md)] lg:aspect-[2/1]" style={{ background: "var(--sunken)" }} aria-hidden />
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="mt-8 border-t pt-5" style={{ borderColor: "var(--line)" }}>
-              {bar(180, 22)}
-              {bar("100%", 14, "mt-4")}
-              {bar("96%", 14, "mt-2")}
-              {bar("72%", 14, "mt-2")}
-            </div>
-          ))}
-        </div>
-        <div className="hidden xl:block"><div className="card">{bar(90, 10)}{bar("100%", 60, "mt-3")}{bar("100%", 60, "mt-2")}</div></div>
-      </div>
-    </div>
-  );
-}

@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
-import { DevelopingRail, MetaLine, PageTitle, ReadingColumns } from "@/components/reading/parts";
+import { DevelopingRail, MetaLine, PageTitle, ReadingColumns, SubtopicNav } from "@/components/reading/parts";
 import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { TickerChip } from "@/components/tabs/Markets";
 import { BackBar, EmptyState } from "@/components/ui";
 import { fetchSubject, fetchSubjects, fetchTrending, type SubjectPage as SubjectPayload } from "@/lib/api";
-import { sectorGroup, sectorPageFor, sectorParam } from "@/lib/sectors";
-import { breadcrumbLd, feedListItems, itemListLd, jsonLd, robotsUnless } from "@/lib/seo";
+import { sectorGroup, sectorPageFor, sectorParam, subjectHref } from "@/lib/sectors";
+import { breadcrumbLd, feedListItems, itemListLd, jsonLd, robotsUnless, social } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // A node of the subject tree and the stories under it — under IT, so
@@ -32,10 +32,14 @@ export async function generateMetadata({ params }: { params: Promise<{ path: str
   if (!page) return { title: "Not found", robots: { index: false, follow: true } };
   const { node, ancestors, story_count } = page;
   const trail = [...ancestors.map((a) => a.label), node.label].join(" · ");
+  const title = `${node.label} — today's record`;
+  const description = `${story_count} ${story_count === 1 ? "story" : "stories"} in ${trail}, from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`;
+  const canonical = sectorPageFor(node.path) ?? `/subject/${node.path.split(".").join("/")}`;
   return {
-    title: `${node.label} — today's record`,
-    description: `${story_count} ${story_count === 1 ? "story" : "stories"} in ${trail}, from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`,
-    alternates: { canonical: sectorPageFor(node.path) ?? `/subject/${node.path.split(".").join("/")}` },
+    title,
+    description,
+    alternates: { canonical },
+    ...social(title, description, canonical),
     // A node nobody has reached yet is not a page worth indexing. It stays
     // readable, and comes back when the corpus fills it.
     ...robotsUnless(story_count > 0),
@@ -56,7 +60,7 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
   const page = await load(path);
   if (!page) notFound();
   const { node, ancestors, children, story_count, stories } = page;
-  const href = (p: string) => `/subject/${p.split(".").join("/")}`;
+  const href = subjectHref;
   // Structured data names the page a group's subject defers to (sectorPageFor),
   // the same address its canonical gives; the visible links stay on the tree.
   const indexed = (p: string) => `${SITE_URL}${sectorPageFor(p) ?? href(p)}`;
@@ -124,14 +128,7 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
               <PageTitle>{node.label}</PageTitle>
               <MetaLine items={[`${story_count} ${story_count === 1 ? "story" : "stories"}`, live != null ? `30 days: ${live}` : null, stories.length > 1 ? "newest first" : null]} />
             </header>
-            {children.length > 0 && (
-              <nav aria-label="Sub-topics" className="p-hide-scroll -mx-[var(--gutter)] flex gap-1.5 overflow-x-auto px-[var(--gutter)] lg:mx-0 lg:flex-wrap lg:px-0">
-                <Link href={href(node.path)} className="p-chip" aria-current="page">All</Link>
-                {children.map((c) => (
-                  <Link key={c.path} href={href(c.path)} className="p-chip">{c.label}</Link>
-                ))}
-              </nav>
-            )}
+            <SubtopicNav all={href(node.path)} nodes={children} />
             {tickers.length > 0 && (
               <section aria-labelledby="companies-named" className="grid gap-2">
                 <SectionHead id="companies-named" title="Companies named" sub={`in ${withTickers} of the ${stories.length} stories below`} />

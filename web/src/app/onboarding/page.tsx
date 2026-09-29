@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { track } from "@/lib/analytics";
 import { safeNext } from "@/lib/next";
 import { SubjectToggles, followedSubjects, groupOn, interestsToPicks, picksToInterests, useRegions, useTaxonomy, useProfessionGroups, type Picks } from "@/components/ProfileEditor";
 import { OnboardingPreview } from "@/components/accounts/OnboardingPreview";
@@ -51,6 +52,9 @@ function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
 
+  // The onboarding funnel, counted by step (1-based): reached, skipped at, finished.
+  useEffect(() => track("Onboarding", { stage: "step", step: 1 }), []);
+
   useEffect(() => {
     const existing = loadProfile();
     if (existing) {
@@ -71,8 +75,8 @@ function OnboardingPage() {
   // The account needs all three; without them "Build my feed" waits and says why.
   const accountIncomplete = !!session && (!name.trim() || !profession || !consent);
 
-  async function finish() {
-    // Client profile (lens/interests/state/languages) drives feed personalization locally.
+  // Client profile (lens/interests/state/languages) drives feed personalization locally.
+  function saveLocal() {
     saveProfile({
       lens,
       region: "IN",
@@ -81,6 +85,24 @@ function OnboardingPage() {
       // English only for now (founder, 2026-09-16); languages are not collected.
       languages: loadProfile()?.languages ?? ["en"],
     });
+  }
+
+  // Skipping keeps what was already picked, in this browser: a reader who will
+  // not type a name still gets their For you (audit 2026-09-29, P1-8).
+  function skip() {
+    if (state || profession || picksToInterests(picks).length) saveLocal();
+    track("Onboarding", { stage: "skip", step: step + 1 });
+    router.push(next);
+  }
+
+  function advance() {
+    if (step === LAST) return finish();
+    track("Onboarding", { stage: "step", step: step + 2 });
+    setStep(step + 1);
+  }
+
+  async function finish() {
+    saveLocal();
     // Account profile (name/profession/state/languages/consent) persists server-side
     // once the reader is signed in, and only with all three answers and the consent
     // in hand (the button waits for the same; this is the check that matters). If
@@ -98,6 +120,8 @@ function OnboardingPage() {
       }
       setSaving(false);
     }
+    // Signed in, Build my feed waits for the account's answers, so this far means it was saved.
+    track("Onboarding", { stage: "done", saved: session ? "account" : "local" });
     router.push(next);
   }
 
@@ -191,7 +215,7 @@ function OnboardingPage() {
       <span className="flex-1" />
       <button
         type="button"
-        onClick={() => (step < LAST ? setStep(step + 1) : finish())}
+        onClick={advance}
         disabled={saving || (step === LAST && accountIncomplete)}
         aria-busy={saving || undefined}
         className="p-btn p-btn--primary p-btn--lg"
@@ -205,7 +229,7 @@ function OnboardingPage() {
     <div className="mx-auto w-full max-w-[1016px] px-[var(--gutter)] pb-[calc(96px+env(safe-area-inset-bottom))] pt-3 lg:pb-12 lg:pt-6">
       {/* Nothing blocks reading: the way out is on every step. */}
       <div className="flex justify-end">
-        <button type="button" onClick={() => router.push(next)} className="p-btn p-btn--text">Skip for now</button>
+        <button type="button" onClick={skip} className="p-btn p-btn--text">Skip for now</button>
       </div>
       <div className="grid lg:grid-cols-[minmax(0,560px)_minmax(0,400px)] lg:justify-center lg:gap-14">
         <div className="grid min-w-0 content-start gap-5">

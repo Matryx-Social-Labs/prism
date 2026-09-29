@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { social } from "@/lib/seo";
 import Link from "next/link";
 import { PageTitle } from "@/components/reading/parts";
 import { REASON_WORDS } from "@/components/RecordHistory";
@@ -14,10 +15,13 @@ import { shortDate } from "@/lib/dateline";
 // does not (no "was / now" pair: a correction is one note).
 export const revalidate = 300;
 
+const title = "Corrections";
+const description = "Every correction Prism has made to a record, newest first, with the reason and what was wrong.";
 export const metadata: Metadata = {
-  title: "Corrections",
-  description: "Every correction Prism has made to a record, newest first, with the reason and what was wrong.",
+  title,
+  description,
   alternates: { canonical: "/corrections" },
+  ...social(title, description, "/corrections"),
 };
 
 export default async function CorrectionsPage() {

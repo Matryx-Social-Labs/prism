@@ -62,12 +62,28 @@ SIGNIN_METHODS = frozenset({"link", "google"})
 ASK_VIA = frozenset({"bar", "foot", "thumb", "selection", "quote", "entity", "chip"})  # AskContext.AskVia
 LENS_STATES = frozenset({f"{slug}:{state}" for slug in LENSES for state in ("open", "locked")})
 SUBSCRIBE_STAGES = frozenset({"prompt", "page", "welcome", "cancel-sheet", "paused", "cancelled",
-                              "switched-yearly", "checkout", "paid"})
+                              "switched-yearly", "checkout", "paid",
+                              "dismissed", "declined", "unverified"})  # how a checkout that did not pay ended
 SUBSCRIBE_DETAIL = frozenset({
-    "ask-limit", "ask-rest", "generic", "account", "header", "direct",  # the door (UpgradeReason, ?from=)
+    # the door (UpgradeReason, ?from=)
+    "ask-limit", "ask-rest", "generic", "lens-limit", "lens-signin", "account", "header", "landing", "footer", "direct",
     "not-using", "too-expensive", "missing-something", "other", "none",  # billing.CancelReason
     "plus_monthly", "plus_yearly", "founding",  # common/billing plan ids
 })
+# The funnel before paying (monetisation audit 2026-09-29, §2.5): a link asked
+# for (sign-in completes as "link"/"google"), the onboarding step reached,
+# finished or skipped (web/src/app/onboarding), a landing button, the For you
+# tab, and the 2nd and 5th story read in a tab (web/src/components/UsageBeacon).
+SIGNIN = SIGNIN_METHODS | {"sent:link"}
+ONBOARDING = frozenset({*(f"{kind}:{n}" for kind in ("step", "skip") for n in (1, 2, 3)), "done:account", "done:local"})
+CTAS = frozenset({"landing:hero", "landing:how", "landing:final-read", "landing:final-setup", "landing:plans"})
+TABS = frozenset({"foryou"})
+DEPTHS = frozenset({"2", "5"})
+# The events whose word is one of a closed list, and the list.
+WORDS: dict[str, frozenset[str]] = {
+    "view": PAGES, "share": SHARE_SURFACES, "signin": SIGNIN, "lens": LENS_STATES, "ask": ASK_VIA,
+    "onboarding": ONBOARDING, "cta": CTAS, "tab": TABS, "depth": DEPTHS,
+}
 HOST = re.compile(r"^[a-z0-9.-]{1,253}$")
 
 # Where an arrival came from, by referrer host. Suffix match on the host.
@@ -120,18 +136,8 @@ def dimension(event: str, d: str, ref: str = "", s: str = "") -> str | None:
     """The one word stored for an event, or None to drop it. Everything the
     client sends is checked against a fixed set or a short slug pattern."""
     d = d.lower()
-    if event == "view":
-        return d if d in PAGES else None
     if event == "arrival":
         return source(ref, s)
-    if event == "share":
-        return d if d in SHARE_SURFACES else None
-    if event == "signin":
-        return d if d in SIGNIN_METHODS else None
-    if event == "lens":
-        return d if d in LENS_STATES else None
-    if event == "ask":
-        return d if d in ASK_VIA else None
     if event == "subscribe":
         # The step counts even when what led there is unknown: /plus?from= is
         # an address anyone can type, and a stray one must not lose the view.
@@ -139,7 +145,8 @@ def dimension(event: str, d: str, ref: str = "", s: str = "") -> str | None:
         if stage not in SUBSCRIBE_STAGES:
             return None
         return d if detail in SUBSCRIBE_DETAIL else stage
-    return None
+    words = WORDS.get(event)
+    return d if words is not None and d in words else None
 
 
 def visitor(salt: str, ip: str, user_agent: str) -> str:
@@ -198,6 +205,13 @@ def demo() -> None:
     assert dimension("subscribe", "page:anything-typed") == "page", "an unknown door keeps the step"
     assert dimension("subscribe", "made-up") is None
     assert dimension("admin", "x") is None
+    assert dimension("subscribe", "page:lens-limit") == "page:lens-limit", "the lens door keeps its word"
+    assert dimension("subscribe", "declined:plus_monthly") == "declined:plus_monthly"
+    assert dimension("signin", "sent:link") == "sent:link" and dimension("signin", "sent:google") is None
+    assert dimension("onboarding", "skip:3") == "skip:3" and dimension("onboarding", "done:local") == "done:local"
+    assert dimension("onboarding", "step:9") is None
+    assert dimension("cta", "landing:hero") == "landing:hero" and dimension("cta", "landing:x") is None
+    assert dimension("tab", "foryou") == "foryou" and dimension("depth", "5") == "5" and dimension("depth", "3") is None
     assert is_bot("Mozilla/5.0 (compatible; Googlebot/2.1)") and is_bot("") and not is_bot("Mozilla/5.0 (iPhone)")
     assert visitor("s1", "1.2.3.4", "ua") != visitor("s2", "1.2.3.4", "ua"), "a new salt must give a new hash"
 

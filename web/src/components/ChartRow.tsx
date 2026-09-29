@@ -10,6 +10,7 @@ import { PhotoImg } from "@/components/PhotoImg";
 import { langNative } from "@/lib/languages";
 import { regionLabel } from "@/lib/regions";
 import { sectorGroup } from "@/lib/sectors";
+import { followRel } from "@/lib/seo";
 
 /**
  * The story row — the unit of the product, identical on Today, Stories, Search,
@@ -97,6 +98,7 @@ export function ChartRow({
     <li className={lead ? "sm:col-span-2" : undefined}>
       <Link
         href={`/story/${item.id}`}
+        rel={followRel(item.indexable)}
         aria-current={lastOpened ? "true" : undefined}
         className={`p-row ${lead ? "p-row--lead" : ""} ${single ? "p-row--single" : ""} h-full`}
         style={{ padding: lead ? "18px 20px 16px" : "14px 16px 12px", gap: 10 }}

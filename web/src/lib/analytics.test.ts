@@ -47,6 +47,26 @@ describe("usage counting", () => {
     expect(sent().d).toBe("prompt:ask-limit");
   });
 
+  // Audit 2026-09-29 §2.5: each word is one the API keeps (common/usage.py).
+  it("words the funnel before paying as the API's closed lists", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    track("Sign in", { stage: "sent", method: "link" });
+    track("Sign in", { method: "google" });
+    track("Onboarding", { stage: "step", step: 2 });
+    track("Onboarding", { stage: "done", saved: "account" });
+    track("Tab", { tab: "foryou" });
+    track("Subscribe", { stage: "declined", plan: "plus_monthly" });
+    const words = fetchSpy.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string));
+    expect(words).toEqual([
+      { e: "signin", d: "sent:link" },
+      { e: "signin", d: "google" },
+      { e: "onboarding", d: "step:2" },
+      { e: "onboarding", d: "done:account" },
+      { e: "tab", d: "foryou" },
+      { e: "subscribe", d: "declined:plus_monthly" },
+    ]);
+  });
+
   it("swallows a failed count", async () => {
     vi.stubEnv("NODE_ENV", "production");
     fetchSpy.mockRejectedValue(new Error("offline"));

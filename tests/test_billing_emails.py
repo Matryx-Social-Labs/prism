@@ -76,10 +76,13 @@ async def test_each_transition_sends_its_email_and_others_send_nothing(monkeypat
     # Why the reader got it names the address it went to; no invented reference rides along.
     assert f"You are getting this because Plus started on your Prism account, {email}." in welcome[2]
     assert "ILLUSTRATION" not in welcome[3] and "example.com" not in welcome[3]
+    # Plus sells the lenses and Ask, never a model (audit 2026-09-29, P0-2).
+    assert "Every lens is open on every story that earns one" in welcome[2] and "model" not in welcome[2].lower()
     not_renew = sender.sent[2][2]
     assert "You keep Plus until 1 January 2100" in not_renew
     ended = sender.sent[3][2]
     assert "ended on 1 January 2000" in ended and "No further charges" in ended
+    assert "10 lens readings and 10 questions a day" in ended, "what stays free includes the free lens readings"
 
 
 async def test_billing_dates_are_the_indian_calendar_day_razorpay_bills_on(monkeypatch):

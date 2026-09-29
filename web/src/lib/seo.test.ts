@@ -96,7 +96,11 @@ describe("robots", () => {
     expect(r.sitemap).toEqual([expect.stringMatching(/\/sitemap\.xml$/), expect.stringMatching(/\/news-sitemap\.xml$/), expect.stringMatching(/\/records-sitemap\.xml$/), expect.stringMatching(/\/entities-sitemap\.xml$/)]);
     const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
     const blocked = rules.filter((x) => x.disallow === "/").map((x) => x.userAgent);
-    expect(blocked).toEqual(expect.arrayContaining(["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent"]));
-    expect(blocked).not.toEqual(expect.arrayContaining(["GPTBot", "ClaudeBot", "PerplexityBot", "OAI-SearchBot", "Googlebot"]));
+    // GPTBot and ClaudeBot are their vendors' TRAINING crawlers (2026-09-29).
+    expect(blocked).toEqual(expect.arrayContaining(["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent", "GPTBot", "ClaudeBot"]));
+    // One by one: `not.arrayContaining` of the whole list passes if any ONE is missing.
+    for (const citing of ["OAI-SearchBot", "ChatGPT-User", "Claude-SearchBot", "Claude-User", "PerplexityBot", "Googlebot", "Bingbot"]) {
+      expect(blocked).not.toContain(citing);
+    }
   });
 });

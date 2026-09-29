@@ -134,12 +134,10 @@ export function LensWriting({ meta }: { meta: LensMeta }) {
   );
 }
 
-// Where a reader at a lens limit reads about Plus; `from` labels the arrival.
-const PLUS_FROM_LENS = "/plus?from=lens-limit";
-
 /** Locked: out of the reads open without an account. What the lens reads,
- *  blurred placeholder lines, what an account gives, and Plus. */
-export function LensLocked({ meta, used, onSignIn }: { meta: LensMeta; used: number | null; onSignIn: () => void }) {
+ *  blurred placeholder lines, what an account gives, and Plus — whose page
+ *  brings the reader back to `back`, the story they were on. */
+export function LensLocked({ meta, used, back, onSignIn }: { meta: LensMeta; used: number | null; back: string; onSignIn: () => void }) {
   return (
     <div className="grid gap-3">
       <div aria-hidden className="grid select-none gap-2 opacity-55 blur-[4px]">
@@ -152,15 +150,16 @@ export function LensLocked({ meta, used, onSignIn }: { meta: LensMeta; used: num
       </p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <button type="button" onClick={onSignIn} className="p-btn p-btn--primary p-btn--sm">Sign in to keep reading</button>
-        <Link href={PLUS_FROM_LENS} className="text-[14px] font-semibold" style={{ color: "var(--accent)" }}>Every lens with Plus →</Link>
+        <Link href={`/plus?from=lens-signin&next=${encodeURIComponent(back)}`} className="text-[14px] font-semibold" style={{ color: "var(--accent)" }}>Every lens with Plus →</Link>
       </div>
     </div>
   );
 }
 
 /** Used: a free account's readings for the day are spent — a different wall
- *  from not signed in, and the one Plus answers. */
-export function LensUsed({ used, limit, onReader }: { used: number | null; limit: number | null; onReader: () => void }) {
+ *  from not signed in, and the one Plus answers: in place, over the story
+ *  (the upgrade sheet), never a trip away from the lens they wanted. */
+export function LensUsed({ used, limit, onPlus, onReader }: { used: number | null; limit: number | null; onPlus: () => void; onReader: () => void }) {
   const cap = limit ?? LENS_READS.free;
   return (
     <div className="grid gap-2.5">
@@ -169,7 +168,7 @@ export function LensUsed({ used, limit, onReader }: { used: number | null; limit
         Plus opens every lens on every story. The reader view of this story stays open, with its sources and quotes.
       </p>
       <div className="flex flex-wrap items-center gap-2.5">
-        <Link href={PLUS_FROM_LENS} className="p-btn p-btn--primary p-btn--sm">See Plus</Link>
+        <button type="button" onClick={onPlus} className="p-btn p-btn--primary p-btn--sm">Get Plus</button>
         <button type="button" onClick={onReader} className="p-btn p-btn--secondary p-btn--sm">Back to the reader view</button>
       </div>
     </div>

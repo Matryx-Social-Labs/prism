@@ -6,10 +6,9 @@ import { SectionHead } from "@/components/SectionHead";
 import { ShareButton } from "@/components/ShareButton";
 import { BackBar } from "@/components/ui";
 import { fetchEvent, type EventDetail, type FeedItem, type OutletRef } from "@/lib/api";
-import { istTime, shortDate } from "@/lib/dateline";
 import { langName, langNative } from "@/lib/languages";
 import { quoteLink } from "@/lib/quoteLink";
-import { findQuote, isReported, saidWords } from "@/lib/quotes";
+import { findQuote, isReported, quoteProvenance, saidWords } from "@/lib/quotes";
 import { robotsUnless } from "@/lib/seo";
 import { indexSources } from "@/lib/sources";
 
@@ -103,9 +102,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   if (!q) redirect(`/story/${event.id}`);
   const { claim, speaker, role } = q;
   const reported = isReported(claim);
-  const index = indexSources(event.sources).get(claim.article_id);
-  const when = claim.published_at ? `${shortDate(claim.published_at)} ${istTime(claim.published_at)} IST` : null;
-  const provenance = [claim.source_name.toUpperCase(), index != null ? `[${index}]` : null, when?.toUpperCase()].filter(Boolean).join(" · ");
+  const provenance = quoteProvenance(claim, indexSources(event.sources).get(claim.article_id));
   const hasContext = Boolean(claim.context_before || claim.context_after);
 
   return (

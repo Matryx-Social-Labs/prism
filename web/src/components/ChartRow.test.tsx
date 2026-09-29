@@ -154,3 +154,18 @@ describe("ChartRow — the photograph, credited (founder, 2026-09-20)", () => {
     expect(screen.getByText("Also shown.").closest(".p-row--lead")).toBeNull();
   });
 });
+
+describe("ChartRow — a hub follows only what asks to be indexed", () => {
+  // Audit A3: 49–58 of a hub's 60 row links pointed at one-outlet records that
+  // ask not to be indexed; each follow was a render of a page Google drops.
+  it("marks a one-outlet record's link nofollow", () => {
+    row(item({ indexable: false, source_count: 1 }));
+    expect(screen.getByRole("link")).toHaveAttribute("rel", "nofollow");
+  });
+
+  it("leaves a record that asks to be indexed, or an older payload that does not say, plain", () => {
+    row(item({ indexable: true }));
+    row(item({ id: "e2", indexable: undefined }));
+    for (const link of screen.getAllByRole("link")) expect(link).not.toHaveAttribute("rel");
+  });
+});

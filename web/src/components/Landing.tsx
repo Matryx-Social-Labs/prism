@@ -147,8 +147,8 @@ export async function Landing() {
       <section className="sc-shell grid justify-items-start gap-3.5 pb-[72px] pt-12" aria-labelledby="final-title">
         <Reveal><h2 id="final-title" style={{ font: "var(--t-display-l)", letterSpacing: "var(--track-display)" }}>Check today&rsquo;s news for yourself.</h2></Reveal>
         <div className="flex flex-wrap gap-2.5">
-          <Link href="/feed" className="p-btn p-btn--primary p-btn--lg">{CTA}</Link>
-          <Link href="/onboarding" className="p-btn p-btn--secondary p-btn--lg">Pick my subjects</Link>
+          <Link href="/feed" data-cta="landing:final-read" className="p-btn p-btn--primary p-btn--lg">{CTA}</Link>
+          <Link href="/onboarding" data-cta="landing:final-setup" className="p-btn p-btn--secondary p-btn--lg">Pick my subjects</Link>
         </div>
         <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>Free to read. No account needed; your subjects stay on this device until you sign in.</p>
       </section>
@@ -176,8 +176,9 @@ function Hero({ evidence, leadRow }: { evidence: Evidence | null; leadRow: FeedI
           Prism gathers each story&rsquo;s reports from the outlets it monitors, in English and Indian languages, onto one page. See who said what, word for word, and which outlets covered it.
         </p>
         <div className="mt-[22px] flex flex-col gap-2.5 lg:flex-row">
-          <Link id="hero-cta" href="/feed" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">{CTA}</Link>
-          <a href={evidence?.proof ? "#how" : "/about"} className="p-btn p-btn--secondary p-btn--lg w-full lg:w-auto">See how it works</a>
+          {/* data-cta: counted by UsageBeacon, one word each (common/usage.CTAS). */}
+          <Link id="hero-cta" href="/feed" data-cta="landing:hero" className="p-btn p-btn--primary p-btn--lg w-full lg:w-auto">{CTA}</Link>
+          <a href={evidence?.proof ? "#how" : "/about"} data-cta="landing:how" className="p-btn p-btn--secondary p-btn--lg w-full lg:w-auto">See how it works</a>
         </div>
         <p className="mt-2.5" style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>Free to read. No account, no sign-up.</p>
         {figures.length > 0 && (

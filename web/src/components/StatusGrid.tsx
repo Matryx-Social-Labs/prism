@@ -71,7 +71,7 @@ export function PlanCards({ plusFrom }: { plusFrom: string | null }) {
       </div>
       <div className="p-card" style={{ borderTop: "3px solid var(--accent)" }}>
         <h3 className="p-eyebrow" style={{ color: "var(--accent)" }}>Prism Plus{plusFrom ? ` · from ${plusFrom} a month` : ""}</h3>
-        <p className="mt-1.5" style={{ font: "var(--t-body-s)" }}>{PLUS_LINE} <Link href="/plus" className="p-link">See Plus</Link></p>
+        <p className="mt-1.5" style={{ font: "var(--t-body-s)" }}>{PLUS_LINE} <Link href="/plus?from=landing" data-cta="landing:plans" className="p-link">See Plus</Link></p>
       </div>
     </div>
   );

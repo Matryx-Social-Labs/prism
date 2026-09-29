@@ -158,6 +158,46 @@ async def sitemap_records(db: AsyncSession = Depends(get_db)):
     ]}
 
 
+NEWS_SITEMAP_CAP = 1000  # Google News reads at most 1,000 URLs per sitemap
+
+
+@router.get("/api/v1/sitemap/news")
+async def sitemap_news(db: AsyncSession = Depends(get_db)):
+    """The news sitemap's records: every served record that asks to be indexed
+    (the records sitemap's rule) and was FIRST reported in the last 48 hours,
+    which is all Google News reads. Its own query: the web used to filter the
+    feed's newest hundred and listed about 10 of the hundreds eligible (audit
+    A4). The date is the first report's publication, never when we last
+    touched the record, and a record whose reports carry no date is not listed.
+
+    `last_updated_at` bounds the scan first (its index): a record first
+    reported in the window was necessarily rebuilt inside it."""
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT e.id, e.title, f.published_at, e.projection->'source_slugs' FROM events e
+                CROSS JOIN LATERAL (
+                    SELECT min(ri.published_at) AS published_at
+                    FROM event_memberships em
+                    JOIN articles a ON a.id = em.article_id
+                    JOIN raw_items ri ON ri.id = a.raw_item_id
+                    WHERE em.event_id = e.id
+                ) f
+                WHERE COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) >= 2
+                  AND e.merged_into IS NULL
+                  AND e.last_updated_at >= now() - interval '48 hours'
+                  AND f.published_at >= now() - interval '48 hours'
+                ORDER BY f.published_at DESC
+                """
+            )
+        )
+    ).all()
+    reg = await outlets.registry(db)
+    listed = [r for r in rows if record_indexable(r[3] or [], reg)][:NEWS_SITEMAP_CAP]
+    return {"records": [{"id": str(r[0]), "title": r[1], "published_at": r[2].isoformat()} for r in listed]}
+
+
 @router.get("/api/v1/taxonomy", response_model=TaxonomyResponse)
 async def get_taxonomy():
     return TaxonomyResponse(

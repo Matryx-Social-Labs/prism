@@ -15,6 +15,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Dash } from "@/components/icons";
 import { useSession } from "@/lib/session";
 import { loadProfile } from "@/lib/profile";
 import { AskPanel } from "@/components/AskPanel";
+import { UpgradeSheet } from "@/components/UpgradeSheet";
 import { AskBar } from "@/components/AskBar";
 import { AskContext, type AskOpen } from "@/components/AskContext";
 import { SelectionAsk } from "@/components/SelectionAsk";
@@ -46,7 +47,9 @@ import { ReadProgress, SectionRail, SectionTabs, jumpTo, type NavItem } from "@/
 import { StoryActionBar } from "@/components/story/StoryActionBar";
 import { shortDate } from "@/lib/dateline";
 import { entityRel } from "@/lib/entities";
-import { sectorGroup } from "@/lib/sectors";
+import { subjectTrail, type TrailStep } from "@/lib/sectors";
+import { followRel } from "@/lib/seo";
+import { SubjectTrail } from "@/components/reading/parts";
 import { isReported, quoteOutlets, saidCount } from "@/lib/quotes";
 import { sentences } from "@/lib/sentences";
 
@@ -79,7 +82,7 @@ function outletsOf(event: EventDetail): OutletRef[] {
     .map((s) => ({ slug: s.source_slug, publisher: s.publisher ?? s.source_slug, name: s.source_name, code: s.code!, origin: s.origin!, language: s.language ?? null, domain: s.domain ?? null }));
 }
 
-export function StoryView({ event }: { event: EventDetail }) {
+export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailStep[] }) {
   // ONE index for [n]: the report list and the citation under every quote read
   // the same map, so the two can never number one article differently.
   const sourceIndex = indexSources(event.sources);
@@ -119,6 +122,16 @@ export function StoryView({ event }: { event: EventDetail }) {
   // Did the READER ask for this lens, or did it come back from their profile?
   // The locked-lens guard below has to tell those apart, and `lens` alone can't.
   const readerPicked = useRef(false);
+  // The lenses counted on this page: once each, when the server has answered.
+  const counted = useRef(new Set<string>());
+  const countLens = (slug: string, locked: boolean) => {
+    if (counted.current.has(slug)) return;
+    counted.current.add(slug);
+    track("Lens", { lens: slug, locked });
+  };
+  // The lens wall's upgrade sheet; `reask` asks for the brief again once Plus is on.
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [reask, setReask] = useState(0);
 
   const registry = useLenses();
   const registrySlugs = registry.map((m) => m.slug);
@@ -149,6 +162,13 @@ export function StoryView({ event }: { event: EventDetail }) {
     // who just needed to sign in.
     const apply = (res: BriefResult | null) => {
       if (cancelled || !res || res.state === "unavailable") return;
+      // Counted on the answer, not the tap: only the server says whether the
+      // lens was locked (the tap read the gate as it stood before it asked).
+      // The anonymous wall is its own Plus prompt; an account's opens the sheet, which counts itself.
+      if (readerPicked.current && !counted.current.has(lens)) {
+        if (res.state === "signin_required") track("Subscribe", { stage: "prompt", from: "lens-signin" });
+        countLens(lens, res.state === "signin_required" || res.state === "limit");
+      }
       if (res.state === "signin_required") return setGateState({ lens, kind: "signin", used: res.used });
       if (res.state === "limit") return setGateState({ lens, kind: "limit", used: res.used, limit: res.limit });
       setGateState(null);
@@ -177,7 +197,7 @@ export function StoryView({ event }: { event: EventDetail }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lens, event.id, session]);
+  }, [lens, event.id, session, reask]);
 
   // Snap back to the reader lens only when a locked pro lens arrived from the
   // PROFILE rather than from a tap. A deliberate pick is allowed to stay so the
@@ -209,7 +229,9 @@ export function StoryView({ event }: { event: EventDetail }) {
   const sourceCount = event.sources.length;
   // Corroboration is outlets, not reports: one newsroom's five reports are still one source.
   const single = outletCount <= 1;
-  const group = sectorGroup(event.sector);
+  // Where the record sits, root first (lib/sectors.subjectTrail; the page passes it labelled).
+  const place = trail ?? subjectTrail(event.subject_path, null, event.sector);
+  const subject = place.at(-1);
   const reports = [...event.sources].sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
 
   // "On this story", in the order the sections appear. A nav that lists
@@ -250,7 +272,9 @@ export function StoryView({ event }: { event: EventDetail }) {
     readerPicked.current = true;
     setFlipped(true);
     setLens(slug);
-    track("Lens", { lens: slug, locked: isLocked(slug) });
+    // A professional lens is counted when the server answers (the brief effect);
+    // the Reader lens is never gated, so its tap is its answer.
+    if (slug === "reader") countLens(slug, false);
     if (!scroll) return;
     document.getElementById("lens-brief")?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
@@ -397,9 +421,9 @@ export function StoryView({ event }: { event: EventDetail }) {
   const ready = !isLocked(lens) && !!brief;
   const lensBody =
     gateState?.lens === lens && gateState.kind === "limit" ? (
-      <LensUsed used={gateState.used} limit={gateState.limit} onReader={() => setLens("reader")} />
+      <LensUsed used={gateState.used} limit={gateState.limit} onPlus={() => setUpgradeOpen(true)} onReader={() => setLens("reader")} />
     ) : gateState?.lens === lens ? (
-      <LensLocked meta={meta} used={gateState.used} onSignIn={() => router.push(`/signin?next=/story/${event.id}`)} />
+      <LensLocked meta={meta} used={gateState.used} back={`/story/${event.id}`} onSignIn={() => router.push(`/signin?next=/story/${event.id}`)} />
     ) : briefLoading && !brief ? (
       <>
         {lensFacts}
@@ -466,6 +490,7 @@ export function StoryView({ event }: { event: EventDetail }) {
         <article className="flex min-w-0 flex-col lg:max-w-[var(--reading)]">
           {/* ── The header: what happened, how current, how well supported ── */}
           <header>
+            <SubjectTrail steps={place} className="mb-2.5 hidden lg:block" />
             <div className="meta-line p-meta flex-wrap normal-case">
               {single && <StatusPill status="single" label="Single source · not yet corroborated" />}
               {routeStory && event.story_slug && (
@@ -475,10 +500,10 @@ export function StoryView({ event }: { event: EventDetail }) {
                 <a href="#history"><StatusPill status="corrected" label={`Corrected ${shortDate(event.corrections![0].created_at)}`} /></a>
               )}
               <span className="p-meta__prov">Updated <Ago iso={event.last_updated_at} /></span>
-              {group && (
+              {subject && (
                 <>
                   <span className="p-meta__sep" />
-                  <span className="p-meta__subject">{group.name}</span>
+                  <Link href={subject.href} className="p-meta__subject underline-offset-4 hover:underline">{subject.name}</Link>
                 </>
               )}
               {(cyber?.cve_ids ?? []).slice(0, 3).map((cve) => (
@@ -661,7 +686,7 @@ export function StoryView({ event }: { event: EventDetail }) {
           <p className="flex flex-wrap justify-between gap-4 pb-6 pt-7 text-[14.5px] font-semibold">
             <Link href="/feed" style={{ color: "var(--accent)" }}>← Today&rsquo;s record</Link>
             {event.story_slug && (
-              <Link href={`/trending/${event.story_slug}`} style={{ color: "var(--accent)" }}>{boundaryVerified ? "The whole story" : "Open the grouping"} →</Link>
+              <Link href={`/trending/${event.story_slug}`} rel={routeStory ? followRel(boundaryVerified) : undefined} style={{ color: "var(--accent)" }}>{boundaryVerified ? "The whole story" : "Open the grouping"} →</Link>
             )}
           </p>
         </article>
@@ -706,6 +731,20 @@ export function StoryView({ event }: { event: EventDetail }) {
         sources={event.sources}
       />
       <SelectionAsk />
+      {/* The lens wall a free account meets: Plus in place, then the lens re-asked. */}
+      <UpgradeSheet
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        reason="lens-limit"
+        used={gateState?.kind === "limit" ? gateState.used ?? undefined : undefined}
+        limit={gateState?.kind === "limit" ? gateState.limit ?? undefined : undefined}
+        lensName={meta.short}
+        back={`/story/${event.id}`}
+        onSubscribed={() => {
+          setGateState(null);
+          setReask((n) => n + 1);
+        }}
+      />
     </AskContext.Provider>
   );
 }

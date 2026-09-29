@@ -56,6 +56,9 @@ describe("CancelSheet — the truth first, one offer matched to the reason, the 
     expect(screen.getByRole("button", { name: "Switch to yearly" })).toBeInTheDocument();
     expect(screen.queryByText("Pause instead")).toBeNull();
     expect(screen.getByRole("button", { name: "Cancel anyway" })).toBeEnabled();
+    // Beside the offer the way out stays a real button, never a ghost (COMPLIANCE §3.4, audit P1-10).
+    expect(screen.getByRole("button", { name: "Cancel anyway" })).toHaveClass("p-btn--secondary");
+    expect(screen.getByRole("button", { name: "Cancel anyway" })).not.toHaveClass("p-btn--ghost");
     await userEvent.click(screen.getByRole("button", { name: "Missing something" }));
     expect(screen.queryByText(/Switch to yearly/)).toBeNull();
     expect(screen.getByText("Pause instead")).toBeInTheDocument();

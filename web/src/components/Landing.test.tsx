@@ -62,6 +62,15 @@ describe("Landing", () => {
     for (const a of actions) expect(a).toHaveAttribute("href", "/feed");
   });
 
+  // Audit 2026-09-29 §2.5: the buttons were not told apart, only the next page
+  // view. Each carries one word from the API's list (common/usage.CTAS).
+  it("marks each call to action with its own counted word, and Plus with its door", async () => {
+    const { container } = render(await Landing());
+    const words = [...container.querySelectorAll("[data-cta]")].map((el) => el.getAttribute("data-cta")).sort();
+    expect(words).toEqual(["landing:final-read", "landing:final-setup", "landing:hero", "landing:how", "landing:plans"]);
+    expect(screen.getByRole("link", { name: "See Plus" })).toHaveAttribute("href", "/plus?from=landing");
+  });
+
   it("shows no written illustration anywhere, and separates current work from future work", async () => {
     fetchFeed.mockResolvedValue([row("lead"), row("two")]);
     fetchEvent.mockImplementation(async (id: string) => record(id));

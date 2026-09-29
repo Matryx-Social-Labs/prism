@@ -12,7 +12,7 @@ const LINKS: [string, string][] = [
   ["/about#status", "What\u2019s live"],
   ["/sources", "Sources"],
   ["/corrections", "Corrections"],
-  ["/plus", "Plus"],
+  ["/plus?from=footer", "Plus"], // the door, counted on /plus (common/usage.SUBSCRIBE_DETAIL)
   ["/privacy", "Privacy"],
   ["/terms", "Terms"],
   ["/refunds", "Refunds"],

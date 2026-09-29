@@ -14,7 +14,8 @@ const billing = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/billing", async (orig) => ({ ...(await orig<typeof import("@/lib/billing")>()), ...billing }));
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(""), useRouter: () => router }));
+const params = vi.hoisted(() => ({ current: new URLSearchParams("") }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => params.current, useRouter: () => router }));
 const session = vi.hoisted(() => ({ current: null as null | { token: string; userId: string; email: string } }));
 vi.mock("@/lib/session", async (orig) => ({
   ...(await orig<typeof import("@/lib/session")>()),
@@ -38,6 +39,7 @@ const PLANS = {
 beforeEach(() => {
   vi.clearAllMocks();
   session.current = null;
+  params.current = new URLSearchParams("");
   billing.fetchPlans.mockResolvedValue(PLANS);
 });
 
@@ -51,7 +53,7 @@ describe("PlusPage", () => {
     expect(screen.getByRole("tab", { name: /Yearly/ })).toHaveTextContent("save ₹589");
     // Remaining seats, said as remaining: "500 of 500 seats" read as sold out.
     expect(screen.getByRole("article", { name: "Founding member" })).toHaveTextContent("500 seats left");
-    expect(screen.getAllByRole("link", { name: "Sign in to continue" })[0]).toHaveAttribute("href", "/signin?next=/plus");
+    expect(screen.getAllByRole("link", { name: "Sign in to continue" })[0]).toHaveAttribute("href", `/signin?next=${encodeURIComponent("/plus?period=year")}`);
     expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
     await userEvent.click(screen.getByRole("tab", { name: "Monthly" }));
     expect(screen.getByRole("article", { name: "Plus" })).toHaveTextContent("₹149");
@@ -72,6 +74,42 @@ describe("PlusPage", () => {
     await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
     expect(billing.subscribe).toHaveBeenCalledWith("plus_yearly", "t", "a@b.c", expect.any(Function));
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/plus/welcome"));
+  });
+
+  // Audit 2026-09-29 P1-3: the buyer is returned to where they came from, and
+  // sign-in brings them back here with the door, the way on and the period.
+  it("returns the buyer to the story they came from, through sign-in and after paying", async () => {
+    params.current = new URLSearchParams("from=lens-limit&next=%2Fstory%2Fe1&period=month");
+    const { unmount } = render(<PlusPage />);
+    expect(await screen.findByRole("tab", { name: "Monthly" })).toHaveAttribute("aria-selected", "true");
+    expect((await screen.findAllByRole("link", { name: "Sign in to continue" }))[0]).toHaveAttribute(
+      "href", `/signin?next=${encodeURIComponent("/plus?from=lens-limit&next=%2Fstory%2Fe1&period=month")}`);
+    unmount();
+
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.subscribe.mockResolvedValue({ plan: "plus_monthly", status: "active", entitled: true });
+    render(<PlusPage />);
+    await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
+    expect(billing.subscribe).toHaveBeenCalledWith("plus_monthly", "t", "a@b.c", expect.any(Function));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/plus/welcome?next=%2Fstory%2Fe1"));
+  });
+
+  it("never returns the buyer off the site", async () => {
+    params.current = new URLSearchParams("next=%2F%2Fevil.example");
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.subscribe.mockResolvedValue({ plan: "plus_yearly", status: "active", entitled: true });
+    render(<PlusPage />);
+    await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/plus/welcome"));
+  });
+
+  // COMPLIANCE-INDIA N7(a): the founding plan's renewal beside its price, in the API's figure.
+  it("says what the founding plan renews at, beside its price", async () => {
+    billing.fetchPlans.mockResolvedValue({ ...PLANS, plans: PLANS.plans.map((p) => (p.plan === "founding" ? { ...p, amount_paise: 89900 } : p)) });
+    render(<PlusPage />);
+    const founding = await screen.findByRole("article", { name: "Founding member" });
+    expect(founding).toHaveTextContent("₹899/ year");
+    expect(founding).toHaveTextContent("Renews at ₹899 a year until you cancel. 7-day full refund.");
   });
 
   it("a declined card does not end the purchase: it is said, and the sheet stays open", async () => {
@@ -117,7 +155,9 @@ describe("PlusPage", () => {
     const { container } = render(<PlusPage />);
     const plus = await screen.findByRole("article", { name: "Plus" });
     expect(plus).toHaveTextContent(/Every lens on every story/);
-    expect(screen.getByRole("article", { name: "Free" })).toHaveTextContent("10 lens readings a day with an account, 3 without");
+    // Without an account the count is per visit, not per day (audit 2026-09-29).
+    expect(screen.getByRole("article", { name: "Free" })).toHaveTextContent("10 lens readings a day with an account, 3 a visit without");
+    expect(screen.getByRole("article", { name: "Free" })).toHaveTextContent("10 questions a day with an account, 3 a visit without");
     expect(screen.getByRole("table")).toHaveTextContent(/Lens readings/);
     expect(container.textContent).not.toMatch(/model/i);
   });

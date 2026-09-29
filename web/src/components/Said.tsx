@@ -45,7 +45,7 @@ const QUOTES_FOLD = 2;
  * the one case where a quote is printed knowing it is not the speaker's words
  * (founder D-quote-3), so it is never printed without saying it.
  */
-function LangLabel({ claim }: { claim: ClaimOut }) {
+export function LangLabel({ claim }: { claim: ClaimOut }) {
   if (!claim.lang) return null;
   const title = claim.translated
     ? `${claim.source_name}'s ${langName(claim.lang)} translation — not the words as spoken`
@@ -94,23 +94,23 @@ function AlsoIn({ claim, sourceIndex, outletOf }: { claim: ClaimOut; sourceIndex
  * speaker's: never inside quotation marks, set upright in the reading voice on
  * a dashed rule — the line form the system gives what is not verified in full.
  */
-function Words({ claim, font, color }: { claim: ClaimOut; font: string; color: string }) {
+export function Words({ claim, font, color }: { claim: ClaimOut; font: string; color: string }) {
   if (isReported(claim)) {
     return (
-      <p className="border-l-2 border-dashed pl-3" style={{ font: "var(--t-body)", color, borderColor: "var(--line-strong)", textWrap: "pretty", overflowWrap: "anywhere" }}>
+      <p lang={claim.lang ?? undefined} className="border-l-2 border-dashed pl-3" style={{ font: "var(--t-body)", color, borderColor: "var(--line-strong)", textWrap: "pretty", overflowWrap: "anywhere" }}>
         {claim.quote_text}
       </p>
     );
   }
   return (
-    <blockquote className="font-record" style={{ font, color, textWrap: "pretty", overflowWrap: "anywhere" }}>
+    <blockquote lang={claim.lang ?? undefined} className="font-record" style={{ font, color, textWrap: "pretty", overflowWrap: "anywhere" }}>
       “{claim.quote_text}”
     </blockquote>
   );
 }
 
 /** "reported", in the provenance line: the article's report of what was said, not a quote. */
-function ReportedLabel({ claim }: { claim: ClaimOut }) {
+export function ReportedLabel({ claim }: { claim: ClaimOut }) {
   return (
     <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-2)" }} title={`${claim.source_name}'s report of what was said — its words, not a quote`}>
       reported

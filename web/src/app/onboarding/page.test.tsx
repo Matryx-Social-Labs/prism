@@ -19,12 +19,15 @@ const setProfile = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/session", () => ({ useSession, fetchLanguages, setProfile }));
 vi.mock("@/lib/api", () => ({ fetchRegions, fetchTaxonomy, fetchProfessions, fetchLenses }));
 vi.mock("next/navigation", () => ({ useRouter: () => router, useSearchParams: () => new URLSearchParams("") }));
+const track = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({ track }));
 
 const KEY = "prism.profile.v1";
 const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");
 
 beforeEach(() => {
   localStorage.clear();
+  track.mockReset();
   useSession.mockReset().mockReturnValue(null);
   router.push.mockReset();
   setProfile.mockReset().mockResolvedValue(undefined);
@@ -85,6 +88,35 @@ describe("Onboarding — three steps of the reservation form", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
     expect(saved()).toBeNull();
     expect(router.push).toHaveBeenCalledWith("/feed");
+  });
+
+  // Audit 2026-09-29 P1-8: Skip discarded the subjects just picked, so a reader
+  // who would not type a name lost their For you.
+  it("keeps what was picked when the reader skips, in this browser", async () => {
+    render(<OnboardingPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await userEvent.click(await screen.findByRole("switch", { name: /^Sports/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+    expect(saved()).toMatchObject({ interests: ["sports"], languages: ["en"] });
+    expect(router.push).toHaveBeenCalledWith("/feed");
+  });
+
+  it("counts the step reached, where it was skipped and how it finished", async () => {
+    const { unmount } = render(<OnboardingPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+    unmount();
+    render(<OnboardingPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Build my feed" }));
+    const words = track.mock.calls.map(([, p]) => p);
+    expect(words).toEqual([
+      { stage: "step", step: 1 }, { stage: "step", step: 2 }, { stage: "skip", step: 2 },
+      { stage: "step", step: 1 }, { stage: "step", step: 2 }, { stage: "step", step: 3 }, { stage: "done", saved: "local" },
+    ]);
+    expect(track.mock.calls.every(([e]) => e === "Onboarding")).toBe(true);
   });
 
   it("goes back to an earlier step from the indicator, keeping the answer", async () => {

@@ -16,7 +16,6 @@ const EXPECTED = {
   "/about": 60,
   "/sources": 300,
   "/corrections": 300,
-  "/news-sitemap.xml": 900,
   "/sitemap.xml": 3600,
 };
 

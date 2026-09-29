@@ -14,6 +14,7 @@ import { istTime } from "@/lib/dateline";
 import { loadProfile } from "@/lib/profile";
 import { loadScope, saveScope, type Scope as SharedScope } from "@/lib/scope";
 import { navFilter, navItem, sectorGroup } from "@/lib/sectors";
+import { followRel } from "@/lib/seo";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import { useStateName } from "@/lib/useStateName";
 
@@ -187,6 +188,7 @@ function ArcRow({ story }: { story: TrendingStory }) {
     <li>
       <Link
         href={arcHref(story)}
+        rel={followRel(verified)}
         className={`group grid gap-2 border-b py-4 ${single ? "p-row--single" : ""} ${stale ? "p-row--stale" : ""}`}
         style={{ borderColor: single ? "var(--line-strong)" : "var(--line)", color: "var(--ink)" }}
       >

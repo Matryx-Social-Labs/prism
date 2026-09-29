@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Ago } from "@/components/Ago";
 import { CoverageBar } from "@/components/Coverage";
+import { ChevronDown } from "@/components/icons";
 import { StatusPill } from "@/components/StatusPill";
 import type { TrendingStory } from "@/lib/api";
 import { arcHref, spanDays } from "@/lib/arc";
-import { sectorGroup } from "@/lib/sectors";
+import { sectorGroup, subjectHref, type TrailStep } from "@/lib/sectors";
+import { followRel } from "@/lib/seo";
 
 /**
  * The pieces the reading routes share (Claude Design · screens/ReadingB.jsx):
@@ -91,7 +93,7 @@ export function DevelopingRail({ stories, title }: { stories: TrendingStory[]; t
           const verified = s.boundary_status === "verified";
           return (
             <li key={s.slug}>
-              <Link href={arcHref(s)} className="group grid gap-2 border-b py-4" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
+              <Link href={arcHref(s)} rel={followRel(verified)} className="group grid gap-2 border-b py-4" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
                   {s.boundary_status && (verified ? <StatusPill status="verified" label="Verified" /> : <StatusPill status="provisional" />)}
                   <span className="p-meta">
@@ -116,5 +118,39 @@ export function DevelopingRail({ stories, title }: { stories: TrendingStory[]; t
       </ol>
       <Link href="/trending" className="p-link mt-2.5 inline-block text-[13.5px]">All developing stories →</Link>
     </section>
+  );
+}
+
+/**
+ * A node's sub-topics as chips, "All" first and current (ReadingB Subject). On
+ * a subject page and on a sector page, which is its group root's page — the
+ * chips there are the only path to the subject pages under the six groups.
+ */
+export function SubtopicNav({ all, nodes }: { all: string; nodes: { path: string; label: string }[] }) {
+  if (nodes.length === 0) return null;
+  return (
+    <nav aria-label="Sub-topics" className="p-hide-scroll -mx-[var(--gutter)] flex gap-1.5 overflow-x-auto px-[var(--gutter)] lg:mx-0 lg:flex-wrap lg:px-0">
+      <Link href={all} className="p-chip" aria-current="page">All</Link>
+      {nodes.map((c) => (
+        <Link key={c.path} href={subjectHref(c.path)} className="p-chip">{c.label}</Link>
+      ))}
+    </nav>
+  );
+}
+
+/** The record's trail, Today › group › node (lib/sectors.subjectTrail), in the subject page's breadcrumb voice. */
+export function SubjectTrail({ steps, className }: { steps: TrailStep[]; className?: string }) {
+  if (steps.length === 0) return null;
+  return (
+    <nav aria-label="Breadcrumb" className={className}>
+      <ol className="flex flex-wrap items-center gap-1.5" style={{ font: "500 13.5px/1.3 var(--font-read)", color: "var(--ink-3)" }}>
+        {[{ name: "Today", href: "/feed" }, ...steps].map((t, i) => (
+          <li key={t.href} className="flex items-center gap-1.5">
+            {i > 0 && <ChevronDown className="-rotate-90" />}
+            <Link href={t.href} className="p-link">{t.name}</Link>
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 }
