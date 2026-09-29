@@ -264,6 +264,19 @@ sometimes unrelated (one cricketer's milestone into another's century). Founder 
 1A (2026-09-29): **a record is one happening**; follow-ups are separate records linked
 as later developments, until the story layer is verified.
 
+**Replayed** (`tools/score_cascade --verify 0.85 --confirm --sets gold,batch3,silver`,
+mE5, `query:` prefix, 785 labelled pairs, 2026-09-30):
+
+| mode | true merges | false merges | missed | P | R | F1 |
+|---|---|---|---|---|---|---|
+| `live` | 84 | 5 | 78 | 0.944 | 0.519 | 0.669 |
+| `confirm` | 80 | 2 | 82 | 0.976 | 0.494 | 0.656 |
+
+Three of five wrong merges gone for four true ones: precision first, with no compounding
+collapse (the headline gate on this path once cost 37% recall). The labelled sets are
+mostly same-happening pairs; production's errors were mostly follow-ups, which the
+human sheets (`tools/gold_attaches`) measure directly.
+
 **The follow-up question**, measured on 60 attaches Jev judged not the same happening:
 every pair at ≥ 0.85 read as a real follow-up (a Supreme Court ruling upholding a High
 Court's, a player declared fit after the injury, the accused produced in court); below
