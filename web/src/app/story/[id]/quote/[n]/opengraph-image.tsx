@@ -15,6 +15,7 @@ import { indexSources } from "@/lib/sources";
 // native-script name (the design's हिंदी) comes out with its vowel signs misplaced.
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const alt = "A quote's share card on Prism: the words as the article printed them, who said them, the outlet, time and language, and how the words were checked against the article.";
 
 async function quoteCard(id: string, n: string) {
   const e = await fetchEvent(id);

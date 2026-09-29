@@ -80,9 +80,10 @@ def main() -> None:
     # App-icon style: on ivory with generous padding (Play/App Store crop the corners).
     mark(1024, INK, IVORY, pad_ratio=0.18).save(OUT / "prism-app-icon-1024.png")
     lockup(160, INK, None).save(OUT / "prism-lockup-ink.png")
-    lockup(160, INK, IVORY).save(OUT / "prism-lockup-ivory.png")
-    lockup(160, IVORY, CHARCOAL).save(OUT / "prism-lockup-charcoal.png")
-    for name in ("prism-mark-512.png", "prism-mark-1024-ivory.png", "prism-mark-1024-charcoal.png", "prism-app-icon-1024.png", "prism-lockup-ivory.png", "prism-lockup-charcoal.png"):
+    # The public lockup is the address, readPrism.news (DESIGN.md · The wordmark):
+    # design/logo/wordmark.py writes it. The mark + "Prism" lockup above stays a
+    # local working file and is never published.
+    for name in ("prism-mark-512.png", "prism-mark-1024-ivory.png", "prism-mark-1024-charcoal.png", "prism-app-icon-1024.png"):
         shutil.copy(OUT / name, PUBLIC / name)
     print("wrote", len(list(OUT.iterdir())), "files to", OUT, "and", len(list(PUBLIC.iterdir())), "to", PUBLIC)
 

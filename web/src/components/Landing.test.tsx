@@ -67,7 +67,7 @@ describe("Landing", () => {
   it("marks each call to action with its own counted word, and Plus with its door", async () => {
     const { container } = render(await Landing());
     const words = [...container.querySelectorAll("[data-cta]")].map((el) => el.getAttribute("data-cta")).sort();
-    expect(words).toEqual(["landing:final-read", "landing:final-setup", "landing:hero", "landing:how", "landing:plans"]);
+    expect(words).toEqual(["landing:digest", "landing:final-read", "landing:final-setup", "landing:hero", "landing:how", "landing:plans"]);
     expect(screen.getByRole("link", { name: "See Plus" })).toHaveAttribute("href", "/plus?from=landing");
   });
 
@@ -91,11 +91,14 @@ describe("Landing", () => {
     expect(screen.getByText(/The evidence is free and stays free/)).toBeInTheDocument();
   });
 
-  it("counts today's outlets out of the monitored set, never as a bare total", async () => {
+  // Audit 03 P2-7: the figures count the newest rows the landing reads, not the
+  // IST day, so the label names that window instead of "today's record".
+  it("counts outlets out of the monitored set, over the window it read, never as a bare total", async () => {
     fetchFeed.mockResolvedValue([row("a", { outlets: [outlet("th"), outlet("ht")] }), row("b", { outlets: [outlet("th")] })]);
     fetchSources.mockResolvedValue({ outlets: 27, checked_at: null, feeds: [] });
     render(await Landing());
-    expect(screen.getByText("of 27 monitored outlets in today's record")).toBeInTheDocument();
+    expect(screen.getByText("of 27 monitored outlets in the latest 2 stories")).toBeInTheDocument();
+    expect(screen.queryByText(/in today's record/)).toBeNull();
   });
 
   it("builds the proof and the lens flip from one real record, and flips a paid lens to the story, not to a sample", async () => {
@@ -184,7 +187,7 @@ describe("Landing", () => {
     fetchSources.mockResolvedValue({ outlets: 27, checked_at: null, feeds: [{ language: "en" }, { language: "hi" }] });
     render(await Landing());
     expect(screen.queryByText("record per story")).toBeNull();
-    expect(screen.getByText("of 2 monitored languages in today's record")).toBeInTheDocument();
+    expect(screen.getByText("of 2 monitored languages in the latest story")).toBeInTheDocument();
   });
 
   it("falls back to the live lens registry when no record carries a brief", async () => {

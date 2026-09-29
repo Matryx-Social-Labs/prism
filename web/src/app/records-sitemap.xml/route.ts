@@ -13,8 +13,12 @@ import { SITE_URL } from "@/lib/site";
 // crawler comes back rather than recording a sitemap with nothing in it.
 export const dynamic = "force-dynamic";
 
+const lastmodTag = (t: string | null | undefined) => (t ? `<lastmod>${t}</lastmod>` : "");
+
 export async function GET(): Promise<Response> {
-  let records: { id: string; last_updated_at: string | null }[];
+  // `lastmod` is the newest report's time (api/routes/meta.py), not the
+  // projection rebuild clock; `last_updated_at` is an older API's field.
+  let records: { id: string; lastmod?: string | null; last_updated_at?: string | null }[];
   try {
     const res = await fetch(`${API_URL}/api/v1/sitemap/records`, { cache: "no-store" });
     if (!res.ok) throw new Error(`api ${res.status}`);
@@ -23,7 +27,7 @@ export async function GET(): Promise<Response> {
     return new Response("records unavailable", { status: 503, headers: { "Retry-After": "300" } });
   }
   const body = records
-    .map((r) => `  <url><loc>${SITE_URL}/story/${r.id}</loc>${r.last_updated_at ? `<lastmod>${r.last_updated_at}</lastmod>` : ""}</url>`)
+    .map((r) => `  <url><loc>${SITE_URL}/story/${r.id}</loc>${lastmodTag(r.lastmod ?? r.last_updated_at)}</url>`)
     .join("\n");
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
   return new Response(xml, {

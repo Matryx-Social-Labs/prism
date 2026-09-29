@@ -138,7 +138,7 @@ ledger in `.claude/plans/trust-india-indic.plan.md`
 - **D-b** Plan renewal terms, decided 2026-09-28 (founder): every plan is charged
   automatically until the reader cancels, at the price they joined at
   (`common/razorpay.TOTAL_COUNT`). The Plus page, its FAQ and the Terms say so beside the
-  price; no page promises a lock or what a plan will cost later.
+  price; beyond keeping the joined price, no page promises what a plan will cost later.
 - **D-c** India compliance (IT Rules digital-media code, DPDP, CERT-In, consumer
   protection) is a team decision on `docs/COMPLIANCE-INDIA.md`.
 - **D-d** Translation of Prism's own writing into Indian languages is held until the
@@ -150,6 +150,16 @@ ledger in `.claude/plans/trust-india-indic.plan.md`
   the record shows and `/corrections` lists. New reporting is not a correction.
 - **D-f** Translating the interface itself is deferred (recommendation on record: the
   record's content before the chrome, on an adoption signal).
+- **D-g** (founder, 2026-09-29) Checkout stays hidden until live Razorpay keys
+  (`checkout_ready` is false on `rzp_test_` keys unless `PRISM_ALLOW_TEST_CHECKOUT`).
+  Prices are GST-inclusive and every price offered for sale shows its GST breakup
+  (E-Com R7(1)(e)); the LLP registers for GST before it sells. Founding (500 seats,
+  ₹999 a year) is the recommended plan while seats remain; its card says the price is
+  kept for as long as the reader stays subscribed, which is D-b. Prices are unchanged
+  after the break-even review in `docs/marketing/MARKETING-PLAN.md` (§ Pricing).
+- **D-h** (founder, 2026-09-29) Grievance Officer: Tejas ShylaShashidhara, Chief
+  Executive Officer, grievance@readprism.news, published on `/grievance` and in the
+  footer (IT Rules R11(2); `docs/COMPLIANCE-INDIA.md` N1).
 
 **Undecided (recorded, not invented)**
 - Which markets sources to add, and which additional regional feeds meet the

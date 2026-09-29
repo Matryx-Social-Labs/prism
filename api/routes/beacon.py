@@ -32,7 +32,8 @@ logger = get_logger(__name__)
 
 
 class Beacon(BaseModel):
-    e: Literal["view", "arrival", "share", "ask", "lens", "subscribe", "signin", "onboarding", "cta", "tab", "depth"]
+    e: Literal["view", "arrival", "share", "ask", "lens", "subscribe", "signin", "onboarding", "cta", "tab", "depth",
+               "campaign", "heard", "survey"]
     d: Annotated[str, Field(max_length=48)] = ""
     # An arrival's referrer HOST (never the path) and its ?s= share marker.
     ref: Annotated[str, Field(max_length=253)] = ""

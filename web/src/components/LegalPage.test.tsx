@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { LegalPage } from "@/components/LegalPage";
-import { CONTACT_EMAIL, LEGAL_DOCS, LEGAL_ENTITY } from "@/lib/legal";
+import { CONTACT_EMAIL, GRIEVANCE_OFFICER, LEGAL_DOCS, LEGAL_ENTITY } from "@/lib/legal";
 
 describe("LegalPage", () => {
   it.each(LEGAL_DOCS)("renders $slug with its title, every section and a way to reach us", (doc) => {
@@ -16,6 +16,14 @@ describe("LegalPage", () => {
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/terms");
     expect(hrefs).toContain("/refunds");
+  });
+
+  // IT Rules R11(2), DPDP s.8(9) (docs/COMPLIANCE-INDIA.md N11): the policies name the officer and link the page.
+  it.each(LEGAL_DOCS.slice(0, 2))("names the Grievance Officer in $slug and links /grievance", (doc) => {
+    render(<LegalPage doc={doc} />);
+    expect(document.body.textContent).toContain(GRIEVANCE_OFFICER.name);
+    expect(document.body.textContent).toContain(GRIEVANCE_OFFICER.email);
+    expect(screen.getAllByRole("link", { name: "Grievance Officer" })[0]).toHaveAttribute("href", "/grievance");
   });
 
   it("carries 'On this page' with an anchor per section, and each section's one-sentence version", () => {

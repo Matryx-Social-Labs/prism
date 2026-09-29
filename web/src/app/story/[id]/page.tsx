@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { fetchEvent, fetchSubjects, type EventDetail } from "@/lib/api";
+import { fetchEvent, fetchStateHubs, fetchSubjects, type EventDetail } from "@/lib/api";
 import { StoryView } from "@/components/StoryView";
 import { subjectTrail } from "@/lib/sectors";
 import { breadcrumbLd, eventDescription, jsonLd, newsArticleLd, robotsUnless } from "@/lib/seo";
@@ -73,7 +73,8 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   // The trail follows the subject path (Politics › Elections), not just the
   // group; the page prints it and links the subject (audit A2, A9). Without
   // the tree it is the sector group, as before.
-  const tree = await fetchSubjects().catch(() => null);
+  // Which state hubs ask to be indexed, for the region chips (audit 02, P1-1).
+  const [tree, hubs] = await Promise.all([fetchSubjects().catch(() => null), fetchStateHubs().catch(() => null)]);
   const place = subjectTrail(event.subject_path, tree?.nodes ?? null, event.sector);
   const trail = [
     { name: "Prism", url: `${SITE_URL}/` },
@@ -84,7 +85,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(newsArticleLd(event)) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbLd(trail)) }} />
-      <StoryView event={event} trail={place} />
+      <StoryView event={event} trail={place} hubs={hubs?.states ? Object.fromEntries(hubs.states.map((h) => [h.code, h.indexable])) : undefined} />
     </>
   );
 }

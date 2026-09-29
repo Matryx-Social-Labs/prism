@@ -193,7 +193,7 @@ export function StoryArc({ s }: { s: TrendingStoryDetail }) {
           {(s.related?.length ?? 0) > 0 && (
             <section aria-labelledby="related-title">
               <SectionHead id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
-              <div className="mt-2"><RelatedRoutes related={s.related} /></div>
+              <div className="mt-2"><RelatedRoutes related={s.related} indexable={verified} /></div>
             </section>
           )}
         </div>

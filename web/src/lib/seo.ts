@@ -4,7 +4,8 @@
 // publisher's photograph is never declared as ours (DESIGN.md § Images).
 import type { EntityQuote, EntityRef, EventDetail, FeedItem, TrendingStory, TrendingStoryDetail } from "@/lib/api";
 import { isReported } from "@/lib/quotes";
-import { CONTACT_EMAIL, LEGAL_ENTITY } from "@/lib/legal";
+import { entityHref } from "@/lib/entities";
+import { CONTACT_EMAIL, GRIEVANCE_OFFICER, LEGAL_ENTITY } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site";
 
 export const ORG_ID = `${SITE_URL}/#organization`;
@@ -64,7 +65,11 @@ export const ORGANIZATION = {
   correctionsPolicy: `${SITE_URL}/about#accountability`,
   actionableFeedbackPolicy: `${SITE_URL}/about#accountability`,
   noBylinesPolicy: `${SITE_URL}/about#accountability`,
-  contactPoint: { "@type": "ContactPoint", email: CONTACT_EMAIL, contactType: "editorial" },
+  contactPoint: [
+    { "@type": "ContactPoint", email: CONTACT_EMAIL, contactType: "editorial" },
+    // The IT Rules' Grievance Officer (R11(2)); the page is /grievance.
+    { "@type": "ContactPoint", contactType: "grievance", name: GRIEVANCE_OFFICER.name, email: GRIEVANCE_OFFICER.email },
+  ],
 };
 
 export const WEBSITE = {
@@ -126,7 +131,7 @@ export function newsArticleLd(event: EventDetail) {
   // not addressed: its URL here only sent crawlers to a page they must drop.
   const about = (event.entities ?? []).slice(0, 12).map((e) =>
     e.slug && e.indexable !== false
-      ? { "@type": "Thing", name: e.name, "@id": `${SITE_URL}/entity/${e.slug}#entity`, url: `${SITE_URL}/entity/${e.slug}` }
+      ? { "@type": "Thing", name: e.name, "@id": `${SITE_URL}${entityHref(e.slug)}#entity`, url: `${SITE_URL}${entityHref(e.slug)}` }
       : { "@type": "Thing", name: e.name },
   );
   return {
@@ -164,24 +169,31 @@ export function newsArticleLd(event: EventDetail) {
 }
 
 /**
- * An actor as itself, with the records naming it as its `subjectOf`. The type
- * is the server's mapping of the extractor's loose vocabulary (Person,
- * Organization, Place…), defaulting to Thing rather than asserting something
- * false about a person. `sameAs` carries the Wikidata item where one is known —
- * the one fact that lets an engine merge this page with the entity it knows.
+ * An actor's page: a CollectionPage `about` the actor, whose `mainEntity` is the
+ * list of records naming it. The count describes the page, not the person, so
+ * it sits in the page's description (audit 01 P2-3). The actor keeps its own
+ * @id, and its quotes (quotationsLd) as its `subjectOf`. The type is the
+ * server's mapping of the extractor's loose vocabulary (Person, Organization,
+ * Place…), defaulting to Thing rather than asserting something false about a
+ * person. `sameAs` carries the Wikidata item where one is known — the one fact
+ * that lets an engine merge this page with the entity it knows.
  */
-export function entityLd(entity: EntityRef, url: string, recordCount: number) {
-  return {
-    "@context": "https://schema.org",
-    "@type": entity.schema_type,
-    "@id": `${url}#entity`,
-    name: entity.name,
+export function entityLd(entity: EntityRef, url: string, recordCount: number, records: FeedItem[] = [], quotes: ReturnType<typeof quotationsLd> = null) {
+  return collectionPageLd({
     url,
-    ...(entity.aliases.length ? { alternateName: entity.aliases.slice(0, 8) } : {}),
-    ...(entity.qid ? { sameAs: [`https://www.wikidata.org/wiki/${entity.qid}`] } : {}),
+    name: `${entity.name} — every record`,
     description: `${recordCount} Prism ${recordCount === 1 ? "record names" : "records name"} ${entity.name}.`,
-    mainEntityOfPage: { "@type": "WebPage", "@id": url },
-  };
+    items: feedListItems(records),
+    about: {
+      "@type": entity.schema_type,
+      "@id": `${url}#entity`,
+      name: entity.name,
+      url,
+      ...(entity.aliases.length ? { alternateName: entity.aliases.slice(0, 8) } : {}),
+      ...(entity.qid ? { sameAs: [`https://www.wikidata.org/wiki/${entity.qid}`] } : {}),
+      ...(quotes ? { subjectOf: quotes } : {}),
+    },
+  });
 }
 
 /**
@@ -264,6 +276,37 @@ export function itemListLd(name: string, pageUrl: string, items: { url: string; 
     url: pageUrl,
     numberOfItems: items.length,
     itemListElement: items.slice(0, 60).map((it, i) => ({ "@type": "ListItem", position: i + 1, url: it.url, name: clip(it.name, 110) })),
+  };
+}
+
+/**
+ * A hub that lists records — a state, a day, an index of either — as a
+ * CollectionPage whose main entity is the list (the itemListLd above), with
+ * what it is about (a place) or when (a day). Nothing here the page does not
+ * print; the list is only what the page links to.
+ */
+export function collectionPageLd(p: {
+  url: string;
+  name: string;
+  description: string;
+  items: { url: string; name: string }[];
+  about?: Record<string, unknown>;
+  temporalCoverage?: string;
+}) {
+  const { "@context": context, ...list } = itemListLd(p.name, p.url, p.items);
+  return {
+    "@context": context,
+    "@type": "CollectionPage",
+    "@id": `${p.url}#page`,
+    url: p.url,
+    name: p.name,
+    description: p.description,
+    inLanguage: "en-IN",
+    isPartOf: { "@id": SITE_ID },
+    publisher: { "@id": ORG_ID },
+    ...(p.about ? { about: p.about } : {}),
+    ...(p.temporalCoverage ? { temporalCoverage: p.temporalCoverage } : {}),
+    mainEntity: list,
   };
 }
 

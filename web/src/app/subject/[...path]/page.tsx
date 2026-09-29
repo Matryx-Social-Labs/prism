@@ -32,8 +32,12 @@ export async function generateMetadata({ params }: { params: Promise<{ path: str
   if (!page) return { title: "Not found", robots: { index: false, follow: true } };
   const { node, ancestors, story_count } = page;
   const trail = [...ancestors.map((a) => a.label), node.label].join(" · ");
-  const title = `${node.label} — today's record`;
-  const description = `${story_count} ${story_count === 1 ? "story" : "stories"} in ${trail}, from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`;
+  // The page lists the archive, not today (audit 02, A10 / P2-2); the
+  // description counts the last 30 days, as the page's own meta line does.
+  const title = subjectTitle(node.label);
+  const live = (await soft(fetchSubjects()))?.nodes.find((n) => n.path === node.path)?.story_count ?? null;
+  const lead = live != null ? `${live} ${live === 1 ? "story" : "stories"} in the last 30 days in ${trail}` : `Stories in ${trail}`;
+  const description = `${lead}, from monitored Indian outlets, one record per story: who reported it, what changed, who said what.`;
   const canonical = sectorPageFor(node.path) ?? `/subject/${node.path.split(".").join("/")}`;
   return {
     title,
@@ -45,6 +49,8 @@ export async function generateMetadata({ params }: { params: Promise<{ path: str
     ...robotsUnless(story_count > 0),
   };
 }
+
+const subjectTitle = (label: string) => `${label} news from Indian outlets — the record`;
 
 /** Best effort: the rail and the 30-day count never hold the page up. */
 async function soft<T>(p: Promise<T>): Promise<T | null> {
@@ -97,7 +103,7 @@ export default async function SubjectPageRoute({ params }: { params: Promise<{ p
       {stories.length > 0 && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(`${node.label} — today's record`, url, feedListItems(stories))) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(subjectTitle(node.label), url, feedListItems(stories))) }}
         />
       )}
       {/* Claude Design · ReadingB Subject: the subject rail on the left, the node's

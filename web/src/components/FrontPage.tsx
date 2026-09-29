@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
+import { ASK_QUESTIONS, LENS_READS } from "@/lib/billing";
+import { loadSession } from "@/lib/session";
 import { Chart } from "@/components/Chart";
 import { lensMarkers } from "@/components/ChartRow";
 import { EmptyState } from "@/components/ui";
@@ -63,9 +66,11 @@ export function FrontPage({ sector = null, initial = null, subtopics = [] }: { s
   const seeded = useRef(initial !== null);
   const [developing, setDeveloping] = useState<TrendingStory[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState(true); // until read: never flash the account line at a signed-in reader
 
   useEffect(() => {
     markReturning();
+    setSignedIn(Boolean(loadSession()));
     const p = loadProfile();
     setProfile(p);
     setScope(loadScope(Boolean(p?.state)) ?? "all");
@@ -223,6 +228,10 @@ export function FrontPage({ sector = null, initial = null, subtopics = [] }: { s
                       </button>
                     ))}
                   </div>
+                ) : ready && !group ? (
+                  // No interests yet: For you is an invitation, never a gate (04 P2-2).
+                  // Subjects are picked on /you (/interests redirects there and drops ?next=).
+                  <Link href="/you" className="p-chip min-h-8 px-3 text-[13px]">For you · pick subjects →</Link>
                 ) : undefined
               }
             />
@@ -248,6 +257,13 @@ export function FrontPage({ sector = null, initial = null, subtopics = [] }: { s
             <div className="mt-7 flex flex-wrap items-baseline gap-3 py-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
               <p style={{ font: "var(--t-title)" }}>That&rsquo;s today&rsquo;s record.</p>
               <span className="p-count">{tally}</span>
+              {/* Peak-end, inline (04 P2-7); the numbers are common/quota.py's, via lib/billing. */}
+              {!signedIn && (
+                <p className="basis-full" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
+                  Back tomorrow? A free account keeps {LENS_READS.free} lens readings and {ASK_QUESTIONS.free} questions a day.{" "}
+                  <Link href="/signin?next=/feed" className="p-link">Continue free</Link>
+                </p>
+              )}
             </div>
           )}
         </div>

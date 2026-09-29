@@ -13,6 +13,20 @@ describe("RelatedRoutes — different stories, said beside the route", () => {
     expect(screen.getByText("moving")).toBeInTheDocument();
     expect(screen.getByText(/shares Siddaramaiah · Congress · 7 related events · quiet since/)).toBeInTheDocument();
   });
+  // A provisional grouping asks not to be indexed, so the page spends no follow
+  // link on it; the status is the page's own story's (one switch for every story).
+  it("marks the links nofollow while stories are provisional, plain once verified or unknown", () => {
+    const one = [{ slug: "neet", label: "The NEET protests", developments: 2, source_count: 4, velocity: 0, last_updated_at: null, shared_cast: [], causal: true }];
+    const rel = (indexable?: boolean) => {
+      const { unmount } = render(<RelatedRoutes related={one} indexable={indexable} />);
+      const value = screen.getByRole("link", { name: "The NEET protests" }).getAttribute("rel");
+      unmount();
+      return value;
+    };
+    expect(rel(false)).toBe("nofollow");
+    expect(rel(true)).toBeNull();
+    expect(rel(undefined)).toBeNull();
+  });
   it("renders nothing when there are none", () => {
     expect(render(<RelatedRoutes related={[]} />).container.innerHTML).toBe("");
   });

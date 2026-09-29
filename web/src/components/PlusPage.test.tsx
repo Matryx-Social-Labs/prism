@@ -1,9 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlusPage } from "@/components/PlusPage";
+import { CHECKOUT_SOON_FAQ } from "@/lib/plusFaq";
 import { PlanCard } from "@/components/PlanCard";
 import { Payments } from "@/components/Payments";
+import type { PlansOut } from "@/lib/billing";
 
 const billing = vi.hoisted(() => ({
   fetchPlans: vi.fn(),
@@ -23,7 +25,7 @@ vi.mock("@/lib/session", async (orig) => ({
   fetchMe: async () => ({ user_id: "u1", email: "a@b.c", plan: "free" }),
 }));
 
-const PLANS = {
+const PLANS: PlansOut = {
   offer: true,
   offer_ends: null,
   founding_left: 500,
@@ -36,6 +38,9 @@ const PLANS = {
   ],
 };
 
+// The offer after the founding seats are gone (or before any are sold): Plus is the recommendation.
+const PLUS_ONLY: PlansOut = { ...PLANS, founding_left: 0, plans: PLANS.plans.filter((p) => p.plan !== "founding") };
+
 beforeEach(() => {
   vi.clearAllMocks();
   session.current = null;
@@ -45,14 +50,13 @@ beforeEach(() => {
 
 describe("PlusPage", () => {
   it("prints the API's prices, yearly by default with the saving computed from them, and sends a stranger to sign in first", async () => {
+    billing.fetchPlans.mockResolvedValue(PLUS_ONLY);
     render(<PlusPage />);
     const plus = await screen.findByRole("article", { name: "Plus" });
     expect(plus).toHaveTextContent("₹1,199");
     expect(plus).toHaveTextContent("≈ ₹100 a month");
     // 12 × 149 − 1,199 = 589: arithmetic on the API's figures, not a typed number.
     expect(screen.getByRole("tab", { name: /Yearly/ })).toHaveTextContent("save ₹589");
-    // Remaining seats, said as remaining: "500 of 500 seats" read as sold out.
-    expect(screen.getByRole("article", { name: "Founding member" })).toHaveTextContent("500 seats left");
     expect(screen.getAllByRole("link", { name: "Sign in to continue" })[0]).toHaveAttribute("href", `/signin?next=${encodeURIComponent("/plus?period=year")}`);
     expect(screen.queryByRole("button", { name: /Get Plus/ })).toBeNull();
     await userEvent.click(screen.getByRole("tab", { name: "Monthly" }));
@@ -69,10 +73,11 @@ describe("PlusPage", () => {
 
   it("a signed-in reader subscribes to the period shown, then lands on the welcome page", async () => {
     session.current = { token: "t", userId: "u1", email: "a@b.c" };
-    billing.subscribe.mockResolvedValue({ plan: "plus_yearly", status: "active", entitled: true });
+    billing.subscribe.mockResolvedValue({ plan: "plus_monthly", status: "active", entitled: true });
     render(<PlusPage />);
+    // Founding seats are on sale, so the switch opens on the month.
     await userEvent.click((await screen.findAllByRole("button", { name: /Get Plus/ }))[0]);
-    expect(billing.subscribe).toHaveBeenCalledWith("plus_yearly", "t", "a@b.c", expect.any(Function));
+    expect(billing.subscribe).toHaveBeenCalledWith("plus_monthly", "t", "a@b.c", expect.any(Function));
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/plus/welcome"));
   });
 
@@ -138,7 +143,7 @@ describe("PlusPage", () => {
     // "Try again" reopens checkout for the same plan.
     billing.subscribe.mockRejectedValueOnce(new Error("dismissed"));
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(billing.subscribe).toHaveBeenLastCalledWith("plus_yearly", "t", "a@b.c", expect.any(Function));
+    expect(billing.subscribe).toHaveBeenLastCalledWith("plus_monthly", "t", "a@b.c", expect.any(Function));
   });
 
   it("answers the questions people ask before paying, and names who charges them", async () => {
@@ -174,6 +179,93 @@ describe("PlusPage", () => {
     expect(container.textContent).not.toMatch(/yours for 12 months|prices final|locked|held for|first 1,000|UTC/i);
     expect(screen.getByRole("table")).toHaveTextContent("Back at 5:30 am IST");
     expect(screen.getByText("Is GST included?")).toBeInTheDocument();
+  });
+
+  // Founder, 2026-09-29: founding is limited seats, positioned as the
+  // recommendation while it is sold; every figure is the API's.
+  it("while founding seats are sold, founding is the recommended card with the page's primary action", async () => {
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.subscribe.mockReturnValue(new Promise(() => {}));
+    render(<PlusPage />);
+    const founding = await screen.findByRole("article", { name: "Founding member" });
+    expect(screen.getAllByRole("article")[0]).toBe(founding);
+    expect(founding).toHaveTextContent("Recommended");
+    expect(screen.getByRole("article", { name: "Plus" })).not.toHaveTextContent("Recommended");
+    expect(founding).toHaveTextContent("Everything in Plus");
+    expect(founding).toHaveTextContent("Your price is kept for as long as you stay subscribed, as Prism adds outlets and languages");
+    // Nobody has joined yet: the cap, not "500 of 500 seats left" (which read as sold out).
+    expect(founding).toHaveTextContent("Limited to 500 members");
+    expect(founding).toHaveTextContent("Renews at ₹999 a year until you cancel. 7-day full refund.");
+    const cta = within(founding).getByRole("button", { name: "Become a founding member · ₹999 a year" });
+    expect(cta).toHaveClass("p-btn--primary");
+    expect(within(screen.getByRole("article", { name: "Plus" })).getByRole("button", { name: "Get Plus monthly" })).toHaveClass("p-btn--secondary");
+    expect(screen.getAllByRole("button", { name: "Become a founding member · ₹999 a year" }).length).toBe(2);
+    expect(screen.queryAllByRole("button", { name: /Get Plus/ }).every((b) => !b.classList.contains("p-btn--primary"))).toBe(true);
+    expect(screen.getByRole("tab", { name: "Monthly" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("article", { name: "Plus" })).not.toHaveTextContent("Founding membership is");
+    // Yearly: 1,199 − 999 = 200, from the two API figures.
+    await userEvent.click(screen.getByRole("tab", { name: /Yearly/ }));
+    expect(screen.getByRole("article", { name: "Plus" })).toHaveTextContent("Founding membership is ₹200 a year less while seats last.");
+    await userEvent.click(within(screen.getByRole("article", { name: "Founding member" })).getByRole("button", { name: /Become a founding member/ }));
+    expect(billing.subscribe).toHaveBeenCalledWith("founding", "t", "a@b.c", expect.any(Function));
+  });
+
+  it("counts the founding seats left once some are taken", async () => {
+    billing.fetchPlans.mockResolvedValue({ ...PLANS, founding_left: 37 });
+    render(<PlusPage />);
+    expect(await screen.findByRole("article", { name: "Founding member" })).toHaveTextContent("37 of 500 seats left");
+  });
+
+  it("once the founding seats are gone, Plus is recommended again, yearly first", async () => {
+    session.current = { token: "t", userId: "u1", email: "a@b.c" };
+    billing.fetchPlans.mockResolvedValue(PLUS_ONLY);
+    render(<PlusPage />);
+    const plus = await screen.findByRole("article", { name: "Plus" });
+    expect(screen.getAllByRole("article")[0]).toBe(plus);
+    expect(plus).toHaveTextContent("Recommended");
+    expect(within(plus).getByRole("button", { name: "Get Plus yearly" })).toHaveClass("p-btn--primary");
+    expect(plus).not.toHaveTextContent("Founding membership is");
+    expect(screen.getByRole("article", { name: "Founding member" })).toHaveTextContent("All seats are taken.");
+    expect(screen.queryByRole("button", { name: /founding member/ })).toBeNull();
+  });
+
+  // E-Com Rules R7(1)(e): one total, with the GST inside it, beside every price on sale.
+  it("prints the GST inside each price on sale beside the price", async () => {
+    render(<PlusPage />);
+    expect(await screen.findByRole("article", { name: "Plus" })).toHaveTextContent("₹149 a month, including ₹22.73 GST (18%). Renews until you cancel.");
+    expect(screen.getByRole("article", { name: "Founding member" })).toHaveTextContent("₹999 a year, including ₹152.39 GST (18%).");
+    await userEvent.click(screen.getByRole("tab", { name: /Yearly/ }));
+    expect(screen.getByRole("article", { name: "Plus" })).toHaveTextContent("₹1,199 a year, including ₹182.90 GST (18%). ≈ ₹100 a month.");
+  });
+
+  // The server reads the plans (app/plus/page.tsx), so the HTML a crawler gets carries the prices.
+  it("prints the server's prices before the browser has fetched any, and keeps them if the refresh fails", async () => {
+    billing.fetchPlans.mockRejectedValue(new Error("plans 502"));
+    render(<PlusPage initialPlans={PLUS_ONLY} />);
+    expect(screen.getByRole("article", { name: "Plus" })).toHaveTextContent("₹1,199");
+    await waitFor(() => expect(billing.fetchPlans).toHaveBeenCalled());
+    expect(screen.queryByText("The plans could not be loaded")).toBeNull();
+    expect(screen.getByRole("article", { name: "Plus" })).toHaveTextContent("₹1,199");
+  });
+
+  // The FAQ's JSON-LD must say exactly what the page shows, and the page says
+  // checkout is not open while it is not (founder, 2026-09-29).
+  it.each([
+    ["open", true],
+    ["not open yet", false],
+  ])("carries FAQPage JSON-LD whose answers are the visible answers (checkout %s)", async (_label, ready) => {
+    billing.fetchPlans.mockResolvedValue({ ...PLANS, checkout_ready: ready });
+    const { container } = render(<PlusPage initialPlans={{ ...PLANS, checkout_ready: ready }} />);
+    await waitFor(() => expect(billing.fetchPlans).toHaveBeenCalled());
+    const ld = [...container.querySelectorAll('script[type="application/ld+json"]')]
+      .map((el) => JSON.parse(el.textContent ?? "{}"))
+      .find((d) => d["@type"] === "FAQPage");
+    expect(ld.mainEntity.length).toBe(screen.getAllByRole("group").length);
+    for (const q of ld.mainEntity) {
+      const summary = screen.getByText(q.name, { selector: "summary span" });
+      expect(summary.closest("details")).toHaveTextContent(q.acceptedAnswer.text);
+    }
+    expect(ld.mainEntity.some((q: { name: string }) => q.name === CHECKOUT_SOON_FAQ.q)).toBe(!ready);
   });
 });
 

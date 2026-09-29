@@ -4,7 +4,7 @@ import { FrontPage } from "@/components/FrontPage";
 import { fetchFeed, fetchSubjects } from "@/lib/api";
 import { FEED_WINDOW } from "@/lib/feedWindow";
 import { SECTOR_GROUPS, sectorGroup, sectorParam } from "@/lib/sectors";
-import { feedListItems, itemListLd, jsonLd, social } from "@/lib/seo";
+import { breadcrumbLd, feedListItems, itemListLd, jsonLd, social } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // The chart filtered to one of the reader's six subjects, its code active in
@@ -41,10 +41,12 @@ export default async function SectorPage({ params }: { params: Promise<{ slug: s
     fetchSubjects().catch(() => null),
   ]);
   const subtopics = tree?.nodes.filter((n) => n.depth === 2 && n.path.startsWith(`${group.slug}.`)) ?? [];
+  const url = `${SITE_URL}/sector/${group.slug}`;
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbLd([{ name: "Prism", url: `${SITE_URL}/` }, { name: group.name, url }])) }} />
       {initial && initial.length > 0 && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(`${group.name} — today's record`, `${SITE_URL}/sector/${group.slug}`, feedListItems(initial))) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(`${group.name} — today's record`, url, feedListItems(initial))) }} />
       )}
       <FrontPage sector={slug} initial={initial} subtopics={subtopics} />
     </>

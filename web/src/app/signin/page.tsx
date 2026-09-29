@@ -39,6 +39,22 @@ function emailProblem(raw: string): string | null {
   return null;
 }
 
+// Slips in a common domain (04 P2-8): suggested beside the field, one tap to
+// take, never corrected behind the reader's back — the address may be real.
+const DOMAIN_TYPOS: Record<string, string> = {
+  "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gmail.co": "gmail.com", "gmail.con": "gmail.com",
+  "yahoo.co": "yahoo.com", "hotmial.com": "hotmail.com",
+};
+
+/** The address with a mistyped common domain put right, or null when there is nothing to suggest. */
+function typoFix(raw: string): string | null {
+  const v = raw.trim();
+  const at = v.lastIndexOf("@");
+  if (at < 1) return null;
+  const fix = DOMAIN_TYPOS[v.slice(at + 1).toLowerCase()];
+  return fix ? `${v.slice(0, at)}@${fix}` : null;
+}
+
 // lib/session's words when the API gave no reason: under the alert's own title they would say it twice.
 const NO_REASON = "Could not send the sign-in link";
 
@@ -98,6 +114,7 @@ function SignIn() {
     if (await send()) setSent(true);
   }
 
+  const suggestion = typoFix(email);
   const col = "mx-auto grid w-full max-w-[420px] content-start gap-[18px] px-[var(--gutter)] pb-12 pt-7 lg:px-0 lg:pt-[72px]";
 
   if (sent) {
@@ -145,6 +162,12 @@ function SignIn() {
             if (invalid) setInvalid(null);
           }}
           error={invalid ?? undefined}
+          hint={suggestion ? (
+            <>
+              Did you mean{" "}
+              <button type="button" className="p-link" style={{ overflowWrap: "anywhere" }} onClick={() => setEmail(suggestion)}>{suggestion}</button>?
+            </>
+          ) : undefined}
         />
         <button type="submit" disabled={busy} aria-busy={busy || undefined} className="p-btn p-btn--primary p-btn--lg p-btn--block">
           {busy ? "Sending…" : "Email me a sign-in link"}

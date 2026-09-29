@@ -56,6 +56,8 @@ type Evidence = {
   route: { event: EventDetail; story: TrendingStoryDetail } | null;
   outlets: number;
   languages: number;
+  /** How many of the newest stories `outlets` and `languages` were counted over. */
+  window: number;
   /** Outlets Prism monitors: the denominator every count on the page is out of. */
   monitored: number | null;
   /** Languages of the monitored feeds, for the name in each script Prism reads. */
@@ -92,6 +94,7 @@ async function loadEvidence(): Promise<Evidence | null> {
       lens: events.find((e) => briefed(e) && (e.available_lenses ?? []).length > 1) ?? events.find(briefed) ?? null,
       route,
       outlets: new Set(outletRefs.map((o) => o.publisher)).size,
+      window: all.length,
       languages: new Set(outletRefs.map((o) => o.language ?? "en")).size,
       monitored: monitored?.outlets ?? null,
       monitoredLanguages: monitored ? [...new Set(monitored.feeds.map((f) => f.language ?? "en"))] : null,
@@ -151,6 +154,10 @@ export async function Landing() {
           <Link href="/onboarding" data-cta="landing:final-setup" className="p-btn p-btn--secondary p-btn--lg">Pick my subjects</Link>
         </div>
         <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>Free to read. No account needed; your subjects stay on this device until you sign in.</p>
+        {/* Signs in and lands on the account's unticked box: the link never subscribes anyone. */}
+        <p style={{ font: "var(--t-body-s)", color: "var(--ink-3)" }}>
+          <Link href={`/signin?next=${encodeURIComponent("/account#digest")}`} data-cta="landing:digest" className="p-link underline underline-offset-[3px]">Get the week&rsquo;s record by email</Link> · Sunday mornings, with a free account. Nothing is sent until you turn it on.
+        </p>
       </section>
     </div>
   );
@@ -160,10 +167,12 @@ export async function Landing() {
 function Hero({ evidence, leadRow }: { evidence: Evidence | null; leadRow: FeedItem | null }) {
   // Counted, never typed: outlets and languages out of what Prism monitors.
   const monitoredLanguages = evidence?.monitoredLanguages?.length ?? 0;
+  const where = evidence?.window === 1 ? "the latest story" : `the latest ${evidence?.window ?? 0} stories`;
   const figures: [string, string][] = evidence && evidence.outlets > 0
     ? [
-        [String(evidence.outlets), evidence.monitored && evidence.monitored >= evidence.outlets ? `of ${evidence.monitored} monitored outlets in today's record` : "outlets in today's record"],
-        [String(evidence.languages), monitoredLanguages >= evidence.languages ? `of ${monitoredLanguages} monitored languages in today's record` : evidence.languages === 1 ? "language in today's record" : "languages in today's record"],
+        // Counted over the newest rows, not the IST day, so the label says so (audit 03 P2-7).
+        [String(evidence.outlets), `${evidence.monitored && evidence.monitored >= evidence.outlets ? `of ${evidence.monitored} monitored outlets` : "outlets"} in ${where}`],
+        [String(evidence.languages), `${monitoredLanguages >= evidence.languages ? `of ${monitoredLanguages} monitored languages` : evidence.languages === 1 ? "language" : "languages"} in ${where}`],
       ]
     : [];
   return (

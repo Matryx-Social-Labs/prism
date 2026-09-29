@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FrontPage } from "@/components/FrontPage";
 import type { FeedItem } from "@/lib/api";
@@ -272,5 +272,33 @@ describe("FrontPage — has a professional read", () => {
     expect(await screen.findByText("No stories with a professional read today")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Show every story" }));
     expect(screen.getByRole("heading", { name: "Plain story" })).toBeInTheDocument();
+  });
+});
+
+describe("FrontPage — activation nudges (monetisation audit 04)", () => {
+  it("invites a reader with no subjects to For you, and never on a subject page (P2-2)", async () => {
+    render(<FrontPage />);
+    expect(await screen.findByRole("link", { name: "For you · pick subjects →" })).toHaveAttribute("href", "/you");
+    cleanup();
+    loadProfile.mockReturnValue({ state: "IN-KA", interests: ["sports"], languages: ["en"] });
+    render(<FrontPage />);
+    await screen.findByRole("tab", { name: "For you" });
+    expect(screen.queryByRole("link", { name: /pick subjects/ })).toBeNull();
+    cleanup();
+    loadProfile.mockReturnValue(null);
+    render(<FrontPage sector="politics" />);
+    await screen.findAllByText("A story on the chart");
+    expect(screen.queryByRole("link", { name: /pick subjects/ })).toBeNull();
+  });
+
+  it("ends the record with what a free account keeps, for a reader who is not signed in (P2-7)", async () => {
+    render(<FrontPage />);
+    expect(await screen.findByText(/Back tomorrow\? A free account keeps 10 lens readings and 10 questions a day\./)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continue free" })).toHaveAttribute("href", "/signin?next=/feed");
+    cleanup();
+    localStorage.setItem("prism.session.v1", JSON.stringify({ userId: "u1", email: "r@example.com" }));
+    render(<FrontPage />);
+    await screen.findByText("That’s today’s record.");
+    expect(screen.queryByText(/Back tomorrow/)).toBeNull();
   });
 });

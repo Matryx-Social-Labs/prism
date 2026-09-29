@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
-import { fetchTrendingStory } from "@/lib/api";
+import { fetchSources, fetchTrendingStory } from "@/lib/api";
+import { monitoredText } from "@/lib/coverage";
 import { CARD_TEXT, SITE_HEADLINE, SITE_LINE, SiteCard, StoryCard, tally } from "@/lib/ogCard";
 import { ogFonts } from "@/lib/ogFonts";
 import { spanDays } from "@/lib/spine";
@@ -12,10 +13,11 @@ import { sectorGroup } from "@/lib/sectors";
 // it gets no route. Then the counted bar.
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const alt = "A developing story's share card on Prism: its name, whether its grouping is verified, how many days it spans, and its coverage bar with how many of the outlets Prism monitors reported it.";
 
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const s = await fetchTrendingStory(slug).catch(() => null);
+  const [s, set] = await Promise.all([fetchTrendingStory(slug).catch(() => null), fetchSources()]);
   if (!s) {
     // A generic card served as a 200 would be cached by the scraper for days.
     const fonts = await ogFonts(SITE_HEADLINE, SITE_LINE, CARD_TEXT);
@@ -29,7 +31,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const route = verified && dated.length === devs ? dated.sort() : null;
   const meta = [sectorGroup(s.sector)?.name ?? "", days ? `${days} ${days === 1 ? "day" : "days"}` : ""];
   const unit = verified ? (devs === 1 ? "development" : "developments") : devs === 1 ? "record" : "records";
-  const count = `${devs} ${unit} · ${t.outlets} ${t.outlets === 1 ? "outlet" : "outlets"}`;
+  const count = `${devs} ${unit} · ${monitoredText(t.outlets, set?.outlets)}`;
   const path = `/trending/${slug}`;
   const fonts = await ogFonts(s.label, ...meta, count, path, CARD_TEXT, route ? "JANFEBMARAPRMAYJUNJULAUGSEPTOCTNOVDEC" : "");
   return new ImageResponse(

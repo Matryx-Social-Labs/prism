@@ -67,6 +67,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
         ["LLP", LEGAL_ENTITY],
         ["Built with", LEGAL_PARTNER],
         ["Write to", <a key="w" href={`mailto:${CONTACT_EMAIL}`} className="p-link">{CONTACT_EMAIL}</a>],
+        ["Complaints", <Link key="g" href="/grievance" className="p-link">Grievance Officer</Link>],
         ["Changed", <time key="c" dateTime={LEGAL_UPDATED} className="p-mono" style={{ fontSize: 12 }}>{CHANGED}</time>],
       ]}
     />

@@ -125,6 +125,16 @@ describe("SiteHeader — the double-header fix", () => {
     expect(container.querySelector("header")?.className).toContain("hidden");
   });
 
+  // 2026-09-29: the new pages draw their own back bar, and a phone showed two lockups.
+  it("hides it on every page that draws its own back bar", () => {
+    for (const path of ["/grievance", "/delivery", "/press", "/for-publishers", "/state", "/state/karnataka", "/archive", "/feed/2026-09-27", "/privacy"]) {
+      at(path);
+      const { container, unmount } = render(<SiteHeader />);
+      expect(container.querySelector("header")?.className, path).toContain("hidden");
+      unmount();
+    }
+  });
+
   it("keeps it on the landing, marketing and auth routes", () => {
     for (const path of ["/", "/about", "/signin"]) {
       at(path);

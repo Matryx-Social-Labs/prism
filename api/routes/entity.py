@@ -27,6 +27,7 @@ from common import outlets
 from common.db import get_db
 from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
+from common.regions import HUB_SLUGS
 from enrichment.claims import dedupe_sources, speaker_key
 
 router = APIRouter()
@@ -281,7 +282,9 @@ async def get_entity(
 @router.get("/api/v1/sitemap/entities")
 async def sitemap_entities(db: AsyncSession = Depends(get_db)):
     """The actors worth a crawl: slug and last change for every entity in at
-    least INDEXABLE_MIN_RECORDS served records."""
+    least INDEXABLE_MIN_RECORDS served records. Not a state's own name: that
+    address 308s to the state's hub (web/src/app/entity/[slug]), which would
+    otherwise compete with it for "<state> news" (audit 02, P1-1)."""
     rows = (
         await db.execute(
             text(
@@ -292,13 +295,14 @@ async def sitemap_entities(db: AsyncSession = Depends(get_db)):
                 JOIN event_entities ee ON ee.entity_id = en.id
                 JOIN events e ON e.id = ee.event_id
                 WHERE COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
+                  AND en.slug <> ALL(:state_hubs)
                 GROUP BY en.slug
                 HAVING count(DISTINCT e.id) >= :floor
                 ORDER BY n DESC
                 LIMIT 50000
                 """
             ),
-            {"floor": INDEXABLE_MIN_RECORDS},
+            {"floor": INDEXABLE_MIN_RECORDS, "state_hubs": sorted(HUB_SLUGS)},
         )
     ).all()
     return {

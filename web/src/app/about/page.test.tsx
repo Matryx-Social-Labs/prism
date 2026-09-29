@@ -121,7 +121,7 @@ describe("/about — how Prism works, on one live story", () => {
     for (const term of ["Monitored outlets", "Single source", "Prism\u2019s reading"]) expect(screen.getByText(term)).toBeInTheDocument();
     const report = screen.getByRole("list", { name: "Report a problem" });
     const first = within(report).getAllByRole("link")[0];
-    expect(first.getAttribute("href")).toMatch(/^mailto:hello@readprism\.news\?subject=A%20fact%20is%20wrong/);
+    expect(first.getAttribute("href")).toBe("/grievance?kind=A+fact+is+wrong#complain");
     expect(screen.getByRole("link", { name: "public list of outlets" })).toHaveAttribute("href", "/sources");
   });
 

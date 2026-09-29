@@ -77,7 +77,11 @@ describe("the record — the header", () => {
     render(<StoryView event={event()} />);
     const links = within(screen.getByRole("list", { name: "Report a problem" })).getAllByRole("link");
     expect(links.map((a) => a.textContent)).toEqual(["A fact is wrong", "A quote is not in the article", "An outlet says something different", "An outlet that covered this is missing"]);
-    expect(decodeURIComponent(links[0].getAttribute("href")!)).toContain("/story/");
+    // The complaint form, prefilled with the kind and this record (IT Rules grievance, api/routes/grievances.py).
+    const href = new URL(links[0].getAttribute("href")!, "https://www.readprism.news");
+    expect(href.pathname).toBe("/grievance");
+    expect(href.searchParams.get("kind")).toBe("A fact is wrong");
+    expect(href.searchParams.get("record")).toMatch(/^\/story\/./);
   });
 
   it("says so when there is one source, in words — never colour alone", () => {

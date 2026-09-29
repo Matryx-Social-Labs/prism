@@ -77,7 +77,8 @@ export function CancelSheet({
     track("Subscribe", { stage: "cancel-sheet" });
     setReason(null); setComment(""); setMonths(null); setNote(null); setDeclined(null); setDone(null); setPauseGone(false);
     fetchPlans()
-      .then((p) => { setYearly(p.plans.find((x) => x.plan === "plus_yearly") ?? null); setMonthly(p.plans.find((x) => x.plan === "plus_monthly") ?? null); })
+      // No yearly offer while checkout is closed: it would open a checkout that answers 503.
+      .then((p) => { setYearly(p.checkout_ready ? p.plans.find((x) => x.plan === "plus_yearly") ?? null : null); setMonthly(p.plans.find((x) => x.plan === "plus_monthly") ?? null); })
       .catch(() => setYearly(null));
     closeRef.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };

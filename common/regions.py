@@ -6,6 +6,8 @@ states we currently have a state-edition source for — the rest still get natio
 news and gain a local tier as we add feeds.
 """
 
+import re
+
 # (ISO 3166-2 code, display name)
 IN_STATES: list[tuple[str, str]] = [
     ("IN-AP", "Andhra Pradesh"), ("IN-AR", "Arunachal Pradesh"), ("IN-AS", "Assam"),
@@ -41,3 +43,23 @@ def states_payload() -> list[dict]:
 def is_state_code(code: str) -> bool:
     """True for a real ISO 3166-2:IN code we know (IN-KA), false for IN-BLR and friends."""
     return code in _VALID
+
+
+# The states and union territories with a hub page, /state/<slug> (marketing
+# audit 02, P1-1): the 33 names web/src/lib/regions.ts carries. Andaman &
+# Nicobar, Dadra & Nagar Haveli and Daman & Diu, and Lakshadweep have no hub:
+# the web names none of them and the corpus places almost nothing there.
+_NO_HUB = {"IN-AN", "IN-DH", "IN-LD"}
+HUB_STATES: list[tuple[str, str]] = [(c, n) for c, n in IN_STATES if c not in _NO_HUB]
+
+
+def state_slug(name: str) -> str:
+    """"Jammu & Kashmir" -> "jammu-and-kashmir". The hub's address, and the slug
+    the entity folder gives the same name, so /entity/<slug> can defer to the
+    hub instead of competing with it for "<state> news" (the same rule as
+    web/src/lib/regions.ts stateSlug)."""
+    return re.sub(r"[^a-z0-9]+", "-", name.lower().replace("&", "and")).strip("-")
+
+
+# slug -> ISO code, for every hub.
+HUB_SLUGS: dict[str, str] = {state_slug(n): c for c, n in HUB_STATES}

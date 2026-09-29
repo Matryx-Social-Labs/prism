@@ -142,6 +142,18 @@ describe("records and stories that should not be indexed say so", () => {
     expect(news).not.toContain("/story/single");
   });
 
+  // Review 2026-09-29: a feed can stamp a report in the future; the record's
+  // lastmod must never pass its own rebuild (the API's sitemaps clamp the same).
+  it("never dates a record after its own last rebuild", async () => {
+    const rebuilt = "2026-09-28T02:11:00+00:00";
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/api/v1/feed")) return json({ items: [{ ...record("multi", true), last_updated_at: rebuilt, latest_published_at: "2031-01-01T00:00:00+00:00" }] });
+      return json({ nodes: [], stories: [] });
+    }));
+    const entry = (await sitemap()).find((e) => e.url.endsWith("/story/multi"));
+    expect(entry?.lastModified).toBe(rebuilt);
+  });
+
   it("the news sitemap is a 503 to come back to when the API is down, never an empty file", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("api down"); }));
     const res = await newsSitemap();

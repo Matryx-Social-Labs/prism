@@ -254,6 +254,14 @@ class Settings(BaseSettings):
     prism_email_provider: str = "console"  # console (dev) | resend
     resend_api_key: str = Field("", repr=False)
     prism_email_from: str = "Prism <onboarding@resend.dev>"  # set to a verified domain sender
+    # The week's record by email (common/weekly_digest.py), Sunday 08:00 IST from
+    # the worker, only to accounts that turned it on. Off until the founder says;
+    # at most this many a run (Resend's free tier is 100 a day), the rest next run.
+    prism_digest_enabled: bool = False
+    prism_digest_max_per_run: int = 90
+    # The API's public address, for the digest's one-click unsubscribe link and
+    # its List-Unsubscribe header (the worker writes them; the API answers them).
+    prism_api_url: str = "http://localhost:8000"
     prism_magic_token_ttl_min: int = 15  # magic-link lifetime
     prism_session_ttl_days: int = 30  # bearer session lifetime
     # The session travels in an HttpOnly cookie, never in storage a script can
@@ -275,6 +283,10 @@ class Settings(BaseSettings):
     razorpay_key_id: str = Field("", repr=False)
     razorpay_key_secret: str = Field("", repr=False)
     razorpay_webhook_secret: str = Field("", repr=False)
+    # Test keys (rzp_test_…) take no money, so checkout stays shut on them
+    # (founder, 2026-09-29: hide checkout until the live keys). True lets a
+    # local or staging deployment drive Razorpay's test sheet end to end.
+    prism_allow_test_checkout: bool = False
 
     # Sources
     x_bearer_token: str = Field("", repr=False)  # X API app-only bearer (console.x.com), pay-per-use

@@ -1,5 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { subscribe } from "@/lib/billing";
+import { gstBreakup, gstIncluded, rupees, subscribe } from "@/lib/billing";
+
+// E-Com Rules R7(1)(e): one total, with the tax inside it broken out. Prices
+// are GST-inclusive (founder, 2026-09-29), so the base is total ÷ 1.18.
+describe("gstBreakup — the GST inside every price on sale", () => {
+  it.each([
+    [14900, "₹149", "₹126.27", "₹22.73"],
+    [99900, "₹999", "₹846.61", "₹152.39"],
+    [119900, "₹1,199", "₹1,016.10", "₹182.90"],
+    [149900, "₹1,499", "₹1,270.34", "₹228.66"],
+    [19900, "₹199", "₹168.64", "₹30.36"],
+  ])("%i paise is %s: %s + %s GST", (paise, total, base, gst) => {
+    expect(gstBreakup(paise)).toEqual({ total, base, gst });
+  });
+
+  it("says it compactly, and whole rupees still print without paise", () => {
+    expect(gstIncluded(14900)).toBe("including ₹22.73 GST (18%)");
+    expect(rupees(119900)).toBe("₹1,199");
+    expect(rupees(12627)).toBe("₹126.27");
+    expect(rupees(12620)).toBe("₹126.20");
+  });
+});
 
 // A checkout that did not pay was counted nowhere: closed, declined and
 // unverifiable all looked like a reader who never tried (audit 2026-09-29, §2.5).

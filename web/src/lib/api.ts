@@ -391,6 +391,92 @@ export async function fetchRegions(): Promise<RegionState[]> {
   return ((await res.json()) as { states: RegionState[] }).states;
 }
 
+/** Every state hub with its records from two or more outlets in the window (GET /api/v1/regions/hubs). */
+export interface StateHubCount {
+  code: string;
+  name: string;
+  slug: string;
+  multi_outlet: number;
+  /** At or over `floor`: the hub asks to be indexed. */
+  indexable: boolean;
+}
+
+export interface StateHubs {
+  floor: number;
+  window_days: number;
+  states: StateHubCount[];
+}
+
+/** One state hub's counts (GET /api/v1/regions/{code}); its rows come from the feed's region scope. */
+export interface StateHubPage extends StateHubCount {
+  qid: string | null;
+  window_days: number;
+  floor: number;
+  /** Records placed in the state in the window, one outlet or more. */
+  records: number;
+  /** Records from two or more outlets, per subject root (common/subjects ROOTS order). */
+  subjects: { root: string; count: number }[];
+  /** Languages of the reports on those records, most records first. */
+  languages: string[];
+  /** The outlets with a desk in the state: the denominator for its volume. */
+  desks: { publisher: string; name: string; language: string | null }[];
+  /** Entities quoted word for word in `speakers_window` of the newest such records, from two up. */
+  speakers: { slug: string; name: string; records: number; indexable: boolean }[];
+  speakers_window: number;
+  /** The newest records from two or more outlets placed here, most outlets first. */
+  items: FeedItem[];
+}
+
+/** A settled answer or null; a failure throws, so a page never prints a guess as a count. */
+async function getJson<T>(path: string, revalidate: number): Promise<T | null> {
+  const res = await fetch(`${API_URL}${path}`, { next: { revalidate } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+export const fetchStateHubs = (revalidate = 600) => getJson<StateHubs>("/api/v1/regions/hubs", revalidate);
+export const fetchStateHub = (code: string, revalidate = 600) => getJson<StateHubPage>(`/api/v1/regions/${encodeURIComponent(code)}`, revalidate);
+
+/** What Prism read on one IST day (GET /api/v1/archive): nothing, a window, or all of it. */
+export interface ArchiveReading {
+  date: string;
+  read: boolean;
+  whole_day: boolean;
+  read_from: string | null;
+  read_to: string | null;
+  /** Prism has read since the day ended; an unsettled day can still gain records. */
+  settled: boolean;
+  /** Null when the day was not read: not counted, never 0. */
+  records: number | null;
+  multi_outlet: number | null;
+  indexable: boolean;
+}
+
+export interface ArchiveIndex {
+  first_day: string | null;
+  today: string;
+  floor: number;
+  /** Yesterday back to the first day read, newest first. */
+  days: ArchiveReading[];
+}
+
+export interface ArchiveDay extends ArchiveReading {
+  floor: number;
+  /** The read days either side; `next_is_today` when the next is today's record (/feed). */
+  prev: string | null;
+  next: string | null;
+  next_is_today: boolean;
+  single_source: number | null;
+  languages: number | null;
+  /** The records from two or more outlets, most outlets first. */
+  items: FeedItem[];
+}
+
+export const fetchArchive = (revalidate = 3600) => getJson<ArchiveIndex>("/api/v1/archive", revalidate);
+/** Null for a date outside the archive (404); throws when the API cannot answer. */
+export const fetchArchiveDay = (date: string, revalidate: number) => getJson<ArchiveDay>(`/api/v1/archive/${encodeURIComponent(date)}`, revalidate);
+
 /** `revalidate` is the caller's clock: a route re-renders at its shortest fetch (scripts/check-cache-windows.mjs). */
 export async function fetchFeed(query: FeedQuery = {}, revalidate = 60): Promise<FeedItem[]> {
   const params = new URLSearchParams();

@@ -100,6 +100,12 @@ async def visits(db: AsyncSession, w: dict[str, date], since: date | None) -> di
     views = await _usage(db, w, "view", since)
     arr = await _usage(db, w, "arrival", since)
     shares = await _usage(db, w, "share", since)
+    # Launch attribution (06 §2.1–2.3): the word a link carried, what readers
+    # say brought them, the post-read question, and visits that read on.
+    campaigns = await _usage(db, w, "campaign", since)
+    heard = await _usage(db, w, "heard", since)
+    check = await _usage(db, w, "survey", since)
+    depth = await _usage(db, w, "depth", since)
     return {
         "key": "visits", "title": "Visits",
         "rows": [
@@ -118,6 +124,12 @@ async def visits(db: AsyncSession, w: dict[str, date], since: date | None) -> di
              "series": arr["split_series"]},
             {"key": "pages", "title": "Views by kind of page", "rows": views["split"], "source": src},
             {"key": "shared", "title": "What was shared", "rows": shares["split"], "source": src},
+            {"key": "campaigns", "title": "Visits by the campaign word their link carried (?ref=)",
+             "rows": campaigns["split"], "source": src, "series": campaigns["split_series"]},
+            {"key": "heard", "title": "Where readers say they heard of Prism", "rows": heard["split"], "source": src},
+            {"key": "check", "title": "Could you check this story for yourself?", "rows": check["split"], "source": src},
+            {"key": "depth", "title": "Visits that read a 2nd or 5th story (2:share arrived by a shared link)",
+             "rows": depth["split"], "source": src},
         ],
     }
 

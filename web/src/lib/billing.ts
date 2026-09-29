@@ -56,7 +56,22 @@ export interface Payment {
 }
 export type CancelReason = "not-using" | "too-expensive" | "missing-something" | "other";
 
-export const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+/** "₹1,199", and paise only when there are some: "₹126.27". */
+export const rupees = (paise: number) =>
+  `₹${(paise / 100).toLocaleString("en-IN", { minimumFractionDigits: paise % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
+/** GST on online news subscriptions (SAC 998431; docs/COMPLIANCE-INDIA.md §3.5). */
+export const GST_RATE = 0.18;
+
+/** The GST inside a GST-inclusive price: the single total and its breakup
+ *  (E-Com Rules R7(1)(e); founder, 2026-09-29: prices stay inclusive). */
+export function gstBreakup(paise: number) {
+  const base = Math.round(paise / (1 + GST_RATE));
+  return { total: rupees(paise), base: rupees(base), gst: rupees(paise - base) };
+}
+
+/** "including ₹22.73 GST (18%)", printed beside a price offered for sale. */
+export const gstIncluded = (paise: number) => `including ${gstBreakup(paise).gst} GST (${Math.round(GST_RATE * 100)}%)`;
 
 export async function fetchPlans(): Promise<PlansOut> {
   const r = await fetch(`${API_URL}/api/v1/billing/plans`, { cache: "no-store" });

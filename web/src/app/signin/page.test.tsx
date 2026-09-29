@@ -207,3 +207,30 @@ describe("Sign in — the way back", () => {
     params.delete("next");
   });
 });
+
+describe("Sign in — a mistyped domain (04 P2-8)", () => {
+  it.each([
+    ["asha@gmial.com", "asha@gmail.com"],
+    ["asha@gmai.com", "asha@gmail.com"],
+    ["asha@gmail.co", "asha@gmail.com"],
+    ["asha@GMAIL.CON", "asha@gmail.com"],
+    ["asha@yahoo.co", "asha@yahoo.com"],
+    ["asha@hotmial.com", "asha@hotmail.com"],
+  ])("suggests the fix for %s, and one tap takes it", async (typed, fixed) => {
+    render(<SignInPage />);
+    await userEvent.type(emailField(), typed);
+    await userEvent.click(screen.getByRole("button", { name: fixed }));
+    expect(emailField()).toHaveValue(fixed);
+    expect(screen.queryByText(/Did you mean/)).toBeNull();
+  });
+
+  it("suggests nothing for an address it has no reason to doubt, and never changes one by itself", async () => {
+    render(<SignInPage />);
+    await userEvent.type(emailField(), "asha@gmail.com");
+    expect(screen.queryByText(/Did you mean/)).toBeNull();
+    await userEvent.clear(emailField());
+    await userEvent.type(emailField(), "asha@gmial.com");
+    await userEvent.click(submitButton());
+    expect(requestMagicLink).toHaveBeenCalledWith("asha@gmial.com", null);
+  });
+});
