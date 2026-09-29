@@ -129,7 +129,7 @@ export function DevelopingRail({ stories, title }: { stories: TrendingStory[]; t
 export function SubtopicNav({ all, nodes }: { all: string; nodes: { path: string; label: string }[] }) {
   if (nodes.length === 0) return null;
   return (
-    <nav aria-label="Sub-topics" className="p-hide-scroll -mx-[var(--gutter)] flex gap-1.5 overflow-x-auto px-[var(--gutter)] lg:mx-0 lg:flex-wrap lg:px-0">
+    <nav aria-label="Sub-topics" className="p-hide-scroll -mx-[var(--gutter)] -my-1 flex gap-1.5 overflow-x-auto px-[var(--gutter)] py-1 lg:mx-0 lg:flex-wrap lg:px-0">
       <Link href={all} className="p-chip" aria-current="page">All</Link>
       {nodes.map((c) => (
         <Link key={c.path} href={subjectHref(c.path)} className="p-chip">{c.label}</Link>

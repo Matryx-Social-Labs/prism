@@ -216,7 +216,7 @@ export function RouteMap({ tree, developments, currentId = null, compact = false
 
   return (
     <div ref={wrap} className="rm relative" onKeyDown={onKey}>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-hidden overscroll-x-contain">
         <svg viewBox={`0 ${yTop} ${W} ${H - yTop}`} width={W} height={H - yTop} role="img" aria-label="How this story unfolded" className={`rm-svg${drawn ? " rm-drawn" : ""}${reduce ? " rm-still" : ""}`}>
           {/* the main line */}
           <path d={`M${xs.get(trunk[0].id)} ${yMain} H${xs.get(trunk.at(-1)!.id)}`} className="rm-main" />

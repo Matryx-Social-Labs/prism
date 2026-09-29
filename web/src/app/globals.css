@@ -513,7 +513,10 @@ a { text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
 button:not(:disabled), summary, label[for] { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 .p-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.p-hide-scroll, .hide-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+/* Every rail carries this class. overflow-x:auto silently makes overflow-y auto too, so a
+   rail with a few px of vertical overflow swiped diagonally on a phone; pin the other axis
+   and keep the rail's overscroll to itself. */
+.p-hide-scroll, .hide-scroll { scrollbar-width: none; -ms-overflow-style: none; overflow-y: hidden; overscroll-behavior-x: contain; }
 .p-hide-scroll::-webkit-scrollbar, .hide-scroll::-webkit-scrollbar { display: none; }
 /* A link in the reading voice: the accent, underlined on hover only. */
 .p-link { color: var(--link); text-decoration: none; font-weight: 600; }
@@ -743,7 +746,7 @@ select.p-input { appearance: none; padding-right: 40px; background-image: url("d
 .sc-shell{max-width:var(--shell);margin:0 auto;padding:0 var(--gutter)}
 .sc-phone-only{display:block}.sc-desk-only{display:none}
 @media (min-width:1024px){.sc-phone-only{display:none}.sc-desk-only{display:block}}
-.sc-rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(var(--gutter) * -1);padding:4px var(--gutter) 8px;scroll-padding:0 var(--gutter)}
+.sc-rail{display:flex;gap:12px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(var(--gutter) * -1);padding:4px var(--gutter) 8px;scroll-padding:0 var(--gutter)}
 .sc-rail::-webkit-scrollbar{display:none}.sc-rail>*{scroll-snap-align:start;flex:none}
 .sc-reveal{opacity:0;transform:translateY(12px);transition:opacity 420ms var(--ease),transform 520ms var(--ease)}
 .sc-reveal.is-in{opacity:1;transform:none}
@@ -753,9 +756,9 @@ select.p-input { appearance: none; padding-right: 40px; background-image: url("d
 .sc-stat{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-control);background:var(--surface);text-align:left;color:inherit;text-decoration:none;min-width:0}
 .sc-stat:hover{border-color:var(--line-strong)}
 .sc-stat b{font:600 22px/1 var(--font-record);letter-spacing:-.02em}.sc-stat span{font:500 12px/1.2 var(--font-read);color:var(--ink-3)}
-.sc-tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.sc-tabs{display:flex;gap:2px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;box-shadow:inset 0 -1px var(--line)}
 .sc-tabs::-webkit-scrollbar{display:none}
-.sc-tabs a{flex:none;padding:12px 12px 10px;font:600 14px/1 var(--font-read);color:var(--ink-3);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}
+.sc-tabs a{flex:none;padding:12px 12px 10px;font:600 14px/1 var(--font-read);color:var(--ink-3);text-decoration:none;border-bottom:2px solid transparent}
 .sc-tabs a[aria-current="true"]{color:var(--ink);border-color:var(--ink)}
 .sc-progress{position:fixed;left:0;top:0;height:2px;background:var(--ink);z-index:70;transform-origin:left;transition:transform 80ms linear}
 @keyframes sc-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

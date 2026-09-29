@@ -24,7 +24,7 @@ export function step(returned: number, accounts: number): number {
 export function CohortGrid({ rows }: { rows: CohortRow[] }) {
   const cols = rows[0]?.by_week.length ?? 0;
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overflow-y-hidden overscroll-x-contain">
       <table className="w-full border-separate text-center font-mono text-[12px] tabular-nums" style={{ borderSpacing: 3 }}>
         <thead>
           <tr className="whitespace-nowrap uppercase" style={{ font: "var(--t-label)", letterSpacing: "var(--track-label)", color: "var(--ink-3)" }}>
