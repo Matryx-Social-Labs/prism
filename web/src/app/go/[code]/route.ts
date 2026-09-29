@@ -24,9 +24,14 @@ async function lookup(code: string): Promise<Link | null> {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const link = await lookup((await params).code.toLowerCase());
-  // Only a path on this site: the API says so, and this makes sure of it.
-  const safe = link && link.path.startsWith("/") && !link.path.startsWith("//");
-  const target = new URL(safe ? link.path : "/", req.nextUrl.origin);
-  if (safe) for (const [k, v] of Object.entries(link.tags)) target.searchParams.set(k, v);
+  const origin = req.nextUrl.origin;
+  let target = new URL("/", origin);
+  if (link?.path.startsWith("/")) {
+    target = new URL(link.path, origin);
+    for (const [k, v] of Object.entries(link.tags)) target.searchParams.set(k, v);
+  }
+  // Only this site, whatever the API answered: a path like "/\evil.example"
+  // resolves to another host, so the check is on where the URL ends up.
+  if (target.origin !== origin) target = new URL("/", origin);
   return NextResponse.redirect(target, { status: 307, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
 }

@@ -14,7 +14,7 @@
  * of every tagged link, hand-made ones included.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AdminHead, AdminSection, useAdmin } from "@/components/admin/AdminShell";
 import { BarList } from "@/components/admin/charts/Bars";
@@ -71,11 +71,17 @@ export default function MarketingPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  // The period last asked for: a slow 90-day answer must not land over the 7 days asked for after it.
+  const asked = useRef(days);
+  asked.current = days;
   const load = useCallback(async () => {
     try {
-      setData(await fetchLinks(session, days));
+      const links = await fetchLinks(session, days);
+      if (asked.current !== days) return;
+      setData(links);
+      setError("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load the links");
+      if (asked.current === days) setError(e instanceof Error ? e.message : "Could not load the links");
     }
   }, [session, days]);
 
@@ -99,6 +105,7 @@ export default function MarketingPage() {
 
   const archive = async (code: string, archived: boolean) => {
     setBusy(code);
+    setError("");
     try {
       await setLinkArchived(session, code, archived);
       await load();

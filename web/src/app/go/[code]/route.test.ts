@@ -28,8 +28,10 @@ describe("/go/<code>, a founder link's short address", () => {
   });
 
   it("never leaves the site, whatever the API answers", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ path: "//evil.example/x", tags: {} })));
-    expect((await go("k3f9qa")).headers.get("location")).toBe("https://www.readprism.news/");
+    for (const path of ["//evil.example/x", "/\\evil.example", "/\t/evil.example", "https://evil.example/"]) {
+      vi.stubGlobal("fetch", vi.fn(async () => Response.json({ path, tags: {} })));
+      expect((await go("k3f9qa")).headers.get("location"), path).toBe("https://www.readprism.news/");
+    }
   });
 
   it("opens the front page while the API is away", async () => {

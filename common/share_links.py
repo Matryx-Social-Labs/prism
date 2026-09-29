@@ -22,14 +22,16 @@ from __future__ import annotations
 import re
 import secrets
 import time
+import unicodedata
 from datetime import date
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import unquote, urlencode, urlsplit
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import usage
+from common.regions import HUB_SLUGS
 
 # Platform → the medium a link for it gets unless the founder picks another.
 # Every one is a campaign word (usage.CAMPAIGNS), so the Overview's "by
@@ -60,8 +62,21 @@ PAGES: dict[str, str] = {
     "trending": "trending", "entity": "entity", "state": "state", "sector": "sector", "subject": "subject",
     "sources": "sources", "pulse": "pulse", "press": "press", "for-publishers": "publishers",
 }
+# A path segment as a URL carries it: an Indian-language slug arrives
+# percent-encoded (common/text.slugify keeps every script's letters).
 SEGMENT = re.compile(r"[A-Za-z0-9._~%-]{1,120}")
 SITE_HOSTS = frozenset({"readprism.news", "www.readprism.news"})
+# Public by path, private in fact: the page Plus opens after paying (robots.ts).
+PRIVATE = ("/plus/welcome",)
+
+
+def _segment_ok(segment: str) -> bool:
+    """A segment that names a page: never "." or ".." however it is encoded (a
+    browser resolves /story/%2e%2e/admin to /admin), a slash, or a control."""
+    if not SEGMENT.fullmatch(segment):
+        return False
+    decoded = unquote(segment)
+    return decoded not in (".", "..") and not any(c in "/\\" or unicodedata.category(c)[0] == "C" for c in decoded)
 
 
 def target_path(value: str, web_url: str) -> str | None:
@@ -71,14 +86,17 @@ def target_path(value: str, web_url: str) -> str | None:
     v = value.strip()
     if not v or v.startswith("//"):
         return None
-    if not v.startswith("/"):
-        u = urlsplit(v if "://" in v else f"https://{v}")
-        if u.scheme not in ("http", "https") or u.hostname not in SITE_HOSTS | {urlsplit(web_url).hostname}:
-            return None
-        v = u.path or "/"
-    path = urlsplit(v).path.rstrip("/") or "/"
+    try:
+        if not v.startswith("/"):
+            u = urlsplit(v if "://" in v else f"https://{v}")
+            if u.scheme not in ("http", "https") or u.hostname not in SITE_HOSTS | {urlsplit(web_url).hostname}:
+                return None
+            v = u.path or "/"
+        path = urlsplit(v).path.rstrip("/") or "/"
+    except ValueError:  # "http://[::1": not an address at all
+        return None
     segments = path.strip("/").split("/") if path != "/" else []
-    if len(segments) > 4 or any(not SEGMENT.fullmatch(s) for s in segments):
+    if len(segments) > 4 or not all(_segment_ok(s) for s in segments) or path.startswith(PRIVATE):
         return None
     return path if (segments[0] if segments else "") in PAGES else None
 
@@ -91,6 +109,35 @@ def kind(path: str) -> str:
     if segments[0] == "feed" and len(segments) == 2:
         return "day"
     return PAGES[segments[0]]
+
+
+# Merges are followed this far, as api/routes/trending does; a longer chain is corruption.
+MAX_MERGE_HOPS = 8
+
+
+async def landing(db: AsyncSession, path: str) -> str:
+    """The page a link's path opens today. A record merged into another, a
+    story folded into another, and a person page named after a state all
+    redirect on the web — a redirect that drops the link's tags, so the visit
+    would go uncounted (the pages are cached, so they cannot carry a query
+    through). /go sends the reader straight to where the page now lives."""
+    segments = path.strip("/").split("/")
+    if segments[0] == "story" and len(segments) >= 2:
+        into = await db.scalar(text("SELECT merged_into FROM events WHERE id::text = :i"), {"i": segments[1]})
+        if into is not None:  # merged_into never chains (api/routes/events._moved)
+            return "/" + "/".join(["story", str(into), *segments[2:]])
+    if segments[0] == "trending" and len(segments) == 2:
+        slug = segments[1]
+        for _ in range(MAX_MERGE_HOPS):
+            nxt = await db.scalar(text("SELECT m.slug FROM stories s JOIN stories m ON m.id = s.merged_into WHERE s.slug = :s"),
+                                  {"s": slug})
+            if nxt is None:
+                break
+            slug = nxt
+        return f"/trending/{slug}"
+    if segments[0] == "entity" and len(segments) == 2 and segments[1] in HUB_SLUGS:
+        return f"/state/{segments[1]}"
+    return path
 
 
 def new_code() -> str:

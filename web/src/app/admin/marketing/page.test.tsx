@@ -63,7 +63,7 @@ describe("Marketing — the links and what they brought", () => {
   it("archives a link on request, and the list is read again", async () => {
     render(<MarketingPage />);
     const row = within((await screen.findByText("k3f9qa")).closest("tr")!);
-    await userEvent.click(row.getByRole("button", { name: "Archive" }));
+    await userEvent.click(row.getByRole("button", { name: "Archive k3f9qa" }));
     expect(setLinkArchived).toHaveBeenCalledWith(ADMIN.session, "k3f9qa", true);
     expect(fetchLinks).toHaveBeenCalledTimes(2);
   });
@@ -77,9 +77,33 @@ describe("Marketing — making a link", () => {
     expect(screen.getByRole("button", { name: /Make the WhatsApp link/ })).toBeDisabled();
   });
 
+  it("makes no link to a page that is not there: the link would open an error", async () => {
+    fetchEvent.mockRejectedValue(new Error("/api/v1/events/gone failed: 404"));
+    render(<MarketingPage />);
+    await userEvent.type(await screen.findByLabelText("A Prism page"), "/story/gone");
+    expect(await screen.findByText(/No such page, or it could not be read/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Make the WhatsApp link/ })).toBeDisabled();
+    expect(makeLink).not.toHaveBeenCalled();
+  });
+
+  it("never shows an older period's links over the one asked for last", async () => {
+    let answer28: (v: unknown) => void = () => undefined;
+    fetchLinks.mockReset()
+      .mockImplementationOnce(() => new Promise((r) => { answer28 = r; }))
+      .mockResolvedValue(payload([link("seven7", { visits: 7 })]));
+    render(<MarketingPage />);
+    await userEvent.click(await screen.findByRole("tab", { name: "7 days" }));
+    expect(await screen.findByText("seven7")).toBeInTheDocument();
+    answer28(payload([link("twenty", { visits: 28 })]));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("twenty")).not.toBeInTheDocument();
+    expect(screen.getByText("seven7")).toBeInTheDocument();
+  });
+
   it("makes a link for the story picked and the platform chosen, then gives the short link, a post and the images", async () => {
     render(<MarketingPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /Boeing 737 MAX software glitch/ }));
+    const picks = within(await screen.findByRole("list", { name: "Today's top stories" }));
+    await userEvent.click(await picks.findByRole("button", { name: /Boeing 737 MAX software glitch/ }));
     await userEvent.click(screen.getByRole("radio", { name: "X" }));
     await userEvent.type(screen.getByLabelText("Campaign"), "Launch Week");
     await screen.findByText("Boeing 737 MAX software glitch", { selector: ".font-semibold" });
@@ -87,7 +111,7 @@ describe("Marketing — making a link", () => {
     expect(makeLink).toHaveBeenCalledWith(ADMIN.session, {
       target: "/story/abc", platform: "x", medium: "social", campaign: "launch-week", title: "Boeing 737 MAX software glitch", note: "",
     });
-    const made = within(await screen.findByRole("generic", { name: "The X link" }));
+    const made = within(await screen.findByRole("group", { name: "The X link" }));
     expect(made.getByText("https://readprism.news/go/n5t6vw")).toBeInTheDocument();
     expect((made.getByLabelText("The post for X") as HTMLTextAreaElement).value).toContain("Reported by 2 of 41 monitored outlets");
     expect(made.getByRole("link", { name: "Open in X" }).getAttribute("href")).toContain("x.com/intent/post");

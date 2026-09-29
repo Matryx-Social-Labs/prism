@@ -80,15 +80,18 @@ export function Act({
   onClick,
   variant = "ghost",
   disabled,
+  label,
   children,
 }: {
   onClick: () => void;
   variant?: "ghost" | "secondary" | "primary" | "destructive";
   disabled?: boolean;
+  /** What it acts on, for a screen reader, where every row has the same button ("Archive k3f9qa"). */
+  label?: string;
   children: React.ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`p-btn p-btn--${variant} p-btn--sm p-hit`}>
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} className={`p-btn p-btn--${variant} p-btn--sm p-hit`}>
       {children}
     </button>
   );

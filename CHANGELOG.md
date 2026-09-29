@@ -14,6 +14,8 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 - A post for the platform, written only from the page's own facts and cut to fit X, with a
   button that opens X, WhatsApp, Telegram, LinkedIn, Facebook, Threads, Reddit or email with
   it. Instagram gets the caption without a link, and the page's images to post.
+- A short link opens where its page lives now: a record merged into another, a story folded
+  into another, or a person page named after a state, so the visit keeps its tags.
 - Every page's share card can be downloaded as the link preview and in Instagram's post
   (1080 × 1350) and Story (1080 × 1920) shapes. People, state and day pages have their own
   cards now, printing their counts.

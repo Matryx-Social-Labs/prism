@@ -12,6 +12,7 @@ adds the visits up by platform and by campaign.
 
 import re
 import uuid
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -62,6 +63,8 @@ async def _count(event: str, dim: str) -> int:
     ("https://readprism.news", "/"),
     ("/", "/"),
     ("/story/abc/quote/q2", "/story/abc/quote/q2"),
+    # An Indian-language slug arrives percent-encoded, and stays so.
+    ("https://www.readprism.news/entity/%E0%A4%85%E0%A4%AE%E0%A4%BF%E0%A4%A4", "/entity/%E0%A4%85%E0%A4%AE%E0%A4%BF%E0%A4%A4"),
 ])
 async def test_a_link_opens_the_page_that_was_pasted(pasted, path):
     assert share_links.target_path(pasted, WEB) == path
@@ -71,6 +74,9 @@ async def test_a_link_opens_the_page_that_was_pasted(pasted, path):
     "https://evil.example/story/abc", "//evil.example/story/abc", "javascript:alert(1)", "/admin", "/account",
     "/signin", "/label/abc", "/auth/verify", "/story/a/b/c/d/e", "/story/<script>", "", "https://readprism.news.evil.example/",
     "ftp://readprism.news/story/abc",
+    # Dot segments, however encoded: a browser resolves each of these to a private page.
+    "/story/../admin", "/story/%2e%2e/admin", "/feed/../account", "/story/%2E/x", "/story/a%2Fb",
+    "/plus/welcome", "http://[::1", "/story/a%00b",
 ])
 async def test_a_link_never_opens_anything_but_a_public_page(pasted):
     assert share_links.target_path(pasted, WEB) is None
@@ -253,17 +259,67 @@ async def test_the_overview_adds_link_visits_up_by_platform_and_campaign(monkeyp
     try:
         async with _client() as c:
             made = [(await c.post("/api/v1/admin/links", json={"target": "/", "platform": p, "campaign": camp}, headers=h)).json()["code"]
-                    for p, camp in (("x", f"t-{tag}"), ("x", f"t-{tag}"), ("whatsapp", ""))]
+                    for p, camp in (("x", f"t-{tag}"), ("x", f"t-{tag}"), ("whatsapp", ""), ("x", f"t-{tag}"))]
+        w = metrics.window(7)
+        last_week = w["prev_end"]
         async with session_scope() as s:
-            for code, n in zip(made, (3, 2, 4), strict=True):
+            for code, n in zip(made[:3], (3, 2, 4), strict=True):
                 await usage.bump(s, "link", code, n=n)
             await usage.bump(s, "goal", f"{made[0]}:account")
+            # Last period only: a code with nothing now must still count in "before".
+            await usage.bump(s, "link", made[1], day=last_week, n=6)
+            await usage.bump(s, "goal", f"{made[1]}:read2", day=last_week, n=20)
+            await usage.bump(s, "link", made[3], day=last_week, n=7)  # no visits this period at all
         async with session_scope() as s:
-            section = await metrics.links(s, metrics.window(7), usage.today())
-        rows = {r["key"]: r for r in section["rows"]}
-        split = {b["key"]: {r["label"]: r["current"] for r in b["rows"]} for b in section["breakdowns"]}
+            before = await metrics.links(s, w, last_week - timedelta(days=30))
+        async with session_scope() as s:
+            for code in (made[1], made[3]):
+                await s.execute(text("DELETE FROM usage_daily WHERE day = :d AND dim LIKE :p"), {"d": last_week, "p": f"{code}%"})
+            after = await metrics.links(s, w, last_week - timedelta(days=30))
+        rows = {r["key"]: r for r in before["rows"]}
+        split = {b["key"]: {r["label"]: r for r in b["rows"]} for b in before["breakdowns"]}
         assert rows["link_visits"]["current"] >= 9 and rows["link_account"]["current"] >= 1
-        assert split["link_campaigns"][f"t-{tag}"] == 5
-        assert split["link_platforms"]["whatsapp"] >= 4 and split["link_platforms"]["x"] >= 5
+        assert split["link_campaigns"][f"t-{tag}"]["current"] == 5
+        assert split["link_platforms"]["whatsapp"]["current"] >= 4 and split["link_platforms"]["x"]["current"] >= 5
+        # The period before, counted from every code it held (review 2026-09-29).
+        gone = {r["key"]: r for r in after["rows"]}
+        assert rows["link_read2"]["previous"] - gone["link_read2"]["previous"] == 20
+        assert split["link_campaigns"][f"t-{tag}"]["previous"] == 6 + 7
     finally:
         await _cleanup(tag, users)
+
+
+async def test_a_short_link_lands_where_the_page_now_lives():
+    """A merged record, a folded story and a person page named after a state all
+    redirect on the web and drop the tags there, so /go resolves them first."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    import json
+
+    survivor, absorbed = uuid.uuid4(), uuid.uuid4()
+    live, folded = uuid.uuid4(), uuid.uuid4()
+    tag = uuid.uuid4().hex[:8]
+    async with session_scope() as s:
+        for e in (survivor, absorbed):
+            await s.execute(text("INSERT INTO events (id, title, summary, last_updated_at) VALUES (:i, 't', 's', now())"), {"i": e})
+        await s.execute(text("UPDATE events SET merged_into = :s WHERE id = :a"), {"s": survivor, "a": absorbed})
+        for sid, slug in ((live, f"live-{tag}"), (folded, f"folded-{tag}")):
+            await s.execute(text('INSERT INTO stories (id, slug, label, "cast", member_event_ids) VALUES (:i, :s, \'x\', \'[]\'::jsonb, CAST(:m AS jsonb))'),
+                            {"i": sid, "s": slug, "m": json.dumps([])})
+        await s.execute(text("UPDATE stories SET merged_into = :l WHERE id = :f"), {"l": live, "f": folded})
+    try:
+        async with session_scope() as s:
+            assert await share_links.landing(s, f"/story/{absorbed}") == f"/story/{survivor}"
+            assert await share_links.landing(s, f"/story/{absorbed}/quote/q1") == f"/story/{survivor}/quote/q1"
+            assert await share_links.landing(s, f"/story/{survivor}") == f"/story/{survivor}"
+            assert await share_links.landing(s, "/story/not-a-uuid") == "/story/not-a-uuid"
+            assert await share_links.landing(s, f"/trending/folded-{tag}") == f"/trending/live-{tag}"
+            assert await share_links.landing(s, "/entity/karnataka") == "/state/karnataka"
+            assert await share_links.landing(s, "/entity/nirmala-sitharaman") == "/entity/nirmala-sitharaman"
+            assert await share_links.landing(s, "/") == "/"
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("UPDATE stories SET merged_into = NULL WHERE id = :f"), {"f": folded})
+            await s.execute(text("DELETE FROM stories WHERE id = ANY(:i)"), {"i": [live, folded]})
+            await s.execute(text("UPDATE events SET merged_into = NULL WHERE id = :a"), {"a": absorbed})
+            await s.execute(text("DELETE FROM events WHERE id = ANY(:i)"), {"i": [survivor, absorbed]})

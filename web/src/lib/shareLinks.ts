@@ -44,6 +44,15 @@ export function targetPath(input: string, here?: string): string | null {
     }
   }
   path = path.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  // The API refuses dot segments however encoded, and the page Plus opens after paying.
+  const dots = path.split("/").some((seg) => {
+    try {
+      return /^\.{1,2}$/.test(decodeURIComponent(seg));
+    } catch {
+      return true;
+    }
+  });
+  if (dots || path.startsWith("/plus/welcome")) return null;
   const first = path === "/" ? "" : path.split("/")[1];
   return first in KINDS ? path : null;
 }
@@ -71,36 +80,37 @@ const PAGE_NAME: Record<string, string> = {
   "/archive": "The archive", "/sources": "The outlets Prism reads", "/state": "Every state", "/press": "Press",
 };
 
-/** The facts of the page a path opens, read from the same public API the page is built from. */
-export async function describe(path: string): Promise<Facts> {
+/** The facts of the page a path opens, read from the same public API the page
+ *  is built from; null when there is no such page (a link to it would open a 404). */
+export async function describe(path: string): Promise<Facts | null> {
   const [first, a, b, c] = path.split("/").filter(Boolean);
-  if (first === "story" && a && b === "quote" && c) {
-    const e = await fetchEvent(a);
-    const q = findQuote(e.claims, c, e.quote_aliases);
-    if (q) return { kind: "quote", speaker: q.speaker, story: e.title };
-  }
   if (first === "story" && a) {
-    const e = await fetchEvent(a);
+    const e = await fetchEvent(a).catch(() => null);
+    if (!e) return null;
+    if (b === "quote" && c) {
+      const q = findQuote(e.claims, c, e.quote_aliases);
+      return q ? { kind: "quote", speaker: q.speaker, story: e.title } : null;
+    }
     const outlets = new Set(e.sources.map((s) => s.publisher ?? s.source_name)).size;
     return { kind: "story", title: e.title, outlets, monitored: e.monitored_outlets ?? (await fetchSources())?.outlets ?? null };
   }
   if (first === "trending" && a) {
     const s = await fetchTrendingStory(a);
-    if (s) return { kind: "trending", title: s.label };
+    return s ? { kind: "trending", title: s.label } : null;
   }
   if (first === "entity" && a) {
     const p = await fetchEntity(a);
-    if (p) return { kind: "entity", name: p.entity.name, records: p.record_count, quotes: p.quote_count ?? 0 };
+    return p ? { kind: "entity", name: p.entity.name, records: p.record_count, quotes: p.quote_count ?? 0 } : null;
   }
-  const hub = first === "state" && a ? stateBySlug(a) : null;
-  if (hub) {
-    const s = await fetchStateHub(hub.code);
-    if (s) return { kind: "state", name: hub.name, multi: s.multi_outlet, days: s.window_days };
+  if (first === "state" && a) {
+    const hub = stateBySlug(a);
+    const s = hub ? await fetchStateHub(hub.code) : null;
+    return hub && s ? { kind: "state", name: hub.name, multi: s.multi_outlet, days: s.window_days } : null;
   }
-  const day = first === "feed" && a ? parseDay(a) : null;
-  if (day) {
-    const d = await fetchArchiveDay(day, dayRevalidate(day));
-    if (d) return { kind: "day", long: longDay(day), multi: d.read ? d.multi_outlet : null };
+  if (first === "feed" && a) {
+    const day = parseDay(a);
+    const d = day ? await fetchArchiveDay(day, dayRevalidate(day)) : null;
+    return day && d ? { kind: "day", long: longDay(day), multi: d.read ? d.multi_outlet : null } : null;
   }
   return { kind: "page", name: PAGE_NAME[path] ?? path, path };
 }

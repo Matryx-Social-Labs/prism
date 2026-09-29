@@ -143,6 +143,6 @@ async def resolve(code: str, response: Response, db: AsyncSession = Depends(get_
     row = (await db.execute(text(f"SELECT {_COLUMNS} FROM share_links WHERE code = :c"), {"c": code})).mappings().first()
     if row is None:
         raise HTTPException(status_code=404, detail="No such link")
-    # A link's page and tags never change once it is made.
-    response.headers["Cache-Control"] = "public, max-age=3600"
-    return {"path": row["path"], "tags": share_links.tags(dict(row))}
+    # The tags never change; the page can (a merge), so the answer is kept briefly.
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return {"path": await share_links.landing(db, row["path"]), "tags": share_links.tags(dict(row))}

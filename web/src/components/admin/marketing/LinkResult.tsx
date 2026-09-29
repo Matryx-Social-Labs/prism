@@ -51,7 +51,7 @@ export function LinkResult({ link, facts, platform }: { link: ShareLink; facts: 
   const name = PLATFORM_LABEL[platform];
   const x = platform === "x" ? xLength(post) : null;
   return (
-    <div className="admin-panel grid gap-4" aria-label={`The ${name} link`}>
+    <div role="group" className="admin-panel grid gap-4" aria-label={`The ${name} link`}>
       <div className="grid gap-3 lg:grid-cols-2">
         <Address name="Post this" url={link.short_url} what="the short link" />
         <Address name="Or the full link, with its tags" url={link.url} what="the full link" />

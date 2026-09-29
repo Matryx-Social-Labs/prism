@@ -28,7 +28,8 @@ describe("what a pasted address opens", () => {
   });
 
   it("is null for another site, a private page, or not an address", () => {
-    for (const bad of ["https://evil.example/story/x", "//evil.example/story/x", "/admin", "/account", "/signin", "javascript:alert(1)", "readprism.news.evil.example/story/x", "not a link"]) {
+    for (const bad of ["https://evil.example/story/x", "//evil.example/story/x", "/admin", "/account", "/signin", "javascript:alert(1)", "readprism.news.evil.example/story/x", "not a link",
+      "/story/../admin", "/story/%2e%2e/admin", "/plus/welcome"]) {
       expect(targetPath(bad)).toBeNull();
     }
   });

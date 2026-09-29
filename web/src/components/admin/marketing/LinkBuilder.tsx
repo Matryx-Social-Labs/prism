@@ -32,7 +32,8 @@ export function LinkBuilder({ data, onMade }: { data: LinksPayload; onMade: (lin
   const { session } = useAdmin();
   const campaignsId = useId();
   const [input, setInput] = useState("");
-  const [facts, setFacts] = useState<Facts | null>(null);
+  // null while reading; "missing" when there is no such page to link to.
+  const [facts, setFacts] = useState<Facts | "missing" | null>(null);
   const [reading, setReading] = useState(false);
   const [query, setQuery] = useState("");
   const [picks, setPicks] = useState<FeedItem[] | null>(null);
@@ -63,8 +64,8 @@ export function LinkBuilder({ data, onMade }: { data: LinksPayload; onMade: (lin
     let live = true;
     setReading(true);
     describe(path)
-      .then((f) => live && setFacts(f))
-      .catch(() => live && setFacts({ kind: "page", name: path, path }))
+      .then((f) => live && setFacts(f ?? "missing"))
+      .catch(() => live && setFacts("missing"))
       .finally(() => live && setReading(false));
     return () => {
       live = false;
@@ -76,13 +77,14 @@ export function LinkBuilder({ data, onMade }: { data: LinksPayload; onMade: (lin
     setMedium(data.platforms[p] ?? "social");
   };
 
+  const ready = facts !== null && facts !== "missing" ? facts : null;
   const make = async () => {
-    if (!path || !facts) return;
+    if (!path || !ready) return;
     setBusy(true);
     setError("");
     try {
-      const link = await makeLink(session, { target: path, platform, medium, campaign: campaign.replace(/-+$/, ""), title: label(facts), note });
-      onMade(link, facts, platform);
+      const link = await makeLink(session, { target: path, platform, medium, campaign: campaign.replace(/-+$/, ""), title: label(ready), note });
+      onMade(link, ready, platform);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The link was not made. Try again.");
     } finally {
@@ -103,7 +105,7 @@ export function LinkBuilder({ data, onMade }: { data: LinksPayload; onMade: (lin
           error={bad ? "That is not a public Prism page. Paste a readprism.news address or a path such as /story/…" : undefined}
           hint={path ? `${kindOf(path)} · ${path}` : "A story, a quote, a person, a state, a day, or any public page."}
         />
-        <div className="flex flex-wrap gap-1.5" aria-label="Quick picks">
+        <div role="group" className="flex flex-wrap gap-1.5" aria-label="Quick picks">
           {QUICK.map((q) => (
             <button key={q.path} type="button" className="p-chip" aria-pressed={path === q.path} onClick={() => setInput(q.path)}>
               {q.label}
@@ -162,14 +164,16 @@ export function LinkBuilder({ data, onMade }: { data: LinksPayload; onMade: (lin
           <span className="p-eyebrow">This link opens</span>
           {!path ? (
             <span style={{ color: "var(--ink-3)" }}>Pick a page first.</span>
-          ) : reading || !facts ? (
+          ) : reading || facts === null ? (
             <span style={{ color: "var(--ink-3)" }}>Reading the page…</span>
+          ) : facts === "missing" ? (
+            <span style={{ color: "var(--danger)" }}>No such page, or it could not be read. Check the address: a link to it would open an error.</span>
           ) : (
             <span className="font-semibold" style={{ color: "var(--ink)" }}>{label(facts)}</span>
           )}
         </div>
         {error && <Alert tone="error">{error}</Alert>}
-        <button type="button" className="p-btn p-btn--primary p-btn--lg" disabled={!path || !facts || busy} onClick={() => void make()}>
+        <button type="button" className="p-btn p-btn--primary p-btn--lg" disabled={!path || !ready || busy} onClick={() => void make()}>
           {busy ? "Making the link…" : `Make the ${PLATFORM_LABEL[platform]} link`}
         </button>
       </div>

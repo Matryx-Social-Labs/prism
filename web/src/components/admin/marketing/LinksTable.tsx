@@ -8,7 +8,7 @@
  * its visits day by day. Archive hides a link from this list; it keeps working.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { ChartPanel } from "@/components/admin/charts/ChartPanel";
 import { dayLabel } from "@/components/admin/charts/format";
@@ -31,6 +31,13 @@ export function LinksTable({ data, onArchive, busy }: { data: LinksPayload; onAr
   const [show, setShow] = useState<Show>("live");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const chartId = useId();
+  const copy = (l: CountedLink) =>
+    void navigator.clipboard?.writeText(l.short_url).then(() => {
+      setCopied(l.code);
+      setTimeout(() => setCopied((c) => (c === l.code ? null : c)), 1600);
+    });
   const counts: Record<Show, number> = {
     live: data.links.filter((l) => !l.archived_at).length,
     archived: data.links.filter((l) => l.archived_at).length,
@@ -62,12 +69,16 @@ export function LinksTable({ data, onArchive, busy }: { data: LinksPayload; onAr
             </tr>
           </thead>
           <tbody>
-            {rows.map((l) => <Row key={l.code} l={l} open={open === l.code} onOpen={() => setOpen(open === l.code ? null : l.code)} onArchive={onArchive} busy={busy === l.code} />)}
+            {rows.map((l) => (
+              <Row key={l.code} l={l} open={open === l.code} chartId={chartId} copied={copied === l.code} onCopy={() => copy(l)}
+                onOpen={() => setOpen(open === l.code ? null : l.code)} onArchive={onArchive} busy={busy === l.code} />
+            ))}
           </tbody>
         </table>
       </div>
       {rows.length === 0 && <Quiet>No link matches.</Quiet>}
       {chosen && (
+        <div id={chartId}>
         <ChartPanel
           title={`Visits by day · ${chosen.code}`}
           source="usage_daily · founder links · the first page of each visit that carried this code"
@@ -77,16 +88,27 @@ export function LinksTable({ data, onArchive, busy }: { data: LinksPayload; onAr
         >
           <TrendChart series={chosen.series} start={data.range.start} label="Visits" />
         </ChartPanel>
+        </div>
       )}
     </div>
   );
 }
 
-function Row({ l, open, onOpen, onArchive, busy }: { l: CountedLink; open: boolean; onOpen: () => void; onArchive: (code: string, archived: boolean) => void; busy: boolean }) {
+function Row({ l, open, chartId, copied, onCopy, onOpen, onArchive, busy }: {
+  l: CountedLink;
+  open: boolean;
+  chartId: string;
+  copied: boolean;
+  onCopy: () => void;
+  onOpen: () => void;
+  onArchive: (code: string, archived: boolean) => void;
+  busy: boolean;
+}) {
   return (
     <tr aria-selected={open}>
       <td>
-        <button type="button" className="grid min-w-[220px] gap-0.5 text-left" onClick={onOpen} aria-expanded={open} aria-label={`Visits by day for ${l.code}`}>
+        <button type="button" className="grid min-w-[220px] gap-0.5 text-left" onClick={onOpen} aria-expanded={open} aria-controls={open ? chartId : undefined}
+          title="Visits by day, under the table">
           <span className="font-mono text-[12px]" style={{ color: "var(--ink)" }}>{l.code}</span>
           <span className="text-[14px] font-medium leading-[1.35]" style={{ color: "var(--ink)" }}>{l.title || l.path}</span>
           <span className="font-mono text-[11.5px] [overflow-wrap:anywhere]" style={{ color: "var(--ink-3)" }}>{l.path}</span>
@@ -113,8 +135,10 @@ function Row({ l, open, onOpen, onArchive, busy }: { l: CountedLink; open: boole
       </td>
       <td>
         <span className="flex gap-1">
-          <Act onClick={() => void navigator.clipboard?.writeText(l.short_url)}>Copy</Act>
-          <Act onClick={() => onArchive(l.code, !l.archived_at)} disabled={busy}>{l.archived_at ? "Restore" : "Archive"}</Act>
+          <Act onClick={onCopy} label={`Copy the short link ${l.code}`}>{copied ? "Copied" : "Copy"}</Act>
+          <Act onClick={() => onArchive(l.code, !l.archived_at)} disabled={busy} label={`${l.archived_at ? "Restore" : "Archive"} ${l.code}`}>
+            {l.archived_at ? "Restore" : "Archive"}
+          </Act>
         </span>
       </td>
     </tr>

@@ -185,16 +185,31 @@ export async function siteCard(format: CardFormat): Promise<Built> {
   return { el: <SiteCard headline={SITE_HEADLINE} line={SITE_LINE} format={format} />, text: [SITE_HEADLINE, SITE_LINE] };
 }
 
-/** The card a page's path shares, for /card/<format>/<path>: the brand card for a page without its own. */
+// The shapes of what a card path may name, checked before anything is fetched:
+// an event id, a slug (any script's letters: common/text.slugify), a quote's id.
+const EVENT_ID = /^[0-9a-f-]{8,64}$/i;
+const SLUG = /^[\p{L}\p{M}\p{N}-]{1,120}$/u;
+const QUOTE_ID = /^[A-Za-z0-9-]{1,64}$/;
+
+/** The card a page's path shares, for /card/<format>/<path>; `site` is the brand
+ *  card; null for anything that is not a real page's card. */
 export function cardForPath(segments: string[], format: CardFormat): Promise<Built> {
-  const [first, a, b, c] = segments;
-  if (first === "story" && a && !b) return storyCard(a, format);
-  if (first === "story" && a && b === "quote" && c) return quoteCard(a, c, format);
-  if (first === "trending" && a && !b) return trendingCard(a, format);
-  if (first === "entity" && a && !b) return entityCard(a, format);
-  if (first === "state" && a && !b) return stateCard(a, format);
-  if (first === "feed" && a && !b) return dayCard(a, format);
-  return siteCard(format);
+  const [first, a, b, c, ...rest] = segments;
+  const none = Promise.resolve(null);
+  if (rest.length) return none;
+  if (first === "site" && !a) return siteCard(format);
+  if (!a || (b && first !== "story")) return none;
+  if (first === "story") {
+    if (!EVENT_ID.test(a)) return none;
+    if (!b) return storyCard(a, format);
+    return b === "quote" && c && QUOTE_ID.test(c) ? quoteCard(a, c, format) : none;
+  }
+  if (!SLUG.test(a)) return none;
+  if (first === "trending") return trendingCard(a, format);
+  if (first === "entity") return entityCard(a, format);
+  if (first === "state") return stateCard(a, format);
+  if (first === "feed") return dayCard(a, format);
+  return none;
 }
 
 /**

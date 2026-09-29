@@ -87,7 +87,10 @@ async def _usage(db: AsyncSession, w: dict[str, date], event: str, since: date |
             # Each word's own day-by-day, for a stacked chart.
             "split_series": {dim: [counted(d, days) for d in _days(w)] for dim, days in by_dim_day.items()},
             "split": sorted(({"label": k or "—", "current": v, "previous": before.get(k, 0) if prev is not None else None}
-                             for k, v in now.items()), key=lambda x: -x["current"])}
+                             for k, v in now.items()), key=lambda x: -x["current"]),
+            # Every word's count in the period before, including words with none now
+            # (the split above lists only words counted in this period); None when uncounted.
+            "before": before if prev is not None else None}
 
 
 def _since_label(since: date | None) -> str:
@@ -134,16 +137,21 @@ async def visits(db: AsyncSession, w: dict[str, date], since: date | None) -> di
     }
 
 
-def _rollup(split: list[dict[str, Any]], label: dict[str, str]) -> list[dict[str, Any]]:
-    """A split keyed by link code, added up under each code's label (its
-    platform or campaign), most first. `previous` stays None when it was."""
-    now: dict[str, int] = {}
-    before: dict[str, int | None] = {}
-    for r in split:
-        k = label.get(r["label"].partition(":")[0], "—") or "no campaign"
-        now[k] = now.get(k, 0) + r["current"]
-        before[k] = None if r["previous"] is None else (before.get(k) or 0) + r["previous"]
-    return sorted(({"label": k, "current": v, "previous": before[k]} for k, v in now.items()), key=lambda x: -x["current"])
+def _rollup(counted: dict[str, Any], label: dict[str, str]) -> list[dict[str, Any]]:
+    """One usage event's counts keyed by link code (`_usage`), added up under
+    each code's label (its platform or campaign), most first. The period before
+    counts every code it held, including one with nothing now; None when uncounted."""
+    def by_label(counts: dict[str, int]) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for code, n in counts.items():
+            k = label.get(code, "—") or "no campaign"
+            out[k] = out.get(k, 0) + n
+        return out
+
+    now = by_label({r["label"]: r["current"] for r in counted["split"]})
+    before = by_label(counted["before"]) if counted["before"] is not None else None
+    return sorted(({"label": k, "current": v, "previous": None if before is None else before.get(k, 0)} for k, v in now.items()),
+                  key=lambda x: -x["current"])
 
 
 async def links(db: AsyncSession, w: dict[str, date], since: date | None) -> dict[str, Any]:
@@ -156,9 +164,9 @@ async def links(db: AsyncSession, w: dict[str, date], since: date | None) -> dic
     made = (await db.execute(text("SELECT code, platform, campaign FROM share_links"))).mappings().all()
 
     def goal(name: str) -> tuple[int | None, int | None]:
-        hits = [r for r in goals["split"] if r["label"].endswith(f":{name}")]
-        now = sum(r["current"] for r in hits) if goals["current"] is not None else None
-        return now, (sum(r["previous"] or 0 for r in hits) if goals["previous"] is not None else None)
+        now = sum(r["current"] for r in goals["split"] if r["label"].endswith(f":{name}")) if goals["current"] is not None else None
+        before = goals["before"]
+        return now, (None if before is None else sum(n for d, n in before.items() if d.endswith(f":{name}")))
 
     rows = [_row("link_visits", "Visits from founder links", visits["current"], visits["previous"], src,
                  series=visits["series"], prev_series=visits["prev_series"],
@@ -177,9 +185,9 @@ async def links(db: AsyncSession, w: dict[str, date], since: date | None) -> dic
         "rows": rows,
         "breakdowns": [
             {"key": "link_platforms", "title": "Visits from founder links, by platform", "source": src,
-             "rows": _rollup(visits["split"], {m["code"]: m["platform"] for m in made})},
+             "rows": _rollup(visits, {m["code"]: m["platform"] for m in made})},
             {"key": "link_campaigns", "title": "Visits from founder links, by campaign", "source": src,
-             "rows": _rollup(visits["split"], {m["code"]: m["campaign"] for m in made})},
+             "rows": _rollup(visits, {m["code"]: m["campaign"] for m in made})},
         ],
     }
 
