@@ -89,3 +89,15 @@ export function entityKind(e: EntityOut): string {
   };
   return KIND[t] ?? (t ? t[0].toUpperCase() + t.slice(1) : "Named");
 }
+
+/** An actor page's eyebrow (and its share card's) by schema.org type — only the
+ *  kinds the API maps with confidence ("Thing" says nothing). */
+export const SCHEMA_KIND: Record<string, string> = {
+  Person: "Person",
+  Organization: "Organisation",
+  GovernmentOrganization: "Organisation",
+  NewsMediaOrganization: "Organisation",
+  Place: "Place",
+  Country: "Place",
+  Product: "Product",
+};

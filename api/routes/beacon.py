@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import client_ip, get_current_user_optional
-from common import usage
+from common import share_links, usage
 from common.db import get_db
 from common.logging import get_logger
 from common.stream import get_redis
@@ -33,7 +33,7 @@ logger = get_logger(__name__)
 
 class Beacon(BaseModel):
     e: Literal["view", "arrival", "share", "ask", "lens", "subscribe", "signin", "onboarding", "cta", "tab", "depth",
-               "campaign", "heard", "survey"]
+               "campaign", "heard", "survey", "link", "goal"]
     d: Annotated[str, Field(max_length=48)] = ""
     # An arrival's referrer HOST (never the path) and its ?s= share marker.
     ref: Annotated[str, Field(max_length=253)] = ""
@@ -56,8 +56,14 @@ async def beacon(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     ua = request.headers.get("user-agent", "")
-    dim = usage.dimension(body.e, body.d, body.ref, body.s)
-    if dim is None or usage.is_bot(ua):
+    if usage.is_bot(ua):
+        return Response(status_code=204)
+    # A founder link's code counts only when it is a link (common/share_links).
+    if body.e in ("link", "goal"):
+        dim = await share_links.dimension(db, body.e, body.d)
+    else:
+        dim = usage.dimension(body.e, body.d, body.ref, body.s)
+    if dim is None:
         return Response(status_code=204)
     day = usage.today()
     try:

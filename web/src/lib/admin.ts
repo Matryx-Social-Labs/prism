@@ -366,3 +366,50 @@ export const decideGrievance = (s: Session, ref: string, status: Exclude<Grievan
     method: "PATCH",
     body: JSON.stringify({ status, outcome }),
   });
+
+/** A founder link (api/routes/admin_marketing.py) with what its visits did in the period asked for. */
+export type LinkGoal = "read2" | "signin" | "account" | "plus" | "digest";
+export interface ShareLink {
+  code: string;
+  path: string;
+  kind: string;
+  title: string;
+  platform: string;
+  medium: string;
+  campaign: string;
+  note: string;
+  created_by: string;
+  created_at: string;
+  archived_at: string | null;
+  /** The page with its tags; `short_url` is /go/<code> and opens the same. */
+  url: string;
+  short_url: string;
+}
+export interface CountedLink extends ShareLink {
+  visits: number;
+  goals: Record<LinkGoal, number>;
+  /** Visits per IST day of the period; null before the link was made. */
+  series: (number | null)[];
+}
+export interface LinksPayload {
+  range: { days: number; start: string; end: string; tz: string };
+  /** Platform → the medium a link for it gets by default. */
+  platforms: Record<string, string>;
+  media: string[];
+  campaigns: string[];
+  links: CountedLink[];
+}
+export interface NewLink {
+  target: string;
+  platform: string;
+  medium?: string;
+  campaign?: string;
+  title?: string;
+  note?: string;
+}
+
+export const fetchLinks = (s: Session, days: number) => adminCall<LinksPayload>(s, `/api/v1/admin/links?days=${days}`);
+export const makeLink = (s: Session, link: NewLink) =>
+  adminCall<ShareLink>(s, "/api/v1/admin/links", { method: "POST", body: JSON.stringify(link) });
+export const setLinkArchived = (s: Session, code: string, archived: boolean) =>
+  adminCall<ShareLink>(s, `/api/v1/admin/links/${encodeURIComponent(code)}`, { method: "PATCH", body: JSON.stringify({ archived }) });

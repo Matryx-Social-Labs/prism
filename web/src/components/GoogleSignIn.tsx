@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui";
 import { afterSignIn, takeNext } from "@/lib/next";
+import { arrivedByLink, linkGoal } from "@/lib/attribution";
 import { saveSession, signInWithGoogle } from "@/lib/session";
 
 /**
@@ -95,9 +96,10 @@ export function GoogleSignIn() {
             if (alive.current) { setBusy(false); if (r.error && r.error !== "access_denied") setError(r.error_description || "Google sign-in failed"); }
             return;
           }
-          signInWithGoogle(r.access_token)
+          signInWithGoogle(r.access_token, arrivedByLink())
             .then(({ session, needsProfile }) => {
               saveSession(session);
+              linkGoal("signin");
               router.replace(afterSignIn(needsProfile, takeNext("/feed", new URLSearchParams(window.location.search).get("next"))));
             })
             .catch((e: Error) => { if (alive.current) { setError(e.message); setBusy(false); } });

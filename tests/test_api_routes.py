@@ -114,6 +114,11 @@ EXPECTED = {
     # Guides, served only to applicants and to a batch's own invites (plan: guides behind sign-in).
     ("GET", "/api/v1/labeller/guides/{kind}"),
     ("GET", "/api/v1/label/{key}/guide"),
+    # Founder share links (/admin/marketing) and the short address's lookup.
+    ("GET", "/api/v1/admin/links"),
+    ("POST", "/api/v1/admin/links"),
+    ("PATCH", "/api/v1/admin/links/{code}"),
+    ("GET", "/api/v1/links/{code}"),
 }
 
 

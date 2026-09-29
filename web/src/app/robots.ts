@@ -17,8 +17,12 @@ import { SITE_URL } from "@/lib/site";
 // index, and they need auth anyway); internal search results and the
 // labelling tool are not pages. "/label" (no trailing slash) covers the
 // labeller workspace and every batch under it — "/label/" left the workspace
-// itself crawlable. "/admin" is the founders' dashboard.
-const PRIVATE = ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist", "/you", "/search", "/label", "/admin", "/plus/welcome"];
+// itself crawlable. "/admin" is the founders' dashboard. "/card/" is a page's
+// share card in Instagram's shapes, for the founders to download: an image a
+// crawler has no use for, and each one is rendered on request (Vercel CPU).
+// "/go/" stays open: a platform's link preview follows the short link to its
+// page's card, and X's respects robots.txt.
+const PRIVATE = ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist", "/you", "/search", "/label", "/admin", "/plus/welcome", "/card/"];
 const TRAINING_CRAWLERS = ["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent", "GPTBot", "ClaudeBot"];
 
 export default function robots(): MetadataRoute.Robots {

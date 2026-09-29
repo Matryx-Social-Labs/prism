@@ -95,11 +95,12 @@ async function detail(res: Response, fallback: string): Promise<string> {
 /** Email-first: we always send a link (same response for new + returning readers,
  * so an onlooker can't tell whether an email is registered). The profile is
  * collected after verify, so this call needs nothing but an email. */
-export async function requestMagicLink(email: string, next?: string | null): Promise<void> {
+/** `link`: the founder link this visit came by (lib/attribution.arrivedByLink); the email link carries it. */
+export async function requestMagicLink(email: string, next?: string | null, link?: string | null): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/auth/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, next: next ?? undefined }),
+    body: JSON.stringify({ email, next: next ?? undefined, link: link ?? undefined }),
   });
   if (!res.ok) throw new Error(await detail(res, "Could not send the sign-in link"));
 }
@@ -132,13 +133,14 @@ export interface VerifyResult {
   needsProfile: boolean;
 }
 
-export async function verifyMagicLink(token: string): Promise<VerifyResult> {
+/** `link`: the founder link's code the email link carried (`&l=`), counted if this makes an account. */
+export async function verifyMagicLink(token: string, link?: string | null): Promise<VerifyResult> {
   const res = await fetch(`${API_URL}/api/v1/auth/verify`, {
     method: "POST",
     // Without it the browser drops the Set-Cookie on a cross-origin response.
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ token, link: link ?? undefined }),
   });
   if (!res.ok) throw new Error(await detail(res, "This sign-in link is invalid or expired"));
   const d = (await res.json()) as { user_id: string; email: string; needs_profile: boolean };
@@ -146,13 +148,14 @@ export async function verifyMagicLink(token: string): Promise<VerifyResult> {
   return { session: { userId: d.user_id, email: d.email }, needsProfile: d.needs_profile };
 }
 
-/** A Google OAuth access token (from our button's token flow) → the same session a magic link gives. */
-export async function signInWithGoogle(accessToken: string): Promise<VerifyResult> {
+/** A Google OAuth access token (from our button's token flow) → the same session a magic link gives.
+ *  `link` as requestMagicLink's. */
+export async function signInWithGoogle(accessToken: string, link?: string | null): Promise<VerifyResult> {
   const res = await fetch(`${API_URL}/api/v1/auth/google`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ access_token: accessToken }),
+    body: JSON.stringify({ access_token: accessToken, link: link ?? undefined }),
   });
   if (!res.ok) throw new Error(await detail(res, "Google sign-in failed"));
   const d = (await res.json()) as { user_id: string; email: string; needs_profile: boolean };

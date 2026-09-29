@@ -259,7 +259,7 @@ async def test_only_a_founder_reads_the_numbers_and_the_csv_is_counts(monkeypatc
                 assert (await c.get(path, headers={"Authorization": f"Bearer {rb}"})).status_code == 403
             r = await c.get("/api/v1/admin/metrics?days=7", headers={"Authorization": f"Bearer {fb}"})
             assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
-            assert [s_["key"] for s_ in r.json()["sections"]] == ["visits", "signups", "engagement", "money", "demand", "supply"]
+            assert [s_["key"] for s_ in r.json()["sections"]] == ["visits", "links", "signups", "engagement", "money", "demand", "supply"]
             assert (await c.get("/api/v1/admin/metrics?days=100000", headers={"Authorization": f"Bearer {fb}"})).status_code == 422
             r = await c.get("/api/v1/admin/metrics/weekly.csv?weeks=3", headers={"Authorization": f"Bearer {fb}"})
             rows = list(csv.DictReader(io.StringIO(r.text)))

@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import clear_session_cookie, get_current_user, session_token, set_session_cookie
-from common import auth
+from common import auth, share_links
 from common.billing import plan_for
 from common.config import get_settings
 from common.db import get_db
@@ -43,6 +43,9 @@ class MagicLinkRequest(BaseModel):
     # Where the reader was going when a gate sent them to sign in (a same-site
     # path); the link carries it so the tab the email opens can finish the trip.
     next: str | None = None
+    # The founder link this visit came by (common/share_links), carried in the
+    # email link so the tab it opens can say so when the account is made.
+    link: str | None = None
 
 
 def safe_next(value: str | None) -> str | None:
@@ -56,6 +59,7 @@ def safe_next(value: str | None) -> str | None:
 
 class VerifyRequest(BaseModel):
     token: str
+    link: str | None = None
 
 
 class ProfileRequest(BaseModel):
@@ -107,6 +111,8 @@ async def request_link(body: MagicLinkRequest, db: AsyncSession = Depends(get_db
     nxt = safe_next(body.next)
     if nxt:
         link += f"&next={quote(nxt, safe='')}"
+    if body.link and share_links.CODE.fullmatch(body.link):
+        link += f"&l={body.link}"
     text, html = magic_link_email(link=link, ttl_min=settings.prism_magic_token_ttl_min, to=body.email)
     await get_email_sender().send(
         to=body.email, subject="Your Prism sign-in link", body=text, html=html
@@ -123,6 +129,7 @@ async def verify(body: VerifyRequest, response: Response, background: Background
     user_id, created = await auth.account_for_verified_email(db, verified)
     if created:  # first verify only: a later sign-in finds the account and sends nothing
         background.add_task(_welcome, verified)
+        await share_links.count_account(db, body.link)
     token = await auth.create_session(db, user_id)
     email = (
         await db.execute(text("SELECT email FROM users WHERE id = :i"), {"i": str(user_id)})
@@ -137,6 +144,7 @@ class GoogleSignIn(BaseModel):
     # access token from our button's OAuth token flow (common/auth.py).
     credential: str | None = None
     access_token: str | None = None
+    link: str | None = None  # as MagicLinkRequest.link
 
 
 @router.post("/api/v1/auth/google", response_model=SessionResponse)
@@ -157,6 +165,7 @@ async def google_sign_in(body: GoogleSignIn, response: Response, background: Bac
     user_id, created = await auth.account_for_verified_email(db, email)
     if created:
         background.add_task(_welcome, email.strip().lower())
+        await share_links.count_account(db, body.link)
     token = await auth.create_session(db, user_id)
     needs_profile = not await auth.profile_complete(db, user_id)
     set_session_cookie(response, token)

@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import { SectionHead } from "@/components/SectionHead";
 import type { Breakdown, MetricRow, MetricSection } from "@/lib/admin";
+import { PLATFORM_LABEL } from "@/lib/shareLinks";
 
 import { BarList, Funnel } from "./charts/Bars";
 import { ChartPanel, InfoButton } from "./charts/ChartPanel";
@@ -31,6 +32,9 @@ const CUMULATIVE = new Set(["accounts"]);
 /** Words as a founder says them. */
 const NAMES: Record<string, Record<string, string>> = {
   report_status: { relevant: "Kept", duplicate: "Duplicate", rejected: "Not relevant", pending: "Not read yet" },
+  // A platform as it is written ("x" → "X"), as Marketing prints it.
+  campaigns: PLATFORM_LABEL,
+  link_platforms: PLATFORM_LABEL,
 };
 
 const NOT_YET = "Not counted yet: counting begins with the first visit.";
@@ -129,6 +133,7 @@ function Figures({ rows }: { rows: MetricRow[] }) {
 /** What a section is for, in a line, where the title alone does not say. */
 const HINT: Record<string, string> = {
   supply: "What Prism read and formed.",
+  links: "Visits the links made on Marketing brought, and what they did next in the same tab. Never who.",
   demand: "Where readers hit a wall.",
 };
 

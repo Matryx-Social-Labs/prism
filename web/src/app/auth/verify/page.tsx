@@ -31,7 +31,7 @@ function Verify() {
       return;
     }
     let cancelled = false;
-    verifyMagicLink(token)
+    verifyMagicLink(token, params.get("l"))
       .then(({ session, needsProfile }) => {
         if (cancelled) return;
         saveSession(session);

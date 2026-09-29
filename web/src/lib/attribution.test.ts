@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { campaignWord, isShareMarker, withoutCampaign } from "@/lib/attribution";
+import { campaignWord, isShareMarker, linkCode, withoutCampaign } from "@/lib/attribution";
 import { PRIVACY } from "@/lib/legal";
 
 const word = (q: string) => campaignWord(new URLSearchParams(q));
@@ -24,6 +24,19 @@ describe("the campaign word a link carried", () => {
     expect(word("ref=&utm_source=reddit")).toBe("reddit");
     expect(word("s=story")).toBeNull();
     expect(word("")).toBeNull();
+  });
+});
+
+describe("a founder link's code", () => {
+  const code = (q: string) => linkCode(new URLSearchParams(q));
+  it("is utm_content when it is one of share_links' codes, lowercased", () => {
+    expect(code("utm_content=k3f9qa")).toBe("k3f9qa");
+    expect(code("utm_content=K3F9QA")).toBe("k3f9qa");
+  });
+  it("is null for any other utm_content: a word, the wrong length, a letter never used", () => {
+    for (const q of ["utm_content=hero_cta", "utm_content=k3f9q", "utm_content=k3f9qa1", "utm_content=k3f0qa", "utm_content=l1io23", ""]) {
+      expect(code(q)).toBeNull();
+    }
   });
 });
 
@@ -53,5 +66,10 @@ describe("the privacy policy", () => {
     expect(collect).toContain("“Where did you hear about Prism?”");
     expect(collect).toContain("“Could you check this story for yourself?”");
     expect(collect).toContain("never words you type");
+    // Founder links (/admin/marketing): the code, what it counts, and that it is never kept on an account.
+    expect(collect).toContain("A link Prism's founders post carries a short code");
+    expect(collect).toContain("the code is not stored with your account");
+    const storage = PRIVACY.sections.find((x) => x.heading === "Cookies and device storage")!.blocks.flat().join(" ");
+    expect(storage).toContain("kept only until the tab is closed");
   });
 });

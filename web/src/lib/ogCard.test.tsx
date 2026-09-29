@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { SiteCard, StoryCard, quoteCheckLine, tally } from "@/lib/ogCard";
+import { CollectionCard, FORMATS, SiteCard, StoryCard, quoteCheckLine, tally } from "@/lib/ogCard";
 
 describe("the quote card's check line", () => {
   // Moved from quotes.test.ts with the v3 card: the card is shared alone, so the
@@ -47,5 +47,27 @@ describe("the card's frame", () => {
     expect(head(story.container)).toBe("readPrism.news/story/e1");
     const site = render(<SiteCard headline="Follow the story" line="One record" />);
     expect(head(site.container)).toBe("readPrism.news");
+  });
+
+  // Instagram's shapes (/card) sit the card in a frame the size of the image and scale it up.
+  const tallHead = (c: HTMLElement) => c.firstElementChild!.firstElementChild!.firstElementChild!.textContent;
+  it("prints a short path on a tall card, and leaves a record's long id off rather than cut it", () => {
+    const long = "/story/94ecb8f5-79b2-4e08-bf22-43e2ecd332e4";
+    const tall = render(<StoryCard path={long} meta={[]} headline="A story" tally={tally([])} count="0 outlets" format="story" />);
+    expect(tallHead(tall.container)).toBe("readPrism.news");
+    const state = render(<CollectionCard path="/state/karnataka" meta={["State"]} title="Karnataka" figures={[{ n: 3, label: "outlets" }]} format="portrait" />);
+    expect(tallHead(state.container)).toBe("readPrism.news/state/karnataka");
+    const og = render(<StoryCard path={long} meta={[]} headline="A story" tally={tally([])} count="0 outlets" />);
+    expect(head(og.container)).toBe(`readPrism.news${long}`);
+  });
+
+  it("sizes each shape as Instagram and the link preview ask, scaled from one layout", () => {
+    expect(Object.fromEntries(Object.entries(FORMATS).map(([k, f]) => [k, [f.width, f.height]]))).toEqual({
+      og: [1200, 630], portrait: [1080, 1350], story: [1080, 1920],
+    });
+    const tall = render(<SiteCard headline="h" line="l" format="portrait" />);
+    const outer = tall.container.firstElementChild as HTMLElement;
+    expect([outer.style.width, outer.style.height]).toEqual(["1080px", "1350px"]);
+    expect((outer.firstElementChild as HTMLElement).style.transform).toBe("scale(1.25)");
   });
 });

@@ -9,13 +9,14 @@
  * many of how many, and the next ones load on request.
  */
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AdminHead, Quiet, useAdmin } from "@/components/admin/AdminShell";
 import { dayLabel, days } from "@/components/admin/charts/format";
 import { Act, Badge, FilterSwitch, SearchBox, matches } from "@/components/admin/ui";
 import { Alert } from "@/components/ui";
-import { adminCall, fetchPeople, type Person } from "@/lib/admin";
+import { adminCall, fetchLinks, fetchPeople, type Person } from "@/lib/admin";
 import { langName } from "@/lib/languages";
 
 type People = Awaited<ReturnType<typeof fetchPeople>>;
@@ -40,6 +41,8 @@ const EMAIL: React.CSSProperties = {
 };
 /** The API's page size (api/routes/admin_controls.people caps a read at 500). */
 const PAGE = 500;
+/** The window for the founder-link line: Marketing's default period. */
+const LINKED_DAYS = 28;
 
 /** One mark per day of the window, filled on a day they used Prism signed in. */
 function ActivityStrip({ on, start, length }: { on: string[]; start: string; length: number }) {
@@ -64,6 +67,15 @@ export default function PeoplePage() {
   const [query, setQuery] = useState("");
   const [plan, setPlan] = useState<Plan>("all");
   const [loading, setLoading] = useState(false);
+  const [linked, setLinked] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Accounts made in a visit that came by a founder link: a total from
+    // Marketing's counts, never which account (common/share_links).
+    fetchLinks(session, LINKED_DAYS)
+      .then((d) => setLinked(d.links.reduce((sum, l) => sum + (l.goals.account ?? 0), 0)))
+      .catch(() => setLinked(null));
+  }, [session]);
 
   useEffect(() => {
     fetchPeople(session)
@@ -98,6 +110,12 @@ export default function PeoplePage() {
   return (
     <>
       <AdminHead title="People" line={line} />
+      {linked !== null && (
+        <p className="text-[13.5px] leading-[1.45]" style={{ color: "var(--ink-2)" }}>
+          {linked.toLocaleString("en-IN")} {linked === 1 ? "account" : "accounts"} in the last {LINKED_DAYS} days {linked === 1 ? "was" : "were"} made in a visit that came by a founder link.{" "}
+          <Link href="/admin/marketing" className="p-link">Marketing</Link>
+        </p>
+      )}
       {error && <Alert tone="error">{error}</Alert>}
       {people.length > 0 && (
         <div className="flex flex-wrap items-end gap-2.5">

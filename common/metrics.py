@@ -124,12 +124,62 @@ async def visits(db: AsyncSession, w: dict[str, date], since: date | None) -> di
              "series": arr["split_series"]},
             {"key": "pages", "title": "Views by kind of page", "rows": views["split"], "source": src},
             {"key": "shared", "title": "What was shared", "rows": shares["split"], "source": src},
-            {"key": "campaigns", "title": "Visits by the campaign word their link carried (?ref=)",
+            {"key": "campaigns", "title": "Visits by the platform their link was made for (?ref= or utm_source)",
              "rows": campaigns["split"], "source": src, "series": campaigns["split_series"]},
             {"key": "heard", "title": "Where readers say they heard of Prism", "rows": heard["split"], "source": src},
             {"key": "check", "title": "Could you check this story for yourself?", "rows": check["split"], "source": src},
             {"key": "depth", "title": "Visits that read a 2nd or 5th story (2:share arrived by a shared link)",
              "rows": depth["split"], "source": src},
+        ],
+    }
+
+
+def _rollup(split: list[dict[str, Any]], label: dict[str, str]) -> list[dict[str, Any]]:
+    """A split keyed by link code, added up under each code's label (its
+    platform or campaign), most first. `previous` stays None when it was."""
+    now: dict[str, int] = {}
+    before: dict[str, int | None] = {}
+    for r in split:
+        k = label.get(r["label"].partition(":")[0], "—") or "no campaign"
+        now[k] = now.get(k, 0) + r["current"]
+        before[k] = None if r["previous"] is None else (before.get(k) or 0) + r["previous"]
+    return sorted(({"label": k, "current": v, "previous": before[k]} for k, v in now.items()), key=lambda x: -x["current"])
+
+
+async def links(db: AsyncSession, w: dict[str, date], since: date | None) -> dict[str, Any]:
+    """Founder links (/admin/marketing, common/share_links): visits that came by
+    one, and what those visits went on to do in the same tab. The code is the
+    word counted; platform and campaign are looked up from the link."""
+    src = f"usage_daily · founder links · {_since_label(since)}"
+    visits = await _usage(db, w, "link", since)
+    goals = await _usage(db, w, "goal", since)
+    made = (await db.execute(text("SELECT code, platform, campaign FROM share_links"))).mappings().all()
+
+    def goal(name: str) -> tuple[int | None, int | None]:
+        hits = [r for r in goals["split"] if r["label"].endswith(f":{name}")]
+        now = sum(r["current"] for r in hits) if goals["current"] is not None else None
+        return now, (sum(r["previous"] or 0 for r in hits) if goals["previous"] is not None else None)
+
+    rows = [_row("link_visits", "Visits from founder links", visits["current"], visits["previous"], src,
+                 series=visits["series"], prev_series=visits["prev_series"],
+                 note="The first page of a visit whose link carried a founder link's code (utm_content).")]
+    for key, label, note in (
+        ("read2", "…that read a second story", None),
+        ("signin", "…that asked to sign in", "A sign-in link asked for, or Google, in that tab."),
+        ("account", "…that made an account", "Counted when the account is made; the code is not stored on it."),
+        ("plus", "…that opened the Plus page", None),
+        ("digest", "…that turned on the weekly email", None),
+    ):
+        now, before = goal(key)
+        rows.append(_row(f"link_{key}", label, now, before, src, note=note))
+    return {
+        "key": "links", "title": "Founder links",
+        "rows": rows,
+        "breakdowns": [
+            {"key": "link_platforms", "title": "Visits from founder links, by platform", "source": src,
+             "rows": _rollup(visits["split"], {m["code"]: m["platform"] for m in made})},
+            {"key": "link_campaigns", "title": "Visits from founder links, by campaign", "source": src,
+             "rows": _rollup(visits["split"], {m["code"]: m["campaign"] for m in made})},
         ],
     }
 
@@ -455,6 +505,7 @@ async def dashboard(db: AsyncSession, days: int, today: date | None = None) -> d
                            "active": since_active.isoformat() if since_active else None},
         "sections": [
             await visits(db, w, since),
+            await links(db, w, since),
             await signups(db, w),
             await engagement(db, w, since_active, since),
             await money(db, w, since),

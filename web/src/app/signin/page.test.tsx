@@ -44,7 +44,7 @@ describe("Sign in — sending the link", () => {
   it("asks for a link for the address the reader entered", async () => {
     render(<SignInPage />);
     await submit();
-    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, null);
+    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, null, null);
   });
 
   it("locks the button while the request is in flight", async () => {
@@ -192,7 +192,7 @@ describe("Sign in — the way back", () => {
     params.set("next", "/plus?from=ask-limit");
     render(<SignInPage />);
     await submit();
-    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, "/plus?from=ask-limit");
+    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, "/plus?from=ask-limit", null);
     expect(window.sessionStorage.getItem("prism.next.v1")).toBe("/plus?from=ask-limit");
     params.delete("next");
     window.sessionStorage.clear();
@@ -202,9 +202,19 @@ describe("Sign in — the way back", () => {
     params.set("next", "https://evil.example/");
     render(<SignInPage />);
     await submit();
-    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, null);
+    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, null, null);
     expect(window.sessionStorage.getItem("prism.next.v1")).toBeNull();
     params.delete("next");
+  });
+});
+
+describe("Sign in — a visit that came by a founder link", () => {
+  it("sends the link's code with the request, so the email link can carry it to the tab it opens", async () => {
+    sessionStorage.setItem("prism.link", "k3f9qa");
+    render(<SignInPage />);
+    await submit();
+    expect(requestMagicLink).toHaveBeenCalledWith(EMAIL, null, "k3f9qa");
+    sessionStorage.clear();
   });
 });
 
@@ -231,6 +241,6 @@ describe("Sign in — a mistyped domain (04 P2-8)", () => {
     await userEvent.clear(emailField());
     await userEvent.type(emailField(), "asha@gmial.com");
     await userEvent.click(submitButton());
-    expect(requestMagicLink).toHaveBeenCalledWith("asha@gmial.com", null);
+    expect(requestMagicLink).toHaveBeenCalledWith("asha@gmial.com", null, null);
   });
 });

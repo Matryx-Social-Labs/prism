@@ -3,6 +3,32 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.116.0] - 2026-09-29
+
+### Added — a Marketing page in the admin: tracked links, short links, posts and images
+- `/admin/marketing` (in the admin's left nav): pick any public Prism page — a story, a
+  quote, a person, a state, a day, the front page, Plus — and a platform (WhatsApp, X,
+  Instagram, LinkedIn, Facebook, Threads, Telegram, Reddit, YouTube, email, a newsletter or a
+  launch site), and get a link tagged with `utm_source`, `utm_medium`, `utm_campaign` and its
+  own code in `utm_content`, plus a short link, `readprism.news/go/<code>`.
+- A post for the platform, written only from the page's own facts and cut to fit X, with a
+  button that opens X, WhatsApp, Telegram, LinkedIn, Facebook, Threads, Reddit or email with
+  it. Instagram gets the caption without a link, and the page's images to post.
+- Every page's share card can be downloaded as the link preview and in Instagram's post
+  (1080 × 1350) and Story (1080 × 1920) shapes. People, state and day pages have their own
+  cards now, printing their counts.
+
+### Added — what each link brought, on the admin pages
+- Per link: visits, then in the same tab a second story, a sign-in asked for, an account made,
+  the Plus page and the weekly email; by platform and by campaign, beside "Where did you hear
+  about Prism?". The Overview gains a "Founder links" section; People says how many accounts
+  came in a visit from a founder link. Counts only, never who: a link's code is never stored
+  on an account, and the privacy policy says what is counted.
+
+### Fixed
+- A link to the front page kept its campaign tags only for first-time visitors: a returning
+  reader was sent on to `/feed` without them, and the visit lost its source.
+
 ## [0.0.115.0] - 2026-09-29
 
 ### Added — a Grievance Officer, and a queue behind "Something wrong?"

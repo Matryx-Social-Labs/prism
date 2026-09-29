@@ -84,9 +84,12 @@ DEPTHS = frozenset({"2", "5", "2:share"})
 # per visit (web/src/lib/attribution.CAMPAIGNS is the other half; it sends
 # "other" for a word not on the list), the answer to "Where did you hear about
 # Prism?", and the post-read question "Could you check this story for
-# yourself?" (06 §2.1). Picked from a list, never typed.
+# yourself?" (06 §2.1). Picked from a list, never typed. The campaign word is
+# the platform a link was made for; common/share_links makes founder links for
+# every one of them but "digest" (the weekly email's own) and "other".
 CAMPAIGNS = frozenset({"producthunt", "hn", "peerlist", "launchpadindia", "reddit", "x", "linkedin", "whatsapp",
-                       "telegram", "newsletter", "digest", "devto", "press", "other"})
+                       "telegram", "newsletter", "digest", "devto", "press", "instagram", "facebook", "youtube",
+                       "threads", "email", "other"})
 HEARD = frozenset({"friend", "search", "ai", "x", "linkedin", "reddit", "newsletter", "launch", "other"})
 SURVEY = frozenset({"check:yes", "check:partly", "check:no"})
 # The events whose word is one of a closed list, and the list.
