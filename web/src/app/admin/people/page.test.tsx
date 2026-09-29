@@ -6,9 +6,10 @@ import PeoplePage from "@/app/admin/people/page";
 
 const fetchPeople = vi.hoisted(() => vi.fn());
 const adminCall = vi.hoisted(() => vi.fn());
+const fetchLinks = vi.hoisted(() => vi.fn());
 const ADMIN = vi.hoisted(() => ({ session: { token: "t", userId: "u", email: "f@example.test" }, email: "f@example.test" }));
 vi.mock("@/components/admin/AdminShell", async (orig) => ({ ...(await orig<typeof import("@/components/admin/AdminShell")>()), useAdmin: () => ADMIN }));
-vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchPeople, adminCall }));
+vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchPeople, adminCall, fetchLinks }));
 
 const person = (over: Record<string, unknown>) => ({
   email: "a@example.test", name: null, profession: null, languages: [], state: null, created_at: "2026-09-20T10:00:00Z",
@@ -16,6 +17,7 @@ const person = (over: Record<string, unknown>) => ({
 });
 
 beforeEach(() => {
+  fetchLinks.mockReset().mockRejectedValue(new Error("offline"));
   fetchPeople.mockReset().mockResolvedValue({
     total: 2, active_window_days: 28, window_start: "2026-08-27",
     people: [
@@ -26,6 +28,20 @@ beforeEach(() => {
 });
 
 describe("people", () => {
+  it("says how many accounts came by a founder link, as a total, and nothing when that cannot be read", async () => {
+    const goals = (account: number) => ({ read2: 0, signin: 0, account, plus: 0, digest: 0 });
+    fetchLinks.mockResolvedValue({ links: [{ goals: goals(2) }, { goals: goals(1) }] });
+    render(<PeoplePage />);
+    expect(await screen.findByText(/3 accounts in the last 28 days were made in a visit that came by a founder link/)).toBeInTheDocument();
+    expect(fetchLinks).toHaveBeenCalledWith(ADMIN.session, 28);
+  });
+
+  it("prints no founder-link line when Marketing's counts cannot be read", async () => {
+    render(<PeoplePage />);
+    await screen.findByText("paid@example.test");
+    expect(screen.queryByText(/founder link/)).not.toBeInTheDocument();
+  });
+
   it("lists each account with its plan, activity and labelling", async () => {
     render(<PeoplePage />);
     const row = within((await screen.findByText("paid@example.test")).closest("tr")!);

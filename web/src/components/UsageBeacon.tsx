@@ -3,7 +3,8 @@
 // One page view per route change, and one arrival per tab: where this visit
 // came from (the referrer's host, never its path) or which Share button sent
 // it (the `?s=` marker a shared link carries), plus the campaign word its link
-// carried (`?ref=`, lib/attribution). /admin is never counted — the
+// carried (`?ref=`, lib/attribution) and a founder link's code, whose tab then
+// counts a 2nd story and the Plus page against it. /admin is never counted — the
 // founders reading their own dashboard are not usage. Also, per tab: the 2nd
 // and 5th story read (does a visit go past one story?), and any click on an
 // element marked `data-cta` — the landing's buttons, which are server-rendered
@@ -13,7 +14,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 import { pageKind, send } from "@/lib/analytics";
-import { campaignWord, isShareMarker, withoutCampaign } from "@/lib/attribution";
+import { campaignWord, isShareMarker, linkCode, linkGoal, rememberLink, withoutCampaign } from "@/lib/attribution";
 
 // "share" when the visit arrived by a shared link, so its 2nd story also
 // counts as `depth:2:share` (the share loop, 06 §2.2b); "1" otherwise.
@@ -40,6 +41,11 @@ export function UsageBeacon() {
         send("arrival", "", { ref, s });
         const campaign = campaignWord(params);
         if (campaign) send("campaign", campaign);
+        const code = linkCode(params);
+        if (code) {
+          rememberLink(code);
+          send("link", code);
+        }
       }
     } catch {
       /* storage blocked: the arrival goes uncounted, the view below still counts */
@@ -54,11 +60,13 @@ export function UsageBeacon() {
     }
     const kind = pageKind(pathname);
     send("view", kind);
+    if (kind === "plus") linkGoal("plus");
     if (kind !== "story") return;
     try {
       const n = Number(sessionStorage.getItem(DEPTH) ?? 0) + 1;
       sessionStorage.setItem(DEPTH, String(n));
       if (DEPTHS.has(n)) send("depth", String(n));
+      if (n === 2) linkGoal("read2");
       if (n === 2 && sessionStorage.getItem(ARRIVED) === "share") send("depth", "2:share");
     } catch {
       /* storage blocked: depth goes uncounted */

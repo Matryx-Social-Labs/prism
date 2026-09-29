@@ -87,3 +87,8 @@
   .admin-people .c-act { order: 4; flex-basis: 100%; }
   .admin-people .c-meta { order: 5; }
 }
+
+/* Marketing (/admin/marketing): a story to pick for a link. */
+.admin-pick { display: flex; width: 100%; align-items: baseline; gap: 12px; min-height: 44px; padding: 10px 8px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; font: 500 14px/1.35 var(--font-read); color: var(--ink); }
+.admin-pick:hover { background: var(--sunken); }
+.admin-pick[aria-pressed="true"] { box-shadow: inset 3px 0 var(--accent); background: var(--accent-soft); }

@@ -57,6 +57,30 @@ describe("the usage beacon", () => {
     document.body.innerHTML = "";
   });
 
+  // Founder links (/admin/marketing): the code in utm_content, then what the visit did next.
+  it("counts a founder link's code once, then a 2nd story and the Plus page once each against it", () => {
+    window.history.replaceState(null, "", "/story/7f9d86ff?utm_source=x&utm_medium=social&utm_content=K3F9QA");
+    const { rerender } = render(<UsageBeacon />);
+    expect(window.location.search).toBe("");
+    for (const path of ["/story/b", "/plus", "/feed", "/plus", "/story/c"]) {
+      pathname.current = path;
+      rerender(<UsageBeacon />);
+    }
+    expect(send.mock.calls.filter(([e]) => e === "link" || e === "goal")).toEqual([
+      ["link", "k3f9qa"], ["goal", "k3f9qa:read2"], ["goal", "k3f9qa:plus"],
+    ]);
+  });
+
+  it("counts nothing against a link when the visit came by none, or by a utm_content that is not a code", () => {
+    window.history.replaceState(null, "", "/story/7f9d86ff?utm_source=x&utm_content=hero_cta");
+    const { rerender } = render(<UsageBeacon />);
+    for (const path of ["/story/b", "/plus"]) {
+      pathname.current = path;
+      rerender(<UsageBeacon />);
+    }
+    expect(send.mock.calls.filter(([e]) => e === "link" || e === "goal")).toEqual([]);
+  });
+
   it("never counts the founders reading /admin", () => {
     pathname.current = "/admin/labellers";
     render(<UsageBeacon />);

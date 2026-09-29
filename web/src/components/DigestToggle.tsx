@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { SectionHead } from "@/components/SectionHead";
 import { Checkbox } from "@/components/ui";
+import { linkGoal } from "@/lib/attribution";
 import { fetchWeeklyDigest, setWeeklyDigest, type Session } from "@/lib/session";
 
 // The week's record by email (common/weekly_digest.py). Consent is this box and
@@ -36,7 +37,9 @@ export function DigestToggle({ session }: { session: Session }) {
     setBusy(true);
     setError(null);
     try {
-      setOn(await setWeeklyDigest(session, next));
+      const saved = await setWeeklyDigest(session, next);
+      setOn(saved);
+      if (saved) linkGoal("digest");
     } catch {
       setError("That did not save. Try again.");
     } finally {

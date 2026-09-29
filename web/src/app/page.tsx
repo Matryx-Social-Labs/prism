@@ -23,7 +23,16 @@ export const metadata: Metadata = {
   ...social("Prism: Follow the story, not the headlines.", DESCRIPTION, "/"),
 };
 
-export default async function Page() {
-  if ((await cookies()).has(RETURNING_COOKIE)) redirect("/feed");
+/** The words a link to `/` carried that say where it came from; they go on to
+ *  /feed with a returning reader, or the visit loses its link (UsageBeacon). */
+function carried(params: Record<string, string | string[] | undefined>): string {
+  const kept = Object.entries(params).filter(
+    (e): e is [string, string] => typeof e[1] === "string" && (e[0] === "ref" || e[0] === "s" || e[0].startsWith("utm_")),
+  );
+  return kept.length ? `?${new URLSearchParams(kept)}` : "";
+}
+
+export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  if ((await cookies()).has(RETURNING_COOKIE)) redirect(`/feed${carried((await searchParams) ?? {})}`);
   return Landing();
 }

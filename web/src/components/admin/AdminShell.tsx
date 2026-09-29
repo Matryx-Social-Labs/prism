@@ -43,6 +43,7 @@ export function useAdmin(): Admin {
 
 export const ADMIN_NAV: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin/marketing", label: "Marketing" },
   { href: "/admin/coverage", label: "Coverage" },
   { href: "/admin/spend", label: "Spend" },
   { href: "/admin/labellers", label: "Labellers" },

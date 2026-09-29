@@ -92,7 +92,9 @@ describe("robots", () => {
     expect(rule.userAgent).toBe("*");
     expect(rule.allow).toBe("/");
     // "/label", not "/label/": the trailing slash left the labeller workspace itself crawlable.
-    for (const p of ["/account", "/search", "/label", "/admin", "/you", "/plus/welcome"]) expect(rule.disallow).toContain(p);
+    for (const p of ["/account", "/search", "/label", "/admin", "/you", "/plus/welcome", "/card/"]) expect(rule.disallow).toContain(p);
+    // A short link must stay open to link-preview crawlers (X's obeys robots.txt), or a founder's post shows no card.
+    expect(rule.disallow).not.toContain("/go/");
     expect(r.sitemap).toEqual([expect.stringMatching(/\/sitemap\.xml$/), expect.stringMatching(/\/news-sitemap\.xml$/), expect.stringMatching(/\/records-sitemap\.xml$/), expect.stringMatching(/\/entities-sitemap\.xml$/)]);
     const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
     const blocked = rules.filter((x) => x.disallow === "/").map((x) => x.userAgent);

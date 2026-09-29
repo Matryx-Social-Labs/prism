@@ -9,6 +9,9 @@ import { OG_COLORS, OG_DISPLAY, OG_MONO, OG_SANS, bodyStack, displayStack, indic
 // Share cards v3 (Claude Design, outside/ShareCards.html): 1200 × 630, the
 // record's voices, a 3px rule under the masthead, the coverage bar in its slot
 // colours with its counts, the path the card opens. Never a photograph.
+// The same cards come in Instagram's shapes too (/card/<format>/…, for the
+// founders' Marketing page): laid out on a narrower canvas and scaled up, so
+// every size, rule and face in the design holds at every shape.
 
 /** The mark as PrismMark draws it, for Satori: a solid triangle on the spectrum bar. */
 export function PrismMarkSvg({ size, ink }: { size: number; ink: string }) {
@@ -26,9 +29,28 @@ export function PrismMarkSvg({ size, ink }: { size: number; ink: string }) {
 }
 
 const c = OG_COLORS;
-const W = 1200;
-const H = 630;
-const INNER = 1056; // W less the 72px sides
+
+export type CardFormat = "og" | "portrait" | "story";
+
+/** A card's size in pixels, how much its layout is scaled up to fill it, its
+ *  padding (top, sides, bottom) on the layout's own scale, and how much larger
+ *  its headline is set, since a tall card has the height for it. */
+export const FORMATS: Record<CardFormat, { width: number; height: number; scale: number; pad: [number, number, number]; display: number }> = {
+  // The link preview: WhatsApp, X, LinkedIn, iMessage.
+  og: { width: 1200, height: 630, scale: 1, pad: [56, 72, 60], display: 1 },
+  // An Instagram post, 4:5.
+  portrait: { width: 1080, height: 1350, scale: 1.25, pad: [64, 56, 72], display: 1.2 },
+  // An Instagram Story, 9:16: Instagram's own bars cover about the top 250 and
+  // the bottom 340 pixels, so the card keeps to the middle.
+  story: { width: 1080, height: 1920, scale: 1.35, pad: [200, 56, 270], display: 1.3 },
+};
+
+/** The longest path a tall card prints beside the lockup; a longer one (a
+ *  record's id) is left off rather than cut: the lockup is the address. */
+const TALL_PATH_MAX = 28;
+
+/** The width inside the sides, on the layout's scale (1056 on the link card). */
+const innerWidth = (format: CardFormat) => FORMATS[format].width / FORMATS[format].scale - 2 * FORMATS[format].pad[1];
 
 /** The legend's slot names, as the card prints them (short: the bar sits beside them). */
 const SLOT: Record<Origin, string> = { national: "national", intl: "international", regional: "Indian-language", wire: "wire" };
@@ -95,21 +117,31 @@ function Pill({ label, dashed, check, small }: PillSpec & { small?: boolean }) {
  * tonal frame), the path, the 3px rule. The lockup already carries the host, so
  * the mono line prints only the path (screens/Wordmark.html); the site card has none.
  */
-function Frame({ path, ink, children }: { path?: string; ink?: boolean; children: ReactNode }) {
+function Frame({ path, ink, format = "og", children }: { path?: string; ink?: boolean; format?: CardFormat; children: ReactNode }) {
   const fg = ink ? c.onInk : c.ink;
   const quiet = { fontWeight: 400, color: ink ? c.onInkMuted : c.inkFaint };
-  return (
-    <div style={{ width: W, height: H, display: "flex", flexDirection: "column", background: ink ? c.inkGround : c.ground, color: fg, padding: "56px 72px 60px" }}>
+  const f = FORMATS[format];
+  const ground = ink ? c.inkGround : c.ground;
+  const card = (
+    <div
+      style={{
+        width: f.width / f.scale, height: f.height / f.scale, display: "flex", flexDirection: "column", background: ground, color: fg,
+        padding: `${f.pad[0]}px ${f.pad[1]}px ${f.pad[2]}px`, ...(f.scale === 1 ? {} : { transform: `scale(${f.scale})`, transformOrigin: "top left" }),
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 15, paddingBottom: 22, borderBottom: `3px solid ${fg}` }}>
         <PrismMarkSvg size={36} ink={fg} />
         <div style={{ display: "flex", fontFamily: OG_DISPLAY, fontSize: 34, fontWeight: 600, letterSpacing: -0.34, lineHeight: 1 }}>
           <span style={quiet}>read</span><span>Prism</span><span style={quiet}>.news</span>
         </div>
-        {path && <span style={{ marginLeft: "auto", fontFamily: OG_MONO, fontSize: 20, letterSpacing: 0.4, opacity: 0.72 }}>{fit(path, 56)}</span>}
+        {path && (format === "og" || path.length <= TALL_PATH_MAX) && (
+          <span style={{ marginLeft: "auto", fontFamily: OG_MONO, fontSize: 20, letterSpacing: 0.4, opacity: 0.72 }}>{fit(path, 56)}</span>
+        )}
       </div>
       {children}
     </div>
   );
+  return f.scale === 1 ? card : <div style={{ width: f.width, height: f.height, display: "flex", background: ground }}>{card}</div>;
 }
 
 function MetaLine({ pill, parts, top = 36 }: { pill?: PillSpec | null; parts: string[]; top?: number }) {
@@ -123,10 +155,10 @@ function MetaLine({ pill, parts, top = 36 }: { pill?: PillSpec | null; parts: st
 }
 
 /** The coverage bar at poster scale, its legend of counts, and the count line on the right. */
-function CoverageBlock({ counts, count, single }: { counts: Record<Origin, number>; count: string; single?: boolean }) {
+function CoverageBlock({ counts, count, single, width }: { counts: Record<Origin, number>; count: string; single?: boolean; width: number }) {
   const parts = ORIGINS.map((k) => [k, counts[k]] as const).filter(([, n]) => n > 0);
   const bar = (
-    <div style={{ display: "flex", gap: 6, height: 22, width: single ? 220 : INNER }}>
+    <div style={{ display: "flex", gap: 6, height: 22, width: single ? 220 : width }}>
       {parts.map(([k, n]) => <div key={k} style={{ flexGrow: n, flexBasis: 0, height: 22, borderRadius: 2, background: c.coverage[k] }} />)}
     </div>
   );
@@ -154,9 +186,9 @@ function CoverageBlock({ counts, count, single }: { counts: Record<Origin, numbe
  * filled. Labelled with the day only — a development's title is prose and has
  * no place in the provenance voice — every station when they fit, else the ends.
  */
-function RouteLine({ dates }: { dates: string[] }) {
+function RouteLine({ dates, width }: { dates: string[]; width: number }) {
   const n = dates.length;
-  const step = (INNER - 24) / (n - 1);
+  const step = (width - 24) / (n - 1);
   const r = n > 12 ? 7 : 11;
   const day = (i: number) => shortDate(dates[i]).toUpperCase();
   // A day is printed once: stations that share it read as one run of dots.
@@ -164,8 +196,8 @@ function RouteLine({ dates }: { dates: string[] }) {
   for (const i of n <= 6 ? dates.map((_, k) => k) : [0, n - 1]) if (!labelled.length || day(i) !== day(labelled[labelled.length - 1])) labelled.push(i);
   return (
     <div style={{ display: "flex", flexDirection: "column", marginTop: 22 }}>
-      <svg width={INNER} height={44} viewBox={`0 0 ${INNER} 44`}>
-        <line x1={12} y1={22} x2={INNER - 12} y2={22} stroke={c.ink} strokeWidth={5} />
+      <svg width={width} height={44} viewBox={`0 0 ${width} 44`}>
+        <line x1={12} y1={22} x2={width - 12} y2={22} stroke={c.ink} strokeWidth={5} />
         {dates.map((_, i) =>
           i === n - 1 ? (
             <circle key={i} cx={12 + i * step} cy={22} r={r + 1} fill={c.ink} />
@@ -189,7 +221,8 @@ function RouteLine({ dates }: { dates: string[] }) {
  * A record or a trending group: the status pill and the mono meta line, the
  * headline in the record voice, a verified arc's route, the counted bar.
  */
-export function StoryCard({ path, pill, meta, headline, tally: t, count, single, route }: {
+export function StoryCard({ path, pill, meta, headline, tally: t, count, single, route, format = "og" }: {
+  format?: CardFormat;
   path: string;
   pill?: PillSpec | null;
   meta: string[];
@@ -201,15 +234,15 @@ export function StoryCard({ path, pill, meta, headline, tally: t, count, single,
 }) {
   const hasRoute = !!route && route.length > 1;
   const title = fit(headline, hasRoute ? 90 : 120);
-  const size = hasRoute ? (title.length > 60 ? 52 : 62) : title.length > 95 ? 54 : title.length > 75 ? 60 : 66;
+  const size = FORMATS[format].display * (hasRoute ? (title.length > 60 ? 52 : 62) : title.length > 95 ? 54 : title.length > 75 ? 60 : 66);
   return (
-    <Frame path={path}>
+    <Frame path={path} format={format}>
       <MetaLine pill={pill} parts={meta} />
       <div style={{ display: "flex", marginTop: hasRoute ? 20 : 22, fontFamily: displayStack(title), fontSize: size, fontWeight: 600, lineHeight: 1.06, letterSpacing: -0.022 * size }}>
         {title}
       </div>
-      {hasRoute && <RouteLine dates={route!} />}
-      <CoverageBlock counts={t.counts} count={count} single={single} />
+      {hasRoute && <RouteLine dates={route!} width={innerWidth(format)} />}
+      <CoverageBlock counts={t.counts} count={count} single={single} width={innerWidth(format)} />
     </Frame>
   );
 }
@@ -218,7 +251,8 @@ export function StoryCard({ path, pill, meta, headline, tally: t, count, single,
  * The quote card: the words as the article printed them under a 6px ink rule,
  * who said it, where and when it was printed, and what the check proved.
  */
-export function QuoteCard({ path, quote, speaker, role, meta, translated, reported = false, storyTitle }: {
+export function QuoteCard({ path, quote, speaker, role, meta, translated, reported = false, storyTitle, format = "og" }: {
+  format?: CardFormat;
   path: string;
   quote: string;
   speaker: string;
@@ -230,10 +264,10 @@ export function QuoteCard({ path, quote, speaker, role, meta, translated, report
   storyTitle?: string | null;
 }) {
   const q = fit(quote, 240);
-  const size = q.length > 180 ? 40 : q.length > 120 ? 46 : indicBodyFamilyFor(q) ? 50 : 54;
+  const size = FORMATS[format].display * (q.length > 180 ? 40 : q.length > 120 ? 46 : indicBodyFamilyFor(q) ? 50 : 54);
   const provenance = meta.filter(Boolean).join(" · ").toUpperCase();
   return (
-    <Frame path={path}>
+    <Frame path={path} format={format}>
       <div style={{ display: "flex", flexDirection: "column", marginTop: "auto", borderLeft: `6px ${reported ? "dashed" : "solid"} ${c.ink}`, paddingLeft: 34 }}>
         <div style={{ display: "flex", fontFamily: displayStack(q), fontStyle: reported ? "normal" : "italic", fontSize: size, lineHeight: 1.26 }}>{reported ? q : `“${q}”`}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 24, fontFamily: bodyStack(speaker + (role ?? "")) }}>
@@ -246,7 +280,7 @@ export function QuoteCard({ path, quote, speaker, role, meta, translated, report
           {reported && <Pill label="reported" dashed small />}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 30 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 20, rowGap: 10, marginTop: 30 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, fontFamily: OG_SANS, fontSize: 21, fontWeight: 600, color: c.ink }}>
           <Check size={22} />
           <span>{quoteCheckLine(translated, reported)}</span>
@@ -278,11 +312,51 @@ export const CARD_TEXT = [
  * bar: a bar is always printed with its count (DESIGN.md), and the brand card
  * is prerendered, so any count on it would be the build's, not today's.
  */
-export function SiteCard({ headline, line }: { headline: string; line: string }) {
+export function SiteCard({ headline, line, format = "og" }: { headline: string; line: string; format?: CardFormat }) {
   return (
-    <Frame ink>
+    <Frame ink format={format}>
       <div style={{ display: "flex", marginTop: "auto", maxWidth: 760, fontFamily: OG_DISPLAY, fontSize: 92, fontWeight: 600, lineHeight: 1.06, letterSpacing: -2 }}>{headline}</div>
       <div style={{ display: "flex", marginTop: 22, maxWidth: 900, fontFamily: OG_SANS, fontSize: 28, lineHeight: 1.4, color: c.onInkMuted }}>{line}</div>
+    </Frame>
+  );
+}
+
+export type Figure = { n: number; label: string };
+
+/**
+ * A page of records that is not one story — a person or organisation, a state,
+ * a day: what it is, its name in the record voice, a line in the reading
+ * voice, and its counts as figures. No coverage bar: these pages list their
+ * newest records, not all of them, and a bar drawn from a sample would
+ * undercount the outlets (a bar is always printed with its true count).
+ */
+export function CollectionCard({ path, meta, title, line, figures, format = "og" }: {
+  path: string;
+  meta: string[];
+  title: string;
+  line?: string | null;
+  figures: Figure[];
+  format?: CardFormat;
+}) {
+  const name = fit(title, 80);
+  const size = FORMATS[format].display * (name.length > 48 ? 64 : name.length > 28 ? 76 : 88);
+  // A tall card stacks its figures, larger; the link card lays them in a row.
+  const tall = format !== "og";
+  return (
+    <Frame path={path} format={format}>
+      <MetaLine parts={meta} />
+      <div style={{ display: "flex", marginTop: 22, fontFamily: displayStack(name), fontSize: size, fontWeight: 600, lineHeight: 1.04, letterSpacing: -0.022 * size }}>{name}</div>
+      {line && <div style={{ display: "flex", marginTop: 18, fontFamily: bodyStack(line), fontSize: 26, lineHeight: 1.35, color: c.inkMuted }}>{fit(line, 140)}</div>}
+      {figures.length > 0 && (
+        <div style={{ display: "flex", flexDirection: tall ? "column" : "row", flexWrap: "wrap", columnGap: 48, rowGap: tall ? 28 : 20, marginTop: "auto", paddingTop: 22, borderTop: `1px solid ${c.line}` }}>
+          {figures.map((f) => (
+            <div key={f.label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontFamily: OG_DISPLAY, fontSize: tall ? 72 : 56, fontWeight: 600, lineHeight: 1, letterSpacing: -1 }}>{f.n.toLocaleString("en-IN")}</span>
+              <span style={{ fontFamily: OG_SANS, fontSize: 21, color: c.inkMuted }}>{f.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </Frame>
   );
 }

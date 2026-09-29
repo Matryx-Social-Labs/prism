@@ -4,10 +4,13 @@
 // it counts as "other"), then takes it out of the address bar so the link a
 // reader copies, and the canonical, stay clean. Nothing about the reader.
 
+import { send } from "@/lib/analytics";
+
 /** Mirrors common/usage.CAMPAIGNS; the API drops any other word. */
 export const CAMPAIGNS = [
   "producthunt", "hn", "peerlist", "launchpadindia", "reddit", "x", "linkedin", "whatsapp",
-  "telegram", "newsletter", "digest", "devto", "press", "other",
+  "telegram", "newsletter", "digest", "devto", "press", "instagram", "facebook", "youtube",
+  "threads", "email", "other",
 ] as const;
 
 // How the same place is spelt in the wild (utm_source is written by whoever
@@ -15,7 +18,8 @@ export const CAMPAIGNS = [
 // that is not a letter or a digit.
 const ALIASES: Record<string, string> = {
   ph: "producthunt", hackernews: "hn", ycombinator: "hn", newsycombinator: "hn", twitter: "x", tco: "x",
-  wa: "whatsapp", dev: "devto", lnkd: "linkedin", launchpad: "launchpadindia",
+  wa: "whatsapp", dev: "devto", lnkd: "linkedin", launchpad: "launchpadindia", ig: "instagram", fb: "facebook",
+  mfacebook: "facebook", lfacebook: "facebook", youtu: "youtube", mail: "email",
 };
 
 /** The campaign word a link carried: `?ref=`, else `utm_source`; null when neither. */
@@ -39,4 +43,55 @@ export function withoutCampaign(href: string): string | null {
 /** The `?s=` marker a Share button puts on a link (lib/analytics.shareSurface; common/usage.SHARE_SURFACES). */
 export function isShareMarker(s: string | null): boolean {
   return s === "story" || s === "quote" || s === "trending" || s === "other";
+}
+
+// Founder links (/admin/marketing, common/share_links): a link made there
+// carries its code in utm_content. The visit counts once against the code, and
+// this tab remembers it (sessionStorage: gone when the tab closes) so that what
+// the visit does next — a second story, a sign-in, the Plus page, the weekly
+// email — counts once each against the same code. Never who; the API drops a
+// code that is not a link.
+const LINK_CODE = /^[2-9a-hjkmnp-z]{6}$/; // common/share_links.CODE
+const LINK = "prism.link";
+const LINK_GOALS = "prism.link.goals";
+
+export type LinkGoal = "read2" | "signin" | "plus" | "digest";
+
+/** The founder link's code a link carried (utm_content), or null. */
+export function linkCode(params: URLSearchParams): string | null {
+  const code = (params.get("utm_content") ?? "").trim().toLowerCase();
+  return LINK_CODE.test(code) ? code : null;
+}
+
+/** Remember, for this tab only, the founder link this visit came by. */
+export function rememberLink(code: string): void {
+  try {
+    window.sessionStorage.setItem(LINK, code);
+  } catch {
+    /* storage blocked: the arrival still counts, what follows does not */
+  }
+}
+
+/** The founder link this tab's visit came by, or null. */
+export function arrivedByLink(): string | null {
+  try {
+    const code = window.sessionStorage.getItem(LINK);
+    return code && LINK_CODE.test(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Count a step once per tab against the founder link the visit came by; nothing when it came by none. */
+export function linkGoal(goal: LinkGoal): void {
+  const code = arrivedByLink();
+  if (!code) return;
+  try {
+    const sent = (window.sessionStorage.getItem(LINK_GOALS) ?? "").split(",");
+    if (sent.includes(goal)) return;
+    window.sessionStorage.setItem(LINK_GOALS, [...sent.filter(Boolean), goal].join(","));
+  } catch {
+    return;
+  }
+  send("goal", `${code}:${goal}`);
 }

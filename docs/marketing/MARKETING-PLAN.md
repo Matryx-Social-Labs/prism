@@ -1,6 +1,9 @@
 # Prism — Marketing and launch plan
 
-**Version 1 · 29 September 2026 · owners: founder (Tejas ShylaShashidhara, CEO), eng (CTO)**
+**Version 1.1 · 29 September 2026 · owners: founder (Tejas ShylaShashidhara, CEO), eng (CTO)**
+
+*1.1 adds the Marketing page in the admin (§5.3, §11.1): tracked links, short links, post
+drafts and share images for every platform, and what each link brought.*
 
 This is the team's plan for taking Prism from a working product to a public launch, and to a
 paid launch after that. It comes from an audit of the whole product against all 50 skills in the
@@ -175,6 +178,17 @@ Prism takes and gives back instead.
 | `/healthz` | Reports the pipeline as stalled when nothing was read (liveness still "ok") |
 | Plus FAQ and `llms-full.txt` | The Plus questions also feed `/llms-full.txt`, the long version of `llms.txt` for answer engines |
 
+### 5.3 Built on `feat/admin-marketing` (0.0.116.0)
+
+| Area | What it does |
+|---|---|
+| Marketing page | `/admin/marketing`, in the admin's left nav: pick any public page (a story, a quote, a person, a state, a day, the front page, Plus), pick a platform, add a campaign; get a tracked link and a short link |
+| Short links | `readprism.news/go/<code>` opens the page with its tags. Six characters, no 0/o or 1/l/i, so it can be read off a phone and typed. A posted link keeps working after it is archived |
+| Post drafts | Written only from the page's own facts ("Reported by 9 of 41 monitored outlets…"), cut to fit X (a link counts as 23 characters), no link in an Instagram caption; one tap opens X, WhatsApp, Telegram, LinkedIn, Facebook, Threads, Reddit or email with it |
+| Share images | Every page's link preview, plus Instagram's post (1080 × 1350) and Story (1080 × 1920) shapes to download. People, state and day pages now have their own cards (their counts as figures; no coverage bar, since those pages list only their newest records) |
+| What each link brought | Visits, then in the same tab: a second story, a sign-in asked for, an account made, the Plus page, the weekly email. On Marketing per link, by platform and by campaign; on the Overview as "Founder links"; on People as one line |
+| Returning readers | A link to the front page keeps its tags when a returning reader is sent on to `/feed` (it used to drop them) |
+
 ---
 
 ## 6. Pricing and packaging
@@ -293,6 +307,9 @@ offer a professional lens, and that reading is what Plus sells.
 | **Email** ("The week's record") | Retention; the owned channel | Opt-in from the landing and the account page | Explicit consent; unsubscribe in every send |
 | **PR** | Credibility and links | §7.3 | Grievance Officer page and a correction runbook first |
 | **Paid ads** | Not now | Under the business model's own assumptions the ceiling is about ₹3.5 a visit; revisit after the paid launch | Never advertise a political record |
+
+**Every post a founder makes uses a link from `/admin/marketing`**, one link per post, so each
+post can be read on its own (§11.1). Reader shares keep their own `?s=` marker.
 
 ### 7.1 The daily social set (from live records only)
 
@@ -562,6 +579,36 @@ Counts below 30 are printed as counts. Targets are set only once there is a base
 | Trust | Corrections logged; median time to correct; grievances acknowledged within 24 hours and decided within 15 days; single-source share; `/healthz` | `/corrections`, `/grievance`, `/healthz` |
 | AI visibility (monthly) | 15 queries × 4 platforms (ChatGPT search, Perplexity, Google AI Overviews, Copilot) × 3 runs; reported as "cited k of n" per platform, month on month | Manual probe log |
 
+### 11.1 Founder links: making them and reading them
+
+**Making one.** `/admin/marketing` → paste the page (or pick a story) → pick the platform →
+a campaign if the post belongs to one (`launch-week`, `budget-2026`, one per partner or
+community) → **Make the link**. Post the short link. One link per post: two posts sharing a
+link cannot be told apart. The tags the link carries:
+
+| Tag | Value |
+|---|---|
+| `utm_source` | The platform, from a fixed list (x, instagram, whatsapp, linkedin, facebook, threads, youtube, reddit, telegram, email, newsletter, producthunt, hn, peerlist, launchpadindia, devto, press) |
+| `utm_medium` | social, message, email, community, launch, partner, press or paid; set from the platform, can be changed |
+| `utm_campaign` | The campaign, lowercase with hyphens; left off when there is none |
+| `utm_content` | The link's own code; every count is kept against it |
+
+**Reading the numbers** (the analytics and attribution skills, applied):
+- **Directional, not proof.** A visit came by the link; what it did next happened in the same
+  tab. Nothing says the post *caused* an account.
+- **A platform's click count will be higher than ours.** It counts bots, link previews and
+  readers without JavaScript; Prism counts a visit whose first page ran.
+- **Chats hide where a visit came from.** "Where did you hear about Prism?" sits beside the
+  link counts on Marketing, and so does the platform word of every tagged link, hand-made ones included.
+- **Below 30, counts only.** No percentages and no "winner" between two wordings until each
+  has 30 visits.
+- **Never who.** A link's code is counted as a daily total and is never stored on an account;
+  the privacy policy says so.
+
+**The Monday review** (with §11): which platforms and campaigns bring visits that read a
+second story; archive links that no longer matter; retire a post format that brings visits
+and nothing after them.
+
 **The AI-visibility baseline:** 0 of 11 queries at one run each (29 September), including the
 brand query. The brand is confused with an unrelated GitHub project called "readprism" and
 several other products named Prism. `alternateName: readprism.news` is live; `sameAs` follows
@@ -590,7 +637,7 @@ once the founder confirms the handles.
 
 ## 13. Every marketing skill, and where it stands
 
-Status: **Live** (0.0.114.0) · **Built** (0.0.115.0, on the branch) · **Planned** (this plan) ·
+Status: **Live** (0.0.114.0) · **Built** (0.0.115.0 and 0.0.116.0) · **Planned** (this plan) ·
 **Later** (after launch or after the paid launch) · **No** (does not apply, with the reason).
 
 | Skill | Status | Where it stands |
@@ -599,9 +646,9 @@ Status: **Live** (0.0.114.0) · **Built** (0.0.115.0, on the branch) · **Planne
 | ad-creative | Later | Needs real reader language first (§8.4) |
 | ads | Later | No paid acquisition before the paid launch; never a political record |
 | ai-seo | Live | Crawler policy, `llms.txt`, structured data; `llms-full.txt` built; monthly probe planned |
-| analytics | Live | Funnel counts fixed and extended; campaign words and survey built |
+| analytics | Built | Funnel counts fixed and extended; campaign words and survey; UTM links with a closed tag list and a register (`/admin/marketing`, 0.0.116.0) |
 | aso | **No** | No app-store app; Prism installs as a web app (FAQ "Is there an app?" built) |
-| attribution | Built | `?ref=` channel words, "Where did you hear about Prism?" |
+| attribution | Built | `?ref=` channel words, "Where did you hear about Prism?"; per-link visits and what followed in the same tab, by platform and campaign, never who (§11.1) |
 | churn-prevention | Live | Cancel sheet honest; pre-renewal email before the first yearly renewal (paid launch) |
 | co-marketing | Later | Newsletter swaps once the weekly email has subscribers; `/for-publishers` built |
 | cold-email | Planned (narrow) | The founder's one-to-one outreach to press and faculty only, never for sales |
@@ -617,13 +664,13 @@ Status: **Live** (0.0.114.0) · **Built** (0.0.115.0, on the branch) · **Planne
 | emails | Built | Weekly email (opt-in), welcome email; switch on at launch |
 | events | Later | One journalism-school workshop at day 45 |
 | free-tools | Later | "Who covered it?" checker at day 60 |
-| image | Built | Share cards print "k of n monitored outlets" and carry alt text; press asset kit |
+| image | Built | Share cards print "k of n monitored outlets" and carry alt text; press asset kit; Instagram post and Story shapes for every card; people, state and day cards |
 | influencer-marketing | Later | No paid creators; SEBI and ASCI limits for finance creators |
 | launch | Planned | §8 |
 | lead-magnets | Built | The weekly email is the magnet; the monthly report follows |
 | marketing-council | Done | Its session concluded: restore ingestion and build the list before any launch |
 | marketing-ideas | Done | Covered by this plan; use its idea bank only when a channel stalls |
-| marketing-loops | Planned | Instrument the share loop (built); weekly review and tracking checks |
+| marketing-loops | Planned | Instrument the share loop (built); the Monday link review (§11.1) |
 | marketing-plan | Done | This document |
 | marketing-psychology | Live | Zero-risk line, honest scarcity for Founding, no fake social proof |
 | offers | Built | Founding recommended while seats last; no struck-through reference price |
@@ -643,7 +690,7 @@ Status: **Live** (0.0.114.0) · **Built** (0.0.115.0, on the branch) · **Planne
 | signup | Live | Mobile sign-in shows what an account adds; email typo hint built |
 | site-architecture | Live / Built | Sub-topic links, subject trail, footer groups, state and archive hubs |
 | sms | **No** | No phone numbers are collected; commercial SMS in India needs TRAI DLT registration; WhatsApp is the sharing rail |
-| social | Planned | §7.1; claim handles first |
+| social | Planned | §7.1; claim handles first; every post from a Marketing link with its draft and card |
 | video | Planned | One 20–30 second captioned screen recording of a real record for the Product Hunt gallery and LinkedIn |
 
 ---

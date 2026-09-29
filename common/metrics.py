@@ -87,7 +87,10 @@ async def _usage(db: AsyncSession, w: dict[str, date], event: str, since: date |
             # Each word's own day-by-day, for a stacked chart.
             "split_series": {dim: [counted(d, days) for d in _days(w)] for dim, days in by_dim_day.items()},
             "split": sorted(({"label": k or "—", "current": v, "previous": before.get(k, 0) if prev is not None else None}
-                             for k, v in now.items()), key=lambda x: -x["current"])}
+                             for k, v in now.items()), key=lambda x: -x["current"]),
+            # Every word's count in the period before, including words with none now
+            # (the split above lists only words counted in this period); None when uncounted.
+            "before": before if prev is not None else None}
 
 
 def _since_label(since: date | None) -> str:
@@ -124,12 +127,67 @@ async def visits(db: AsyncSession, w: dict[str, date], since: date | None) -> di
              "series": arr["split_series"]},
             {"key": "pages", "title": "Views by kind of page", "rows": views["split"], "source": src},
             {"key": "shared", "title": "What was shared", "rows": shares["split"], "source": src},
-            {"key": "campaigns", "title": "Visits by the campaign word their link carried (?ref=)",
+            {"key": "campaigns", "title": "Visits by the platform their link was made for (?ref= or utm_source)",
              "rows": campaigns["split"], "source": src, "series": campaigns["split_series"]},
             {"key": "heard", "title": "Where readers say they heard of Prism", "rows": heard["split"], "source": src},
             {"key": "check", "title": "Could you check this story for yourself?", "rows": check["split"], "source": src},
             {"key": "depth", "title": "Visits that read a 2nd or 5th story (2:share arrived by a shared link)",
              "rows": depth["split"], "source": src},
+        ],
+    }
+
+
+def _rollup(counted: dict[str, Any], label: dict[str, str]) -> list[dict[str, Any]]:
+    """One usage event's counts keyed by link code (`_usage`), added up under
+    each code's label (its platform or campaign), most first. The period before
+    counts every code it held, including one with nothing now; None when uncounted."""
+    def by_label(counts: dict[str, int]) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for code, n in counts.items():
+            k = label.get(code, "—") or "no campaign"
+            out[k] = out.get(k, 0) + n
+        return out
+
+    now = by_label({r["label"]: r["current"] for r in counted["split"]})
+    before = by_label(counted["before"]) if counted["before"] is not None else None
+    return sorted(({"label": k, "current": v, "previous": None if before is None else before.get(k, 0)} for k, v in now.items()),
+                  key=lambda x: -x["current"])
+
+
+async def links(db: AsyncSession, w: dict[str, date], since: date | None) -> dict[str, Any]:
+    """Founder links (/admin/marketing, common/share_links): visits that came by
+    one, and what those visits went on to do in the same tab. The code is the
+    word counted; platform and campaign are looked up from the link."""
+    src = f"usage_daily · founder links · {_since_label(since)}"
+    visits = await _usage(db, w, "link", since)
+    goals = await _usage(db, w, "goal", since)
+    made = (await db.execute(text("SELECT code, platform, campaign FROM share_links"))).mappings().all()
+
+    def goal(name: str) -> tuple[int | None, int | None]:
+        now = sum(r["current"] for r in goals["split"] if r["label"].endswith(f":{name}")) if goals["current"] is not None else None
+        before = goals["before"]
+        return now, (None if before is None else sum(n for d, n in before.items() if d.endswith(f":{name}")))
+
+    rows = [_row("link_visits", "Visits from founder links", visits["current"], visits["previous"], src,
+                 series=visits["series"], prev_series=visits["prev_series"],
+                 note="The first page of a visit whose link carried a founder link's code (utm_content).")]
+    for key, label, note in (
+        ("read2", "…that read a second story", None),
+        ("signin", "…that asked to sign in", "A sign-in link asked for, or Google, in that tab."),
+        ("account", "…that made an account", "Counted when the account is made; the code is not stored on it."),
+        ("plus", "…that opened the Plus page", None),
+        ("digest", "…that turned on the weekly email", None),
+    ):
+        now, before = goal(key)
+        rows.append(_row(f"link_{key}", label, now, before, src, note=note))
+    return {
+        "key": "links", "title": "Founder links",
+        "rows": rows,
+        "breakdowns": [
+            {"key": "link_platforms", "title": "Visits from founder links, by platform", "source": src,
+             "rows": _rollup(visits, {m["code"]: m["platform"] for m in made})},
+            {"key": "link_campaigns", "title": "Visits from founder links, by campaign", "source": src,
+             "rows": _rollup(visits, {m["code"]: m["campaign"] for m in made})},
         ],
     }
 
@@ -455,6 +513,7 @@ async def dashboard(db: AsyncSession, days: int, today: date | None = None) -> d
                            "active": since_active.isoformat() if since_active else None},
         "sections": [
             await visits(db, w, since),
+            await links(db, w, since),
             await signups(db, w),
             await engagement(db, w, since_active, since),
             await money(db, w, since),

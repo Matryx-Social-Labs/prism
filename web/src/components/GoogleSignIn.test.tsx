@@ -59,7 +59,7 @@ describe("GoogleSignIn", () => {
     await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
     await waitFor(() => expect(gis.cb).not.toBeNull());
     await act(async () => { gis.cb!({ access_token: "ya29.x" }); });
-    expect(session.signInWithGoogle).toHaveBeenCalledWith("ya29.x");
+    expect(session.signInWithGoogle).toHaveBeenCalledWith("ya29.x", null);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/onboarding?next=%2Fwatchlist"));
   });
 

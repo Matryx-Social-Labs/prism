@@ -19,7 +19,7 @@ beforeEach(() => {
 describe("/ — landing for a first visitor, chart for a returning reader", () => {
   it("renders the landing when the returning cookie is absent", async () => {
     has.mockReturnValue(false);
-    const tree = await Page();
+    const tree = await Page({});
     expect(redirect).not.toHaveBeenCalled();
     expect(tree).toBeTruthy();
     expect(has).toHaveBeenCalledWith("prism.returning");
@@ -27,7 +27,14 @@ describe("/ — landing for a first visitor, chart for a returning reader", () =
 
   it("redirects to /feed when the returning cookie is present", async () => {
     has.mockReturnValue(true);
-    await Page();
+    await Page({});
     expect(redirect).toHaveBeenCalledWith("/feed");
+  });
+
+  it("keeps the words a link carried on the way to /feed, and nothing else", async () => {
+    has.mockReturnValue(true);
+    const searchParams = Promise.resolve({ utm_source: "x", utm_content: "k3f9qa", ref: "hn", s: "story", q: "drop", a: ["1", "2"] });
+    await Page({ searchParams });
+    expect(redirect).toHaveBeenCalledWith("/feed?utm_source=x&utm_content=k3f9qa&ref=hn&s=story");
   });
 });

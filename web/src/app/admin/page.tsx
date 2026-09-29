@@ -35,7 +35,7 @@ const HEADLINE: ReadonlyArray<[string, string, keyof Metrics["counting_since"] |
 ];
 
 /** Supply first: it is counted since launch, so it is the fullest picture. */
-const ORDER = ["supply", "visits", "signups", "engagement", "money", "demand"];
+const ORDER = ["supply", "visits", "links", "signups", "engagement", "money", "demand"];
 
 const year = (iso: string) => iso.slice(0, 4);
 

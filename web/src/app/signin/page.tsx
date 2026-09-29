@@ -9,6 +9,7 @@ import { Check } from "@/components/icons";
 import { Alert, TextField } from "@/components/ui";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
 import { track } from "@/lib/analytics";
+import { arrivedByLink, linkGoal } from "@/lib/attribution";
 import { ASK_QUESTIONS, LENS_READS } from "@/lib/billing";
 import { requestMagicLink } from "@/lib/session";
 
@@ -94,9 +95,10 @@ function SignIn() {
     setError(null);
     setBusy(true);
     try {
-      await requestMagicLink(email.trim(), next);
+      await requestMagicLink(email.trim(), next, arrivedByLink());
       // Asked for, not yet used: the gap between the two is the mail that never arrived.
       track("Sign in", { stage: "sent", method: "link" });
+      linkGoal("signin");
       return true;
     } catch (err) {
       setError(failure(err));

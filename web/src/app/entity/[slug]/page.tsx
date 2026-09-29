@@ -6,6 +6,7 @@ import { MetaLine, PageTitle, ReadingColumns } from "@/components/reading/parts"
 import { SectionHead } from "@/components/SectionHead";
 import { BackBar, EmptyState } from "@/components/ui";
 import { fetchEntity, type EntityPage as EntityPayload } from "@/lib/api";
+import { SCHEMA_KIND } from "@/lib/entities";
 import { stateBySlug } from "@/lib/regions";
 import { breadcrumbLd, entityLd, jsonLd, quotationsLd, robotsUnless, social } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
@@ -76,17 +77,6 @@ function saidDescription(name: string, quotes: number, reported: number, records
     : `${said} and checked against the article, ${where}`;
 }
 
-/** The eyebrow for the actor's kind — only for the kinds the API maps with confidence ("Thing" says nothing). */
-const KIND: Record<string, string> = {
-  Person: "Person",
-  Organization: "Organisation",
-  GovernmentOrganization: "Organisation",
-  NewsMediaOrganization: "Organisation",
-  Place: "Place",
-  Country: "Place",
-  Product: "Product",
-};
-
 export default async function EntityHubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   deferToStateHub(slug);
@@ -94,7 +84,7 @@ export default async function EntityHubPage({ params }: { params: Promise<{ slug
   if (!page) notFound();
   const { entity, record_count, records } = page;
   const url = `${SITE_URL}/entity/${entity.slug}`;
-  const kind = KIND[entity.schema_type];
+  const kind = SCHEMA_KIND[entity.schema_type];
   const stories = `${record_count} ${record_count === 1 ? "story" : "stories"}`;
   const quoteCount = page.quote_count ?? 0;
   const reportedCount = page.reported_count ?? 0;
