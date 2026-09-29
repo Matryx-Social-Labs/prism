@@ -76,10 +76,21 @@ def below_floor(rec: dict | None) -> bool:
 RUNWAY_WARN_DAYS = 2
 
 
-async def _daily_spend() -> float | None:
-    """Mean cost of the last two complete ledger days; None when unrecorded."""
-    days = [d for d in (await spend.days(3))[1:] if d["recorded"]]
-    return sum(d["cost"] for d in days) / len(days) if days else None
+# Hours of today's ledger before its pace counts: an hour's burst is not a day.
+MIN_TODAY_HOURS = 3
+
+
+async def _daily_spend(now: float | None = None) -> float | None:
+    """Dollars a day: the mean of the last two complete ledger days, or today's
+    pace when that is higher — after a pause the complete days read ~$0 and
+    would never warn. None when nothing was recorded."""
+    today, *before = await spend.days(3)
+    days = [d for d in before if d["recorded"]]
+    rate = sum(d["cost"] for d in days) / len(days) if days else 0.0
+    hours = ((now or time.time()) % 86400) / 3600
+    if today["recorded"] and hours >= MIN_TODAY_HOURS:
+        rate = max(rate, today["cost"] * 24 / hours)
+    return rate or None
 
 
 async def warn_if_low(rec: dict | None) -> None:

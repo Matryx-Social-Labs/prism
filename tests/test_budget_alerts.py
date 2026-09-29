@@ -20,6 +20,9 @@ class _Redis:
         self.keys[key] = value
         return True
 
+    async def delete(self, key):
+        self.keys.pop(key, None)
+
 
 class _Sender:
     def __init__(self, fail=False):
@@ -40,7 +43,11 @@ def mail(monkeypatch):
     monkeypatch.setattr(alerts, "get_email_sender", lambda: sender)
     monkeypatch.setattr(get_settings(), "prism_admin_emails", "a@x.test, b@x.test")
     monkeypatch.setattr(get_settings(), "prism_llm_budget_floor_usd", 5.0)
+    monkeypatch.setattr(budget.time, "time", lambda: NOON_UTC)
     return sender
+
+
+NOON_UTC = 1_790_000_000 - 1_790_000_000 % 86400 + 12 * 3600
 
 
 @pytest.mark.asyncio
@@ -51,9 +58,22 @@ async def test_an_alert_goes_to_every_founder_once_per_window(mail):
 
 
 @pytest.mark.asyncio
-async def test_a_failed_send_never_raises(monkeypatch, mail):
+async def test_an_undelivered_alert_is_tried_again_next_pass(monkeypatch, mail):
+    """Review 2026-09-29: the window was taken before sending, so a Resend
+    outage silenced the alert for 12 hours."""
     monkeypatch.setattr(alerts, "get_email_sender", lambda: _Sender(fail=True))
     assert await alerts.notify("k2", "Subject", "Body") is False
+    monkeypatch.setattr(alerts, "get_email_sender", lambda: mail)
+    assert await alerts.notify("k2", "Subject", "Body") is True
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_mail_provider_never_raises(monkeypatch, mail):
+    def unwired():
+        raise NotImplementedError("email provider 'x' not wired")
+
+    monkeypatch.setattr(alerts, "get_email_sender", unwired)
+    assert await alerts.notify("k4", "Subject", "Body") is False
 
 
 @pytest.mark.asyncio
@@ -91,6 +111,14 @@ async def test_a_healthy_balance_is_quiet(monkeypatch, mail):
     monkeypatch.setattr(budget.spend, "days", _ledger(1.0, 8.0, 8.0))
     await budget.warn_if_low({"balance": 5.0 + 40.0, "at": 0})
     assert mail.sent == []
+
+
+@pytest.mark.asyncio
+async def test_the_runway_counts_todays_pace_after_a_pause(monkeypatch, mail):
+    """Collection paused for two days reads ~$0 a day; today's spend is the rate."""
+    monkeypatch.setattr(budget.spend, "days", _ledger(6.0, None, None))  # $6 by noon = $12/day
+    await budget.warn_if_low({"balance": 5.0 + 15.0, "at": 0})
+    assert mail.sent and "days of LLM credit" in mail.sent[0][1]
 
 
 @pytest.mark.asyncio

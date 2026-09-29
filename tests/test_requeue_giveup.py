@@ -147,3 +147,32 @@ async def test_without_the_failure_counts_nothing_is_given_up(monkeypatch, stall
     monkeypatch.setattr(runner.stream, "permanent_failures", failures)
     await runner.requeue_stalled()
     assert {str(i) for i in stalled} <= set(published)
+
+
+async def test_many_failing_at_once_is_the_pipeline_and_nothing_is_given_up(monkeypatch, stalled):
+    """Review 2026-09-29: a model answering every article with an invalid record
+    (qwen, 2026-09-04) would have marked the whole backlog failed in 40 minutes."""
+    published, alerts = [], []
+
+    async def publish(topic, message):
+        published.append(message["raw_item_id"])
+
+    async def failures(ids):
+        return {str(i): runner.MAX_PERMANENT_FAILURES for i in stalled}
+
+    async def notify(key, subject, body, **kw):
+        alerts.append(key)
+        return True
+
+    monkeypatch.setattr(runner, "SYSTEMIC_GIVE_UP", 1)
+    monkeypatch.setattr(runner.stream, "publish", publish)
+    monkeypatch.setattr(runner.stream, "permanent_failures", failures)
+    monkeypatch.setattr(runner.alerts, "notify", notify)
+    await runner.requeue_stalled()
+
+    assert {str(i) for i in stalled} <= set(published)
+    assert alerts == ["requeue-systemic"]
+    async with session_scope() as s:
+        states = (await s.execute(text("SELECT DISTINCT relevance FROM raw_items WHERE id = ANY(CAST(:i AS uuid[]))"),
+                                  {"i": [str(i) for i in stalled]})).scalars().all()
+    assert states == ["relevant"]

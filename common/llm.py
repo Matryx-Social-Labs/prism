@@ -193,10 +193,11 @@ _MANDATORY_REASONING_MODELS = frozenset({
 _MARKED_CACHE_MODELS = ("google/", "anthropic/")
 
 
-def _cached_prefix(model: str, system_messages: list[dict[str, Any]]) -> dict[str, Any]:
-    """Everything before the first variable token, as one system message."""
+def _cached_prefix(model: str, system_messages: list[dict[str, Any]], *, private: bool = False) -> dict[str, Any]:
+    """Everything before the first variable token, as one system message. Never
+    marked on a private call: a reader's words are not left in a provider cache."""
     text = "\n\n".join(m["content"] for m in system_messages)
-    if model.startswith(_MARKED_CACHE_MODELS):
+    if model.startswith(_MARKED_CACHE_MODELS) and not private:
         return {"role": "system", "content": [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]}
     return {"role": "system", "content": text}
 
@@ -290,7 +291,7 @@ async def _structured_chat[T: BaseModel](
     first_variable = next((i for i, m in enumerate(messages) if m.get("role") != "system"), len(messages))
     kwargs: dict[str, Any] = {
         "model": model,
-        "messages": [_cached_prefix(model, [*messages[:first_variable], schema_msg]), *messages[first_variable:]],
+        "messages": [_cached_prefix(model, [*messages[:first_variable], schema_msg], private=private), *messages[first_variable:]],
         "response_format": {
             "type": "json_schema",
             "json_schema": {"name": output_model.__name__, "schema": schema},

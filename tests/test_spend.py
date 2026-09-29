@@ -94,6 +94,17 @@ async def test_a_gemini_prefix_is_marked_for_the_cache(monkeypatch):
     assert article["content"] == "ARTICLE"
 
 
+async def test_a_private_call_is_never_marked(monkeypatch):
+    """A reader's words are not left in a provider's cache (Ask, the guard)."""
+    sent: list = []
+    monkeypatch.setattr(llm, "get_llm", lambda: _client(sent))
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setattr(spend, "record_response", _noop)
+    await llm.structured_chat(model="google/gemini-3.1-flash-lite", messages=[{"role": "user", "content": "x"}],
+                              output_model=Out, trace_name="t", private=True)
+    assert isinstance(sent[0]["messages"][0]["content"], str)
+
+
 async def test_other_models_get_a_plain_prefix(monkeypatch):
     """Their providers cache a repeated prefix on their own (Z.AI, Together);
     a content-block system message is only for the providers that need a mark."""

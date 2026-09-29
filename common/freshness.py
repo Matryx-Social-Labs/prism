@@ -200,7 +200,8 @@ _FRESHNESS_SQL = text(
             AS oldest_enrichment_pending_s,
         (SELECT extract(epoch FROM (now() - min(a.fetched_at)))
          FROM articles a
-         WHERE NOT EXISTS (
+         JOIN raw_items r ON r.id = a.raw_item_id
+         WHERE r.relevance <> 'failed' AND NOT EXISTS (
              SELECT 1 FROM event_memberships m WHERE m.article_id = a.id
          )) AS oldest_correlation_pending_s
     FROM journeys

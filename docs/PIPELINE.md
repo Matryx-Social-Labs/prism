@@ -142,8 +142,15 @@ one to a per-raw-item count in Redis (`failures:<raw_item_id>`, 14 days, `common
 `requeue_stalled()` skips an item at `MAX_PERMANENT_FAILURES = 3`, sets its `relevance` to
 `failed` so no query picks it up again, and emails the founders (`common/alerts.py`). Transient
 failures (timeouts, quota, a database away) never dead-letter, so an outage never counts against
-an item; without Redis nothing is given up. Before this, a refused or invalid extraction was
-re-sent and paid for every ten minutes indefinitely.
+an item; without Redis nothing is given up. More than `SYSTEMIC_GIVE_UP = 20` items reaching the
+count in one pass is a broken model or deploy, not bad articles: nothing is given up and the
+founders get a "systemic" email. Before this, a refused or invalid extraction was re-sent and paid
+for every ten minutes indefinitely.
+
+To retry a given-up item: `DEL failures:<raw_item_id>` in Redis, then
+`UPDATE raw_items SET relevance = 'pending'` (it was never classified) or `'relevant'` (classified,
+never enriched) for that id; the next requeue pass (≤ 10 min) sends it again. `tools/redrive_dead.py`
+alone does not: the consumers skip a row whose relevance is `failed`.
 
 **Enrichment concurrency.** `ENRICH_CONCURRENCY = int(os.environ.get("PRISM_ENRICH_CONCURRENCY",
 "12"))` (`worker/__main__.py:67`). Classification runs at `concurrency=4`
@@ -503,11 +510,12 @@ from a 400–1,500-character summary (Times of India's run 400–460, 66 words, 
 fetches the same pages at 635–984 words). Now only a 1,500+ body skips the fetch, and a fetched
 page is kept only if it is at least as long as the summary.
 
-**A page of other headlines is refused** (`is_headline_list`): 20+ lines, median 6–16 words, at
-most 10% ending a sentence. Aaj Tak's short-video pages extract as the next videos' headlines,
-the story's own among them (so the off-title guard passes them), and 26 of them embedded together
-into one record. Refused only when there is a summary to fall back to; measured on 25,287 pages it
-flags the 72 short-video pages, 5 live blogs and 3 genuine lists.
+**A page of other headlines is refused** (`is_headline_list`): 12+ lines of 3+ words (filler like
+"Advertisement" is not counted), median 6–16 words, at most 10% ending a sentence. Aaj Tak's
+short-video pages extract as the next videos' headlines, the story's own among them (so the
+off-title guard passes them), and 26 of them embedded together into one record. Refused only when
+there is a summary to fall back to; measured on 25,287 pages it flags the 72 short-video pages and
+10 others (live blogs, a trains list, appointment lists).
 
 The og-image comes free from the same fetch's metadata — never a separate request
 (`enrichment/fulltext.py:66-67`).

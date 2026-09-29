@@ -49,17 +49,20 @@ MIN_HEAD_SHARE = 0.3
 # story's own headline followed by the next videos' — the off-title guard passes
 # them, since the story's headline is in the list — and 26 of them embedded
 # together into one record of unrelated stories (2026-09-28). The shape:
-# many headline-length lines that almost never end a sentence. Measured on
-# 25,287 production pages (30 days): it flags all 72 short-video pages and 8
-# others (5 live blogs and 3 genuine lists), none of them an ordinary story.
-HEADLINE_LIST_MIN_LINES = 20
+# many headline-length lines that almost never end a sentence. Lines under
+# three words ("Advertisement", "Swipe", "Live") are filler and not counted, so
+# the rule does not depend on them. Measured on 25,287 production pages (30
+# days): it flags all 72 short-video pages and 10 others (live blogs, a trains
+# list, appointment lists), none of them an ordinary story.
+HEADLINE_LIST_MIN_LINES = 12
+HEADLINE_LIST_MIN_LINE_WORDS = 3
 HEADLINE_LIST_WORDS = (6, 16)  # median words per line
 HEADLINE_LIST_MAX_ENDED = 0.1  # share of lines that end a sentence
 _SENTENCE_END = re.compile(r"[.।॥:;\"”’)]\s*$")
 
 
 def is_headline_list(text: str) -> bool:
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    lines = [ln.strip() for ln in text.splitlines() if len(ln.split()) >= HEADLINE_LIST_MIN_LINE_WORDS]
     if len(lines) < HEADLINE_LIST_MIN_LINES:
         return False
     low, high = HEADLINE_LIST_WORDS

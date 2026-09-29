@@ -30,10 +30,13 @@ true before credit is added and collection resumes.
 ### Fixed — failures that cost money or went unseen
 - An article that fails permanently (a model refusal, an invalid record) is retried three
   times, then marked `failed`. It was re-sent and paid for every ten minutes, forever.
-  Timeouts, quota and outages never count against an item.
+  Timeouts, quota and outages never count against an item, and more than 20 failing at once
+  is read as a broken model or deploy: nothing is given up and the founders are told.
 - The founders are emailed when collection stops under the LLM budget floor, when less than
-  two days of credit remain, and when items are given up. On 2026-09-28 collection stopped
-  for 37 hours and nobody was told. Needs `PRISM_ADMIN_EMAILS` on the worker.
+  two days of credit remain (read from today's pace too, so it works right after a pause),
+  and when items are given up. On 2026-09-28 collection stopped for 37 hours and nobody was
+  told. An undelivered alert is tried again on the next pass. Needs `PRISM_ADMIN_EMAILS` on
+  the worker.
 
 ## [0.0.116.0] - 2026-09-29
 

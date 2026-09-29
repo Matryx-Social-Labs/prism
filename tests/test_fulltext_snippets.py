@@ -83,13 +83,23 @@ def test_the_short_video_page_is_a_headline_list():
     assert fulltext.is_headline_list(HEADLINE_LIST)
 
 
+def test_the_list_is_caught_without_its_filler_lines():
+    """Review 2026-09-29: 10 of the fixture's 26 lines are "Advertisement" and
+    "Swipe"; the rule must not depend on the site keeping them."""
+    bare = "\n".join(ln for ln in HEADLINE_LIST.splitlines() if ln.strip() not in {"Advertisement", "Swipe"})
+    assert fulltext.is_headline_list(bare)
+
+
 @pytest.mark.parametrize("text", [
     STORY,
     # A story with sub-headings: short lines, but most of it is sentences.
     "\n".join(["Key developments", STORY, "What the police said", STORY, "What happens next", STORY]),
     # A short list is a list inside an article, not a page of headlines.
-    "\n".join(f"Candidate {i} from district {i} named for the seat" for i in range(12)),
-], ids=["story", "story-with-subheadings", "short-list"])
+    "\n".join(f"Candidate {i} from district {i} named for the seat" for i in range(8)),
+    # Past the line count, so the shape is what decides:
+    "\n".join(["Police said the campus was calm by evening and that the exams were deferred."] * 25),
+    "\n".join(f"- Seat {i}: the candidate named on Tuesday is a former district president." for i in range(25)),
+], ids=["story", "story-with-subheadings", "short-list", "25-paragraphs", "25-sentence-bullets"])
 def test_an_article_is_not_a_headline_list(text):
     assert not fulltext.is_headline_list(text)
 

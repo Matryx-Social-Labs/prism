@@ -25,19 +25,32 @@ async def notify(key: str, subject: str, body: str, *, every_hours: int = EVERY_
     if not admins:
         logger.warning("alert_no_recipients", key=key, subject=subject)
         return False
+    throttle = f"alert:{key}"
     try:
-        if not await get_redis().set(f"alert:{key}", "1", nx=True, ex=every_hours * 3600):
+        if not await get_redis().set(throttle, "1", nx=True, ex=every_hours * 3600):
             return False
     except Exception as exc:  # noqa: BLE001 — without the throttle, do not risk a flood
         logger.warning("alert_throttle_unavailable", key=key, error=str(exc)[:160])
         return False
-    sender = get_email_sender()
+    provider = get_settings().prism_email_provider
+    if provider == "console":
+        logger.error("alert_console_only", key=key, subject=subject, body=body)  # nobody will see it by email
     sent = False
-    for to in admins:
+    try:
+        sender = get_email_sender()
+        for to in admins:
+            try:
+                await sender.send(to=to, subject=f"[Prism] {subject}", body=body)
+                sent = True
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("alert_send_failed", key=key, to=to, error=str(exc)[:160])
+    except Exception as exc:  # noqa: BLE001 — an unknown provider
+        logger.warning("alert_sender_unavailable", key=key, error=str(exc)[:160])
+    if not sent:
+        # Undelivered is not "told": free the window so the next pass tries again.
         try:
-            await sender.send(to=to, subject=f"[Prism] {subject}", body=body)
-            sent = True
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("alert_send_failed", key=key, to=to, error=str(exc)[:160])
-    logger.warning("alert_sent" if sent else "alert_undelivered", key=key, subject=subject)
+            await get_redis().delete(throttle)
+        except Exception:  # noqa: BLE001
+            pass
+    logger.warning("alert_sent" if sent else "alert_undelivered", key=key, subject=subject, provider=provider)
     return sent

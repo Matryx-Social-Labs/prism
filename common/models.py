@@ -87,7 +87,7 @@ class RawItem(TimestampMixin, Base):
     )
     raw: Mapped[dict] = mapped_column(JSONB, nullable=False)  # untouched source payload
     image_url: Mapped[str | None] = mapped_column(Text)
-    relevance: Mapped[str] = mapped_column(Text, default="pending", nullable=False)  # pending|relevant|rejected
+    relevance: Mapped[str] = mapped_column(Text, default="pending", nullable=False)  # pending|relevant|rejected|duplicate|failed (failed: given up, ingestion/runner._given_up)
     # A dedicated stage clock. ``updated_at`` is not classification time: later
     # enrichment can update this row when it discovers an image.
     classified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
