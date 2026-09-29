@@ -10,6 +10,10 @@ Match cascade (strongest first), all persisted in the match trail:
   7. verified   — gist-embedding candidates judged by Jev (correlation/verify.py),
                   for an article every tier above refused; flag prism_event_verify
 
+With prism_event_verify=confirm, tiers 3-6 only PROPOSE: their events join the
+gist candidates, and Jev's answer decides every attach (_verified). Tiers 1-2 are
+exact and still attach on their own.
+
 Identity is never merged: matching links the article to the event; it never
 rewrites entities or inflates impact (EduThreat canonicalization rules).
 """
@@ -23,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
 from common.text import detect_script, title_share
-from correlation.verify import Candidate, event_blocks, judge, record
+from correlation.verify import Candidate, event_blocks, judge, judge_story, record
 
 logger = logging.getLogger(__name__)
 
@@ -231,17 +235,24 @@ async def find_event(
         if match:
             return match
 
+    # Under `confirm` a fuzzy tier's match is a proposal, not an attach: every
+    # tier runs and the verifier reads them all. Otherwise the first one wins.
+    confirm = get_settings().prism_event_verify == "confirm"
+    proposals: list[Match] = []
+
     match = await _match_by_title(session, title, published_at)
-    if match:
+    if match and not confirm:
         return match
+    proposals += [match] if match else []
 
     # Cross-language, on the one field every article now carries in one
     # voice: the extractor's English headline against the events' Prism
     # headlines. Off until its threshold is set from labels.
     if english_title and get_settings().prism_headline_tier_threshold > 0:
         match = await _match_by_headline(session, english_title, published_at)
-        if match:
+        if match and not confirm:
             return match
+        proposals += [match] if match else []
 
     # Distance alone is only evidence where the model's subspace for this script
     # isn't collapsed (see EMBEDDING_TRUSTED_SCRIPTS). Where it is, skipping
@@ -259,8 +270,9 @@ async def find_event(
 
     if embedding is not None and trusted:
         match = await _match_by_embedding(session, embedding, published_at)
-        if match:
+        if match and not confirm:
             return match
+        proposals += [match] if match else []
 
     # Cross-language / same-story: same key actors + a looser embedding band.
     if entity_slugs and embedding is not None:
@@ -276,8 +288,12 @@ async def find_event(
             allow_single_actor=trusted,
             title=title,
         )
-        if match:
+        if match and not confirm:
             return match
+        proposals += [match] if match else []
+
+    if confirm:
+        return await _verified(session, proposals, gist, verify_block, published_at, article_id)
 
     # Last: the verified tier, for an article every tier above refused. Nearest
     # member articles by gist, then Jev decides (correlation/verify.py).
@@ -554,13 +570,18 @@ async def _match_by_entities(
     result = await session.execute(
         text(
             f"""
-            WITH ent_df AS (
+            -- A folded spelling counts as its canonical actor: the fold moved
+            -- every mention to the canonical and left the variant pointing at it.
+            WITH named AS (
+                SELECT DISTINCT COALESCE(v.merged_into, v.id) AS id FROM entities v WHERE v.slug = ANY(:slugs)
+            ),
+            ent_df AS (
                 SELECT ent.id, count(DISTINCT ee.event_id)::float AS df
-                FROM entities ent
+                FROM named n
+                JOIN entities ent ON ent.id = n.id
                 JOIN event_entities ee ON ee.entity_id = ent.id
                 JOIN events ev ON ev.id = ee.event_id
-                WHERE ent.slug = ANY(:slugs)
-                  AND ent.entity_type = ANY(:types)
+                WHERE ent.entity_type = ANY(:types)
                   AND (CAST(:published_at AS timestamptz) IS NULL
                        OR ev.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
                 GROUP BY ent.id
@@ -722,23 +743,28 @@ async def _match_by_embedding(
 GIST_CANDIDATES = 5
 
 
-async def _match_by_gist_verified(
-    session: AsyncSession, gist: list[float], block: str, published_at, article_id: uuid.UUID
-) -> Match | None:
-    """The in-window events whose nearest member article's gist is within the
-    candidate floor, up to five, judged in one Jev call against each event's
-    founding headline and summary. `shadow` asks and records but never attaches.
+async def _gist_candidates(
+    session: AsyncSession, gist: list[float], published_at, *, among: list[uuid.UUID] | None = None,
+) -> list[Candidate]:
+    """In-window events by their nearest member article's gist: the nearest
+    GIST_CANDIDATES inside the candidate floor or, given `among`, those events'
+    own distances whatever they are.
 
     Candidates come from MEMBER articles, not a per-event average: an average
     drifts toward whatever a wrong merge brought in and then draws more of it —
-    the feedback loop that grew one Kannada event to 139 articles. The judge
-    reads the founder's text, which never moves."""
-    settings = get_settings()
-    mode = settings.prism_event_verify
-    max_dist = _scale().get("gist_candidate")
-    if mode not in ("shadow", "live") or max_dist is None:
-        return None
-    vector_literal = "[" + ",".join(f"{v:.6f}" for v in gist) + "]"
+    the feedback loop that grew one Kannada event to 139 articles."""
+    params: dict = {"vec": "[" + ",".join(f"{v:.6f}" for v in gist) + "]"}
+    if among is not None:
+        scope, keep, limit = "e.id = ANY(CAST(:among AS uuid[]))", "", ""
+        params["among"] = [str(i) for i in among]
+    else:
+        max_dist = _scale().get("gist_candidate")
+        if max_dist is None:
+            return []
+        scope = (f"(CAST(:published_at AS timestamptz) IS NULL OR e.last_updated_at >= "
+                 f"CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')")
+        keep, limit = "HAVING min(a.gist_embedding <=> CAST(:vec AS vector)) <= :max_dist", "LIMIT :k"
+        params |= {"published_at": published_at, "max_dist": max_dist, "k": GIST_CANDIDATES}
     rows = (
         await session.execute(
             text(
@@ -747,21 +773,80 @@ async def _match_by_gist_verified(
                 FROM events e
                 JOIN event_memberships m ON m.event_id = e.id
                 JOIN articles a ON a.id = m.article_id
-                WHERE a.gist_embedding IS NOT NULL
-                  AND (CAST(:published_at AS timestamptz) IS NULL
-                       OR e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')
+                WHERE a.gist_embedding IS NOT NULL AND {scope}
                 GROUP BY m.event_id
-                HAVING min(a.gist_embedding <=> CAST(:vec AS vector)) <= :max_dist
+                {keep}
                 ORDER BY dist, m.event_id
-                LIMIT :k
+                {limit}
                 """
             ),
-            {"vec": vector_literal, "published_at": published_at, "max_dist": max_dist, "k": GIST_CANDIDATES},
+            params,
         )
     ).all()
-    if not rows:
+    return [Candidate(event_id=r.event_id, distance=float(r.dist)) for r in rows]
+
+
+# The proposals that still attach when Jev cannot answer.
+UNJUDGED_FALLBACK = frozenset({"title_time", "headline_xlang"})
+
+
+async def _verified(
+    session: AsyncSession, proposals: list[Match], gist: list[float] | None, block: str | None,
+    published_at, article_id: uuid.UUID | None,
+) -> Match | None:
+    """Mode `confirm`: the fuzzy tiers' proposals and the gist candidates, judged
+    in one Jev call on the same happening AND on being a later development
+    (correlation/verify.SAME_STORY). An attach needs Jev's word; a proposal it
+    refuses leaves the article to found its own record, and the follow-up answer
+    stays in event_match_verdicts for the consumer to link (_link_follow_up).
+
+    When Jev cannot answer (an outage, a timeout, no text to judge), a title
+    proposal attaches as it did before this mode (92% the same happening) — a
+    missed judgement must not turn every retelling into a duplicate record —
+    but the embedding and entity tiers' (76%, 44%) do not: a new record is the
+    cheaper mistake, and the record merge folds it later."""
+    first = next((p for p in proposals if p.match_type in UNJUDGED_FALLBACK), None)
+    if not block or article_id is None:
+        return first
+    proposed = list(dict.fromkeys(p.event_id for p in proposals))
+    near = await _gist_candidates(session, gist, published_at) if gist is not None else []
+    known = {c.event_id: c for c in near}
+    if gist is not None and proposed:
+        known |= {c.event_id: c for c in await _gist_candidates(session, gist, published_at, among=proposed)}
+    candidates = [known.get(e, Candidate(event_id=e, distance=None)) for e in proposed]
+    candidates += [c for c in near if c.event_id not in set(proposed)]
+    if not candidates:
         return None
-    candidates = [Candidate(event_id=r.event_id, distance=float(r.dist)) for r in rows]
+    blocks = await event_blocks(session, [c.event_id for c in candidates])
+    try:
+        verdicts, model, _ = await judge_story(article_id=article_id, block=block, candidates=candidates, blocks=blocks)
+    except Exception as exc:  # noqa: BLE001 — see the docstring: the old tiers' answer stands
+        logger.warning("event_confirm_failed article=%s error=%s", article_id, str(exc)[:160])
+        return first
+    await record(session, article_id=article_id, scored=verdicts, model=model, mode="confirm")
+    if not verdicts:
+        return first
+    best = max(verdicts, key=lambda v: v.same)
+    if best.same < get_settings().prism_event_verify_min:
+        return None
+    tier = next((p.match_type for p in proposals if p.event_id == best.candidate.event_id), "verified")
+    return Match(event_id=best.candidate.event_id, match_type=tier, match_score=best.same)
+
+
+async def _match_by_gist_verified(
+    session: AsyncSession, gist: list[float], block: str, published_at, article_id: uuid.UUID
+) -> Match | None:
+    """The in-window events whose nearest member article's gist is within the
+    candidate floor, up to five, judged in one Jev call against each event's
+    founding headline and summary. `shadow` asks and records but never attaches.
+    The judge reads the founder's text, which never moves."""
+    settings = get_settings()
+    mode = settings.prism_event_verify
+    if mode not in ("shadow", "live"):
+        return None
+    candidates = await _gist_candidates(session, gist, published_at)
+    if not candidates:
+        return None
     blocks = await event_blocks(session, [c.event_id for c in candidates])
     # Only the network call falls back. A database error inside this try would
     # be swallowed as "no match" with the transaction already aborted, and the

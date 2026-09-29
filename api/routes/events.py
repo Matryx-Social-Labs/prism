@@ -28,6 +28,8 @@ from api.schemas import (
     ClipShow,
     EntityOut,
     EventDetail,
+    FollowUpRef,
+    FollowUps,
     ImpactOut,
     PerspectiveOut,
     QuestionsResponse,
@@ -421,6 +423,39 @@ def quote_aliases(sources: list[dict], groups: list[SpeakerClaims]) -> dict[str,
     return out
 
 
+# Per side, the most a record page lists: a story runs longer, and its page is
+# /trending/{slug}.
+FOLLOW_UPS_MAX = 5
+
+
+async def follow_ups(db: AsyncSession, event_id: uuid.UUID) -> FollowUps:
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT side, e.id, e.title, e.first_seen_at, (e.projection->>'source_count')::int AS source_count
+                FROM (
+                    SELECT 'earlier' AS side, from_event_id AS other FROM event_links
+                    WHERE to_event_id = :eid AND relation = 'leads_to' AND method = 'verified'
+                    UNION ALL
+                    SELECT 'later', to_event_id FROM event_links
+                    WHERE from_event_id = :eid AND relation = 'leads_to' AND method = 'verified'
+                ) l
+                JOIN events e ON e.id = l.other AND e.merged_into IS NULL
+                ORDER BY e.first_seen_at, e.id
+                """
+            ),
+            {"eid": str(event_id)},
+        )
+    ).mappings().all()
+    side: dict[str, list[FollowUpRef]] = {"earlier": [], "later": []}
+    for r in rows:
+        side[r["side"]].append(FollowUpRef(id=str(r["id"]), title=r["title"],
+                                           first_seen_at=r["first_seen_at"].isoformat(), source_count=r["source_count"]))
+    # The nearest earlier ones and the latest later ones — a founding record
+    # collects many follow-ups, and the newest is what a reader came for.
+    return FollowUps(**{k: v[-FOLLOW_UPS_MAX:] for k, v in side.items()})
+
 @router.get("/api/v1/events/{event_id}", response_model=EventDetail)
 async def get_event(
     event_id: uuid.UUID,
@@ -606,6 +641,7 @@ async def get_event(
             for e in entities
         ],
         story_slug=story["slug"] if story else None,
+        follow_ups=await follow_ups(db, event_id),
         monitored_outlets=mon.outlets,
         corrections=await corrections_for(db, event_id),
         monitored_checked_at=mon.checked_at,

@@ -569,3 +569,40 @@ async def test_an_actor_inherited_from_one_absorbed_article_does_not_widen_the_g
             await s.execute(text("DELETE FROM entities WHERE id = ANY(:i)"),
                             {"i": [str(e) for e, _ in core + stray]})
             await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})
+
+
+async def test_a_folded_spelling_still_counts_as_its_actor():
+    """REGRESSION 2026-09-29: link_entities --fold points a variant ("jp-nadda")
+    at its canonical entity and moves every mention to the canonical, but the
+    entity tier looked slugs up without following merged_into — an article
+    naming the variant brought no evidence for that actor at all."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    eid, tag = uuid.uuid4(), uuid.uuid4().hex[:6]
+    canon, other, variant = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    try:
+        async with session_scope() as s:
+            await s.execute(
+                text("INSERT INTO events (id, title, sector, regions, last_updated_at, embedding) "
+                     "VALUES (:i, 'Nadda meets Wangchuk', 'politics', ARRAY['IN'], now(), CAST(:v AS vector))"),
+                {"i": str(eid), "v": _vec(V)},
+            )
+            for ent_id, slug in ((canon, f"jagat-prakash-nadda-{tag}"), (other, f"wangchuk-{tag}")):
+                await s.execute(text("INSERT INTO entities (id, slug, name, entity_type) VALUES (:i, :s, :s, 'person')"),
+                                {"i": str(ent_id), "s": slug})
+                await s.execute(text("INSERT INTO event_entities (id, event_id, entity_id, role) VALUES (:i, :e, :n, 'subject')"),
+                                {"i": str(uuid.uuid4()), "e": str(eid), "n": str(ent_id)})
+            await s.execute(text("INSERT INTO entities (id, slug, name, entity_type, merged_into) "
+                                 "VALUES (:i, :s, :s, 'person', :c)"),
+                            {"i": str(variant), "s": f"jp-nadda-{tag}", "c": str(canon)})
+            await _attach_article(s, eid, [canon, other])
+        async with session_scope() as s:
+            m = await find_event(s, cve_ids=[], url=None, title="बिलकुल अलग शीर्षक", published_at=None,
+                                 embedding=V_MODERATE, entity_slugs=[f"jp-nadda-{tag}", f"wangchuk-{tag}"])
+        assert m is not None and m.event_id == eid and m.match_type == "entity_overlap"
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_entities WHERE event_id = :e"), {"e": str(eid)})
+            await _purge_events(s, [eid])
+            await s.execute(text("DELETE FROM entities WHERE id = ANY(:ids)"), {"ids": [str(variant), str(canon), str(other)]})
+            await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(eid)})

@@ -260,7 +260,38 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
     )
 
     await _upsert_entities(session, event.id, shared.get("entities") or [], article_id)
+    if is_new_event:
+        await _link_follow_up(session, article_id, event.id)
     return event.id, is_new_event
+
+
+async def _link_follow_up(session, article_id: uuid.UUID, event_id: uuid.UUID) -> None:
+    """A new record for a later development of an existing one is linked to it:
+    the earlier record `leads_to` this one. Only on Jev's word (the follow-up
+    answer kept by clustering._verified, mode `confirm`), at the floor, strongest
+    first — never on shared actors or topic alone. The record page reads these
+    as "Earlier / Later in this story"."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT event_id, story_noul FROM event_match_verdicts "
+                "WHERE article_id = :a AND mode = 'confirm' AND story_noul >= :floor AND event_id <> :e "
+                "ORDER BY story_noul DESC, event_id LIMIT 1"
+            ),
+            {"a": str(article_id), "floor": get_settings().prism_follow_up_min, "e": str(event_id)},
+        )
+    ).first()
+    if row is None:
+        return
+    await session.flush()  # the new record's row, which the link references
+    await session.execute(
+        text(
+            "INSERT INTO event_links (id, from_event_id, to_event_id, relation, confidence, method) "
+            "VALUES (:i, :f, :t, 'leads_to', :c, 'verified') "
+            "ON CONFLICT ON CONSTRAINT uq_event_links_pair DO NOTHING"
+        ),
+        {"i": str(uuid.uuid4()), "f": str(row.event_id), "t": str(event_id), "c": float(row.story_noul)},
+    )
 
 
 # ── Deferred analysis: real-time attach above, debounced LLM analysis here ──
@@ -456,7 +487,11 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None, *, touch: bool 
                     -- summaries[0] is the event summary, so an unstable sort
                     -- silently swaps in a later member's and reintroduces the
                     -- headline/summary mismatch #135 fixed.
-                    ORDER BY em.created_at, ri.published_at NULLS LAST, a.id
+                    -- The record's own founder first, whenever it was written: a merge
+                    -- moves the absorbed record's members in with their OLD created_at,
+                    -- and 144 of 878 merged records took the absorbed founder's summary
+                    -- under their own headline (2026-09-29). Only the founder is 'new_event'.
+                    ORDER BY (em.match_type = 'new_event') DESC, em.created_at, ri.published_at NULLS LAST, a.id
                     """
                 ),
                 {"eid": str(event_id)},
@@ -700,7 +735,7 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
                     -- summaries[0] is the event summary, so an unstable sort
                     -- silently swaps in a later member's and reintroduces the
                     -- headline/summary mismatch #135 fixed.
-                    ORDER BY em.created_at, ri.published_at NULLS LAST, a.id
+                    ORDER BY (em.match_type = 'new_event') DESC, em.created_at, ri.published_at NULLS LAST, a.id
                     """
                 ),
                 {"eid": str(event_id)},

@@ -240,6 +240,56 @@ Design decisions and why:
 | 6 s ceiling; any failure founds a new event | Jev runs under correlation's advisory lock; an outage must cost a missed merge, never a stalled pipeline |
 | The question names the traps literally | Jev is literal: "different figures" (Mushtaq Khan's age was reported as 56, 67, 75 and 76), "another instance of a recurring kind" (co-ops, Lok Adalats) |
 
+## Confirm mode: every fuzzy attach verified (0.0.118.0)
+
+`PRISM_EVENT_VERIFY=confirm` (`correlation/clustering._verified`). The exact tiers
+(`cve_id`, `url_exact`) still attach on their own. The title, headline, embedding and
+entity tiers only **propose**: every tier runs, their events join the gist candidates,
+and one Jev call asks, per candidate, *the same happening?* and *a later development of
+it?* (`verify.SAME_STORY`).
+
+| Jev's answer | What happens |
+|---|---|
+| same happening ≥ 0.85 | attach (`match_type` = the tier that proposed it, or `verified`) |
+| below that, later development ≥ `PRISM_FOLLOW_UP_MIN` (0.85) | the article founds its own record, and the earlier record `leads_to` it (`event_links.method = 'verified'`); the record page lists it under "Earlier and later" |
+| neither | a new record |
+| Jev failed, timed out, or there is no text to judge | a **title** proposal attaches as before (92%); an embedding or entity proposal (76%, 44%) does not — a new record is the cheaper mistake, and the record merge folds it later |
+
+**Why.** Scored by Jev's own same-happening test on 781 production attaches
+(2026-09-24..28): the verified tier 100%, title 92%, embedding 76%, **entity_overlap
+44%** (28% clearly different). entity_overlap carried 19% of all attaches and 56% of the
+records shown as covered by two or more outlets. Its errors were mostly follow-ups (the
+parents' hunger strike attached to the student's death, 67 articles in one record) and
+sometimes unrelated (one cricketer's milestone into another's century). Founder decision
+1A (2026-09-29): **a record is one happening**; follow-ups are separate records linked
+as later developments, until the story layer is verified.
+
+**The follow-up question**, measured on 60 attaches Jev judged not the same happening:
+every pair at ≥ 0.85 read as a real follow-up (a Supreme Court ruling upholding a High
+Court's, a player declared fit after the injury, the accused produced in court); below
+0.5 they were different matters (another meeting, another semifinal).
+
+**The backlog** (`tools/repair_attaches`): the same two questions for every fuzzy
+membership in a window; a dry run writes a CSV and changes nothing; `--apply` moves the
+ones under `--detach-below` through the live path (they join the record they do report,
+or found their own, linked when Jev says so), at the time they first arrived, and
+rebuilds what they left without moving it up the feed. Dry run, 7 days to 2026-09-28,
+4,217 attaches:
+
+| tier | same (≥ 0.85) | likely same (0.5–0.85) | likely different (0.15–0.5) | different (< 0.15) |
+|---|---|---|---|---|
+| title_time | 255 | 58 | 16 | 21 |
+| embedding | 407 | 260 | 150 | 64 |
+| entity_overlap | 677 | 669 | 889 | 751 |
+
+At `--detach-below 0.5`, 1,891 would move, 452 of them linked as follow-ups.
+
+**The human check** (`tools/gold_attaches`): Jev scored the old tiers and Jev replaced
+them, so the numbers above are not independent. 300 article-vs-record pairs, stratified
+by tier and band, blind, two labellers with 100 in common; `--score` gives agreement,
+the verifier's precision and recall at 0.5 / 0.7 / 0.85, the follow-up links' precision,
+and the old tiers' true share reweighted to the window.
+
 ## Cost and latency
 
 | | Measured |
@@ -265,10 +315,13 @@ For scale, extraction is the dominant spend (`docs/ML-EVALUATION.md`).
 4. **Shadow for ≥ 3 days** (`PRISM_EVENT_VERIFY=shadow` on the worker): every
    would-be attachment is recorded (`event_match_verdicts.mode = 'shadow'`,
    log line `event_verify_shadow`). A founder reads 50 sampled would-be merges.
-5. **Live.** Watch: share of articles founding new events (baseline ~75%),
-   single-article events (85%), the weekly copy rate (`tools/audit_event_dups`,
-   10.1% at 0.85), `event_verify_failed` rate, correlation lock time.
-6. **Then** repair the backlog (open work below) — after the live tier is verified.
+5. **Live** — since 2026-09-27 17:12 UTC. Watch: share of articles founding new events
+   (baseline ~75%), single-article events (85%), the weekly copy rate
+   (`tools/audit_event_dups`, 10.1% at 0.85 on 09-25, **1.4% on 2026-09-29** after the
+   09-27 record merge), `event_verify_failed` rate, correlation lock time.
+6. **Confirm** (0.0.118.0): `PRISM_EVENT_VERIFY=confirm`, then `tools/repair_attaches`
+   (dry run, founder review, `--apply --limit 50` canary, the rest), then the labels
+   (`tools/gold_attaches`). Back to `live` restores the old tiers exactly.
 
 ## Datasets
 
@@ -290,6 +343,15 @@ uv run python -m tools.score_cascade --models intfloat/multilingual-e5-base --do
 
 # Compile a finished label batch into pairs
 uv run python -m tools.gold_crosslingual --compile <KEY>
+
+# Confirm mode, replayed: the fuzzy tiers only propose
+uv run python -m tools.score_cascade --models intfloat/multilingual-e5-base --doc-prefix query \
+    --sets gold,batch3,silver --verify 0.85 --confirm
+
+# Re-judge the fuzzy tiers' attaches (dry run: a CSV, nothing moved), then the human check
+DATABASE_URL=<prod> uv run python -m tools.repair_attaches --days 7
+uv run python -m tools.gold_attaches --sample 300 --days 7
+uv run python -m tools.gold_attaches --score A.csv B.csv --key .context/label_attaches_<ts>.key.json
 ```
 
 Rules that have held in this code (see the comments in `correlation/clustering.py`):

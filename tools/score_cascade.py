@@ -41,6 +41,7 @@ TITLE_TIER: list[str] = ["trigram"]
 DOC_PREFIX: list[str] = ["passage"]
 # The verified tier's attach floor; 0 = off, as in production until it ships.
 VERIFY: list[float] = [0.0]
+CONFIRM: list[bool] = [False]  # --confirm: PRISM_EVENT_VERIFY=confirm, the fuzzy tiers only propose
 # Which labelled pairs are replayed and scored: gold (July, gold_pairs), batch3
 # (cross-language, September) and silver (same-language, September, unratified —
 # tools/gold_same_happening).
@@ -225,7 +226,7 @@ async def run(models: list[str], limit: int | None) -> None:
             from common.embeddings import _get_model, _needs_prefix, embed_texts_sync
 
             os.environ["PRISM_HEADLINE_TIER_THRESHOLD"] = str(HEADLINE_TIER[0])
-            os.environ["PRISM_EVENT_VERIFY"] = "live" if VERIFY[0] else "off"
+            os.environ["PRISM_EVENT_VERIFY"] = ("confirm" if CONFIRM[0] else "live") if VERIFY[0] else "off"
             os.environ["PRISM_EVENT_VERIFY_MIN"] = str(VERIFY[0] or 0.85)
             get_settings.cache_clear()
             _get_model.cache_clear()
@@ -263,7 +264,7 @@ async def run(models: list[str], limit: int | None) -> None:
 
                 gists = await _gists(prod, targets)
                 ver.decide = _cached_decide()
-                print(f"  verified tier: live at {VERIFY[0]} ({len(gists)} gists)")
+                print(f"  verified tier: {'confirm' if CONFIRM[0] else 'live'} at {VERIFY[0]} ({len(gists)} gists)")
 
             local = await asyncpg.connect(local_url, timeout=120)
             try:
@@ -291,7 +292,7 @@ async def run(models: list[str], limit: int | None) -> None:
             # Dumped so a re-score costs nothing. The replay is the expensive part
             # and its OUTPUT is just a placement map; re-running it to ask a second
             # question of the same run is pure waste.
-            dump = Path(f".cache/cascade_placements_{TITLE_TIER[0]}_hl{HEADLINE_TIER[0]}_v{VERIFY[0]}_{'+'.join(SETS)}.json")
+            dump = Path(f".cache/cascade_placements_{TITLE_TIER[0]}_hl{HEADLINE_TIER[0]}_v{VERIFY[0]}{'c' if CONFIRM[0] else ''}_{'+'.join(SETS)}.json")
             dump.parent.mkdir(parents=True, exist_ok=True)
             dump.write_text(json.dumps(placed_all))
 
@@ -327,10 +328,15 @@ def main() -> None:
     ap.add_argument("--verify", type=float, default=0.0,
                     help="attach floor for the verified tier (correlation/verify.py); 0 = off. "
                          "Jev answers are cached in .cache/verify_replay.json")
+    ap.add_argument("--confirm", action="store_true",
+                    help="with --verify: the fuzzy tiers only propose and Jev decides every attach (mode confirm)")
     ap.add_argument("--sets", default="gold",
                     help="comma-separated: gold (July), batch3 (cross-language, Sept), silver (same-language, Sept)")
     a = ap.parse_args()
     VERIFY[0] = a.verify
+    CONFIRM[0] = a.confirm
+    if a.confirm and not a.verify:
+        ap.error("--confirm needs --verify (the attach floor)")
     SETS[:] = [x.strip() for x in a.sets.split(",")]
     HEADLINE_TIER[0] = a.headline_tier
     TITLE_GATE[0] = a.title_gate

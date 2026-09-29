@@ -1412,10 +1412,10 @@ bug that was fixed, and `tests/test_distance_scale.py` guards it.
 
 Still open:
 
-- **The verified tier is off by default** (`prism_event_verify`). Every §3.3 number is
-  measured, not yet live: the rollout is backfill → replay → shadow ≥ 3 days → live
-  (`docs/CANONICALIZATION.md`). Check the deployed value before assuming production
-  traffic is attached by it.
+- **The verified tier is live in production since 2026-09-27** (`prism_event_verify`,
+  code default `off`), and from 0.0.118.0 runs in mode `confirm`: the title, embedding
+  and entity tiers only propose and Jev decides every attach (`docs/CANONICALIZATION.md`,
+  "Confirm mode"). Check the deployed value before assuming which mode attached a row.
 - **Two Leiden resolution constants coexist** (`LEIDEN_RESOLUTION = 0.020` for v1
   entity-only edges, `LEIDEN_RESOLUTION_V2 = 0.05`, the v2 default).
   `persist_veto_overlay` records the overlay run's `resolution` stats column with the v1

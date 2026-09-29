@@ -102,8 +102,14 @@ class Skip:
     reason: str
 
 
+# The merge floor, apart from the live attach floor (prism_event_verify_min):
+# the 2026-09-27 merge ran at 0.87 by setting PRISM_EVENT_VERIFY_MIN, which would
+# have raised the live tier's floor too. tools/merge_duplicates --min sets this.
+MERGE_MIN: float | None = None
+
+
 def _floor() -> float:
-    return get_settings().prism_event_verify_min
+    return MERGE_MIN if MERGE_MIN is not None else get_settings().prism_event_verify_min
 
 
 async def _uncovered(session: AsyncSession, pairs: list[tuple[uuid.UUID, uuid.UUID]]) -> dict[uuid.UUID, list[str]]:

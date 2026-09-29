@@ -1251,7 +1251,7 @@ defaults above are not the whole story:
 | `PRISM_PODCASTS_ENABLED` | `true` | — |
 | `PRISM_X_ENABLED` | `true` | — |
 | `PRISM_QUOTE_VERDICTS` | `true` | — |
-| `PRISM_EVENT_VERIFY` (verified matching tier) | `off` until shadowed — see `docs/CANONICALIZATION.md` | `off` |
+| `PRISM_EVENT_VERIFY` (verified matching tier) | `live` since 2026-09-27; `confirm` from 0.0.118.0 — see `docs/CANONICALIZATION.md` | `off` |
 | `PRISM_MODEL_EXTRACT` / `_EXTRACT_LIGHT` / `_GATE` / `_CLASSIFY` | `google/gemini-3.1-flash-lite` | — |
 | `PRISM_MODEL_CORRELATE` | `z-ai/glm-5.3-flash` | — |
 | `PRISM_MODEL_JUDGE` | `google/gemini-3.5-flash` | — |

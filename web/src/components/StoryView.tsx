@@ -31,6 +31,7 @@ import { ArrivalNote, ReaderQuestion } from "@/components/story/ReaderPrompts";
 import { RecordHistory } from "@/components/RecordHistory";
 import { StoryRoute } from "@/components/StoryRoute";
 import { RelatedRoutes } from "@/components/RelatedRoutes";
+import { FollowUps } from "@/components/FollowUps";
 import { Said } from "@/components/Said";
 import { Clips } from "@/components/Clips";
 import { X_POSTS, XPosts } from "@/components/XPosts";
@@ -690,6 +691,9 @@ export function StoryView({ event, trail, hubs }: { event: EventDetail; trail?: 
 
           {/* One question at most, once the reader has scrolled past the coverage (06 §2.1, §2.3). */}
           <ReaderQuestion key={`ask-${event.id}`} />
+
+          {/* ── Earlier and later: other records linked to this one as developments ── */}
+          <FollowUps followUps={event.follow_ups} className={sec} />
 
           {/* ── Related stories: different stories that touch this one ── */}
           {(routeStory?.related?.length ?? 0) > 0 && (
