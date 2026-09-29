@@ -1,13 +1,12 @@
-"""Full-text retrieval — direct fetch tier only for the prototype.
-
-CVE-feed and RSS bodies are used as-is (tier "body"); news URLs are
-fetched and cleaned with trafilatura (tier "direct"). Proxy/archive
-fallback tiers are deferred.
+"""Full-text retrieval: a feed that carries the whole article is used as-is
+(tier "body"); otherwise the page is fetched and cleaned with trafilatura (tier
+"direct"), and the feed's summary is the fallback.
 """
 
 import asyncio
 import html
 import re
+import statistics
 
 import httpx
 import trafilatura
@@ -15,10 +14,19 @@ import trafilatura
 from common.imagehash import refuse_non_public
 from common.logging import get_logger
 from common.text import title_share
+from ingestion.rss import USER_AGENT
 
 logger = get_logger(__name__)
 
 MIN_USEFUL_CHARS = 400
+# A feed body this long is the article; anything shorter is the feed's summary
+# and the page is fetched. The old floor was MIN_USEFUL_CHARS, and a summary
+# clears 400: measured 2026-09-29 over 8 days, ~1,250 articles were enriched
+# from a 400-1,500-character summary without a fetch — Times of India's run
+# 400-460 (66 words) while the worker fetches the same pages at 635-984 words.
+# Feeds that do carry the text (Sambad, Dainik Bhaskar, ET, Entrackr, RBI)
+# average 1,700-4,000.
+FULL_BODY_CHARS = 1500
 
 # A fetched page is the article only if it is about the article's headline.
 # Measured on 24,287 direct-tier articles (production, 30 days to 2026-09-27):
@@ -35,6 +43,31 @@ MIN_TITLE_SHARE = 0.15
 # >= 0.3 — the 3 of ~25 re-files below it fall back to the feed body.
 HEAD_CHARS = 500
 MIN_HEAD_SHARE = 0.3
+
+
+# A page of OTHER stories' headlines. Aaj Tak's short-video pages extract as the
+# story's own headline followed by the next videos' — the off-title guard passes
+# them, since the story's headline is in the list — and 26 of them embedded
+# together into one record of unrelated stories (2026-09-28). The shape:
+# many headline-length lines that almost never end a sentence. Lines under
+# three words ("Advertisement", "Swipe", "Live") are filler and not counted, so
+# the rule does not depend on them. Measured on 25,287 production pages (30
+# days): it flags all 72 short-video pages and 10 others (live blogs, a trains
+# list, appointment lists), none of them an ordinary story.
+HEADLINE_LIST_MIN_LINES = 12
+HEADLINE_LIST_MIN_LINE_WORDS = 3
+HEADLINE_LIST_WORDS = (6, 16)  # median words per line
+HEADLINE_LIST_MAX_ENDED = 0.1  # share of lines that end a sentence
+_SENTENCE_END = re.compile(r"[.।॥:;\"”’)]\s*$")
+
+
+def is_headline_list(text: str) -> bool:
+    lines = [ln.strip() for ln in text.splitlines() if len(ln.split()) >= HEADLINE_LIST_MIN_LINE_WORDS]
+    if len(lines) < HEADLINE_LIST_MIN_LINES:
+        return False
+    low, high = HEADLINE_LIST_WORDS
+    ended = sum(bool(_SENTENCE_END.search(ln)) for ln in lines) / len(lines)
+    return low <= statistics.median(len(ln.split()) for ln in lines) <= high and ended <= HEADLINE_LIST_MAX_ENDED
 
 
 def off_title(title: str | None, text: str) -> float | None:
@@ -96,7 +129,7 @@ async def retrieve_fulltext(
     body: the wrong text is worse than a short one, because it is what the
     extractor summarises and what the matcher embeds.
     """
-    if body and len(body) >= MIN_USEFUL_CHARS:
+    if body and len(body) >= FULL_BODY_CHARS:
         return body, "body", None
 
     if url:
@@ -107,7 +140,7 @@ async def retrieve_fulltext(
             async with httpx.AsyncClient(
                 timeout=30,
                 follow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; prism-prototype/0.1)"},
+                headers={"User-Agent": USER_AGENT},
                 event_hooks={"request": [refuse_non_public]},
             ) as client:
                 response = await client.get(url)
@@ -132,7 +165,15 @@ async def retrieve_fulltext(
             if share is not None:
                 logger.info("fulltext_rejected", reason="off_title", url=url, title_share=round(share, 2))
                 extracted = None
-            if extracted and (len(extracted) >= MIN_USEFUL_CHARS or not body):
+            if extracted and body and is_headline_list(extracted):
+                # Only with a summary to fall back to: a real list article
+                # (appointments, an award list) with no summary is still more
+                # than nothing.
+                logger.info("fulltext_rejected", reason="headline_list", url=url)
+                extracted = None
+            # A page shorter than the feed's own summary is a teaser or a failed
+            # extraction, not the article.
+            if extracted and (not body or len(extracted) >= max(MIN_USEFUL_CHARS, len(body))):
                 return extracted, "direct", image
         except Exception:
             logger.warning("fulltext_fetch_failed", url=url, exc_info=True)

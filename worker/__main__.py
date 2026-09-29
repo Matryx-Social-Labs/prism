@@ -73,7 +73,7 @@ async def _budget_watch() -> None:
 
     while True:
         try:
-            await budget.refresh()
+            await budget.warn_if_low(await budget.refresh())
         except Exception:
             logger.exception("budget_watch_error")
         await asyncio.sleep(BUDGET_INTERVAL_S)

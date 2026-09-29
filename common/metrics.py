@@ -431,7 +431,7 @@ async def supply(db: AsyncSession, w: dict[str, date]) -> dict[str, Any]:
         by_status.setdefault(relevance, {})[d] = n
     # Kept first, then what was filtered out, in a fixed order a chart can colour by.
     status = {k: [by_status.get(k, {}).get(d, 0) for d in _days(w)]
-              for k in ("relevant", "duplicate", "rejected", "pending") if k in by_status}
+              for k in ("relevant", "duplicate", "rejected", "pending", "failed") if k in by_status}
     return {
         "key": "supply", "title": "Supply",
         "rows": [

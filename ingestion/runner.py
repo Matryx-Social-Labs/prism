@@ -2,7 +2,7 @@
 
 from sqlalchemy import select, text
 
-from common import budget, stream
+from common import alerts, budget, stream
 from common.config import get_settings
 from common.db import session_scope
 from common.logging import get_logger
@@ -12,6 +12,14 @@ from ingestion import rss
 from ingestion.seed import seed_sources
 
 logger = get_logger(__name__)
+
+# Dead letters after which requeue_stalled stops re-sending an item: each one
+# was a paid attempt that failed permanently (a refusal, an invalid record).
+MAX_PERMANENT_FAILURES = 3
+# More items than this reaching the count in one pass is not a bad article, it
+# is a broken model or deploy (qwen answered bare numbers for every article on
+# 2026-09-04): nothing is given up, and the founders are told.
+SYSTEMIC_GIVE_UP = 20
 
 
 async def run_all() -> dict[str, int]:
@@ -67,6 +75,9 @@ async def requeue_stalled(limit: int = 500) -> int:
     Scheduled on its own, not inside run_all: recovery that only runs while
     ingestion is enabled is off exactly when a cost brake or an outage has
     stopped the pipeline mid-flight (audit H9).
+
+    An item that dead-lettered MAX_PERMANENT_FAILURES times is given up
+    instead (_given_up): it was paid for each time and would be forever.
     """
     requeued = 0
     async with session_scope() as session:
@@ -112,8 +123,10 @@ async def requeue_stalled(limit: int = 500) -> int:
                     SELECT a.raw_item_id, a.id AS article_id, en.id AS enrichment_id
                     FROM articles a
                     JOIN enrichments en ON en.article_id = a.id
+                    JOIN raw_items ri ON ri.id = a.raw_item_id
                     LEFT JOIN event_memberships m ON m.article_id = a.id
-                    WHERE m.id IS NULL AND en.created_at < now() - interval '20 minutes'
+                    WHERE m.id IS NULL AND ri.relevance <> 'failed'
+                      AND en.created_at < now() - interval '20 minutes'
                     ORDER BY en.created_at
                     LIMIT :limit
                     """
@@ -121,6 +134,11 @@ async def requeue_stalled(limit: int = 500) -> int:
                 {"limit": limit},
             )
         ).mappings().all()
+
+    spent = await _given_up([*pending, *unenriched, *(row["raw_item_id"] for row in uncorrelated)])
+    pending = [i for i in pending if str(i) not in spent]
+    unenriched = [i for i in unenriched if str(i) not in spent]
+    uncorrelated = [row for row in uncorrelated if str(row["raw_item_id"]) not in spent]
 
     for raw_id in pending:
         await stream.publish(stream.RAW_ITEMS, RawItemMessage(raw_item_id=str(raw_id)).model_dump())
@@ -148,3 +166,44 @@ async def requeue_stalled(limit: int = 500) -> int:
             uncorrelated=len(uncorrelated),
         )
     return requeued
+
+
+async def _given_up(raw_ids: list) -> set[str]:
+    """The items that failed permanently MAX_PERMANENT_FAILURES times: marked
+    `failed` so no query picks them up again, and a founder is told. Without the
+    counts (Redis away) nothing is given up — that is no evidence of failure."""
+    try:
+        failures = await stream.permanent_failures([str(i) for i in raw_ids])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("failure_counts_unavailable", error=str(exc)[:160])
+        return set()
+    spent = {i for i, n in failures.items() if n >= MAX_PERMANENT_FAILURES}
+    if not spent:
+        return spent
+    if len(spent) > SYSTEMIC_GIVE_UP:
+        logger.error("requeue_systemic_failure", count=len(spent))
+        await alerts.notify(
+            "requeue-systemic",
+            f"{len(spent)} news items keep failing: the pipeline, not the articles",
+            f"{len(spent)} stalled items have each failed permanently {MAX_PERMANENT_FAILURES}+ times. That many at "
+            "once is a broken model, prompt or deploy, so none were given up and they keep being retried. Read "
+            "`tools/redrive_dead.py --list` for the error.",
+        )
+        return set()
+    async with session_scope() as session:
+        # Only rows still waiting on a stage: one settled in between keeps its state.
+        await session.execute(
+            text("UPDATE raw_items SET relevance = 'failed', rejection_reason = :why, updated_at = now() "
+                 "WHERE id = ANY(CAST(:ids AS uuid[])) AND relevance IN ('pending', 'relevant')"),
+            {"ids": sorted(spent), "why": f"gave up after {MAX_PERMANENT_FAILURES} permanent failures"},
+        )
+    logger.warning("requeue_gave_up", count=len(spent), raw_item_ids=sorted(spent)[:20])
+    await alerts.notify(
+        "requeue-gave-up",
+        f"{len(spent)} news items failed for good",
+        f"{len(spent)} items failed {MAX_PERMANENT_FAILURES} times without a transient cause (a model refusal or an "
+        "invalid record) and are no longer retried: raw_items with relevance 'failed' (the error is in "
+        "`tools/redrive_dead.py --list`). To retry one: `DEL failures:<id>` in Redis, then set its relevance back to "
+        "'pending' (never classified) or 'relevant' (classified, never enriched) — see docs/PIPELINE.md.",
+    )
+    return spent

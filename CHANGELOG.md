@@ -3,6 +3,41 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.117.0] - 2026-09-29
+
+Phase 0 of the data plan (`.claude/plans/data-accuracy-and-sources.plan.md`): what had to be
+true before credit is added and collection resumes.
+
+### Changed — each article's text is the article, not the feed's summary
+- The page is fetched unless the feed carries the whole article (1,500+ characters). A feed
+  summary cleared the old 400-character bar, so ~1,250 articles in 8 days were read from a
+  summary: Times of India's 66 words, while the worker fetches the same pages at 635–984 words.
+  A fetched page shorter than the summary is not kept.
+- A page that is a list of other stories' headlines is refused for the summary. Aaj Tak's
+  short-video pages read that way, and 26 of them had collected into one record of unrelated
+  stories.
+- Feeds and pages are fetched as `Prism/1.0 (+readprism.news)`. Publishers' shared firewall
+  refused the old name because it carried a URL: Business Standard, NDTV Profit and PIB answer
+  now (still off, until the first source wave). Every enabled outlet's pages answer as before.
+
+### Changed — the two largest model lines cost less
+- Extraction's fixed instructions are sent as one message marked for Gemini's cache: all
+  4,380 tokens are read from cache on every call, where about 2,450 were. $0.00046 a call on
+  20 production articles, from $0.00069 on the same articles.
+- Record analysis runs at minimal reasoning on the pinned provider: 9.2 s and $0.00053 a
+  call, from 39.5 s and $0.00166, with every record valid and the briefs as grounded.
+
+### Fixed — failures that cost money or went unseen
+- An article that fails permanently (a model refusal, an invalid record) is retried three
+  times, then marked `failed`. It was re-sent and paid for every ten minutes, forever.
+  Timeouts, quota and outages never count against an item, and more than 20 failing at once
+  is read as a broken model or deploy: nothing is given up and the founders are told.
+- The founders are emailed when collection stops under the LLM budget floor, when less than
+  two days of credit remain (read from today's pace too, so it works right after a pause),
+  and when items are given up. On 2026-09-28 collection stopped for 37 hours and nobody was
+  told. An undelivered alert is tried again on the next pass. Needs `PRISM_ADMIN_EMAILS` on
+  the worker.
+
 ## [0.0.116.0] - 2026-09-29
 
 ### Added — a Marketing page in the admin: tracked links, short links, posts and images

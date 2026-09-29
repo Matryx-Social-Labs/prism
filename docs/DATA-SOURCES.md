@@ -110,6 +110,15 @@ in the language's Unicode block across the first ~8 titles. Paywall check:
 spot-fetched article per outlet, ≥400 chars = pass (`MIN_USEFUL_CHARS` in
 `enrichment/fulltext.py`). All dates below are relative to 2026-09-24.
 
+**The User-Agent was the block (2026-09-29).** A firewall shared by Indian publishers 403s a
+User-Agent that carries a URL (`://`, `www.`), an `@` or "bot". Ours was
+`Prism/1.0 (+https://www.readprism.news)`; it is now `Prism/1.0 (+readprism.news)` for feeds AND
+article pages (`ingestion/rss.USER_AGENT`). From the worker: Business Standard, NDTV Profit and PIB
+went 403 → 200, and the article pages of every enabled feed (2 each, 118) answer exactly as they
+did to the old fetch string. The "403 from Railway" entries below were this rule, not the egress.
+NDTV and ESPNcricinfo article pages still 403 every User-Agent, a browser's included — those
+outlets are read from their feeds' summaries.
+
 | Outlet | Slug | Lang | Feed URL | Items/day (est.) | Newest item | Paywall check | Notes |
 |---|---|---|---|---|---|---|---|
 | The Indian Express | indianexpress | en | indianexpress.com/section/india/feed/ | ~25 | 0.7 h | OK (4232 chars) | broad national+state |

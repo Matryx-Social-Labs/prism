@@ -160,7 +160,10 @@ Local dev can point at this same instance (put the three values in `.env`).
    - **Start command**: `python -m worker`
    - No public domain needed.
 3. **Variables**: same set as `api` (Railway shared variables help here), plus optionally
-   `PRISM_INGEST_INTERVAL_MINUTES` (default `5`).
+   `PRISM_INGEST_INTERVAL_MINUTES` (default `5`). The worker needs `PRISM_ADMIN_EMAILS` and a
+   real `PRISM_EMAIL_PROVIDER` too: it emails the founders when collection stops under the
+   LLM budget floor, when less than two days of credit remain, and when items are given up
+   after repeated permanent failures (`common/alerts.py`, 0.0.117.0).
 
 ### 2.4 Verify
 

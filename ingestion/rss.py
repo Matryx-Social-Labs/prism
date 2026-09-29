@@ -69,9 +69,9 @@ FEEDS: list[FeedSpec] = [
     # Business & Markets — about half of what they started (audit, 2026-09-27).
     FeedSpec("livemint", "https://www.livemint.com/rss/news"),
     FeedSpec("hindu_businessline", "https://www.thehindubusinessline.com/news/feeder/default.rss"),
-    # 403 Forbidden from Railway's egress on every cycle since it was added
-    # (2026-09-24, never one success); it answered from a laptop. Off until a
-    # licensed or allowlisted feed exists.
+    # 403'd every cycle from 2026-09-24: the URL in our User-Agent, not Railway
+    # (fixed 2026-09-29, see USER_AGENT; the worker now gets 200). Stays off
+    # until the first source wave (.claude/plans/data-accuracy-and-sources.plan.md).
     FeedSpec("businessstandard", "https://www.business-standard.com/rss/latest.rss", enabled=False),
     FeedSpec("economictimes", "https://economictimes.indiatimes.com/rssfeedstopstories.cms"),
     # ── India national (single-topic — deterministic, zero LLM) ──
@@ -80,10 +80,10 @@ FEEDS: list[FeedSpec] = [
     # Measured 2026-09-21 with this User-Agent: RBI answers 200, entries are dated
     # and carry the full release in the summary. Deterministic finance sector.
     FeedSpec("rbi", "https://www.rbi.org.in/pressreleases_rss.xml", sector="finance"),
-    # PIB: the edge 403s any User-Agent that carries a URL (ours does; `Foo/1.0
-    # (+example.com)` passes, `Foo/1.0 (+https://example.com)` does not), the
-    # Lang=1 URL redirects to Hindi unless `reg=3` is added, and entries carry no
-    # date and no body. Off until a per-feed UA and a fulltext path are measured.
+    # PIB: the edge 403s any User-Agent that carries a URL (ours no longer does,
+    # 2026-09-29), the Lang=1 URL redirects to Hindi unless `reg=3` is added, and
+    # entries carry no date and no body. Off until the first source wave gives it
+    # a page-fetch path for the date and text.
     FeedSpec("pib", "https://www.pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3&reg=3", enabled=False),
     # SEBI: the feed answers 200 but the release pages 403 this User-Agent, the
     # summaries are 50–200 chars, and the feed is mostly enforcement orders and
@@ -173,8 +173,13 @@ FEEDS: list[FeedSpec] = [
 ]
 
 # Identify honestly and be reachable: the old "prism-prototype/0.1" named no
-# product, offered no contact, and told every publisher we were a toy.
-USER_AGENT = "Prism/1.0 (+https://www.readprism.news)"
+# product, offered no contact, and told every publisher we were a toy. The
+# address goes WITHOUT a scheme: a firewall shared by Indian publishers 403s a
+# User-Agent carrying a URL (`://`, `www.`), an `@` or "bot". Checked from the
+# worker 2026-09-29: Business Standard, NDTV Profit and PIB answer 403 to
+# `(+https://www.readprism.news)` and 200 to this; the article pages of every
+# feed (2 each, 118) answer the same as they did to the old fetch string.
+USER_AGENT = "Prism/1.0 (+readprism.news)"
 
 SPEC_BY_SLUG: dict[str, FeedSpec] = {spec.slug: spec for spec in FEEDS}
 RSS_CONCURRENCY = 8

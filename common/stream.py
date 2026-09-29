@@ -281,8 +281,44 @@ async def _heartbeat(r, topic: str, group: str, consumer_name: str, entry_id) ->
             pass
 
 
+# Dead letters per raw item, for ingestion/runner.requeue_stalled: a payload
+# that keeps failing permanently is given up rather than re-sent (and paid for)
+# every ten minutes. Transient failures never dead-letter, so an outage never
+# counts against an item.
+FAILURES_TTL_S = 14 * 86400
+
+
+def _failure_key(raw_item_id: str) -> str:
+    return f"failures:{raw_item_id}"
+
+
+async def _count_failure(r, fields: dict) -> None:
+    try:
+        raw_item_id = json.loads((fields or {}).get("data") or "{}").get("raw_item_id")
+    except (ValueError, AttributeError):
+        return
+    if not raw_item_id:
+        return
+    try:
+        pipe = r.pipeline(transaction=False)
+        pipe.incr(_failure_key(raw_item_id))
+        pipe.expire(_failure_key(raw_item_id), FAILURES_TTL_S)
+        await pipe.execute()
+    except Exception:  # noqa: BLE001 — a lost count only means one more retry
+        logger.warning("failure_count_failed", raw_item_id=raw_item_id)
+
+
+async def permanent_failures(raw_item_ids: list[str]) -> dict[str, int]:
+    """How many times each of these raw items dead-lettered, for those that did."""
+    if not raw_item_ids:
+        return {}
+    counts = await get_redis().mget([_failure_key(i) for i in raw_item_ids])
+    return {i: int(n) for i, n in zip(raw_item_ids, counts, strict=True) if n}
+
+
 async def _dead_letter(r, topic: str, group: str, entry_id, fields: dict, exc: Exception) -> None:
     """Preserve a permanently failed payload for inspection and replay."""
+    await _count_failure(r, fields)
     deliveries = await _deliveries(r, topic, group, entry_id)
     try:
         await r.xadd(

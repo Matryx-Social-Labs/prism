@@ -20,7 +20,7 @@ from common.config import get_settings
 from common.countries import gdelt_country_to_iso
 from common.db import session_scope
 from common.entities import drop_source_names, source_name_slugs
-from common.llm import structured_chat
+from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
 from common.models import (
     Article,
@@ -761,6 +761,12 @@ async def _analyze_event(event_id: uuid.UUID) -> tuple[bool, bool]:
             output_model=EventAnalysis,
             trace_name="event-analysis",
             max_tokens=6000,
+            # At glm's default reasoning a call wrote 2,567 tokens in 39.5 s for
+            # $0.00166; minimal on the brief providers wrote 661 in 9.2 s for
+            # $0.00053, all valid, briefs as grounded (bake-off, 8 prod records,
+            # 2026-09-29). It was the second-largest line on the bill.
+            reasoning=REASONING_OFF,
+            providers=[p.strip() for p in settings.prism_brief_providers.split(",") if p.strip()] or None,
             metadata={"stage": "correlation", "event_id": str(event_id)},
             langfuse_prompt=prompt if prompt.version else None,
         )
