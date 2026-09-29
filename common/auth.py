@@ -67,7 +67,15 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
     The UPDATE ... WHERE consumed_at IS NULL ... RETURNING makes consumption
     atomic — a token replayed concurrently is spent exactly once.
     """
-    email = (
+    email = await consume_magic_token(session, raw_token)
+    if email is None:
+        return None
+    return await user_for_verified_email(session, email)
+
+
+async def consume_magic_token(session: AsyncSession, raw_token: str) -> str | None:
+    """Spend a magic token once; the email it was issued to, or None."""
+    return (
         await session.execute(
             text(
                 "UPDATE auth_tokens SET consumed_at = now() "
@@ -77,15 +85,16 @@ async def verify_and_consume(session: AsyncSession, raw_token: str) -> UUID | No
             {"h": _hash(raw_token)},
         )
     ).scalar_one_or_none()
-    if email is None:
-        return None
-    return await user_for_verified_email(session, email)
 
 
 async def user_for_verified_email(session: AsyncSession, email: str) -> UUID:
+    return (await account_for_verified_email(session, email))[0]
+
+
+async def account_for_verified_email(session: AsyncSession, email: str) -> tuple[UUID, bool]:
     """The account for an email some identity provider has VERIFIED — a consumed
-    magic link, or a Google ID token with email_verified. Creates it on first
-    sign-in (no unverified/junk rows);
+    magic link, or a Google ID token with email_verified — and whether this call
+    created it. Creates it on first sign-in (no unverified/junk rows);
     a Google sign-in on an address that already has a magic-link account lands
     in the same account, since the verified email is the identity."""
     email = email.strip().lower()
@@ -98,11 +107,10 @@ async def user_for_verified_email(session: AsyncSession, email: str) -> UUID:
             {"e": email},
         )
     ).scalar_one_or_none()
-    if user_id is None:  # existing user
-        user_id = (
-            await session.execute(text("SELECT id FROM users WHERE email = :e"), {"e": email})
-        ).scalar_one()
-    return user_id
+    if user_id is not None:
+        return user_id, True
+    existing = (await session.execute(text("SELECT id FROM users WHERE email = :e"), {"e": email})).scalar_one()
+    return existing, False
 
 
 GOOGLE_TOKENINFO = "https://oauth2.googleapis.com/tokeninfo"

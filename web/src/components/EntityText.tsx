@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { useAsk } from "@/components/AskContext";
 import type { EntityOut, SpeakerClaims } from "@/lib/api";
-import { entityKind, entityRel, markEntities, type Segment } from "@/lib/entities";
+import { entityKind, entityHref, entityRel, markEntities, type Segment } from "@/lib/entities";
 import { saidCount } from "@/lib/quotes";
 
 /**
@@ -57,7 +57,7 @@ export function EntityMark({ label, entity, claims = [] }: { label: string; enti
   const timer = useRef<number | null>(null);
   const said = claims.find((sp) => norm(sp.speaker) === norm(entity.name));
   // The actor's page when the server has one (identity is the server's), else search.
-  const href = entity.slug ? `/entity/${entity.slug}` : `/search?q=${encodeURIComponent(entity.name)}`;
+  const href = entity.slug ? entityHref(entity.slug) : `/search?q=${encodeURIComponent(entity.name)}`;
   const rel = entity.slug ? entityRel(entity) : undefined;
   // The card opens under the mark, nudged left just enough to stay on screen.
   const [dx, setDx] = useState(0);

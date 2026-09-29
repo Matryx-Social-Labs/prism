@@ -27,6 +27,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { CentredBrand } from "@/components/ui";
 import { StatusPill } from "@/components/StatusPill";
 import { ReportProblem } from "@/components/ReportProblem";
+import { ArrivalNote, ReaderQuestion } from "@/components/story/ReaderPrompts";
 import { RecordHistory } from "@/components/RecordHistory";
 import { StoryRoute } from "@/components/StoryRoute";
 import { RelatedRoutes } from "@/components/RelatedRoutes";
@@ -45,10 +46,11 @@ import { Impacts } from "@/components/story/Impacts";
 import { LensBrief, LensLocked, LensSwitch, LensUsed, LensWriting } from "@/components/story/LensBrief";
 import { ReadProgress, SectionRail, SectionTabs, jumpTo, type NavItem } from "@/components/story/StoryNav";
 import { StoryActionBar } from "@/components/story/StoryActionBar";
-import { shortDate } from "@/lib/dateline";
-import { entityRel } from "@/lib/entities";
+import { istTime, shortDate } from "@/lib/dateline";
+import { entityHref, entityRel } from "@/lib/entities";
+import { stateByCode, stateBySlug, stateName } from "@/lib/regions";
 import { subjectTrail, type TrailStep } from "@/lib/sectors";
-import { followRel } from "@/lib/seo";
+import { firstReportedAt, followRel } from "@/lib/seo";
 import { SubjectTrail } from "@/components/reading/parts";
 import { isReported, quoteOutlets, saidCount } from "@/lib/quotes";
 import { sentences } from "@/lib/sentences";
@@ -82,7 +84,12 @@ function outletsOf(event: EventDetail): OutletRef[] {
     .map((s) => ({ slug: s.source_slug, publisher: s.publisher ?? s.source_slug, name: s.source_name, code: s.code!, origin: s.origin!, language: s.language ?? null, domain: s.domain ?? null }));
 }
 
-export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailStep[] }) {
+/**
+ * `hubs`: which state hubs ask to be indexed (code → yes), from the story page;
+ * a region chip links its hub only then, and a state's own name follows it no
+ * further than the hub does (audit 02, P1-1). Absent: region chips stay plain.
+ */
+export function StoryView({ event, trail, hubs }: { event: EventDetail; trail?: TrailStep[]; hubs?: Record<string, boolean> }) {
   // ONE index for [n]: the report list and the citation under every quote read
   // the same map, so the two can never number one article differently.
   const sourceIndex = indexSources(event.sources);
@@ -116,9 +123,22 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
   >(null);
   const [questions, setQuestions] = useState<string[]>([]);
   const [myRegion, setMyRegion] = useState<string | null>(null);
-  // Country codes resolve locally; a state code (IN-KA) needs the regions list,
+  // Country codes and the 33 hub states resolve locally (lib/regions), so their
+  // chips are in the server HTML; any other state code needs the regions list,
   // and until it arrives the code is left out rather than printed raw.
-  const regionLabels = useStateNames(event.regions).filter((r) => !/^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(r)).map((r) => (r.includes("-") ? r : regionName(r)));
+  const stateNames = useStateNames(event.regions);
+  const regionChips = event.regions
+    .map((code, i) => ({ code, label: stateName(code) ?? stateNames[i] ?? code }))
+    .filter((r) => !/^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(r.label))
+    .map((r) => ({ code: r.code, label: r.label.includes("-") ? r.label : regionName(r.label) }));
+  // The cast, with a state's own name as indexable as its hub: its link goes there (lib/entities.entityHref).
+  const cast = useMemo(
+    () => event.entities.map((en) => {
+      const hub = en.slug ? stateBySlug(en.slug) : null;
+      return hub && hubs ? { ...en, indexable: hubs[hub.code] === true } : en;
+    }),
+    [event.entities, hubs],
+  );
   // Did the READER ask for this lens, or did it come back from their profile?
   // The locked-lens guard below has to tell those apart, and `lens` alone can't.
   const readerPicked = useRef(false);
@@ -227,6 +247,7 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
   const boundaryVerified = routeStory?.boundary_status === "verified";
 
   const sourceCount = event.sources.length;
+  const firstReported = firstReportedAt(event);
   // Corroboration is outlets, not reports: one newsroom's five reports are still one source.
   const single = outletCount <= 1;
   // Where the record sits, root first (lib/sectors.subjectTrail; the page passes it labelled).
@@ -305,12 +326,16 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
   const narrationBlocks = useMemo(() => [...briefSentences, ...(lensPointsRaw ?? [])], [briefSentences, lensPointsRaw]);
   const narration = useNarration(narrationBlocks, `${lens}|${brief ?? ""}`);
 
-  // Region labels are places on the chart, not actors with a page; only the
-  // cast links out (audit H29 — these chips used to point at /search, which is
-  // noindex). The slug is the server's: identity is folded there, not here.
+  // A place links its state's hub only when the hub asks to be indexed (audit
+  // 02, P1-1); other places stay plain. The cast links out (audit H29 — these
+  // chips used to point at /search, which is noindex). The slug is the
+  // server's: identity is folded there, not here.
   const namedIn: { label: string; href: string | null; rel?: "nofollow" }[] = [
-    ...regionLabels.map((label) => ({ label, href: null })),
-    ...event.entities.map((en) => ({ label: en.name, href: en.slug ? `/entity/${en.slug}` : null, rel: entityRel(en) })),
+    ...regionChips.map((r) => {
+      const hub = stateByCode(r.code);
+      return { label: r.label, href: hub && hubs?.[r.code] ? `/state/${hub.slug}` : null };
+    }),
+    ...cast.map((en) => ({ label: en.name, href: en.slug ? entityHref(en.slug) : null, rel: entityRel(en) })),
   ].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
   const coverageLine = (
     <>
@@ -432,7 +457,7 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
     ) : brief ? (
       <>
         {lensFacts}
-        <BriefText sentences={briefSentences} points={lensPoints} active={narration.active} meta={meta} pointsHeading={pointsHeading} entities={event.entities} claims={claims} />
+        <BriefText sentences={briefSentences} points={lensPoints} active={narration.active} meta={meta} pointsHeading={pointsHeading} entities={cast} claims={claims} />
         {lens === "reader" && lensPoints.length > 0 && (
           <p className="text-[13px] leading-[1.4]" style={{ color: "var(--ink-3)" }}>The points restate the reports; where one says why it matters, that is Prism&apos;s reading, not a reported fact.</p>
         )}
@@ -488,6 +513,8 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
         <SectionRail items={navItems} />
 
         <article className="flex min-w-0 flex-col lg:max-w-[var(--reading)]">
+          {/* A first visit by a shared link: one line on what this page is (04 P2-3). First on a phone, above the deck. */}
+          <ArrivalNote key={`note-${event.id}`} className="-order-2 mb-3 lg:order-none" />
           {/* ── The header: what happened, how current, how well supported ── */}
           <header>
             <SubjectTrail steps={place} className="mb-2.5 hidden lg:block" />
@@ -500,6 +527,13 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
                 <a href="#history"><StatusPill status="corrected" label={`Corrected ${shortDate(event.corrections![0].created_at)}`} /></a>
               )}
               <span className="p-meta__prov">Updated <Ago iso={event.last_updated_at} /></span>
+              {/* The date the JSON-LD publishes (datePublished), on the newsroom clock. */}
+              {firstReported && (
+                <>
+                  <span className="p-meta__sep" />
+                  <span className="p-meta__prov">First reported {shortDate(firstReported)}, {istTime(firstReported)} IST</span>
+                </>
+              )}
               {subject && (
                 <>
                   <span className="p-meta__sep" />
@@ -515,7 +549,7 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
             </h1>
             <p className="mt-2 text-[13px] font-medium leading-[1.3]" style={{ color: "var(--ink-3)" }}>{headlineByline(event)}</p>
             {event.summary && (
-              <EntityText as="p" text={event.summary} entities={event.entities} claims={claims} className="mt-3" style={{ font: "var(--t-body-l)", color: "var(--ink)", textWrap: "pretty" }} />
+              <EntityText as="p" text={event.summary} entities={cast} claims={claims} className="mt-3" style={{ font: "var(--t-body-l)", color: "var(--ink)", textWrap: "pretty" }} />
             )}
             <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(92px,1fr))] gap-2">
               {stats.map((st, i) => (
@@ -654,11 +688,14 @@ export function StoryView({ event, trail }: { event: EventDetail; trail?: TrailS
             </div>
           </section>
 
+          {/* One question at most, once the reader has scrolled past the coverage (06 §2.1, §2.3). */}
+          <ReaderQuestion key={`ask-${event.id}`} />
+
           {/* ── Related stories: different stories that touch this one ── */}
           {(routeStory?.related?.length ?? 0) > 0 && (
             <section className={sec} aria-labelledby="related-title">
               <Head id="related-title" title="Related stories" hint="Different stories that touch this one, by the cast they share or a causal note across the boundary. Not part of this story." />
-              <div className="mt-2"><RelatedRoutes related={routeStory!.related} /></div>
+              <div className="mt-2"><RelatedRoutes related={routeStory!.related} indexable={boundaryVerified} /></div>
             </section>
           )}
 

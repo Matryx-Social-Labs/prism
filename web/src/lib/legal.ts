@@ -12,6 +12,18 @@ export const LEGAL_ENTITY = "Prism Media Intelligence LLP";
 export const LEGAL_PARTNER = "Matryx Social Labs Private Limited (Matrix Social Labs)";
 export const CONTACT_EMAIL = "hello@readprism.news";
 export const LEGAL_CITY = "Bengaluru, Karnataka";
+/** The registered postal address, printed wherever the officer is once it is known. Never guess it. */
+export const LEGAL_POSTAL_ADDRESS: string | null = null;
+/** The IT Rules' Grievance Officer (founder, 2026-09-29). api/routes/grievances.py
+ *  carries the same name; tests/test_grievances.py fails if they differ. */
+export const GRIEVANCE_OFFICER = {
+  name: "Tejas ShylaShashidhara",
+  designation: "Grievance Officer (Chief Executive Officer)",
+  email: "grievance@readprism.news",
+} as const;
+export const GRIEVANCE_ADDRESS = LEGAL_POSTAL_ADDRESS ?? `${LEGAL_CITY}, India`;
+/** Who decides a complaint and how to reach them, as the policies print it (IT Rules R11(2); DPDP s.8(9)). */
+const OFFICER_LINE = `Complaints about anything on Prism, or about your data, go to our Grievance Officer: ${GRIEVANCE_OFFICER.name}, ${GRIEVANCE_OFFICER.designation}, ${LEGAL_ENTITY}, ${GRIEVANCE_ADDRESS}. Write to ${GRIEVANCE_OFFICER.email} or use the form at readprism.news/grievance. A complaint is acknowledged within 24 hours and decided within 15 days.`;
 export const LEGAL_UPDATED = "2026-09-29";
 
 /** A paragraph, or a bullet list. */
@@ -48,10 +60,12 @@ export const PRIVACY: LegalDoc = {
       short: "No history of what you read; your email and what you tell us once you sign in.",
       blocks: [
         "Reading without an account: we keep no history of what you read, and nothing in our database identifies you. One cookie, prism.returning, tells the front page you have been here before so it can take you straight to the chart. Your browser keeps a few settings on your device (theme, the scope you last chose, the last story you opened) and sends them nowhere.",
-        "How Prism is used, counted without knowing who: we count page views and a handful of actions (opening a lens, asking a question, sharing, each step of subscribing and of setting up your feed, which button on the front page was pressed, switching to For you, and whether a visit went on to a second or a fifth story) as daily totals by kind. A kind of page, never which story; how a question was opened, never the question; the site a visit came from, never the page. To count how many people visited in a day, we hash your IP address and browser with a random value that is replaced every day and deleted within two days; the hash is used only for that day's count, never stored in our database, and cannot be linked to you or to another day. None of this sets a cookie.",
+        "How Prism is used, counted without knowing who: we count page views and a handful of actions (opening a lens, asking a question, sharing, each step of subscribing and of setting up your feed, which button on the front page was pressed, switching to For you, and whether a visit went on to a second or a fifth story, and whether one that came by a shared link went on to a second) as daily totals by kind. We also count, the same way, the campaign word a link to Prism carried (such as ?ref=producthunt, one word from a fixed list, which we then take out of the address), your answer to “Where did you hear about Prism?” and your answer to “Could you check this story for yourself?”: each answer is one choice from a fixed list, never words you type, and is kept only as a daily total, never linked to you or to the story. A kind of page, never which story; how a question was opened, never the question; the site a visit came from, never the page. To count how many people visited in a day, we hash your IP address and browser with a random value that is replaced every day and deleted within two days; the hash is used only for that day's count, never stored in our database, and cannot be linked to you or to another day. None of this sets a cookie.",
         "Asking a question without an account: the question and the answer are stored against a random session id that lives in your browser. To keep the free box open for everyone we count questions per session and per IP address, hashed with a value that changes every day, so the hash cannot be turned back into your address; the counter expires after about a day (26 hours).",
         "An account: signing in sets one cookie, prism_session, that keeps you signed in for 30 days; it is marked so that no script on the page can read it, and signing out deletes it. Your email address, from the sign-in link you click or from Google if you sign in with Google. From Google we receive your email and the fact that Google has verified it, nothing else. At onboarding you may tell us your name, profession, state and reading languages, and we record the time you agreed to the Terms.",
         "What you do with an account: the tickers and sectors on your watchlist; the questions you ask and their answers, linked to your account; the days on which you used Prism while signed in (the date only, never what you read), so we can see how many readers come back; and, once paid plans exist, your plan, its status and the amount. We never see or store card or UPI details, the payment provider holds those.",
+        "The week's record by email, only if you turn it on in your account (it is off until you tick the box): we record the time you turned it on and, if you turn it off, the time you did, as the record of your consent; and the week we last sent it, so it goes once a week. It is sent to your account's email on Sunday morning (IST) and holds the week's records that two or more outlets reported, their counts and the week's corrections; nothing about what you read. To stop it, untick the box on your account page, or use the unsubscribe link in any copy and press its button; either stops it at once, without signing in.",
+        "A complaint to the Grievance Officer: what you write in the form (your email address, your name if you give it, the kind of problem, the page it is about and your words), the reference we give it, when we acknowledged it, and our decision and when we made it. We keep it to answer you and to show, month by month, that complaints were answered in time, as the IT Rules require; it is not used for anything else, and you can ask the Grievance Officer to delete it once it has been decided. To keep the form from being abused we count complaints per connection and acknowledgements per email address each day, as salted hashes that change daily and are never stored in our database.",
         "Technical records: our hosts keep ordinary server logs (IP address, browser, pages requested) for a short period to run and secure the service.",
       ],
     },
@@ -66,7 +80,7 @@ export const PRIVACY: LegalDoc = {
           "To apply fair-use limits on the question box.",
           "To count, in totals, how Prism is used and how many readers come back, so we know what to build.",
           "To bill you for a plan you chose and send its invoices.",
-          "To send you the email you asked for: a sign-in link, and later a daily brief if you opt in.",
+          "To send you the email you asked for: a sign-in link, and the week's record if you turn it on; and, once, when you first create an account, a short note on what it adds and how to delete it.",
         ],
         "We do not sell personal data and we do not use it for advertising. We do not build profiles of you for anyone else.",
       ],
@@ -91,7 +105,7 @@ export const PRIVACY: LegalDoc = {
       heading: "Cookies and device storage",
       short: "One routing cookie and a few settings on your device. No trackers.",
       blocks: [
-        "One cookie, prism.returning, for routing a returning reader. On your device: your session token, your profile, your theme, your last scope and your last opened story; a marker that this tab's visit has already been counted; and, when you are signed in, the date your account was last counted as active, so it is counted once a day. There are no advertising cookies and no cross-site tracking. Usage is counted without cookies, as “What we collect” describes.",
+        "One cookie, prism.returning, for routing a returning reader. On your device: your session token, your profile, your theme, your last scope and your last opened story; a marker that this tab's visit has already been counted; whether you have been asked where you heard about Prism, when you were last asked whether you could check a story (at most once in 14 days), and whether you closed the note shown to readers new to Prism, so none of them comes back sooner than that; and, when you are signed in, the date your account was last counted as active, so it is counted once a day. There are no advertising cookies and no cross-site tracking. Usage is counted without cookies, as “What we collect” describes.",
       ],
     },
     {
@@ -112,7 +126,7 @@ export const PRIVACY: LegalDoc = {
       heading: "Your rights",
       short: "See it, fix it, erase it, take it back — one email.",
       blocks: [
-        `You can ask what we hold about you, have it corrected, have it erased, or withdraw your consent, which closes the account. You can nominate someone to exercise these rights for you. Write to ${CONTACT_EMAIL} from the address on the account; we act within 30 days. If you are not satisfied you may complain to the Data Protection Board of India.`,
+        `You can ask what we hold about you, have it corrected, have it erased, or withdraw your consent, which closes the account. You can nominate someone to exercise these rights for you. Write to ${CONTACT_EMAIL} from the address on the account; we act within 30 days. If you are not satisfied, complain to our Grievance Officer (see Contact below); if you are still not satisfied you may complain to the Data Protection Board of India.`,
       ],
     },
     {
@@ -132,8 +146,8 @@ export const PRIVACY: LegalDoc = {
     },
     {
       heading: "Contact",
-      short: "One address for everything, including grievances.",
-      blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}. The same address reaches our grievance officer. Matters about the engineering of the service reach ${LEGAL_PARTNER} through us.`],
+      short: "Questions to one address; complaints to our Grievance Officer.",
+      blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}. Matters about the engineering of the service reach ${LEGAL_PARTNER} through us.`, OFFICER_LINE],
     },
   ],
 };
@@ -222,8 +236,8 @@ export const TERMS: LegalDoc = {
     },
     {
       heading: "Contact",
-      short: "One address.",
-      blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}`],
+      short: "One address; complaints to our Grievance Officer.",
+      blocks: [`${LEGAL_ENTITY} · ${CONTACT_EMAIL}`, OFFICER_LINE],
     },
   ],
 };

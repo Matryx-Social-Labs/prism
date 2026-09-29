@@ -59,7 +59,7 @@ export function istStamp(iso: string): string {
   return `${two(day)} ${MONTHS[month].toUpperCase()} ${year} ${istTime(iso)} IST`;
 }
 
-const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** The device's zone; "Asia/Kolkata" for a reader in India. */
 export function viewerZone(): string {

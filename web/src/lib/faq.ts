@@ -40,6 +40,11 @@ export const LANDING_FAQ: Faq[] = [
     a: "Most news apps give you a list of headlines or a short summary. Prism gives each story one page with every report it found, the exact words people said, and a count of who covered it out of a public list, so you can check the story for yourself.",
   },
   {
+    // app/manifest.ts: installable (display standalone), start_url /feed, which is Today.
+    q: "Is there an app?",
+    a: "Not in an app store. On a phone, open readprism.news in your browser and add it to your home screen from the browser menu; it then opens on Today like an app.",
+  },
+  {
     q: "What if Prism gets something wrong?",
     a: `Use “Something wrong?” at the foot of any story, or write to ${CONTACT_EMAIL} with its link. A correction is shown on the story with the date and the reason, and listed on the Corrections page. Every earlier version of a story page is kept.`,
   },

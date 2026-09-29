@@ -8,7 +8,7 @@ import re
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,11 +19,23 @@ from common.billing import plan_for
 from common.config import get_settings
 from common.db import get_db
 from common.email import get_email_sender
-from common.email_templates import magic_link_email
+from common.email_templates import magic_link_email, welcome_email
 from common.languages import DEFAULT_LANGUAGES, is_valid_language, offered
+from common.logging import get_logger
 from common.professions import grouped, is_valid_profession
 
 router = APIRouter()
+logger = get_logger(__name__)
+
+
+async def _welcome(email: str) -> None:
+    """The new account's one welcome, after the response: a dropped email is
+    logged, never a failed sign-in."""
+    text_body, html = welcome_email(to=email)
+    try:
+        await get_email_sender().send(to=email, subject="Your Prism account", body=text_body, html=html)
+    except Exception:
+        logger.exception("welcome_email_failed")
 
 
 class MagicLinkRequest(BaseModel):
@@ -103,10 +115,14 @@ async def request_link(body: MagicLinkRequest, db: AsyncSession = Depends(get_db
 
 
 @router.post("/api/v1/auth/verify", response_model=SessionResponse)
-async def verify(body: VerifyRequest, response: Response, db: AsyncSession = Depends(get_db)):
-    user_id = await auth.verify_and_consume(db, body.token)
-    if user_id is None:
+async def verify(body: VerifyRequest, response: Response, background: BackgroundTasks,
+                 db: AsyncSession = Depends(get_db)):
+    verified = await auth.consume_magic_token(db, body.token)
+    if verified is None:
         raise HTTPException(status_code=401, detail="invalid or expired token")
+    user_id, created = await auth.account_for_verified_email(db, verified)
+    if created:  # first verify only: a later sign-in finds the account and sends nothing
+        background.add_task(_welcome, verified)
     token = await auth.create_session(db, user_id)
     email = (
         await db.execute(text("SELECT email FROM users WHERE id = :i"), {"i": str(user_id)})
@@ -124,7 +140,8 @@ class GoogleSignIn(BaseModel):
 
 
 @router.post("/api/v1/auth/google", response_model=SessionResponse)
-async def google_sign_in(body: GoogleSignIn, response: Response, db: AsyncSession = Depends(get_db)):
+async def google_sign_in(body: GoogleSignIn, response: Response, background: BackgroundTasks,
+                         db: AsyncSession = Depends(get_db)):
     """A Google ID token from the button or One Tap → the same session a
     consumed magic link gets. The verified email is the identity, so an address
     that signed in by link before lands in its existing account."""
@@ -137,7 +154,9 @@ async def google_sign_in(body: GoogleSignIn, response: Response, db: AsyncSessio
             raise HTTPException(status_code=422, detail="credential or access_token required")
     except auth.GoogleTokenInvalid as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
-    user_id = await auth.user_for_verified_email(db, email)
+    user_id, created = await auth.account_for_verified_email(db, email)
+    if created:
+        background.add_task(_welcome, email.strip().lower())
     token = await auth.create_session(db, user_id)
     needs_profile = not await auth.profile_complete(db, user_id)
     set_session_cookie(response, token)

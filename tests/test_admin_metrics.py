@@ -98,6 +98,23 @@ async def test_the_lens_wall_is_demand_beside_the_question_limit(seeded):
     assert {r["label"]: r["current"] for r in by["rows"]} == {"free": 2, "anonymous": 1}
 
 
+async def test_launch_attribution_is_read_where_the_arrivals_are(seeded):
+    """06 §2.3: campaign words, 'where did you hear', the check-it question and
+    share arrivals reading on sit beside 'Where visits came from'."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    async with session_scope() as s:
+        for event, dim, n in [("campaign", "producthunt", 4), ("campaign", "hn", 1), ("heard", "friend", 2),
+                              ("survey", "check:no", 1), ("depth", "2:share", 3)]:
+            await s.execute(text("INSERT INTO usage_daily (day, event, dim, count) VALUES (:d, :e, :m, :n)"),
+                            {"d": TODAY, "e": event, "m": dim, "n": n})
+        visits = await metrics.visits(s, metrics.window(28, TODAY), since=date(2031, 1, 1))
+    split = {b["key"]: {r["label"]: r["current"] for r in b["rows"]} for b in visits["breakdowns"]}
+    assert split["campaigns"] == {"producthunt": 4, "hn": 1}
+    assert split["heard"] == {"friend": 2} and split["check"] == {"check:no": 1}
+    assert split["depth"] == {"2:share": 3}
+
+
 async def test_a_day_before_counting_began_is_not_a_zero(seeded):
     """Visits were never recorded before deploy; a day with no record is not a
     day nobody came, and the period before has no total at all."""

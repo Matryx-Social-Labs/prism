@@ -203,13 +203,17 @@ RECORD_MIN_OUTLETS = 2
 RAW_RECORD_FEEDS = frozenset({"nvd", "cisa_kev"})
 
 
-def record_indexable(source_slugs: list[str], registry: dict[str, Outlet] | None) -> bool:
+def publishers_of(source_slugs: list[str], registry: dict[str, Outlet] | None) -> set[str]:
     """Outlets are counted the way the page prints them: by publisher among the
     registered sources, or by slug when none is registered (lib/coverage.publishers).
     Raw-record feeds are not outlets: a CVE both NVD and CISA carry is one record."""
     news = [s for s in source_slugs if s not in RAW_RECORD_FEEDS]
     known = {registry[s].publisher for s in news if registry and s in registry}
-    return len(known or set(news)) >= RECORD_MIN_OUTLETS
+    return known or set(news)
+
+
+def record_indexable(source_slugs: list[str], registry: dict[str, Outlet] | None) -> bool:
+    return len(publishers_of(source_slugs, registry)) >= RECORD_MIN_OUTLETS
 
 
 _cache: tuple[float, dict[str, Outlet]] | None = None

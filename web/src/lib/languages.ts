@@ -35,3 +35,11 @@ export function detectScript(text: string): string | null {
   for (const [re, lang] of SCRIPT_RANGES) if (re.test(text)) return lang;
   return null;
 }
+
+/** "Kannada, English and 9 more languages": a list a sentence can hold, in the order given. */
+export function languageList(codes: string[], max = 3): string {
+  const names = codes.map(langName);
+  if (names.length <= max) return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : (names[0] ?? "");
+  const more = names.length - max;
+  return `${names.slice(0, max).join(", ")} and ${more} more ${more === 1 ? "language" : "languages"}`;
+}

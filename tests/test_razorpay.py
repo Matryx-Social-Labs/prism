@@ -69,6 +69,12 @@ def _mock(plans: list[dict], calls: list[tuple[str, str, dict | None]]):
 
 
 @pytest.fixture(autouse=True)
+def _test_keys_may_check_out(monkeypatch):
+    """These drive checkout on rzp_test_ keys, which serving refuses by default."""
+    monkeypatch.setattr(get_settings(), "prism_allow_test_checkout", True)
+
+
+@pytest.fixture(autouse=True)
 def _fresh_cache():
     razorpay._plan_cache.clear()
     yield

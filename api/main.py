@@ -23,6 +23,8 @@ from api.routes import (
     entity,
     events,
     feed,
+    grievances,
+    hubs,
     label,
     labeller,
     meta,
@@ -30,6 +32,7 @@ from api.routes import (
     subject,
     trending,
     watchlist,
+    weekly_digest,
 )
 from common.config import get_settings
 from common.logging import setup_logging
@@ -71,10 +74,13 @@ app.include_router(search.router)
 app.include_router(digest.router)
 app.include_router(events.router)
 app.include_router(corrections.router)
+app.include_router(grievances.router)
 app.include_router(entity.router)
+app.include_router(hubs.router)
 app.include_router(subject.router)
 app.include_router(trending.router)
 app.include_router(watchlist.router)
+app.include_router(weekly_digest.router)
 app.include_router(label.router)
 app.include_router(labeller.router)
 app.include_router(admin.router)

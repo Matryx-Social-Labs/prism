@@ -30,8 +30,9 @@ class FakeSession:
         self.row = row
         self.params = None
 
-    async def execute(self, statement, params):
-        self.params = params
+    async def execute(self, statement, params=None):
+        if params is not None:
+            self.params = params
         if isinstance(self.row, Exception):
             raise self.row
         return FakeResult(self.row)
@@ -90,6 +91,9 @@ async def test_reports_each_pipeline_clock_and_backlog_age():
     out = await pipeline_freshness(session)
 
     assert session.params == {"window_hours": WINDOW_HOURS}
+    assert out["ok"] is True
+    assert out["stalled"] is False
+    assert out["newest_observed_at"] == "2026-09-17T12:00:00+00:00"
     assert out["observation"]["latest_at"] == "2026-09-17T12:00:00+00:00"
     assert out["observation"]["publish_to_observe"] == {
         "samples": 90,
@@ -132,3 +136,44 @@ async def test_clamps_internal_window_callers_to_one_week():
 async def test_database_failure_is_unknown_not_a_health_failure():
     out = await pipeline_freshness(FakeSession(RuntimeError("old schema")))
     assert out == {"ok": None, "window_hours": WINDOW_HOURS, "error": "unavailable"}
+
+
+async def test_a_window_that_observed_nothing_is_not_ok_and_says_since_when():
+    """2026-09-29: `ok: true` beside `observation.count: 0` for a day while
+    ingestion was paused. Nothing observed is a stall, not a fast pipeline."""
+    newest = datetime(2026, 9, 28, 2, 10, tzinfo=UTC)
+    out = await pipeline_freshness(FakeSession({"observed_count": 0, "newest_observed_at": newest}))
+    assert out["ok"] is False
+    assert out["stalled"] is True
+    assert out["newest_observed_at"] == "2026-09-28T02:10:00+00:00"
+    assert out["observation"] == {
+        "count": 0,
+        "latest_at": None,
+        "publish_to_observe": {"samples": 0, "p50_s": None, "p95_s": None},
+    }
+
+
+async def test_a_stall_whose_newest_observation_cannot_be_read_is_still_a_stall():
+    class NewestFails(FakeSession):
+        async def execute(self, statement, params=None):
+            if params is None:
+                raise RuntimeError("timeout")
+            return await super().execute(statement, params)
+
+    out = await pipeline_freshness(NewestFails({"observed_count": 0}))
+    assert (out["ok"], out["stalled"], out["newest_observed_at"]) == (False, True, None)
+
+
+async def test_healthz_stays_ok_on_a_stalled_pipeline(monkeypatch):
+    """Liveness is the API's, not the collector's: a paused pipeline must not
+    take the API out of Railway's rotation (api/routes/meta.healthz)."""
+    from api.routes import meta
+
+    async def nothing(*_args, **_kwargs):
+        return {}
+
+    monkeypatch.setattr(meta, "backlog", nothing)
+    monkeypatch.setattr(meta, "check_corpus_model", nothing)
+    out = await meta.healthz(db=FakeSession({"observed_count": 0}), freshness_window_hours=WINDOW_HOURS)
+    assert out["status"] == "ok"
+    assert (out["freshness"]["ok"], out["freshness"]["stalled"]) == (False, True)

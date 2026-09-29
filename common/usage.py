@@ -76,13 +76,24 @@ SUBSCRIBE_DETAIL = frozenset({
 # tab, and the 2nd and 5th story read in a tab (web/src/components/UsageBeacon).
 SIGNIN = SIGNIN_METHODS | {"sent:link"}
 ONBOARDING = frozenset({*(f"{kind}:{n}" for kind in ("step", "skip") for n in (1, 2, 3)), "done:account", "done:local"})
-CTAS = frozenset({"landing:hero", "landing:how", "landing:final-read", "landing:final-setup", "landing:plans"})
+CTAS = frozenset({"landing:hero", "landing:how", "landing:final-read", "landing:final-setup", "landing:plans", "landing:digest"})
 TABS = frozenset({"foryou"})
-DEPTHS = frozenset({"2", "5"})
+# "2:share": the 2nd story of a visit that arrived by a shared link (the share loop, 06 §2.2b).
+DEPTHS = frozenset({"2", "5", "2:share"})
+# Launch attribution (06 §2.3): the ?ref= / utm_source word a link carried, once
+# per visit (web/src/lib/attribution.CAMPAIGNS is the other half; it sends
+# "other" for a word not on the list), the answer to "Where did you hear about
+# Prism?", and the post-read question "Could you check this story for
+# yourself?" (06 §2.1). Picked from a list, never typed.
+CAMPAIGNS = frozenset({"producthunt", "hn", "peerlist", "launchpadindia", "reddit", "x", "linkedin", "whatsapp",
+                       "telegram", "newsletter", "digest", "devto", "press", "other"})
+HEARD = frozenset({"friend", "search", "ai", "x", "linkedin", "reddit", "newsletter", "launch", "other"})
+SURVEY = frozenset({"check:yes", "check:partly", "check:no"})
 # The events whose word is one of a closed list, and the list.
 WORDS: dict[str, frozenset[str]] = {
     "view": PAGES, "share": SHARE_SURFACES, "signin": SIGNIN, "lens": LENS_STATES, "ask": ASK_VIA,
     "onboarding": ONBOARDING, "cta": CTAS, "tab": TABS, "depth": DEPTHS,
+    "campaign": CAMPAIGNS, "heard": HEARD, "survey": SURVEY,
 }
 HOST = re.compile(r"^[a-z0-9.-]{1,253}$")
 
@@ -212,6 +223,10 @@ def demo() -> None:
     assert dimension("onboarding", "step:9") is None
     assert dimension("cta", "landing:hero") == "landing:hero" and dimension("cta", "landing:x") is None
     assert dimension("tab", "foryou") == "foryou" and dimension("depth", "5") == "5" and dimension("depth", "3") is None
+    assert dimension("depth", "2:share") == "2:share" and dimension("depth", "5:share") is None
+    assert dimension("campaign", "producthunt") == "producthunt" and dimension("campaign", "my-blog") is None
+    assert dimension("heard", "friend") == "friend" and dimension("heard", "my uncle told me") is None
+    assert dimension("survey", "check:partly") == "check:partly" and dimension("survey", "check:maybe") is None
     assert is_bot("Mozilla/5.0 (compatible; Googlebot/2.1)") and is_bot("") and not is_bot("Mozilla/5.0 (iPhone)")
     assert visitor("s1", "1.2.3.4", "ua") != visitor("s2", "1.2.3.4", "ua"), "a new salt must give a new hash"
 

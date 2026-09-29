@@ -73,6 +73,8 @@ describe("UpgradeSheet", () => {
     render(<UpgradeSheet open onClose={() => {}} reason="ask-limit" />);
     const button = await screen.findByRole("button", { name: "Get Plus · ₹199 a month" });
     const terms = screen.getByText(/₹199 today, then ₹199 every month until you cancel/);
+    // E-Com Rules R7(1)(e): the GST inside the price, beside it.
+    expect(terms).toHaveTextContent("until you cancel, each including ₹30.36 GST (18%).");
     expect(terms).toHaveTextContent("Cancel in one click from your account; paid time is kept.");
     expect(terms.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -95,6 +97,23 @@ describe("UpgradeSheet", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Get Plus · ₹149 a month/ }));
     expect(await screen.findByRole("status")).toHaveTextContent("The Markets read is open.");
     expect(onSubscribed).toHaveBeenCalled();
+  });
+
+  // Founder, 2026-09-29: while founding seats are sold, the sheet points at them, on /plus, with the way back.
+  it("while founding seats are sold and checkout is open, offers founding as the second way, to /plus on the year", async () => {
+    const founding = { plan: "founding", label: "Founding member · yearly", amount_paise: 99900, period: "year" };
+    billing.fetchPlans.mockResolvedValue({ ...PLANS, plans: [...PLANS.plans, founding] });
+    const onClose = vi.fn();
+    const { unmount } = render(<UpgradeSheet open onClose={onClose} reason="lens-limit" back="/story/e1" />);
+    const link = await screen.findByRole("link", { name: "Or become a founding member · ₹999 a year" });
+    expect(link).toHaveAttribute("href", "/plus?from=lens-limit&period=year&next=%2Fstory%2Fe1");
+    expect(screen.getByRole("link", { name: "Sign in to get Plus" }).compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    unmount();
+
+    billing.fetchPlans.mockResolvedValue({ ...PLANS, checkout_ready: false, plans: [...PLANS.plans, founding] });
+    render(<UpgradeSheet open onClose={onClose} reason="lens-limit" />);
+    expect(await screen.findByText("Plus opens soon")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /founding member/ })).toBeNull();
   });
 
   it("a declined payment is said inside the sheet, and the purchase waits for the next try", async () => {

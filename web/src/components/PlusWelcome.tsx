@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PLAN_LABEL, refundOpen } from "@/components/PlanCard";
+import { ShareButton } from "@/components/ShareButton";
 import { track } from "@/lib/analytics";
+import { fetchEvent } from "@/lib/api";
 import { fetchMySubscription, rupees, type MySubscription } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
 import { safeNext } from "@/lib/next";
@@ -19,6 +21,14 @@ export function PlusWelcome() {
   const params = useSearchParams();
   const next = safeNext(params.get("next")) ?? "/feed";
   const [sub, setSub] = useState<MySubscription | null>(null);
+  // The story the reader was on when they paid: offered to share (04 P2-9),
+  // once its own headline has loaded — a share with no title is a naked link.
+  const storyId = next.match(/^\/story\/([^/?#]+)/)?.[1] ?? null;
+  const [storyTitle, setStoryTitle] = useState<string | null>(null);
+  useEffect(() => {
+    if (!storyId) return;
+    fetchEvent(storyId).then((e) => setStoryTitle(e.title)).catch(() => setStoryTitle(null));
+  }, [storyId]);
   useEffect(() => {
     track("Subscribe", { stage: "welcome" });
   }, []);
@@ -57,6 +67,13 @@ export function PlusWelcome() {
           </div>
         ))}
       </dl>
+      {storyId && storyTitle && (
+        <div className="grid justify-items-start gap-2 pt-3.5" style={{ borderTop: "1px solid var(--line)" }}>
+          <p className="p-field__label">Share this story</p>
+          <p className="text-balance" style={{ font: "var(--t-title-s)" }}>{storyTitle}</p>
+          <ShareButton url={`/story/${storyId}`} title={storyTitle} />
+        </div>
+      )}
       <div className="flex flex-wrap gap-2.5">
         <Link href={next} className={`${big} p-btn--primary`}>{next.startsWith("/story/") ? "Back to the story" : "Continue reading"}</Link>
         <Link href="/account" className={`${big} p-btn--secondary`}>Your account</Link>

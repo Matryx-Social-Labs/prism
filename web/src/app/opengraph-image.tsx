@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { CARD_TEXT, SITE_HEADLINE, SITE_LINE, SiteCard } from "@/lib/ogCard";
+import { CARD_TEXT, SITE_ALT, SITE_HEADLINE, SITE_LINE, SiteCard } from "@/lib/ogCard";
 import { ogFonts } from "@/lib/ogFonts";
 
 // The brand card, on the ink ground (share cards v3): every route without a
@@ -8,6 +8,7 @@ import { ogFonts } from "@/lib/ogFonts";
 // falls back to it rather than to an invented one.
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const alt = SITE_ALT;
 
 export default async function Image() {
   const fonts = await ogFonts(SITE_HEADLINE, SITE_LINE, CARD_TEXT);

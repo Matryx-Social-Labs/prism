@@ -65,6 +65,16 @@ describe("CancelSheet — the truth first, one offer matched to the reason, the 
     expect(screen.getByPlaceholderText(/What's missing/)).toBeInTheDocument();
   });
 
+  // Checkout closed (test keys on production, 2026-09-29): the yearly switch
+  // would open a checkout that answers 503, so price gets the pause instead.
+  it("offers no yearly switch while checkout is closed", async () => {
+    billing.fetchPlans.mockResolvedValue({ ...PLANS, checkout_ready: false });
+    sheet();
+    await userEvent.click(screen.getByRole("button", { name: "Too expensive" }));
+    expect(await screen.findByText("Pause instead")).toBeInTheDocument();
+    expect(screen.queryByText(/Switch to yearly/)).toBeNull();
+  });
+
   it("a pause shows when Plus returns before it is taken, pauses for the months chosen, and says so", async () => {
     billing.pauseSubscription.mockResolvedValue({ paused_until: "2026-12-19T00:00:00Z", paid_until: "2026-10-20T00:00:00Z" });
     const onPaused = vi.fn();

@@ -6,6 +6,7 @@ const fetchSubjects = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual<typeof import("@/lib/api")>("@/lib/api")), fetchFeed, fetchSubjects }));
 
 import SectorPage from "@/app/sector/[slug]/page";
+import { SITE_URL } from "@/lib/site";
 
 const node = (path: string, label: string) => ({ path, slug: path.split(".").pop()!, label, depth: path.split(".").length, story_count: 3 });
 const TREE = {
@@ -50,5 +51,19 @@ describe("/sector/<slug> — the group's sub-topics", () => {
     const doc = await page("politics");
     expect(chips(doc)).toEqual([]);
     expect(doc.querySelector("h1")?.textContent).toContain("Politics");
+  });
+});
+
+// Audit 01 P2-3: a breadcrumb places the subject under the site, as on subject and record pages.
+describe("/sector/<slug> — breadcrumb", () => {
+  it("is Prism › the group, at the group's canonical address", async () => {
+    const doc = await page("finance");
+    const crumbs = [...doc.querySelectorAll('script[type="application/ld+json"]')]
+      .map((s) => JSON.parse(s.textContent ?? "null"))
+      .find((d) => d["@type"] === "BreadcrumbList");
+    expect(crumbs.itemListElement.map((i: { position: number; name: string; item: string }) => [i.position, i.name, i.item])).toEqual([
+      [1, "Prism", `${SITE_URL}/`],
+      [2, "Business & Markets", `${SITE_URL}/sector/business`],
+    ]);
   });
 });

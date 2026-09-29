@@ -6,7 +6,7 @@ import { Check } from "@/components/icons";
 import { Sheet } from "@/components/story/Sheet";
 import { Alert } from "@/components/ui";
 import { track } from "@/lib/analytics";
-import { ASK_QUESTIONS, fetchPlans, rupees, subscribe, type PlansOut } from "@/lib/billing";
+import { ASK_QUESTIONS, fetchPlans, gstIncluded, rupees, subscribe, type PlansOut } from "@/lib/billing";
 import { useSession } from "@/lib/session";
 
 // The moment a reader meets a limit (Design System v2 · money/UpgradeSheetBody):
@@ -73,8 +73,10 @@ export function UpgradeSheet({
 
   if (!open) return null;
   const monthly = plans?.plans.find((p) => p.plan === "plus_monthly");
+  const founding = plans?.plans.find((p) => p.plan === "founding");
   const ready = !!plans?.checkout_ready && !!monthly;
-  const next = `/plus?from=${reason}${back ? `&next=${encodeURIComponent(back)}` : ""}`;
+  const way = back ? `&next=${encodeURIComponent(back)}` : "";
+  const next = `/plus?from=${reason}${way}`;
   const price = monthly ? rupees(monthly.amount_paise) : null;
   const title = session ? HEADING[reason] : "Keep asking with an account";
 
@@ -139,10 +141,16 @@ export function UpgradeSheet({
             {failed && <Alert tone="error" title="The payment did not go through">{failed}</Alert>}
             {ready && (
               <p style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>
-                {price} today, then {price} every {monthly!.period} until you cancel, GST included. Cancel in one click from your account; paid time is kept.
+                {price} today, then {price} every {monthly!.period} until you cancel, each {gstIncluded(monthly!.amount_paise)}. Cancel in one click from your account; paid time is kept.
               </p>
             )}
             {action}
+            {/* While founding seats are sold, the yearly founding plan is one step away, on /plus. */}
+            {ready && founding && (
+              <Link href={`/plus?from=${reason}&period=year${way}`} className="p-link inline-flex min-h-[44px] items-center justify-self-center text-[14px]" onClick={onClose}>
+                Or become a founding member · {rupees(founding.amount_paise)} a year
+              </Link>
+            )}
             <Link href={next} className="inline-flex min-h-[44px] items-center justify-self-center text-[14px] font-semibold" style={{ color: "var(--accent)" }} onClick={onClose}>All plans →</Link>
           </>
         )}

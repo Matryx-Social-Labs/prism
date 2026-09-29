@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
 import { EntityQuotes } from "@/components/reading/EntityQuotes";
 import { MetaLine, PageTitle, ReadingColumns } from "@/components/reading/parts";
 import { SectionHead } from "@/components/SectionHead";
 import { BackBar, EmptyState } from "@/components/ui";
 import { fetchEntity, type EntityPage as EntityPayload } from "@/lib/api";
-import { entityLd, feedListItems, itemListLd, jsonLd, quotationsLd, robotsUnless, social } from "@/lib/seo";
+import { stateBySlug } from "@/lib/regions";
+import { breadcrumbLd, entityLd, jsonLd, quotationsLd, robotsUnless, social } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // An actor and every record it appears in. The cast of a record was already
@@ -27,8 +28,20 @@ async function load(slug: string): Promise<EntityPayload | null> {
   }
 }
 
+/**
+ * A state's own name has one page, its hub: /entity/karnataka and
+ * /state/karnataka competed for "Karnataka news" (audit 02, P1-1), so the
+ * actor address 308s there before anything is fetched, and the entities
+ * sitemap leaves it out (api/routes/entity.sitemap_entities).
+ */
+function deferToStateHub(slug: string): void {
+  const hub = stateBySlug(slug);
+  if (hub) permanentRedirect(`/state/${hub.slug}`);
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
+  deferToStateHub(slug);
   const page = await load(slug);
   if (!page) return { title: "Not found", robots: { index: false, follow: true } };
   const { entity, record_count, indexable } = page;
@@ -76,6 +89,7 @@ const KIND: Record<string, string> = {
 
 export default async function EntityHubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  deferToStateHub(slug);
   const page = await load(slug);
   if (!page) notFound();
   const { entity, record_count, records } = page;
@@ -93,16 +107,8 @@ export default async function EntityHubPage({ params }: { params: Promise<{ slug
   // tickers and sectors only).
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd({ ...entityLd(entity, url, record_count), ...(quotesLd ? { subjectOf: quotesLd } : {}) }) }}
-      />
-      {records.length > 0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd(`${entity.name} — every record`, url, feedListItems(records))) }}
-        />
-      )}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(entityLd(entity, url, record_count, records, quotesLd)) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbLd([{ name: "Prism", url: `${SITE_URL}/` }, { name: entity.name, url }])) }} />
       <div className="contents lg:hidden">
         <BackBar label="Today" href="/feed" />
       </div>

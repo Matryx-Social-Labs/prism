@@ -8,9 +8,11 @@ import { Reveal } from "@/components/Reveal";
 import { SectionHead } from "@/components/SectionHead";
 import { Alert } from "@/components/ui";
 import { track } from "@/lib/analytics";
-import { ASK_QUESTIONS as ASK, fetchPlans, LENS_READS, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
+import { ASK_QUESTIONS as ASK, fetchPlans, gstIncluded, LENS_READS, rupees, subscribe, type PlanOut, type PlansOut } from "@/lib/billing";
 import { billingDay } from "@/lib/dateline";
+import { CHECKOUT_SOON_FAQ, FOUNDING_SEATS, PLUS_FAQ } from "@/lib/plusFaq";
 import { safeNext } from "@/lib/next";
+import { faqLd, jsonLd } from "@/lib/seo";
 import { fetchMe, useSession } from "@/lib/session";
 
 // The pricing page (Design System v2 · Plus): a provenance strip, the headline,
@@ -21,20 +23,15 @@ import { fetchMe, useSession } from "@/lib/session";
 // sells the lenses and Ask, never a model (PRODUCT.md; founder decision #2,
 // 27 Sep). A plan is charged automatically until the reader cancels, at the
 // price they joined at (founder, 28 Sep; common/razorpay.TOTAL_COUNT); no line
-// promises a lock or what a plan will cost later.
-const FOUNDING_SEATS = 500; // common/billing.FOUNDING_CAP
+// promises a lock or what a plan will cost later. While founding memberships
+// are offered, founding is the recommended card (founder, 2026-09-29).
 
 type Period = "month" | "year";
 
-const FAQ: { q: string; a: string }[] = [
-  { q: "Does it renew on its own?", a: "Yes. Razorpay charges the price you joined at, at the start of every month or year, until you cancel. A new price only ever applies to a new subscription." },
-  { q: "Can I cancel?", a: "Yes, in one click from your account, any time. You keep Plus until the end of the period you paid for and are not charged again." },
-  { q: "What if I change my mind?", a: "A yearly or founding charge is refunded in full if you ask within 7 days — no questions. Monthly charges are not refunded; cancelling stops the next one." },
-  { q: "Who charges me, and how?", a: "Razorpay processes the payment (UPI Autopay, cards, net banking). It is collected by Matryx Social Labs Private Limited on behalf of Prism Media Intelligence LLP until the LLP's own merchant account is live, so that is the name you may see on your statement." },
-  { q: "Is GST included?", a: "Yes. Every price on this page includes GST, and each charge comes with an invoice by email." },
-  { q: "What if a charge fails?", a: "Plus stays on for three days while Razorpay tries again, and we email you. If it still fails, Plus pauses and reading stays free." },
-  { q: "What does Plus not change?", a: "The record. Every record, source, quote, coverage split and clip stays free for everyone, with or without an account. Plus adds every lens on every story and more of Ask." },
-];
+// Answered on the page and, word for word, in its FAQPage JSON-LD (lib/seo
+// faqLd): the markup must equal the visible text.
+/** Said first while checkout is shut (plans.checkout_ready false, e.g. on test keys). */
+
 
 function Feature({ ok = true, children }: { ok?: boolean; children: React.ReactNode }) {
   return (
@@ -45,19 +42,18 @@ function Feature({ ok = true, children }: { ok?: boolean; children: React.ReactN
   );
 }
 
-/** A plan card (money/PricingCard): Plus is ruled in ink with the accent on top; the founding card's top rule is dashed. */
-function PlanColumn({ kind, name, price, per, sub, note, action, soldOut = false, children }: {
+/** A plan card (money/PricingCard): the recommended one is ruled in ink with the accent on top; otherwise the founding card's top rule is dashed. */
+function PlanColumn({ kind, name, price, per, note, action, recommended: rec = false, soldOut = false, children }: {
   kind: "plus" | "free" | "founding";
   name: string;
   price?: React.ReactNode;
   per?: string;
-  sub?: string | null;
   note?: string | null;
   action?: React.ReactNode;
+  recommended?: boolean;
   soldOut?: boolean;
   children?: React.ReactNode;
 }) {
-  const rec = kind === "plus";
   return (
     <article
       aria-label={name}
@@ -80,7 +76,6 @@ function PlanColumn({ kind, name, price, per, sub, note, action, soldOut = false
           {per && <span style={{ font: "500 14px/1 var(--font-read)", color: "var(--ink-3)" }}>{per}</span>}
         </p>
       )}
-      {sub && <p className="p-count whitespace-normal" style={{ fontSize: 12, color: "var(--ink-2)" }}>{sub}</p>}
       {note && <p style={{ font: "400 13.5px/1.45 var(--font-read)", color: "var(--ink-2)" }}>{note}</p>}
       {children && <ul className="grid gap-2">{children}</ul>}
       {action && <div className="mt-auto pt-1">{action}</div>}
@@ -97,7 +92,11 @@ function StateBox({ children, dashed = false }: { children: React.ReactNode; das
   );
 }
 
-export function PlusPage() {
+/** A price on sale, its single total with the GST inside it (E-Com R7(1)(e)): "₹149 a month, including ₹22.73 GST (18%)." */
+const priced = (p: PlanOut) => `${rupees(p.amount_paise)} a ${p.period}, ${gstIncluded(p.amount_paise)}.`;
+
+/** `initialPlans` is the server's read (app/plus/page.tsx), so the HTML a crawler gets carries the prices; the client refreshes it. */
+export function PlusPage({ initialPlans = null }: { initialPlans?: PlansOut | null }) {
   const session = useSession();
   const router = useRouter();
   const params = useSearchParams();
@@ -105,10 +104,11 @@ export function PlusPage() {
   // Where the buyer came from (a story, by the door they used): the welcome
   // page's way on, and sign-in's way back here (audit 2026-09-29, P1-3).
   const back = safeNext(params.get("next"));
-  const [plans, setPlans] = useState<PlansOut | null>(null);
+  const [plans, setPlans] = useState<PlansOut | null>(initialPlans);
   const [plansFailed, setPlansFailed] = useState(false);
   const [myPlan, setMyPlan] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>(params.get("period") === "month" ? "month" : "year");
+  const askedPeriod = params.get("period");
+  const [chosenPeriod, setPeriod] = useState<Period | null>(askedPeriod === "month" || askedPeriod === "year" ? askedPeriod : null);
   const [busy, setBusy] = useState<string | null>(null);
   const [declined, setDeclined] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ plan: string; message: string } | null>(null);
@@ -131,16 +131,32 @@ export function PlusPage() {
   const monthly = byPlan.plus_monthly;
   const yearly = byPlan.plus_yearly;
   const founding = byPlan.founding;
+  // While founding is offered it is the yearly recommendation, so the switch
+  // opens on the month; a period in the link always wins.
+  const period: Period = chosenPeriod ?? (founding ? "month" : "year");
   const plus = period === "year" ? yearly ?? monthly : monthly ?? yearly;
   // Arithmetic on the API's own figures, never a typed number.
   const yearlySaving = monthly && yearly ? monthly.amount_paise * 12 - yearly.amount_paise : null;
-  const perMonth = yearly ? Math.round(yearly.amount_paise / 12) : null;
+  const perMonth = yearly ? Math.round(yearly.amount_paise / 1200) * 100 : null;
+  const foundingLess = founding && yearly ? yearly.amount_paise - founding.amount_paise : null;
 
   const onPlus = myPlan === "plus";
   const ready = !!plans?.checkout_ready;
   const offerEnds = plans?.offer_ends ? billingDay(plans.offer_ends, { long: true }) : null;
   const plusPlan = period === "year" ? "plus_yearly" : "plus_monthly";
   const plusCta = period === "year" ? "Get Plus yearly" : "Get Plus monthly";
+  const foundingCta = founding ? `Become a founding member · ${rupees(founding.amount_paise)} a year` : "";
+  const plusNote = plus
+    ? [
+        priced(plus),
+        period === "year" && perMonth ? `≈ ${rupees(perMonth)} a month.` : null,
+        "Renews until you cancel.",
+        period === "year" && foundingLess && foundingLess > 0 ? `Founding membership is ${rupees(foundingLess)} a year less while seats last.` : null,
+      ].filter(Boolean).join(" ")
+    : null;
+  // Remaining seats, said as remaining: "500 of 500 seats" read as sold out.
+  const seats = plans && plans.founding_left >= FOUNDING_SEATS ? `Limited to ${FOUNDING_SEATS} members` : `${plans?.founding_left} of ${FOUNDING_SEATS} seats left`;
+  const faq = plans && !plans.checkout_ready ? [CHECKOUT_SOON_FAQ, ...PLUS_FAQ] : PLUS_FAQ;
   // Sign-in returns here with the door, the way on and the period the reader chose.
   const signinBack = new URLSearchParams({ ...(from && { from }), ...(back && { next: back }), period }).toString();
 
@@ -182,6 +198,66 @@ export function PlusPage() {
   // (common/billing.prices): gone because they are taken is said; gone because the offer closed is left out.
   const foundingGone = !founding && !!plans && plans.founding_left <= 0;
 
+  const plusCard = (
+    <PlanColumn
+      kind="plus"
+      name="Plus"
+      recommended={!founding}
+      price={plus ? rupees(plus.amount_paise) : <span className="p-skel inline-block h-9 w-28 align-middle" aria-hidden />}
+      per={period === "year" ? "/ year" : "/ month"}
+      note={plusNote}
+      action={<Action plan={plusPlan} primary={!founding} label={plusCta} />}
+    >
+      <Feature><b className="font-semibold">Every lens on every story</b>, as often as you like</Feature>
+      <Feature><b className="font-semibold">{ASK.plus} questions a day</b> on any story</Feature>
+      <Feature>Answers from the <b className="font-semibold">whole story</b> — the reports of every related record</Feature>
+      <Feature>Ask <b className="font-semibold">stays on</b> when the free box rests for the day</Feature>
+      <Feature>Everything in Free</Feature>
+    </PlanColumn>
+  );
+  const freeCard = (
+    <PlanColumn
+      kind="free"
+      name="Free"
+      price="₹0"
+      per="forever"
+      note="No card, no trial clock."
+      action={session ? <StateBox>{onPlus ? "Included" : "Your plan"}</StateBox> : <Link href="/feed" className="p-btn p-btn--secondary p-btn--block">Keep reading free</Link>}
+    >
+      <Feature>Every record, source, verified quote, coverage count and clip, forever</Feature>
+      {/* Without an account the count is per visit (a browser session), not per day. */}
+      <Feature><b className="font-semibold">{LENS_READS.free} lens readings a day</b> with an account, {LENS_READS.anon} a visit without</Feature>
+      <Feature><b className="font-semibold">{ASK.free} questions a day</b> with an account, {ASK.anon} a visit without</Feature>
+      <Feature ok={false}>Answers from this record only</Feature>
+      <Feature ok={false}>Ask rests for the day when the free box is spent</Feature>
+    </PlanColumn>
+  );
+  const foundingCard = founding ? (
+    <PlanColumn
+      kind="founding"
+      name="Founding member"
+      recommended
+      price={rupees(founding.amount_paise)}
+      per="/ year"
+      // Its renewal beside its price (docs/COMPLIANCE-INDIA.md N7(a)): the price joined at, until cancelled.
+      note={`${priced(founding)} Renews at ${rupees(founding.amount_paise)} a year until you cancel. 7-day full refund.`}
+      action={onPlus ? null : <Action plan="founding" primary label={foundingCta} />}
+    >
+      <Feature>Everything in Plus</Feature>
+      {/* True by common/razorpay.TOTAL_COUNT (renews until cancelled) and the Terms' "keeps the price you joined at". */}
+      <Feature>Your price is kept for as long as you stay subscribed, as Prism adds outlets and languages</Feature>
+      <Feature><b className="font-semibold">{seats}</b></Feature>
+    </PlanColumn>
+  ) : foundingGone || !plans ? (
+    <PlanColumn kind="founding" name="Founding member" soldOut note={plans ? "All seats are taken. Thank you." : null} />
+  ) : null;
+  // The recommended card leads (the wide first column, first on a phone).
+  const cards = (
+    founding
+      ? [["founding", foundingCard], ["plus", plusCard], ["free", freeCard]]
+      : [["plus", plusCard], ["free", freeCard], ["founding", foundingCard]]
+  ).filter(([, card]) => card) as [string, React.ReactNode][];
+
   return (
     <div className="mx-auto w-full max-w-[1120px] px-[var(--gutter)] pb-24 pt-5 lg:pb-16 lg:pt-12">
       {/* ── Hero ─────────────────────────────────────────────────── */}
@@ -205,7 +281,8 @@ export function PlusPage() {
         </div>
       </header>
 
-      {plansFailed && (
+      {/* The server's figures stand if only the refresh failed. */}
+      {plansFailed && !plans && (
         <div className="mt-6">
           <Alert tone="error" title="The plans could not be loaded" action={<button type="button" onClick={loadPlans} className="p-btn p-btn--sm p-btn--secondary max-sm:min-h-[44px]">Try again</button>}>
             Nothing on this page can be bought until they do.
@@ -214,61 +291,8 @@ export function PlusPage() {
       )}
 
       {/* ── Plans ─────────────────────────────────────────────────── */}
-      <section aria-label="Plans" className={`mt-5 grid gap-3.5 ${founding || foundingGone || !plans ? "lg:grid-cols-[1.15fr_1fr_1fr]" : "lg:grid-cols-[1.15fr_1fr]"}`}>
-        <Reveal className="min-w-0">
-          <PlanColumn
-            kind="plus"
-            name="Plus"
-            price={plus ? rupees(plus.amount_paise) : <span className="p-skel inline-block h-9 w-28 align-middle" aria-hidden />}
-            per={period === "year" ? "/ year" : "/ month"}
-            note={plus ? (period === "year" && perMonth ? `≈ ${rupees(perMonth)} a month, GST included. Renews until you cancel.` : "GST included. Renews until you cancel.") : null}
-            action={<Action plan={plusPlan} primary label={plusCta} />}
-          >
-            <Feature><b className="font-semibold">Every lens on every story</b>, as often as you like</Feature>
-            <Feature><b className="font-semibold">{ASK.plus} questions a day</b> on any story</Feature>
-            <Feature>Answers from the <b className="font-semibold">whole story</b> — the reports of every related record</Feature>
-            <Feature>Ask <b className="font-semibold">stays on</b> when the free box rests for the day</Feature>
-            <Feature>Everything in Free</Feature>
-          </PlanColumn>
-        </Reveal>
-
-        <Reveal className="min-w-0" delay={40}>
-          <PlanColumn
-            kind="free"
-            name="Free"
-            price="₹0"
-            per="forever"
-            note="No card, no trial clock."
-            action={session ? <StateBox>{onPlus ? "Included" : "Your plan"}</StateBox> : <Link href="/feed" className="p-btn p-btn--secondary p-btn--block">Keep reading free</Link>}
-          >
-            <Feature>Every record, source, verified quote, coverage count and clip, forever</Feature>
-            {/* Without an account the count is per visit (a browser session), not per day. */}
-            <Feature><b className="font-semibold">{LENS_READS.free} lens readings a day</b> with an account, {LENS_READS.anon} a visit without</Feature>
-            <Feature><b className="font-semibold">{ASK.free} questions a day</b> with an account, {ASK.anon} a visit without</Feature>
-            <Feature ok={false}>Answers from this record only</Feature>
-            <Feature ok={false}>Ask rests for the day when the free box is spent</Feature>
-          </PlanColumn>
-        </Reveal>
-
-        {(founding || foundingGone || !plans) && <Reveal className="min-w-0" delay={80}>
-          {founding ? (
-            <PlanColumn
-              kind="founding"
-              name="Founding member"
-              price={rupees(founding.amount_paise)}
-              per="/ year"
-              sub={`${plans!.founding_left} ${plans!.founding_left === 1 ? "seat" : "seats"} left`}
-              // Its renewal beside its price (docs/COMPLIANCE-INDIA.md N7(a)): the price joined at, until cancelled.
-              note={`Renews at ${rupees(founding.amount_paise)} a year until you cancel. 7-day full refund.`}
-              action={onPlus ? null : <Action plan="founding" primary={false} label="Become a founding member" />}
-            >
-              <Feature>Everything in Plus</Feature>
-              <Feature>One of the first {FOUNDING_SEATS} readers who paid for an independent record</Feature>
-            </PlanColumn>
-          ) : (
-            <PlanColumn kind="founding" name="Founding member" soldOut note={plans ? "All seats are taken. Thank you." : null} />
-          )}
-        </Reveal>}
+      <section aria-label="Plans" className={`mt-5 grid gap-3.5 ${cards.length === 3 ? "lg:grid-cols-[1.15fr_1fr_1fr]" : "lg:grid-cols-[1.15fr_1fr]"}`}>
+        {cards.map(([key, card], i) => <Reveal key={key} className="min-w-0" delay={i * 40}>{card}</Reveal>)}
       </section>
 
       {/* Razorpay draws the checkout; Prism says what went wrong and what to do. */}
@@ -334,7 +358,8 @@ export function PlusPage() {
 
         <section aria-labelledby="faq-title" className="min-w-0">
           <SectionHead id="faq-title" title="Before you pay" />
-          {FAQ.map((f, i) => (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(faqLd(faq)) }} />
+          {faq.map((f, i) => (
             <details key={f.q} open={i === 0} className="group py-1" style={{ borderTop: "1px solid var(--line)" }}>
               <summary className="flex min-h-[52px] cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden" style={{ font: "600 15.5px/1.35 var(--font-read)" }}>
                 <span className="min-w-0 flex-1">{f.q}</span>
@@ -350,9 +375,14 @@ export function PlusPage() {
       {!onPlus && (
         <section className="mt-16 flex flex-wrap items-center gap-4 pt-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
           <p className="min-w-0 flex-[1_1_280px]" style={{ font: "var(--t-display-m)", letterSpacing: "var(--track-display)" }}>
-            {monthly && yearly ? `${rupees(yearly.amount_paise)} a year, or ${rupees(monthly.amount_paise)} a month.` : "Every lens on every story, and a hundred questions a day."}
+            {founding
+              ? `${rupees(founding.amount_paise)} a year as a founding member, while seats last.`
+              : monthly && yearly ? `${rupees(yearly.amount_paise)} a year, or ${rupees(monthly.amount_paise)} a month.` : "Every lens on every story, and a hundred questions a day."}
           </p>
-          <div className="w-full sm:w-auto"><Action plan={plusPlan} primary label={plusCta} cls="p-btn--lg max-sm:w-full" /></div>
+          {/* The page's one primary follows the recommended card. */}
+          <div className="w-full sm:w-auto">
+            {founding ? <Action plan="founding" primary label={foundingCta} cls="p-btn--lg max-sm:w-full" /> : <Action plan={plusPlan} primary label={plusCta} cls="p-btn--lg max-sm:w-full" />}
+          </div>
         </section>
       )}
     </div>

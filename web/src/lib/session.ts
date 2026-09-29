@@ -167,6 +167,25 @@ export async function fetchMe(session: Session): Promise<{ user_id: string; emai
   return res.json();
 }
 
+/** The week's record by email: whether this account turned it on (off until it does). */
+export async function fetchWeeklyDigest(session: Session): Promise<boolean> {
+  const res = await fetch(`${API_URL}/api/v1/me/digest`, { headers: authHeader(session), credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(`digest ${res.status}`);
+  return ((await res.json()) as { on: boolean }).on;
+}
+
+/** Turn it on (the consent, recorded with its time) or off (the withdrawal). Returns the saved state. */
+export async function setWeeklyDigest(session: Session, on: boolean): Promise<boolean> {
+  const res = await fetch(`${API_URL}/api/v1/me/digest`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeader(session) },
+    body: JSON.stringify({ on }),
+  });
+  if (!res.ok) throw new Error(await detail(res, "Could not save the email setting"));
+  return ((await res.json()) as { on: boolean }).on;
+}
+
 /** The session's plan, "free" until known; anonymous is "free". Cached per
  * account for the tab so the header does not ask on every route. */
 const planCache = new Map<string, "free" | "plus">();

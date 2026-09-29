@@ -5,8 +5,8 @@ creates the subscription server-side at the price of the day and hands its id
 to Checkout.js; Checkout's success callback comes back to `/billing/verify`
 with Razorpay's signature, which turns the row active at once; the webhook
 then keeps the row true over the months (charged, halted, cancelled). Until
-the keys are set, `plans` says `checkout_ready: false` and the checkout routes
-answer 503, so the pricing page shows no button that cannot work. Entitlement
+live keys are set, `plans` says `checkout_ready: false` and the checkout route
+answers 503, so the pricing page shows no button that cannot work. Entitlement
 is read from `subscriptions` by common/billing.plan_for.
 
 The life after paying, each one click from the account page (DESIGN.md
@@ -55,10 +55,20 @@ def _iso(d: datetime | None) -> str | None:
     return d.isoformat() if d else None
 
 
+CHECKOUT_CLOSED = "Checkout is not open yet. Nothing was charged."
+
+
+def checkout_open() -> bool:
+    """Keys set, and live ones: a test key's sheet takes no money, so a reader
+    must never meet it (founder, 2026-09-29) unless PRISM_ALLOW_TEST_CHECKOUT."""
+    s = get_settings()
+    return razorpay.configured() and (not s.razorpay_key_id.startswith("rzp_test_") or s.prism_allow_test_checkout)
+
+
 @router.get("/api/v1/billing/plans")
 async def plans(db: AsyncSession = Depends(get_db)):
     out = await prices(db, _launch_date())
-    out["checkout_ready"] = razorpay.configured()
+    out["checkout_ready"] = checkout_open()
     out["key_id"] = get_settings().razorpay_key_id or None  # public by design; Checkout.js needs it
     return out
 
@@ -73,8 +83,8 @@ class CheckoutIn(BaseModel):
 @router.post("/api/v1/billing/checkout")
 async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db), user_id: UUID = Depends(get_current_user)):
     """A subscription at TODAY's price for this plan, ready for Checkout.js."""
-    if not razorpay.configured():
-        raise HTTPException(status_code=503, detail="payments not configured")
+    if not checkout_open():
+        raise HTTPException(status_code=503, detail=CHECKOUT_CLOSED)
     current = await _current(db, user_id)
     start_at: int | None = None
     replaces: str | None = None

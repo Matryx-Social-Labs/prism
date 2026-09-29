@@ -134,7 +134,8 @@ function CoverageBlock({ counts, count, single }: { counts: Record<Origin, numbe
     <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
       {/* One source so far: a dashed edge round the bar (the design's outline, offset 4). */}
       {single ? <div style={{ display: "flex", alignSelf: "flex-start", margin: "0 0 0 -6px", padding: 4, border: `2px dashed ${c.inkFaint}` }}>{bar}</div> : bar}
-      <div style={{ display: "flex", alignItems: "center", gap: 26, marginTop: 14, fontFamily: OG_SANS, fontSize: 21, color: c.inkMuted }}>
+      {/* Wraps rather than overflows: "k of n monitored outlets" beside four slots is wider than the card. */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 26, rowGap: 10, marginTop: 14, fontFamily: OG_SANS, fontSize: 21, color: c.inkMuted }}>
         {parts.map(([k, n]) => (
           <div key={k} style={{ display: "flex", alignItems: "center" }}>
             <div style={{ width: 14, height: 14, borderRadius: 2, background: c.coverage[k], marginRight: 8 }} />
@@ -260,9 +261,11 @@ export function QuoteCard({ path, quote, speaker, role, meta, translated, report
   );
 }
 
-/** The site card's words: the promise, and what the product is, in one sentence. */
+/** The site card's words: the promise, and what the product is, in one sentence (the landing's subhead). */
 export const SITE_HEADLINE = "Follow the story, not the headlines.";
-export const SITE_LINE = "One record per story, from monitored outlets across India's languages — every development, verified quote and source open to inspection.";
+export const SITE_LINE = "One page per story from the outlets Prism monitors, in English and Indian languages: who said what, word for word, and who covered it. Free to read.";
+/** og:image:alt for the site card: what it prints, nothing more. */
+export const SITE_ALT = `readPrism.news: ${SITE_HEADLINE} ${SITE_LINE}`;
 
 /** Every word a card draws that its route does not pass in, for the font subset (ogFonts). */
 export const CARD_TEXT = [
@@ -270,16 +273,16 @@ export const CARD_TEXT = [
   "One source so far", "translation", quoteCheckLine(true), quoteCheckLine(false), "…",
 ].join(" ");
 
-/** The site card, on the ink ground: the promise, one sentence, the slot colours. */
+/**
+ * The site card, on the ink ground: the promise and one sentence. No coverage
+ * bar: a bar is always printed with its count (DESIGN.md), and the brand card
+ * is prerendered, so any count on it would be the build's, not today's.
+ */
 export function SiteCard({ headline, line }: { headline: string; line: string }) {
-  const slots: [Origin, number, number][] = [["national", 5, 1], ["intl", 1.2, 1], ["regional", 4, 1], ["wire", 0.6, 0.6]];
   return (
     <Frame ink>
       <div style={{ display: "flex", marginTop: "auto", maxWidth: 760, fontFamily: OG_DISPLAY, fontSize: 92, fontWeight: 600, lineHeight: 1.06, letterSpacing: -2 }}>{headline}</div>
-      <div style={{ display: "flex", marginTop: 22, maxWidth: 860, fontFamily: OG_SANS, fontSize: 28, lineHeight: 1.4, color: c.onInkMuted }}>{line}</div>
-      <div style={{ display: "flex", gap: 6, height: 22, marginTop: 34 }}>
-        {slots.map(([k, grow, opacity]) => <div key={k} style={{ flexGrow: grow, flexBasis: 0, borderRadius: 2, background: c.coverageOnInk[k], opacity }} />)}
-      </div>
+      <div style={{ display: "flex", marginTop: 22, maxWidth: 900, fontFamily: OG_SANS, fontSize: 28, lineHeight: 1.4, color: c.onInkMuted }}>{line}</div>
     </Frame>
   );
 }

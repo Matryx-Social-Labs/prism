@@ -6,6 +6,7 @@ import { BottomTabBar } from "@/components/BottomTabBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { jsonLd, siteGraph } from "@/lib/seo";
+import { FEED_TITLE } from "@/lib/atom";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -91,11 +92,13 @@ const themeInit = `(function(){document.documentElement.classList.add("js");try{
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={FONT_VARIABLES} suppressHydrationWarning>
+    <html lang="en-IN" className={FONT_VARIABLES} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         {/* Who publishes this and how to search it — the same on every page (lib/seo). */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(siteGraph()) }} />
+        {/* Here, not metadata.alternates: a page's own alternates (its canonical) replace the layout's, so the feed would vanish from every page that sets one. */}
+        <link rel="alternate" type="application/atom+xml" title={FEED_TITLE} href="/feed.xml" />
       </head>
       <body className="flex min-h-dvh flex-col antialiased">
         <a

@@ -17,6 +17,10 @@ const EXPECTED = {
   "/sources": 300,
   "/corrections": 300,
   "/sitemap.xml": 3600,
+  // The state hubs and the archive index (audit 02, P1): ten minutes and an hour.
+  "/state": 600,
+  "/state/karnataka": 600,
+  "/archive": 3600,
 };
 
 const { routes } = JSON.parse(readFileSync(".next/prerender-manifest.json", "utf8"));

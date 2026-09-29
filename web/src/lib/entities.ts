@@ -1,4 +1,5 @@
 import type { EntityOut } from "@/lib/api";
+import { stateBySlug } from "@/lib/regions";
 
 /**
  * Finds the story's named entities inside a run of text so the record can
@@ -69,6 +70,15 @@ export function markBlocks(texts: string[], entities: EntityOut[]): Segment[][] 
  */
 export function entityRel(e: { indexable?: boolean }): "nofollow" | undefined {
   return e.indexable === false ? "nofollow" : undefined;
+}
+
+/**
+ * An actor's page — except a state's own name, whose page is the state's hub:
+ * /entity/karnataka 308s to /state/karnataka so the two never compete for
+ * "<state> news" (audit 02, P1-1), and a link goes straight there.
+ */
+export function entityHref(slug: string): string {
+  return stateBySlug(slug) ? `/state/${slug}` : `/entity/${slug}`;
 }
 
 export function entityKind(e: EntityOut): string {

@@ -86,6 +86,21 @@ def _facts(facts: list[tuple[str, str]]) -> str:
     )
 
 
+def _records(items: list[tuple[str, str, str]]) -> str:
+    """The digest's list: each record's headline in the record voice, linked, and
+    its count on a mono line under it, on hairlines. (title, count, href)."""
+    rows = "".join(
+        f'<tr><td style="padding:12px 0;border-bottom:1px solid {LINE}">'
+        f'<a href="{_E(href, quote=True)}" style="font-family:{RECORD};font-size:18px;line-height:24px;font-weight:bold;color:{INK};text-decoration:none">{_E(t)}</a>'
+        f'<div style="padding-top:4px;font-family:{MONO};font-size:12px;line-height:18px;color:{INK_3}">{_E(m)}</div></td></tr>'
+        for t, m, href in items
+    )
+    return (
+        f'<tr><td {_PX} style="padding:18px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+        f'style="border-top:1px solid {LINE}">{rows}</table></td></tr>'
+    )
+
+
 def _rule(height: int, color: str) -> str:
     return (
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
@@ -104,10 +119,13 @@ def shell(
     note: str | None = None,
     preheader: str | None = None,
     subject: str | None = None,
+    records: list[tuple[str, str, str]] | None = None,
+    unsubscribe: str | None = None,
 ) -> str:
     """One email's HTML. Every part is plain text and escaped here. `because`
     finishes the sentence "You are getting this because …"; `subject` is the
-    document title when it differs from the heading."""
+    document title when it differs from the heading. `records` are linked
+    (title, count, href) rows; `unsubscribe` is the one-click link in the footer."""
     body = "".join(
         f'<tr><td {_PX} style="padding:{12 if i == 0 else 10}px 28px 0;font-family:{READ};font-size:16px;line-height:25px;color:{INK}">{_E(p)}</td></tr>'
         for i, p in enumerate(paragraphs)
@@ -118,6 +136,11 @@ def shell(
         else ""
     )
     note_html = f'<tr><td {_PX} style="padding:18px 28px 0;font-family:{MONO};font-size:12px;line-height:18px;color:{INK_3}">{_E(note)}</td></tr>' if note else ""
+    unsub = (
+        f'<br><a href="{_E(unsubscribe, quote=True)}" style="color:{INK_3};text-decoration:underline">Unsubscribe in one click</a>'
+        if unsubscribe
+        else ""
+    )
     return f"""\
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" lang="en"><head>
@@ -134,11 +157,12 @@ def shell(
 <tr><td {_PX} style="padding:20px 28px 0;font-family:{MONO};font-size:12px;line-height:18px;letter-spacing:.4px;color:{INK_3}">{_E(meta.upper())}</td></tr>
 <tr><td {_PX} style="padding:8px 28px 0"><h1 style="margin:0;font-family:{RECORD};font-size:28px;line-height:34px;font-weight:bold;color:{INK}">{_E(title)}</h1></td></tr>
 {body}
+{_records(records) if records else ""}
 {_facts(facts) if facts else ""}
 {_button(*cta) if cta else ""}
 {note_html}
 <tr><td {_PX} style="padding:26px 28px 0">{_rule(1, LINE)}</td></tr>
-<tr><td {_PX} style="padding:16px 28px 26px;font-family:{READ};font-size:13px;line-height:20px;color:{INK_3}">{WHY} {_E(because)}<br><br>{_E(SIGN_OFF)}</td></tr>
+<tr><td {_PX} style="padding:16px 28px 26px;font-family:{READ};font-size:13px;line-height:20px;color:{INK_3}">{WHY} {_E(because)}{unsub}<br><br>{_E(SIGN_OFF)}</td></tr>
 </table></td></tr></table></body></html>"""
 
 
@@ -151,17 +175,21 @@ def plain(
     because: str,
     facts: list[tuple[str, str]] | None = None,
     note: str | None = None,
+    records: list[tuple[str, str, str]] | None = None,
+    unsubscribe: str | None = None,
     **_: object,
 ) -> str:
     """The plain-text twin, in the design's .txt shape: the same parts, in order."""
     blocks = [title, meta.upper(), *paragraphs]
+    if records:
+        blocks.append("\n\n".join(f"{t}\n{m}\n{href}" for t, m, href in records))
     if facts:
         blocks.append("\n".join(f"{k}: {v}" for k, v in facts))
     if cta:
         blocks.append(f"{cta[0]}: {cta[1]}")
     if note:
         blocks.append(note)
-    blocks += [f"—\n{WHY} {because}", SIGN_OFF]
+    blocks += [f"—\n{WHY} {because}" + (f"\nUnsubscribe in one click: {unsubscribe}" if unsubscribe else ""), SIGN_OFF]
     return "\n\n".join(blocks)
 
 
@@ -182,4 +210,31 @@ def magic_link_email(*, link: str, ttl_min: int, to: str, now: datetime | None =
         note="Did not ask for this? Ignore it. Nobody can sign in without this link.",
         because=f"someone asked to sign in to Prism with {to}.",
         preheader=f"Your one-time link to sign in. It works once, for {ttl_min} minutes.",
+    )
+
+
+# Where a reader writes to delete the account (web/src/lib/legal.ts CONTACT_EMAIL).
+CONTACT = "hello@readprism.news"
+
+
+def welcome_email(*, to: str) -> tuple[str, str]:
+    """The one service message a new free account gets (first verify only, never
+    on a later sign-in): what the account adds, counted from the quota constants,
+    where to pick subjects, how to delete it. No marketing: the week's record is
+    named only to say it is off."""
+    from common.quota import USER_ASK_PER_DAY, USER_LENS_PER_DAY
+
+    return render(
+        subject="Your Prism account",
+        title="Your Prism account",
+        meta="Free account",
+        paragraphs=[
+            f"Your account adds {USER_LENS_PER_DAY} lens readings and {USER_ASK_PER_DAY} questions a day, and a watchlist. "
+            "Pick the subjects you follow and they make your For you tab.",
+            "The week's record by email is off. It stays off unless you turn it on in your account.",
+            f"To delete your account and everything Prism holds, write to {CONTACT} from this address.",
+        ],
+        cta=("Pick what you follow", f"{_web()}/interests"),
+        because=f"a Prism account was opened with {to}.",
+        preheader="What your account adds, and where to pick what you follow.",
     )

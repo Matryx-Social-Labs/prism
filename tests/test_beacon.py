@@ -195,3 +195,23 @@ async def test_a_signed_in_beacon_records_the_day_and_nothing_else():
             await s.execute(text("DELETE FROM sessions WHERE user_id = :u"), {"u": uid})
             await s.execute(text("DELETE FROM users WHERE id = :u"), {"u": uid})
 
+
+
+async def test_launch_attribution_is_counted_in_closed_words_only():
+    """06 §2.1–2.3: the campaign word a link carried, where a reader says they
+    heard of Prism, the post-read question and a share arrival reading on —
+    each a word from a fixed list. A word off the list is dropped, so a script
+    (or a reader's own words) can never write a new row."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    words = [("campaign", "producthunt"), ("campaign", "other"), ("heard", "friend"),
+             ("survey", "check:partly"), ("depth", "2:share")]
+    strays = [("campaign", "my-newsletter-42"), ("heard", "my uncle on whatsapp"), ("survey", "check:maybe"),
+              ("depth", "5:share")]
+    before = [await _count(e, d) for e, d in words]
+    stray_before = [await _count(e, d) for e, d in strays]
+    async with _client() as c:
+        for e, d in words + strays:
+            assert (await c.post("/api/v1/beacon", json={"e": e, "d": d}, headers=_reader())).status_code == 204
+    assert [await _count(e, d) for e, d in words] == [n + 1 for n in before]
+    assert [await _count(e, d) for e, d in strays] == stray_before

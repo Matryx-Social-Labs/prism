@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
-import { fetchFeed, fetchSubjects, fetchTrending } from "@/lib/api";
+import { fetchArchive, fetchFeed, fetchStateHubs, fetchSubjects, fetchTrending } from "@/lib/api";
 import { SECTOR_GROUPS, sectorPageFor } from "@/lib/sectors";
 import { SITE_URL } from "@/lib/site";
+import { newsTime } from "@/lib/dateline";
 
 export const revalidate = 3600;
 // Every fetch below is asked for the same hour: a shorter one would set the
@@ -30,6 +31,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/refunds`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/delivery`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/grievance`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${SITE_URL}/press`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${SITE_URL}/for-publishers`, changeFrequency: "monthly", priority: 0.3 },
     ...SECTOR_GROUPS.map((g) => ({ url: `${SITE_URL}/sector/${g.slug}`, changeFrequency: "hourly" as const, priority: 0.7 })),
     // Every node of the subject tree that has stories under it. A node with
     // none is left out rather than offered to a crawler as an empty room, and
@@ -52,7 +57,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Only what asks to be indexed: two outlets or more, a verified story (lib/seo NOT_INDEXED).
     stories = feed.filter((e) => e.indexable !== false).map((e) => ({
       url: `${SITE_URL}/story/${e.id}`,
-      lastModified: e.last_updated_at,
+      // The newest report, as records-sitemap.xml has it: not the rebuild clock (audit 01 P2-11).
+      // Never later than the record's own rebuild: a feed can stamp a report in
+      // the future, and the API's sitemaps clamp the same way (review 2026-09-29).
+      lastModified: Date.parse(newsTime(e)) > Date.parse(e.last_updated_at) ? e.last_updated_at : newsTime(e),
       changeFrequency: "hourly" as const,
       priority: 0.7,
     }));
@@ -71,5 +79,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // as above
   }
 
-  return [...staticPages, ...arcs, ...stories];
+  // The state hubs and the day archive (audit 02, P1): their indexes always,
+  // and a hub or a day only when it asks to be indexed (the API's floors). An
+  // API that cannot answer leaves both out rather than guessing.
+  const hubs = await fetchStateHubs(revalidate).catch(() => null);
+  const archive = await fetchArchive(revalidate).catch(() => null);
+  const places: MetadataRoute.Sitemap = [
+    { url: `${SITE_URL}/state`, changeFrequency: "daily", priority: 0.6 },
+    ...(hubs?.states ?? []).filter((s) => s.indexable).map((s) => ({ url: `${SITE_URL}/state/${s.slug}`, changeFrequency: "hourly" as const, priority: 0.7 })),
+    { url: `${SITE_URL}/archive`, changeFrequency: "daily", priority: 0.5 },
+    ...(archive?.days ?? []).filter((d) => d.indexable).map((d) => ({ url: `${SITE_URL}/feed/${d.date}`, changeFrequency: "weekly" as const, priority: 0.5 })),
+  ];
+
+  return [...staticPages, ...places, ...arcs, ...stories];
 }

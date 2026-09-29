@@ -336,3 +336,33 @@ export function runwayDays(data: Spend): number | null {
   if (perDay <= 0) return null;
   return Math.max(0, (data.balance.balance - data.floor) / perDay);
 }
+
+// ── Grievances (api/routes/grievances.py) ─────────────────────────────────────
+
+export type GrievanceStatus = "open" | "resolved" | "rejected";
+
+export interface AdminGrievance {
+  ref: string;
+  created_at: string;
+  name: string | null;
+  email: string;
+  category: string;
+  subject_url: string | null;
+  body: string;
+  status: GrievanceStatus;
+  /** Null when the acknowledgement email did not go out: acknowledge by hand. */
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  outcome: string | null;
+  decide_by: string;
+}
+
+export const fetchGrievances = (s: Session) =>
+  adminCall<{ decide_within_days: number; grievances: AdminGrievance[] }>(s, "/api/v1/admin/grievances");
+
+/** Resolve or reject, once; `emailed` says whether the complainant was told. */
+export const decideGrievance = (s: Session, ref: string, status: Exclude<GrievanceStatus, "open">, outcome: string) =>
+  adminCall<{ ref: string; status: GrievanceStatus; emailed: boolean }>(s, `/api/v1/admin/grievances/${encodeURIComponent(ref)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, outcome }),
+  });

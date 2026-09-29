@@ -10,6 +10,7 @@ Prism is not a publisher of original reporting and does not rate outlets. A reco
 - A quote has its own address, readprism.news/story/<id>/quote/<n>: the words, the speaker, the outlet, and a link that opens the article at that line.
 - Record pages carry NewsArticle JSON-LD with isBasedOn (the reports, with outlet and language) and about (the named people and organisations, linked to their pages).
 - Records, subject pages, actor pages and the pages listed here are server-rendered HTML.
+- [llms-full.txt](https://www.readprism.news/llms-full.txt): this file, then the questions a first visit asks, what Prism refuses to do and the words on a record, as the pages print them.
 
 ## Live pages
 
@@ -24,9 +25,11 @@ Prism is not a publisher of original reporting and does not rate outlets. A reco
 ## Sitemaps
 
 - [Pages](https://www.readprism.news/sitemap.xml) · [Records](https://www.readprism.news/records-sitemap.xml) · [Actors](https://www.readprism.news/entities-sitemap.xml) · [News, last 48 hours](https://www.readprism.news/news-sitemap.xml)
+- [Atom feed](https://www.readprism.news/feed.xml): the newest records two or more monitored outlets reported.
 
 ## Optional
 
 - [Plus](https://www.readprism.news/plus): the record stays free for everyone; Plus adds the professional readings of a story and more questions a day.
 - [Privacy](https://www.readprism.news/privacy) · [Terms](https://www.readprism.news/terms) · [Refunds](https://www.readprism.news/refunds)
-- Contact: hello@readprism.news
+- [Press](https://www.readprism.news/press): the description, how to cite, the logo files · [For publishers](https://www.readprism.news/for-publishers): what Prism takes from a report and sends back
+- Contact: hello@readprism.news · Grievances: grievance@readprism.news, to the [Grievance Officer](https://www.readprism.news/grievance)

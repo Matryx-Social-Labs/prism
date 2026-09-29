@@ -18,15 +18,17 @@ logger = get_logger(__name__)
 
 
 class EmailSender(Protocol):
-    async def send(self, *, to: str, subject: str, body: str, html: str | None = None) -> None: ...
+    async def send(self, *, to: str, subject: str, body: str, html: str | None = None, reply_to: str | None = None,
+                   headers: dict[str, str] | None = None) -> None: ...
 
 
 class ConsoleEmailSender:
     """Dev sender: logs the message instead of delivering it. The magic link
     appears in the worker/API logs so a developer can complete the flow."""
 
-    async def send(self, *, to: str, subject: str, body: str, html: str | None = None) -> None:
-        logger.info("email_console", to=to, subject=subject, body=body)
+    async def send(self, *, to: str, subject: str, body: str, html: str | None = None, reply_to: str | None = None,
+                   headers: dict[str, str] | None = None) -> None:
+        logger.info("email_console", to=to, subject=subject, body=body, reply_to=reply_to, headers=headers)
 
 
 class ResendEmailSender:
@@ -34,7 +36,8 @@ class ResendEmailSender:
     on a verified domain (PRISM_EMAIL_FROM). Raises on failure so a dropped login
     email is loud, not silent."""
 
-    async def send(self, *, to: str, subject: str, body: str, html: str | None = None) -> None:
+    async def send(self, *, to: str, subject: str, body: str, html: str | None = None, reply_to: str | None = None,
+                   headers: dict[str, str] | None = None) -> None:
         settings = get_settings()
         if not settings.resend_api_key:
             raise RuntimeError("prism_email_provider=resend but RESEND_API_KEY is unset")
@@ -48,6 +51,9 @@ class ResendEmailSender:
                     "subject": subject,
                     "text": body,  # plaintext fallback
                     "html": html or f"<p>{body}</p>",
+                    **({"reply_to": reply_to} if reply_to else {}),
+                    # List-Unsubscribe and -Post (the digest); Resend passes custom headers through.
+                    **({"headers": headers} if headers else {}),
                 },
             )
         if resp.status_code >= 300:

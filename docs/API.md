@@ -44,7 +44,7 @@ There is no shared pagination dependency — each route declares its own `limit`
 
 | Method & path | Params | Auth | Notes |
 |---|---|---|---|
-| `GET /healthz` | `freshness_window_hours` (query, clamped `MIN_WINDOW_HOURS..MAX_WINDOW_HOURS`) | public | **No `/api/v1` prefix.** Never fails on pipeline backlog — always `SELECT 1`, then reports Redis stream depth (`streams`) and a 24h window of p50/p95 pipeline-stage latencies (`freshness`). `-1`/`null` means "unavailable," not zero. |
+| `GET /healthz` | `freshness_window_hours` (query, clamped `MIN_WINDOW_HOURS..MAX_WINDOW_HOURS`) | public | **No `/api/v1` prefix.** Never fails on pipeline backlog — always `SELECT 1`, then reports Redis stream depth (`streams`) and a 24h window of p50/p95 pipeline-stage latencies (`freshness`). `freshness.ok` is `false` and `freshness.stalled` `true` when the window observed nothing, with `freshness.newest_observed_at` saying since when; `status` stays `"ok"`. `-1`/`null` means "unavailable," not zero. |
 | `GET /api/v1/lenses` → `LensesResponse` | — | public | Shipped lenses only. |
 | `GET /api/v1/sources` → `SourcesResponse` | — | public | Public monitored-outlet list; deliberately excludes feed URLs and error text. |
 | `GET /api/v1/regions` | — | public | `common.regions.states_payload()`. |

@@ -11,7 +11,9 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // On the phone these draw their own top: the masthead with the tab bar, or a back bar.
-const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you", "/account", "/interests", "/watchlist", "/story", "/entity", "/subject", "/corrections", "/sources", "/privacy", "/terms", "/refunds"];
+const APP_ROUTES = ["/feed", "/trending", "/pulse", "/search", "/sector", "/you", "/account", "/interests", "/watchlist", "/story", "/entity", "/subject", "/corrections", "/sources", "/privacy", "/terms", "/refunds",
+  // 0.0.115.0's pages draw a back bar too: without them here the phone showed two lockups.
+  "/grievance", "/delivery", "/press", "/for-publishers", "/state", "/archive"];
 
 // Signing in and setting up a feed get the brand-only bar (Design System v2 ·
 // Accounts board): no nav to wander off through, no "Sign in" on the sign-in page.

@@ -450,6 +450,11 @@ class User(TimestampMixin, Base):
     languages: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     state: Mapped[str | None] = mapped_column(Text)
     consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The week's record by email (common/weekly_digest.py): the consent record
+    # (on, and off once withdrawn) and the ISO week last sent (migration d7e2b4c81f05).
+    digest_opted_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    digest_unsubscribed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    digest_last_week: Mapped[str | None] = mapped_column(Text)
 
 
 class UsageQuota(TimestampMixin, Base):

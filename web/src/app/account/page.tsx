@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { DigestToggle } from "@/components/DigestToggle";
 import { Payments } from "@/components/Payments";
 import { PlanCard } from "@/components/PlanCard";
 import { SectionHead } from "@/components/SectionHead";
@@ -54,6 +55,8 @@ export default function AccountPage() {
             <ThemeToggle />
           </div>
         </section>
+
+        <DigestToggle session={session} />
 
         <div className="grid gap-2 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
           <div>

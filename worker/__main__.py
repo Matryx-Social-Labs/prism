@@ -277,6 +277,16 @@ async def main(stages: list[str]) -> None:
             _indexnow, IntervalTrigger(minutes=60), id="indexnow", max_instances=1, coalesce=True,
             next_run_time=datetime.now(UTC) + timedelta(seconds=300),
         )
+        # The week's record by email, Sunday 08:00 IST, to accounts that turned it
+        # on. A no-op unless PRISM_DIGEST_ENABLED (common/weekly_digest).
+        from apscheduler.triggers.cron import CronTrigger
+
+        from common.weekly_digest import run_digest
+
+        scheduler.add_job(
+            run_digest, CronTrigger(day_of_week="sun", hour=2, minute=30, timezone="UTC"), id="weekly_digest",
+            max_instances=1, coalesce=True, misfire_grace_time=3600,
+        )
         scheduler.start()
         # Kick off one ingestion run at startup so a fresh deploy has data.
         tasks.append(asyncio.create_task(_initial_ingest()))

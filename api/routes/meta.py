@@ -138,12 +138,22 @@ async def sitemap_records(db: AsyncSession = Depends(get_db)):
 
     Only records that ask to be indexed (common/outlets.record_indexable: two
     outlets or more), so the sitemap never offers a page whose robots say no.
-    Two sources is the SQL's cut; two publishers is the rule's."""
+    Two sources is the SQL's cut; two publishers is the rule's.
+
+    `lastmod` is the newest report's publication (the projection's
+    `latest_published_at`), never after the record was last rebuilt with it:
+    `last_updated_at` alone is the rebuild clock, and hundreds of URLs sharing
+    one rebuild hour is what makes Google stop trusting lastmod (audit 01
+    P2-11). A record without a dated report falls back to the rebuild clock."""
     rows = (
         await db.execute(
             text(
                 """
-                SELECT id, last_updated_at, projection->'source_slugs' FROM events
+                SELECT id,
+                       LEAST(COALESCE((projection->>'latest_published_at')::timestamptz, last_updated_at),
+                             last_updated_at),
+                       projection->'source_slugs'
+                FROM events
                 WHERE COALESCE(jsonb_array_length(projection->'source_slugs'), 0) >= 2
                   AND merged_into IS NULL
                 ORDER BY last_updated_at DESC LIMIT 50000
@@ -153,7 +163,7 @@ async def sitemap_records(db: AsyncSession = Depends(get_db)):
     ).all()
     reg = await outlets.registry(db)
     return {"records": [
-        {"id": str(r[0]), "last_updated_at": r[1].isoformat() if r[1] else None}
+        {"id": str(r[0]), "lastmod": r[1].isoformat() if r[1] else None}
         for r in rows if record_indexable(r[2] or [], reg)
     ]}
 
@@ -196,6 +206,42 @@ async def sitemap_news(db: AsyncSession = Depends(get_db)):
     reg = await outlets.registry(db)
     listed = [r for r in rows if record_indexable(r[3] or [], reg)][:NEWS_SITEMAP_CAP]
     return {"records": [{"id": str(r[0]), "title": r[1], "published_at": r[2].isoformat()} for r in listed]}
+
+
+ATOM_ENTRIES = 50
+_ATOM_SCAN = 200  # two sources in SQL can be one publisher (two feeds of one masthead)
+
+
+@router.get("/api/v1/sitemap/atom")
+async def sitemap_atom(db: AsyncSession = Depends(get_db)):
+    """The Atom feed's records (web /feed.xml): the newest records that ask to
+    be indexed (the records sitemap's rule), newest report first. `updated` is
+    the newest report's publication, never when Prism last rebuilt the record,
+    and never later than that rebuild: a feed that stamps its report in the
+    future cannot pin a record to the top. A record whose reports carry no
+    date is not listed. `summary` is the record's own, never article text."""
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT id, title, summary, projection->'source_slugs' AS slugs,
+                       LEAST((projection->>'latest_published_at')::timestamptz, last_updated_at) AS updated
+                FROM events
+                WHERE COALESCE(jsonb_array_length(projection->'source_slugs'), 0) >= 2
+                  AND merged_into IS NULL
+                  AND projection->>'latest_published_at' IS NOT NULL
+                ORDER BY updated DESC LIMIT :scan
+                """
+            ),
+            {"scan": _ATOM_SCAN},
+        )
+    ).mappings().all()
+    reg = await outlets.registry(db)
+    listed = [r for r in rows if record_indexable(r["slugs"] or [], reg)][:ATOM_ENTRIES]
+    return {"records": [
+        {"id": str(r["id"]), "title": r["title"], "summary": r["summary"] or None, "updated": r["updated"].isoformat()}
+        for r in listed
+    ]}
 
 
 @router.get("/api/v1/taxonomy", response_model=TaxonomyResponse)

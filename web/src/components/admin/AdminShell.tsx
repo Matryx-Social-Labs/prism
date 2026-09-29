@@ -48,6 +48,7 @@ export const ADMIN_NAV: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/admin/labellers", label: "Labellers" },
   { href: "/admin/batches", label: "Batches" },
   { href: "/admin/people", label: "People" },
+  { href: "/admin/grievances", label: "Grievances" },
   { href: "/admin/controls", label: "Controls" },
   { href: "/admin/audit", label: "Audit" },
 ];

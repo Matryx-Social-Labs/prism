@@ -7,13 +7,14 @@ import AdminOverview from "@/app/admin/page";
 const fetchMetrics = vi.hoisted(() => vi.fn());
 const fetchLabellers = vi.hoisted(() => vi.fn());
 const fetchBatches = vi.hoisted(() => vi.fn());
+const fetchGrievances = vi.hoisted(() => vi.fn());
 const ADMIN = vi.hoisted(() => ({ session: { token: "t", userId: "u", email: "f@example.test" }, email: "f@example.test" }));
 
 vi.mock("@/components/admin/AdminShell", async (orig) => ({
   ...(await orig<typeof import("@/components/admin/AdminShell")>()),
   useAdmin: () => ADMIN,
 }));
-vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchMetrics, fetchLabellers, fetchBatches }));
+vi.mock("@/lib/admin", async (orig) => ({ ...(await orig<typeof import("@/lib/admin")>()), fetchMetrics, fetchLabellers, fetchBatches, fetchGrievances }));
 
 const metrics = (days: number) => ({
   range: { days, start: "2031-01-04", end: "2031-01-31", prev_start: "2030-12-07", prev_end: "2031-01-03", tz: "Asia/Kolkata" },
@@ -28,6 +29,7 @@ beforeEach(() => {
   fetchMetrics.mockReset().mockImplementation(async (_s: unknown, days: number) => metrics(days));
   fetchLabellers.mockReset().mockResolvedValue({ labellers: [{ status: "applied" }, { status: "active" }], board: [], languages: [] });
   fetchBatches.mockReset().mockResolvedValue({ batches: [{ purpose: "practice", open: false, gated: 0, tasks: 8 }, { purpose: "work", open: true, gated: 150, tasks: 150 }] });
+  fetchGrievances.mockReset().mockResolvedValue({ decide_within_days: 15, grievances: [{ status: "open" }, { status: "open" }, { status: "resolved" }] });
 });
 
 describe("the overview", () => {
@@ -38,6 +40,8 @@ describe("the overview", () => {
     expect(screen.getByRole("link", { name: /1 practice rounds or tests not published/ })).toBeInTheDocument();
     // A fully gated work batch is not waiting on anyone.
     expect(screen.queryByText(/without a language gate/)).not.toBeInTheDocument();
+    // Open complaints carry a legal clock; decided ones wait on nobody.
+    expect(screen.getByRole("link", { name: /2 complaints to decide/ })).toHaveAttribute("href", "/admin/grievances");
   });
 
   it("shows the period and when counting began, and re-reads on a new period", async () => {
@@ -79,6 +83,7 @@ describe("the overview", () => {
   it("says plainly when nothing is waiting", async () => {
     fetchLabellers.mockResolvedValue({ labellers: [], board: [], languages: [] });
     fetchBatches.mockResolvedValue({ batches: [] });
+    fetchGrievances.mockResolvedValue({ decide_within_days: 15, grievances: [] });
     render(<AdminOverview />);
     expect(await screen.findByText("Nothing is waiting on you.")).toBeInTheDocument();
   });

@@ -8,7 +8,7 @@ import { SystemPage } from "@/components/ui";
 // back to their stacks (Georgia, the system sans), which is enough for one line.
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <html lang="en">
+    <html lang="en-IN">
       <body>
         <SystemPage kind="error" reference={error.digest} onRetry={reset} />
       </body>

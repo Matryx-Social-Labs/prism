@@ -208,6 +208,11 @@ _FRESHNESS_SQL = text(
 )
 
 
+# Only read when the window saw nothing: when it saw something, the newest
+# observation is the window's own `latest_observed_at`.
+_NEWEST_OBSERVED_SQL = text("SELECT max(observed_at) AS newest_observed_at FROM raw_items")
+
+
 def _int(row: Any, key: str) -> int:
     return int(row.get(key) or 0)
 
@@ -241,6 +246,12 @@ async def pipeline_freshness(
 
     A bounded window lets operators distinguish a recovered live path from an
     older catch-up cohort. The default remains 24 hours for existing callers.
+
+    ``ok`` is False and ``stalled`` True when the window observed nothing: the
+    collector stopped, and every stage clock below is empty rather than fast
+    (2026-09-29: ``ok: true`` beside ``observation.count: 0`` for a day).
+    ``newest_observed_at`` then says since when. It is telemetry, not
+    liveness: ``/healthz`` still answers "ok" on a paused pipeline.
     """
     window_hours = max(MIN_WINDOW_HOURS, min(MAX_WINDOW_HOURS, int(window_hours)))
     try:
@@ -250,13 +261,22 @@ async def pipeline_freshness(
         logger.exception("pipeline_freshness_unavailable")
         return {"ok": None, "window_hours": window_hours, "error": "unavailable"}
 
+    observed = _int(row, "observed_count")
+    newest = _time(row, "latest_observed_at")
+    if not observed:
+        try:
+            newest = _time((await db.execute(_NEWEST_OBSERVED_SQL)).mappings().one(), "newest_observed_at")
+        except Exception:  # noqa: BLE001 - still stalled; only "since when" is unknown
+            logger.exception("newest_observation_unavailable")
     published_samples = _int(row, "publish_observe_samples")
     enriched = _int(row, "enriched_count")
     return {
-        "ok": True,
+        "ok": observed > 0,
+        "stalled": not observed,
+        "newest_observed_at": newest,
         "window_hours": window_hours,
         "observation": {
-            "count": _int(row, "observed_count"),
+            "count": observed,
             "latest_at": _time(row, "latest_observed_at"),
             "publish_to_observe": _latency(row, "publish_observe", published_samples),
         },

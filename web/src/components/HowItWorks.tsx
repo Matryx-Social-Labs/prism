@@ -53,7 +53,7 @@ export const REFUSALS: [string, string][] = [
 
 // The words a record uses, for a reader meeting them for the first time. Plain
 // definitions, in the order a record shows them.
-const WORDS: [string, string][] = [
+export const WORDS: [string, string][] = [
   ["Report", "One article by one outlet, kept as it was published, with its outlet and time. Prism links to it; the journalism is the outlet\u2019s."],
   ["Record", "Everything Prism holds on one story: the reports, who said what, who covered it, and the brief written from them."],
   ["Monitored outlets", "The fixed list of outlets Prism reads. Every count on a record is out of this list."],
@@ -294,7 +294,10 @@ export async function HowItWorks() {
               headline that misreads it, an outlet credited for a photograph that is not theirs. Every record
               has these links at its foot, with its address filled in; or write to{" "}
               <a className="p-link" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>{" "}
-              with the record&rsquo;s link. {LEGAL_ENTITY} publishes Prism and is answerable for it.
+              with the record&rsquo;s link. {LEGAL_ENTITY} publishes Prism and is answerable for it; a
+              formal complaint goes to its{" "}
+              <Link href="/grievance" className="p-link">Grievance Officer</Link>, who acknowledges it within 24 hours
+              and decides it within 15 days.
             </p>
             <div className="mt-4 max-w-[420px]"><ReportProblem /></div>
           </Closing>

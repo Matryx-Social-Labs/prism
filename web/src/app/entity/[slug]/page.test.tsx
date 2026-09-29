@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { EntityPage, EntityQuote } from "@/lib/api";
+import { SITE_URL } from "@/lib/site";
 
 const fetchEntity = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual<typeof import("@/lib/api")>("@/lib/api")), fetchEntity }));
@@ -49,11 +50,11 @@ const THREE = [quote("q1", METRO), quote("q2", WATER), quote("q3", REPORTED, { s
 const params = { params: Promise.resolve({ slug: "dk-shivakumar" }) };
 const open = async () => render(await EntityHubPage(params));
 
-/** The entity's own JSON-LD block (the first; the second is the records ItemList). */
-function entityGraph(container: HTMLElement) {
-  const script = container.querySelector('script[type="application/ld+json"]');
-  return JSON.parse(script?.textContent ?? "null");
-}
+/** The page's JSON-LD blocks: the CollectionPage about the entity, then its breadcrumb. */
+const blocks = (container: HTMLElement) =>
+  [...container.querySelectorAll('script[type="application/ld+json"]')].map((s) => JSON.parse(s.textContent ?? "null"));
+/** The entity itself, as the CollectionPage is `about` it. */
+const entityGraph = (container: HTMLElement) => blocks(container)[0].about;
 
 beforeEach(() => fetchEntity.mockReset());
 
@@ -87,7 +88,7 @@ describe("/entity/[slug] — what they said", () => {
     const shown = [...container.querySelectorAll("blockquote")].map((b) => b.textContent?.replace(/^“|”$/g, ""));
     expect(items.map((q: { text: string }) => q.text)).toEqual(shown);
     expect(shown).toEqual([METRO, WATER]);
-    expect(items.every((q: { "@type": string; spokenByCharacter: { "@id": string } }) => q["@type"] === "Quotation" && q.spokenByCharacter["@id"] === `${ld.url}#entity`)).toBe(true);
+    expect(items.every((q: { "@type": string; spokenByCharacter: { "@id": string } }) => q["@type"] === "Quotation" && q.spokenByCharacter["@id"] === ld["@id"])).toBe(true);
   });
 
   it("prints k of n when the page holds fewer than it counted, and from which stories", async () => {
@@ -102,6 +103,35 @@ describe("/entity/[slug] — what they said", () => {
     expect(screen.queryByRole("heading", { name: /said/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/quote/)).not.toBeInTheDocument();
     expect(entityGraph(container).subjectOf).toBeUndefined();
+  });
+});
+
+// Audit 01 P2-3: the page is a CollectionPage about the actor, the count is
+// the page's (never the person's description), and a breadcrumb places it.
+describe("/entity/[slug] — structured data", () => {
+  const row = (id: string) => ({ id, title: `Record ${id}` }) as unknown as EntityPage["records"][number];
+
+  it("is a CollectionPage about the actor, listing the records, with the count in the page's description", async () => {
+    fetchEntity.mockResolvedValue(page([], { records: [row("r1"), row("r2")], entity: { slug: "dk-shivakumar", name: "DK Shivakumar", entity_type: "person", schema_type: "Person", qid: "Q123", aliases: [] } }));
+    const { container } = await open();
+    const [collection, crumbs] = blocks(container);
+    const url = `${SITE_URL}/entity/dk-shivakumar`;
+    expect(collection["@type"]).toBe("CollectionPage");
+    expect(collection.url).toBe(url);
+    expect(collection.description).toBe("9 Prism records name DK Shivakumar.");
+    expect(collection.about).toMatchObject({ "@type": "Person", "@id": `${url}#entity`, name: "DK Shivakumar", sameAs: ["https://www.wikidata.org/wiki/Q123"] });
+    expect(collection.about.description).toBeUndefined();
+    expect(collection.mainEntity["@type"]).toBe("ItemList");
+    expect(collection.mainEntity["@context"]).toBeUndefined();
+    expect(collection.mainEntity.itemListElement.map((i: { name: string }) => i.name)).toEqual(["Record r1", "Record r2"]);
+    expect(crumbs["@type"]).toBe("BreadcrumbList");
+    expect(crumbs.itemListElement.map((i: { name: string; item: string }) => [i.name, i.item])).toEqual([["Prism", `${SITE_URL}/`], ["DK Shivakumar", url]]);
+  });
+
+  it("lists no records it does not have", async () => {
+    fetchEntity.mockResolvedValue(page([]));
+    const { container } = await open();
+    expect(blocks(container)[0].mainEntity).toMatchObject({ numberOfItems: 0, itemListElement: [] });
   });
 });
 

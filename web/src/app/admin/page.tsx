@@ -17,7 +17,7 @@ import { KpiTile } from "@/components/admin/charts/KpiTile";
 import { dayLabel } from "@/components/admin/charts/format";
 import { DashboardSection } from "@/components/admin/Dashboard";
 import { Alert } from "@/components/ui";
-import { downloadWeeklyCsv, fetchBatches, fetchLabellers, fetchMetrics, type MetricRow, type Metrics } from "@/lib/admin";
+import { downloadWeeklyCsv, fetchBatches, fetchGrievances, fetchLabellers, fetchMetrics, type MetricRow, type Metrics } from "@/lib/admin";
 
 const PERIODS = [7, 28, 90] as const;
 
@@ -84,9 +84,11 @@ export default function AdminOverview() {
 
   useEffect(() => {
     // What is waiting on a founder, from the same routes the pages below use.
-    Promise.all([fetchLabellers(session), fetchBatches(session)])
-      .then(([l, b]) =>
+    Promise.all([fetchLabellers(session), fetchBatches(session), fetchGrievances(session)])
+      .then(([l, b, g]) =>
         setNeeds([
+          // First: the only item here with a legal clock (15 days, IT Rules R11(2)).
+          { href: "/admin/grievances", count: g.grievances.filter((x) => x.status === "open").length, text: "complaints to decide" },
           { href: "/admin/labellers", count: l.labellers.filter((x) => x.status === "applied").length, text: "applications to read" },
           { href: "/admin/batches", count: b.batches.filter((x) => x.purpose !== "work" && !x.open).length, text: "practice rounds or tests not published" },
           { href: "/admin/batches", count: b.batches.filter((x) => x.purpose === "work" && x.gated < x.tasks).length, text: "work batches without a language gate" },

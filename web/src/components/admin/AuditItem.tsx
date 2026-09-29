@@ -12,6 +12,7 @@ export const ACTION_WORD: Record<string, string> = {
   "batch.languages": "Filled in a batch's languages",
   "batch.list": "Changed a batch's listing",
   "batch.open": "Opened or closed a batch",
+  "grievance.decide": "Decided a complaint",
   "labeller.add": "Added a labeller",
   "labeller.grant": "Changed a qualification",
   "labeller.status": "Changed a labeller's status",
