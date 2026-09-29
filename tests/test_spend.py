@@ -55,7 +55,7 @@ async def _redis_up() -> bool:
         return False
 
 
-async def test_the_schema_sits_before_the_article_so_the_prefix_can_be_cached(monkeypatch):
+async def test_the_prompt_and_schema_are_one_prefix_before_the_article(monkeypatch):
     sent: list = []
     monkeypatch.setattr(llm, "get_llm", lambda: _client(sent))
     monkeypatch.setattr(llm, "_respect_cooldown", _noop)
@@ -65,12 +65,44 @@ async def test_the_schema_sits_before_the_article_so_the_prefix_can_be_cached(mo
         {"role": "user", "content": "ARTICLE: a different body every call"},
     ]
     await llm.structured_chat(model="m", messages=messages, output_model=Out, trace_name="extract-shared")
-    roles = [(m["role"], m["content"][:24]) for m in sent[0]["messages"]]
-    assert roles[0] == ("system", "You extract news facts.")
-    assert roles[1][0] == "system" and "JSON Schema" in sent[0]["messages"][1]["content"]
-    assert roles[2] == ("user", "ARTICLE: a different bod")
+    first, article = sent[0]["messages"]
     # Nothing variable may precede the schema: it is the end of the cached prefix.
-    assert all(m["role"] == "system" for m in sent[0]["messages"][:2])
+    assert first["role"] == "system"
+    assert first["content"].startswith("You extract news facts.") and "JSON Schema" in first["content"]
+    assert article == {"role": "user", "content": "ARTICLE: a different body every call"}
+
+
+async def test_a_gemini_prefix_is_marked_for_the_cache(monkeypatch):
+    """REGRESSION 2026-09-29: Gemini's implicit cache served 2,450 of
+    extraction's 4,380 fixed tokens; marked, all of it was read from cache on
+    20 of 20 calls and a call fell from $0.00069 to $0.00046. OpenRouter honours
+    the mark only on ONE system message — two were sent until this change."""
+    sent: list = []
+    monkeypatch.setattr(llm, "get_llm", lambda: _client(sent))
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setattr(spend, "record_response", _noop)
+    messages = [
+        {"role": "system", "content": "You extract news facts."},
+        {"role": "system", "content": "Also this."},
+        {"role": "user", "content": "ARTICLE"},
+    ]
+    await llm.structured_chat(model="google/gemini-3.1-flash-lite", messages=messages, output_model=Out, trace_name="t")
+    first, article = sent[0]["messages"]
+    [block] = first["content"]
+    assert block["cache_control"] == {"type": "ephemeral"}
+    assert block["text"].startswith("You extract news facts.\n\nAlso this.") and "JSON Schema" in block["text"]
+    assert article["content"] == "ARTICLE"
+
+
+async def test_other_models_get_a_plain_prefix(monkeypatch):
+    """Their providers cache a repeated prefix on their own (Z.AI, Together);
+    a content-block system message is only for the providers that need a mark."""
+    sent: list = []
+    monkeypatch.setattr(llm, "get_llm", lambda: _client(sent))
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setattr(spend, "record_response", _noop)
+    await llm.structured_chat(model="z-ai/glm-5.3-flash", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t")
+    assert isinstance(sent[0]["messages"][0]["content"], str)
 
 
 async def test_a_prompt_with_no_system_message_still_leads_with_the_schema(monkeypatch):
@@ -80,6 +112,7 @@ async def test_a_prompt_with_no_system_message_still_leads_with_the_schema(monke
     monkeypatch.setattr(spend, "record_response", _noop)
     await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t")
     assert [m["role"] for m in sent[0]["messages"]] == ["system", "user"]
+    assert "JSON Schema" in sent[0]["messages"][0]["content"]
 
 
 async def test_openrouter_is_asked_for_the_calls_cost(monkeypatch):

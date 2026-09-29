@@ -2,7 +2,7 @@
 
 from sqlalchemy import select, text
 
-from common import budget, stream
+from common import alerts, budget, stream
 from common.config import get_settings
 from common.db import session_scope
 from common.logging import get_logger
@@ -12,6 +12,10 @@ from ingestion import rss
 from ingestion.seed import seed_sources
 
 logger = get_logger(__name__)
+
+# Dead letters after which requeue_stalled stops re-sending an item: each one
+# was a paid attempt that failed permanently (a refusal, an invalid record).
+MAX_PERMANENT_FAILURES = 3
 
 
 async def run_all() -> dict[str, int]:
@@ -112,8 +116,10 @@ async def requeue_stalled(limit: int = 500) -> int:
                     SELECT a.raw_item_id, a.id AS article_id, en.id AS enrichment_id
                     FROM articles a
                     JOIN enrichments en ON en.article_id = a.id
+                    JOIN raw_items ri ON ri.id = a.raw_item_id
                     LEFT JOIN event_memberships m ON m.article_id = a.id
-                    WHERE m.id IS NULL AND en.created_at < now() - interval '20 minutes'
+                    WHERE m.id IS NULL AND ri.relevance <> 'failed'
+                      AND en.created_at < now() - interval '20 minutes'
                     ORDER BY en.created_at
                     LIMIT :limit
                     """
@@ -121,6 +127,11 @@ async def requeue_stalled(limit: int = 500) -> int:
                 {"limit": limit},
             )
         ).mappings().all()
+
+    spent = await _given_up([*pending, *unenriched, *(row["raw_item_id"] for row in uncorrelated)])
+    pending = [i for i in pending if str(i) not in spent]
+    unenriched = [i for i in unenriched if str(i) not in spent]
+    uncorrelated = [row for row in uncorrelated if str(row["raw_item_id"]) not in spent]
 
     for raw_id in pending:
         await stream.publish(stream.RAW_ITEMS, RawItemMessage(raw_item_id=str(raw_id)).model_dump())
@@ -148,3 +159,32 @@ async def requeue_stalled(limit: int = 500) -> int:
             uncorrelated=len(uncorrelated),
         )
     return requeued
+
+
+async def _given_up(raw_ids: list) -> set[str]:
+    """The items that failed permanently MAX_PERMANENT_FAILURES times: marked
+    `failed` so no query picks them up again, and a founder is told. Without the
+    counts (Redis away) nothing is given up — that is no evidence of failure."""
+    try:
+        failures = await stream.permanent_failures([str(i) for i in raw_ids])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("failure_counts_unavailable", error=str(exc)[:160])
+        return set()
+    spent = {i for i, n in failures.items() if n >= MAX_PERMANENT_FAILURES}
+    if not spent:
+        return spent
+    async with session_scope() as session:
+        await session.execute(
+            text("UPDATE raw_items SET relevance = 'failed', rejection_reason = :why, updated_at = now() "
+                 "WHERE id = ANY(CAST(:ids AS uuid[]))"),
+            {"ids": sorted(spent), "why": f"gave up after {MAX_PERMANENT_FAILURES} permanent failures"},
+        )
+    logger.warning("requeue_gave_up", count=len(spent), raw_item_ids=sorted(spent)[:20])
+    await alerts.notify(
+        "requeue-gave-up",
+        f"{len(spent)} news items failed for good",
+        f"{len(spent)} items failed {MAX_PERMANENT_FAILURES} times without a transient cause (a model refusal or an "
+        "invalid record) and will not be retried. They are raw_items with relevance 'failed'; the payloads are in "
+        "the dead-letter streams (tools/redrive_dead.py --list).",
+    )
+    return spent

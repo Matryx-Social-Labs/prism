@@ -72,6 +72,7 @@ async def test_the_analysis_writes_every_lens_the_story_offers(monkeypatch):
     asked = {}
 
     async def analysis(**kw):
+        asked.update(kw)
         asked["prompt"] = json.dumps(kw["messages"])
         return EventAnalysis(briefs=LensBriefs(
             reader=LensRead(text="The reader read."), markets=LensRead(text="The markets read.", points=["watch"]),
@@ -105,6 +106,11 @@ async def test_the_analysis_writes_every_lens_the_story_offers(monkeypatch):
     requested = asked["prompt"].split("Requested lenses: ", 1)[1].split("\\n", 1)[0]
     assert set(requested.split(", ")) == {"reader", "markets"}
     assert proj["lens_briefs"]["markets"] == "The markets read."
+    # Bake-off 2026-09-29, 8 prod records: at glm's default reasoning a call
+    # wrote 2,567 tokens in 39.5 s for $0.00166; minimal on Together wrote 661
+    # in 9.2 s for $0.00053, every record valid and the briefs as grounded.
+    assert asked["reasoning"] == REASONING_OFF
+    assert asked["providers"] == ["together"]
 
 
 async def test_the_sweep_writes_what_recent_stories_offer_and_lack(monkeypatch):

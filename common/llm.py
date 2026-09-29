@@ -182,6 +182,25 @@ _MANDATORY_REASONING_MODELS = frozenset({
 })
 
 
+# Providers that cache only what a request marks. Gemini's implicit cache kept
+# about half of extraction's fixed prefix (2,450 of 4,380 tokens, whatever the
+# traffic); the same prefix marked was read whole from cache on 20 of 20 calls
+# and a call fell from $0.00069 to $0.00046 (2026-09-29, gemini-3.1-flash-lite
+# on AI Studio flex). OpenRouter honours the mark on one system message only —
+# it folds them into Gemini's single systemInstruction — so the prompt's own
+# system messages and the schema travel as ONE message. Z.AI, Together and the
+# other GLM hosts cache a repeated prefix on their own.
+_MARKED_CACHE_MODELS = ("google/", "anthropic/")
+
+
+def _cached_prefix(model: str, system_messages: list[dict[str, Any]]) -> dict[str, Any]:
+    """Everything before the first variable token, as one system message."""
+    text = "\n\n".join(m["content"] for m in system_messages)
+    if model.startswith(_MARKED_CACHE_MODELS):
+        return {"role": "system", "content": [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]}
+    return {"role": "system", "content": text}
+
+
 def reasoning_payload(model: str, reasoning: dict[str, Any]) -> dict[str, Any]:
     """The `reasoning` body for this model: "off" becomes "minimal" where off is refused."""
     if reasoning == REASONING_OFF and model in _MANDATORY_REASONING_MODELS:
@@ -271,7 +290,7 @@ async def _structured_chat[T: BaseModel](
     first_variable = next((i for i, m in enumerate(messages) if m.get("role") != "system"), len(messages))
     kwargs: dict[str, Any] = {
         "model": model,
-        "messages": [*messages[:first_variable], schema_msg, *messages[first_variable:]],
+        "messages": [_cached_prefix(model, [*messages[:first_variable], schema_msg]), *messages[first_variable:]],
         "response_format": {
             "type": "json_schema",
             "json_schema": {"name": output_model.__name__, "schema": schema},

@@ -137,6 +137,14 @@ classification), a `relevant` row with no `articles` row (failed enrichment), an
 article with no `event_memberships` row (publish to `enriched.items` failed or dead-lettered) —
 `ingestion/runner.py:80-129`.
 
+**A permanent failure is retried three times, not forever** (0.0.117.0). Every dead letter adds
+one to a per-raw-item count in Redis (`failures:<raw_item_id>`, 14 days, `common/stream.py`);
+`requeue_stalled()` skips an item at `MAX_PERMANENT_FAILURES = 3`, sets its `relevance` to
+`failed` so no query picks it up again, and emails the founders (`common/alerts.py`). Transient
+failures (timeouts, quota, a database away) never dead-letter, so an outage never counts against
+an item; without Redis nothing is given up. Before this, a refused or invalid extraction was
+re-sent and paid for every ten minutes indefinitely.
+
 **Enrichment concurrency.** `ENRICH_CONCURRENCY = int(os.environ.get("PRISM_ENRICH_CONCURRENCY",
 "12"))` (`worker/__main__.py:67`). Classification runs at `concurrency=4`
 (`worker/__main__.py:294`); correlation is pinned at `concurrency=1`
@@ -247,7 +255,10 @@ nothing (`ingestion/runner.py:17-41`):
 2. LLM budget floor: `budget.below_floor(await budget.current())` — collection stops under
    `prism_llm_budget_floor_usd` (default **$5.00**, `common/config.py:142`) even though nothing
    downstream has failed yet, because *"the queue must not grow while enrichment cannot follow"*
-   (`ingestion/runner.py:26-27`).
+   (`ingestion/runner.py:26-27`). The worker's budget watch (every 15 min) emails the founders
+   when this happens and when fewer than `RUNWAY_WARN_DAYS = 2` days of spend remain above the
+   floor at the last two recorded days' rate (`budget.warn_if_low`, 0.0.117.0) — on 2026-09-28
+   collection stopped for 37 hours with only a log line to show for it.
 3. Corpus cap: `prism_ingest_max_articles` (default **0** = disabled, `common/config.py:138`) — a
    hard ceiling on the *articles* table, not spend directly, because it is *"the one quantity that
    cannot drift"* (`common/config.py:118-126`).
@@ -473,7 +484,7 @@ three cheaper fallbacks, resolved in `handle_classified_item()`
 | Tier | When | Where |
 |---|---|---|
 | `duplicate_url` | a prior enrichment exists for the same canonical URL (534 URL groups arrive more than once in production, 533 of them cross-source) | `enrichment/consumer.py:71,76-79`, `_extraction_for_same_url()` at `enrichment/consumer.py:288-324` |
-| `body` | the feed's own body is already ≥400 chars (`MIN_USEFUL_CHARS`) | `enrichment/fulltext.py:20,70-71` |
+| `body` | the feed carries the article: its body is ≥1,500 chars (`FULL_BODY_CHARS`); or the page fetch failed, was refused, or gave less text than the feed's summary | `enrichment/fulltext.py` |
 | `direct` | fetched via `httpx` + `trafilatura.bare_extraction`, with an SSRF guard (`refuse_non_public`, every hop) | `enrichment/fulltext.py:73-103` |
 | `title` | nothing else produced usable text | `enrichment/consumer.py:84-85` |
 | `none` | (rare) no body, no URL, or fetch failed and body absent | `enrichment/fulltext.py:107-109` |
@@ -485,6 +496,18 @@ HTML string inside a JSON payload, and re-parsing that string as a document (rat
 tag-stripping it) recovers prose instead of boilerplate. Measured: *"854 of prajavani's 880
 direct-tier articles arrived like this, while thehindu's 853 on the same path were clean"*
 (`enrichment/fulltext.py:96-100`) — a per-site failure, not a general one.
+
+**A summary is not the article** (0.0.117.0). The fetch used to be skipped for any feed body of
+400+ characters, which a summary clears: over 8 days to 2026-09-28, ~1,250 articles were enriched
+from a 400–1,500-character summary (Times of India's run 400–460, 66 words, while the worker
+fetches the same pages at 635–984 words). Now only a 1,500+ body skips the fetch, and a fetched
+page is kept only if it is at least as long as the summary.
+
+**A page of other headlines is refused** (`is_headline_list`): 20+ lines, median 6–16 words, at
+most 10% ending a sentence. Aaj Tak's short-video pages extract as the next videos' headlines,
+the story's own among them (so the off-title guard passes them), and 26 of them embedded together
+into one record. Refused only when there is a summary to fall back to; measured on 25,287 pages it
+flags the 72 short-video pages, 5 live blogs and 3 genuine lists.
 
 The og-image comes free from the same fetch's metadata — never a separate request
 (`enrichment/fulltext.py:66-67`).

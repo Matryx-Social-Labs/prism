@@ -55,6 +55,18 @@ def test_the_crawler_identifies_itself_and_is_reachable():
     assert "readprism.news" in USER_AGENT
 
 
+@pytest.mark.parametrize("trips_the_firewall", ["://", "www.", "@", "bot"])
+def test_the_crawler_name_passes_the_publishers_firewall(trips_the_firewall):
+    """REGRESSION 2026-09-29: Business Standard, NDTV Profit and PIB 403'd
+    `Prism/1.0 (+https://www.readprism.news)` from the worker for weeks — a
+    shared WAF rule refuses a URL in the User-Agent — and the pages fetched
+    for enrichment use the same name."""
+    from enrichment import fulltext
+
+    assert trips_the_firewall not in USER_AGENT.lower()
+    assert fulltext.USER_AGENT == USER_AGENT
+
+
 def test_regional_editions_fold_into_one_masthead():
     """REGRESSION: The Times of India counted as three publishers.
 
