@@ -10,8 +10,8 @@
  * Design System v2 · Label flow board: a sticky task header (the way back, the
  * batch, which question this is), the question as the eyebrow, the material, and
  * the answers — in a bar at the thumb on a phone, beside the material with their
- * keys on desktop. Every kind of task — story, claim, quote rendering, brief line
- * — sits in the same frame (components/label/parts.TaskFrame). The guide before
+ * keys on desktop. Every kind of task — story, claim, quote rendering, brief line,
+ * attach check — sits in the same frame (components/label/parts.TaskFrame). The guide before
  * the first task, the named-invite greeting, the self-join form and every end
  * state stand alone under the label bar, each with a way back to the workspace.
  * Selection and verdicts are rule weight, a filled mark and a word, never colour
@@ -27,6 +27,7 @@ import {
   fetchLabelTask,
   joinLabelBatch,
   postLabelAnswer,
+  type AttachChoice,
   type LabelBatch,
   type LabelFeedback,
   type LabelGuide,
@@ -42,6 +43,7 @@ import { DoneScreen, PracticeFeedback, RoundResult } from "@/components/label/ro
 import { ClaimTask } from "@/components/label/ClaimTask";
 import { QuoteRenderingTask } from "@/components/label/QuoteRenderingTask";
 import { BriefLineTask } from "@/components/label/BriefLineTask";
+import { AttachTask } from "@/components/label/AttachTask";
 import { StoryTask } from "@/components/label/StoryTask";
 import { KIND_QUESTION } from "@/lib/labeller";
 
@@ -186,7 +188,7 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   }, [load]);
 
   const submit = useCallback(
-    async (unsure: boolean, skipped = false, agreed = false, none = false) => {
+    async (unsure: boolean, skipped = false, agreed = false, none = false, choice?: AttachChoice) => {
       if (!task || saving) return;
       setSaving(true);
       try {
@@ -199,10 +201,13 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
           // A claim answer has no candidate ids. "The article does attribute this
           // quote to this speaker" is carried as a single sentinel selection, so
           // the same responses table and the same agreement maths serve both kinds.
-          selected: skipped || none ? [] : task.claim || task.rendering || task.line ? (agreed ? [task.id] : []) : [...picked],
+          selected: skipped || none ? [] : task.claim || task.rendering || task.line || task.pair ? (agreed ? [task.id] : []) : [...picked],
           unsure,
           skipped,
           ms_spent: Date.now() - startedAt.current,
+          // The attach check's answer, and only its: the API refuses a choice on
+          // any other kind, and requires one on a definite attach answer.
+          ...(task.pair && choice ? { choice } : {}),
         });
         // A practice answer is marked straight away and waits for "Next";
         // everything else moves on.
@@ -232,13 +237,14 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   // hand should not leave the keyboard for a hundred screens.
   //
   // Only while a candidate task is what is on screen: not under the guide, not
-  // under a practice answer, and never on a claim or rendering task, which
-  // advertise no shortcut. And Enter on a focused control answers as that
-  // control — a window-wide Enter used to cancel "Yes" and file "No", and file
-  // the ticked rows for a focused "Not sure" (2026-09-24). A candidate row is
-  // the exception: Enter there submits, rather than unticking what was ticked.
+  // under a practice answer, and never on a claim, rendering, brief-line or
+  // attach task, which advertise no shortcut. And Enter on a focused control
+  // answers as that control — a window-wide Enter used to cancel "Yes" and file
+  // "No", and file the ticked rows for a focused "Not sure" (2026-09-24). A
+  // candidate row is the exception: Enter there submits, rather than unticking
+  // what was ticked.
   const greeting = invited && !greeted && state === "ready";
-  const candidateTask = state === "ready" && !!task && !task.claim && !task.rendering && !task.line && primed !== false && !feedback && !greeting;
+  const candidateTask = state === "ready" && !!task && !task.claim && !task.rendering && !task.line && !task.pair && primed !== false && !feedback && !greeting;
   useEffect(() => {
     if (!candidateTask || !task) return;
     const onKey = (ev: KeyboardEvent) => {
@@ -274,6 +280,11 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
   const answerStory = (a: Answer) => {
     setPending(a);
     void submit(a === "unsure", a === "cant", false, a === "no");
+  };
+  // The attach check: a definite answer names which of the three; Not sure names none.
+  const answerAttach = (a: AttachChoice | "unsure") => {
+    setPending(a);
+    void submit(a === "unsure", false, false, false, a === "unsure" ? undefined : a);
   };
 
   if (!token) {
@@ -469,7 +480,9 @@ export default function LabelPage({ params }: { params: Promise<{ key: string }>
         </div>
       )}
       {shown &&
-        (shown.line ? (
+        (shown.pair ? (
+          <AttachTask pair={shown.pair} tag={tag} saving={saving} pending={busy} feedback={practice} onAnswer={answerAttach} />
+        ) : shown.line ? (
           <BriefLineTask line={shown.line} tag={tag} saving={saving} pending={busy} feedback={practice} onAnswer={answer} />
         ) : shown.rendering ? (
           <QuoteRenderingTask rendering={shown.rendering} tag={tag} saving={saving} pending={busy} feedback={practice} onAnswer={answer} />

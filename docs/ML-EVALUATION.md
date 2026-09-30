@@ -1073,9 +1073,18 @@ kind before that kind's work batches are offered; every mutating admin action
 writes an audit row in the same transaction (`common/label_ops.py`).
 
 **Guides are server-only**, never shipped to the client bundle — checked by
-`web/scripts/check-no-guides.mjs` — covering 6 task kinds: `story_boundary`,
+`web/scripts/check-no-guides.mjs` — covering 7 task kinds: `story_boundary`,
 `event_identity`, `topic_relation`, `claim_attribution`, `quote_rendering`,
-`brief_support` (`common/label_guides.py`).
+`brief_support`, `attach_identity` (`common/label_guides.py`).
+
+**Founders label without an approval or a test** (0.0.119.0): an account on
+`PRISM_ADMIN_EMAILS` is active on applying, qualified for every kind, and never
+withdrawn by live checks (`api/routes/labeller.is_founder`). **`attach_identity`**
+is the article-vs-record check behind confirm mode: the record's founding headline
+and summary against one report put in it, answered same / follow-up / different /
+not sure (`choice` on the answer, stored in `selected`). No test exists for it, so
+only founders see its batches; `tools/gold_attaches --push` builds them from the
+blind sheets and `--score-batch` scores the answers.
 
 ---
 
@@ -1089,6 +1098,7 @@ writes an audit row in the same transaction (`common/label_ops.py`).
 | `CORPUS_STORIES` (story-layer, uniform corpus sample — distinct from the CJP-slice `gold_stories` above, same file) | `tools/gold_stories.py` | 123 tasks, 30 corpus stories; batch `OkY3sDj_iuiQ` (2026-09-01..03) | 2 labellers | partially — 30/123 unanimous; `CORPUS_DISPUTED` = 67 pairs excluded | Per-candidate agreement **0.904** over 69 comparable tasks, Cohen's **kappa 0.593**; exact-set agreement only 52% ("112 ticks against 68 on identical tasks, one lumper and one splitter"); granularity median 3/mean 3.13/max 7 vs the published reference's median 3/mean 4.07/max 25; **61 of 246 responses were "I can't read this"** (Kannada/Devanagari/Tamil) — a labelling-capacity gap, not a model one | in-repo |
 | `gold_story_pairs` (story-layer, v2, pairwise adjudicated) | `tools/gold_story_pairs.py` | **1,147 pairs confirmed live** (1,111 `"agree"` + 36 `"adj:..."`), **42 positive / 1,105 negative**; 123 seeds; batch `yy5J0lJdX00L` (2026-09-07..09) + 27-story second pass `mwWQawQFPvj6` (2026-09-10) | 2 labellers | **Yes** — 36 disputed pairs adjudicated with full context and founder-ratified, 2026-09-14 | Labellers had opposite biases: one merged by topic (misses were roundups/repeat CVEs/multiple animals), one split unfolding stories into per-day snapshots; inter-labeller kappa **0.40** before adjudication | in-repo, `PAIRS` with per-pair provenance (`agree` / `adj:tejas-said-same:<confidence>` / `adj:vijay-said-same:<confidence>`); `pairs(include_adjudicated=False)` scores only the 1,111 agreed pairs |
 | `gold_brief_cites` (brief per-line citation gate) | `tools/gold_brief_cites.py` | `PRACTICE_SIZE=8`, `POOL_SIZE=40`, sample `{single:70, matched:60, figure_missing:35, uncited:35}` per round | constructed negatives (corrupted true citations), not independently authored | gate `GATE = 0.995` on `evidenced` precision over `single`+`matched` strata | far stricter gate than any other in this repo (0.995 vs 0.90-0.95 elsewhere) — misattributed evidence is treated as worse than a wrong match | DB-backed label batches (`brief_support` kind); scored via `--score KEY` |
+| attach check (article vs the record it was put in) | `tools/gold_attaches.py` | 300 pairs stratified by tier × Jev band, two batches of 200 overlapping by 100 (2026-09-29 sample) | founders, in /label (kind `attach_identity`) | pending | Jev's scores decide the sample, so recall is not reweighted | prod `label_responses`; key json beside the sheets |
 | `BATCH_3_CROSSLINGUAL` (cross-language same-happening) | `tools/gold_same_happening.py` | **268 pairs, 43 same** (`docs/CANONICALIZATION.md:254`; source dict's own docstring says "150 tasks... 43 same / 225 not," 40 disputed excluded) | 2 human labellers, batch `MGDmtLPZOdjy` (2026-09-17), compiled 2026-09-25 via `tools.gold_crosslingual --compile` | not fully — disagreements exist and are documented as unresolved | some "no"s are judgement calls the verifier reads the other way (e.g. "India squad announced" vs "Naman Dhir gets maiden call-up" labelled different when it's one announcement) | in-repo dict |
 | `SILVER_SAME_LANGUAGE` | `tools/gold_same_happening.py` | **128 pairs, 64 same** (of 135 sampled; 7 left unlabelled as genuinely ambiguous), headline-cosine bands 0.39–1.0 | **Claude**, not a person, 2026-09-25 | **Not ratified** — explicitly "silver," quote its numbers as silver | exists specifically because the other sets carry almost no same-language templated local news (the failure case similarity misses) | in-repo dict |
 | `gold_crosslingual` propose/label machinery | `tools/gold_crosslingual.py` | generates the batch above; candidate net = English events within 4 days at headline cosine ≥0.30, up to 4 per seed; a dated 2026-09-17 measurement (19% of non-English founders had an English twin at cosine ≥0.39) is the empirical basis for building this set at all | — | — | compiles to `GOLD_PAIRS`-shaped output | `.cache/gold_crosslingual.json` + label batches |

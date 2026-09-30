@@ -311,6 +311,47 @@ GUIDES: dict[str, dict[str, Any]] = {
         "start": START,
         "after": STOP_ANY_TIME,
     },
+    "attach_identity": {
+        "question": "Is this report about the record's happening?",
+        "minutes": 2,
+        "in_short": "Same: the report tells of the very happening the record is about. Follow-up: a later development "
+                    "of it. Different: anything else, however close the subject.",
+        "lede": ["Prism puts every report it collects into a record of one happening. You see a record — its headline "
+                 "and summary, as first reported — and one report Prism put into it. You judge one thing: **is the "
+                 "report about the record's happening?**"],
+        "do": [
+            "Say **Same** when the report tells of the same incident, death, match, ruling, announcement, deal, "
+            "statement or protest — even with other details, other figures, on a later day, or in another language.",
+            "Say **Follow-up** when the report is a later development of that happening: the investigation after a "
+            "death, the verdict after a trial, the final after the semifinal, a reaction or protest over the decision.",
+            "Say **Different** when it is another happening: another meeting, another district's version of the same "
+            "kind of news, the same people in another matter.",
+            "Read the report's own headline as printed as well as the English one: the English is Prism's rendering.",
+            "Answer **Not sure** when you genuinely cannot tell. It is a real answer.",
+        ],
+        "dont": [
+            "Do not say Same because the report shares a name, a place or a subject with the record.",
+            "Do not say Same for a follow-up: a hunger strike over a death is a follow-up of the death, not the death.",
+            "Do not judge whether the report is true or well written — only what it is about.",
+        ],
+        "examples_label": "Worked examples · invented",
+        "examples": [
+            {"mark": "yes", "head": "SAME — other figures, the same happening",
+             "body": "Record: “Bus fire on the expressway kills nine.” Report: “11 dead as bus catches fire near "
+                     "Mathura.” The same fire; the reports gave different counts."},
+            {"head": "LATER DEVELOPMENT — the next stage",
+             "body": "Record: “High Court disqualifies the MLA.” Report: “Supreme Court upholds the MLA's "
+                     "disqualification.” A later development of the record's happening, not the same one."},
+            {"mark": "no", "head": "DIFFERENT — same people, another matter",
+             "body": "Record: “Qatar's Prime Minister meets Iran's Foreign Minister in Doha.” Report: “Qatar's Prime "
+                     "Minister and Iran's President hold talks.” Another meeting."},
+            {"mark": "no", "head": "DIFFERENT — the same kind of news",
+             "body": "Record: “Lok Adalat settles 1,200 cases in Mysuru.” Report: “Lok Adalat settles 800 cases in "
+                     "Mandya.” Another district's Lok Adalat."},
+        ],
+        "start": START,
+        "after": STOP_ANY_TIME,
+    },
 }
 
 KINDS = tuple(GUIDES)

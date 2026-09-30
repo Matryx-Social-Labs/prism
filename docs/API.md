@@ -187,7 +187,7 @@ Two credential types: a batch `key` (a join capability, safe to put in a URL) vs
 | `GET /api/v1/label/{key}/guide` | invite token | `403` no token, `404` no guide for that task kind. `Cache-Control: private, no-store`. |
 | `GET /api/v1/label/{key}` | invite token optional | Batch header + this invite's progress. |
 | `GET /api/v1/label/{key}/next` | invite token | Deterministic lowest-unanswered-position order (not random), so two labellers converge on the same task sequence. |
-| `POST /api/v1/label/{key}/answer` | invite token | Body `{task_id, token, selected[]=[], unsure=false, skipped=false, ms_spent?}`. `409` if the batch/round is closed. Work-purpose answers are **final** — no rewrite — to prevent gaming hidden quality checks. Upserts on `(task_id, invite_id)`. |
+| `POST /api/v1/label/{key}/answer` | invite token | Body `{task_id, token, selected[]=[], unsure=false, skipped=false, choice?, ms_spent?}`. `choice` (`same` / `follow_up` / `different`) is the `attach_identity` kind's answer and required for its definite answers; any other kind sending it is a `422`. `409` if the batch/round is closed. Work-purpose answers are **final** — no rewrite — to prevent gaming hidden quality checks. Upserts on `(task_id, invite_id)`. |
 | `GET /api/v1/label/{key}/export` | **static admin token** (`require_admin`) | Every response, ungrouped, per labeller — explicitly never server-side merged into a verdict. |
 
 ## Labeller workspace (`api/routes/labeller.py`)
