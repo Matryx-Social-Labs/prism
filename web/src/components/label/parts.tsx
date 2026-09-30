@@ -12,7 +12,8 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
 import { Brand } from "@/components/Brand";
-import { ArrowLeft, Check, Close, Dash, InfoIcon } from "@/components/icons";
+import { ArrowLeft, ArrowRight, Check, Close, Dash, InfoIcon } from "@/components/icons";
+import type { AttachChoice } from "@/lib/api";
 
 /** The highlight on the words a question is about. */
 export const MARK: CSSProperties = {
@@ -215,13 +216,18 @@ export function CandidateRow({
   );
 }
 
-export type Answer = "yes" | "no" | "unsure" | "cant";
+/** Every answer a labeller can give: yes / no / not sure / can't read, and the
+ *  attach check's three (same, a later development, different). */
+export type Answer = "yes" | "no" | "unsure" | "cant" | AttachChoice;
 
 const ICON: Record<Answer, ReactNode> = {
   yes: <Check size={18} />,
   no: <Close size={18} />,
   unsure: <InfoIcon size={18} />,
   cant: <Dash size={18} />,
+  same: <Check size={18} />,
+  follow_up: <ArrowRight size={18} />,
+  different: <Close size={18} />,
 };
 
 function Key({ k }: { k?: string }) {
@@ -234,6 +240,40 @@ function Key({ k }: { k?: string }) {
     >
       {k}
     </kbd>
+  );
+}
+
+/** One answer: a word with its icon. The answer being saved is outlined and
+ *  says so; while anything is saving, none can be pressed. */
+export function AnswerButton({
+  a, cls, text, saving, picked, disabled = false, keyHint, onClick,
+}: {
+  a: Answer;
+  cls: string;
+  text: string;
+  saving: boolean;
+  picked?: Answer | null;
+  disabled?: boolean;
+  keyHint?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`p-btn ${cls} justify-start gap-2.5 text-left leading-[1.25]`}
+      style={{
+        whiteSpace: "normal",
+        outline: picked === a ? "2px solid var(--ink)" : undefined,
+        outlineOffset: picked === a ? 2 : undefined,
+      }}
+      disabled={saving || disabled}
+      aria-busy={(saving && picked === a) || undefined}
+      onClick={onClick}
+    >
+      <span aria-hidden className="inline-flex shrink-0">{ICON[a]}</span>
+      <span className="min-w-0">{saving && picked === a ? "Saving…" : text}</span>
+      <Key k={keyHint} />
+    </button>
   );
 }
 
@@ -257,25 +297,18 @@ export function AnswerButtons({
   onAnswer: (answer: Answer) => void;
 }) {
   const needsPick = count === 0;
-  const label = (a: Answer, text: string) => (saving && picked === a ? "Saving…" : text);
   const button = (a: Answer, cls: string, text: string, disabled = false) => (
-    <button
-      type="button"
-      className={`p-btn ${cls} justify-start gap-2.5 text-left leading-[1.25]`}
-      style={{
-        whiteSpace: "normal",
-        outline: picked === a ? "2px solid var(--ink)" : undefined,
-        outlineOffset: picked === a ? 2 : undefined,
-      }}
-      disabled={saving || disabled}
-      aria-busy={(saving && picked === a) || undefined}
+    <AnswerButton
+      a={a}
+      cls={cls}
+      text={text}
+      saving={saving}
+      picked={picked}
+      disabled={disabled}
+      // A key hint only where the key would act: not on a Yes that waits for a tick.
+      keyHint={disabled ? undefined : keys[a]}
       onClick={() => onAnswer(a)}
-    >
-      <span aria-hidden className="inline-flex shrink-0">{ICON[a]}</span>
-      <span className="min-w-0">{label(a, text)}</span>
-      {/* A key hint only where the key would act: not on a Yes that waits for a tick. */}
-      <Key k={disabled ? undefined : keys[a]} />
-    </button>
+    />
   );
   const yesText = needsPick ? "Tick one, or choose None" : count != null ? `${yes} — ${count} selected` : yes;
   return (

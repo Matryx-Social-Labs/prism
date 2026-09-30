@@ -10,7 +10,14 @@ shows records against records, so this is a spreadsheet: blind (no tier, no
 score), the article's own title beside its English headline and summary.
 
   uv run python -m tools.gold_attaches --sample 300 --days 7   # after tools.repair_attaches has judged that window
-  uv run python -m tools.gold_attaches --score A.csv B.csv --key .context/label_attaches_<ts>.key.json
+  uv run python -m tools.gold_attaches --push "Attach check" --sheets A.csv B.csv --key <ts>.key.json   # into /label
+  uv run python -m tools.gold_attaches --score-batch KEY_A KEY_B --key <ts>.key.json   # answers given in /label
+  uv run python -m tools.gold_attaches --score A.csv B.csv --key <ts>.key.json         # answers typed in the sheets
+
+--push puts the two sheets into the /label workspace as two listed batches of
+kind attach_identity (the article shown against its record; same / follow-up /
+different / not sure). No test exists for the kind, so only founders — who label
+without one — see them; one founder takes A, the other B.
 
 --sample stratifies by tier and by Jev's band, so every band the thresholds sit
 in is read, and writes two sheets: labeller A rows 1-200, labeller B rows
@@ -122,9 +129,89 @@ def kappa(a: list[str], b: list[str]) -> float | None:
 
 
 def score(sheets: list[Path], key_path: Path) -> None:
+    score_labels([_answers(p) for p in sheets], json.loads(key_path.read_text()))
+
+
+KIND = "attach_identity"
+
+
+def _task_payload(row: dict, key: dict) -> dict:
+    """What the /label task shows, from a sheet row, and the machine's answer
+    under "_" keys (stripped before it is served)."""
+    machine = key["pairs"][row["pair"]]
+    return {
+        "kind": KIND,
+        "record": {"headline": row["record_headline"], "summary": row["record_summary"],
+                   "first_reported": row["record_first_reported"]},
+        "article": {"outlet": row["article_outlet"], "published": row["article_published"],
+                    "language": row["article_language"], "title": row["article_title_as_printed"],
+                    "headline_english": row["article_headline_english"],
+                    "summary_english": row["article_summary_english"]},
+        "_pair": row["pair"], "_tier": machine["tier"], "_same": machine["same"], "_follows": machine["follows"],
+    }
+
+
+async def push(name: str, sheets: list[Path], key_path: Path) -> None:
+    import secrets
+    import uuid
+
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
     key = json.loads(key_path.read_text())
+    c = await asyncpg.connect(_prod_url(), timeout=90)
+    try:
+        for tag, sheet in zip("AB", sheets, strict=False):
+            with sheet.open() as f:
+                rows = list(csv.DictReader(f))
+            bid, batch_key = uuid.uuid4(), secrets.token_urlsafe(9)
+            async with c.transaction():
+                await c.execute(
+                    "INSERT INTO label_batches (id, key, name, kind, purpose, open, self_join, listed, notes) "
+                    "VALUES ($1, $2, $3, $4, 'work', true, false, true, $5)",
+                    bid, batch_key, f"{name} · {tag}", KIND,
+                    "Is this report about the record's happening? Same, follow-up or different. "
+                    "Scored by tools/gold_attaches --score-batch.")
+                # No language gate: every task carries the report's English
+                # rendering beside the title it was printed with.
+                await c.executemany(
+                    "INSERT INTO label_tasks (id, batch_id, position, candidates, payload) "
+                    "VALUES ($1, $2, $3, '[]'::jsonb, $4::jsonb)",
+                    [(uuid.uuid4(), bid, i, json.dumps(_task_payload(r, key), ensure_ascii=False))
+                     for i, r in enumerate(rows)])
+            print(f"batch {tag}: {len(rows)} tasks, key {batch_key}")
+    finally:
+        await c.close()
+
+
+async def batch_labels(keys: list[str]) -> list[dict[str, str]]:
+    """Each labeller's answers across these batches: pair -> same / follow-up /
+    different / unsure. A skip is no answer."""
+    import asyncpg
+
+    from tools.snapshot_l2 import _prod_url
+
+    c = await asyncpg.connect(_prod_url(), timeout=90)
+    try:
+        rows = await c.fetch(
+            "SELECT r.labeller, t.payload->>'_pair' AS pair, r.selected, r.unsure, r.skipped "
+            "FROM label_responses r JOIN label_tasks t ON t.id = r.task_id JOIN label_batches b ON b.id = t.batch_id "
+            "WHERE b.key = ANY($1::text[])", keys)
+    finally:
+        await c.close()
+    by: dict[str, dict[str, str]] = defaultdict(dict)
+    for r in rows:
+        if r["skipped"]:
+            continue
+        chosen = (json.loads(r["selected"]) if isinstance(r["selected"], str) else r["selected"]) or []
+        by[r["labeller"]][r["pair"]] = "unsure" if r["unsure"] else chosen[0].replace("_", "-") if chosen else "unsure"
+    print(f"labellers: {', '.join(f'{k} ({len(v)})' for k, v in by.items())}")
+    return list(by.values())
+
+
+def score_labels(labels: list[dict[str, str]], key: dict) -> None:
     pairs, population = key["pairs"], {tuple(k.split("|")): v for k, v in key["population"].items()}
-    labels = [_answers(p) for p in sheets]
     if len(labels) == 2:
         both = sorted(set(labels[0]) & set(labels[1]))
         k_same = kappa([labels[0][p] == "same" for p in both], [labels[1][p] == "same" for p in both])
@@ -172,14 +259,21 @@ def main() -> None:
     ap.add_argument("--sample", type=int)
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--score", nargs="+", type=Path)
+    ap.add_argument("--push", metavar="NAME")
+    ap.add_argument("--sheets", nargs="+", type=Path)
+    ap.add_argument("--score-batch", nargs="+", metavar="KEY")
     ap.add_argument("--key", type=Path)
     a = ap.parse_args()
     if a.sample:
         asyncio.run(sample(a.sample, a.days))
+    elif a.push and a.sheets and a.key:
+        asyncio.run(push(a.push, a.sheets, a.key))
+    elif a.score_batch and a.key:
+        score_labels(asyncio.run(batch_labels(a.score_batch)), json.loads(a.key.read_text()))
     elif a.score and a.key:
         score(a.score, a.key)
     else:
-        ap.error("--sample N, or --score SHEET [SHEET] --key KEY")
+        ap.error("--sample N | --push NAME --sheets A B --key KEY | --score-batch KEY.. --key KEY | --score SHEET.. --key KEY")
 
 
 if __name__ == "__main__":

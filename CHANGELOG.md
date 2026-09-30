@@ -3,6 +3,24 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.119.0] - 2026-09-30
+
+### Added — the attach check in the labelling workspace
+- A new task in `/label`: one report beside the record Prism put it in (the record's
+  headline and summary as first reported; the report's headline as printed, with Prism's
+  English rendering), answered **Same happening / Later development / Different
+  happening / Not sure**. It is the human check on the verifier that now decides every
+  match (0.0.118.0): the 300 pairs sampled from the week's matches go in as two batches,
+  200 each with 100 read by both.
+- `tools/gold_attaches --push` builds the batches from the blind sheets; `--score-batch`
+  scores what founders answer there: agreement, the verifier's precision and recall at
+  each floor, how often a follow-up link is right, and what the old rules really got right.
+
+### Changed — founders label without an approval or a test
+- An account on the admin email list is approved the moment it applies at `/label`,
+  counts as qualified for every kind of task, and is never withdrawn by the live checks.
+  The attach check has no test yet, so its batches show only to founders.
+
 ## [0.0.118.0] - 2026-09-29
 
 Phase 1 of the data plan (`.claude/plans/data-accuracy-and-sources.plan.md`): every

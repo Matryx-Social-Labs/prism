@@ -831,6 +831,68 @@ describe("a brief-line task (does the report say this?)", () => {
   });
 });
 
+describe("an attach task (is this report about the record's happening?)", () => {
+  // The API refuses a definite attach answer without `choice` and refuses
+  // `choice` on every other kind (422), so a choice sent to the wrong kind — or
+  // left off this one — is an answer that never reaches the gold set.
+  const attach = {
+    id: "task-a1", position: 0, kind: "attach_identity" as const,
+    pair: {
+      record: { headline: "High Court disqualifies MLA", summary: "s", first_reported: "2026-09-21 10:00" },
+      article: { outlet: "sakshi", published: "2026-09-27 08:00", language: "te", title: "ఎమ్మెల్యే",
+        headline_english: "Supreme Court upholds MLA disqualification", summary_english: "s2" },
+    },
+  };
+
+  it("files a later development as choice follow_up, with nothing selected", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: attach, closed: false });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Later development" }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalledTimes(1));
+    expect(postLabelAnswer.mock.calls[0][1]).toMatchObject({
+      task_id: "task-a1", choice: "follow_up", selected: [], unsure: false, skipped: false,
+    });
+  });
+
+  it("files not sure with no choice at all", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: attach, closed: false });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Not sure" }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalledTimes(1));
+    const body = postLabelAnswer.mock.calls[0][1];
+    expect(body).toMatchObject({ selected: [], unsure: true, skipped: false });
+    expect(body).not.toHaveProperty("choice");
+  });
+
+  it("never sends a choice for any other kind", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({
+      task: { id: "task-c1", position: 0, kind: "claim_attribution" as const, claim: {
+        article_id: "a1", title: "t", source: "s", speaker: "The minister", quote_text: "double its outlay",
+        context_before: "the minister said ", context_after: ".", target: null, stance: "neutral",
+      } },
+      closed: false,
+    });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Yes —/ }));
+    await waitFor(() => expect(postLabelAnswer).toHaveBeenCalledTimes(1));
+    expect(postLabelAnswer.mock.calls[0][1]).not.toHaveProperty("choice");
+  });
+
+  it("names the expected answer in words after a practice answer", async () => {
+    stubStorage({ "prism.label.token.batch-key": "t", "prism.labeller": "ana" });
+    fetchLabelTask.mockResolvedValue({ task: attach, closed: false });
+    postLabelAnswer.mockResolvedValue({ ok: true, feedback: { correct: false, expected: ["follow_up"], explanation: "The appeal came later." } });
+    render(<LabelPage params={params} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Same happening" }));
+    expect(await screen.findByText("Not quite.")).toBeInTheDocument();
+    expect(screen.getByText("The answer: Later development.")).toBeInTheDocument();
+    expect(screen.queryByText(/should be ticked/)).toBeNull();
+  });
+});
+
 describe("live checks (phase 5)", () => {
   const CLAIM = {
     article_id: "a1", title: "t", source: "s", speaker: "The minister", quote_text: "double its outlay",

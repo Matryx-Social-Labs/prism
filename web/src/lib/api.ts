@@ -1156,17 +1156,38 @@ export interface LabelBriefLine {
   };
 }
 
+/** "Is this report about the record's happening?" — one report against the
+ *  record Prism put it in (tools/gold_attaches --push). Times are "YYYY-MM-DD HH:MM". */
+export interface LabelAttachPair {
+  record: { headline: string; summary: string; first_reported: string };
+  article: {
+    outlet: string;
+    published: string;
+    /** A code ("hi", "kn", "en"), for the lang attribute of the title as printed. */
+    language: string;
+    /** The report's own headline, as printed. */
+    title: string;
+    /** Prism's English rendering. */
+    headline_english: string;
+    summary_english: string;
+  };
+}
+
+/** The attach check's three definite answers. No other kind sends one. */
+export type AttachChoice = "same" | "follow_up" | "different";
+
 export interface LabelTask {
   id: string;
   position: number;
   sector?: string | null;
   /** Absent on story tasks, which predate the second kind. */
-  kind?: "claim_attribution" | "quote_rendering" | "brief_support";
+  kind?: "claim_attribution" | "quote_rendering" | "brief_support" | "attach_identity";
   seed?: LabelEvent;
   candidates?: LabelEvent[];
   claim?: LabelClaim;
   rendering?: LabelRendering;
   line?: LabelBriefLine;
+  pair?: LabelAttachPair;
 }
 
 export interface LabelBatch {
@@ -1293,6 +1314,8 @@ export async function postLabelAnswer(
     /** "I cannot read this language" — about the labeller, not about the story. */
     skipped?: boolean;
     ms_spent: number;
+    /** The attach check's definite answer — required there, refused (422) on every other kind. */
+    choice?: AttachChoice;
   }
 ): Promise<{ feedback?: LabelFeedback; requalify?: boolean }> {
   const r = await fetch(`${API_URL}/api/v1/label/${encodeURIComponent(key)}/answer`, {

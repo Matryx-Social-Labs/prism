@@ -39,7 +39,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_current_user
+from api.deps import admin_emails, get_current_user
 from common import label_guides
 from common.db import get_db
 from common.label_scoring import (
@@ -71,6 +71,15 @@ class Apply(BaseModel):
 # NULL `:langs` is an anonymous invite, a founder's link, served everything.
 ELIGIBLE = ("(CAST(:langs AS text[]) IS NULL OR t.languages IS NULL "
             "OR t.languages <@ CAST(:langs AS text[]))")
+
+
+async def is_founder(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """An account on PRISM_ADMIN_EMAILS (the /admin allowlist). Founders label
+    without an approval or a test (founder decision, 2026-09-30): they are who
+    approves and who writes the tests, and a kind with no test yet — the
+    attach check — would otherwise have nobody allowed to answer it."""
+    email = (await db.execute(text("SELECT lower(email) FROM users WHERE id = :u"), {"u": str(user_id)})).scalar()
+    return bool(email) and email in admin_emails()
 
 
 async def labeller_row(db: AsyncSession, user_id: uuid.UUID) -> dict | None:
@@ -153,6 +162,11 @@ async def apply(body: Apply, user_id: uuid.UUID = Depends(get_current_user), db:
         ),
         {"u": str(user_id), "l": langs, "n": body.note.strip() or None},
     )
+    if await is_founder(db, user_id):
+        # No approval queue for the people who run it. A founder an admin
+        # paused or removed stays so: only an application is promoted.
+        await db.execute(text("UPDATE labellers SET status = 'active' WHERE user_id = :u AND status = 'applied'"),
+                         {"u": str(user_id)})
     row = await labeller_row(db, user_id)
     return {"status": row["status"], "languages_read": list(row["languages_read"])}
 
@@ -273,6 +287,8 @@ async def start(key: str, user_id: uuid.UUID = Depends(get_current_user), db: As
 
 
 async def is_qualified(db: AsyncSession, user_id: uuid.UUID, kind: str) -> bool:
+    if await is_founder(db, user_id):
+        return True
     return bool((
         await db.execute(
             text("SELECT 1 FROM labeller_qualifications WHERE user_id = :u AND kind = :k AND passed_at IS NOT NULL"),
@@ -314,6 +330,7 @@ async def kind_status(db: AsyncSession, user_id: uuid.UUID, langs: list[str], wo
         )).mappings().all()
     }
     kinds = sorted(work_kinds | {r["kind"] for r in rounds} | {k for k, q in quals.items() if q["passed_at"]})
+    founder = await is_founder(db, user_id)
     out = []
     for kind in kinds:
         q = quals.get(kind) or {}
@@ -325,12 +342,13 @@ async def kind_status(db: AsyncSession, user_id: uuid.UUID, langs: list[str], wo
             retake_at = due.isoformat() if due > datetime.now(UTC) else None
         out.append({
             "kind": kind,
-            "qualified": bool(q.get("passed_at")),
+            "qualified": founder or bool(q.get("passed_at")),
             "best_score": q.get("best_score"),
             "attempts": q.get("attempts") or 0,
             "can_practise": practice,
             # A test needs enough items IN YOUR LANGUAGES to be a test.
-            "can_test": test_items >= QUESTIONS_PER_TEST and not q.get("passed_at") and retake_at is None,
+            "can_test": (test_items >= QUESTIONS_PER_TEST and not q.get("passed_at") and retake_at is None
+                         and not founder),
             "retake_at": retake_at,
             "has_work": kind in work_kinds,
         })
@@ -587,7 +605,10 @@ async def live_accuracy(db: AsyncSession, user_id: Any, kind: str) -> tuple[int,
 
 async def recheck(db: AsyncSession, user_id: Any, kind: str) -> bool:
     """Withdraw a kind whose live accuracy fell below LIVE_MIN. Returns True when
-    it did. The retake clock restarts, so the way back is the test, tomorrow."""
+    it did. The retake clock restarts, so the way back is the test, tomorrow.
+    A founder's is never withdrawn: it was never a test's to give."""
+    if await is_founder(db, user_id):
+        return False
     # One recheck at a time per (account, kind): two check answers landing
     # together could each read a window missing the other and neither withdraw
     # (security review, 2026-09-23).

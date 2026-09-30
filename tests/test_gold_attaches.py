@@ -33,3 +33,14 @@ def test_scoring_counts_only_agreed_answers_and_reads_every_floor(tmp_path, caps
 def test_kappa_is_one_on_perfect_agreement_and_undefined_on_a_constant():
     assert gold_attaches.kappa(["a", "b", "a"], ["a", "b", "a"]) == 1.0
     assert gold_attaches.kappa(["a", "a"], ["a", "a"]) is None
+
+
+def test_a_pushed_task_shows_the_sheets_text_and_hides_the_machines_answer():
+    row = {"pair": "p1", "record_headline": "R", "record_summary": "RS", "record_first_reported": "2026-09-21 10:00",
+           "article_outlet": "sakshi", "article_published": "2026-09-27 08:00", "article_language": "te",
+           "article_title_as_printed": "T", "article_headline_english": "H", "article_summary_english": "S"}
+    key = {"pairs": {"p1": {"tier": "entity_overlap", "same": 0.1, "follows": 0.93}}}
+    payload = gold_attaches._task_payload(row, key)
+    assert payload["kind"] == "attach_identity"
+    assert payload["record"]["headline"] == "R" and payload["article"]["title"] == "T"
+    assert {k for k in payload if k.startswith("_")} == {"_pair", "_tier", "_same", "_follows"}

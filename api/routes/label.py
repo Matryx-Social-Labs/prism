@@ -36,7 +36,7 @@ opinion — and a second opinion is the entire reason responses are keyed per pe
 import json
 import secrets
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -59,6 +59,7 @@ from common.db import get_db
 router = APIRouter()
 
 MAX_LABELLER = 60
+ATTACH = "attach_identity"
 # Which tasks an invite may be served and may answer. A qualification attempt
 # is its own random draw, and THE DRAW IS AUTHORITATIVE for its lifetime: the
 # language gate chose it at start and is not re-applied. Re-applying it let a
@@ -90,6 +91,10 @@ class Answer(BaseModel):
     # indistinguishable from having asked the wrong person, and the second one is
     # fixed by routing the task to someone else.
     skipped: bool = False
+    # The attach check's answer (kind attach_identity): same happening, a later
+    # development of it, or another happening. Kept in `selected`, as the claim
+    # kinds keep theirs, so one table and one export serve every kind.
+    choice: Literal["same", "follow_up", "different"] | None = None
     ms_spent: int | None = None
 
 
@@ -297,6 +302,10 @@ async def next_task(
             shaped = {"kind": "quote_rendering", "rendering": payload}
         elif kind == "claim_attribution":
             shaped = {"kind": "claim_attribution", "claim": payload}
+        elif kind == "attach_identity":
+            # A report against the record it was put in; the machine's answer
+            # (keys starting "_") is kept for scoring, never shown.
+            shaped = {"kind": "attach_identity", "pair": {k: v for k, v in payload.items() if not k.startswith("_")}}
         elif kind == "brief_support":
             # Keys starting "_" are the machine's own verdict, kept for scoring
             # (tools/gold_brief_cites --score). A labeller who could read it in
@@ -412,6 +421,9 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
         # not be writable through this key.
         raise HTTPException(status_code=404, detail="task not in this batch")
 
+    if (body.choice is not None) != (b["kind"] == ATTACH and not body.unsure and not body.skipped):
+        # An attach answer says which of the three, and no other kind has one.
+        raise HTTPException(status_code=422, detail="choice is the attach check's answer, and only its")
     await db.execute(
         text(
             """
@@ -427,7 +439,7 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
         {
             "id": uuid.uuid4(), "t": body.task_id, "inv": inv["id"],
             "l": inv["name"] or "anonymous",
-            "sel": json.dumps([str(x) for x in body.selected]),
+            "sel": json.dumps([body.choice] if body.choice else [str(x) for x in body.selected]),
             "u": body.unsure, "sk": body.skipped, "ms": body.ms_spent,
         },
     )
@@ -441,7 +453,8 @@ async def answer(key: str, body: Answer, db: AsyncSession = Depends(get_db)):
     if b["purpose"] == "practice":
         # Practice teaches as it goes. A TEST never answers here: its results
         # come once, at the end (finish_attempt), when nothing can be changed.
-        answer = {"selected": [str(x) for x in body.selected], "unsure": body.unsure, "skipped": body.skipped}
+        chosen = [body.choice] if body.choice else [str(x) for x in body.selected]
+        answer = {"selected": chosen, "unsure": body.unsure, "skipped": body.skipped}
         return {"ok": True, "feedback": feedback(dict(owned), answer)}
     return {"ok": True}
 

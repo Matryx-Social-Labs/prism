@@ -13,6 +13,7 @@
  * conveyed by colour alone (the Legend Rule).
  */
 
+import { ATTACH_CHOICES } from "@/components/label/AttachTask";
 import { EndScreen, Lede, Verdict } from "@/components/label/parts";
 import type { LabelFeedback, LabelResult, LabelTask } from "@/lib/api";
 import { KIND_QUESTION } from "@/lib/labeller";
@@ -28,23 +29,27 @@ export function PracticeFeedback({ task, feedback, onNext }: { task: LabelTask; 
   const yes = expected.has(task.id);
   const rendering = task.rendering;
   const rows = (task.candidates ?? []).flatMap((c, i) => (expected.has(c.id) ? [i + 1] : []));
-  const answer = task.line
-    ? yes
-      ? "Yes — the report says this."
-      : "No — the report does not say this."
-    : task.claim
+  // The attach check's expected answer is one of its three choices, by name.
+  const choice = ATTACH_CHOICES.find(([c]) => expected.has(c))?.[1];
+  const answer = task.pair
+    ? `The answer: ${choice ?? feedback.expected.join(", ")}.`
+    : task.line
       ? yes
-        ? `Yes — the article credits these words to ${task.claim.speaker}.`
-        : `No — the article does not credit these words to ${task.claim.speaker}.`
-      : rendering
-        ? rendering.question === "same"
-          ? yes ? "Yes — the same statement, in two languages." : "No — two different things said."
-          : yes
-            ? `Yes — ${rendering.speaker} said it in ${rendering.a.language}.`
-            : `No — ${rendering.a.outlet} translated it.`
-        : rows.length
-          ? `The ones to tick: ${listed(rows)}.`
-          : "Nothing here should be ticked.";
+        ? "Yes — the report says this."
+        : "No — the report does not say this."
+      : task.claim
+        ? yes
+          ? `Yes — the article credits these words to ${task.claim.speaker}.`
+          : `No — the article does not credit these words to ${task.claim.speaker}.`
+        : rendering
+          ? rendering.question === "same"
+            ? yes ? "Yes — the same statement, in two languages." : "No — two different things said."
+            : yes
+              ? `Yes — ${rendering.speaker} said it in ${rendering.a.language}.`
+              : `No — ${rendering.a.outlet} translated it.`
+          : rows.length
+            ? `The ones to tick: ${listed(rows)}.`
+            : "Nothing here should be ticked.";
   return (
     <section aria-live="polite" className="grid gap-2.5">
       <Verdict kind={feedback.correct ? "right" : "wrong"} word={feedback.correct ? "Right." : "Not quite."}>
