@@ -317,8 +317,8 @@ GUIDES: dict[str, dict[str, Any]] = {
         "in_short": "Same: the report tells of the very happening the record is about. Follow-up: a later development "
                     "of it. Different: anything else, however close the subject.",
         "lede": ["Prism puts every report it collects into a record of one happening. You see a record — its headline "
-                 "and summary, as first reported — and one report Prism put into it. You judge one thing: **is the "
-                 "report about the record's happening?**"],
+                 "and summary, as first reported — and one report Prism put into it. You judge one thing: **does the "
+                 "report tell of that same happening, a later stage of it, or something else?**"],
         "do": [
             "Say **Same** when the report tells of the same incident, death, match, ruling, announcement, deal, "
             "statement or protest — even with other details, other figures, on a later day, or in another language.",
