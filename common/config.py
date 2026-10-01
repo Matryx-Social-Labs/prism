@@ -160,6 +160,17 @@ class Settings(BaseSettings):
     # its own record and is linked back instead. The default equals the gist
     # floor: no change until set — set it from the founders' attach labels.
     prism_proposal_verify_min: float = 0.85
+    # One name, one entity (correlation/variants.py): an article joining a record
+    # whose cast already holds another spelling of one of its names (same type,
+    # same consonant skeleton) asks Jev whether both name one entity. off |
+    # shadow (ask and record, never fold) | live (fold at >= the floor into the
+    # spelling with the most mentions). tools/entity_variants.py does the backlog.
+    # The floor, read by hand from the production dry run (2026-10-01, 1,628
+    # evidenced pairs): Jev puts one-name pairs at 0.6-0.95, not near 1; a random
+    # 50 at >= 0.7 were 50/50 one entity, and the three doubtful pairs in a random
+    # 120 (Sanjay Sah/Shah, Sourav/Saurav Das, Ashok Bharti/Bharat) sat at 0.46-0.63.
+    prism_entity_variants: str = "off"
+    prism_entity_variant_min: float = 0.7
     prism_ingest_max_articles: int = 0
     # Stop COLLECTING when the recorded OpenRouter balance is under this many
     # dollars, so a stalled enrichment never grows a backlog that becomes a bill

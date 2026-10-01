@@ -42,6 +42,7 @@ from common.wikidata import (
     fetch_aliases,
     search,
 )
+from correlation import entity_fold
 
 
 def _db_url() -> str:
@@ -499,10 +500,7 @@ async def fold(c, ents: list[dict], linked: dict, journal: str, *, write: bool) 
     entries = []
     for canon, *variants in groups:
         for v in variants:
-            for tbl in ("event_entities", "article_entities", "impacts"):
-                for r in await c.fetch(f"SELECT * FROM {tbl} WHERE entity_id = $1", v["id"]):
-                    row = {k: (str(x) if x is not None else None) for k, x in dict(r).items()}
-                    entries.append({"table": tbl, "row": row, "to": str(canon["id"])})
+            entries += await entity_fold.journal(c, v["id"], canon["id"])
     print(f"  {len(groups)} groups -> {len(entries)} mentions move onto {len(groups)} rows")
     if not write:
         print("  (dry run — nothing written; --fold --write applies it)")
@@ -515,28 +513,14 @@ async def fold(c, ents: list[dict], linked: dict, journal: str, *, write: bool) 
     async with c.transaction():
         for canon, *variants in groups:
             for v in variants:
-                for tbl, key in (("event_entities", "event_id"), ("article_entities", "article_id")):
-                    # Repoint only where it would not collide with a row the canonical
-                    # already holds — (key, entity_id) is unique — then clear the rest.
-                    await c.execute(
-                        f"""UPDATE {tbl} SET entity_id = $1 WHERE entity_id = $2
-                            AND NOT EXISTS (SELECT 1 FROM {tbl} t2
-                                            WHERE t2.{key} = {tbl}.{key} AND t2.entity_id = $1)""",
-                        canon["id"], v["id"])
-                    await c.execute(f"DELETE FROM {tbl} WHERE entity_id = $1", v["id"])
-                await c.execute("UPDATE impacts SET entity_id = $1 WHERE entity_id = $2",
-                                canon["id"], v["id"])
-                # The redirect, without which this fold decays. The variant row
-                # survives on purpose, so `_resolve_entity` would send the next
-                # article naming it straight back here and reopen the split — the
-                # measurement would stay true only until the next ingest.
-                await c.execute("UPDATE entities SET merged_into = $1 WHERE id = $2",
-                                canon["id"], v["id"])
+                # Repoints, clears collisions, sets the redirect without which the
+                # fold decays at ingest speed (correlation/entity_fold.py).
+                await entity_fold.fold_into(c, v["id"], canon["id"])
     print(f"  FOLDED: {len(entries)} mentions repointed, {len(groups)} redirects set")
 
 
 # Bumped whenever the journal's shape changes. `unfold` refuses anything else.
-JOURNAL_FORMAT = "prism-entity-fold/2"
+JOURNAL_FORMAT = entity_fold.JOURNAL_FORMAT
 
 
 async def unfold(c, journal: str, *, write: bool) -> None:
@@ -587,26 +571,10 @@ async def unfold(c, journal: str, *, write: bool) -> None:
         print("  (dry run — nothing written; --unfold --write applies it)")
         return
 
-    restored = 0
     async with c.transaction():
-        for tbl, rows in by_table.items():
-            for e in rows:
-                # `json_populate_record` rather than a column list of parameters:
-                # the journal is JSON, so every value in it is a string, and
-                # asyncpg refuses a string for a timestamptz parameter. Handing
-                # Postgres the whole object lets it coerce each field against the
-                # table's own row type — no per-column casting to keep in sync with
-                # the schema, and it stays correct when a column is added.
-                await c.execute(
-                    f"INSERT INTO {tbl} SELECT * FROM json_populate_record(NULL::{tbl}, $1::json)"
-                    f" ON CONFLICT (id) DO UPDATE SET entity_id = EXCLUDED.entity_id",
-                    json.dumps(e["row"]),
-                )
-                restored += 1
-        await c.execute(
-            "UPDATE entities SET merged_into = NULL WHERE id = ANY($1::uuid[])",
-            sorted({e["row"]["entity_id"] for e in entries}),
-        )
+        # `json_populate_record` inside: the journal is JSON, every value a
+        # string, and asyncpg refuses a string for a timestamptz parameter.
+        restored = await entity_fold.restore(c, entries)
     print(f"  UNFOLDED: {restored} rows restored, redirects cleared")
 
 

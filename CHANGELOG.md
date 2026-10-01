@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.123.0] - 2026-10-01
+
+### Added — one name, one entity
+- A person's or organisation's name spelled differently by different outlets was a
+  different entity: the Flydubai pilot was fifteen, and stories split by language because
+  the matching and the story graph join records on shared entities. Spellings that share a
+  consonant skeleton, with evidence that they name one thing (the same record, a verified
+  follow-up, or one story), are now judged by the verifier and folded into the commonest
+  spelling. Every fold is journalled and can be undone; a pair one article names together
+  is never folded.
+- At ingest, when an article joins a record (`PRISM_ENTITY_VARIANTS`); for the backlog,
+  `tools/entity_variants.py` (production dry run: 1,390 folds of 1,640 pairs judged, $0.015).
+
 ## [0.0.122.0] - 2026-10-01
 
 ### Changed — a timeline reads in the order things were reported
