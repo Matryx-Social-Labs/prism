@@ -830,7 +830,7 @@ async def _verified(
     candidates += [c for c in near if c.event_id not in set(proposed)]
     if not candidates:
         return None
-    blocks = await event_blocks(session, [c.event_id for c in candidates])
+    blocks = await event_blocks(session, [c.event_id for c in candidates], near=gist)
     try:
         verdicts, model, _ = await judge_story(article_id=article_id, block=block, candidates=candidates, blocks=blocks)
     except Exception as exc:  # noqa: BLE001 — see the docstring: the old tiers' answer stands

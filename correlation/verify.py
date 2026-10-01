@@ -107,15 +107,64 @@ def event_block(title: str, summary: str | None, first_seen_at) -> str:
     return f"First reported {first_seen_at:%Y-%m-%d %H:%M}.\nHeadline: {title}\nSummary: {summary or ''}"
 
 
-async def event_blocks(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
-    """Each candidate's FOUNDING headline and summary — what the judge reads."""
+# With `near`, a record is read as it stands, not only as founded: its founding
+# headline and summary, then up to this many CONFIRMED members' headlines — the
+# ones nearest the incoming article's gist. On the 292 labelled attach pairs
+# (2026-10-01) recall at the 0.65 proposal floor rose 0.727 -> 0.770 at the same
+# precision (0.975 -> 0.976); one Gujarat award in five records scored 0.70-0.79
+# against founders that each told a different facet of the story.
+MEMBER_LINES = 2
+
+
+def _with_members(block: str, headlines: list[str] | None) -> str:
+    return block + "".join(f"\nAlso reported as: {h}" for h in headlines or [])
+
+
+async def event_blocks(
+    session: AsyncSession, ids: list[uuid.UUID], *, near: list[float] | None = None
+) -> dict[uuid.UUID, str]:
+    """Each candidate's FOUNDING headline and summary — what the judge reads —
+    and, given the article's gist, the headlines of its confirmed members nearest
+    it. Confirmed: the exact tiers and the verified tier, or a verdict at the
+    proposal floor; an unjudged fuzzy attach (before confirm mode) is never shown,
+    so a member swept in by shared names cannot pull the next one in."""
+    if near is None:
+        rows = (
+            await session.execute(
+                text("SELECT id, title, summary, first_seen_at FROM events WHERE id = ANY(CAST(:ids AS uuid[]))"),
+                {"ids": [str(i) for i in ids]},
+            )
+        ).all()
+        return {r.id: event_block(r.title, r.summary, r.first_seen_at) for r in rows}
     rows = (
         await session.execute(
-            text("SELECT id, title, summary, first_seen_at FROM events WHERE id = ANY(CAST(:ids AS uuid[]))"),
-            {"ids": [str(i) for i in ids]},
+            text(
+                """
+                SELECT e.id, e.title, e.summary, e.first_seen_at, mates.headlines
+                FROM events e
+                LEFT JOIN LATERAL (
+                    SELECT array_agg(t.hl) AS headlines FROM (
+                        SELECT coalesce(en.shared_fields->>'headline', ri.title) AS hl
+                        FROM event_memberships m
+                        JOIN articles x ON x.id = m.article_id
+                        JOIN raw_items ri ON ri.id = x.raw_item_id
+                        JOIN enrichments en ON en.article_id = x.id
+                        WHERE m.event_id = e.id AND m.match_type <> 'new_event' AND x.gist_embedding IS NOT NULL
+                          AND (m.match_type IN ('verified', 'cve_id', 'url_exact') OR EXISTS (
+                               SELECT 1 FROM event_match_verdicts v
+                               WHERE v.article_id = m.article_id AND v.event_id = m.event_id AND v.noul >= :floor))
+                        ORDER BY x.gist_embedding <=> CAST(:near AS vector)
+                        LIMIT :n
+                    ) t
+                ) mates ON true
+                WHERE e.id = ANY(CAST(:ids AS uuid[]))
+                """
+            ),
+            {"ids": [str(i) for i in ids], "near": "[" + ",".join(f"{x:.7f}" for x in near) + "]",
+             "floor": get_settings().prism_proposal_verify_min, "n": MEMBER_LINES},
         )
     ).all()
-    return {r.id: event_block(r.title, r.summary, r.first_seen_at) for r in rows}
+    return {r.id: _with_members(event_block(r.title, r.summary, r.first_seen_at), r.headlines) for r in rows}
 
 
 async def judge(

@@ -279,6 +279,21 @@ pilot"), so the record merge keeps 0.85. A proposal attaches from
 0.85 (`clustering._attaches`). These are reads, not labels: the founders' attach check
 (`/label`, batches `v_tQBu8kPmAc`/`vabpufxFYUjP`, stratified by band) sets the floor.
 
+**The record as it stands (0.0.121.0).** The judge reads each candidate's founding headline
+and summary, then up to two **confirmed** members' headlines nearest the incoming article's
+gist ("Also reported as: …"; `verify.event_blocks(near=gist)`). Confirmed means an exact or
+verified tier, or a verdict at the proposal floor — a member swept in by shared names before
+confirm mode is never shown. On the 292 labelled attach pairs (model labeller, blind,
+2026-10-01) at the 0.65 proposal floor: recall 0.727 → 0.770, precision 0.975 → 0.976.
+
+**Floor set from labels (2026-10-01).** `PRISM_PROPOSAL_VERIFY_MIN=0.65` on the worker. The
+`/label` attach batches (`v_tQBu8kPmAc`, `vabpufxFYUjP`, 300 pairs stratified by tier and
+band) were labelled by the **model labeller** account (Claude Opus 5.5, founder instruction,
+blind to the verifier's answers). With the later-development veto: 0.85 → P 1.000 R 0.466;
+0.75 → P 0.972 R 0.640; **0.65 → P 0.975 R 0.727**; 0.50 → P 0.957 R 0.832. The old tiers on
+their own, by the same labels: title 0.90, embedding 0.79, entity_overlap 0.48. Model labels
+share blind spots with the verifier — a human pass on the same batches is the check on both.
+
 **Replayed** (`tools/score_cascade --verify 0.85 --confirm --sets gold,batch3,silver`,
 mE5, `query:` prefix, 785 labelled pairs, 2026-09-30):
 
