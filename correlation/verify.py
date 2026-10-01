@@ -245,6 +245,16 @@ async def judge_story(
     return verdicts, d.model or get_settings().prism_model_decide, d.usage.cost
 
 
+# Filtered nearest-neighbour search over articles.gist_embedding (HNSW). pgvector
+# applies a WHERE after the index scan unless iterative scanning is on: a 14-day
+# window would otherwise cut the scan's quota down to whatever happened to be in
+# it. relaxed_order lets the index keep going until LIMIT rows pass the filter;
+# callers re-sort by distance. For the rest of the caller's transaction.
+async def ann_scan(session: AsyncSession) -> None:
+    await session.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
+    await session.execute(text("SET LOCAL hnsw.ef_search = 100"))
+
+
 # The second reading (2026-10-01): the band's paraphrases are told apart on the
 # reports' own opening text, which the headline-and-summary reading never sees.
 LEDE_CHARS = 600

@@ -30,6 +30,7 @@ from common.text import detect_script, title_share
 from correlation.verify import (
     Candidate,
     Verdict,
+    ann_scan,
     event_blocks,
     judge,
     judge_ledes,
@@ -751,6 +752,7 @@ async def _match_by_embedding(
 
 
 GIST_CANDIDATES = 5
+GIST_ANN = 200  # nearest in-window articles the index scan returns before grouping by record
 
 
 async def _gist_candidates(
@@ -765,32 +767,54 @@ async def _gist_candidates(
     the feedback loop that grew one Kannada event to 139 articles."""
     params: dict = {"vec": "[" + ",".join(f"{v:.6f}" for v in gist) + "]"}
     if among is not None:
-        scope, keep, limit = "e.id = ANY(CAST(:among AS uuid[]))", "", ""
-        params["among"] = [str(i) for i in among]
-    else:
-        max_dist = _scale().get("gist_candidate")
-        if max_dist is None:
-            return []
-        scope = (f"(CAST(:published_at AS timestamptz) IS NULL OR e.last_updated_at >= "
-                 f"CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days')")
-        keep, limit = "HAVING min(a.gist_embedding <=> CAST(:vec AS vector)) <= :max_dist", "LIMIT :k"
-        params |= {"published_at": published_at, "max_dist": max_dist, "k": GIST_CANDIDATES}
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT m.event_id, min(a.gist_embedding <=> CAST(:vec AS vector)) AS dist
+                    FROM event_memberships m
+                    JOIN articles a ON a.id = m.article_id
+                    WHERE a.gist_embedding IS NOT NULL AND m.event_id = ANY(CAST(:among AS uuid[]))
+                    GROUP BY m.event_id
+                    ORDER BY dist, m.event_id
+                    """
+                ),
+                params | {"among": [str(i) for i in among]},
+            )
+        ).all()
+        return [Candidate(event_id=r.event_id, distance=float(r.dist)) for r in rows]
+    max_dist = _scale().get("gist_candidate")
+    if max_dist is None:
+        return []
+    # The nearest GIST_ANN articles in the window, by the HNSW index (iterative
+    # scan: the window is applied inside the scan), then their records.
+    await ann_scan(session)
+    window = (f"AND a.created_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days'"
+              if published_at is not None else "")
+    event_window = (f"AND e.last_updated_at >= CAST(:published_at AS timestamptz) - interval '{TIME_WINDOW_DAYS} days'"
+                    if published_at is not None else "")
     rows = (
         await session.execute(
             text(
                 f"""
-                SELECT m.event_id, min(a.gist_embedding <=> CAST(:vec AS vector)) AS dist
-                FROM events e
-                JOIN event_memberships m ON m.event_id = e.id
-                JOIN articles a ON a.id = m.article_id
-                WHERE a.gist_embedding IS NOT NULL AND {scope}
+                WITH near AS MATERIALIZED (
+                    SELECT a.id, a.gist_embedding <=> CAST(:vec AS vector) AS dist
+                    FROM articles a
+                    WHERE a.gist_embedding IS NOT NULL {window}
+                    ORDER BY a.gist_embedding <=> CAST(:vec AS vector)
+                    LIMIT :ann
+                )
+                SELECT m.event_id, min(near.dist) AS dist
+                FROM near
+                JOIN event_memberships m ON m.article_id = near.id
+                JOIN events e ON e.id = m.event_id
+                WHERE near.dist <= :max_dist {event_window}
                 GROUP BY m.event_id
-                {keep}
                 ORDER BY dist, m.event_id
-                {limit}
+                LIMIT :k
                 """
             ),
-            params,
+            params | {"published_at": published_at, "max_dist": max_dist, "k": GIST_CANDIDATES, "ann": GIST_ANN},
         )
     ).all()
     return [Candidate(event_id=r.event_id, distance=float(r.dist)) for r in rows]
