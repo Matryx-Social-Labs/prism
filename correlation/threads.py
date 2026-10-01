@@ -435,8 +435,11 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
                 """
                 SELECT e.id, e.title, e.sector, e.occurred_at, e.last_updated_at, e.image_url,
                        COALESCE(e.first_published_at, e.first_seen_at) AS published,
-                       COALESCE((e.projection->>'source_count')::int, 1) AS source_count
-                FROM events e WHERE e.id = ANY(CAST(:ids AS uuid[]))
+                       COALESCE((e.projection->>'source_count')::int, 1) AS source_count,
+                       se.facet
+                FROM events e
+                LEFT JOIN story_events se ON se.event_id = e.id
+                WHERE e.id = ANY(CAST(:ids AS uuid[]))
                 """
             ),
             {"ids": ids},
@@ -492,6 +495,9 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
             "why": why.get(str(e["id"])),
             # The route map weighs a station by how many outlets filed it.
             "source_count": e["source_count"],
+            # What kind of development it is in its story (correlation/verify.FACETS);
+            # None until the record joins a persistent story.
+            "facet": e["facet"],
         }
         for e in sorted(events, key=lambda e: (e["published"], str(e["id"])))
     ]

@@ -39,3 +39,35 @@ describe.each(["related", "timeline"] as const)("StoryTimeline (%s)", (mode) => 
     expect(gutter("Two")).toHaveTextContent(/^30 SEPT$/);
   });
 });
+
+/**
+ * Facets: what kind of development each record is in its story (the judge's
+ * fixed list). On the Flydubai story: event 13 · investigation 12 · response 9 ·
+ * people 19 · reactions 42 · politics 7 — the chips filter the list to one kind.
+ */
+describe.each(["related", "timeline"] as const)("StoryTimeline facets (%s)", (mode) => {
+  const faceted = [
+    { ...dev("a", "Flight diverted to Saudi Arabia", "2026-09-30T07:33:00Z"), facet: "event" },
+    { ...dev("b", "UAE opens a probe", "2026-10-01T04:00:00Z"), facet: "investigation" },
+    { ...dev("c", "Modi praises the pilot", "2026-10-01T02:12:00Z"), facet: "reactions" },
+    { ...dev("d", "Trump praises the pilot", "2026-10-01T02:03:00Z"), facet: "reactions" },
+  ];
+
+  it("counts each kind and filters the list to the one chosen", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<StoryTimeline story={{ developments: faceted, cast: [] }} mode={mode} />);
+    expect(screen.getByRole("button", { name: "All 4" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Reactions 2" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reactions 2" }));
+    expect(screen.getByRole("button", { name: "Reactions 2" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Modi praises the pilot")).toBeInTheDocument();
+    expect(screen.queryByText("UAE opens a probe")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "All 4" }));
+    expect(screen.getByText("UAE opens a probe")).toBeInTheDocument();
+  });
+
+  it("shows no chips when the records carry no facet or only one kind", () => {
+    render(<StoryTimeline story={{ developments: devs, cast: [] }} mode={mode} />);
+    expect(screen.queryByRole("button", { name: /^All / })).not.toBeInTheDocument();
+  });
+});

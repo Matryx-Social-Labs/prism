@@ -201,6 +201,8 @@ export interface StoryDevelopment {
   is_current: boolean;
   why: string | null;
   source_count?: number; // the station's weight on the route map; older payloads omit it
+  /** What kind of development it is in its story (event, investigation, …); null until the record joins one. */
+  facet?: string | null;
 }
 export interface StoryTimelineData {
   developments: StoryDevelopment[];
