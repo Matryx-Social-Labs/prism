@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.121.0] - 2026-10-01
+
+### Changed — a report is judged against the record as it stands
+- The verifier read each record only as founded: its first headline and summary. In a
+  developing story the founder tells one facet, so later reports of the same happening
+  scored 0.70–0.84 against it — one Gujarat award sat in five records. It now also reads up
+  to two confirmed members' headlines nearest the incoming report. Only members the
+  verifier or an exact rule confirmed are shown, so an old name-swept member cannot pull
+  the next report in.
+- Measured on the 300 labelled attach pairs: at the 0.65 floor, recall 0.727 → 0.770 at the
+  same precision.
+
+### Data — the matching floor is set from labels
+- The attach-check batches in `/label` were labelled by a model labeller account (Claude
+  Opus 5.5), on founder instruction, blind to the verifier's answers, and stored under its
+  own account so they are never mistaken for human labels.
+- From them, a record a matching rule proposed now attaches from 0.65
+  (`PRISM_PROPOSAL_VERIFY_MIN`): precision 0.975, recall 0.727, against 1.000 and 0.466 at
+  0.85.
+
 ## [0.0.120.0] - 2026-10-01
 
 ### Changed — a match a rule proposed is held to its own floor

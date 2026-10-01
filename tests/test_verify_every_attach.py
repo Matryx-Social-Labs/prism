@@ -31,6 +31,7 @@ from tests.test_verified_tier import (
     _direction,
     _event_with_member,
     _incoming_article,
+    _vec,
 )
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -294,3 +295,65 @@ async def test_a_verdict_without_a_follow_up_answer_never_names_the_new_column()
     await verify.record(_Session(), article_id=uuid.uuid4(), scored=[(c, 0.9)], model="m", mode="live")
     await verify.record(_Session(), article_id=uuid.uuid4(), scored=[verify.Verdict(c, 0.1, 0.9)], model="m", mode="confirm")
     assert "story_noul" not in sql[0] and "story_noul" in sql[1]
+
+
+async def _member(s, event_id, headline: str, gist: list[float], *, match_type: str, verdict: float | None) -> None:
+    sid, rid, aid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    await s.execute(text("INSERT INTO sources (id,slug,name,source_type) VALUES (:i,:s,:s,'rss')"),
+                    {"i": str(sid), "s": f"fixture-{sid.hex[:8]}"})
+    await s.execute(text("INSERT INTO raw_items (id,source_id,external_id,title,raw,relevance) "
+                         "VALUES (:i,:s,:e,:t,'{}'::jsonb,'relevant')"),
+                    {"i": str(rid), "s": str(sid), "e": f"ext-{rid.hex[:8]}", "t": headline})
+    await s.execute(text("INSERT INTO articles (id,raw_item_id,clean_text,retrieval_tier,word_count,gist_embedding) "
+                         "VALUES (:i,:r,'body','direct',1,CAST(:g AS vector))"),
+                    {"i": str(aid), "r": str(rid), "g": _vec(gist)})
+    await s.execute(text("INSERT INTO enrichments (id, article_id, summary, event_type, shared_fields) "
+                         "VALUES (:i, :a, 's', 'report', CAST(:f AS jsonb))"),
+                    {"i": str(uuid.uuid4()), "a": str(aid), "f": f'{{"headline": "{headline}"}}'})
+    await s.execute(text("INSERT INTO event_memberships (id,event_id,article_id,match_type,is_survivor) "
+                         "VALUES (:i,:e,:a,:m,false)"),
+                    {"i": str(uuid.uuid4()), "e": str(event_id), "a": str(aid), "m": match_type})
+    if verdict is not None:
+        await s.execute(text("INSERT INTO event_match_verdicts (article_id, event_id, noul, model, mode) "
+                             "VALUES (:a, :e, :n, 'm', 'confirm')"), {"a": str(aid), "e": str(event_id), "n": verdict})
+
+
+async def test_a_record_is_read_with_its_confirmed_members_nearest_the_article():
+    """A Gujarat award sat in five records scoring 0.70-0.79 against founders
+    that each told another facet. The judge now reads what the record holds —
+    but only members Jev (or an exact tier) confirmed: a name-swept member must
+    not pull the next article in."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    g = _direction()
+    async with session_scope() as s:
+        eid = await _event_with_member(s, f"Pilot to receive state award {uuid.uuid4().hex[:6]}", _at(g, 0.5))
+        await _member(s, eid, "Award ceremony date fixed", _at(g, 0.05), match_type="entity_overlap", verdict=0.9)
+        await _member(s, eid, "Prayers held for the pilot", _at(g, 0.02), match_type="entity_overlap", verdict=None)
+        await _member(s, eid, "Award named after the state", _at(g, 0.3), match_type="verified", verdict=None)
+        await _member(s, eid, "Far confirmed member", _at(g, 0.6), match_type="entity_overlap", verdict=0.95)
+        read = (await verify.event_blocks(s, [eid], near=g))[eid]
+        founded = (await verify.event_blocks(s, [eid]))[eid]
+        await s.rollback()
+    assert read.startswith(founded), "the founder still leads"
+    assert "Also reported as: Award ceremony date fixed\nAlso reported as: Award named after the state" in read
+    assert "Prayers held" not in read, "an unjudged fuzzy member is never shown"
+    assert "Far confirmed member" not in read, f"only the {verify.MEMBER_LINES} nearest"
+    assert "Also reported as" not in founded
+
+
+async def test_confirm_reads_each_candidate_as_it_stands(monkeypatch, jev):
+    seen = {}
+
+    async def blocks(session, ids, *, near=None):
+        seen["near"] = near
+        return {}
+
+    async def no_gist_candidates(*_a, **_k):
+        return []
+
+    monkeypatch.setattr(clustering, "event_blocks", blocks)
+    monkeypatch.setattr(clustering, "_gist_candidates", no_gist_candidates)
+    g = _direction()
+    await clustering._verified(None, [_proposal(uuid.uuid4())], g, BLOCK, None, uuid.uuid4())
+    assert seen["near"] == g
