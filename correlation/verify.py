@@ -74,6 +74,42 @@ SAME_STORY = (
 )
 
 
+# The story layer (correlation/stories.py): is a record part of a story? Asked
+# against the story's founding report (or a running story's scope), its latest
+# report and its two members nearest the record. "Another event in the same
+# ongoing war ... tournament" is what holds a running story together; the
+# exclusions are the same-topic-different-event merges measured 2026-09-09
+# (two CVEs, two diseases, two seizures). Prototype 2026-10-01: attach precision
+# 0.92-0.97 at 0.70 on 60 read.
+PART_OF_STORY = (
+    "{a} reports a development in the same specific developing news story as {b}: the same happening, or a "
+    "follow-up, consequence, official response, reaction, investigation, court stage or later stage of it, or another "
+    "event in the same specific ongoing war, conflict, crisis, dispute, case, campaign, tournament or disaster. Not when "
+    "they only share a country, region, party, person, organisation, sector or topic in different matters (two "
+    "different crimes, two different court cases, two different bills, another company's results, another day's prices "
+    "or weather)"
+)
+
+# What kind of development a record is within its story — a fixed list, so a
+# story's facets are counted and named the same way on every story. Read on the
+# Flydubai story (103 records): event 13, investigation 12, response 9, people 19,
+# reactions 42, politics 7.
+FACETS = {
+    "event": "the main happening itself: what took place (the incident, attack, match, ruling, announcement, deal) "
+             "and its immediate facts",
+    "investigation": "investigation, arrest, charges, court proceedings or official findings about it",
+    "response": "an official or institutional action in response: a government, regulator, company or army decides, "
+                "suspends, orders, reviews or retaliates",
+    "diplomacy": "talks, proposals, negotiations, warnings or statements between countries or parties",
+    "people": "the people involved: victims, survivors, heroes, families, their condition, recovery or life story",
+    "reactions": "praise, condemnation, tributes, honours, prayers or other reactions by leaders, public figures or "
+                 "the public",
+    "politics": "political attacks, blame or use of it by parties and politicians",
+    "impact": "consequences for markets, prices, travel, business, supply or daily life",
+    "explainer": "background, analysis, explainer or profile, no new development",
+}
+
+
 @dataclass(frozen=True)
 class Candidate:
     event_id: uuid.UUID

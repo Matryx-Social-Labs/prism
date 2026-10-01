@@ -373,3 +373,24 @@ async def test_the_story_partition_never_sees_a_merged_record():
         nodes = await _load_nodes(s)
     assert str(survivor) in nodes and str(absorbed) not in nodes
     assert _window("last_updated_at").endswith(" AND merged_into IS NULL")
+
+
+async def test_a_merged_copy_hands_its_story_place_to_the_survivor():
+    """One story per record (correlation/stories.py): a copy's place moves to the
+    survivor unless the survivor has its own, and a story founded on the copy
+    is re-anchored rather than left pointing at a record that redirects."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    survivor, absorbed, _ = await _pair(uuid.uuid4().hex[:8])
+    story = uuid.uuid4()
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, anchor_event_id, status) "
+                             "VALUES (:i, :s, 'x', '[]'::jsonb, '[]'::jsonb, :a, 'shadow')"),
+                        {"i": str(story), "s": f"fixture-{story.hex[:12]}", "a": str(absorbed)})
+        await s.execute(text("INSERT INTO story_events (event_id, story_id, facet) VALUES (:a, :s, 'event')"),
+                        {"a": str(absorbed), "s": str(story)})
+    merges, _ = await _mine(absorbed)
+    assert await merge.apply(merges[absorbed])
+    assert await _scalar("SELECT story_id FROM story_events WHERE event_id = :e", e=survivor) == story
+    assert await _scalar("SELECT count(*) FROM story_events WHERE event_id = :e", e=absorbed) == 0
+    assert await _scalar("SELECT anchor_event_id FROM stories WHERE id = :i", i=story) == survivor

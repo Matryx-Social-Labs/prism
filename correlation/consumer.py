@@ -43,6 +43,7 @@ from correlation.briefs import available_lenses, persist_briefs, template_briefs
 from correlation.chronology import place_in_time
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
+from correlation.stories import assign_story
 from correlation.threads import link_event_threads
 from correlation.variants import reconcile_on_attach
 from correlation.verify import article_block
@@ -356,7 +357,13 @@ async def run_due_analyses() -> int:
 
 
 async def analyze_event_now(event_id: uuid.UUID) -> None:
-    """The deferred work: perspectives/impacts/briefs + thread linking + republish."""
+    """The deferred work: the record's story, perspectives/impacts/briefs + thread linking + republish."""
+    try:
+        async with session_scope() as session:
+            await assign_story(session, event_id)  # once per record; a no-op when placed or PRISM_STORIES=off
+    except Exception:
+        # Stories are additive; never fail analysis over them. The backfill tool places it later.
+        logger.exception("story_assign_failed", event_id=str(event_id))
     has_news, ran_llm = await _analyze_event(event_id)
     if has_news and ran_llm:
         try:
