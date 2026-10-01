@@ -209,6 +209,59 @@ async def judge_story(
     return verdicts, d.model or get_settings().prism_model_decide, d.usage.cost
 
 
+# The second reading (2026-10-01): the band's paraphrases are told apart on the
+# reports' own opening text, which the headline-and-summary reading never sees.
+LEDE_CHARS = 600
+
+
+async def lede_blocks(session: AsyncSession, block: str, article_id: uuid.UUID,
+                      event_id: uuid.UUID) -> tuple[str, str] | None:
+    """The article's block and the record's founding block, each with its
+    report's opening text. None when either article has no text."""
+    row = (
+        await session.execute(
+            text(
+                """
+                SELECT e.title, e.summary, coalesce(e.first_published_at, e.first_seen_at) AS first_at,
+                       (SELECT left(a.clean_text, :n) FROM articles a WHERE a.id = :a) AS a_lede,
+                       (SELECT left(x.clean_text, :n) FROM event_memberships m JOIN articles x ON x.id = m.article_id
+                        WHERE m.event_id = e.id AND m.match_type = 'new_event' LIMIT 1) AS e_lede
+                FROM events e WHERE e.id = :e
+                """
+            ),
+            {"a": str(article_id), "e": str(event_id), "n": LEDE_CHARS},
+        )
+    ).one_or_none()
+    if row is None or not row.a_lede or not row.e_lede:
+        return None
+    opening = lambda t: "\nOpening text: " + " ".join(t.split())  # noqa: E731
+    return block + opening(row.a_lede), event_block(row.title, row.summary, row.first_at) + opening(row.e_lede)
+
+
+async def judge_ledes(*, article_id: uuid.UUID, report: str, record: str) -> tuple[float, float, str, float]:
+    """Same happening, and later development, read on the opening texts: one
+    Jev call. Network only, as judge(); a failure raises for the caller."""
+    d = await asyncio.wait_for(
+        decide({"REPORT": report, "RECORD": record},
+               {"same": Noul(instructions=SAME_HAPPENING.format(a="REPORT", b="RECORD")),
+                "story": Noul(instructions=SAME_STORY.format(a="REPORT", b="RECORD"))},
+               trace_name="event-escalate", metadata={"stage": "correlation", "article_id": str(article_id)}),
+        VERIFY_TIMEOUT_S,
+    )
+    same, story = d.answers["same"], d.answers["story"]
+    assert isinstance(same, NoulAnswer) and isinstance(story, NoulAnswer)
+    return same.noul, story.noul, d.model or get_settings().prism_model_decide, d.usage.cost
+
+
+async def record_ledes(session: AsyncSession, *, article_id: uuid.UUID, event_id: uuid.UUID,
+                       same: float, follows: float) -> None:
+    await session.execute(
+        text("UPDATE event_match_verdicts SET lede_noul = :n, lede_story_noul = :s "
+             "WHERE article_id = :a AND event_id = :e"),
+        {"n": same, "s": follows, "a": str(article_id), "e": str(event_id)},
+    )
+
+
 async def record(
     session: AsyncSession, *, article_id: uuid.UUID, scored: list[tuple[Candidate, float]] | list[Verdict],
     model: str, mode: str,
