@@ -212,6 +212,29 @@ today — the verifier must not trade precision for new duplicates); multi-outle
 - 1.7 labels: `/label` shows records against records only, so `tools/gold_attaches`
   writes two blind sheets (300 article-vs-record pairs, 100 read twice) instead.
 
+**Phase 1 status (2026-10-01): live and applied** (main 2ad5bd7, 0.0.119.1–0.0.123.0).
+- Restart after the top-up exposed OpenRouter's opt-in prompt-injection guardrail: a 403 on
+  one headline ("How does your system override law?") was read as quota and paused every call
+  (0.0.119.1: a refused request is that article's alone; guardrail switched off by the founder).
+- `PRISM_EVENT_VERIFY=confirm` since 09:25 UTC. Model labeller (below, §8) labelled the 300
+  attach pairs blind → `PRISM_PROPOSAL_VERIFY_MIN=0.65` for records a fuzzy tier proposed
+  (P 0.975, R 0.727; 0.85 was P 1.000, R 0.466); gist-only candidates keep 0.85. Old tiers by
+  the same labels: title 0.90, embedding 0.79, entity_overlap 0.48.
+- Judge against the record **as it stands** (0.0.121.0): founder + 2 confirmed members nearest
+  the article's gist; recall 0.727 → 0.770 at the same precision.
+- Repair applied for the last 30 days at `--detach-below 0.15` only (~1,580 moved): by the
+  labels, 0.15–0.5 is still 20–43% the same happening — re-judge that band after 2.7–2.9.
+  URL copies now move together (0.0.121.1: 31 of the first 250 moves were pulled back by a
+  second copy of the same article).
+- Record merges at 0.85 only (87 in 7 days). The 0.80–0.85 band read ~88% right; its errors
+  are reactions folded into the incident ("PM praises pilot" into the attack).
+- Records dated by first report, not processing (0.0.122.0): `events.first_published_at`,
+  32,615 backfilled, 10,313 had been dated >6h late, 551 links turned; search groups by story.
+- One name, one entity (0.0.123.0): spelling variants folded on Jev's word with evidence
+  (same record / verified link / one story), journalled and undoable: 1,412 folds, the
+  Flydubai pilot 15 entities → 1 (+4 one-off spellings under the floor). Live at ingest
+  (`PRISM_ENTITY_VARIANTS=live`).
+
 ### Phase 2 — signals and identity (week 2)
 
 2.1 Keep what we already fetch: `og:url`/canonical, `datePublished`/`dateModified`, author,
@@ -231,6 +254,27 @@ today — the verifier must not trade precision for new duplicates); multi-outle
     P39/P102/P27/P106/P946/P249/P414/P2002/P131. Uses: fold variant actor pages (308), speaker ↔ entity
     for quotes, ticker cross-check (ISIN P946 must match the securities master), X account ↔ entity,
     state placement via P131. Not used for event matching.
+
+**Phase 2 addition (2026-10-01): context-based entity linking.** Spelling folds (0.0.123.0)
+only catch one name written several ways. Context also resolves "POTUS", "the 47th President",
+"the Chief Minister" and misspellings no rule catches. Research: retrieval and reasoning are
+complementary — together +6.9% overall, up to +23.3% on rare entities, benchmark incl. Hindi
+and Tamil (Think Before You Link, arXiv 2609.10745); LLMs asked for Wikidata QIDs directly
+invent them (<1% precision, arXiv 2505.03473) — so retrieve candidates, let the judge choose.
+2.7 **In-article coreference at extraction**: one entity per real person/org per article with
+    every surface form the article uses ("Trump", "the President", "POTUS") and the role it
+    gives them. Cheap (the extractor already reads the article); fixes in-article spelling.
+2.8 **Titles → office holders by date**: role mentions ("PM", "CM of Karnataka", "POTUS",
+    "Chief Election Commissioner") resolve to whoever held the office on the article's date —
+    Wikidata P39 with P580/P582 qualifiers, cached per office; Indian state offices seeded by
+    hand where Wikidata is thin.
+2.9 **Retrieval + reasoning linking to Wikidata**: candidates from Wikidata labels/aliases in
+    all 12 languages (and our own registry), the judge picks with the article's sentence or
+    says none. Today 1.4% of entities carry a QID; flydubai had none.
+2.10 **Entity registry**: identity = QID where one exists (else our id), multi-script names,
+    roles over time, provenance per link; the slug becomes a display handle, not identity.
+    New people (not in Wikidata, like the pilot) keep the skeleton + evidence + verifier fold.
+    Gate: 200 `entity_link` labels, P ≥ 0.95 (model labeller + a human audit sample).
 
 ### Phase 3 — source waves (weeks 2–3), each after the scale gate (section 7)
 
@@ -258,6 +302,24 @@ two-client offset test passes).
 4.4 Founder defines a story on the six contested classes from the 09-14 adjudication (box-office runs,
     same-day weather, a rally remark on an ongoing negotiation, an explainer spawned by an incident,
     daily updates, reactions) — that answer IS the label guide.
+
+**Phase 4 revision (2026-10-01): stories made of threads, no size cap.** After the name fold
+the Flydubai story no longer splits by language but by facet: the attack (17 records), the
+landing (8), praise (7), the airlift (6), Modi (6), the Gujarat award (6) — because Leiden CPM
+caps a community near 25 records (Story Forest's bound) and this story has ~100. Cross-language
+gist edges (founder gist, other-language 2-NN, distance ≤ 0.07, headline overlap) were measured
+offline on the live window: ~94% right on a read of 33, stories 3,780 → 3,678, max 24, Flydubai
+21 → 19 stories — useful, but the cap is the real limit.
+4.5 **Story → threads**: a story is the connected set of records joined by verified
+    `leads_to` links and confirmed `same_story` edges (star to an anchor, never transitive);
+    threads inside it are the current Leiden communities (Attack · Reactions · Investigation ·
+    Recovery · Honours · Politics). No size cap on the story; threads stay small.
+4.6 **Cross-language story edges** (above) behind replay on labelled story pairs.
+4.7 **Story identity**: a story keeps its slug while its anchor record is in it; when none of
+    its founding records remain it gets a new slug and the old one redirects
+    (`/trending/netanyahu-calls-accusations-of-genocide-in-gaza-…` held the pilot story).
+4.8 The partition job sleeps 15 minutes after every worker restart before its first run —
+    time it from the last run instead, so deploys do not stall stories.
 
 ### Phase 5 — lenses readers can trust, and how they are shown (weeks 3–6)
 
@@ -304,6 +366,14 @@ A wave goes in only when all hold, then runs 48 h before the next:
 | Lens facts | 100 ticker relevance + 100 cyber facts + 100 Health/Policy fields each | Phase 5 gates | new `/label` kind `lens_fact` |
 | Entity links | 200 QID links | 2.6 precision | new `/label` kind `entity_link` |
 
+**Model labeller (founder instruction 2026-10-01).** Labels are now produced by a model
+labeller account — "Claude Opus 5.5 (model labeller)", `claude-opus-5-5@labeller.invalid`,
+qualified by grant, its labeller note saying the labels are machine judgements — through the
+real `/label` API, blind to the verifier's answers. First set: the 300 attach pairs (S 161,
+D 90, F 41, unsure 8). Model labels share blind spots with Jev; a human audit sample per set
+stays the check on both. Next sets: 100 gist-only candidates at 0.65–0.85 (a read of 22 says
+~91% same at ≥ 0.75), 100 record-merge pairs at 0.75–0.85, 200 entity links (2.10).
+
 ≈ 1,300 items. Pairs take ~20–40 s each with the Jev pre-label shown, so ~10–12 labeller-hours per
 labeller, two labellers for agreement. The labeller workspace, qualification and hidden checks already
 exist; two kinds are new.
@@ -329,3 +399,58 @@ exist; two kinds are new.
 | New UA still blocked from Railway egress | per-feed check from the worker before enabling |
 | Source waves raise cost | telemetry + gate 4; each wave ~+$0.5–1.5/day at $1.3/1k |
 | Labellers disagree (κ 0.3–0.4 before) | founder definitions first, adjudicate disputes, Jev as a third opinion |
+
+
+## 11. Case study and product vision (2026-10-01) — to be refined into a structured plan
+
+### The Flydubai FZ1073 story, end to end
+Ground truth (public reporting): 30 Sep, FZ1073 Dubai → Tel Aviv; the Omani co-pilot stabbed
+Captain Smit Machchhar; the jet fell 14,000 ft in under 30 s; the captain opened the cockpit
+door, passengers subdued the co-pilot, landing in Tabuk (174 aboard); Saudi arrest. 1 Oct:
+surgery, airlift to Abu Dhabi, UAE investigation, flydubai suspends Israel flights; reactions
+(Netanyahu, Modi, Trump, Murmu), Gujarat award. ~10–15 happenings.
+
+| Stage | Was (morning) | Now | Left |
+|---|---|---|---|
+| Entity names | pilot = 15 entities, flydubai 2 | 1 (+4 one-offs), flydubai 1 | context linking (2.7–2.10) |
+| Records | 190 articles → 70 records; old rules glued reactions into a 59-article English record; 61% of articles founded records under the 0.85 floor | floor 0.65 for proposals, record-as-it-stands, repair, merges ≥ 0.85 | pre-fix duplicates at 0.70–0.84 (airlift ×5, UAE probe ×6, award ×5, Modi ×7) |
+| Time | processing order (all 10-01 08:18–12:14) | first report order (09-30 07:30 →) | — |
+| Stories | ~25 stories, split by language | split by facet (17/8/7/6/6/6) | threads (4.5) |
+| Search | 20 flat siblings | grouped under the story | story-first results |
+
+### Architecture — the data layers (each with its own judge, measured by labels)
+Report → **Mention** (entity + role + QID, 2.7–2.10) → **Record** (one happening, verified, all
+languages) → **Thread** (later developments, by first report) → **Story** (the developing story,
+made of threads, no size cap). Rules that hold: candidates are proposed by cheap signals and
+decided by the judge; floors come from labels, never from 0.5; star-attach, never chain; every
+destructive repair is dry-run first, canaried, journalled where possible.
+
+### The product a reader sees
+- **Story page**: a timeline by day with times — each entry one happening with "n outlets ·
+  k languages"; reactions under what they react to; threads as sections; "new since you last
+  read".
+- **Record page**: every report of one happening, across languages; where figures disagree
+  (174 vs 180 passengers) both are shown with who said which.
+- **Entity page**: one person across languages and scripts, roles over time.
+- **Search**: stories first, then records (grouping shipped 0.0.122.0).
+- Lenses sit on top of verified records only.
+
+### Quality loop
+Daily `/admin` panel: residual duplicate rate, wrong-attach rate (sampled and labelled by the
+model labeller; human audit sample weekly), name-variant rate, story fragmentation (records per
+story, stories per happening cluster), time skew (first_seen − first_published). A release that
+moves any of them the wrong way is held.
+
+### Next, ranked
+1. Story → threads (4.5) — what readers see; lets the record merge stay strict at 0.85.
+2. Context-based entity linking (2.7 → 2.8 → 2.9 → 2.10).
+3. Labels: gist-only floor (100), record-merge band (100), entity links (200).
+4. Re-judge the 0.15–0.5 repair band and the 0.70–0.84 duplicate records with the
+   record-as-it-stands judge and the new labels.
+5. Partition timing after restarts (4.8); story slug identity (4.7).
+
+### Open founder decisions
+- Thread names: generated per story, or a fixed vocabulary (Incident · Reactions ·
+  Investigation · Legal · Honours · Politics)?
+- Where a reader lands from search/feed: the story (timeline) or the record?
+- Human audit cadence for the model labeller's sets (proposal: 10% of each set, two founders).
