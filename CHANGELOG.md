@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.120.0] - 2026-10-01
+
+### Changed — a match a rule proposed is held to its own floor
+- With every match confirmed by the verifier (0.0.118.0, switched on 2026-10-01), one
+  floor of 0.85 split stories that belong together: in the first hour, 77 of 335 new
+  records had a candidate scored 0.5–0.85, and one Flydubai cockpit attack sat in five
+  records. When a matching rule proposed the record and the verifier did not call the
+  report a later development, a hand read found the same happening 21/30 at 0.50–0.60,
+  24/30 at 0.60–0.70 and 25/30 at 0.70–0.85.
+- New setting `PRISM_PROPOSAL_VERIFY_MIN`: a proposed record attaches from that floor
+  unless the verifier calls the report a later development (then it founds its own
+  record, linked back). A record only the verifier's own search found keeps 0.85.
+  Default 0.85, so nothing changes until it is set; the founders' attach labels set it.
+
 ## [0.0.119.1] - 2026-10-01
 
 ### Fixed — one refused article no longer pauses every model call

@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
 from common.text import detect_script, title_share
-from correlation.verify import Candidate, event_blocks, judge, judge_story, record
+from correlation.verify import Candidate, Verdict, event_blocks, judge, judge_story, record
 
 logger = logging.getLogger(__name__)
 
@@ -790,6 +790,19 @@ async def _gist_candidates(
 UNJUDGED_FALLBACK = frozenset({"title_time", "headline_xlang"})
 
 
+def _attaches(v: Verdict, proposed: set[uuid.UUID]) -> bool:
+    """Jev's word on one candidate. A record a fuzzy tier proposed attaches from
+    prism_proposal_verify_min, unless — under the gist floor — Jev also calls the
+    article a later development of it: then it founds its own record, linked
+    back. A record only the gist found needs prism_event_verify_min."""
+    settings = get_settings()
+    if v.same >= settings.prism_event_verify_min:
+        return True
+    if v.candidate.event_id not in proposed:
+        return False
+    return v.same >= settings.prism_proposal_verify_min and (v.follows or 0.0) < settings.prism_follow_up_min
+
+
 async def _verified(
     session: AsyncSession, proposals: list[Match], gist: list[float] | None, block: str | None,
     published_at, article_id: uuid.UUID | None,
@@ -826,9 +839,10 @@ async def _verified(
     await record(session, article_id=article_id, scored=verdicts, model=model, mode="confirm")
     if not verdicts:
         return first
-    best = max(verdicts, key=lambda v: v.same)
-    if best.same < get_settings().prism_event_verify_min:
+    passing = [v for v in verdicts if _attaches(v, set(proposed))]
+    if not passing:
         return None
+    best = max(passing, key=lambda v: v.same)
     tier = next((p.match_type for p in proposals if p.event_id == best.candidate.event_id), "verified")
     return Match(event_id=best.candidate.event_id, match_type=tier, match_score=best.same)
 
