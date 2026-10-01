@@ -117,3 +117,13 @@ def test_a_missing_answer_is_a_contract_break_not_a_silent_default(monkeypatch):
     monkeypatch.setattr(decisions, "_client", _client(lambda r: httpx.Response(200, json=partial)))
     with pytest.raises(ValueError, match="sector"):
         asyncio.run(decide({}, QUESTIONS, trace_name="test"))
+
+
+def test_a_guardrail_403_refuses_the_request_not_the_account(monkeypatch):
+    body = {"error": {"message": "Request blocked: prompt injection patterns detected", "code": 403,
+                      "metadata": {"patterns": ["system_override"]}}}
+    monkeypatch.setattr(decisions, "_client", _client(lambda r: httpx.Response(403, json=body)))
+    with pytest.raises(ValueError, match="prompt injection") as caught:
+        asyncio.run(decide({}, QUESTIONS, trace_name="test"))
+    assert not isinstance(caught.value, ConnectionError), "transient would redeliver it forever"
+    assert llm._cooldown_until == 0.0

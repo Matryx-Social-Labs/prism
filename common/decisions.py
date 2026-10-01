@@ -33,7 +33,13 @@ from pydantic import BaseModel, Field, TypeAdapter
 
 from common import spend
 from common.config import get_settings
-from common.llm import QUOTA_STATUS, LlmQuotaError, respect_cooldown, start_cooldown
+from common.llm import (
+    QUOTA_STATUS,
+    LlmQuotaError,
+    request_refused,
+    respect_cooldown,
+    start_cooldown,
+)
 from common.logging import get_logger
 from common.observability import get_langfuse, observe
 
@@ -213,7 +219,7 @@ async def _post(body: dict[str, Any]) -> httpx.Response:
         else:
             if response.status_code < 400:
                 return response
-            if response.status_code in QUOTA_STATUS:
+            if response.status_code in QUOTA_STATUS and not request_refused(response.status_code, response.text):
                 start_cooldown(response.status_code, response.text, get_settings().prism_model_decide)
                 raise LlmQuotaError(f"decisions {response.status_code}: {response.text[:200]}")
             if response.status_code < 500:

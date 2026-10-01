@@ -67,8 +67,8 @@ class LlmContentBlocked(ValueError):
     PROHIBITED_CONTENT, 403). Crime reporting — sexual assault, child abuse —
     trips it, and it is per-article and permanent, so it is a ValueError: the
     stream dead-letters once instead of redelivering five times. structured_chat
-    only raises this when no fallback model is configured; with one, the
-    article is answered by the fallback and this never surfaces."""
+    raises this when no fallback model is configured or the fallback is refused
+    too (an OpenRouter guardrail refuses every model on the key)."""
 
 
 # Gemini's finish reasons for "I will not answer this article": the request
@@ -95,6 +95,21 @@ def _blocked_error(obj: Any) -> dict | None:
     return err if blocked else None
 
 
+# OpenRouter's 403 is a refusal of ONE request, not the account (credit is 402):
+# a guardrail ("Request blocked: prompt injection patterns detected") or a
+# moderation flag. 2026-10-01: a Hindustan Times headline quoting a judge, "How
+# does your system override law?", matched the guardrail's `system_override`
+# pattern; read as quota, each redelivery paused every model call for 120 s and
+# the verifier timed out inside the pause. These markers keep it per-article.
+_REQUEST_REFUSED_MARKERS = ("request blocked", "flagged", "content_policy", "prohibited_content")
+
+
+def request_refused(status: int, message: str) -> bool:
+    """A 403 that refuses this request's content rather than the account's access."""
+    text = message.lower()
+    return status == 403 and any(m in text for m in _REQUEST_REFUSED_MARKERS)
+
+
 async def respect_cooldown() -> None:
     """Wait out a quota pause before any model call — the chat client's and the decisions client's."""
     wait = _cooldown_until - time.monotonic()
@@ -108,7 +123,7 @@ def start_cooldown(status: int, message: str = "", model: str | None = None) -> 
     account, so a 402 on either is a 402 on both. A 429 with a model named
     pauses that model only."""
     global _cooldown_until
-    if status not in QUOTA_STATUS:
+    if status not in QUOTA_STATUS or request_refused(status, message):
         return
     pause = _WEEKLY_COOLDOWN_SECONDS if "weekly" in message.lower() else _COOLDOWN_SECONDS
     if status == 429 and model:
@@ -336,6 +351,10 @@ async def _structured_chat[T: BaseModel](
                 response = await client.chat.completions.create(**kwargs)
                 await spend.record_response(response, trace_name, kwargs["model"])
             else:
+                if request_refused(e.status_code, str(e)):
+                    if _swap_to_fallback(kwargs, reasoning, trace_name):
+                        continue
+                    raise LlmContentBlocked(f"{kwargs['model']} refused: {str(e)[:200]}") from e
                 _maybe_start_cooldown(e, kwargs["model"])
                 if e.status_code in QUOTA_STATUS:
                     raise LlmQuotaError(f"llm quota exhausted ({e.status_code})") from e

@@ -5,6 +5,7 @@ treated like the other quota statuses so a spent account self-heals on top-up.""
 import time
 
 import httpx
+import pytest
 from openai import APIStatusError
 
 from common import llm
@@ -66,3 +67,54 @@ def test_a_timed_out_call_is_retried_not_dropped():
     from common.llm import get_llm
 
     assert get_llm().max_retries >= 1
+
+
+# --- a 403 that refuses one request is that article's, not the account's -------
+
+GUARDRAIL = ("Error code: 403 - {'error': {'message': 'Request blocked: prompt injection patterns detected', "
+             "'code': 403, 'metadata': {'patterns': ['system_override']}}}")
+
+
+def _refused(message: str = GUARDRAIL) -> APIStatusError:
+    resp = httpx.Response(403, request=httpx.Request("POST", "http://x"))
+    return APIStatusError(message, response=resp, body=None)
+
+
+def test_a_guardrail_403_pauses_nothing():
+    """2026-10-01: an HT headline quoting a judge — "How does your system
+    override law?" — tripped OpenRouter's prompt-injection guardrail. Read as
+    quota, every redelivery paused every model call for 120 s."""
+    llm._cooldown_until = 0.0
+    llm._maybe_start_cooldown(_refused())
+    assert llm._cooldown_until == 0.0
+
+
+async def test_a_refused_article_dead_letters_after_the_fallback_is_refused_too(monkeypatch):
+    from pydantic import BaseModel
+
+    from common.config import get_settings
+
+    class Out(BaseModel):
+        ok: bool
+
+    models = []
+
+    class _Completions:
+        async def create(self, **kw):
+            models.append(kw["model"])
+            raise _refused()
+
+    class _Client:
+        chat = type("Chat", (), {"completions": _Completions()})()
+
+    async def _noop(*_a):
+        return None
+
+    monkeypatch.setattr(llm, "get_llm", lambda: _Client())
+    monkeypatch.setattr(llm, "_respect_cooldown", _noop)
+    monkeypatch.setattr(get_settings(), "prism_model_fallback", "fallback/model")
+    llm._cooldown_until = 0.0
+    with pytest.raises(llm.LlmContentBlocked):  # a ValueError: the stream dead-letters it once
+        await llm.structured_chat(model="m", messages=[{"role": "user", "content": "x"}], output_model=Out, trace_name="t")
+    assert models == ["m", "fallback/model"]
+    assert llm._cooldown_until == 0.0

@@ -3,6 +3,20 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.119.1] - 2026-10-01
+
+### Fixed — one refused article no longer pauses every model call
+- OpenRouter answers 403 when its prompt-injection guardrail or a moderation flag refuses a
+  single request; credit is 402. The client read every 403 as the account being out of
+  quota and paused all model calls for two minutes. On the restart after the top-up, one
+  Hindustan Times headline quoting a judge, "How does your system override law?", matched
+  the guardrail's `system_override` pattern; each time it came back, extraction, the gate
+  and the verifier stopped for two minutes, and the verifier timed out inside the pause (38
+  articles in five minutes founded their own record instead of being checked).
+- Now a refused request is that article's alone: it is tried once on the fallback model,
+  then dead-lettered and given up after three tries like any article a model refuses. Jev
+  calls get the same rule.
+
 ## [0.0.119.0] - 2026-09-30
 
 ### Added — the attach check in the labelling workspace
