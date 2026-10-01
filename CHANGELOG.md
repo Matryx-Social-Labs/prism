@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.128.0] - 2026-10-01
+
+### Added — what is breaking (shadow)
+- A record first reported in the last three hours is marked breaking when at least six
+  outlets report it within two hours of the first report, in at least two languages, unless
+  it was anticipated (its story already had three or more outlets in the 1–72 hours before:
+  a medal, a match result). Each outlet counts once, at its first article's own publication
+  time. Calibrated on 16 days of production arrivals: about 1.6 a day (an actor's death, a
+  suicide bombing, the Pune drowning, a Supreme Court order). Stored on the record with the
+  counts the front page will print; `PRISM_BREAKING` off | shadow | live, nothing shown yet.
+
 ## [0.0.127.0] - 2026-10-01
 
 ### Changed — the second reading asks in both orders

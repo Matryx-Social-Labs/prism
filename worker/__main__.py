@@ -96,6 +96,7 @@ async def _trending_reconciler() -> None:
     """Reconcile trending stories on an interval, off the ingest path. Keeps the
     /trending slugs stable (see correlation/trending.py)."""
     from common.db import session_scope
+    from correlation.heat import mark_breaking
     from correlation.trending import reconcile_stories
 
     while True:
@@ -105,6 +106,11 @@ async def _trending_reconciler() -> None:
                 await reconcile_stories(session)
         except Exception:
             logger.exception("trending_reconciler_error")
+        try:  # what is breaking, on the same 10-minute clock (PRISM_BREAKING)
+            async with session_scope() as session:
+                await mark_breaking(session)
+        except Exception:
+            logger.exception("breaking_marker_error")
 
 
 PARTITION_INTERVAL_S = int(os.environ.get("PRISM_PARTITION_INTERVAL_S", "900"))  # base L2 pass (cheap)
