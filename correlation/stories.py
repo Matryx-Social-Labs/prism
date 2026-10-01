@@ -34,7 +34,7 @@ from common.config import get_settings
 from common.decisions import Choice, ChoiceAnswer, Noul, NoulAnswer, decide
 from common.logging import get_logger
 from correlation.trending import _label, story_slug
-from correlation.verify import FACETS, PART_OF_STORY, VERIFY_TIMEOUT_S
+from correlation.verify import FACETS, PART_OF_STORY, VERIFY_TIMEOUT_S, ann_scan
 
 logger = get_logger(__name__)
 
@@ -42,6 +42,7 @@ NEIGHBOUR_DIST = 0.11  # founder-gist cosine distance (mE5) for a record to prop
 CANDIDATES = 3
 WINDOW_DAYS = 14
 NEAR_MEMBERS = 2
+ANN = 200  # nearest in-window founder gists the index scan returns before grouping by story
 
 
 def _vec(v) -> str:
@@ -85,27 +86,35 @@ async def _candidates(session: AsyncSession, rec) -> list[tuple[uuid.UUID, float
     for sid in linked:
         found[sid] = None
     if rec.gist is not None:
+        await ann_scan(session)  # the window is applied inside the HNSW scan
         rows = (
             await session.execute(
                 text(
                     f"""
-                    SELECT se.story_id, min(a.gist_embedding <=> CAST(:vec AS vector)) AS d
-                    FROM story_events se
+                    WITH near AS MATERIALIZED (
+                        SELECT a.id, a.gist_embedding <=> CAST(:vec AS vector) AS d
+                        FROM articles a
+                        WHERE a.gist_embedding IS NOT NULL
+                          AND a.created_at >= CAST(:at AS timestamptz) - interval '{WINDOW_DAYS + 1} days'
+                        ORDER BY a.gist_embedding <=> CAST(:vec AS vector)
+                        LIMIT :ann
+                    )
+                    SELECT se.story_id, min(near.d) AS d
+                    FROM near
+                    JOIN event_memberships m ON m.article_id = near.id AND m.match_type = 'new_event'
+                    JOIN events e ON e.id = m.event_id AND e.merged_into IS NULL
+                    JOIN story_events se ON se.event_id = e.id
                     JOIN stories s ON s.id = se.story_id AND s.merged_into IS NULL
-                    JOIN events e ON e.id = se.event_id AND e.merged_into IS NULL
-                    JOIN event_memberships m ON m.event_id = e.id AND m.match_type = 'new_event'
-                    JOIN articles a ON a.id = m.article_id
-                    WHERE a.gist_embedding IS NOT NULL
+                    WHERE near.d <= :maxd
                       AND coalesce(e.first_published_at, e.first_seen_at)
                           BETWEEN CAST(:at AS timestamptz) - interval '{WINDOW_DAYS} days'
                               AND CAST(:at AS timestamptz) + interval '1 hour'
-                      AND (a.gist_embedding <=> CAST(:vec AS vector)) <= :maxd
                     GROUP BY se.story_id
                     ORDER BY d, se.story_id
                     LIMIT :k
                     """
                 ),
-                {"vec": rec.gist, "at": rec.at, "maxd": NEIGHBOUR_DIST, "k": CANDIDATES},
+                {"vec": rec.gist, "at": rec.at, "maxd": NEIGHBOUR_DIST, "k": CANDIDATES, "ann": ANN},
             )
         ).all()
         for r in rows:

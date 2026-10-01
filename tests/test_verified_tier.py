@@ -253,3 +253,31 @@ async def test_a_database_failure_is_never_swallowed_as_no_match(monkeypatch, je
         with pytest.raises(RuntimeError, match="verdict insert failed"):
             await _run(s, g, aid)
         await s.rollback()
+
+
+async def test_out_of_window_lookalikes_never_crowd_out_an_in_window_candidate(monkeypatch, jev):
+    """The gist search is an index scan for the nearest articles (2026-10-01: the
+    seq scan took 1.02 s per article under the match lock). The 14-day window is
+    applied INSIDE that scan (pgvector iterative scan), so older articles nearer
+    the gist cannot fill the scan's quota and hide the record that is in window."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    calls, answers = jev
+    monkeypatch.setattr(get_settings(), "prism_event_verify", "live")
+    monkeypatch.setattr(clustering, "GIST_ANN", 2)
+    g, tag = _direction(), uuid.uuid4().hex[:8]
+    async with session_scope() as s:
+        for k in range(3):  # nearer, but reported a month ago
+            old = await _event_with_member(s, f"Old lookalike {k} {tag}", _at(g, FLOOR / 8))
+            await s.execute(text("UPDATE events SET last_updated_at = now() - interval '30 days' WHERE id = :e"),
+                            {"e": str(old)})
+            await s.execute(text("UPDATE articles SET created_at = now() - interval '30 days' WHERE id IN "
+                                 "(SELECT article_id FROM event_memberships WHERE event_id = :e)"), {"e": str(old)})
+        fresh = await _event_with_member(s, f"In window {tag}", _at(g, FLOOR / 2))
+        answers[f"In window {tag}"] = 0.95
+        aid = await _incoming_article(s)
+        from datetime import UTC, datetime
+        match = await clustering._match_by_gist_verified(s, g, "Published now by x.\nHeadline: h\nSummary: s",
+                                                         datetime.now(UTC), aid)
+        assert match is not None and match.event_id == fresh
+        await s.rollback()

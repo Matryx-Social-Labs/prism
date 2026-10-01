@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.126.0] - 2026-10-01
+
+### Changed — the gist search uses an index
+- Every incoming article searched the English gists of the last 14 days for the records it
+  might belong to, and nothing indexed them: the index sat on the raw-text vectors the
+  matching no longer uses, so the search scanned ~34,000 gists, about a second per article
+  inside the one-at-a-time match lock. `articles.gist_embedding` now has an HNSW index, and
+  the search (and the story layer's) asks for the nearest 200 in-window articles with
+  pgvector's iterative scan, so the 14-day window is applied inside the scan and older
+  lookalikes cannot crowd out a record that is in it. On 200 recent production articles the
+  new query returned the same top five candidates as the old one 199 times.
+
 ## [0.0.125.0] - 2026-10-01
 
 ### Added — stories that persist (shadow)
