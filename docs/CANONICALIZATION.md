@@ -447,3 +447,28 @@ thresholds move with the embedding model; calibrate Jev floors on labels, not 0.
 - Nakshatri et al., *Using LLM for Improving Key Event Discovery: Temporal-Guided News Stream Clustering with Event Summaries*, EMNLP 2023 Findings — assign articles by embedding LLM-written event summaries; LLM pair check to merge clusters. <https://aclanthology.org/2023.findings-emnlp.274/>
 - Chen et al., *SemEval-2022 Task 8: Multilingual News Article Similarity*. <https://aclanthology.org/2022.semeval-1.155/>
 - Near-duplicate detection for wire copy (MinHash vs SimHash). <https://medium.com/@jonathankoren/near-duplicate-detection-b6694e807f7a>
+
+
+## One name, one entity (0.0.123.0)
+
+Entity identity is a slug, so every transliteration an Indian-language article makes was a
+new entity: the Flydubai pilot was fifteen (smit-machchhar 97 mentions, smit-machhar 36,
+smith-machar 21, …), and in 30 days 713 spelling groups sat in one record together. The
+matching tier and the story graph join on entity ids, so one story split by language.
+
+`correlation/variants.py` keys names by consonant skeleton (aspirates and sibilants folded,
+doubled letters collapsed, vowels dropped; multi-word, five consonants or more). **A key
+never folds alone:** a pair is a candidate only with evidence that both name one thing (the
+same record, a verified follow-up link, or one current story), never when one article names
+both, and folds only when Jev reads both in context at `PRISM_ENTITY_VARIANT_MIN` (0.7). Every
+variant is judged against the survivor (most mentions), never through a third spelling.
+Each fold is journalled in `entity_variant_verdicts` and can be undone
+(`tools/entity_variants.py --unfold SLUG --apply`); an undone pair never folds again.
+
+- Ingest: `reconcile_on_attach` after an article joins a record (`PRISM_ENTITY_VARIANTS`
+  off | shadow | live), off the match lock; about 2.5% of articles ask, under a cent a day.
+- Backlog: `tools/entity_variants.py` (dry run by default). Production dry run 2026-10-01:
+  84,031 entities, 1,657 evidenced pairs, 1,640 judged for $0.015 — 1,390 fold, 250 keep.
+  A random 50 folds read by hand were all one entity spelled two ways (Tejashwi/Tejasvi
+  Yadav, Ashwini/Ashwani Vaishnaw, IndianOil/Indian Oil); the pilot's six commonest
+  spellings fold into smit-machchhar and fly-dubai into flydubai.

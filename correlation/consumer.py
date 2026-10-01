@@ -44,6 +44,7 @@ from correlation.chronology import place_in_time
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
 from correlation.threads import link_event_threads
+from correlation.variants import reconcile_on_attach
 from correlation.verify import article_block
 
 logger = get_logger(__name__)
@@ -173,6 +174,13 @@ async def handle_enriched_item(payload: dict) -> None:
     # to the debounced sweeper: a burst of coverage for one story then costs a
     # single analysis pass, off the ingest hot path.
     await mark_event_dirty(event_id)
+    # Another spelling of one of its names already in the record's cast is asked
+    # of Jev and folded on its word — after the commit, so never under the lock.
+    if not is_new_event:
+        try:
+            await reconcile_on_attach(event_id, article_id)
+        except Exception:  # noqa: BLE001 — an unfolded spelling is the old behaviour; never fail ingest
+            logger.exception("entity_variant_reconcile_failed", article_id=str(article_id))
 
 
 def cve_ids_of(enrichment: Enrichment) -> list[str]:
