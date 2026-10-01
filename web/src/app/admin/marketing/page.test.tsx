@@ -39,7 +39,7 @@ beforeEach(() => {
   ]));
   fetchMetrics.mockReset().mockResolvedValue({ sections: [] });
   fetchFeed.mockReset().mockResolvedValue([{ id: "abc", title: "Boeing 737 MAX software glitch", source_count: 9 }]);
-  searchEvents.mockReset().mockResolvedValue([]);
+  searchEvents.mockReset().mockResolvedValue({ items: [], stories: [] });
   fetchEvent.mockReset().mockResolvedValue({ title: "Boeing 737 MAX software glitch", sources: [{ publisher: "a" }, { publisher: "b" }], monitored_outlets: 41 });
   makeLink.mockReset().mockResolvedValue(link("n5t6vw", { platform: "x", medium: "social" }));
   setLinkArchived.mockReset().mockResolvedValue(link("k3f9qa", { archived_at: "2026-09-29T10:00:00Z" }));

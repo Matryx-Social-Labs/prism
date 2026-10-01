@@ -50,6 +50,8 @@ export interface FeedItem {
   price_impact_direction: string | null;
   last_updated_at: string;
   latest_published_at?: string | null;
+  /** When the record was first reported; only search sends it, for its story groups. */
+  first_published_at?: string | null;
   score: number;
   /** Every registered source behind the story; the coverage bar and monograms are drawn from it. */
   outlets?: OutletRef[];
@@ -193,6 +195,8 @@ export interface StoryDevelopment {
   title: string;
   sector: string | null;
   occurred_at: string | null;
+  /** When it was first reported; the developments come in this order. Older payloads omit it. */
+  first_published_at?: string | null;
   image_url: string | null;
   is_current: boolean;
   why: string | null;
@@ -218,6 +222,8 @@ export interface EventDetail {
   image_url: string | null;
   regions: string[];
   occurred_at: string | null;
+  /** When it was first reported (its earliest report's own time). Optional: an older payload has none. */
+  first_published_at?: string | null;
   last_updated_at: string;
   lens_briefs: Record<string, string>;
   lens_points: Record<string, string[]>;
@@ -268,6 +274,8 @@ export interface FollowUpRef {
   id: string;
   title: string;
   first_seen_at: string;
+  /** When it was first reported; the order the lists use. Optional: an older payload has none. */
+  first_published_at?: string | null;
   source_count: number | null;
 }
 
@@ -743,11 +751,31 @@ export async function fetchDigest(): Promise<MarketDigest | null> {
   }
 }
 
-export async function searchEvents(q: string): Promise<FeedItem[]> {
+/** Two or more matches that belong to one story, collapsed under it (api/schemas.SearchStoryOut). */
+export interface SearchStory {
+  slug: string;
+  label: string;
+  /** Every record in the story, matched or not. */
+  developments: number;
+  /** Its newest record, by first report. */
+  latest_published_at: string | null;
+  /** The matching records (all in `items`), in the order they were first reported. */
+  event_ids: string[];
+  /** "provisional" until the story evaluation passes: the group says so and counts records. */
+  boundary_status?: string;
+}
+
+export interface SearchResult {
+  /** Every match, in the search's own order; the ungrouped ones are those no story names. */
+  items: FeedItem[];
+  stories: SearchStory[];
+}
+
+export async function searchEvents(q: string): Promise<SearchResult> {
   const res = await fetch(`${API_URL}/api/v1/search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { items: FeedItem[] };
-  return data.items;
+  if (!res.ok) return { items: [], stories: [] };
+  const data = (await res.json()) as { items: FeedItem[]; stories?: SearchStory[] };
+  return { items: data.items, stories: data.stories ?? [] };
 }
 
 export interface TaxonomySector {

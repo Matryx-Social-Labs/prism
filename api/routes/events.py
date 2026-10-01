@@ -433,7 +433,9 @@ async def follow_ups(db: AsyncSession, event_id: uuid.UUID) -> FollowUps:
         await db.execute(
             text(
                 """
-                SELECT side, e.id, e.title, e.first_seen_at, (e.projection->>'source_count')::int AS source_count
+                SELECT side, e.id, e.title, e.first_seen_at,
+                       COALESCE(e.first_published_at, e.first_seen_at) AS first_published_at,
+                       (e.projection->>'source_count')::int AS source_count
                 FROM (
                     SELECT 'earlier' AS side, from_event_id AS other FROM event_links
                     WHERE to_event_id = :eid AND relation = 'leads_to' AND method = 'verified'
@@ -442,7 +444,9 @@ async def follow_ups(db: AsyncSession, event_id: uuid.UUID) -> FollowUps:
                     WHERE from_event_id = :eid AND relation = 'leads_to' AND method = 'verified'
                 ) l
                 JOIN events e ON e.id = l.other AND e.merged_into IS NULL
-                ORDER BY e.first_seen_at, e.id
+                -- When each was first reported. first_seen_at is when Prism
+                -- processed it, and after a backlog that is the queue's order.
+                ORDER BY COALESCE(e.first_published_at, e.first_seen_at), e.id
                 """
             ),
             {"eid": str(event_id)},
@@ -450,8 +454,9 @@ async def follow_ups(db: AsyncSession, event_id: uuid.UUID) -> FollowUps:
     ).mappings().all()
     side: dict[str, list[FollowUpRef]] = {"earlier": [], "later": []}
     for r in rows:
-        side[r["side"]].append(FollowUpRef(id=str(r["id"]), title=r["title"],
-                                           first_seen_at=r["first_seen_at"].isoformat(), source_count=r["source_count"]))
+        side[r["side"]].append(FollowUpRef(id=str(r["id"]), title=r["title"], first_seen_at=r["first_seen_at"].isoformat(),
+                                           first_published_at=r["first_published_at"].isoformat(),
+                                           source_count=r["source_count"]))
     # The nearest earlier ones and the latest later ones — a founding record
     # collects many follow-ups, and the newest is what a reader came for.
     return FollowUps(**{k: v[-FOLLOW_UPS_MAX:] for k, v in side.items()})
@@ -468,7 +473,8 @@ async def get_event(
             text(
                 """
                 SELECT id, title, headline_by, summary, sector, subsector, subject_path, image_url, regions,
-                       occurred_at, last_updated_at, projection, merged_into
+                       occurred_at, last_updated_at, projection, merged_into,
+                       COALESCE(first_published_at, first_seen_at) AS first_published_at
                 FROM events WHERE id = :eid
                 """
             ),
@@ -629,6 +635,7 @@ async def get_event(
         image_url=event["image_url"],
         regions=event["regions"] or [],
         occurred_at=event["occurred_at"].isoformat() if event["occurred_at"] else None,
+        first_published_at=event["first_published_at"].isoformat() if event.get("first_published_at") else None,
         last_updated_at=event["last_updated_at"].isoformat(),
         projection=safe_projection,
         lens_briefs=briefs,

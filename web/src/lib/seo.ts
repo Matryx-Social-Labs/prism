@@ -108,6 +108,10 @@ const clip = (s: string, n = 200) => (s.length > n ? `${s.slice(0, n - 3).trimEn
 
 /** When the first of a record's reports was published, or null. */
 export function firstReportedAt(event: EventDetail): string | null {
+  // The API's first_published_at ignores a report dated outside the record's
+  // window (a months-old live blog, a clock in the future); the bare minimum
+  // over the sources is the fallback for an older payload.
+  if (event.first_published_at) return event.first_published_at;
   return (event.sources ?? []).map((s) => s.published_at).filter((t): t is string => Boolean(t)).sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
 }
 

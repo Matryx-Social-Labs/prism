@@ -1,13 +1,18 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SectionHead } from "@/components/SectionHead";
 import { ChartRow } from "@/components/ChartRow";
 import { Masthead } from "@/components/Masthead";
 import { SectorStrip } from "@/components/SectorStrip";
+import { StatusPill } from "@/components/StatusPill";
+import { StoryTimeline } from "@/components/StoryTimeline";
 import { Alert, EmptyState, TextField } from "@/components/ui";
-import { fetchTrending, searchEvents, type FeedItem } from "@/lib/api";
+import { fetchTrending, searchEvents, type FeedItem, type SearchStory } from "@/lib/api";
+import { istTime, shortDate } from "@/lib/dateline";
+import { followRel } from "@/lib/seo";
 import { loadProfile } from "@/lib/profile";
 import { navItem, underNav } from "@/lib/sectors";
 import { useScrollRestore } from "@/lib/useScrollRestore";
@@ -21,17 +26,76 @@ import { useScrollRestore } from "@/lib/useScrollRestore";
  * with nothing behind it says so. The board draws a "People and organisations"
  * section first: /api/v1/search returns records only, so it is not drawn. A
  * failed request says so, in its own line — never "no matches" for an error.
+ *
+ * Two or more matches in one story collapse under it, in the place of its best
+ * match: the story's name, "k of n records", and the matches by day in the
+ * order they were first reported. "pilot" listed 20 sibling records of one
+ * story before this (2026-10-01).
  */
 const FIELD_ID = "search-q";
 /** What is searched, on the start screen: the API matches headline, summary and cast. */
 const START = "Search every record by its headline, its summary and the people and organisations it names: a story, a person, a place, a ticker or a CVE id.";
 /** The API's page (api/routes/search.py, limit 30): a full page may hide more, so it prints "30+". */
 const SEARCH_CAP = 30;
+
+type Block = { item: FeedItem; story?: undefined } | { story: SearchStory; items: FeedItem[]; item?: undefined };
+
+/** The results in the API's order, a story group standing where its best match
+ *  stood. The subject strip can hide matches: a group left with one is a row again. */
+function searchBlocks(shown: FeedItem[], stories: SearchStory[]): Block[] {
+  const byId = new Map(shown.map((i) => [i.id, i]));
+  const groupOf = new Map<string, { story: SearchStory; items: FeedItem[] }>();
+  for (const story of stories) {
+    const items = story.event_ids.map((id) => byId.get(id)).filter((i): i is FeedItem => Boolean(i));
+    if (items.length < 2) continue;
+    for (const i of items) groupOf.set(i.id, { story, items });
+  }
+  const placed = new Set<string>();
+  const out: Block[] = [];
+  for (const item of shown) {
+    const g = groupOf.get(item.id);
+    if (!g) out.push({ item });
+    else if (!placed.has(g.story.slug)) {
+      placed.add(g.story.slug);
+      out.push(g);
+    }
+  }
+  return out;
+}
+
+function StoryGroup({ story, items }: { story: SearchStory; items: FeedItem[] }) {
+  const verified = story.boundary_status === "verified";
+  const unit = verified ? "developments" : "records";
+  const latest = story.latest_published_at;
+  const developments = items.map((i) => ({
+    id: i.id, title: i.title, sector: i.sector, occurred_at: null, first_published_at: i.first_published_at ?? null,
+    image_url: null, is_current: false, why: null, source_count: i.source_count,
+  }));
+  return (
+    <li className="grid gap-2 border px-4 pb-1 pt-3.5" style={{ borderStyle: verified ? "solid" : "dashed", borderColor: "var(--line-strong)", borderRadius: "var(--r-record)" }}>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusPill status={verified ? "verified" : "provisional"} label={verified ? "Verified" : undefined} />
+        <span className="p-meta">
+          <span className="p-meta__prov">{items.length} of {story.developments} {unit}</span>
+          {latest && <><span className="p-meta__sep" /><span className="p-meta__prov">latest {shortDate(latest)} {istTime(latest)}</span></>}
+        </span>
+      </div>
+      <h2 className="text-balance" style={{ font: "var(--t-title)" }}>
+        <Link href={`/trending/${story.slug}`} rel={followRel(verified)} className="underline-offset-4 hover:underline" style={{ color: "var(--ink)" }}>
+          {story.label}
+        </Link>
+      </h2>
+      <StoryTimeline story={{ developments, cast: [] }} mode="related" />
+    </li>
+  );
+}
+
 function SearchInner() {
   const params = useSearchParams();
   const router = useRouter();
   const [q, setQ] = useState(params.get("q") ?? "");
   const [results, setResults] = useState<FeedItem[]>([]);
+  const [stories, setStories] = useState<SearchStory[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   // A rejected search is NOT the same as no results: without this flag every
@@ -73,9 +137,10 @@ function SearchInner() {
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const items = await searchEvents(term);
+        const found = await searchEvents(term);
         if (cancelled) return;
-        setResults(items);
+        setResults(found.items);
+        setStories(found.stories);
         setResultsTerm(term);
         setSearched(true);
         router.replace(`/search?q=${encodeURIComponent(term)}`, { scroll: false });
@@ -102,6 +167,7 @@ function SearchInner() {
   // order stands: re-sorted most-outlets-first, the exact record for a query
   // sank below broad stories that merely mention it (audit 2026-09-27).
   const shown = useMemo(() => results.filter((r) => underNav(group, r)), [results, group]);
+  const blocks = useMemo(() => searchBlocks(shown, stories), [shown, stories]);
 
   const more = !group && results.length >= SEARCH_CAP ? "+" : "";
   const count = searched && !loading && !failed ? `${shown.length}${more} ${shown.length === 1 && !more ? "result" : "results"}` : null;
@@ -165,7 +231,9 @@ function SearchInner() {
           )}
           {shown.length > 0 && (
             <ol className="p-print grid gap-2.5">
-              {shown.map((item) => <ChartRow key={item.id} item={item} primaryLang={primaryLang} />)}
+              {blocks.map((b) =>
+                b.story ? <StoryGroup key={`story-${b.story.slug}`} story={b.story} items={b.items} /> : <ChartRow key={b.item.id} item={b.item} primaryLang={primaryLang} />,
+              )}
             </ol>
           )}
         </section>

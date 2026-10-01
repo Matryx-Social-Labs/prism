@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { Corner } from "@/components/icons";
-import type { StoryTimelineData } from "@/lib/api";
-import { shortDate } from "@/lib/dateline";
+import type { StoryDevelopment, StoryTimelineData } from "@/lib/api";
+import { istTime, reportedAt, shortDate } from "@/lib/dateline";
 
 // "The story so far" — ONE canonical, chronological timeline of a story's
 // developments, identical on every development (they share the same connected
@@ -16,9 +16,33 @@ import { shortDate } from "@/lib/dateline";
 // mode="related" is Design System v2 · structure/RelatedStories for a
 // provisional grouping: date · title · sources on DASHED rules, because the
 // grouping is under review and no order between the rows is claimed.
+//
+// Both list the developments in the order they were first reported (the API
+// sorts on first_published_at), grouped by day: the gutter prints the day on
+// the first development of each day, and every development's time under it.
 
-function dateLabel(iso: string | null): string {
-  return iso ? shortDate(iso).toUpperCase() : "";
+type Gutter = { at: string | null; day: string; time: string };
+
+/** The gutter of each row: the IST day where it changes, and the first report's time. */
+function gutters(developments: StoryDevelopment[]): Gutter[] {
+  let prev = "";
+  return developments.map((n) => {
+    const at = reportedAt(n);
+    const day = at ? shortDate(at).toUpperCase() : "";
+    const first = day !== prev;
+    prev = day;
+    // occurred_at alone is a bare date (an older payload): no time to print.
+    return { at, day: first ? day : "", time: n.first_published_at ? istTime(n.first_published_at) : "" };
+  });
+}
+
+function When({ g, className = "" }: { g: Gutter; className?: string }) {
+  return (
+    <time dateTime={g.at ?? undefined} className={`grid font-mono text-[11px] leading-[1.4] ${className}`} style={{ color: "var(--ink-3)" }}>
+      {g.day && <span>{g.day}</span>}
+      {g.time && <span>{g.time}</span>}
+    </time>
+  );
 }
 
 function sources(n: number | undefined): string | null {
@@ -31,16 +55,18 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
   // A timeline only exists when there's more than just this event.
   if (developments.filter((d) => !d.is_current).length === 0) return null;
 
+  const when = gutters(developments);
+
   if (mode === "related") {
     return (
       <ol className="p-print">
-        {developments.map((n) => (
+        {developments.map((n, i) => (
           <li
             key={n.id}
             className="grid grid-cols-[56px_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 border-t py-3 sm:grid-cols-[64px_minmax(0,1fr)_auto]"
             style={{ borderTopStyle: "dashed", borderColor: "var(--line-strong)" }}
           >
-            <span className="font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>{dateLabel(n.occurred_at)}</span>
+            <When g={when[i]} />
             {n.is_current ? (
               <span style={{ font: "var(--t-title-s)", color: "var(--ink)" }}>
                 {n.title} <span className="p-eyebrow ml-1 whitespace-nowrap">You are here</span>
@@ -71,7 +97,7 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
       {/* Timeline: a hairline rule down the left, one dated node per development. */}
       <ol className="p-print relative flex flex-col" style={{ marginLeft: 6 }}>
         <span aria-hidden className="absolute bottom-1 left-0 top-1 w-px" style={{ background: "var(--line)" }} />
-        {developments.map((n) => (
+        {developments.map((n, i) => (
           <li key={n.id} className="relative flex gap-4 py-2.5 pl-6">
             {/* marker: filled ink = you are here, hollow = other development */}
             <span
@@ -79,9 +105,7 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
               className="absolute left-0 top-[15px] h-[9px] w-[9px] -translate-x-1/2 rounded-full"
               style={n.is_current ? { background: "var(--ink)", border: "2px solid var(--ink)" } : { background: "var(--paper)", border: "1.5px solid var(--line-strong)" }}
             />
-            <span className="w-[52px] shrink-0 pt-[3px] font-mono text-[11px]" style={{ color: "var(--ink-3)" }}>
-              {dateLabel(n.occurred_at)}
-            </span>
+            <When g={when[i]} className="w-[52px] shrink-0 content-start pt-[3px]" />
             <span className="flex min-w-0 flex-col gap-0.5">
               {n.is_current ? (
                 <>

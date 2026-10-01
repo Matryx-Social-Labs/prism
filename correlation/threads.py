@@ -4,7 +4,12 @@ Runs inside the serial correlation consumer after an event's projection is
 rebuilt, so linking never races cluster assignment. Candidates come from
 cheap SQL (shared entities, then mid-band embedding distance); one batched
 LLM call confirms/rejects; every verdict — including rejections — persists
-to event_links so a pair is never asked twice.
+to event_links so a pair is never asked twice. A rejection is stored as
+relation 'none': the negative cache _drop_known_pairs reads, never shown to a
+reader (every read path takes 'leads_to', or excludes 'none').
+
+A leads_to link runs from the record first reported earlier to the later one
+(correlation/chronology.py), whichever way the model read it.
 """
 
 import json
@@ -19,6 +24,7 @@ from common.db import session_scope
 from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
 from common.observability import fetch_prompt
+from correlation.chronology import place_in_time
 from correlation.clustering import _scale
 from correlation.schemas import ThreadLinkResult
 
@@ -44,22 +50,26 @@ async def link_event_threads(event_id: uuid.UUID) -> None:
     async with session_scope() as session:
         event = (
             await session.execute(
-                text("SELECT title, summary, sector, occurred_at FROM events WHERE id = :eid"),
+                text("SELECT title, summary, sector, COALESCE(first_published_at, first_seen_at) AS published "
+                     "FROM events WHERE id = :eid"),
                 {"eid": str(event_id)},
             )
         ).mappings().first()
     if event is None:
         return
 
+    # The prompt orders cause before effect by "occurred" date. It is given when
+    # each was first reported: the extractor's date is day-only, missing on ~40%
+    # of records and sometimes a day off, and it oriented links backwards.
     candidate_lines = [
-        f"[{i}] title={c['title']} | sector={c['sector']} | occurred={c['occurred_at']} | summary={(c['summary'] or '(none)')[:400]}"
+        f"[{i}] title={c['title']} | sector={c['sector']} | occurred={c['published'].isoformat()} | summary={(c['summary'] or '(none)')[:400]}"
         for i, c in enumerate(candidates)
     ]
     prompt = fetch_prompt("thread-link")
     messages = prompt.compile(
         title=event["title"],
         sector=event["sector"] or "unknown",
-        occurred_at=str(event["occurred_at"] or "unknown"),
+        occurred_at=event["published"].isoformat(),
         summary=(event["summary"] or "(none)")[:600],
         candidates="\n".join(candidate_lines),
     )
@@ -102,6 +112,7 @@ async def link_event_threads(event_id: uuid.UUID) -> None:
             ),
             rows,  # executemany — one round trip for up to MAX_LINK_CANDIDATES verdicts, not one each
         )
+        await place_in_time(session, event_id)  # leads_to from the earlier report, whatever the model said
     linked = sum(1 for j in result.judgements if j.related)
     if linked:
         logger.info("thread_links_created", event_id=str(event_id), linked=linked)
@@ -115,7 +126,8 @@ async def _find_candidates(event_id: uuid.UUID) -> list[dict]:
                 text(
                     f"""
                     (
-                        SELECT e.id, e.title, e.summary, e.sector, e.occurred_at,
+                        SELECT e.id, e.title, e.summary, e.sector,
+                               COALESCE(e.first_published_at, e.first_seen_at) AS published,
                                COUNT(*) AS shared, 0.0 AS dist
                         FROM event_entities mine
                         JOIN event_entities theirs
@@ -123,13 +135,14 @@ async def _find_candidates(event_id: uuid.UUID) -> list[dict]:
                         JOIN events e ON e.id = theirs.event_id
                         WHERE mine.event_id = :eid
                           AND e.last_updated_at > now() - interval '{WINDOW_DAYS} days'
-                        GROUP BY e.id, e.title, e.summary, e.sector, e.occurred_at
+                        GROUP BY e.id, e.title, e.summary, e.sector, e.first_published_at, e.first_seen_at
                         ORDER BY shared DESC
                         LIMIT {MAX_CANDIDATES}
                     )
                     UNION ALL
                     (
-                        SELECT e.id, e.title, e.summary, e.sector, e.occurred_at,
+                        SELECT e.id, e.title, e.summary, e.sector,
+                               COALESCE(e.first_published_at, e.first_seen_at) AS published,
                                0 AS shared,
                                (e.embedding <=> (SELECT embedding FROM events WHERE id = :eid)) AS dist
                         FROM events e
@@ -178,65 +191,6 @@ async def _drop_known_pairs(event_id: uuid.UUID, candidates: list[dict]) -> list
         ).all()
     known = {r[0] for r in rows} | {r[1] for r in rows}
     return [c for c in candidates if c["id"] not in known]
-
-
-def format_thread_node(row) -> dict:
-    return {
-        "event_id": str(row["id"]),
-        "title": row["title"],
-        "sector": row["sector"],
-        "occurred_at": row["occurred_at"].isoformat() if row["occurred_at"] else None,
-        "relation": row["relation"],
-        "rationale": row["rationale"],
-        "confidence": row["confidence"],
-        "image_url": row["image_url"],
-    }
-
-
-# Chain traversal: only confident causal edges make the displayed chain —
-# an inaccurate chain is worse than a short one.
-CHAIN_MIN_CONFIDENCE = 0.55
-CHAIN_MAX_DEPTH = 3
-CHAIN_MAX_NODES = 8
-
-
-async def _walk_chain(session, event_id: uuid.UUID, direction: str) -> list[dict]:
-    """Multi-hop walk over leads_to edges (ancestors or descendants)."""
-    frontier = {str(event_id)}
-    seen = {str(event_id)}
-    out: list[dict] = []
-    for _ in range(CHAIN_MAX_DEPTH):
-        if not frontier or len(out) >= CHAIN_MAX_NODES:
-            break
-        near, far = ("to_event_id", "from_event_id") if direction == "up" else ("from_event_id", "to_event_id")
-        rows = (
-            await session.execute(
-                text(
-                    f"""
-                    SELECT e.id, e.title, e.sector, e.occurred_at, e.image_url,
-                           l.relation, l.rationale, l.confidence, l.from_event_id
-                    FROM event_links l
-                    JOIN events e ON e.id = l.{far}
-                    WHERE l.{near} = ANY(CAST(:ids AS uuid[]))
-                      AND l.relation = 'leads_to'
-                      AND COALESCE(l.confidence, 1.0) >= {CHAIN_MIN_CONFIDENCE}
-                    """
-                ),
-                {"ids": list(frontier)},
-            )
-        ).mappings().all()
-        frontier = set()
-        for row in rows:
-            rid = str(row["id"])
-            if rid in seen:
-                continue  # cycle guard
-            seen.add(rid)
-            frontier.add(rid)
-            out.append(format_thread_node(row))
-            if len(out) >= CHAIN_MAX_NODES:
-                break
-    out.sort(key=lambda n: n["occurred_at"] or "")
-    return out
 
 
 STORY_WINDOW_DAYS = 30
@@ -340,7 +294,7 @@ _STRONG_NEIGHBOURS_SQL = text(
     ),
     {_ROUNDUP_CTE}
     SELECT e.id AS id,
-           coalesce(e.occurred_at::timestamptz, e.last_updated_at) AS d
+           coalesce(e.first_published_at, e.first_seen_at) AS d
     FROM event_entities ee1
     JOIN entities ent ON ent.id = ee1.entity_id AND ent.entity_type IN ('person', 'organization')
                      AND ent.name <> ALL(:stop)
@@ -355,11 +309,11 @@ _STRONG_NEIGHBOURS_SQL = text(
           OR (SELECT embedding FROM events WHERE id = :seed) IS NULL
           OR (e.embedding <=> (SELECT embedding FROM events WHERE id = :seed)) <= CAST(:max_dist AS double precision)
       )
-    GROUP BY e.id, e.occurred_at, e.last_updated_at
+    GROUP BY e.id, e.first_published_at, e.first_seen_at
     HAVING count(DISTINCT ee1.entity_id) >= :min_shared
        AND sum(1.0 / df.d) * exp(
                -1.0 * CAST(:lam AS double precision) * coalesce(abs(extract(epoch FROM (
-                   coalesce(e.occurred_at::timestamptz, e.last_updated_at) - CAST(:node_date AS timestamptz)
+                   coalesce(e.first_published_at, e.first_seen_at) - CAST(:node_date AS timestamptz)
                )) / 86400.0), 0)
            ) >= CAST(:min_weight AS double precision)
     """
@@ -369,7 +323,7 @@ _STRONG_NEIGHBOURS_SQL = text(
 async def _node_date(session, eid: str):
     row = (
         await session.execute(
-            text("SELECT coalesce(occurred_at::timestamptz, last_updated_at) AS d FROM events WHERE id = :eid"),
+            text("SELECT coalesce(first_published_at, first_seen_at) AS d FROM events WHERE id = :eid"),
             {"eid": eid},
         )
     ).first()
@@ -480,6 +434,7 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
             text(
                 """
                 SELECT e.id, e.title, e.sector, e.occurred_at, e.last_updated_at, e.image_url,
+                       COALESCE(e.first_published_at, e.first_seen_at) AS published,
                        COALESCE((e.projection->>'source_count')::int, 1) AS source_count
                 FROM events e WHERE e.id = ANY(CAST(:ids AS uuid[]))
                 """
@@ -521,25 +476,25 @@ async def _assemble_timeline(session, seed: uuid.UUID, ids: list[str]) -> dict:
             {"ids": ids, "stop": _STORY_STOP_LIST},
         )
     ).mappings().all()
-    developments = sorted(
-        (
-            {
-                "id": str(e["id"]),
-                "title": e["title"],
-                "sector": e["sector"],
-                "occurred_at": (e["occurred_at"] or e["last_updated_at"]).isoformat()
-                if (e["occurred_at"] or e["last_updated_at"])
-                else None,
-                "image_url": e["image_url"],
-                "is_current": str(e["id"]) == str(seed),
-                "why": why.get(str(e["id"])),
-                # The route map weighs a station by how many outlets filed it.
-                "source_count": e["source_count"],
-            }
-            for e in events
-        ),
-        key=lambda d: d["occurred_at"] or "",
-    )
+    # In the order the records were first reported. occurred_at (the extractor's
+    # day, else the last rebuild) put a backlog's records in processing order.
+    developments = [
+        {
+            "id": str(e["id"]),
+            "title": e["title"],
+            "sector": e["sector"],
+            "occurred_at": (e["occurred_at"] or e["last_updated_at"]).isoformat()
+            if (e["occurred_at"] or e["last_updated_at"])
+            else None,
+            "first_published_at": e["published"].isoformat(),
+            "image_url": e["image_url"],
+            "is_current": str(e["id"]) == str(seed),
+            "why": why.get(str(e["id"])),
+            # The route map weighs a station by how many outlets filed it.
+            "source_count": e["source_count"],
+        }
+        for e in sorted(events, key=lambda e: (e["published"], str(e["id"])))
+    ]
     return {"developments": developments, "cast": [c["name"] for c in cast]}
 
 
