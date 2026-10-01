@@ -40,7 +40,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
-from common.decisions import Noul, NoulAnswer, decide
+from common.decisions import Choice, ChoiceAnswer, Noul, NoulAnswer, decide
 from common.logging import get_logger
 
 logger = get_logger(__name__)
@@ -284,19 +284,40 @@ async def lede_blocks(session: AsyncSession, block: str, article_id: uuid.UUID,
     return block + opening(row.a_lede), event_block(row.title, row.summary, row.first_at) + opening(row.e_lede)
 
 
+# Which of three the two reports are, asked once in each order (ComEM, COLING'25:
+# the answer depends on which text the judge reads first). On the 147 decided
+# band pairs (2026-10-01), p(same) >= 0.80 in both orders took 62% of the
+# duplicates at precision 0.97; two yes/no questions in one order, 49% at 0.98.
+RELATION = {
+    "same": "both report the same real-world happening: the same incident, death, match, ruling, announcement, deal, "
+            "statement, protest or release, even with different details, figures, wording, language or a later write-up",
+    "follow_up": "one is a later development of the other: a reaction, praise or condemnation by someone, an "
+                 "investigation, arrest, charge or court step, a later stage (preview vs the event, semifinal vs final), "
+                 "or an analysis or profile written about it",
+    "different": "different happenings: another instance of a recurring kind (another day's prices or weather, another "
+                 "district's or company's similar news), a different person's statement on the same issue, a different case",
+}
+
+
+async def _relation(report_a: str, report_b: str, article_id: uuid.UUID) -> tuple[float, float, str, float]:
+    d = await decide({"REPORT_A": report_a, "REPORT_B": report_b},
+                     {"relation": Choice(instructions="How are REPORT_A and REPORT_B related?", criteria=RELATION)},
+                     trace_name="event-escalate", metadata={"stage": "correlation", "article_id": str(article_id)})
+    a = d.answers["relation"]
+    assert isinstance(a, ChoiceAnswer)
+    probs = a.probabilities or {a.choice: a.confidence}
+    return probs.get("same", 0.0), probs.get("follow_up", 0.0), d.model or get_settings().prism_model_decide, d.usage.cost
+
+
 async def judge_ledes(*, article_id: uuid.UUID, report: str, record: str) -> tuple[float, float, str, float]:
-    """Same happening, and later development, read on the opening texts: one
-    Jev call. Network only, as judge(); a failure raises for the caller."""
-    d = await asyncio.wait_for(
-        decide({"REPORT": report, "RECORD": record},
-               {"same": Noul(instructions=SAME_HAPPENING.format(a="REPORT", b="RECORD")),
-                "story": Noul(instructions=SAME_STORY.format(a="REPORT", b="RECORD"))},
-               trace_name="event-escalate", metadata={"stage": "correlation", "article_id": str(article_id)}),
+    """(p same, p later development) on the opening texts: the lower "same" and
+    the higher "later development" of two readings, one in each order. Network
+    only, as judge(); a failure in either raises for the caller."""
+    (s1, f1, model, c1), (s2, f2, _, c2) = await asyncio.wait_for(
+        asyncio.gather(_relation(report, record, article_id), _relation(record, report, article_id)),
         VERIFY_TIMEOUT_S,
     )
-    same, story = d.answers["same"], d.answers["story"]
-    assert isinstance(same, NoulAnswer) and isinstance(story, NoulAnswer)
-    return same.noul, story.noul, d.model or get_settings().prism_model_decide, d.usage.cost
+    return min(s1, s2), max(f1, f2), model, c1 + c2
 
 
 async def record_ledes(session: AsyncSession, *, article_id: uuid.UUID, event_id: uuid.UUID,

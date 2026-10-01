@@ -160,11 +160,11 @@ class Settings(BaseSettings):
     # its own record and is linked back instead. The default equals the gist
     # floor: no change until set — set it from the founders' attach labels.
     prism_proposal_verify_min: float = 0.85
-    # confirm: the best refused candidate at or above the escalate floor gets a
-    # second Jev call on both reports' opening text; it attaches ("escalated") at
-    # >= prism_event_escalate_min unless that call also names it a later development
-    # (>= prism_follow_up_min). Measured 2026-10-01 on 160 blind labels: 52 taken,
-    # precision 0.98, half the band's duplicate records (tests/test_band_escalation.py).
+    # confirm: the best refused candidate at or above the escalate floor is read
+    # again on both reports' opening text — same / later development / different,
+    # once in each order — and attaches ("escalated") when the lower p(same) is
+    # >= prism_event_escalate_min. Measured 2026-10-01 on 147 blind labels: 62% of
+    # the band's duplicate records at precision 0.97 (tests/test_band_escalation.py).
     # off | shadow (ask, record, never attach) | live.
     prism_event_escalate: str = "off"
     prism_event_escalate_floor: float = 0.65
