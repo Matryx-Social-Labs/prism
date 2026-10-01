@@ -129,6 +129,43 @@ async def test_a_proposal_without_a_gist_is_still_judged(jev):
         await s.rollback()
 
 
+async def test_a_likely_same_proposal_attaches_from_the_proposal_floor_and_a_gist_find_does_not(monkeypatch, jev):
+    """2026-10-01, the first hour of confirm: one Flydubai cockpit attack had
+    five records scoring 0.70-0.80 against each other under the one 0.85 floor.
+    In Jev's 0.5-0.85 band, 23 of 25 proposals it did not call a later
+    development were the same happening; a record nobody proposed keeps 0.85."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    _, answers = jev
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        proposed = await _event_with_member(s, f"Flydubai cockpit attack {tag}", _at(g, FLOOR * 3))
+        await _event_with_member(s, f"Flydubai captain hailed {tag}", _at(g, FLOOR / 2))
+        answers[f"Flydubai cockpit attack {tag}"] = (0.72, 0.3)
+        answers[f"Flydubai captain hailed {tag}"] = (0.8, 0.1)
+        aid = await _incoming_article(s)
+        assert await clustering._verified(s, [_proposal(proposed)], g, BLOCK, None, aid) is None, "unset: one floor"
+        monkeypatch.setattr(get_settings(), "prism_proposal_verify_min", 0.5)
+        match = await clustering._verified(s, [_proposal(proposed)], g, BLOCK, None, aid)
+        assert match == clustering.Match(event_id=proposed, match_type="entity_overlap", match_score=0.72)
+        await s.rollback()
+
+
+async def test_a_likely_same_proposal_jev_calls_a_later_development_founds_its_own_record(monkeypatch, jev):
+    """Bail granted → "family reacts to bail": Jev 0.72 same, 0.89 later development."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    _, answers = jev
+    monkeypatch.setattr(get_settings(), "prism_proposal_verify_min", 0.5)
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        proposed = await _event_with_member(s, f"High Court grants bail {tag}", _at(g, FLOOR * 3))
+        answers[f"High Court grants bail {tag}"] = (0.72, 0.89)
+        aid = await _incoming_article(s)
+        assert await clustering._verified(s, [_proposal(proposed)], g, BLOCK, None, aid) is None
+        await s.rollback()
+
+
 async def test_when_jev_cannot_answer_only_a_title_proposal_attaches(monkeypatch, jev):
     """An outage must not turn every retelling into a duplicate record — but the
     embedding and entity tiers (76%, 44%) are not trusted on their own either:

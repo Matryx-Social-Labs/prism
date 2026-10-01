@@ -151,6 +151,14 @@ class Settings(BaseSettings):
     prism_event_verify: str = "off"
     prism_event_verify_min: float = 0.85
     prism_follow_up_min: float = 0.85
+    # confirm: the floor for a record a fuzzy tier PROPOSED (the gist-only
+    # candidates keep prism_event_verify_min). A proposal has its tier's evidence
+    # behind it: in Jev's "likely same" band, 0.5-0.85, 23 of 25 read pairs were
+    # the same happening where Jev did not also call it a later development
+    # (2026-10-01, the 30-day repair dry run). At or above prism_follow_up_min on
+    # the follow-up question, an under-0.85 proposal founds its own record and is
+    # linked back instead. The default equals the gist floor: no change until set.
+    prism_proposal_verify_min: float = 0.85
     prism_ingest_max_articles: int = 0
     # Stop COLLECTING when the recorded OpenRouter balance is under this many
     # dollars, so a stalled enrichment never grows a backlog that becomes a bill
