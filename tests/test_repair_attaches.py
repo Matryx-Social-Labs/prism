@@ -123,3 +123,57 @@ async def test_a_swept_in_follow_up_founds_its_own_record_linked_back(monkeypatc
 async def test_bands_read_like_the_verifier():
     assert [repair_attaches.band(p) for p in (0.9, 0.85, 0.6, 0.2, 0.05)] == [
         "same", "same", "likely same", "likely different", "different"]
+
+
+async def test_a_copy_of_the_article_leaves_with_it_and_neither_comes_back(monkeypatch, swept):
+    """2026-10-01: one article ingested from two feeds (The Hindu's national and
+    state feeds) sat twice in a wrong record. The repair moved one copy and the
+    other pulled it straight back by URL — 31 of the first 250 moves."""
+    row, src, _ = swept
+    monkeypatch.setattr(get_settings(), "prism_event_verify", "confirm")
+
+    async def jev(state, questions, **_):
+        return Decisions(answers={k: NoulAnswer(noul=0.1 if k.startswith("same") else 0.2) for k in questions},
+                         model="typesafe/jev-test")
+
+    monkeypatch.setattr(verify, "decide", jev)
+    rid, copy = uuid.uuid4(), uuid.uuid4()
+    async with session_scope() as s:
+        url = (await s.execute(text("SELECT ri.url FROM articles a JOIN raw_items ri ON ri.id = a.raw_item_id "
+                                    "WHERE a.id = :a"), {"a": str(row["article_id"])})).scalar_one()
+        await s.execute(text("INSERT INTO raw_items (id, source_id, external_id, url, title, raw, relevance, published_at) "
+                             "VALUES (:i, :s, :x, :u, :t, '{}'::jsonb, 'relevant', :w)"),
+                        {"i": str(rid), "s": str(src), "x": rid.hex, "u": url, "t": FOLLOW_UP, "w": WHEN})
+        await s.execute(text("INSERT INTO articles (id, raw_item_id, clean_text, retrieval_tier, word_count) "
+                             "VALUES (:i, :r, :t, 'direct', 9)"), {"i": str(copy), "r": str(rid), "t": FOLLOW_UP})
+        await s.execute(text("INSERT INTO enrichments (id, article_id, summary, event_type, shared_fields) "
+                             "VALUES (:i, :a, :t, 'report', '{}'::jsonb)"), {"i": str(uuid.uuid4()), "a": str(copy), "t": FOLLOW_UP})
+        await s.execute(text("INSERT INTO event_memberships (id, event_id, article_id, match_type, is_survivor, created_at) "
+                             "VALUES (:i, :e, :a, 'entity_overlap', false, :w)"),
+                        {"i": str(uuid.uuid4()), "e": str(row["event_id"]), "a": str(copy), "w": WHEN})
+    try:
+        landed, _ = await repair_attaches.move(row, 0.1, 0.2)
+        assert landed != row["event_id"]
+        async with session_scope() as s:
+            homes = dict((await s.execute(text("SELECT article_id, event_id FROM event_memberships "
+                                               "WHERE article_id = ANY(CAST(:a AS uuid[]))"),
+                                          {"a": [str(row["article_id"]), str(copy)]})).all())
+        assert row["event_id"] not in homes.values(), "neither copy is left in, or pulled back into, the record"
+        assert homes[copy] == homes[row["article_id"]], "the copy follows the article"
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM event_memberships WHERE article_id = :a"), {"a": str(copy)})
+            await s.execute(text("DELETE FROM event_match_verdicts WHERE article_id = :a"), {"a": str(copy)})
+            await s.execute(text("DELETE FROM enrichments WHERE article_id = :a"), {"a": str(copy)})
+            await s.execute(text("DELETE FROM articles WHERE id = :a"), {"a": str(copy)})
+
+
+async def test_a_copy_pulled_back_by_url_is_loaded_again(swept):
+    row, _, _ = swept
+    async with session_scope() as s:
+        await s.execute(text("UPDATE event_memberships SET match_type = 'url_exact' WHERE id = :m"), {"m": str(row["membership"])})
+    assert row["membership"] not in {r["membership"] for r in await repair_attaches.load(61)}, "a plain URL match is not ours"
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO event_match_verdicts (article_id, event_id, noul, model, mode) "
+                             "VALUES (:a, :e, 0.05, 'm', 'repair')"), {"a": str(row["article_id"]), "e": str(row["event_id"])})
+    assert row["membership"] in {r["membership"] for r in await repair_attaches.load(61)}
