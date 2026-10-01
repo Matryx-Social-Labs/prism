@@ -81,7 +81,12 @@ async def load(days: int) -> list[dict]:
                     JOIN raw_items ri ON ri.id = a.raw_item_id
                     JOIN sources src ON src.id = ri.source_id
                     JOIN enrichments en ON en.article_id = a.id
-                    WHERE m.match_type = ANY(:fuzzy)
+                    -- url_exact too, but only where this repair already judged the pair:
+                    -- a copy of the same article (one URL in two feeds) pulled the
+                    -- moved one back by URL before copies moved together (2026-10-01).
+                    WHERE (m.match_type = ANY(:fuzzy) OR (m.match_type = 'url_exact' AND EXISTS (
+                               SELECT 1 FROM event_match_verdicts r
+                               WHERE r.article_id = m.article_id AND r.event_id = m.event_id AND r.mode = :mode)))
                       AND m.created_at > now() - make_interval(days => :days)
                       AND NOT EXISTS (
                           SELECT 1 FROM event_match_verdicts v
@@ -90,7 +95,7 @@ async def load(days: int) -> list[dict]:
                     ORDER BY m.created_at, m.id
                     """
                 ),
-                {"fuzzy": list(FUZZY), "days": days, "floor": get_settings().prism_event_verify_min},
+                {"fuzzy": list(FUZZY), "days": days, "floor": get_settings().prism_event_verify_min, "mode": MODE},
             )
         ).mappings().all()
     return [dict(r) for r in rows]
@@ -214,6 +219,34 @@ async def _prune(s, event_id: uuid.UUID, article_id: uuid.UUID) -> None:
     )
 
 
+class _SameAsFounder(Exception):
+    """The membership is a copy of the record's own founding article."""
+
+
+async def _detach_copies(s, event_id: uuid.UUID, article_id: uuid.UUID) -> list[tuple[uuid.UUID, object]] | None:
+    """Take every other copy of the article (one URL, ingested from two feeds)
+    out of the record with it, returning (article, attached_at) to re-home. A
+    copy left behind pulled the moved one straight back by URL: 31 of the
+    first 250 moves on 2026-10-01. None when the record's founder is a copy —
+    the record is about this article, whatever the verdict said."""
+    url = "coalesce(ri.url_canonical, ri.url)"
+    rows = (await s.execute(
+        text(f"""
+            SELECT m.id, m.article_id, m.match_type, m.created_at
+            FROM event_memberships m JOIN articles a ON a.id = m.article_id JOIN raw_items ri ON ri.id = a.raw_item_id
+            WHERE m.event_id = :e AND m.article_id <> :a
+              AND {url} = (SELECT {url} FROM articles a JOIN raw_items ri ON ri.id = a.raw_item_id WHERE a.id = :a)
+        """),
+        {"e": str(event_id), "a": str(article_id)},
+    )).all()
+    if any(r.match_type == "new_event" for r in rows):
+        return None
+    if rows:
+        await s.execute(text("DELETE FROM event_memberships WHERE id = ANY(CAST(:ids AS uuid[]))"),
+                        {"ids": [str(r.id) for r in rows]})
+    return [(r.article_id, r.created_at) for r in rows]
+
+
 async def move(r: dict, same: float, story: float | None) -> tuple[uuid.UUID, bool] | None:
     """Detach one membership and re-home its article through the live path.
     Returns (the record it landed in, whether it founded it); None when it had
@@ -229,6 +262,9 @@ async def move(r: dict, same: float, story: float | None) -> tuple[uuid.UUID, bo
         ).first()
         if gone is None:
             return None
+        copies = await _detach_copies(s, r["event_id"], r["article_id"])
+        if copies is None:  # the record's founder is this very article: nothing to move
+            raise _SameAsFounder
         await _prune(s, r["event_id"], r["article_id"])
         # Its briefs and perspectives were written with the article that left.
         await s.execute(text("DELETE FROM perspectives WHERE event_id = :e"), {"e": str(r["event_id"])})
@@ -246,6 +282,15 @@ async def move(r: dict, same: float, story: float | None) -> tuple[uuid.UUID, bo
             text("UPDATE event_memberships SET created_at = :t WHERE article_id = :a"),
             {"t": r["attached_at"], "a": str(r["article_id"])},
         )
+        for copy_id, attached_at in copies:  # follows the article by URL, wherever it went
+            copy = await s.get(Article, copy_id)
+            found = (await s.execute(
+                select(Enrichment).where(Enrichment.article_id == copy_id).order_by(Enrichment.created_at.desc())
+            )).scalars().first()
+            await consumer._attach(s, copy, found, found.shared_fields or {}, copy_id, consumer.cve_ids_of(found))
+            await s.flush()
+            await s.execute(text("UPDATE event_memberships SET created_at = :t WHERE article_id = :a"),
+                            {"t": attached_at, "a": str(copy_id)})
         if is_new:
             await s.execute(
                 text("UPDATE events SET first_seen_at = :t, last_updated_at = :t WHERE id = :e"),
@@ -284,6 +329,9 @@ async def main() -> int:
         same, story = cache[_key(r)]
         try:
             done = await move(r, same, story)
+        except _SameAsFounder:
+            outcome["kept: a copy of the record's founding article"] += 1
+            continue
         except Exception as exc:  # noqa: BLE001 — one bad row must not stop the batch; it is retried next run
             print(f"  failed {r['membership']}: {type(exc).__name__}: {str(exc)[:120]}")
             outcome["failed"] += 1

@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.121.1] - 2026-10-01
+
+### Fixed — a repaired article no longer comes back on its own copy
+- One article ingested from two feeds (The Hindu's national and state feeds, say) sat
+  twice in a wrong record. The repair moved one copy and the other pulled it straight
+  back by URL: 31 of the first 250 moves on 2026-10-01. Copies of the article now leave
+  the record together and follow it wherever it lands; a membership that is a copy of the
+  record's own founding article is kept. The pairs already pulled back are picked up
+  again by the next run.
+
 ## [0.0.121.0] - 2026-10-01
 
 ### Changed — a report is judged against the record as it stands
