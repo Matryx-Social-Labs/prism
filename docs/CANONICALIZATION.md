@@ -251,7 +251,7 @@ it?* (`verify.SAME_STORY`).
 | Jev's answer | What happens |
 |---|---|
 | same happening ≥ 0.85 | attach (`match_type` = the tier that proposed it, or `verified`) |
-| a record a tier **proposed**: same happening ≥ `PRISM_PROPOSAL_VERIFY_MIN` (0.5 in prod since 2026-10-01; default 0.85) and later development below `PRISM_FOLLOW_UP_MIN` | attach under the proposing tier (0.0.120.0) |
+| a record a tier **proposed**: same happening ≥ `PRISM_PROPOSAL_VERIFY_MIN` (default 0.85, the gist floor) and later development below `PRISM_FOLLOW_UP_MIN` | attach under the proposing tier (0.0.120.0) |
 | below that, later development ≥ `PRISM_FOLLOW_UP_MIN` (0.85) | the article founds its own record, and the earlier record `leads_to` it (`event_links.method = 'verified'`); the record page lists it under "Earlier and later" |
 | neither | a new record |
 | Jev failed, timed out, or there is no text to judge | a **title** proposal attaches as before (92%); an embedding or entity proposal (76%, 44%) does not — a new record is the cheaper mistake, and the record merge folds it later |
@@ -269,9 +269,11 @@ as later developments, until the story layer is verified.
 far more than the replay predicted: 77 of 335 new records had a candidate Jev scored
 0.5–0.85, and one Flydubai cockpit attack had five records scoring 0.70–0.80 against
 each other. A record a tier proposed has that tier's evidence behind it; in the 30-day
-repair dry run's 0.5–0.85 band, read by hand: 23 of 25 proposals Jev did *not* also call
-a later development were the same happening, and about 10 of 15 it did call one were
-later developments (bail granted → "family reacts to bail"). So a proposal attaches from
+repair dry run, read by hand, the proposals Jev did *not* also call a later development
+were the same happening 21/30 at 0.50–0.60, 24/30 at 0.60–0.70 and 25/30 at 0.70–0.85;
+about 10 of 15 it did call one were later developments (bail granted → "family reacts to
+bail"). Record-to-record pairs are worse below ~0.7 (reactions: "Trump praises the
+pilot"), so the record merge keeps 0.85. A proposal attaches from
 `PRISM_PROPOSAL_VERIFY_MIN` unless Jev's later-development answer reaches
 `PRISM_FOLLOW_UP_MIN`, which founds a linked record; a record only the gist found keeps
 0.85 (`clustering._attaches`). These are reads, not labels: the founders' attach check
