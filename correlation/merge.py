@@ -73,6 +73,7 @@ KEYED = {
     "clip_verdicts": ("window_id",),
     "event_x_posts": ("post_id",),
     "x_post_verdicts": ("post_id",),
+    "story_verdicts": ("story_id",),
 }
 # Left on the absorbed row on purpose. The verdicts are the evidence for the
 # merge; a labelling task is history; a veto verdict is a cache keyed on a
@@ -81,7 +82,7 @@ KEYED = {
 LEFT = {"event_match_verdicts", "label_tasks"}
 HANDLED_TABLES = (
     set(KEYED) | LEFT
-    | {"event_memberships", "agent_sessions", "event_links", "perspectives", "impacts"}
+    | {"event_memberships", "agent_sessions", "event_links", "perspectives", "impacts", "stories", "story_events"}
 )
 
 
@@ -267,6 +268,12 @@ async def apply(m: Merge) -> bool:
         await s.execute(text("DELETE FROM event_links WHERE :a IN (from_event_id, to_event_id)"), ids)
         await s.execute(text("DELETE FROM perspectives WHERE event_id = :a"), ids)
         await s.execute(text("DELETE FROM impacts WHERE event_id = :a"), ids)
+        # One story per record: the copy's place moves to the survivor unless the
+        # survivor has its own; a story founded on the copy is re-anchored.
+        await s.execute(text("UPDATE story_events SET event_id = :s WHERE event_id = :a "
+                             "AND NOT EXISTS (SELECT 1 FROM story_events x WHERE x.event_id = :s)"), ids)
+        await s.execute(text("DELETE FROM story_events WHERE event_id = :a"), ids)
+        await s.execute(text("UPDATE stories SET anchor_event_id = :s WHERE anchor_event_id = :a"), ids)
         await _move_story_members(s, m)
 
         # As an attach would: the survivor takes the copy's photo if it had

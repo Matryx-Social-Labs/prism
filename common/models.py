@@ -328,6 +328,10 @@ class Story(TimestampMixin, Base):
     last_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # A story persists from its first record (correlation/stories.py); a running story
+    # (a war, a tournament) is judged on a founder-written scope instead.
+    anchor_event_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("events.id"))
+    scope: Mapped[str | None] = mapped_column(Text)
 
 
 class PartitionRun(TimestampMixin, Base):

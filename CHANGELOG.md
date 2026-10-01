@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.125.0] - 2026-10-01
+
+### Added — stories that persist (shadow)
+- The story layer was a global partition rebuilt every 15 minutes and kept only while a
+  story trended; it cannot hold a story past ~25 records, so the Iran war's 360 records sat
+  in 198 groups and the Flydubai attack's 102 in 35. Every new record now joins one story
+  at birth: the stories of its nearest earlier records (English gist) and of any record the
+  verifier linked it to as a later development are proposed, and one Jev call asks whether
+  it is part of each and what kind of development it is (event, investigation, response,
+  diplomacy, people, reactions, politics, impact, explainer). Otherwise it founds a story.
+  Prototype on 12,941 records: Flydubai 13% → 92% in one story, precision 0.92–0.97.
+- Running stories for an ongoing war, dispute or tournament, judged on a one-line scope a
+  founder writes: `tools/story_anchor.py` (dry run by default) creates one and absorbs the
+  stories its scope covers; they redirect to it.
+- `PRISM_STORIES` off | shadow | live (off by default). Shadow writes stories nobody is
+  served; `tools/assign_stories.py` places the backlog in first-report order.
+- A merged record hands its story place to the survivor; a story founded on it is
+  re-anchored.
+
 ## [0.0.124.0] - 2026-10-01
 
 ### Changed — fewer duplicate records

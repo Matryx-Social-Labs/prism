@@ -169,6 +169,12 @@ class Settings(BaseSettings):
     prism_event_escalate: str = "off"
     prism_event_escalate_floor: float = 0.65
     prism_event_escalate_min: float = 0.80
+    # Stories that persist (correlation/stories.py): every new record joins one
+    # story at birth on Jev's word, or founds one. off | shadow (stories written
+    # with status 'shadow', never served) | live. prism_story_min is the attach
+    # floor (prototype 2026-10-01: precision 0.92-0.97 at 0.70).
+    prism_stories: str = "off"
+    prism_story_min: float = 0.70
     # One name, one entity (correlation/variants.py): an article joining a record
     # whose cast already holds another spelling of one of its names (same type,
     # same consonant skeleton) asks Jev whether both name one entity. off |
