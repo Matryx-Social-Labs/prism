@@ -646,6 +646,9 @@ class StoryDevelopmentOut(BaseModel):
     why: str | None = None
     # How many outlets filed this development: the station's weight on the route map.
     source_count: int = 1
+    # What kind of development it is in its story: event, investigation, response,
+    # diplomacy, people, reactions, politics, impact or explainer (correlation/verify.FACETS).
+    facet: str | None = None
 
 
 class BranchNodeOut(BaseModel):

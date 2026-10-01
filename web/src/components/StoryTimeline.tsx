@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Corner } from "@/components/icons";
 import type { StoryDevelopment, StoryTimelineData } from "@/lib/api";
 import { istTime, reportedAt, shortDate } from "@/lib/dateline";
@@ -49,16 +50,51 @@ function sources(n: number | undefined): string | null {
   return n == null ? null : `${n} ${n === 1 ? "source" : "sources"}`;
 }
 
+// What kind of development each record is in its story — the judge's fixed list
+// (correlation/verify.FACETS), in this order on every story.
+const FACETS: [string, string][] = [
+  ["event", "The event"], ["investigation", "Investigation"], ["response", "Response"], ["diplomacy", "Diplomacy"],
+  ["people", "People"], ["reactions", "Reactions"], ["politics", "Politics"], ["impact", "Impact"],
+  ["explainer", "Explainers"],
+];
+
+/** Chips that narrow the list to one kind of development, counted; absent below two kinds. */
+function FacetChips({ developments, chosen, choose }: {
+  developments: StoryDevelopment[]; chosen: string | null; choose: (facet: string | null) => void;
+}) {
+  const counts = new Map<string, number>();
+  for (const d of developments) if (d.facet) counts.set(d.facet, (counts.get(d.facet) ?? 0) + 1);
+  const present = FACETS.filter(([key]) => counts.has(key));
+  if (present.length < 2) return null;
+  return (
+    <div role="group" aria-label="Kinds of development" className="mb-4 flex flex-wrap gap-1.5">
+      <button type="button" className="p-chip" aria-pressed={chosen === null} onClick={() => choose(null)}>
+        All <span className="p-count">{developments.length}</span>
+      </button>
+      {present.map(([key, label]) => (
+        <button key={key} type="button" className="p-chip" aria-pressed={chosen === key} onClick={() => choose(key)}>
+          {label} <span className="p-count">{counts.get(key)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimelineData; mode?: "timeline" | "related" }) {
-  const developments = story?.developments ?? [];
+  const [facet, setFacet] = useState<string | null>(null);
+  const all = story?.developments ?? [];
   const cast = story?.cast ?? [];
   // A timeline only exists when there's more than just this event.
-  if (developments.filter((d) => !d.is_current).length === 0) return null;
+  if (all.filter((d) => !d.is_current).length === 0) return null;
 
+  const developments = facet ? all.filter((d) => d.facet === facet) : all;
   const when = gutters(developments);
+  const chips = <FacetChips developments={all} chosen={facet} choose={setFacet} />;
 
   if (mode === "related") {
     return (
+      <>
+      {chips}
       <ol className="p-print">
         {developments.map((n, i) => (
           <li
@@ -80,11 +116,13 @@ export function StoryTimeline({ story, mode = "timeline" }: { story?: StoryTimel
           </li>
         ))}
       </ol>
+      </>
     );
   }
 
   return (
     <div>
+      {chips}
       {cast.length > 0 && (
         <div className="mb-5 flex flex-wrap items-center gap-1.5">
           <span className="mr-1" style={{ font: "var(--t-label)", color: "var(--ink-3)" }}>Following</span>

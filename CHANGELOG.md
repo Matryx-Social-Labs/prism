@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.129.0] - 2026-10-02
+
+### Added — the kinds of development in a story
+- Every development on a story page now carries what kind it is within the story, from the
+  judge's fixed list (the event, investigation, response, diplomacy, people, reactions,
+  politics, impact, explainers), and the list opens with counted chips that narrow it to one
+  kind: on the Flydubai story, the event 13 · investigation 12 · response 9 · people 19 ·
+  reactions 42 · politics 7. The chips appear only once a story's records carry two kinds or
+  more, which happens as records join persistent stories.
+
 ## [0.0.128.0] - 2026-10-01
 
 ### Added — what is breaking (shadow)
