@@ -6,7 +6,8 @@ import { SectionHead as Head } from "@/components/SectionHead";
 
 /**
  * Earlier and later: other records a verifier judged to be earlier or later
- * developments of this one (api/routes/events.follow_ups), oldest first. They
+ * developments of this one (api/routes/events.follow_ups), in the order they
+ * were first reported, each dated by its first report. They
  * are links between records, not the story's timeline — that is "How this
  * story unfolded", and only once its boundary is verified. Absent, never
  * empty, when there are none (and on an older payload with no field).
@@ -47,7 +48,7 @@ function Side({ label, refs }: { label: string; refs: FollowUpRef[] }) {
               {r.title}
             </Link>
             <p className="p-count">
-              {shortDate(r.first_seen_at)}
+              {shortDate(r.first_published_at ?? r.first_seen_at)}
               {r.source_count != null && ` · ${r.source_count} ${r.source_count === 1 ? "outlet" : "outlets"}`}
             </p>
           </li>

@@ -4,6 +4,7 @@ Drives the real FastAPI app via httpx/ASGITransport against a live Postgres.
 Skips without a database.
 """
 
+import datetime as dt
 import json
 import uuid
 
@@ -264,3 +265,50 @@ async def test_search_never_returns_a_record_with_no_sources():
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM events WHERE id = ANY(:ids)"), {"ids": [str(served), str(hidden)]})
+
+
+async def test_matches_that_share_a_story_collapse_under_it_in_the_order_first_reported():
+    """A search for "pilot" listed 20 sibling records of the Flydubai story, four
+    of them one Gujarat award (2026-10-01). Two or more matches in one story are
+    a group; a lone match in a story, and a match in none, stay rows."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:8]
+    t0 = dt.datetime.now(dt.UTC).replace(microsecond=0) - dt.timedelta(days=60)
+    h = dt.timedelta(hours=1)
+    # name: (matches the query, search rank by last_updated_at, first reported)
+    spec = {"award_a": (True, 4, t0 - 1 * h), "rescue": (True, 1, t0 - 10 * h), "award_b": (True, 5, t0 - 5 * h),
+            "newest": (False, 0, t0), "alone": (True, 6, t0 - 2 * h), "unstoried": (True, 2, t0 - 3 * h)}
+    ids = {k: uuid.uuid4() for k in spec}
+    story, lone = (uuid.uuid4(), f"group-{tag}"), (uuid.uuid4(), f"lone-{tag}")
+    async with session_scope() as s:
+        for k, (hit, rank, reported) in spec.items():
+            await s.execute(
+                text("INSERT INTO events (id, title, sector, projection, first_seen_at, first_published_at, last_updated_at) "
+                     "VALUES (:i, :t, 'civic', '{\"source_slugs\": [\"thehindu\"]}', :w, :p, :u)"),
+                {"i": str(ids[k]), "t": f"{'Pilot-' + tag if hit else 'Other'} {k}", "w": t0, "p": reported,
+                 "u": t0 + rank * h},
+            )
+        for (sid, slug), members in ((story, ["award_a", "rescue", "award_b", "newest"]), (lone, ["alone"])):
+            await s.execute(
+                text('INSERT INTO stories (id, slug, label, "cast", member_event_ids, hero_event_id, sector, regions, '
+                     "source_count, velocity, status, first_seen_at, last_updated_at) "
+                     "VALUES (:i, :s, :s, '[]', CAST(:m AS jsonb), :h, 'civic', '{}', 2, 0, 'active', :w, :w)"),
+                {"i": str(sid), "s": slug, "m": json.dumps([str(ids[m]) for m in members]), "h": str(ids[members[0]]),
+                 "w": t0},
+            )
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+            body = (await ac.get("/api/v1/search", params={"q": f"Pilot-{tag}"})).json()
+        assert [i["id"] for i in body["items"]] == [str(ids[k]) for k in ("alone", "award_b", "award_a", "unstoried", "rescue")]
+        assert body["stories"] == [{
+            "slug": story[1], "label": story[1], "developments": 4, "latest_published_at": t0.isoformat(),
+            "event_ids": [str(ids[k]) for k in ("rescue", "award_b", "award_a")], "boundary_status": "provisional",
+        }]
+        assert body["items"][0]["first_published_at"] == (t0 - 2 * h).isoformat()
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM stories WHERE id = ANY(CAST(:i AS uuid[]))"),
+                            {"i": [str(story[0]), str(lone[0])]})
+            await s.execute(text("DELETE FROM events WHERE id = ANY(CAST(:i AS uuid[]))"),
+                            {"i": [str(v) for v in ids.values()]})

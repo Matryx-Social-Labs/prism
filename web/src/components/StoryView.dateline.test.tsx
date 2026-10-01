@@ -43,6 +43,16 @@ describe("the record's first-reported time", () => {
     expect(newsArticleLd(e).datePublished).toBe("2026-09-27T20:45:00Z");
   });
 
+  it("takes the API's first_published_at over a report dated outside the record's window", () => {
+    // A live blog carrying the date of its first post, months back: the API's
+    // window drops it, the bare minimum over the sources did not.
+    const e = { ...event([SRC("a1", "reuters", "2026-06-02T10:00:00Z"), SRC("a2", "thehindu", "2026-09-27T20:45:00Z")]),
+      first_published_at: "2026-09-27T20:45:00Z" } as EventDetail;
+    render(<StoryView event={e} />);
+    expect(screen.getByText("First reported 28 Sept, 02:15 IST")).toBeInTheDocument();
+    expect(newsArticleLd(e).datePublished).toBe("2026-09-27T20:45:00Z");
+  });
+
   it("prints nothing when no report carries a time, rather than a guess", () => {
     render(<StoryView event={event([SRC("a1", "thehindu", null)])} />);
     expect(screen.queryByText(/First reported/)).toBeNull();

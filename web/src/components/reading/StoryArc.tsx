@@ -15,7 +15,7 @@ import { StoryTimeline } from "@/components/StoryTimeline";
 import { BackBar } from "@/components/ui";
 import type { StoryDevelopment, TrendingStoryDetail } from "@/lib/api";
 import { coverageText, publishers } from "@/lib/coverage";
-import { shortDate } from "@/lib/dateline";
+import { reportedAt, shortDate } from "@/lib/dateline";
 import { entityRel } from "@/lib/entities";
 import { REPORT_IMAGES } from "@/lib/images";
 import { framesFromStory } from "@/lib/photos";
@@ -37,11 +37,12 @@ import { spanDays, spineLength } from "@/lib/spine";
  */
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** The most recent development by its own date; the last listed wins a tie. */
+/** The most recently reported development; the last listed wins a tie. */
 function latestOf(devs: StoryDevelopment[]): StoryDevelopment | null {
   let best: StoryDevelopment | null = null, bestT = -Infinity;
   for (const d of devs) {
-    const t = d.occurred_at ? Date.parse(d.occurred_at) : NaN;
+    const at = reportedAt(d);
+    const t = at ? Date.parse(at) : NaN;
     if (!Number.isNaN(t) && t >= bestT) { best = d; bestT = t; }
   }
   return best ?? devs.at(-1) ?? null;
@@ -70,7 +71,7 @@ export function StoryArc({ s }: { s: TrendingStoryDetail }) {
   // A main line of one or two stations has nothing to fold: open the list on everything.
   const openAll = !tree || spineLength(tree) < 3;
   const latest = latestOf(s.developments);
-  const dated = s.developments.some((d) => d.occurred_at);
+  const dated = s.developments.some((d) => reportedAt(d));
   const photos = s.photos ?? [];
   const url = `/trending/${s.canonical_slug}`;
 
@@ -211,7 +212,8 @@ function LatestRecord({ d, s }: { d: StoryDevelopment; s: TrendingStoryDetail })
   const subject = sectorGroup(d.sector)?.name;
   const credit = d.image_url ? (s.photos ?? []).find((p) => p.url === d.image_url)?.outlet ?? null : null;
   const photo = REPORT_IMAGES && d.image_url ? d.image_url : null;
-  const prov = [d.occurred_at ? shortDate(d.occurred_at) : null, d.source_count != null ? plural(d.source_count, "source", "sources") : null].filter((x): x is string => Boolean(x));
+  const at = reportedAt(d);
+  const prov = [at ? shortDate(at) : null, d.source_count != null ? plural(d.source_count, "source", "sources") : null].filter((x): x is string => Boolean(x));
   return (
     <Link href={`/story/${d.id}`} className="p-row group" style={{ padding: "14px 16px" }}>
       <div className="flex items-start gap-3">

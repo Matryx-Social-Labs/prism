@@ -62,6 +62,9 @@ class FeedItem(BaseModel):
     # this, not last_updated_at, which is set to now() on every projection
     # rebuild and so showed one identical batch timestamp against every story.
     latest_published_at: str | None = None
+    # When the record was first reported (events.first_published_at): what a
+    # search group orders its records by. Only search selects it; None elsewhere.
+    first_published_at: str | None = None
     score: float
     # Every registered source behind the story (one per feed slug in the
     # projection); the row's coverage bar and monogram stack are drawn from it.
@@ -71,6 +74,29 @@ class FeedItem(BaseModel):
 class FeedResponse(BaseModel):
     items: list[FeedItem]
     lens: str
+
+
+class SearchStoryOut(BaseModel):
+    """Matching records that belong to one story, collapsed under it: a search
+    for "pilot" listed 20 sibling records of one story, four of them one award.
+    Only where two or more matches share the story; a lone match stays a row."""
+
+    slug: str
+    label: str
+    developments: int  # every record in the story, matched or not
+    latest_published_at: str | None = None  # its newest record, by first report
+    # The matching records (all in `items`), in the order they were first reported.
+    event_ids: list[str]
+    # Provisional until the story evaluation passes (common/stories.py): the
+    # group then says so and counts records, not developments.
+    boundary_status: str = "provisional"
+
+
+class SearchResponse(FeedResponse):
+    # `items` stays every match in the search's own order, so a client that
+    # predates the groups keeps working; the ungrouped records are the items
+    # no group names.
+    stories: list[SearchStoryOut] = []
 
 
 class LensOut(BaseModel):
@@ -391,14 +417,16 @@ class SpeakerClaims(BaseModel):
 class FollowUpRef(BaseModel):
     id: str
     title: str
-    first_seen_at: str
+    first_seen_at: str  # when Prism processed it; kept for older clients
+    first_published_at: str | None = None  # when it was first reported, the order the lists use
     source_count: int | None = None
 
 
 class FollowUps(BaseModel):
     """Records the verifier judged to be earlier or later developments of this
     one (correlation/consumer._link_follow_up; event_links method 'verified'),
-    oldest first. Never the LLM thread-linker's links, never shared actors alone."""
+    in the order they were first reported. Never the LLM thread-linker's links,
+    never shared actors alone."""
     earlier: list[FollowUpRef] = []
     later: list[FollowUpRef] = []
 
@@ -420,6 +448,9 @@ class EventDetail(BaseModel):
     image_url: str | None
     regions: list[str]
     occurred_at: str | None
+    # When it was first reported: the earliest report's own time inside the
+    # record's window (correlation/chronology.py), else when Prism first saw it.
+    first_published_at: str | None = None
     last_updated_at: str
     projection: dict | None
     lens_briefs: dict[str, str]
@@ -606,6 +637,8 @@ class StoryDevelopmentOut(BaseModel):
     title: str
     sector: str | None
     occurred_at: str | None
+    # When it was first reported; the developments are in this order.
+    first_published_at: str | None = None
     image_url: str | None
     is_current: bool
     # The causal note from event_links, rendered as "↳ {why}" under the

@@ -100,6 +100,7 @@ def build_feed_item(
         price_impact_direction=(finance.get("price_impact") or {}).get("direction"),
         last_updated_at=row["last_updated_at"].isoformat(),
         latest_published_at=projection.get("latest_published_at"),
+        first_published_at=fp.isoformat() if (fp := _get(row, "first_published_at")) else None,
         score=score,
         outlets=outlet_refs(projection.get("source_slugs") or [], registry),
     )

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SearchPage from "@/app/search/page";
-import type { FeedItem } from "@/lib/api";
+import type { FeedItem, SearchResult, SearchStory } from "@/lib/api";
 
 const searchEvents = vi.hoisted(() => vi.fn());
 const fetchTrending = vi.hoisted(() => vi.fn());
@@ -50,6 +50,11 @@ function item(over: Partial<FeedItem> = {}): FeedItem {
   };
 }
 
+/** What /api/v1/search returns: every match, and the stories two or more of them share. */
+function found(items: FeedItem[], stories: SearchStory[] = []): SearchResult {
+  return { items, stories };
+}
+
 /** The line that marks the start screen: what can be searched. */
 const START = "Search every record by its headline, its summary and the people and organisations it names: a story, a person, a place, a ticker or a CVE id.";
 
@@ -58,7 +63,7 @@ function input() {
 }
 
 beforeEach(() => {
-  searchEvents.mockReset().mockResolvedValue([]);
+  searchEvents.mockReset().mockResolvedValue(found([]));
   fetchTrending.mockReset().mockResolvedValue([]);
   router.replace.mockReset();
   params.get.mockReset().mockReturnValue(null);
@@ -98,13 +103,13 @@ describe("Search — querying", () => {
   // A slow response for a query the reader has already moved on from must not
   // land on top of the newer results.
   it("ignores a late response for an abandoned query", async () => {
-    let landStale: (v: FeedItem[]) => void = () => {};
+    let landStale: (v: SearchResult) => void = () => {};
     searchEvents.mockImplementation((term: string) =>
       term === "old query"
-        ? new Promise<FeedItem[]>((res) => {
+        ? new Promise<SearchResult>((res) => {
             landStale = res;
           })
-        : Promise.resolve([item({ id: "fresh", title: "Fresh result headline" })])
+        : Promise.resolve(found([item({ id: "fresh", title: "Fresh result headline" })]))
     );
 
     render(<SearchPage />);
@@ -115,7 +120,7 @@ describe("Search — querying", () => {
     await userEvent.type(input(), "new query");
     expect(await screen.findByText("Fresh result headline")).toBeInTheDocument();
 
-    landStale([item({ id: "stale", title: "Stale result headline" })]);
+    landStale(found([item({ id: "stale", title: "Stale result headline" })]));
     await new Promise((r) => setTimeout(r, 50));
 
     expect(screen.queryByText("Stale result headline")).not.toBeInTheDocument();
@@ -125,7 +130,7 @@ describe("Search — querying", () => {
 
 describe("Search — results", () => {
   it("renders each hit as a link to its story", async () => {
-    searchEvents.mockResolvedValue([item()]);
+    searchEvents.mockResolvedValue(found([item()]));
     render(<SearchPage />);
     await userEvent.type(input(), "freight");
     const link = await screen.findByRole("link", { name: /Monsoon freight corridor reopens/ });
@@ -133,7 +138,7 @@ describe("Search — results", () => {
   });
 
   it("says nothing matched instead of showing a blank screen", async () => {
-    searchEvents.mockResolvedValue([]);
+    searchEvents.mockResolvedValue(found([]));
     render(<SearchPage />);
     await userEvent.type(input(), "zzzqqq");
     const msg = await screen.findByText(/No records match/);
@@ -199,7 +204,7 @@ describe("Search — a failed request", () => {
   });
 
   it("still says 'no match' when the search genuinely returned nothing", async () => {
-    searchEvents.mockResolvedValue([]);
+    searchEvents.mockResolvedValue(found([]));
     render(<SearchPage />);
     await userEvent.type(screen.getByRole("searchbox"), "zzzz");
 
@@ -211,7 +216,7 @@ describe("Search — a failed request", () => {
     // Typing MORE rather than clearing is the case that matters: emptying the
     // input resets `failed` through the short-term branch, so a test that clears
     // first passes even with the reset on the search path deleted.
-    searchEvents.mockRejectedValueOnce(new Error("offline")).mockResolvedValue([]);
+    searchEvents.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(found([]));
     render(<SearchPage />);
     const box = screen.getByRole("searchbox");
     await userEvent.type(box, "reliance");
@@ -228,10 +233,10 @@ describe("Search — a failed request", () => {
 
 describe("Search — the Records head counts the results", () => {
   it("counts what matched and the sources behind it, on the masthead's dateline", async () => {
-    searchEvents.mockResolvedValue([
+    searchEvents.mockResolvedValue(found([
       item({ id: "a", source_count: 5 }),
       item({ id: "b", title: "Second hit", source_count: 3 }),
-    ]);
+    ]));
     render(<SearchPage />);
     await userEvent.type(input(), "freight");
     // Distinct mastheads across the results, not a per-row sum: two rows from
@@ -241,7 +246,7 @@ describe("Search — the Records head counts the results", () => {
 
   // The API serves a page of 30: a full page may hide more.
   it("prints a full page as 30+, and draws no people section it has no data for", async () => {
-    searchEvents.mockResolvedValue(Array.from({ length: 30 }, (_, i) => item({ id: `r${i}` })));
+    searchEvents.mockResolvedValue(found(Array.from({ length: 30 }, (_, i) => item({ id: `r${i}` }))));
     render(<SearchPage />);
     await userEvent.type(input(), "freight");
     expect(await screen.findByText("30+ results")).toBeInTheDocument();
@@ -264,10 +269,10 @@ describe("Search — the Records head counts the results", () => {
 
   // The strip filters what came back; the API searched everything.
   it("filters the results by sector group in place, and says so when the group is empty", async () => {
-    searchEvents.mockResolvedValue([
+    searchEvents.mockResolvedValue(found([
       item({ id: "a", title: "Rupee slides", sector: "finance" }),
       item({ id: "b", title: "Poll result", sector: "politics" }),
-    ]);
+    ]));
     render(<SearchPage />);
     await userEvent.type(input(), "result");
     await screen.findByRole("link", { name: /Poll result/ });
@@ -282,10 +287,10 @@ describe("Search — the Records head counts the results", () => {
   // sector `other`; with no sector group behind the key the chip lit up and the
   // list stayed unfiltered. They filter on the subject root.
   it("filters by the Education and Civic & Safety chips too, on the subject root", async () => {
-    searchEvents.mockResolvedValue([
+    searchEvents.mockResolvedValue(found([
       item({ id: "a", title: "Board exam postponed", sector: "other", subject_path: "education.exams" }),
       item({ id: "b", title: "Bus overturns on highway", sector: "other", subject_path: "civic" }),
-    ]);
+    ]));
     render(<SearchPage />);
     await userEvent.type(input(), "board");
     await screen.findByRole("link", { name: /Board exam postponed/ });
@@ -298,15 +303,53 @@ describe("Search — the Records head counts the results", () => {
   });
 });
 
+describe("Search — matches that share a story", () => {
+  // "pilot" listed 20 sibling records of the Flydubai story, four of them one
+  // award (2026-10-01). The API names the stories two or more matches share.
+  const story: SearchStory = {
+    slug: "flydubai", label: "Captain Machchhar saves the Flydubai flight", developments: 21,
+    latest_published_at: "2026-10-01T06:40:00Z", event_ids: ["rescue", "award"], boundary_status: "provisional",
+  };
+  const hits = [
+    item({ id: "award", title: "Pilot to receive Gujarat award", sector: "politics", first_published_at: "2026-10-01T04:23:00Z" }),
+    item({ id: "other", title: "Pilot training rules eased", sector: "logistics" }),
+    item({ id: "rescue", title: "Pilot saves the flight", sector: "logistics", first_published_at: "2026-09-30T08:03:00Z" }),
+  ];
+
+  it("collapses them under the story, where its best match stood, in the order first reported", async () => {
+    searchEvents.mockResolvedValue(found(hits, [story]));
+    render(<SearchPage />);
+    await userEvent.type(input(), "pilot");
+    const title = await screen.findByRole("link", { name: story.label });
+    expect(title).toHaveAttribute("href", "/trending/flydubai");
+    const group = title.closest("li")!;
+    expect(within(group).getByText("2 of 21 records")).toBeInTheDocument();
+    expect(within(group).getByText("Provisional grouping")).toBeInTheDocument();
+    expect(within(group).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["/trending/flydubai", "/story/rescue", "/story/award"]);
+    const hrefs = within(group.closest("ol")!).getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/trending/flydubai", "/story/rescue", "/story/award", "/story/other"]);
+  });
+
+  it("is a row again when the subject strip leaves it one match", async () => {
+    searchEvents.mockResolvedValue(found(hits, [story]));
+    render(<SearchPage />);
+    await userEvent.type(input(), "pilot");
+    await screen.findByRole("link", { name: story.label });
+    await userEvent.click(screen.getByRole("button", { name: /Politics/ }));
+    expect(screen.queryByRole("link", { name: story.label })).toBeNull();
+    expect(screen.getByRole("link", { name: /Pilot to receive Gujarat award/ })).toHaveAttribute("href", "/story/award");
+  });
+});
+
 describe("Search — order", () => {
   // REGRESSION (audit 2026-09-27): the page re-sorted results most-outlets-first,
   // so the exact "Sun Pharma" record sank below market stories that merely
   // mention it. A search list keeps the order the API returned.
   it("keeps the API's order rather than re-sorting by outlet count", async () => {
-    searchEvents.mockResolvedValue([
+    searchEvents.mockResolvedValue(found([
       item({ id: "exact", title: "Sun Pharma Chengalpattu expansion not yet implemented", source_count: 1 }),
       item({ id: "broad", title: "Pharma stocks lead the index", source_count: 6 }),
-    ]);
+    ]));
     render(<SearchPage />);
     await userEvent.type(input(), "Sun Pharma");
     await screen.findByRole("link", { name: /Pharma stocks lead/ });
@@ -342,7 +385,7 @@ describe("Search — clearing the box", () => {
     expect(screen.getByText(START)).toBeInTheDocument();
 
     // The abandoned response landing later must not resurrect anything.
-    release([]);
+    release(found([]));
     await waitFor(() => expect(screen.getByText(START)).toBeInTheDocument());
     expect(screen.queryByText(/Searching/i)).not.toBeInTheDocument();
   });

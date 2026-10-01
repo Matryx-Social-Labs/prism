@@ -177,6 +177,13 @@ class Event(TimestampMixin, Base):
     last_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # When the record was first REPORTED: the earliest member's own publication
+    # time within [first_seen_at - 7 days, first_seen_at + 1 hour], else
+    # first_seen_at (correlation/chronology.py). first_seen_at is when Prism
+    # processed it, which after a backlog is hours late. Deferred: only the API
+    # container migrates, and a worker loading Event before the column exists
+    # would fail every attach.
+    first_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), deferred=True)
     # First instant a published partition made this event addressable as part of
     # a story (including a singleton story). NULL means not yet published.
     story_visible_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

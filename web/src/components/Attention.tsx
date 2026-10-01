@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { StoryDevelopment } from "@/lib/api";
-import { shortDate } from "@/lib/dateline";
+import { reportedAt, shortDate } from "@/lib/dateline";
 
 /**
  * Sources per day (Design System v2 · structure/AttentionChart): one bar per
@@ -23,11 +23,13 @@ const LABEL_MAX = 14;
 export function attentionDays(developments: StoryDevelopment[]): AttentionDay[] {
   const byDay = new Map<string, number | null>();
   for (const d of developments) {
-    if (!d.occurred_at) continue;
-    const t = Date.parse(d.occurred_at);
+    // The day it was first reported, the day the timeline files it under.
+    const at = reportedAt(d);
+    if (!at) continue;
+    const t = Date.parse(at);
     if (Number.isNaN(t)) continue;
     // A bare date is already the day; a timestamp is read on the newsroom (IST) clock.
-    const key = d.occurred_at.length === 10 ? d.occurred_at : new Date(t + IST_MS).toISOString().slice(0, 10);
+    const key = at.length === 10 ? at : new Date(t + IST_MS).toISOString().slice(0, 10);
     const prev = byDay.has(key) ? byDay.get(key)! : 0;
     // One development without a count leaves its whole day uncounted.
     byDay.set(key, prev == null || d.source_count == null ? null : prev + d.source_count);

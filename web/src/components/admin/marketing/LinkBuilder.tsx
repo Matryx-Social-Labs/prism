@@ -50,7 +50,7 @@ export function LinkBuilder({ data, onMade }: { data: LinksPayload; onMade: (lin
   useEffect(() => {
     let live = true;
     const q = query.trim();
-    const load = q.length >= SEARCH_FROM ? searchEvents(q) : fetchFeed({ sort: "top", limit: PICKS });
+    const load = q.length >= SEARCH_FROM ? searchEvents(q).then((found) => found.items) : fetchFeed({ sort: "top", limit: PICKS });
     load.then((items) => live && setPicks(items.slice(0, PICKS))).catch(() => live && setPicks([]));
     return () => {
       live = false;

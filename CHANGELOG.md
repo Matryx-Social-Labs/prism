@@ -3,6 +3,24 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.122.0] - 2026-10-01
+
+### Changed — a timeline reads in the order things were reported
+- A record's time was when Prism processed it. After the restart's backlog, every record of
+  the Flydubai cockpit-attack story (articles published from 30 September 07:30 UTC)
+  showed 1 October 08:18–12:14, and its timeline read in the order the queue drained.
+  Records now carry `first_published_at`: the earliest member article's own publication
+  time, inside a week before Prism first saw it and an hour after (RSS dates can be months
+  old or in the future), kept on every attach, merge and repair.
+- "Earlier and later in this story", the story timeline and the thread linker order by it,
+  and every "leads to" link now runs from the record reported first; links stored the other
+  way round are turned. A rejected thread link is never shown.
+- Search collapses matches that share a story under it: the story's name, "k of n
+  records", and the matches in the order first reported. "pilot" had listed 20 sibling
+  records of one story, four of them one award.
+- `tools/backfill_first_published.py` fills the records that predate the column (dry run
+  by default).
+
 ## [0.0.121.1] - 2026-10-01
 
 ### Fixed — a repaired article no longer comes back on its own copy

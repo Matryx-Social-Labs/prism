@@ -19,6 +19,13 @@ export function newsTime(item: { latest_published_at?: string | null; last_updat
   return item.latest_published_at || item.last_updated_at;
 }
 
+/** When a development was first reported: its first report's own time
+ *  (api first_published_at), else the day the extractor gave it. Older
+ *  payloads carry only occurred_at, which after a backlog was processing order. */
+export function reportedAt(d: { first_published_at?: string | null; occurred_at: string | null }): string | null {
+  return d.first_published_at ?? d.occurred_at;
+}
+
 /** 14:22 IST — the reader's newsroom clock, not their device's. */
 export function istTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", {

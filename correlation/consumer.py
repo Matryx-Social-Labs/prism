@@ -40,6 +40,7 @@ from common.outlets import RAW_RECORD_FEEDS
 from common.stream import get_redis
 from common.text import entity_slug, is_latin_text
 from correlation.briefs import available_lenses, persist_briefs, template_briefs
+from correlation.chronology import place_in_time
 from correlation.clustering import find_event
 from correlation.schemas import CorrelationResult, EventAnalysis
 from correlation.threads import link_event_threads
@@ -266,11 +267,16 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
 
 
 async def _link_follow_up(session, article_id: uuid.UUID, event_id: uuid.UUID) -> None:
-    """A new record for a later development of an existing one is linked to it:
-    the earlier record `leads_to` this one. Only on Jev's word (the follow-up
-    answer kept by clustering._verified, mode `confirm`), at the floor, strongest
-    first — never on shared actors or topic alone. The record page reads these
-    as "Earlier / Later in this story"."""
+    """A new record Jev judged part of an existing one's story is linked to it,
+    the earlier record by first report `leads_to` the later. Only on Jev's word
+    (the follow-up answer kept by clustering._verified, mode `confirm`), at the
+    floor, strongest first — never on shared actors or topic alone. The record
+    page reads these as "Earlier / Later in this story".
+
+    The existing record is not always the earlier one: after a backlog the
+    queue drains out of publication order, so the record founded first can
+    hold the later report. place_in_time sets the new record's time and turns
+    the link the right way round."""
     row = (
         await session.execute(
             text(
@@ -292,6 +298,7 @@ async def _link_follow_up(session, article_id: uuid.UUID, event_id: uuid.UUID) -
         ),
         {"i": str(uuid.uuid4()), "f": str(row.event_id), "t": str(event_id), "c": float(row.story_noul)},
     )
+    await place_in_time(session, event_id)
 
 
 # ── Deferred analysis: real-time attach above, debounced LLM analysis here ──
@@ -685,6 +692,9 @@ async def _rebuild_projection(event_id: uuid.UUID, session=None, *, touch: bool 
             text("UPDATE events SET projection = COALESCE(projection, '{}'::jsonb) || CAST(:p AS jsonb) WHERE id = :eid"),
             {"p": json.dumps(computed, default=str), "eid": str(event_id)},
         )
+        # When it was first reported moves with its members (an earlier report
+        # joins, a merge brings one in), and its links turn with it.
+        await place_in_time(session, event_id)
         if touch:
             event.last_updated_at = func.now()
 
