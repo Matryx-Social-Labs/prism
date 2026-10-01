@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.127.0] - 2026-10-01
+
+### Changed — the second reading asks in both orders
+- The band's second reading now asks the verifier which of three the two reports are (the
+  same happening, a later development, or different), once with the new report first and
+  once with the record first, and attaches only when both say "same" at 0.80 or more. On the
+  147 decided labelled pairs this takes 62% of the band's duplicate records at precision
+  0.97, against 49% at 0.98 for two yes/no questions read in one order. Still off by default
+  (`PRISM_EVENT_ESCALATE`).
+
 ## [0.0.126.0] - 2026-10-01
 
 ### Changed — the gist search uses an index

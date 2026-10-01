@@ -899,7 +899,7 @@ async def _escalated(session: AsyncSession, best: Verdict, block: str, article_i
         logger.warning("event_escalate_failed article=%s error=%s", article_id, str(exc)[:160])
         return None
     await record_ledes(session, article_id=article_id, event_id=event_id, same=same, follows=follows)
-    if same < settings.prism_event_escalate_min or follows >= settings.prism_follow_up_min:
+    if same < settings.prism_event_escalate_min:  # the lower of two readings, one in each order
         return None
     if mode == "shadow":
         logger.info("event_escalate_shadow article=%s would_match=%s lede_noul=%.3f", article_id, event_id, same)
