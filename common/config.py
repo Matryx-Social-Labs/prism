@@ -175,6 +175,13 @@ class Settings(BaseSettings):
     # floor (prototype 2026-10-01: precision 0.92-0.97 at 0.70).
     prism_stories: str = "off"
     prism_story_min: float = 0.70
+    # Breaking (correlation/heat.py): a record first reported in the last 3 h
+    # reaching >= min_outlets outlets within 2 h of its first report, in >= min_languages
+    # languages, unless its story was already covered. off | shadow (computed and
+    # stored, never shown) | live. Calibrated 2026-10-01: ~1.6 a day.
+    prism_breaking: str = "off"
+    prism_breaking_min_outlets: int = 6
+    prism_breaking_min_languages: int = 2
     # One name, one entity (correlation/variants.py): an article joining a record
     # whose cast already holds another spelling of one of its names (same type,
     # same consonant skeleton) asks Jev whether both name one entity. off |

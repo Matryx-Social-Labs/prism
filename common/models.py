@@ -184,6 +184,10 @@ class Event(TimestampMixin, Base):
     # container migrates, and a worker loading Event before the column exists
     # would fail every attach.
     first_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), deferred=True)
+    # correlation/heat.py: when the record crossed the breaking bar, and on what count.
+    breaking_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), deferred=True)
+    breaking_outlets: Mapped[int | None] = mapped_column(Integer, deferred=True)
+    breaking_languages: Mapped[int | None] = mapped_column(Integer, deferred=True)
     # First instant a published partition made this event addressable as part of
     # a story (including a singleton story). NULL means not yet published.
     story_visible_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
