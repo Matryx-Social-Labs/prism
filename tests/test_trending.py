@@ -398,3 +398,27 @@ def test_a_missing_hero_falls_through_to_the_thresholds():
     judged exactly as before — never merged for both being None."""
     assert not _same_story({"1"}, ["A"], {"2"}, ["B"], {}, None, None)
     assert _same_story({"1", "2", "3"}, ["A", "B"], {"1", "2", "3"}, ["A", "B"], {}, None, None)
+
+
+async def test_a_merged_story_is_never_reactivated_by_a_later_update():
+    """2026-10-01: 95 stories carried merged_into AND status 'active'. A story
+    merged earlier in a pass was matched again later in the same pass, and
+    _update_story set it active; it then counted as live while it redirected."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    from correlation.trending import _update_story
+
+    survivor, merged = uuid.uuid4(), uuid.uuid4()
+    async with session_scope() as s:
+        for sid in (survivor, merged):
+            await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, status) "
+                                 "VALUES (:i, :s, 'x', '[]'::jsonb, '[]'::jsonb, 'active')"),
+                            {"i": str(sid), "s": f"fixture-{sid.hex[:12]}"})
+        await s.execute(text("UPDATE stories SET merged_into = :into, status = 'dormant' WHERE id = :sid"),
+                        {"into": str(survivor), "sid": str(merged)})
+        facts = {"cast": [], "hero_title": "x", "member_ids": [], "hero_event_id": None, "sector": None,
+                 "regions": [], "total_sources": 2, "recent_sources": 1}
+        await _update_story(s, str(merged), facts)
+        status = (await s.execute(text("SELECT status FROM stories WHERE id = :i"), {"i": str(merged)})).scalar_one()
+        assert status == "dormant"
+        await s.rollback()

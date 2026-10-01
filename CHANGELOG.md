@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.124.0] - 2026-10-01
+
+### Changed — fewer duplicate records
+- One happening reported in different words was still becoming several records: since
+  every attach needs the verifier's word, a report it scored 0.65–0.85 against a record
+  nobody else proposed founded its own (14% of new records on 1 October; "Iran claims
+  seizure of US underwater drone" was four records, the Flydubai pilot's airlift five).
+  The best refused candidate above 0.65 is now read a second time on both reports' opening
+  text and attaches at 0.80 unless that reading calls it a later development
+  (`PRISM_EVENT_ESCALATE`, off by default; shadow first). Measured on 160 blind-labelled
+  pairs: 52 attached, one wrong (precision 0.98), half of the band's duplicates; four chat
+  models read "same" too liberally (precision 0.76–0.89) at 2–100× the cost.
+- Both answers are kept beside the first reading (`event_match_verdicts.lede_noul`,
+  `lede_story_noul`).
+
+### Fixed
+- A story merged into another could be set active again later in the same trending pass
+  (95 were); a merged story now stays dormant and the pass sweeps any left over.
+
 ## [0.0.123.0] - 2026-10-01
 
 ### Added — one name, one entity

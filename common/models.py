@@ -212,7 +212,7 @@ class EventMembership(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id"), nullable=False)
     article_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("articles.id"), nullable=False)
-    match_type: Mapped[str] = mapped_column(Text, nullable=False)  # cve_id|url_exact|title_time|headline_xlang|embedding|entity_overlap|verified|new_event
+    match_type: Mapped[str] = mapped_column(Text, nullable=False)  # cve_id|url_exact|title_time|headline_xlang|embedding|entity_overlap|verified|escalated|new_event
     match_score: Mapped[float | None] = mapped_column(Float)
     is_survivor: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

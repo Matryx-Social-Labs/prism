@@ -393,7 +393,7 @@ async def _update_story(session: AsyncSession, story_id: str, c: dict) -> None:
                    member_event_ids = CAST(:members AS jsonb), hero_event_id = :hero,
                    sector = :sector, regions = CAST(:regions AS text[]),
                    source_count = :sc, velocity = :vel, status = 'active', last_updated_at = now()
-            WHERE id = :sid
+            WHERE id = :sid AND merged_into IS NULL  -- a story merged earlier in this pass stays merged
             """
         ),
         {"sid": story_id, "label": label, **_facts_params(c)},
@@ -522,5 +522,7 @@ async def reconcile_stories(session: AsyncSession) -> int:
         ),
         {"seen": list(seen) or ["00000000-0000-0000-0000-000000000000"]},
     )
+    # A merged story redirects; it is never live (95 were, 2026-10-01).
+    await session.execute(text("UPDATE stories SET status = 'dormant' WHERE merged_into IS NOT NULL AND status = 'active'"))
     logger.info("trending_reconciled", communities=len(communities), active=len(seen))
     return len(seen)

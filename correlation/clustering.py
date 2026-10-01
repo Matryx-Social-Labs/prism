@@ -27,7 +27,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
 from common.text import detect_script, title_share
-from correlation.verify import Candidate, Verdict, event_blocks, judge, judge_story, record
+from correlation.verify import (
+    Candidate,
+    Verdict,
+    event_blocks,
+    judge,
+    judge_ledes,
+    judge_story,
+    lede_blocks,
+    record,
+    record_ledes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -841,10 +851,36 @@ async def _verified(
         return first
     passing = [v for v in verdicts if _attaches(v, set(proposed))]
     if not passing:
-        return None
+        return await _escalated(session, max(verdicts, key=lambda v: v.same), block, article_id)
     best = max(passing, key=lambda v: v.same)
     tier = next((p.match_type for p in proposals if p.event_id == best.candidate.event_id), "verified")
     return Match(event_id=best.candidate.event_id, match_type=tier, match_score=best.same)
+
+
+async def _escalated(session: AsyncSession, best: Verdict, block: str, article_id: uuid.UUID) -> Match | None:
+    """The best refused candidate, read again on both opening texts when its
+    first reading reached the escalate floor (prism_event_escalate, see config).
+    A failure or a missing text founds the article's own record, as before."""
+    settings = get_settings()
+    mode = settings.prism_event_escalate
+    if mode not in ("shadow", "live") or best.same < settings.prism_event_escalate_floor:
+        return None
+    event_id = best.candidate.event_id
+    blocks = await lede_blocks(session, block, article_id, event_id)
+    if blocks is None:
+        return None
+    try:
+        same, follows, _, _ = await judge_ledes(article_id=article_id, report=blocks[0], record=blocks[1])
+    except Exception as exc:  # noqa: BLE001 — an unread second reading leaves the article its own record
+        logger.warning("event_escalate_failed article=%s error=%s", article_id, str(exc)[:160])
+        return None
+    await record_ledes(session, article_id=article_id, event_id=event_id, same=same, follows=follows)
+    if same < settings.prism_event_escalate_min or follows >= settings.prism_follow_up_min:
+        return None
+    if mode == "shadow":
+        logger.info("event_escalate_shadow article=%s would_match=%s lede_noul=%.3f", article_id, event_id, same)
+        return None
+    return Match(event_id=event_id, match_type="escalated", match_score=same)
 
 
 async def _match_by_gist_verified(
