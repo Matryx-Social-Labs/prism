@@ -22,6 +22,11 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     with op.get_context().autocommit_block():
+        # A parallel HNSW build needs shared memory, and Railway's Postgres
+        # container has Docker's 64 MB /dev/shm: in prod the parallel build failed
+        # ("could not resize shared memory segment") and left an INVALID index that
+        # IF NOT EXISTS then skipped on the next boot. Serial build: 31 s for 34k gists.
+        op.execute("SET max_parallel_maintenance_workers = 0")
         op.execute(
             "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_articles_gist_embedding_hnsw "
             "ON articles USING hnsw (gist_embedding vector_cosine_ops)"
