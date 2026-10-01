@@ -394,7 +394,8 @@ answer typed with a probability"* (`common/decisions.py:1-9`). Wire contract (me
 `{answers, usage: {input_tokens, output_tokens, cost}, model, id, provider}`; **$0.042 per million
 input tokens, output free**; 64k tokens/call; 1,200 requests/minute
 (`common/decisions.py:11-16`). Failure semantics mirror `common/llm.py`: quota codes (401/402/403/
-429) → `LlmQuotaError` (account-wide cooldown); 5xx/timeout → retried twice then `ConnectionError`
+429) → `LlmQuotaError` (account-wide cooldown), except a 403 that refuses the request itself (a guardrail's "Request blocked", a
+moderation flag: `llm.request_refused`) → `ValueError`, that article alone; 5xx/timeout → retried twice then `ConnectionError`
 (transient, redelivered); other 4xx → `ValueError` (dead-letter once, our request was wrong) —
 `common/decisions.py:202-221`.
 
@@ -1148,7 +1149,11 @@ lookup never depends on Langfuse being reachable, tracing on or off.
   (`_WEEKLY_COOLDOWN_SECONDS = 900` if the 429's message mentions "weekly"). A 401/402/403 pauses
   the **whole account** (`_cooldown_until` global — "the credits are one account"); a 429 **with a
   model name** pauses only that model (`_model_cooldown_until[model]`), so one model's weekly cap
-  no longer stalls every other call.
+  no longer stalls every other call. A 403 that refuses one request (`request_refused`: OpenRouter's
+  prompt-injection guardrail or a moderation flag, by its message) pauses nothing: it is
+  `LlmContentBlocked`, tried once on the fallback model, then dead-lettered like any refused article.
+  2026-10-01 a headline quoting a judge ("How does your system override law?") matched the
+  guardrail's `system_override` pattern and, read as quota, paused every call for 120 s per redelivery.
 - **Content-policy fallback**: on a detected block (`native_finish_reason` in
   `{SAFETY, PROHIBITED_CONTENT, RECITATION, BLOCKLIST, SPII}`, or an explicit `error` object),
   swaps once to `prism_model_fallback` (`z-ai/glm-5.3-flash`); with no fallback configured, raises
