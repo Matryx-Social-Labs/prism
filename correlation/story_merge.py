@@ -88,7 +88,7 @@ big AS (
       AND s.last_updated_at > now() - interval '{WINDOW_DAYS} days'
       AND (coalesce(z.n, 0) >= :big OR s.scope IS NOT NULL)
 ),
-centroid AS (
+centroid AS MATERIALIZED (
     SELECT se.story_id, avg(a.gist_embedding) AS c
     FROM big JOIN story_events se ON se.story_id = big.id
     JOIN events e ON e.id = se.event_id AND e.merged_into IS NULL
