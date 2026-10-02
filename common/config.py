@@ -171,8 +171,10 @@ class Settings(BaseSettings):
     prism_event_escalate_min: float = 0.80
     # Stories that persist (correlation/stories.py): every new record joins one
     # story at birth on Jev's word, or founds one. off | shadow (stories written
-    # with status 'shadow', never served) | live. prism_story_min is the attach
-    # floor (prototype 2026-10-01: precision 0.92-0.97 at 0.70).
+    # with status 'shadow', never served) | live (they are what /trending and the
+    # story pages serve; refresh_stories replaces the Leiden pass, which rests with
+    # its partition and veto; turn on with tools/stories_live). prism_story_min is
+    # the attach floor (prototype 2026-10-01: precision 0.92-0.97 at 0.70).
     prism_stories: str = "off"
     prism_story_min: float = 0.70
     # Breaking (correlation/heat.py): a record first reported in the last 3 h

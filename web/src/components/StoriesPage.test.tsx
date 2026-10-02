@@ -127,11 +127,11 @@ describe("Trending — the chart of arcs", () => {
     expect(container.textContent).not.toMatch(/drawn in one ink|outlet-origin split/);
   });
 
-  it("shows a route and opens its hero only after the boundary is verified", async () => {
+  it("opens a verified story on its own page, followed, counted in developments", async () => {
     fetchTrending.mockResolvedValue([story({ boundary_status: "verified" })]);
     render(<TrendingPage />);
     const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
-    expect(r).toHaveAttribute("href", "/story/ev-1#route");
+    expect(r).toHaveAttribute("href", `/trending/${story().slug}`);
     expect(r).not.toHaveAttribute("rel");
     expect(r.textContent).toMatch(/5 developments/);
     expect(r.textContent).toMatch(/Verified/);

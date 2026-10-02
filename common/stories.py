@@ -9,3 +9,10 @@ two cannot disagree."""
 # sat in Search Console's "crawled - currently not indexed" with URLs promising
 # one event and pages showing another (2026-09-21).
 STORY_BOUNDARY_STATUS = "provisional"
+
+
+def boundary_status(anchor_event_id) -> str:
+    """A story the judge built (correlation/stories.py: every record confirmed part
+    of it at birth; 0.93-0.98 of joins right on 60 read blind, 2026-10-02) is
+    verified. A Leiden grouping keeps STORY_BOUNDARY_STATUS."""
+    return "verified" if anchor_event_id else STORY_BOUNDARY_STATUS

@@ -95,15 +95,21 @@ TRENDING_INTERVAL_S = int(os.environ.get("PRISM_TRENDING_INTERVAL_S", "600"))
 async def _trending_reconciler() -> None:
     """Reconcile trending stories on an interval, off the ingest path. Keeps the
     /trending slugs stable (see correlation/trending.py)."""
+    from common.config import get_settings
     from common.db import session_scope
     from correlation.heat import mark_breaking
+    from correlation.stories import refresh_stories
     from correlation.trending import reconcile_stories
 
     while True:
         await asyncio.sleep(TRENDING_INTERVAL_S)
         try:
             async with session_scope() as session:
-                await reconcile_stories(session)
+                # Live, the persistent stories are what /trending lists; Leiden rests.
+                if get_settings().prism_stories == "live":
+                    await refresh_stories(session)
+                else:
+                    await reconcile_stories(session)
         except Exception:
             logger.exception("trending_reconciler_error")
         try:  # what is breaking, on the same 10-minute clock (PRISM_BREAKING)
@@ -121,10 +127,13 @@ async def _partition_reconciler() -> None:
     """Republish the global storyline partition (base L2) on an interval — the
     consistent boundary every story_timeline reads (correlation/partition.py). Cheap,
     no LLM; the veto refines it separately below."""
+    from common.config import get_settings
     from correlation.partition import persist_base_run
 
     while True:
         await asyncio.sleep(PARTITION_INTERVAL_S)
+        if get_settings().prism_stories == "live":  # nothing reads the partition once stories are live
+            continue
         try:
             await persist_base_run()
         except Exception:
@@ -135,10 +144,13 @@ async def _veto_reconciler() -> None:
     """Refine the current base run with the grounded LLM veto on a slower cadence,
     publishing an overlay run only if its base is still current (correlation/
     partition.py::persist_veto_overlay)."""
+    from common.config import get_settings
     from correlation.partition import persist_veto_overlay
 
     while True:
         await asyncio.sleep(VETO_INTERVAL_S)
+        if get_settings().prism_stories == "live":  # an LLM pass over a partition nothing reads
+            continue
         try:
             await persist_veto_overlay()
         except Exception:

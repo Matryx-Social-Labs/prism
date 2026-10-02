@@ -568,18 +568,23 @@ async def get_event(
     # still-unmerged row behind whose members overlap.
     # ponytail: JSONB containment over the whole stories table — a few thousand
     # rows today. Add a GIN index on member_event_ids if this shows up in p95.
+    # A judge-built story first (correlation/stories.py; a primary-key lookup, and
+    # /trending/{slug} follows it if it was absorbed), else the Leiden-era owner.
     story = (
         await db.execute(
             text(
                 """
-                SELECT slug FROM stories
-                WHERE merged_into IS NULL
-                  AND member_event_ids @> CAST(:member AS jsonb)
-                ORDER BY last_updated_at DESC
-                LIMIT 1
+                SELECT coalesce(
+                    (SELECT st.slug FROM story_events se JOIN stories st ON st.id = se.story_id
+                     WHERE se.event_id = :eid AND st.status <> 'shadow'),
+                    (SELECT slug FROM stories
+                     WHERE merged_into IS NULL AND anchor_event_id IS NULL
+                       AND member_event_ids @> CAST(:member AS jsonb)
+                     ORDER BY last_updated_at DESC
+                     LIMIT 1)) AS slug
                 """
             ),
-            {"member": json.dumps([str(event_id)])},
+            {"eid": str(event_id), "member": json.dumps([str(event_id)])},
         )
     ).mappings().first()
     projection = event["projection"] or {}

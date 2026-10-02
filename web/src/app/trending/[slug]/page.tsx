@@ -39,7 +39,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description,
     alternates: { canonical: `/trending/${s.canonical_slug}` },
     // A provisional grouping drifts: its URL can name one event and its page show another.
-    ...robotsUnless(s.boundary_status === "verified"),
+    // A one-record or one-outlet story is a thin page, verified or not.
+    ...robotsUnless(s.boundary_status === "verified" && s.developments.length >= 2 && s.source_count >= 2),
     openGraph: { type: "article", title: s.label, description, url: `/trending/${s.canonical_slug}` },
     twitter: { card: "summary_large_image", title: s.label, description },
   };

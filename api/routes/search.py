@@ -11,7 +11,7 @@ from common import outlets
 from common.db import get_db
 from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
-from common.stories import STORY_BOUNDARY_STATUS
+from common.stories import boundary_status
 
 router = APIRouter()
 
@@ -82,8 +82,8 @@ async def _story_groups(db: AsyncSession, rows) -> list[SearchStoryOut]:
     order they were first reported; groups in the order of their best match.
 
     A record's story is resolved as the record page resolves it
-    (api/routes/events.get_event): the newest unmerged story whose frozen member
-    set holds it. One pass over the unmerged stories' members (343 stories,
+    (api/routes/events.get_event): a judge-built story first, else the newest
+    unmerged story whose frozen member set holds it. One pass over the unmerged stories' members (343 stories,
     ~8k members on 2026-10-01), not a containment scan per match."""
     if not rows:
         return []
@@ -91,7 +91,7 @@ async def _story_groups(db: AsyncSession, rows) -> list[SearchStoryOut]:
         await db.execute(
             text(
                 """
-                SELECT DISTINCT ON (m.event_id) m.event_id, st.slug, st.label,
+                SELECT DISTINCT ON (m.event_id) m.event_id, st.slug, st.label, st.anchor_event_id,
                        jsonb_array_length(st.member_event_ids) AS developments,
                        (SELECT max(COALESCE(e.first_published_at, e.first_seen_at)) FROM events e
                         WHERE e.id IN (SELECT CAST(x AS uuid) FROM jsonb_array_elements_text(st.member_event_ids) x)
@@ -99,7 +99,7 @@ async def _story_groups(db: AsyncSession, rows) -> list[SearchStoryOut]:
                 FROM stories st
                 CROSS JOIN LATERAL jsonb_array_elements_text(st.member_event_ids) AS m(event_id)
                 WHERE st.merged_into IS NULL AND m.event_id = ANY(CAST(:ids AS text[]))
-                ORDER BY m.event_id, st.last_updated_at DESC
+                ORDER BY m.event_id, (st.anchor_event_id IS NOT NULL) DESC, st.last_updated_at DESC
                 """
             ),
             {"ids": [str(r["id"]) for r in rows]},
@@ -122,7 +122,7 @@ async def _story_groups(db: AsyncSession, rows) -> list[SearchStoryOut]:
                 developments=o["developments"],
                 latest_published_at=o["latest"].isoformat() if o["latest"] else None,
                 event_ids=[str(r["id"]) for r in sorted(matched, key=lambda r: (r["first_published_at"], str(r["id"])))],
-                boundary_status=STORY_BOUNDARY_STATUS,
+                boundary_status=boundary_status(o["anchor_event_id"]),
             )
         )
     return groups

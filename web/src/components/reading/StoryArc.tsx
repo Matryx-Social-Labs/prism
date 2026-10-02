@@ -88,7 +88,7 @@ export function StoryArc({ s }: { s: TrendingStoryDetail }) {
       </div>
       <h1 className="text-balance [font:var(--t-display-m)] lg:[font:var(--t-display-l)]" style={{ letterSpacing: "var(--track-display)" }}>{s.label}</h1>
       <p className="max-w-[60ch]" style={{ font: "var(--t-body)", color: "var(--ink-2)" }}>
-        {verified ? "A story headline written from its developments." : "These reports may belong together. Prism has not confirmed an order of events."}
+        {verified ? "Each development was checked against this story before it joined." : "These reports may belong together. Prism has not confirmed an order of events."}
       </p>
     </header>
   );
