@@ -53,16 +53,21 @@ async def trending(
                 SELECT st.slug, st.label, st."cast" AS cast, st.source_count, st.velocity,
                        st.sector, st.regions, st.hero_event_id, st.member_event_ids,
                        st.first_seen_at, st.last_updated_at, st.anchor_event_id,
+                       coalesce(st.pinned_until > now(), false) AS pinned,
                        jsonb_array_length(st.member_event_ids) AS developments,
                        e.title AS hero_title, e.image_url AS hero_image
                 FROM stories st
                 LEFT JOIN events e ON e.id = st.hero_event_id
-                WHERE st.status = 'active' AND st.merged_into IS NULL
+                -- listed, or pinned by a founder (api/routes/admin_stories.py) while the pin holds
+                WHERE (st.status = 'active' OR (st.pinned_until > now() AND st.status <> 'shadow'))
+                  AND st.merged_into IS NULL
                   AND (CAST(:state AS text) IS NULL OR :state = ANY(st.regions))
                   AND (CAST(:sectors AS text[]) IS NULL OR st.sector = ANY(:sectors))
                   AND (CAST(:subject AS text) IS NULL OR e.subject_path = :subject OR e.subject_path LIKE :subject_under)
-                -- A running story (a founder-written scope: a war, a tournament) leads while it is listed.
-                ORDER BY (st.scope IS NOT NULL) DESC, st.velocity DESC, st.source_count DESC, st.last_updated_at DESC
+                -- A pinned story leads; then a running story (a founder-written scope: a war, a
+                -- tournament) while it is listed; then the heat.
+                ORDER BY coalesce(st.pinned_until > now(), false) DESC, (st.scope IS NOT NULL) DESC,
+                         st.velocity DESC, st.source_count DESC, st.last_updated_at DESC
                 LIMIT :lim
                 """
             ),
@@ -80,6 +85,7 @@ async def trending(
             {
                 "route": route,
                 "boundary_status": boundary_status(r["anchor_event_id"]),
+                "pinned": r["pinned"],
                 "slug": r["slug"],
                 "label": r["label"],
                 "photos": pics,

@@ -16,6 +16,7 @@ from api.routes import (
     admin_labellers,
     admin_marketing,
     admin_metrics,
+    admin_stories,
     auth,
     beacon,
     billing,
@@ -89,4 +90,5 @@ app.include_router(admin_labellers.router)
 app.include_router(admin_controls.router)
 app.include_router(admin_metrics.router)
 app.include_router(admin_marketing.router)
+app.include_router(admin_stories.router)
 app.include_router(beacon.router)

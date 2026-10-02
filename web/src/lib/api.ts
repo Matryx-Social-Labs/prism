@@ -541,6 +541,7 @@ export interface TrendingStory {
   last_updated_at: string | null; // LAST MOVED
   route: RouteData | null; // the route glyph's data; null when the story predates the partition
   boundary_status?: "provisional" | "verified";
+  pinned?: boolean; // a founder's pin (/admin/stories): it leads the list while the pin holds
 }
 
 export interface RouteNode {

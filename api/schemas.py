@@ -626,6 +626,8 @@ class TrendingStoryOut(BaseModel):
     # Story boundaries remain provisional until the recent two-labeller set
     # passes its precision gate. Clients must not render chronology otherwise.
     boundary_status: str = "provisional"
+    # A founder's pin (api/routes/admin_stories.py): it leads the list while the pin holds.
+    pinned: bool = False
 
 
 class TrendingResponse(BaseModel):

@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.132.0] - 2026-10-02
+
+### Added — a founder pins a story to the head of /trending
+- /admin/stories lists what /trending leads with: the pinned and running stories, then the list in
+  its own order, and a search over every served story by headline. A founder pins a story for
+  1–30 days: it heads /trending, ahead of the running stories, and stays listed while the pin
+  holds even if it has gone quiet. Unpinning returns it to the list's own order. Each pin and
+  unpin is recorded against the founder in the audit log, and the row says "Pinned" first.
+
 ## [0.0.131.0] - 2026-10-02
 
 ### Changed — running stories keep their records; big stories are found by their centre

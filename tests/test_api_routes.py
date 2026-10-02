@@ -118,6 +118,9 @@ EXPECTED = {
     ("GET", "/api/v1/admin/links"),
     ("POST", "/api/v1/admin/links"),
     ("PATCH", "/api/v1/admin/links/{code}"),
+    ("GET", "/api/v1/admin/stories"),
+    ("POST", "/api/v1/admin/stories/{slug}/pin"),
+    ("DELETE", "/api/v1/admin/stories/{slug}/pin"),
     ("GET", "/api/v1/links/{code}"),
 }
 
