@@ -422,3 +422,37 @@ async def test_a_merged_story_is_never_reactivated_by_a_later_update():
         status = (await s.execute(text("SELECT status FROM stories WHERE id = :i"), {"i": str(merged)})).scalar_one()
         assert status == "dormant"
         await s.rollback()
+
+
+async def test_reconcile_never_touches_a_persistent_story(monkeypatch):
+    """2026-10-02: reconcile read every unmerged story, the persistent ones
+    (correlation/stories.py) included. A shadow story anchored on a community's
+    hero matched it by the same-hero rule: six were set active with Leiden members
+    and 107 were merged into Leiden stories. Each layer keeps to its own rows."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    import correlation.trending as T
+
+    hero, leiden, persistent = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    community = {"member_ids": [str(hero)], "cast": [], "hero_title": "Hero", "hero_en_title": None,
+                 "hero_event_id": str(hero), "sector": "other", "regions": [], "total_sources": 3, "recent_sources": 2}
+    monkeypatch.setattr(T, "detect_trending_communities", lambda _s: _aw([community]))
+    monkeypatch.setattr(T, "_cast_df", lambda _s, _n: _aw({}))
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO events (id, title, sector, first_seen_at) VALUES (:i, 'Hero', 'other', now())"),
+                        {"i": str(hero)})
+        await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, hero_event_id, status, "
+                             "first_seen_at) VALUES (:i, :s, 'Leiden', '[]'::jsonb, CAST(:m AS jsonb), :h, 'active', "
+                             "now() - interval '1 day')"),
+                        {"i": str(leiden), "s": f"fx-{leiden.hex[:12]}", "m": f'["{hero}"]', "h": str(hero)})
+        await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, hero_event_id, "
+                             "anchor_event_id, status, first_seen_at) VALUES (:i, :s, 'Persistent', '[]'::jsonb, "
+                             "'[]'::jsonb, :h, :h, 'shadow', now() - interval '2 days')"),
+                        {"i": str(persistent), "s": f"fx-{persistent.hex[:12]}", "h": str(hero)})
+        await T.reconcile_stories(s)
+        row = (await s.execute(text("SELECT status, merged_into, member_event_ids, label FROM stories WHERE id = :i"),
+                               {"i": str(persistent)})).one()
+        assert (row.status, row.merged_into, row.member_event_ids, row.label) == ("shadow", None, [], "Persistent")
+        assert (await s.execute(text("SELECT merged_into FROM stories WHERE id = :i"),
+                                {"i": str(leiden)})).scalar_one() is None
+        await s.rollback()

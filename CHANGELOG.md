@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.129.1] - 2026-10-02
+
+### Fixed — the trending pass keeps to its own stories
+- The trending pass read every story, the persistent ones included. A shadow story anchored
+  on the same record as a trending community was taken for it: six were made live on
+  /trending with the community's records and 107 were merged into trending stories. Its
+  pairwise pass also ran over all ~13,000 persistent stories and held the worker for about
+  two minutes every ten. It now reads and sweeps only the stories it made.
+
 ## [0.0.129.0] - 2026-10-02
 
 ### Added — the kinds of development in a story

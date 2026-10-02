@@ -421,8 +421,13 @@ async def reconcile_stories(session: AsyncSession) -> int:
     communities = await detect_trending_communities(session)
     rows = (
         await session.execute(
+            # Only the stories this pass made. The persistent stories (correlation/
+            # stories.py, anchor_event_id set) are another layer's rows: read here,
+            # a shadow story sharing a hero was "updated" into a live Leiden card or
+            # merged into one, and the pairwise pass below ran over ~13k rows and
+            # held the worker for two minutes every ten (2026-10-02).
             text('SELECT id, member_event_ids, "cast", first_seen_at, hero_event_id '
-                 'FROM stories WHERE merged_into IS NULL')
+                 'FROM stories WHERE merged_into IS NULL AND anchor_event_id IS NULL')
         )
     ).mappings().all()
     stories = {
@@ -515,7 +520,7 @@ async def reconcile_stories(session: AsyncSession) -> int:
         text(
             f"""
             UPDATE stories SET status = 'dormant', last_updated_at = last_updated_at
-            WHERE status = 'active' AND merged_into IS NULL
+            WHERE status = 'active' AND merged_into IS NULL AND anchor_event_id IS NULL
               AND id <> ALL(CAST(:seen AS uuid[]))
               AND last_updated_at < now() - interval '{DORMANT_AFTER_HOURS} hours'
             """
@@ -523,6 +528,7 @@ async def reconcile_stories(session: AsyncSession) -> int:
         {"seen": list(seen) or ["00000000-0000-0000-0000-000000000000"]},
     )
     # A merged story redirects; it is never live (95 were, 2026-10-01).
-    await session.execute(text("UPDATE stories SET status = 'dormant' WHERE merged_into IS NOT NULL AND status = 'active'"))
+    await session.execute(text("UPDATE stories SET status = 'dormant' "
+                               "WHERE merged_into IS NOT NULL AND status = 'active' AND anchor_event_id IS NULL"))
     logger.info("trending_reconciled", communities=len(communities), active=len(seen))
     return len(seen)
