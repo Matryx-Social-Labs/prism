@@ -115,3 +115,24 @@ async def test_the_plan_decides_the_scope(monkeypatch):
     for plan in ("free", "plus"):
         _ = [e async for e in rag.answer_stream(event_id=uuid.uuid4(), session_id=uuid.uuid4(), question="q", plan=plan)]
     assert seen == [False, True]
+
+
+async def test_a_live_judge_built_story_is_what_plus_reads(story):
+    """Live, the partition rests (worker/__main__.py) and goes stale; a record in
+    a served judge-built story reads that story, not the partition's grouping."""
+    ev_a, ev_b, ev_lone, arts = story
+    sid = uuid.uuid4()
+    async with session_scope() as s:
+        await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, anchor_event_id, status) "
+                             "VALUES (:i, :sl, 'x', '[]'::jsonb, '[]'::jsonb, :a, 'active')"),
+                        {"i": str(sid), "sl": f"fx-{sid.hex[:12]}", "a": str(ev_a)})
+        for ev in (ev_a, ev_lone):
+            await s.execute(text("INSERT INTO story_events (event_id, story_id, facet) VALUES (:e, :s, 'event')"),
+                            {"e": str(ev), "s": str(sid)})
+    try:
+        plus, _, _ = await rag.retrieve_grounding(ev_a, "q", story_wide=True)
+        assert {c.article_id for c in plus} == {arts[ev_a], arts[ev_lone]}
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM story_events WHERE story_id = :s"), {"s": str(sid)})
+            await s.execute(text("DELETE FROM stories WHERE id = :s"), {"s": str(sid)})

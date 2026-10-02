@@ -39,12 +39,14 @@ async def test_go_live_lists_records_redirects_majority_leiden_stories_and_rever
         await stories_live.go_live(s, journal)
         row = (await s.execute(text("SELECT status, member_event_ids FROM stories WHERE id = :i"), {"i": str(v3)})).one()
         assert row.status != "shadow" and set(row.member_event_ids) == {str(recs[0]), str(recs[1])}
-        moved = dict((await s.execute(text("SELECT id, merged_into FROM stories WHERE id = ANY(CAST(:i AS uuid[]))"),
-                                      {"i": [str(half), str(minority)]})).all())
-        assert moved == {half: v3, minority: None}
+        moved = {r.id: (r.merged_into, r.status) for r in (await s.execute(
+            text("SELECT id, merged_into, status FROM stories WHERE id = ANY(CAST(:i AS uuid[]))"),
+            {"i": [str(half), str(minority)]})).all()}
+        # The minority story stays resolvable but leaves the list: nothing refreshes it once Leiden rests.
+        assert moved == {half: (v3, "dormant"), minority: (None, "dormant")}
         await stories_live.revert(s, journal)
         back = dict((await s.execute(text("SELECT id, status FROM stories WHERE id = ANY(CAST(:i AS uuid[]))"),
-                                     {"i": [str(v3), str(half)]})).all())
-        assert back == {v3: "shadow", half: "active"}
+                                     {"i": [str(v3), str(half), str(minority)]})).all())
+        assert back == {v3: "shadow", half: "active", minority: "active"}
         assert (await s.execute(text("SELECT merged_into FROM stories WHERE id = :i"), {"i": str(half)})).scalar_one() is None
         await s.rollback()

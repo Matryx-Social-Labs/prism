@@ -46,7 +46,9 @@ function stubApi() {
     if (one) return json(record(one[1], one[1] === "multi"));
     const arc = url.match(/\/api\/v1\/trending\/([^/?]+)$/);
     if (arc) return json(story(arc[1], arc[1] === "provisional" ? "provisional" : "verified"));
-    if (url.includes("/api/v1/trending")) return json({ stories: [story("provisional", "provisional"), story("verified", "verified")] });
+    // The list carries counts where the story page carries the developments themselves.
+    const row = (slug: string, status: string) => ({ ...story(slug, status), developments: story(slug, status).developments.length });
+    if (url.includes("/api/v1/trending")) return json({ stories: [row("provisional", "provisional"), row("verified", "verified"), row("thin", "verified")] });
     return json({ items: [record("single", false), record("multi", true)] });
   }));
 }
@@ -141,6 +143,7 @@ describe("records and stories that should not be indexed say so", () => {
     expect(urls).not.toContain("/story/single");
     expect(urls).toContain("/trending/verified");
     expect(urls).not.toContain("/trending/provisional");
+    expect(urls).not.toContain("/trending/thin"); // a running story of one record is listed, never offered
     const news = await (await newsSitemap()).text();
     expect(news).toContain("/story/multi");
     expect(news).not.toContain("/story/single");

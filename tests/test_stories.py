@@ -351,7 +351,7 @@ async def test_a_judge_built_story_is_served_verified_running_first_and_owns_its
             await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, hero_event_id, "
                                  "anchor_event_id, scope, source_count, velocity, status) VALUES (:i, :sl, 'Iran war', "
                                  "'[]'::jsonb, CAST(:m AS jsonb), :e, :e, 'The 2026 Iran war', 2, 0, 'active')"),
-                            {"i": str(run), "sl": f"run-{tag}", "e": str(ev), "m": f'["{ev}"]'})
+                            {"i": str(run), "sl": f"run-{tag}", "e": str(ev), "m": f'["{ev}", "{uuid.uuid4()}"]'})
             await s.execute(text("INSERT INTO story_events (event_id, story_id, facet) VALUES (:e, :s, 'event')"),
                             {"e": str(ev), "s": str(run)})
             # A Leiden story holding the same record, refreshed later: the old lookup's pick.
@@ -368,8 +368,34 @@ async def test_a_judge_built_story_is_served_verified_running_first_and_owns_its
             detail = (await ac.get(f"/api/v1/trending/run-{tag}")).json()
             assert detail["boundary_status"] == "verified" and detail["branches"] is None
             assert (await ac.get(f"/api/v1/events/{ev}")).json()["story_slug"] == f"run-{tag}"
+            # A story of one is the record itself: no story section, and no Leiden grouping instead.
+            await _drop_to_one(ev, run)
+            assert (await ac.get(f"/api/v1/events/{ev}")).json()["story_slug"] is None
     finally:
         async with session_scope() as s:
             await s.execute(text("DELETE FROM story_events WHERE event_id = :e"), {"e": str(ev)})
             await s.execute(text("DELETE FROM stories WHERE id = ANY(CAST(:i AS uuid[]))"), {"i": [str(run), str(leiden)]})
             await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(ev)})
+
+
+async def _drop_to_one(ev: uuid.UUID, sid: uuid.UUID) -> None:
+    async with session_scope() as s:
+        await s.execute(text("UPDATE stories SET member_event_ids = CAST(:m AS jsonb) WHERE id = :i"),
+                        {"m": f'["{ev}"]', "i": str(sid)})
+
+
+async def test_a_story_an_outlet_joins_after_two_hours_is_still_reread(jev):
+    """An outlet attaching to an existing record does not touch the story row: a
+    two-record story from one outlet, joined three hours ago, must still be read
+    when a second outlet arrives, or it is never listed."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        recs = [await _event_with_member(s, f"Two records {k} {tag}", _at(g, 0.05)) for k in range(2)]
+        sid = await _story_of_records(s, recs)
+        await s.execute(text("UPDATE stories SET last_updated_at = now() - interval '3 hours' WHERE id = :i"),
+                        {"i": str(sid)})
+        await stories.refresh_stories(s)
+        assert (await s.execute(text("SELECT status FROM stories WHERE id = :i"), {"i": str(sid)})).scalar_one() == "active"
+        await s.rollback()

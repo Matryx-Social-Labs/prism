@@ -9,10 +9,15 @@ what it did, so the dry run is the real run, unkept.
      merged_into and redirects;
   2. refresh_stories(everything=True): counts, listing state, hero, cast, label;
   3. each Leiden story whose records sit at least half in one judge-built story
-     redirects there (merged_into, dormant), so an old link opens the new story.
+     redirects there (merged_into, dormant), so an old link opens the new story;
+     the other Leiden stories leave the list (dormant, still resolvable): nothing
+     refreshes them once the Leiden pass rests.
+
+Both directions hold the assignment lock (stories.assign) for the transaction,
+so no record joins a story while its member list is rebuilt.
 
 --revert puts every judge-built story back in shadow and restores the Leiden
-rows the journal names. Run it with PRISM_STORIES=shadow on the worker.
+rows this run changed. Run it right after PRISM_STORIES=shadow reaches the worker.
 
     uv run python -m tools.stories_live [--apply] [--journal PATH]
     uv run python -m tools.stories_live --revert PATH [--apply]
@@ -69,27 +74,34 @@ LIMIT 20
 
 
 async def go_live(session, journal: dict) -> None:
+    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('stories.assign'))"))
     journal["v3"] = [dict(r) for r in (await session.execute(text(
         "SELECT id::text, status, merged_into::text FROM stories WHERE anchor_event_id IS NOT NULL"))).mappings()]
-    journal["leiden"] = [dict(r) for r in (await session.execute(text(
-        "SELECT id::text, status, merged_into::text FROM stories WHERE anchor_event_id IS NULL"))).mappings()]
+    leiden = [dict(r) for r in (await session.execute(text(
+        "SELECT id::text, status, merged_into::text FROM stories "
+        "WHERE anchor_event_id IS NULL AND merged_into IS NULL"))).mappings()]
     listed = (await session.execute(text(LIST))).rowcount
     print(f"1. judge-built stories listing their records: {listed}")
     t0 = time.monotonic()
     active = await refresh_stories(session, everything=True)
     print(f"2. refreshed in {time.monotonic() - t0:.0f} s: {active} listed on /trending")
     pairs = (await session.execute(text(MAJORITY))).all()
-    for leiden, root, _, _ in pairs:
+    for leiden_id, root, _, _ in pairs:
         await session.execute(text("UPDATE stories SET merged_into = :r, status = 'dormant' WHERE id = :l"),
-                              {"r": str(root), "l": str(leiden)})
-    left = len([r for r in journal["leiden"] if r["merged_into"] is None]) - len(pairs)
-    print(f"3. Leiden stories redirected to a judge-built story: {len(pairs)}; left as they were: {left}")
+                              {"r": str(root), "l": str(leiden_id)})
+    unlisted = (await session.execute(text(
+        "UPDATE stories SET status = 'dormant' WHERE anchor_event_id IS NULL AND merged_into IS NULL "
+        "AND status = 'active'"))).rowcount
+    journal["leiden"] = leiden  # every unmerged Leiden row, as it was: the rows this run may change
+    print(f"3. Leiden stories redirected to a judge-built story: {len(pairs)}; "
+          f"the rest unlisted: {unlisted} (of {len(leiden) - len(pairs)})")
     print("\nTOP OF /trending")
     for r in (await session.execute(text(TOP))).all():
         print(f"  {'RUNNING ' if r.running else ''}v{r.velocity:.0f} · {r.source_count} outlets · {r.n} records  {r.label[:80]}")
 
 
 async def revert(session, journal: dict) -> None:
+    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('stories.assign'))"))
     n = (await session.execute(text(
         "UPDATE stories SET status = 'shadow', member_event_ids = '[]'::jsonb WHERE anchor_event_id IS NOT NULL"))).rowcount
     await session.execute(

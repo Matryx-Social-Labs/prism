@@ -69,7 +69,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
   try {
     const trending = await fetchTrending({ state: null, sector: null, limit: 100 }, revalidate);
-    arcs = trending.filter((s) => s.boundary_status === "verified").map((s) => ({
+    // As the story page's robots: verified, two or more developments from two or more outlets.
+    arcs = trending.filter((s) => s.boundary_status === "verified" && s.developments >= 2 && s.source_count >= 2).map((s) => ({
       url: `${SITE_URL}/trending/${s.slug}`,
       lastModified: s.last_updated_at ?? undefined,
       changeFrequency: "hourly" as const,

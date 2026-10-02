@@ -342,7 +342,11 @@ _REFRESH = f"""
 WITH s AS (
     SELECT id, scope FROM stories
     WHERE anchor_event_id IS NOT NULL AND merged_into IS NULL AND status <> 'shadow'
-      AND (CAST(:everything AS boolean) OR status = 'active' OR last_updated_at > now() - interval '2 hours')
+      -- an outlet joining an existing record does not touch the story row, so a
+      -- story that could still be listed is re-read until it no longer can
+      AND (CAST(:everything AS boolean) OR status = 'active'
+           OR (jsonb_array_length(member_event_ids) >= 2
+               AND last_updated_at > now() - interval '{RUNNING_LISTED_FOR_H} hours'))
 ),
 rec AS (
     SELECT se.story_id, e.id, e.first_seen_at, coalesce(e.first_published_at, e.first_seen_at) AS at

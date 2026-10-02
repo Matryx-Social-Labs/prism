@@ -21,6 +21,11 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   holding at least half its records, so old links keep working. Without `--apply` it rolls
   back after printing what it did. `--revert` puts everything back.
 - Live, the old trending pass rests, and so do its partition and the hourly LLM veto over it.
+  Old trending stories that redirect nowhere leave the list (still resolvable), since nothing
+  refreshes them any more. A Plus reader's story-wide question reads the judge-built story
+  instead of the resting partition.
+- A record's page names its story only when the story holds two or more records: a story of
+  one is the record itself. The sitemap offers a story only when its page may be indexed.
 
 ### Changed — the established story wins
 - When the judge passes a record for more than one story, it joins the one with the most
