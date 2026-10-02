@@ -57,7 +57,19 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
     );
   }
 
-  if (!story.branches || story.branches.nodes.length < 2) return null;
+  if (!story.branches || story.branches.nodes.length < 2) {
+    // A story the judge built has no branch tree (that was the partition's): its
+    // developments, dated, with their kinds, this record marked.
+    const developments = story.developments.map((d) => ({ ...d, is_current: d.id === currentId }));
+    return (
+      <div>
+        <StoryTimeline story={{ developments, cast: story.timeline_cast }} />
+        <a href={`/trending/${story.canonical_slug ?? slug}`} rel={followRel(true)} className="p-link mt-2.5 inline-flex min-h-[44px] items-center text-[14.5px]">
+          Open this story →
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div>

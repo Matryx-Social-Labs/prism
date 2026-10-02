@@ -3,6 +3,36 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.130.0] - 2026-10-02
+
+### Added — stories go live (behind `PRISM_STORIES=live`)
+- With the flag live, the stories the judge built are what /trending lists and what every story
+  page and record page shows. A story is listed while it has two or more records from two or
+  more outlets and its newest record was first reported in the last day. A running story (a war,
+  a tournament, written with a scope line) is listed for three days after its latest record and
+  leads the list. How hot a story is now counts outlets by their own publication time, so a
+  backlog read today cannot make a two-day-old story look new.
+- A judge-built story is served as verified. On a record's page it prints its developments by
+  day with their kinds and this record marked; until now a verified story with no branch tree
+  printed nothing there. A story link opens the story's page. A story is indexed only with two
+  or more developments from two or more outlets.
+- `tools/stories_live` turns them on in one transaction. It lists every story's records,
+  refreshes their counts and labels, and redirects each old trending story to the new story
+  holding at least half its records, so old links keep working. Without `--apply` it rolls
+  back after printing what it did. `--revert` puts everything back.
+- Live, the old trending pass rests, and so do its partition and the hourly LLM veto over it.
+  Old trending stories that redirect nowhere leave the list (still resolvable), since nothing
+  refreshes them any more. A Plus reader's story-wide question reads the judge-built story
+  instead of the resting partition.
+- A record's page names its story only when the story holds two or more records: a story of
+  one is the record itself. The sitemap offers a story only when its page may be indexed.
+
+### Changed — the established story wins
+- When the judge passes a record for more than one story, it joins the one with the most
+  records, then the oldest. A splinter scoring a hair higher had been taking records from the
+  main story: two of the three Flydubai records outside it on 2 October (0.87 for the main story,
+  0.89 for a splinter). The other passing stories stay on file for the merge pass.
+
 ## [0.0.129.1] - 2026-10-02
 
 ### Fixed — the trending pass keeps to its own stories

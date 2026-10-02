@@ -13,9 +13,11 @@ a record always ends in exactly one story.
 import uuid
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
 import correlation.stories as stories
+from api.main import app
 from common.config import get_settings
 from common.db import session_scope
 from common.decisions import ChoiceAnswer, Decisions, NoulAnswer
@@ -211,9 +213,14 @@ async def test_a_live_story_lists_its_members_for_the_serving_queries(monkeypatc
         later = await _event_with_member(s, f"Coaching institute owner held {tag}", _at(g, 0.05))
         answers[f"Pune students drown {tag}"] = 0.9
         await stories.assign_story(s, later)
-        row = (await s.execute(text("SELECT status, member_event_ids FROM stories WHERE anchor_event_id = :a"),
+        row = (await s.execute(text("SELECT id, status, member_event_ids FROM stories WHERE anchor_event_id = :a"),
                                {"a": str(anchor)})).one()
-        assert row.status == "active" and set(row.member_event_ids) == {str(anchor), str(later)}
+        assert set(row.member_event_ids) == {str(anchor), str(later)}
+        assert row.status == "dormant", "a new story waits unlisted until the refresh finds it earned"
+        await stories.refresh_stories(s)
+        row = (await s.execute(text("SELECT status, source_count, velocity FROM stories WHERE id = :i"),
+                               {"i": str(row.id)})).one()
+        assert (row.status, row.source_count, row.velocity) == ("active", 2, 2.0)
         await s.rollback()
 
 
@@ -238,4 +245,157 @@ async def test_a_story_absorbed_into_a_running_story_moves_every_record_and_redi
         assert (await _story_of(s, a)).story_id == running and (await _story_of(s, b)).story_id == running
         row = (await s.execute(text("SELECT merged_into, status FROM stories WHERE id = :i"), {"i": str(small)})).one()
         assert (row.merged_into, row.status) == (running, "shadow"), "a shadow story stays unserved when absorbed"
+        await s.rollback()
+
+
+async def _story_of_records(s, title_events: list[uuid.UUID], *, scope: str | None = None) -> uuid.UUID:
+    """A persistent story over these records, anchored on the first, written directly."""
+    sid = uuid.uuid4()
+    await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, hero_event_id, anchor_event_id, "
+                         "scope, status, first_seen_at) VALUES (:i, :sl, 'x', '[]'::jsonb, CAST(:m AS jsonb), :a, :a, :sc, "
+                         "'dormant', now())"),
+                    {"i": str(sid), "sl": f"fx-{sid.hex[:12]}", "a": str(title_events[0]), "sc": scope,
+                     "m": "[" + ",".join(f'"{e}"' for e in title_events) + "]"})
+    for e in title_events:
+        await s.execute(text("INSERT INTO story_events (event_id, story_id, facet) VALUES (:e, :s, 'event')"),
+                        {"e": str(e), "s": str(sid)})
+    return sid
+
+
+async def test_the_established_story_wins_over_a_splinter_that_scored_higher(jev):
+    """2026-10-02: two of the three Flydubai records outside the main story had
+    the main story passing (0.87, 0.83) and a splinter scoring a hair higher
+    (0.89, 0.85); the highest score took them, and the story stayed split."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    _, answers = jev
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        main = [await _event_with_member(s, f"Flydubai flight lands in Saudi Arabia {tag}", _at(g, 0.05)),
+                await _event_with_member(s, f"Pilot hailed for landing {tag}", _at(g, 0.05))]
+        splinter = [await _event_with_member(s, f"Captain explains the incident {tag}", _at(g, 0.06))]
+        big, small = await _story_of_records(s, main), await _story_of_records(s, splinter)
+        answers[f"Flydubai flight lands in Saudi Arabia {tag}"] = 0.87
+        answers[f"Captain explains the incident {tag}"] = 0.89
+        x = await _event_with_member(s, f"Video of bloodied captain emerges {tag}", g)
+        await stories.assign_story(s, x)
+        row = await _story_of(s, x)
+        assert row.story_id == big and row.noul == 0.87
+        both = (await s.execute(text("SELECT count(*) FROM story_verdicts WHERE event_id = :e AND noul >= 0.7"),
+                                {"e": str(x)})).scalar_one()
+        assert both == 2, "the splinter's passing verdict stays for the merge pass"
+        assert small != big
+        await s.rollback()
+
+
+async def _published(s, eid: uuid.UUID, hours_ago: int) -> None:
+    """Every report of the record published `hours_ago`; the record first reported then."""
+    await s.execute(text("UPDATE events SET first_seen_at = now() - make_interval(hours => :h), "
+                         "first_published_at = now() - make_interval(hours => :h) WHERE id = :e"),
+                    {"h": hours_ago, "e": str(eid)})
+    await s.execute(text("UPDATE raw_items SET published_at = now() - make_interval(hours => :h) WHERE id IN ("
+                         "SELECT a.raw_item_id FROM event_memberships m JOIN articles a ON a.id = m.article_id "
+                         "WHERE m.event_id = :e)"), {"h": hours_ago, "e": str(eid)})
+
+
+async def test_refresh_counts_heat_by_publication_not_by_when_prism_read_it(jev):
+    """A backlog read today of reports from two days ago is not trending: the
+    velocity and the listing read each outlet's own publication time."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        old = [await _event_with_member(s, f"Old report {k} {tag}", _at(g, 0.05)) for k in range(2)]
+        for e in old:
+            await _published(s, e, 48)
+        sid = await _story_of_records(s, old)
+        await stories.refresh_stories(s, everything=True)
+        row = (await s.execute(text("SELECT status, source_count, velocity FROM stories WHERE id = :i"),
+                               {"i": str(sid)})).one()
+        assert (row.status, row.source_count, row.velocity) == ("dormant", 2, 0.0)
+        await s.rollback()
+
+
+async def test_a_running_story_stays_listed_for_three_days_and_a_lone_record_is_never_listed(jev):
+    if not await _db_reachable():
+        pytest.skip("no database")
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        war = await _event_with_member(s, f"Strikes on Isfahan {tag}", g)
+        await _published(s, war, 48)
+        running = await _story_of_records(s, [war], scope=f"The 2026 Iran war {tag}")
+        lone = await _story_of_records(s, [await _event_with_member(s, f"Lone report {tag}", _direction())])
+        await stories.refresh_stories(s, everything=True)
+        status = dict((await s.execute(text("SELECT id, status FROM stories WHERE id = ANY(CAST(:i AS uuid[]))"),
+                                       {"i": [str(running), str(lone)]})).all())
+        assert status == {running: "active", lone: "dormant"}
+        await _published(s, war, 80)
+        await stories.refresh_stories(s, everything=True)
+        assert (await s.execute(text("SELECT status FROM stories WHERE id = :i"),
+                                {"i": str(running)})).scalar_one() == "dormant"
+        await s.rollback()
+
+
+async def test_a_judge_built_story_is_served_verified_running_first_and_owns_its_records():
+    """Live: the API reads the judge-built story as verified (a Leiden grouping
+    stays provisional), a running story leads the list, and a record's page
+    finds its story through story_events."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:8]
+    ev, run, leiden = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    try:
+        async with session_scope() as s:
+            await s.execute(text("INSERT INTO events (id, title, sector) VALUES (:i, 'Strikes on Isfahan', 'other')"),
+                            {"i": str(ev)})
+            await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, hero_event_id, "
+                                 "anchor_event_id, scope, source_count, velocity, status) VALUES (:i, :sl, 'Iran war', "
+                                 "'[]'::jsonb, CAST(:m AS jsonb), :e, :e, 'The 2026 Iran war', 2, 0, 'active')"),
+                            {"i": str(run), "sl": f"run-{tag}", "e": str(ev), "m": f'["{ev}", "{uuid.uuid4()}"]'})
+            await s.execute(text("INSERT INTO story_events (event_id, story_id, facet) VALUES (:e, :s, 'event')"),
+                            {"e": str(ev), "s": str(run)})
+            # A Leiden story holding the same record, refreshed later: the old lookup's pick.
+            await s.execute(text("INSERT INTO stories (id, slug, label, \"cast\", member_event_ids, source_count, "
+                                 "velocity, status, last_updated_at) VALUES (:i, :sl, 'Leiden', '[]'::jsonb, "
+                                 "CAST(:m AS jsonb), 9, 99, 'active', now() + interval '1 minute')"),
+                            {"i": str(leiden), "sl": f"leiden-{tag}", "m": f'["{ev}"]'})
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+            listed = (await ac.get("/api/v1/trending?limit=50")).json()["stories"]
+            order = [x["slug"] for x in listed]
+            assert order.index(f"run-{tag}") < order.index(f"leiden-{tag}"), "a running story leads"
+            status = {x["slug"]: x["boundary_status"] for x in listed}
+            assert (status[f"run-{tag}"], status[f"leiden-{tag}"]) == ("verified", "provisional")
+            detail = (await ac.get(f"/api/v1/trending/run-{tag}")).json()
+            assert detail["boundary_status"] == "verified" and detail["branches"] is None
+            assert (await ac.get(f"/api/v1/events/{ev}")).json()["story_slug"] == f"run-{tag}"
+            # A story of one is the record itself: no story section, and no Leiden grouping instead.
+            await _drop_to_one(ev, run)
+            assert (await ac.get(f"/api/v1/events/{ev}")).json()["story_slug"] is None
+    finally:
+        async with session_scope() as s:
+            await s.execute(text("DELETE FROM story_events WHERE event_id = :e"), {"e": str(ev)})
+            await s.execute(text("DELETE FROM stories WHERE id = ANY(CAST(:i AS uuid[]))"), {"i": [str(run), str(leiden)]})
+            await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": str(ev)})
+
+
+async def _drop_to_one(ev: uuid.UUID, sid: uuid.UUID) -> None:
+    async with session_scope() as s:
+        await s.execute(text("UPDATE stories SET member_event_ids = CAST(:m AS jsonb) WHERE id = :i"),
+                        {"m": f'["{ev}"]', "i": str(sid)})
+
+
+async def test_a_story_an_outlet_joins_after_two_hours_is_still_reread(jev):
+    """An outlet attaching to an existing record does not touch the story row: a
+    two-record story from one outlet, joined three hours ago, must still be read
+    when a second outlet arrives, or it is never listed."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        recs = [await _event_with_member(s, f"Two records {k} {tag}", _at(g, 0.05)) for k in range(2)]
+        sid = await _story_of_records(s, recs)
+        await s.execute(text("UPDATE stories SET last_updated_at = now() - interval '3 hours' WHERE id = :i"),
+                        {"i": str(sid)})
+        await stories.refresh_stories(s)
+        assert (await s.execute(text("SELECT status FROM stories WHERE id = :i"), {"i": str(sid)})).scalar_one() == "active"
         await s.rollback()

@@ -25,6 +25,7 @@ record: the cheaper mistake, merged later.
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 
 from sqlalchemy import text
@@ -33,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.config import get_settings
 from common.decisions import Choice, ChoiceAnswer, Noul, NoulAnswer, decide
 from common.logging import get_logger
-from correlation.trending import _label, story_slug
+from correlation.trending import _community_facts, _label, story_slug
 from correlation.verify import FACETS, PART_OF_STORY, VERIFY_TIMEOUT_S, ann_scan
 
 logger = get_logger(__name__)
@@ -253,11 +254,34 @@ async def assign_story(session: AsyncSession, event_id: uuid.UUID) -> uuid.UUID 
                 [{"e": str(event_id), "s": str(sid), "n": n, "f": f, "d": d, "m": model}
                  for (sid, d), (n, f) in zip(candidates, answers, strict=True)],
             )
-            (sid, _), (noul, facet) = max(zip(candidates, answers, strict=True), key=lambda c: c[1][0])
-            if noul >= settings.prism_story_min:
+            passing = [(sid, n, f) for (sid, _), (n, f) in zip(candidates, answers, strict=True)
+                       if n >= settings.prism_story_min]
+            if passing:
+                sid, noul, facet = await _established(session, passing)
                 await _join(session, rec, sid, noul, facet)
                 return sid
-    return await _found(session, rec, "shadow" if mode == "shadow" else "active")
+    # Live, a new story waits unlisted until refresh_stories finds it earned (two records, two outlets).
+    return await _found(session, rec, "shadow" if mode == "shadow" else "dormant")
+
+
+async def _established(session: AsyncSession, passing: list[tuple[uuid.UUID, float, str]]):
+    """Of the stories the judge passed, the one with the most records, then the
+    oldest; the judge's score only breaks a tie. A splinter took records its main
+    story also passed: two of the three Flydubai records outside the main story
+    on 2026-10-02 (0.87 for the main story, 0.89 for a splinter). The other
+    passing stories stay in story_verdicts for the merge pass."""
+    if len(passing) == 1:
+        return passing[0]
+    rows = (
+        await session.execute(
+            text("SELECT s.id, (SELECT count(*) FROM story_events x WHERE x.story_id = s.id) AS n, "
+                 "extract(epoch FROM coalesce(s.first_seen_at, now())) AS since "
+                 "FROM stories s WHERE s.id = ANY(CAST(:ids AS uuid[]))"),
+            {"ids": [str(p[0]) for p in passing]},
+        )
+    ).all()
+    rank = {r.id: (r.n, -float(r.since)) for r in rows}
+    return max(passing, key=lambda p: (rank.get(p[0], (0, 0.0)), p[1]))
 
 
 async def create_running_story(session: AsyncSession, *, title: str, scope: str,
@@ -306,3 +330,92 @@ async def absorb(session: AsyncSession, into: uuid.UUID, story_id: uuid.UUID) ->
         {"into": str(into), "s": str(story_id)},
     )
     return moved
+
+
+# Live serving (prism_stories=live): what /trending lists and in what order.
+LISTED_FOR_H = 24  # a story is listed while its newest record was first reported within a day
+RUNNING_LISTED_FOR_H = 72  # a running story, three days
+HEAT_H = 6  # velocity: distinct outlets reporting on the story within six hours (as trending's)
+RELABEL_MIN = 20  # stories joined since: label, cast and hero re-read (the pass runs every 10 minutes)
+
+_REFRESH = f"""
+WITH s AS (
+    SELECT id, scope FROM stories
+    WHERE anchor_event_id IS NOT NULL AND merged_into IS NULL AND status <> 'shadow'
+      -- an outlet joining an existing record does not touch the story row, so a
+      -- story that could still be listed is re-read until it no longer can
+      AND (CAST(:everything AS boolean) OR status = 'active'
+           OR (jsonb_array_length(member_event_ids) >= 2
+               AND last_updated_at > now() - interval '{RUNNING_LISTED_FOR_H} hours'))
+),
+rec AS (
+    SELECT se.story_id, e.id, e.first_seen_at, coalesce(e.first_published_at, e.first_seen_at) AS at
+    FROM s JOIN story_events se ON se.story_id = s.id
+    JOIN events e ON e.id = se.event_id AND e.merged_into IS NULL
+),
+n AS (SELECT story_id, count(*) AS records, max(at) AS newest FROM rec GROUP BY story_id),
+arr AS (  -- each outlet's first article on each record, at its own publication time, windowed as the timeline is
+    SELECT r.story_id, coalesce(src.publisher, src.slug) AS outlet,
+           min(CASE WHEN ri.published_at BETWEEN r.first_seen_at - interval '7 days' AND r.first_seen_at + interval '1 hour'
+                    THEN ri.published_at ELSE m.created_at END) AS t
+    FROM rec r
+    JOIN event_memberships m ON m.event_id = r.id
+    JOIN articles a ON a.id = m.article_id
+    JOIN raw_items ri ON ri.id = a.raw_item_id
+    JOIN sources src ON src.id = ri.source_id AND src.source_type = 'rss'
+    GROUP BY r.story_id, r.id, outlet
+),
+o AS (
+    SELECT story_id, count(DISTINCT outlet) AS outlets,
+           count(DISTINCT outlet) FILTER (WHERE t > now() - interval '{HEAT_H} hours') AS recent
+    FROM arr GROUP BY story_id
+)
+UPDATE stories st
+SET source_count = coalesce(o.outlets, 0), velocity = coalesce(o.recent, 0),
+    status = CASE WHEN n.records >= 2 AND o.outlets >= 2 AND n.newest > now() - interval '{LISTED_FOR_H} hours' THEN 'active'
+                  WHEN s.scope IS NOT NULL AND n.newest > now() - interval '{RUNNING_LISTED_FOR_H} hours' THEN 'active'
+                  ELSE 'dormant' END
+FROM s LEFT JOIN n ON n.story_id = s.id LEFT JOIN o ON o.story_id = s.id
+WHERE st.id = s.id
+RETURNING st.status
+"""
+
+
+async def refresh_stories(session: AsyncSession, *, everything: bool = False) -> int:
+    """The live stories' counts and state, replacing the Leiden pass
+    (trending.reconcile_stories). Listed (active): two or more records from two or
+    more outlets, the newest first reported within LISTED_FOR_H; a running story,
+    any record within RUNNING_LISTED_FOR_H. Velocity counts outlets by their own
+    publication time, so a backlog cannot fake heat. A story joined since the last
+    pass re-reads its hero, cast and label; a running story keeps its title.
+    `everything` covers every live story (the go-live, tools/stories_live).
+    Returns the stories listed."""
+    states = (await session.execute(text(_REFRESH), {"everything": everything})).scalars().all()
+    touched = (
+        await session.execute(
+            text(
+                f"""
+                SELECT s.id, s.scope, s.label, array_agg(se.event_id) AS members
+                FROM stories s
+                JOIN story_events se ON se.story_id = s.id
+                JOIN events e ON e.id = se.event_id AND e.merged_into IS NULL
+                WHERE s.anchor_event_id IS NOT NULL AND s.merged_into IS NULL AND s.status <> 'shadow'
+                  AND (CAST(:everything AS boolean) OR s.last_updated_at > now() - interval '{RELABEL_MIN} minutes')
+                GROUP BY s.id HAVING count(*) >= 2
+                """
+            ),
+            {"everything": everything},
+        )
+    ).all()
+    for row in touched:
+        facts = await _community_facts(session, [str(m) for m in row.members])
+        label = row.label if row.scope else _label(facts["cast"], facts["hero_title"], facts.get("hero_en_title"))
+        await session.execute(
+            text('UPDATE stories SET label = :label, "cast" = CAST(:cast AS jsonb), hero_event_id = :hero, '
+                 "sector = :sector, regions = CAST(:regions AS text[]) WHERE id = :id"),
+            {"id": str(row.id), "label": label, "cast": json.dumps(facts["cast"]), "hero": facts["hero_event_id"],
+             "sector": facts["sector"], "regions": facts["regions"]},
+        )
+    listed = sum(1 for st in states if st == "active")
+    logger.info("stories_refreshed", stories=len(states), listed=listed, relabelled=len(touched))
+    return listed

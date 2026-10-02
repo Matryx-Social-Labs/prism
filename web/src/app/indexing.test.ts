@@ -22,8 +22,11 @@ const record = (id: string, indexable: boolean) => ({
   last_updated_at: new Date().toISOString(), latest_published_at: new Date().toISOString(),
   claims: [{ speaker: "A Speaker", role: null, claims: [{ quote_text: "We will cooperate.", source_name: "The Hindu" }] }],
 });
+const dev = (id: string) => ({ id, title: `Development ${id}`, first_published_at: new Date().toISOString() });
+// Two developments from two outlets unless it is the thin one: a one-record story is a thin page, verified or not.
 const story = (slug: string, boundary_status: string) => ({
-  slug, canonical_slug: slug, label: `Story ${slug}`, boundary_status, developments: [], last_updated_at: new Date().toISOString(),
+  slug, canonical_slug: slug, label: `Story ${slug}`, boundary_status, last_updated_at: new Date().toISOString(),
+  developments: slug === "thin" ? [dev("a")] : [dev("a"), dev("b")], source_count: slug === "thin" ? 1 : 2,
 });
 
 function stubApi() {
@@ -42,8 +45,10 @@ function stubApi() {
     const one = url.match(/\/api\/v1\/events\/([^/?]+)$/);
     if (one) return json(record(one[1], one[1] === "multi"));
     const arc = url.match(/\/api\/v1\/trending\/([^/?]+)$/);
-    if (arc) return json(story(arc[1], arc[1] === "verified" ? "verified" : "provisional"));
-    if (url.includes("/api/v1/trending")) return json({ stories: [story("provisional", "provisional"), story("verified", "verified")] });
+    if (arc) return json(story(arc[1], arc[1] === "provisional" ? "provisional" : "verified"));
+    // The list carries counts where the story page carries the developments themselves.
+    const row = (slug: string, status: string) => ({ ...story(slug, status), developments: story(slug, status).developments.length });
+    if (url.includes("/api/v1/trending")) return json({ stories: [row("provisional", "provisional"), row("verified", "verified"), row("thin", "verified")] });
     return json({ items: [record("single", false), record("multi", true)] });
   }));
 }
@@ -128,6 +133,7 @@ describe("records and stories that should not be indexed say so", () => {
     stubApi();
     expect((await arcMetadata({ params: Promise.resolve({ slug: "provisional" }) })).robots).toEqual(NOINDEX);
     expect("robots" in (await arcMetadata({ params: Promise.resolve({ slug: "verified" }) }))).toBe(false);
+    expect((await arcMetadata({ params: Promise.resolve({ slug: "thin" }) })).robots).toEqual(NOINDEX);
   });
 
   it("the sitemap and the news sitemap offer only what asks to be indexed", async () => {
@@ -137,6 +143,7 @@ describe("records and stories that should not be indexed say so", () => {
     expect(urls).not.toContain("/story/single");
     expect(urls).toContain("/trending/verified");
     expect(urls).not.toContain("/trending/provisional");
+    expect(urls).not.toContain("/trending/thin"); // a running story of one record is listed, never offered
     const news = await (await newsSitemap()).text();
     expect(news).toContain("/story/multi");
     expect(news).not.toContain("/story/single");

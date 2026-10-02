@@ -53,8 +53,9 @@ class GroundingChunk:
 async def retrieve_grounding(event_id: uuid.UUID, question: str, *, story_wide: bool = False) -> tuple[list[GroundingChunk], dict, str]:
     """Top-K chunks from the event's member articles + structured projection.
 
-    `story_wide` widens the article set to every event in this event's story
-    (the current partition run). An event with no story membership reads as
+    `story_wide` widens the article set to every event in this event's story:
+    its judge-built story once stories are live (correlation/stories.py), else
+    the current partition run. An event with no story membership reads as
     itself, so a Plus reader never gets LESS than a free one."""
     query_vec = await embed_query(question)
     vector_literal = "[" + ",".join(f"{v:.6f}" for v in query_vec) + "]"
@@ -62,10 +63,17 @@ async def retrieve_grounding(event_id: uuid.UUID, question: str, *, story_wide: 
         """em.event_id IN (
             SELECT :eid
             UNION
+            SELECT se2.event_id FROM story_events se1
+            JOIN stories st ON st.id = se1.story_id AND st.status <> 'shadow'
+            JOIN story_events se2 ON se2.story_id = se1.story_id
+            WHERE se1.event_id = :eid
+            UNION
             SELECT es2.event_id FROM event_story es1
             JOIN event_story es2 ON es2.run_id = es1.run_id AND es2.story_label = es1.story_label
             JOIN partition_runs pr ON pr.id = es1.run_id AND pr.status = 'current'
             WHERE es1.event_id = :eid
+              AND NOT EXISTS (SELECT 1 FROM story_events se JOIN stories st ON st.id = se.story_id
+                              WHERE se.event_id = :eid AND st.status <> 'shadow')
         )"""
         if story_wide
         else "em.event_id = :eid"

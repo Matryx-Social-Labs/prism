@@ -19,7 +19,7 @@ from api.schemas import TrendingResponse, TrendingStoryDetail
 from common import outlets
 from common.db import get_db
 from common.images import REAL_PHOTO_SQL, hi_res, placeholders
-from common.stories import STORY_BOUNDARY_STATUS
+from common.stories import STORY_BOUNDARY_STATUS, boundary_status
 from common.taxonomy import TAXONOMY
 
 router = APIRouter()
@@ -52,7 +52,7 @@ async def trending(
                 """
                 SELECT st.slug, st.label, st."cast" AS cast, st.source_count, st.velocity,
                        st.sector, st.regions, st.hero_event_id, st.member_event_ids,
-                       st.first_seen_at, st.last_updated_at,
+                       st.first_seen_at, st.last_updated_at, st.anchor_event_id,
                        jsonb_array_length(st.member_event_ids) AS developments,
                        e.title AS hero_title, e.image_url AS hero_image
                 FROM stories st
@@ -61,7 +61,8 @@ async def trending(
                   AND (CAST(:state AS text) IS NULL OR :state = ANY(st.regions))
                   AND (CAST(:sectors AS text[]) IS NULL OR st.sector = ANY(:sectors))
                   AND (CAST(:subject AS text) IS NULL OR e.subject_path = :subject OR e.subject_path LIKE :subject_under)
-                ORDER BY st.velocity DESC, st.source_count DESC, st.last_updated_at DESC
+                -- A running story (a founder-written scope: a war, a tournament) leads while it is listed.
+                ORDER BY (st.scope IS NOT NULL) DESC, st.velocity DESC, st.source_count DESC, st.last_updated_at DESC
                 LIMIT :lim
                 """
             ),
@@ -78,7 +79,7 @@ async def trending(
         "stories": [
             {
                 "route": route,
-                "boundary_status": STORY_BOUNDARY_STATUS,
+                "boundary_status": boundary_status(r["anchor_event_id"]),
                 "slug": r["slug"],
                 "label": r["label"],
                 "photos": pics,
@@ -321,7 +322,7 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
     story = (
         await db.execute(
             text(
-                'SELECT id, slug, label, "cast" AS cast, member_event_ids, hero_event_id, '
+                'SELECT id, slug, label, "cast" AS cast, member_event_ids, hero_event_id, anchor_event_id, '
                 "sector, source_count, velocity, status, merged_into "
                 "FROM stories WHERE slug = :slug"
             ),
@@ -351,7 +352,7 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
         story = (
             await db.execute(
                 text(
-                    'SELECT id, slug, label, "cast" AS cast, member_event_ids, hero_event_id, '
+                    'SELECT id, slug, label, "cast" AS cast, member_event_ids, hero_event_id, anchor_event_id, '
                     "sector, source_count, velocity, status, merged_into "
                     "FROM stories WHERE id = :id"
                 ),
@@ -402,10 +403,9 @@ async def trending_story(slug: str, db: AsyncSession = Depends(get_db)):
     return {
         "photos": photos,
         "outlets": who,
-        # Fail closed until the live, two-labeller boundary evaluation passes.
-        # The members remain available as related coverage, but clients must not
-        # present the generated branch order as verified chronology.
-        "boundary_status": STORY_BOUNDARY_STATUS,
+        # A judge-built story is verified (common/stories.boundary_status); a Leiden
+        # grouping fails closed: related coverage, never verified chronology.
+        "boundary_status": boundary_status(story["anchor_event_id"]),
         "related": related,
         "slug": story["slug"],
         "canonical_slug": story["slug"],  # if != the requested slug, the client should redirect
