@@ -117,3 +117,41 @@ async def test_a_running_story_is_never_absorbed_and_takes_merges_at_its_own_mar
         merges = [m for m in await story_merge.plan_merges(s, hours=2) if war in (m["story"], m["into"])]
         assert [(m["story"], m["into"]) for m in merges] == [(oil, war)]
         await s.rollback()
+
+
+async def test_a_pass_never_chains_a_story_through_another_merge(jev):  # noqa: F811
+    """A splinter of a splinter: (A, B) and (B, C) both pass. One pass plans one
+    of them; carrying A into C would join it to a story it was never read against."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    _, answers = jev
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        c_recs = [await _event_with_member(s, f"C main {k} {tag}", _at(g, 0.05)) for k in range(3)]
+        b_recs = [await _event_with_member(s, f"B middle {k} {tag}", _at(g, 0.05)) for k in range(2)]
+        a_recs = [await _event_with_member(s, f"A small {tag}", _at(g, 0.05))]
+        c, b, a = (await _story_of_records(s, c_recs), await _story_of_records(s, b_recs),
+                   await _story_of_records(s, a_recs))
+        await _verdict(s, c_recs[0], b, 0.80)
+        await _verdict(s, b_recs[0], a, 0.80)
+        answers[f"C main 0 {tag}"] = 0.9
+        answers[f"B middle 0 {tag}"] = 0.9
+        mine = [m for m in await story_merge.plan_merges(s, hours=2) if {m["story"], m["into"]} & {a, b, c}]
+        assert len(mine) == 1
+        await s.rollback()
+
+
+async def test_the_backlog_pairs_a_far_small_story_with_the_big_story_whose_centre_is_near(monkeypatch, jev):  # noqa: F811
+    if not await _db_reachable():
+        pytest.skip("no database")
+    _, answers = jev
+    monkeypatch.setattr(story_merge, "BIG_STORY", 3)
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        war = await _story_of_records(s, [await _event_with_member(s, f"War {k} {tag}", _at(g, 0.15)) for k in range(4)])
+        small = await _story_of_records(s, [await _event_with_member(s, f"Delegation expelled {tag}", g)])
+        answers[f"War 0 {tag}"] = 0.9
+        assert [m for m in await story_merge.plan_merges(s, hours=2) if m["story"] == small] == []
+        merges = [m for m in await story_merge.plan_merges(s, hours=2, centroid=True) if m["story"] == small]
+        assert [m["into"] for m in merges] == [war]
+        await s.rollback()

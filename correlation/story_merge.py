@@ -5,13 +5,18 @@ split: a splinter founded before the main story was a candidate, or one the
 judge passed alongside the main story. The pass proposes pairs from what the
 judge already said, never from scratch:
   - a record passed for a story other than its own (both at the join floor);
-  - a story's founding report scored >= FOUNDER_HINT against another story;
+  - a story that has grown since its founding report scored >= FOUNDER_HINT
+    against another story (a story of one was judged on that report at birth);
   - with `centroid` (the one-off backlog, tools/merge_stories), a small story
-    and the big story whose centroid is nearest its founding report.
+    and the big story whose centroid is nearest its founding report, within
+    CENTROID_DIST.
 The smaller story S (never a running story) is absorbed into L (a running story,
 else more records, else older) when S's founding report and its latest report
-each read as part of L at L's join floor + MERGE_MARGIN. Star to L, so nothing
-chains; absorb keeps S's own member list, so a merge can be read back.
+each read as part of L at L's join floor + MERGE_MARGIN. Star to L, and a pass
+plans each story into at most one merge, as either side, so nothing chains
+within a pass (A into B and B into C would carry A unread into C); the next
+pass takes up what this one left. absorb keeps S's own member list, so a
+merge can be read back.
 
 Prototype on prod, 2026-10-02 (1,563 pairs from the judge's own verdicts): at
 the plain floor + 0.10, 35 of 40 read right and the 5 doubtful merges all
@@ -41,6 +46,8 @@ logger = get_logger(__name__)
 
 MERGE_MARGIN = 0.15
 FOUNDER_HINT = 0.5
+CENTROID_DIST = 0.12  # cosine distance, founding report to a big story's centroid (the prototype's 0.88)
+MAX_PAIRS = 300  # judged per pass; the rest wait for the next
 
 _PAIRS = """
 WITH RECURSIVE canon(id, root) AS (
@@ -64,6 +71,7 @@ founder AS (  -- a story whose founding report scored near another story
     SELECT st.id AS x, v.story AS y
     FROM stories st JOIN v ON v.event_id = st.anchor_event_id AND v.story <> st.id
     WHERE st.merged_into IS NULL AND v.noul >= CAST(:hint AS float)
+      AND (SELECT count(*) FROM story_events x WHERE x.story_id = st.id) >= 2
 )
 SELECT DISTINCT LEAST(x, y) AS a, GREATEST(x, y) AS b FROM (SELECT * FROM twice UNION ALL SELECT * FROM founder) u
 """
@@ -95,9 +103,10 @@ small AS (
     JOIN articles a ON a.id = m.article_id AND a.gist_embedding IS NOT NULL
     WHERE s.scope IS NULL AND s.last_updated_at > now() - make_interval(hours => :hours)
 )
-SELECT small.id AS a, nearest.story_id AS b FROM small
-CROSS JOIN LATERAL (SELECT story_id FROM centroid WHERE story_id <> small.id
+SELECT LEAST(small.id, nearest.story_id) AS a, GREATEST(small.id, nearest.story_id) AS b FROM small
+CROSS JOIN LATERAL (SELECT story_id, c <=> small.g AS d FROM centroid WHERE story_id <> small.id
                     ORDER BY c <=> small.g LIMIT 1) nearest
+WHERE nearest.d <= :centroid_dist
 """
 
 _STORY = """
@@ -133,23 +142,26 @@ async def _readings(session: AsyncSession, small, large) -> list[float]:
     return out
 
 
-async def plan_merges(session: AsyncSession, *, hours: int = 2, centroid: bool = False) -> list[dict]:
+async def plan_merges(session: AsyncSession, *, hours: int = 2, centroid: bool = False,
+                      max_pairs: int = MAX_PAIRS) -> list[dict]:
     """Judge the pairs raised in the last `hours`; write nothing. Each merge is
     {story, into, records, parts}, in the order to apply."""
     settings = get_settings()
     params = {"hours": hours, "floor": settings.prism_story_min, "running_floor": settings.prism_story_running_min,
-              "hint": FOUNDER_HINT, "big": BIG_STORY}
+              "hint": FOUNDER_HINT, "big": BIG_STORY, "centroid_dist": CENTROID_DIST}
     pairs = list((await session.execute(text(_PAIRS), params)).all())
     if centroid:
         pairs += list((await session.execute(text(_CENTROID_PAIRS), params)).all())
     merges: list[dict] = []
-    taken: set[uuid.UUID] = set()
-    for a, b in dict.fromkeys((r.a, r.b) for r in pairs):
+    planned: set[uuid.UUID] = set()  # either side of a planned merge
+    for a, b in list(dict.fromkeys((r.a, r.b) for r in pairs))[:max_pairs]:
+        if a in planned or b in planned:
+            continue
         sa, sb = await _story(session, a), await _story(session, b)
         if sa is None or sb is None or sa.merged_into or sb.merged_into:
             continue
         oriented = _orient(sa, sb)
-        if oriented is None or oriented[0].id in taken:
+        if oriented is None:
             continue
         small, large = oriented
         try:
@@ -158,7 +170,7 @@ async def plan_merges(session: AsyncSession, *, hours: int = 2, centroid: bool =
             logger.warning("story_merge_judge_failed", story=str(small.id), into=str(large.id), error=str(exc)[:160])
             continue
         if parts and min(parts) >= join_floor(large.scope) + MERGE_MARGIN:
-            taken.add(small.id)
+            planned.update((small.id, large.id))
             merges.append({"story": small.id, "into": large.id, "records": small.n, "parts": parts})
     logger.info("story_merge_planned", pairs=len(pairs), merges=len(merges))
     return merges

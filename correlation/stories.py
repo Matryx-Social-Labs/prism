@@ -312,7 +312,7 @@ def join_floor(scope: str | None) -> float:
     101 belonged, none of the ~20 at 0.55-0.70 wrongly (read 2026-10-02), so
     the 0.70 floor was turning away a fifth of a running story's records."""
     settings = get_settings()
-    return settings.prism_story_running_min if scope else settings.prism_story_min
+    return settings.prism_story_running_min if scope is not None else settings.prism_story_min
 
 
 async def _meta(session: AsyncSession, ids: list[uuid.UUID]) -> dict:

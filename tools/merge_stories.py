@@ -18,10 +18,11 @@ async def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--hours", type=int, default=240, help="pairs the judge raised in this many hours")
     ap.add_argument("--centroid", action="store_true", help="also pair each small story with the nearest big story")
+    ap.add_argument("--max-pairs", type=int, default=5000)
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args(argv)
     async with session_scope() as session:
-        merges = await plan_merges(session, hours=args.hours, centroid=args.centroid)
+        merges = await plan_merges(session, hours=args.hours, centroid=args.centroid, max_pairs=args.max_pairs)
         titles = dict((await session.execute(text(
             "SELECT s.id, coalesce(s.scope, s.label) FROM stories s WHERE s.id = ANY(CAST(:i AS uuid[]))"),
             {"i": [str(x) for m in merges for x in (m["story"], m["into"])]})).all())
