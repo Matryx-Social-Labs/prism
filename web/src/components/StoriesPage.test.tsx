@@ -127,6 +127,13 @@ describe("Trending — the chart of arcs", () => {
     expect(container.textContent).not.toMatch(/drawn in one ink|outlet-origin split/);
   });
 
+  it("says a founder's pin in words, first on the row", async () => {
+    fetchTrending.mockResolvedValue([story({ boundary_status: "verified", pinned: true })]);
+    render(<TrendingPage />);
+    const r = await screen.findByRole("link", { name: /CPI\(M\) · Pinarayi Vijayan/ });
+    expect(r.textContent).toMatch(/^Pinned/);
+  });
+
   it("opens a verified story on its own page, followed, counted in developments", async () => {
     fetchTrending.mockResolvedValue([story({ boundary_status: "verified" })]);
     render(<TrendingPage />);

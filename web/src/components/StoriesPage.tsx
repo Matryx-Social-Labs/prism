@@ -167,8 +167,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * (provisional is said once for the page), then subject · span · last update,
  * the story's name, and the one-ink bar labelled with its counts. State is line
  * form: a single-outlet story sits on a dashed rule, one that has not moved in
- * three days at reduced weight. Verified arcs open on their hero's route;
- * provisional groups open on the group page (lib/arc).
+ * three days at reduced weight. A story opens on its own page (lib/arc). A
+ * founder's pin is said in words, first: it is why the row leads.
  */
 function ArcRow({ story }: { story: TrendingStory }) {
   const verified = story.boundary_status === "verified";
@@ -193,6 +193,7 @@ function ArcRow({ story }: { story: TrendingStory }) {
         style={{ borderColor: single ? "var(--line-strong)" : "var(--line)", color: "var(--ink)" }}
       >
         <div className="flex flex-wrap items-center gap-2">
+          {story.pinned && <span className="p-eyebrow">Pinned</span>}
           {verified && <StatusPill status="verified" label="Verified" />}
           {parts.length > 0 && (
             <span className="p-meta">

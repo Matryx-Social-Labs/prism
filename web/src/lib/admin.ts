@@ -413,3 +413,30 @@ export const makeLink = (s: Session, link: NewLink) =>
   adminCall<ShareLink>(s, "/api/v1/admin/links", { method: "POST", body: JSON.stringify(link) });
 export const setLinkArchived = (s: Session, code: string, archived: boolean) =>
   adminCall<ShareLink>(s, `/api/v1/admin/links/${encodeURIComponent(code)}`, { method: "PATCH", body: JSON.stringify({ archived }) });
+
+// ── /admin/stories: what /trending leads with (api/routes/admin_stories.py) ──
+
+export interface AdminStory {
+  slug: string;
+  label: string;
+  status: string;
+  developments: number;
+  source_count: number;
+  velocity: number;
+  running: boolean;
+  pinned: boolean;
+  pinned_until: string | null;
+  last_updated_at: string | null;
+}
+
+export function fetchAdminStories(s: Session, q = ""): Promise<{ stories: AdminStory[]; pin_days_max: number }> {
+  return adminCall(s, `/api/v1/admin/stories${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`);
+}
+
+export function pinStory(s: Session, slug: string, days: number): Promise<AdminStory> {
+  return adminCall(s, `/api/v1/admin/stories/${encodeURIComponent(slug)}/pin`, { method: "POST", body: JSON.stringify({ days }) });
+}
+
+export function unpinStory(s: Session, slug: string): Promise<AdminStory> {
+  return adminCall(s, `/api/v1/admin/stories/${encodeURIComponent(slug)}/pin`, { method: "DELETE" });
+}

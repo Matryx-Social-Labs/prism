@@ -336,6 +336,8 @@ class Story(TimestampMixin, Base):
     # (a war, a tournament) is judged on a founder-written scope instead.
     anchor_event_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("events.id"))
     scope: Mapped[str | None] = mapped_column(Text)
+    # A founder's pin on /trending (api/routes/admin_stories.py): leads the list until then.
+    pinned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PartitionRun(TimestampMixin, Base):
