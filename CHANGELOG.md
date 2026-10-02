@@ -3,6 +3,30 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.131.0] - 2026-10-02
+
+### Changed — running stories keep their records; big stories are found by their centre
+- A running story (a war, a tournament, written with a scope line) now takes a record the judge
+  reads at 0.60 or more, instead of 0.70. The judge reads a scope line lower than a founding report:
+  of 105 running-story judgements between 0.45 and 0.90, 101 belonged, and none of the ~20 between
+  0.55 and 0.70 was wrong. "Women's hockey team celebrates Asian Games gold" (0.65) and "Yathindra
+  demands cancellation of SIR" (0.66) had been founding stories of their own. When a running story
+  and another story both pass, the running story takes the record.
+- Every new record is also judged against the two big stories (20 records or more, or running)
+  whose centre, the mean of their reports, is nearest. For Iran-war records the story had missed,
+  the story was among the nearest three by centre 73% of the time against 52% by nearest report
+  (Ukraine: 100% against 38%). The judge still decides.
+
+### Added — the story merge pass (`PRISM_STORY_MERGE`, off | shadow | live)
+- Hourly, a story the judge has tied to a bigger one is absorbed into it when its founding report
+  and its latest report each read as part of it at the join floor plus 0.15. The tie can be a record
+  it passed for both, or a founding report that scored 0.5 or more against the other. A running
+  story is never absorbed. Merges are judged without holding up assignment, then applied briefly
+  under its lock. Prototype on production (1,563 pairs): at the floor plus 0.10, 35 of 40 read
+  right; the five doubtful merges all scored under plus 0.15, where 18 of 18 read right.
+  `tools/merge_stories` runs the backlog (`--centroid` also pairs each small story with the
+  nearest big story).
+
 ## [0.0.130.0] - 2026-10-02
 
 ### Added — stories go live (behind `PRISM_STORIES=live`)

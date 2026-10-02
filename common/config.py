@@ -177,6 +177,13 @@ class Settings(BaseSettings):
     # the attach floor (prototype 2026-10-01: precision 0.92-0.97 at 0.70).
     prism_stories: str = "off"
     prism_story_min: float = 0.70
+    # A running story's floor (correlation/stories.join_floor): 101 of 105 running-
+    # story judgements at 0.45-0.90 belonged, none at 0.55-0.70 wrongly (2026-10-02).
+    prism_story_running_min: float = 0.60
+    # The story merge pass (correlation/story_merge.py): a smaller story is absorbed
+    # into a bigger one when its founding and latest reports each read as part of it
+    # at the join floor + 0.15. off | shadow (log only) | live.
+    prism_story_merge: str = "off"
     # Breaking (correlation/heat.py): a record first reported in the last 3 h
     # reaching >= min_outlets outlets within 2 h of its first report, in >= min_languages
     # languages, unless its story was already covered. off | shadow (computed and

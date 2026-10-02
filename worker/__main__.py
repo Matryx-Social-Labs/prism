@@ -119,6 +119,36 @@ async def _trending_reconciler() -> None:
             logger.exception("breaking_marker_error")
 
 
+STORY_MERGE_INTERVAL_S = int(os.environ.get("PRISM_STORY_MERGE_INTERVAL_S", "3600"))
+
+
+async def _story_merger() -> None:
+    """Fold split stories into the story they are part of (correlation/story_merge.py),
+    over the pairs the judge raised in the last two intervals. PRISM_STORY_MERGE."""
+    from common.config import get_settings
+    from common.db import session_scope
+    from correlation.story_merge import apply_merges, plan_merges
+
+    hours = max(2, 2 * STORY_MERGE_INTERVAL_S // 3600)
+    while True:
+        await asyncio.sleep(STORY_MERGE_INTERVAL_S)
+        mode = get_settings().prism_story_merge
+        if mode not in ("shadow", "live"):
+            continue
+        try:
+            # Judged without the assignment lock (judge calls take seconds); applied under it, briefly.
+            async with session_scope() as session:
+                merges = await plan_merges(session, hours=hours)
+            if mode == "live" and merges:
+                async with session_scope() as session:
+                    await apply_merges(session, merges)
+            for m in merges if mode == "shadow" else []:
+                logger.info("story_merge_shadow", story=str(m["story"]), into=str(m["into"]), records=m["records"],
+                            parts=m["parts"])
+        except Exception:
+            logger.exception("story_merge_error")
+
+
 PARTITION_INTERVAL_S = int(os.environ.get("PRISM_PARTITION_INTERVAL_S", "900"))  # base L2 pass (cheap)
 VETO_INTERVAL_S = int(os.environ.get("PRISM_VETO_INTERVAL_S", "3600"))  # overlay veto pass (LLM)
 
@@ -397,6 +427,7 @@ async def main(stages: list[str]) -> None:
         tasks.append(asyncio.create_task(_analysis_sweeper()))
         tasks.append(asyncio.create_task(_budget_watch()))
         tasks.append(asyncio.create_task(_trending_reconciler()))
+        tasks.append(asyncio.create_task(_story_merger()))
         tasks.append(asyncio.create_task(_partition_reconciler()))
         tasks.append(asyncio.create_task(_veto_reconciler()))
         tasks.append(asyncio.create_task(_quote_reconciler()))

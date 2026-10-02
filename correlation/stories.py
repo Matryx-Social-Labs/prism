@@ -41,6 +41,12 @@ logger = get_logger(__name__)
 
 NEIGHBOUR_DIST = 0.11  # founder-gist cosine distance (mE5) for a record to propose its story
 CANDIDATES = 3
+# A big story (BIG_STORY records or more, or a running story) is also proposed by
+# its centroid, the mean of its members' gists: for Iran-war records the story
+# missed, the story was among the nearest 3 by centroid for 73% against 52% by
+# nearest member; Ukraine 100% against 38% (2026-10-02). The judge still decides.
+BIG_STORY = 20
+CENTROID_CANDIDATES = 2
 WINDOW_DAYS = 14
 NEAR_MEMBERS = 2
 ANN = 200  # nearest in-window founder gists the index scan returns before grouping by story
@@ -120,7 +126,42 @@ async def _candidates(session: AsyncSession, rec) -> list[tuple[uuid.UUID, float
         ).all()
         for r in rows:
             found.setdefault(r.story_id, float(r.d))
-    return list(found.items())[:CANDIDATES]
+    found = dict(list(found.items())[:CANDIDATES])
+    if rec.gist is not None:
+        for r in await _big_story_centroids(session, rec):
+            found.setdefault(r.story_id, float(r.d))
+    return list(found.items())
+
+
+async def _big_story_centroids(session: AsyncSession, rec):
+    """The big stories moving in the window whose centroid is nearest the record.
+    ponytail: averages every big story's member gists per record (~20 stories,
+    a few thousand vectors); keep a centroid column if it shows in assign latency."""
+    return (
+        await session.execute(
+            text(
+                f"""
+                WITH big AS (
+                    SELECT se.story_id FROM story_events se
+                    JOIN stories s ON s.id = se.story_id AND s.merged_into IS NULL
+                    WHERE s.last_updated_at >= CAST(:at AS timestamptz) - interval '{WINDOW_DAYS} days'
+                    GROUP BY se.story_id, s.scope
+                    HAVING count(*) >= :big OR s.scope IS NOT NULL
+                )
+                SELECT se.story_id, avg(a.gist_embedding) <=> CAST(:vec AS vector) AS d
+                FROM big
+                JOIN story_events se ON se.story_id = big.story_id
+                JOIN events e ON e.id = se.event_id AND e.merged_into IS NULL
+                JOIN event_memberships m ON m.event_id = e.id AND m.match_type = 'new_event'
+                JOIN articles a ON a.id = m.article_id AND a.gist_embedding IS NOT NULL
+                GROUP BY se.story_id
+                ORDER BY d, se.story_id
+                LIMIT :k
+                """
+            ),
+            {"vec": rec.gist, "at": rec.at, "big": BIG_STORY, "k": CENTROID_CANDIDATES},
+        )
+    ).all()
 
 
 def _report_block(rec) -> str:
@@ -254,34 +295,50 @@ async def assign_story(session: AsyncSession, event_id: uuid.UUID) -> uuid.UUID 
                 [{"e": str(event_id), "s": str(sid), "n": n, "f": f, "d": d, "m": model}
                  for (sid, d), (n, f) in zip(candidates, answers, strict=True)],
             )
+            meta = await _meta(session, [sid for sid, _ in candidates])
             passing = [(sid, n, f) for (sid, _), (n, f) in zip(candidates, answers, strict=True)
-                       if n >= settings.prism_story_min]
+                       if sid in meta and n >= join_floor(meta[sid].scope)]
             if passing:
-                sid, noul, facet = await _established(session, passing)
+                sid, noul, facet = _established(meta, passing)
                 await _join(session, rec, sid, noul, facet)
                 return sid
     # Live, a new story waits unlisted until refresh_stories finds it earned (two records, two outlets).
     return await _found(session, rec, "shadow" if mode == "shadow" else "dormant")
 
 
-async def _established(session: AsyncSession, passing: list[tuple[uuid.UUID, float, str]]):
-    """Of the stories the judge passed, the one with the most records, then the
-    oldest; the judge's score only breaks a tie. A splinter took records its main
-    story also passed: two of the three Flydubai records outside the main story
-    on 2026-10-02 (0.87 for the main story, 0.89 for a splinter). The other
-    passing stories stay in story_verdicts for the merge pass."""
-    if len(passing) == 1:
-        return passing[0]
+def join_floor(scope: str | None) -> float:
+    """The judge's floor to join a story. Jev reads a running story's scope line
+    lower than a founding report: of 105 running-story judgements at 0.45-0.90,
+    101 belonged, none of the ~20 at 0.55-0.70 wrongly (read 2026-10-02), so
+    the 0.70 floor was turning away a fifth of a running story's records."""
+    settings = get_settings()
+    return settings.prism_story_running_min if scope is not None else settings.prism_story_min
+
+
+async def _meta(session: AsyncSession, ids: list[uuid.UUID]) -> dict:
+    """Records, age and scope of each live story among `ids`."""
     rows = (
         await session.execute(
-            text("SELECT s.id, (SELECT count(*) FROM story_events x WHERE x.story_id = s.id) AS n, "
+            text("SELECT s.id, s.scope, (SELECT count(*) FROM story_events x WHERE x.story_id = s.id) AS n, "
                  "extract(epoch FROM coalesce(s.first_seen_at, now())) AS since "
-                 "FROM stories s WHERE s.id = ANY(CAST(:ids AS uuid[]))"),
-            {"ids": [str(p[0]) for p in passing]},
+                 "FROM stories s WHERE s.id = ANY(CAST(:ids AS uuid[])) AND s.merged_into IS NULL"),
+            {"ids": [str(i) for i in ids]},
         )
     ).all()
-    rank = {r.id: (r.n, -float(r.since)) for r in rows}
-    return max(passing, key=lambda p: (rank.get(p[0], (0, 0.0)), p[1]))
+    return {r.id: r for r in rows}
+
+
+def _established(meta: dict, passing: list[tuple[uuid.UUID, float, str]]):
+    """Of the stories the judge passed, a running story first, then the one with
+    the most records, then the oldest; the judge's score only breaks a tie. A
+    splinter took records its main story also passed: two of the three Flydubai
+    records outside the main story on 2026-10-02 (0.87 for the main story, 0.89
+    for a splinter). The other passing stories stay in story_verdicts for the
+    merge pass (correlation/story_merge.py)."""
+    def rank(p):
+        m = meta[p[0]]
+        return (m.scope is not None, m.n, -float(m.since), p[1])
+    return max(passing, key=rank)
 
 
 async def create_running_story(session: AsyncSession, *, title: str, scope: str,
