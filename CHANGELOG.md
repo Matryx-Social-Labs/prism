@@ -3,6 +3,18 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.133.0] - 2026-10-05
+
+### Changed — breaking means something happened (shadow)
+- Outlet counts could not tell a sudden happening from a widely carried statement: in three days
+  of shadow, 4 of 11 firings were a speech, a pledge, a campaign launch and a party's candidate
+  list. Each record that crosses the counts is now asked once whether it reports a sudden happening
+  (a death, an accident, an attack, an arrest, a court order, an official finding, a result) rather
+  than a statement, promise, launch or routine change, and breaks at 0.6 or more. On 18 labelled
+  candidates from two weeks, every happening read 0.83 or more and five of the six statements 0.31
+  or less. The reading is kept, so no candidate is asked twice; one the judge could not read is
+  asked again on the next pass. Breaking stays in shadow.
+
 ## [0.0.132.1] - 2026-10-02
 
 ### Fixed — a big story takes all its splinters in one pass

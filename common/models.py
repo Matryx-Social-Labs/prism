@@ -188,6 +188,7 @@ class Event(TimestampMixin, Base):
     breaking_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), deferred=True)
     breaking_outlets: Mapped[int | None] = mapped_column(Integer, deferred=True)
     breaking_languages: Mapped[int | None] = mapped_column(Integer, deferred=True)
+    breaking_sudden: Mapped[float | None] = mapped_column(Float, deferred=True)  # the judge's reading (heat.py)
     # First instant a published partition made this event addressable as part of
     # a story (including a singleton story). NULL means not yet published.
     story_visible_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
