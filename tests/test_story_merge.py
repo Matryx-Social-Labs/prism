@@ -155,3 +155,34 @@ async def test_the_backlog_pairs_a_far_small_story_with_the_big_story_whose_cent
         merges = [m for m in await story_merge.plan_merges(s, hours=2, centroid=True) if m["story"] == small]
         assert [m["into"] for m in merges] == [war]
         await s.rollback()
+
+
+async def test_a_big_story_takes_every_splinter_in_one_pass(jev):  # noqa: F811
+    """2026-10-02: a pass that let a story into one merge only folded 19 of the
+    backlog's splinters: the Iran war could absorb one splinter an hour."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    _, answers = jev
+    g, tag = _direction(), uuid.uuid4().hex[:6]
+    async with session_scope() as s:
+        main = [await _event_with_member(s, f"Big story {k} {tag}", _at(g, 0.05)) for k in range(4)]
+        big = await _story_of_records(s, main)
+        splinters = [await _story_of_records(s, [await _event_with_member(s, f"Splinter {k} {tag}", _at(g, 0.05))])
+                     for k in range(3)]
+        for k, sp in enumerate(splinters):
+            await _verdict(s, main[k], sp, 0.80)
+        answers[f"Big story 0 {tag}"] = 0.9
+        merges = [m for m in await story_merge.plan_merges(s, hours=2) if m["into"] == big]
+        assert sorted(m["story"] for m in merges) == sorted(splinters)
+        await s.rollback()
+
+
+def test_a_pass_admits_star_merges_and_never_a_chain():
+    a, b, c, d = (uuid.uuid4() for _ in range(4))
+    # B was absorbed into C: nothing more for B, either way round.
+    assert not story_merge.admissible(b, d, absorbed={b}, targets={c})
+    assert not story_merge.admissible(a, b, absorbed={b}, targets={c})
+    # A was absorbed into B: B takes merges now, so B is never absorbed into C.
+    assert not story_merge.admissible(b, c, absorbed={a}, targets={b})
+    # C takes merges: it takes another.
+    assert story_merge.admissible(d, c, absorbed={b}, targets={c})

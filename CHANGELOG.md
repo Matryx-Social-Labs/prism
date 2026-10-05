@@ -3,6 +3,15 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.132.1] - 2026-10-02
+
+### Fixed — a big story takes all its splinters in one pass
+- The merge pass let a story into one merge per pass, either side, to stop chains. A big story
+  could therefore absorb one splinter an hour, and the ten-day backlog folded 19 splinters where
+  the two-day canary had folded 72. Now a story is absorbed at most once, is never absorbed once
+  it takes merges, and nothing joins a story already absorbed. A big story takes any number of
+  merges in one pass, since they all point straight at it.
+
 ## [0.0.132.0] - 2026-10-02
 
 ### Added — a founder pins a story to the head of /trending

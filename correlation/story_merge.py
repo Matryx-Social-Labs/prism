@@ -12,11 +12,12 @@ judge already said, never from scratch:
     CENTROID_DIST.
 The smaller story S (never a running story) is absorbed into L (a running story,
 else more records, else older) when S's founding report and its latest report
-each read as part of L at L's join floor + MERGE_MARGIN. Star to L, and a pass
-plans each story into at most one merge, as either side, so nothing chains
-within a pass (A into B and B into C would carry A unread into C); the next
-pass takes up what this one left. absorb keeps S's own member list, so a
-merge can be read back.
+each read as part of L at L's join floor + MERGE_MARGIN. Star to L: within a
+pass a story is absorbed at most once, a story that takes merges is never
+absorbed, and nothing joins a story already absorbed, so nothing chains (A into
+B and B into C would carry A unread into C); the next pass takes up what this
+one left. A big story takes any number of merges in one pass. absorb keeps S's
+own member list, so a merge can be read back.
 
 Prototype on prod, 2026-10-02 (1,563 pairs from the judge's own verdicts): at
 the plain floor + 0.10, 35 of 40 read right and the 5 doubtful merges all
@@ -142,6 +143,14 @@ async def _readings(session: AsyncSession, small, large) -> list[float]:
     return out
 
 
+def admissible(small: uuid.UUID, large: uuid.UUID, absorbed: set, targets: set) -> bool:
+    """Whether `small` may be absorbed into `large` in a pass that has already
+    planned `absorbed` -> `targets`: never absorbed twice, never absorbed once it
+    takes merges, and nothing joins a story already absorbed. A target may take
+    any number of merges: they all point straight at it."""
+    return small not in absorbed and small not in targets and large not in absorbed
+
+
 async def plan_merges(session: AsyncSession, *, hours: int = 2, centroid: bool = False,
                       max_pairs: int = MAX_PAIRS) -> list[dict]:
     """Judge the pairs raised in the last `hours`; write nothing. Each merge is
@@ -153,9 +162,10 @@ async def plan_merges(session: AsyncSession, *, hours: int = 2, centroid: bool =
     if centroid:
         pairs += list((await session.execute(text(_CENTROID_PAIRS), params)).all())
     merges: list[dict] = []
-    planned: set[uuid.UUID] = set()  # either side of a planned merge
+    absorbed: set[uuid.UUID] = set()
+    targets: set[uuid.UUID] = set()
     for a, b in list(dict.fromkeys((r.a, r.b) for r in pairs))[:max_pairs]:
-        if a in planned or b in planned:
+        if a in absorbed or b in absorbed:  # settled this pass, whichever side it would take
             continue
         sa, sb = await _story(session, a), await _story(session, b)
         if sa is None or sb is None or sa.merged_into or sb.merged_into:
@@ -164,13 +174,16 @@ async def plan_merges(session: AsyncSession, *, hours: int = 2, centroid: bool =
         if oriented is None:
             continue
         small, large = oriented
+        if not admissible(small.id, large.id, absorbed, targets):
+            continue
         try:
             parts = await _readings(session, small, large)
         except Exception as exc:  # noqa: BLE001 — an unread pair stays apart until the next pass
             logger.warning("story_merge_judge_failed", story=str(small.id), into=str(large.id), error=str(exc)[:160])
             continue
         if parts and min(parts) >= join_floor(large.scope) + MERGE_MARGIN:
-            planned.update((small.id, large.id))
+            absorbed.add(small.id)
+            targets.add(large.id)
             merges.append({"story": small.id, "into": large.id, "records": small.n, "parts": parts})
     logger.info("story_merge_planned", pairs=len(pairs), merges=len(merges))
     return merges
