@@ -17,19 +17,20 @@ from sqlalchemy import text
 
 from common.config import get_settings
 from common.db import session_scope
+from common.decisions import Decisions, NoulAnswer
 from correlation import heat
 from tests.test_verified_tier import _db_reachable
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
-async def _record(s, reports: list[tuple[str, str, int]], *, first_minutes_ago: int = 100) -> uuid.UUID:
+async def _record(s, reports: list[tuple[str, str, int]], *, first_minutes_ago: int = 100, title: str | None = None) -> uuid.UUID:
     """A record whose first report was `first_minutes_ago`, and one article per
     (publisher, language, minutes after the first report)."""
     eid, tag = uuid.uuid4(), uuid.uuid4().hex[:8]
     t0 = datetime.now(UTC) - timedelta(minutes=first_minutes_ago)
     await s.execute(text("INSERT INTO events (id, title, sector, first_seen_at, first_published_at) "
-                         "VALUES (:i, :t, 'other', :t0, :t0)"), {"i": str(eid), "t": f"Record {tag}", "t0": t0})
+                         "VALUES (:i, :t, 'other', :t0, :t0)"), {"i": str(eid), "t": title or f"Record {tag}", "t0": t0})
     for k, (publisher, lang, after) in enumerate(reports):
         sid, rid, aid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         await s.execute(text("INSERT INTO sources (id, slug, name, source_type, publisher) VALUES (:i, :s, :s, 'rss', :p)"),
@@ -57,8 +58,26 @@ SIX_TWO_LANGUAGES = [("p1", "en", 0), ("p2", "en", 10), ("p3", "hi", 20), ("p4",
 
 
 @pytest.fixture
-def live(monkeypatch):
+def judge(monkeypatch):
+    """The sudden-happening reading per headline prefix (0.9 unless set); records each call."""
+    calls: list[str] = []
+    readings: dict[str, float] = {}
+
+    async def fake_decide(state, questions, **_):
+        title = state["REPORT"].split("\n")[0].removeprefix("Headline: ")
+        calls.append(title)
+        if readings.get(title) == "down":
+            raise ConnectionError("decisions unavailable")
+        return Decisions(answers={"sudden": NoulAnswer(noul=readings.get(title, 0.9))}, model="test")
+
+    monkeypatch.setattr(heat, "decide", fake_decide)
+    return calls, readings
+
+
+@pytest.fixture
+def live(monkeypatch, judge):
     monkeypatch.setattr(get_settings(), "prism_breaking", "live")
+    return judge
 
 
 async def test_six_outlets_in_two_hours_in_two_languages_is_breaking(live):
@@ -144,7 +163,7 @@ async def test_an_old_record_is_never_marked(live):
         await s.rollback()
 
 
-async def test_off_marks_nothing(monkeypatch):
+async def test_off_marks_nothing(monkeypatch, judge):
     if not await _db_reachable():
         pytest.skip("no database")
     monkeypatch.setattr(get_settings(), "prism_breaking", "off")
@@ -152,4 +171,39 @@ async def test_off_marks_nothing(monkeypatch):
         eid = await _record(s, SIX_TWO_LANGUAGES)
         await heat.mark_breaking(s)
         assert (await _state(s, eid)).breaking_at is None
+        await s.rollback()
+
+
+async def test_a_widely_carried_statement_is_judged_once_and_never_breaks(live):
+    """2026-10-05: four of eleven shadow firings were a speech, a pledge, a
+    campaign launch and a candidate list. Counted like news, read as statements."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    calls, readings = live
+    title = f"Adhikari to implement UCC {uuid.uuid4().hex[:6]}"
+    readings[title] = 0.08
+    async with session_scope() as s:
+        eid = await _record(s, SIX_TWO_LANGUAGES, title=title)
+        await heat.mark_breaking(s)
+        row = (await s.execute(text("SELECT breaking_at, breaking_sudden, breaking_outlets FROM events WHERE id = :e"),
+                               {"e": str(eid)})).one()
+        assert row.breaking_at is None and row.breaking_sudden == 0.08 and row.breaking_outlets == 6
+        await heat.mark_breaking(s)
+        assert calls.count(title) == 1, "a candidate is asked once"
+        await s.rollback()
+
+
+async def test_an_unread_candidate_is_asked_again_on_the_next_pass(live):
+    if not await _db_reachable():
+        pytest.skip("no database")
+    calls, readings = live
+    title = f"Pune students drown {uuid.uuid4().hex[:6]}"
+    readings[title] = "down"
+    async with session_scope() as s:
+        eid = await _record(s, SIX_TWO_LANGUAGES, title=title)
+        await heat.mark_breaking(s)
+        assert (await _state(s, eid)).breaking_at is None
+        readings[title] = 0.96
+        await heat.mark_breaking(s)
+        assert (await _state(s, eid)).breaking_at is not None and calls.count(title) == 2
         await s.rollback()
