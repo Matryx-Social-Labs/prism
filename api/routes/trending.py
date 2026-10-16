@@ -139,6 +139,38 @@ async def story_outlets(db: AsyncSession, member_ids: list) -> list[dict]:
     return out
 
 
+def _pick_photos(cands: list, publisher, limit: int) -> list:
+    """Up to `limit` of the candidate reports' pictures, in order: a repeated URL
+    and a near-identical hash are dropped, then one per publisher first, then the
+    rest."""
+    from common.imagehash import hamming
+
+    publishers = {publisher(r) for r in cands}
+    seen_urls: set[str] = set()
+    hashes: list[str] = []
+    first: set[str] = set()
+    lead, rest = [], []
+    for r in cands:
+        # Stop once the pick can no longer change: `limit` publishers lead, or
+        # every publisher leads and the rest fill the page. Each photo is checked
+        # against every one kept, so scanning all of them is quadratic: 17.7M
+        # comparisons and 10s on a 3,699-record story (2026-10-16).
+        if len(lead) >= limit or (len(first) == len(publishers) and len(lead) + len(rest) >= limit):
+            break
+        if r["image_url"] in seen_urls:
+            continue
+        h = r["image_phash"]
+        if h and any(hamming(h, x) <= 8 for x in hashes):
+            continue
+        seen_urls.add(r["image_url"])
+        if h:
+            hashes.append(h)
+        pub = publisher(r)
+        (rest if pub in first else lead).append(r)
+        first.add(pub)
+    return (lead + rest)[:limit]
+
+
 async def story_photos(db: AsyncSession, member_ids_per_story: list[list], limit: int = STORY_PHOTOS) -> list[list[dict]]:
     """Up to STORY_PHOTOS distinct photographs per story, across its developments.
 
@@ -147,8 +179,6 @@ async def story_photos(db: AsyncSession, member_ids_per_story: list[list], limit
     story: one per publisher first (BBC's language editions upload the same
     picture under new ids), near-identical hashes dropped, credited with the
     outlet that took it."""
-    from common.imagehash import hamming
-
     all_ids = sorted({str(e) for ids in member_ids_per_story for e in ids})
     if not all_ids:
         return [[] for _ in member_ids_per_story]
@@ -174,30 +204,13 @@ async def story_photos(db: AsyncSession, member_ids_per_story: list[list], limit
     by_event: dict[str, list] = {}
     for r in rows:
         by_event.setdefault(str(r["event_id"]), []).append(r)
+
+    def publisher(r) -> str:
+        return reg[r["source_slug"]].publisher if r["source_slug"] in reg else r["source_slug"]
+
     out: list[list[dict]] = []
     for ids in member_ids_per_story:
-        cands = [r for e in ids for r in by_event.get(str(e), [])]
-        seen_urls: set[str] = set()
-        hashes: list[str] = []
-        picked: list = []
-        for r in cands:
-            if r["image_url"] in seen_urls:
-                continue
-            h = r["image_phash"]
-            if h and any(hamming(h, x) <= 8 for x in hashes):
-                continue
-            seen_urls.add(r["image_url"])
-            if h:
-                hashes.append(h)
-            picked.append(r)
-        # One per publisher first, then the rest.
-        first: set[str] = set()
-        lead, rest = [], []
-        for r in picked:
-            pub = reg[r["source_slug"]].publisher if r["source_slug"] in reg else r["source_slug"]
-            (rest if pub in first else lead).append(r)
-            first.add(pub)
-        chosen = (lead + rest)[:limit]
+        chosen = _pick_photos([r for e in ids for r in by_event.get(str(e), [])], publisher, limit)
         out.append(
             [
                 {

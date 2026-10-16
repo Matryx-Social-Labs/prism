@@ -3,6 +3,17 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.133.2] - 2026-10-16
+
+### Fixed — /trending and big story pages took 10 seconds
+- A story's photos are picked from every picture its records carry: repeats and near-identical
+  pictures dropped, one per publisher first, at most 8. The near-identical check compared every
+  picture with every one already kept, across the whole story, before taking the first 8. On the
+  3,699-record election story that was 17.7 million comparisons and about 10 seconds. Every
+  /trending request paid it, because that story is on the list. The pick now stops once its 8
+  can no longer change. The same photos are picked: checked on the 40 largest live stories, and
+  by a test against the full scan on random stories. /trending on 40 stories: 15.5s to 2.3s.
+
 ## [0.0.133.1] - 2026-10-16
 
 ### Fixed — the API went down when a big story was opened
