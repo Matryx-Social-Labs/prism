@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -8,6 +9,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from common.config import get_settings
+
+# Longest any one statement may run inside an API request.
+API_STATEMENT_TIMEOUT = "30s"
 
 _engine = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
@@ -50,9 +54,15 @@ async def get_db() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency: commit on success so write endpoints (auth, later the
     paywall gate + watchlist) actually persist. Reads commit an empty tx (no-op).
     Without this, INSERT/UPDATE in a route silently roll back when the request ends.
+
+    Every request gets a statement timeout. Without one, a slow query outlives the
+    client that asked for it, and each new visit adds another copy: on 2026-10-16
+    fifteen copies of one ran for up to 1h40m and their parallel workers filled
+    /dev/shm, so every other query failed. The worker does not use this dependency.
     """
     async with get_session_factory()() as session:
         try:
+            await session.execute(text(f"SET LOCAL statement_timeout = '{API_STATEMENT_TIMEOUT}'"))
             yield session
             await session.commit()
         except Exception:

@@ -246,17 +246,29 @@ async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: l
     members = [str(m) for m in member_ids]
     if not members and not cast:
         return []
+    # Links compare as uuid so their indexes are used, then hash-join against the
+    # active stories' members. The old form cast link ids to text and probed every
+    # story (40k, mostly dormant) with jsonb `?` per link: on a 3,699-member story
+    # it ran for over an hour, stacked one copy per visit and filled /dev/shm until
+    # every query failed (2026-10-16). `shared` is cut to active stories too, which
+    # the final WHERE already required.
     rows = (
         await db.execute(
             text(
                 """
-                WITH causal AS (
-                    SELECT DISTINCT st.id
+                WITH linked AS (
+                    SELECT (CASE WHEN el.from_event_id = ANY(CAST(:members AS uuid[]))
+                                 THEN el.to_event_id ELSE el.from_event_id END)::text AS event_id
                     FROM event_links el
-                    JOIN stories st ON st.member_event_ids ? (CASE WHEN el.from_event_id::text = ANY(:members)
-                                                                   THEN el.to_event_id ELSE el.from_event_id END)::text
                     WHERE el.relation <> 'none'
-                      AND (el.from_event_id::text = ANY(:members) OR el.to_event_id::text = ANY(:members))
+                      AND (el.from_event_id = ANY(CAST(:members AS uuid[]))
+                           OR el.to_event_id = ANY(CAST(:members AS uuid[])))
+                ),
+                causal AS (
+                    SELECT DISTINCT st.id
+                    FROM stories st, jsonb_array_elements_text(st.member_event_ids) AS m(event_id)
+                    WHERE st.status = 'active' AND st.merged_into IS NULL
+                      AND m.event_id IN (SELECT event_id FROM linked)
                 ),
                 df AS (
                     SELECT c.name, count(*) AS df
@@ -270,7 +282,7 @@ async def _related_stories(db: AsyncSession, story_id, member_ids: list, cast: l
                            sum(1.0 / df.df) AS weight
                     FROM stories st, jsonb_array_elements_text(st."cast") AS c(name)
                     JOIN df ON df.name = c.name
-                    WHERE c.name = ANY(:cast)
+                    WHERE c.name = ANY(:cast) AND st.status = 'active' AND st.merged_into IS NULL
                     GROUP BY st.id
                 )
                 SELECT st.slug, st.label, st.source_count, st.velocity, st.last_updated_at,

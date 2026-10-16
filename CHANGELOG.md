@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.133.1] - 2026-10-16
+
+### Fixed — the API went down when a big story was opened
+- A story's "related stories" query cast link ids to text (so the link indexes went unused) and
+  probed every story, 40k of them and nearly all dormant, with jsonb `?` once per link. Since the
+  merge pass (0.0.132.1) a story can have 3,699 records. On that story the query ran for over an
+  hour, each visit started another copy, and 15 copies held the database's shared memory until
+  every other query failed with "No space left on device". Pages read "Prism API not reachable".
+  Links now compare as uuid and join only the active stories' records: 1.6s on that story where
+  it never finished before, 0.2s instead of 4–8s on the next largest. The results are the same.
+- Every API request now runs under a 30s statement timeout, so a slow query fails its one request
+  instead of outliving it. The worker does not use the API's sessions and is unaffected.
+
 ## [0.0.133.0] - 2026-10-05
 
 ### Changed — breaking means something happened (shadow)
