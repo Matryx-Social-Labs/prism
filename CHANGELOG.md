@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.135.1] - 2026-11-02
+
+### Changed — a record's search snippet leads with its coverage count
+- Search Console, three months: 83% of impressions at positions 3–10 at about 2% CTR, a Prism
+  record listed beside the outlets' own articles. What a record adds is the count across them,
+  so its meta description now starts with it, in the page's own words: "13 outlets · 6
+  languages. US President Donald Trump has dismissed…". The counts are the page's
+  (`coverageText`), never a number the page does not print. To judge after four weeks: CTR at
+  positions 3–10 in Search Console; revert `eventDescription` in `web/src/lib/seo.ts` if it fell.
+
 ## [0.0.135.0] - 2026-11-02
 
 ### Fixed — an outage told Google that live pages were gone
