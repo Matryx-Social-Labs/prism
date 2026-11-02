@@ -105,4 +105,15 @@ describe("robots", () => {
       expect(blocked).not.toContain(citing);
     }
   });
+
+  it("closes the prefilled complaint forms, keeps the Grievance page open, and refuses SEO-tool crawlers", () => {
+    // Every story links to four /grievance?kind=…&record=… forms: Claude-SearchBot
+    // was rendering them as pages, 43% of all Vercel renders (2026-11-02).
+    const r = robots();
+    const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
+    expect(rules[0].disallow).toContain("/grievance?");
+    expect(rules[0].disallow).not.toContain("/grievance"); // the IT Rules page itself stays findable
+    const blocked = rules.filter((x) => x.disallow === "/").map((x) => x.userAgent);
+    for (const tool of ["AhrefsBot", "SERankingBacklinksBot", "Reflectionbot"]) expect(blocked).toContain(tool);
+  });
 });
