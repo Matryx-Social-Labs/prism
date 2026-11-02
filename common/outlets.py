@@ -13,6 +13,7 @@ label is an opinion — country and language are facts of the source.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -214,6 +215,24 @@ def publishers_of(source_slugs: list[str], registry: dict[str, Outlet] | None) -
 
 def record_indexable(source_slugs: list[str], registry: dict[str, Outlet] | None) -> bool:
     return len(publishers_of(source_slugs, registry)) >= RECORD_MIN_OUTLETS
+
+
+def record_indexable_sql(alias: str) -> str:
+    """SQL: record_indexable for the events row `alias`, for queries that count
+    records (an actor page counts only the indexed ones). Same reading as
+    publishers_of: registered sources by publisher, else slugs, raw feeds never.
+    tests/test_record_indexable_sql.py holds the two to the same answers.
+
+    `alias` is a table alias pasted into the SQL — never a value."""
+    if not re.fullmatch(r"[a-z_]+", alias):
+        raise ValueError(f"not a table alias: {alias!r}")
+    raw = ", ".join(f"'{s}'" for s in sorted(RAW_RECORD_FEEDS))
+    return f"""((SELECT CASE WHEN count(s_r.slug) > 0
+                      THEN count(DISTINCT COALESCE(NULLIF(s_r.publisher, ''), s_r.slug))
+                      ELSE count(DISTINCT x_r.slug) END
+        FROM jsonb_array_elements_text(COALESCE({alias}.projection->'source_slugs', '[]'::jsonb)) x_r(slug)
+        LEFT JOIN sources s_r ON s_r.slug = x_r.slug
+        WHERE x_r.slug <> ALL(ARRAY[{raw}])) >= {RECORD_MIN_OUTLETS})"""
 
 
 _cache: tuple[float, dict[str, Outlet]] | None = None
