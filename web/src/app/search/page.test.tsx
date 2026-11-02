@@ -6,13 +6,15 @@ import type { FeedItem, SearchResult, SearchStory } from "@/lib/api";
 
 const searchEvents = vi.hoisted(() => vi.fn());
 const fetchTrending = vi.hoisted(() => vi.fn());
+const fetchFeed = vi.hoisted(() => vi.fn());
+const fetchArchive = vi.hoisted(() => vi.fn());
 // ONE object for the whole file. `router` is in the search effect's dep array,
 // so a mock that built a fresh object per render would re-run the effect on
 // every render and spin forever.
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 const params = vi.hoisted(() => ({ get: vi.fn() }));
 
-vi.mock("@/lib/api", () => ({ searchEvents, fetchTrending }));
+vi.mock("@/lib/api", () => ({ searchEvents, fetchTrending, fetchFeed, fetchArchive }));
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
   useSearchParams: () => params,
@@ -65,6 +67,8 @@ function input() {
 beforeEach(() => {
   searchEvents.mockReset().mockResolvedValue(found([]));
   fetchTrending.mockReset().mockResolvedValue([]);
+  fetchFeed.mockReset().mockResolvedValue([]);
+  fetchArchive.mockReset().mockResolvedValue(null);
   router.replace.mockReset();
   params.get.mockReset().mockReturnValue(null);
 });
@@ -185,6 +189,23 @@ describe("Search — start screen", () => {
     expect(screen.queryByRole("button", { name: "RELIANCE" })).toBeNull();
     await userEvent.type(input(), "RELIANCE");
     await waitFor(() => expect(searchEvents).toHaveBeenCalledWith("RELIANCE"));
+  });
+});
+
+describe("Search — ways in before a query", () => {
+  // The start screen offered six names and nothing else; it now lists the most
+  // reported records today and the days before (2026-11-02).
+  it("ranks today's most-reported records and offers the days before", async () => {
+    fetchFeed.mockResolvedValue([item({ id: "a", title: "Two outlets", source_count: 2 }), item({ id: "b", title: "Nine outlets", source_count: 9 })]);
+    fetchArchive.mockResolvedValue({ first_day: "2026-10-30", today: "2026-11-02", floor: 20, days: [
+      { date: "2026-11-01", read: true, whole_day: true, read_from: null, read_to: null, settled: true, records: 9, multi_outlet: 4, indexable: true },
+    ] });
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByText("Most reported today")).toBeInTheDocument());
+    const links = screen.getAllByRole("link").map((a) => a.textContent);
+    expect(links.indexOf("Nine outlets")).toBeLessThan(links.indexOf("Two outlets"));
+    expect(screen.getByRole("navigation", { name: "Days" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /1 November|Yesterday/ })).toHaveAttribute("href", "/feed/2026-11-01");
   });
 });
 

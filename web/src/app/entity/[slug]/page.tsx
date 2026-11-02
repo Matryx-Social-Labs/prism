@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
 import { EntityQuotes } from "@/components/reading/EntityQuotes";
 import { MetaLine, PageTitle, ReadingColumns } from "@/components/reading/parts";
 import { SectionHead } from "@/components/SectionHead";
 import { BackBar, EmptyState } from "@/components/ui";
-import { fetchEntity, type EntityPage as EntityPayload } from "@/lib/api";
+import { ENTITY_PAGE, fetchEntity, type EntityPage as EntityPayload } from "@/lib/api";
 import { SCHEMA_KIND } from "@/lib/entities";
 import { stateBySlug } from "@/lib/regions";
 import { breadcrumbLd, entityLd, jsonLd, quotationsLd, robotsUnless, social } from "@/lib/seo";
@@ -22,7 +23,16 @@ import { SITE_URL } from "@/lib/site";
 export const revalidate = 300;
 
 // null only for a page that does not exist; an outage throws (a 5xx, not a 404).
-const load = (slug: string): Promise<EntityPayload | null> => fetchEntity(slug);
+const load = (slug: string, page: number): Promise<EntityPayload | null> => fetchEntity(slug, page);
+
+type Params = { params: Promise<{ slug: string }>; searchParams?: Promise<{ page?: string }> };
+
+/** ?page=N, a whole number from 1; anything else reads as the first page. */
+const pageOf = async (searchParams: Params["searchParams"]) => {
+  const n = Number((await searchParams)?.page);
+  return Number.isInteger(n) && n > 1 ? n : 1;
+};
+const pageHref = (slug: string, n: number) => (n > 1 ? `/entity/${slug}?page=${n}` : `/entity/${slug}`);
 
 /**
  * A state's own name has one page, its hub: /entity/karnataka and
@@ -35,22 +45,25 @@ function deferToStateHub(slug: string): void {
   if (hub) permanentRedirect(`/state/${hub.slug}`);
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Params): Promise<Metadata> {
   const { slug } = await params;
   deferToStateHub(slug);
-  const page = await load(slug);
+  const n = await pageOf(searchParams);
+  const page = await load(slug, n);
   if (!page) return { title: "Not found", robots: { index: false, follow: true } };
   const { entity, record_count, indexable } = page;
   const said = (page.quotes?.length ?? 0) >= SAID_IN_TITLE;
-  const title = said ? `${entity.name} — what was said, and every record` : `${entity.name} — every record`;
+  const base = said ? `${entity.name} — what was said, and every record` : `${entity.name} — every record`;
+  const title = n > 1 ? `${base}, page ${n}` : base;
   const description = said
     ? saidDescription(entity.name, page.quote_count ?? 0, page.reported_count ?? 0, page.quoted_records ?? 0)
     : `Every Prism record naming ${entity.name}: ${record_count} ${record_count === 1 ? "story" : "stories"} from monitored Indian outlets, each with its reports, what changed and who said what.`;
   return {
     title,
     description,
-    alternates: { canonical: `/entity/${entity.slug}` },
-    ...social(title, description, `/entity/${entity.slug}`),
+    // Each page of older records is its own address, never folded into page one.
+    alternates: { canonical: pageHref(entity.slug, n) },
+    ...social(title, description, pageHref(entity.slug, n)),
     // A stub still resolves for the reader and still passes its links on; it
     // simply does not ask for the crawl budget the records need.
     ...robotsUnless(indexable),
@@ -72,11 +85,12 @@ function saidDescription(name: string, quotes: number, reported: number, records
     : `${said} and checked against the article, ${where}`;
 }
 
-export default async function EntityHubPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function EntityHubPage({ params, searchParams }: Params) {
   const { slug } = await params;
   deferToStateHub(slug);
-  const page = await load(slug);
-  if (!page) notFound();
+  const n = await pageOf(searchParams);
+  const page = await load(slug, n);
+  if (!page || (n > 1 && page.records.length === 0)) notFound();
   const { entity, record_count, records } = page;
   const url = `${SITE_URL}/entity/${entity.slug}`;
   const kind = SCHEMA_KIND[entity.schema_type];
@@ -115,7 +129,7 @@ export default async function EntityHubPage({ params }: { params: Promise<{ slug
                 id="entity-stories"
                 title="Stories"
                 count={record_count}
-                sub={records.length < record_count ? `newest first · the latest ${records.length}` : records.length > 1 ? "newest first" : undefined}
+                sub={n > 1 ? `newest first · page ${n} of ${Math.ceil(record_count / ENTITY_PAGE)}` : records.length < record_count ? `newest first · the latest ${records.length}` : records.length > 1 ? "newest first" : undefined}
               />
               {records.length === 0 ? (
                 <EmptyState title="No stories name this actor yet">A story joins this page when a report on it names {entity.name}.</EmptyState>
@@ -126,8 +140,15 @@ export default async function EntityHubPage({ params }: { params: Promise<{ slug
                   ))}
                 </ol>
               )}
+              {(n > 1 || n * ENTITY_PAGE < record_count) && (
+                <nav aria-label="More records" className="flex flex-wrap justify-between gap-3 pt-2">
+                  {n > 1 ? <Link href={pageHref(entity.slug, n - 1)} className="p-link">← Newer records</Link> : <span />}
+                  {n * ENTITY_PAGE < record_count && <Link href={pageHref(entity.slug, n + 1)} className="p-link">Older records →</Link>}
+                </nav>
+              )}
             </section>
-            <EntityQuotes page={page} />
+            {/* The quotes are read from the newest records: page one only, never repeated. */}
+            {n === 1 && <EntityQuotes page={page} />}
           </>
         }
       />

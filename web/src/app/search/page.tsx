@@ -10,7 +10,9 @@ import { SectorStrip } from "@/components/SectorStrip";
 import { StatusPill } from "@/components/StatusPill";
 import { StoryTimeline } from "@/components/StoryTimeline";
 import { Alert, EmptyState, TextField } from "@/components/ui";
-import { fetchTrending, searchEvents, type FeedItem, type SearchStory } from "@/lib/api";
+import { DayStrip } from "@/components/DayStrip";
+import { dayStrip, istToday } from "@/lib/archive";
+import { fetchTrending, searchEvents, type FeedItem, type SearchStory, fetchArchive, fetchFeed, type ArchiveReading } from "@/lib/api";
 import { istTime, shortDate } from "@/lib/dateline";
 import { followRel } from "@/lib/seo";
 import { loadProfile } from "@/lib/profile";
@@ -90,6 +92,8 @@ function StoryGroup({ story, items }: { story: SearchStory; items: FeedItem[] })
   );
 }
 
+const TOP_N = 5;
+
 function SearchInner() {
   const params = useSearchParams();
   const router = useRouter();
@@ -109,6 +113,18 @@ function SearchInner() {
   // Real entities off the live trending cast: a hardcoded list would go stale
   // and, on a product that sells provenance, would be quietly dishonest.
   const [entities, setEntities] = useState<string[]>([]);
+  // Before a query, the page offers ways in (LinkedIn's and Binance's search, Mobbin):
+  // the most-reported records today and the days before it.
+  const [top, setTop] = useState<FeedItem[]>([]);
+  const [days, setDays] = useState<ArchiveReading[] | null>(null);
+  useEffect(() => {
+    fetchFeed({ sort: "latest", limit: 60 })
+      .then((rows) => setTop([...rows].sort((a, b) => (b.source_count ?? 0) - (a.source_count ?? 0)).slice(0, TOP_N)))
+      .catch(() => setTop([]));
+    fetchArchive()
+      .then((a) => setDays(a?.days ?? null))
+      .catch(() => setDays(null));
+  }, []);
   useEffect(() => {
     // Focus without the browser's scroll-into-view: autoFocus slid the query
     // and the masthead under the sticky header on load.
@@ -205,6 +221,26 @@ function SearchInner() {
                     <button key={e} type="button" onClick={() => setQ(e)} className="p-chip">{e}</button>
                   ))}
                 </div>
+              </div>
+            )}
+            {top.length > 0 && (
+              <div className="grid gap-1 pt-3">
+                <p className="p-eyebrow">Most reported today</p>
+                <ol className="grid">
+                  {top.map((it, i) => (
+                    <li key={it.id} className="flex items-baseline gap-3 border-b py-2.5" style={{ borderColor: "var(--line)" }}>
+                      <span className="p-count w-4 shrink-0">{i + 1}</span>
+                      <Link href={`/story/${it.id}`} prefetch={false} className="min-w-0 flex-1 no-underline hover:underline" style={{ font: "var(--t-title-s)", color: "var(--ink)" }}>{it.title}</Link>
+                      <span className="p-count shrink-0">{it.source_count} outlets</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {days && (
+              <div className="grid gap-1 pt-3">
+                <p className="p-eyebrow">Browse by day</p>
+                <DayStrip days={dayStrip(days, null, istToday())} />
               </div>
             )}
           </div>

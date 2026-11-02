@@ -879,6 +879,21 @@ select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; 
 .meta-line { display: flex; align-items: center; gap: 8px; font: 400 11.5px/1.3 var(--font-mono); letter-spacing: .02em; color: var(--ink-3); text-transform: uppercase; }
 .meta-line .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line-strong); display: inline-block; }
 .glass { background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+/* The day strip (components/DayStrip): a tab row of days, label over count, 44 tall. */
+.sc-days a,.sc-days>span{display:grid;align-content:center;justify-items:start;gap:3px;min-height:44px;padding:8px 12px 6px}
+.sc-days a[aria-current="page"]{color:var(--ink);border-color:var(--ink)}
+.sc-days__off{flex:none;font:600 14px/1 var(--font-read);color:var(--ink-3);border-bottom:2px dashed var(--line-strong)}
+.sc-days a.sc-days__all{color:var(--accent);align-content:center}
+/* The archive calendar (components/ArchiveCalendar): weeks of seven, 44 tall days. A record is cut square. */
+.sc-cal{display:grid;gap:4px}
+.sc-cal__week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.sc-cal__head{font:600 11px/1 var(--font-read);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:4px 2px}
+.sc-cal__day{display:grid;align-content:center;justify-items:center;gap:2px;min-height:48px;border-radius:var(--r-record);font:500 14px/1 var(--font-read);color:var(--ink-3);text-decoration:none}
+.sc-cal__day--read{border:1px solid var(--line);background:var(--surface);color:var(--ink);transition:border-color var(--t-micro) var(--ease)}
+.sc-cal__day--read:hover{border-color:var(--line-strong)}
+.sc-cal__day--part{border-style:dashed;border-color:var(--line-strong)}
+.sc-cal__day--today{border-color:var(--ink)}
+.sc-cal__day--off{border:1px dashed var(--line-strong);background:var(--data-uncounted)}
 /* The phone masthead's dateline ladder (Masthead): one rung shows, picked by the masthead's own width. */
 .p-masthead { container-type: inline-size; }
 .p-dateline__m, .p-dateline__s { display: none; }

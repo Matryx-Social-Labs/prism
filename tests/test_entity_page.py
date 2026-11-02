@@ -132,6 +132,20 @@ async def test_an_actor_whose_records_are_all_one_outlet_is_a_stub_everywhere():
     assert chip is False, "a chip linking here must say nofollow too"
 
 
+async def test_older_records_page_past_the_newest():
+    """An actor page printed "4630 stories · the latest 30" with no way to the rest
+    (2026-11-02); `offset` pages the list, newest first, without repeats."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    slug = await _seed(5)
+    first = [r["id"] for r in (await _get(f"/api/v1/entity/{slug}?limit=2")).json()["records"]]
+    second = [r["id"] for r in (await _get(f"/api/v1/entity/{slug}?limit=2&offset=2")).json()["records"]]
+    last = [r["id"] for r in (await _get(f"/api/v1/entity/{slug}?limit=2&offset=4")).json()["records"]]
+    assert len(first) == 2 and len(second) == 2 and len(last) == 1
+    assert not set(first) & set(second) and not set(second) & set(last)
+    assert (await _get(f"/api/v1/entity/{slug}?offset=-1")).status_code == 422
+
+
 async def test_an_unknown_actor_is_404_not_an_empty_page():
     if not await _db_reachable():
         pytest.skip("no database")

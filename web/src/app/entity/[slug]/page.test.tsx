@@ -152,3 +152,42 @@ describe("/entity/[slug] — title and description", () => {
     expect(meta.description).toMatch(/^Every Prism record naming DK Shivakumar: 9 stories/);
   });
 });
+
+// "4630 stories · the latest 30" with no way to the rest (2026-11-02): older
+// records are pages a reader and a crawler can follow, NYT's author page "Show more".
+describe("older records", () => {
+  const rec = (id: string) =>
+    ({
+      id, indexable: true, title: `Record ${id}`, summary: null, sector: null, subsector: null, subject_path: null, regions: ["IN"], image_url: null,
+      is_regional: false, coverage: null, event_type: null, source_count: 2, cvss_score: null, cvss_severity: null, kev_listed: false,
+      cve_ids: [], tickers: [], catalyst: null, price_impact_direction: null, headline_lang: null, available_languages: ["en"],
+      last_updated_at: "2026-10-27T10:00:00Z", latest_published_at: "2026-10-27T10:00:00Z", score: 0, outlets: [],
+    }) as unknown as EntityPage["records"][number];
+  const at = (n: number | undefined) => ({ params: Promise.resolve({ slug: "dk-shivakumar" }), searchParams: Promise.resolve(n ? { page: String(n) } : {}) });
+
+  it("links the next page of older records from the first", async () => {
+    fetchEntity.mockResolvedValue(page([], { record_count: 75, records: [rec("a")] }));
+    render(await EntityHubPage(at(undefined)));
+    expect(fetchEntity).toHaveBeenCalledWith("dk-shivakumar", 1);
+    expect(screen.getByRole("link", { name: /Older records/ })).toHaveAttribute("href", "/entity/dk-shivakumar?page=2");
+    expect(screen.queryByRole("link", { name: /Newer records/ })).toBeNull();
+  });
+
+  it("reads a later page, links both ways, and names itself as the canonical address", async () => {
+    fetchEntity.mockResolvedValue(page([], { record_count: 75, records: [rec("b")] }));
+    render(await EntityHubPage(at(2)));
+    expect(fetchEntity).toHaveBeenCalledWith("dk-shivakumar", 2);
+    expect(screen.getByRole("link", { name: /Newer records/ })).toHaveAttribute("href", "/entity/dk-shivakumar");
+    expect(screen.getByRole("link", { name: /Older records/ })).toHaveAttribute("href", "/entity/dk-shivakumar?page=3");
+    const meta = await generateMetadata(at(2));
+    expect(meta.alternates?.canonical).toBe("/entity/dk-shivakumar?page=2");
+  });
+
+  it("has no older link on the last page, and a page past the end is not found", async () => {
+    fetchEntity.mockResolvedValue(page([], { record_count: 75, records: [rec("c")] }));
+    render(await EntityHubPage(at(3)));
+    expect(screen.queryByRole("link", { name: /Older records/ })).toBeNull();
+    fetchEntity.mockResolvedValue(page([], { record_count: 75, records: [] }));
+    await expect(EntityHubPage(at(9))).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+});

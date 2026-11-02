@@ -719,8 +719,12 @@ export interface EntityQuote extends ClaimOut {
   source_index: number | null;
 }
 
-export async function fetchEntity(slug: string): Promise<EntityPage | null> {
-  const res = await fetch(`${API_URL}/api/v1/entity/${encodeURIComponent(slug)}`, {
+/** Records per page of an actor's list (api/routes/entity: limit, offset). */
+export const ENTITY_PAGE = 30;
+
+export async function fetchEntity(slug: string, page = 1): Promise<EntityPage | null> {
+  const older = page > 1 ? `?limit=${ENTITY_PAGE}&offset=${(page - 1) * ENTITY_PAGE}` : "";
+  const res = await fetch(`${API_URL}/api/v1/entity/${encodeURIComponent(slug)}${older}`, {
     next: { revalidate: 300 },
   });
   if (res.status === 404) return null;

@@ -1,5 +1,5 @@
 import { FrontPage } from "@/components/FrontPage";
-import { fetchFeed, type FeedItem } from "@/lib/api";
+import { fetchArchive, fetchFeed, type ArchiveReading, type FeedItem } from "@/lib/api";
 import { FEED_WINDOW } from "@/lib/feedWindow";
 import { feedListItems, itemListLd, jsonLd } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
@@ -18,12 +18,14 @@ export default async function FeedPage() {
   } catch {
     // API unreachable at render: the client fetches as before.
   }
+  // The days before today, for the day strip; without them the strip is left out.
+  const days: ArchiveReading[] | null = (await fetchArchive().catch(() => null))?.days ?? null;
   return (
     <>
       {initial && initial.length > 0 && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd("Today's record", `${SITE_URL}/feed`, feedListItems(initial))) }} />
       )}
-      <FrontPage initial={initial} />
+      <FrontPage initial={initial} days={days} />
     </>
   );
 }

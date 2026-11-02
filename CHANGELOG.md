@@ -3,6 +3,26 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.136.0] - 2026-11-02
+
+### Added — yesterday's record and every day before it, one tap from Today
+- There was no way from Today to yesterday: the day pages and the archive existed, linked only
+  from the desktop footer, which a phone never shows. A day strip now sits under Today's heading
+  and on every day page: Today, Yesterday, then dated days, each with its count of records from
+  two or more outlets, ending in "All days →". A day Prism was not reading is listed but not
+  linked, and has no count. On a day page every day is dated, because a settled day's page is
+  cached for a week and a word like "yesterday" would go stale inside it. Today's list now ends
+  with "Yesterday's record →". (Pattern: Peacock's day strip, Mobbin.)
+- The archive is a calendar, one month per section: each read day is a link with its count;
+  a day Prism was not reading is hatched; a day read in part or not complete is dashed, and
+  says so to a screen reader. (Pattern: Instagram's archive calendar, Mobbin.)
+- Search, before a query: the five records most reported today, and the day strip.
+  (Pattern: LinkedIn's and Binance's search, Mobbin.)
+- Actor pages reach every record: "Older records →" pages through them 30 at a time
+  (`/entity/<slug>?page=N`, API `offset`), where before the page printed "4630 stories · the
+  latest 30" and stopped. Each page is its own canonical address; a page past the end is a 404;
+  the quotes stay on page one.
+
 ## [0.0.135.1] - 2026-11-02
 
 ### Changed — a record's search snippet leads with its coverage count

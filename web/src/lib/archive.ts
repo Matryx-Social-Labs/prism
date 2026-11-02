@@ -58,14 +58,60 @@ export function bySubject(items: FeedItem[]): SubjectGroup[] {
   return [...groups, { key: null, name: "Not yet placed in a subject", href: null, items: rest }].filter((g) => g.items.length > 0);
 }
 
-export type ArchiveRow = { kind: "day"; day: ArchiveReading } | { kind: "gap"; from: string; to: string };
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const utc = (day: string) => new Date(`${day}T00:00:00Z`);
+const plusDays = (day: string, n: number) => new Date(utc(day).getTime() + n * 86_400_000).toISOString().slice(0, 10);
 
-/** The index's rows, newest first: each day read, and each run of days not read as one row. */
-export function archiveRows(days: ArchiveReading[]): ArchiveRow[] {
-  return days.reduce<ArchiveRow[]>((out, day) => {
-    const last = out[out.length - 1];
-    if (day.read) return [...out, { kind: "day", day }];
-    if (last?.kind === "gap") return [...out.slice(0, -1), { ...last, from: day.date }];
-    return [...out, { kind: "gap", from: day.date, to: day.date }];
-  }, []);
+export type StripDay = { date: string; label: string; href: string | null; read: boolean; count: number | null; current: boolean };
+
+/**
+ * The day strip under Today and every day page: today, then the days read
+ * before it, `size` wide and keeping the day being read in view. Before it,
+ * yesterday's record was reachable only from the desktop footer (2026-11-02).
+ * A day Prism was not reading is listed but not linked and has no count.
+ */
+export function dayStrip(days: ArchiveReading[], current: string | null, today: string, size = 7): StripDay[] {
+  const yesterday = plusDays(today, -1);
+  const all: StripDay[] = [
+    { date: today, label: "Today", href: "/feed", read: true, count: null, current: current === null },
+    ...days.map((d) => {
+      const at = utc(d.date);
+      // "Yesterday" only on Today: a settled day's page is cached for a week, and a
+      // relative word inside it would name the wrong day by tomorrow.
+      const label = d.date === yesterday && current === null ? "Yesterday" : `${WEEKDAYS[at.getUTCDay()]} ${at.getUTCDate()} ${SHORT_MONTHS[at.getUTCMonth()]}`;
+      return { date: d.date, label, href: d.read ? `/feed/${d.date}` : null, read: d.read, count: d.read ? d.multi_outlet : null, current: d.date === current };
+    }),
+  ];
+  const at = Math.max(0, all.findIndex((d) => d.current));
+  const start = Math.max(0, Math.min(at - 3, all.length - size));
+  return all.slice(start, start + size);
+}
+
+/** The months from the first day read to today, newest first, as yyyy-mm. */
+export function archiveMonths(firstDay: string, today: string): string[] {
+  const out: string[] = [];
+  for (let m = today.slice(0, 7); m >= firstDay.slice(0, 7); m = plusDays(`${m}-01`, -1).slice(0, 7)) out.push(m);
+  return out;
+}
+
+export type CalendarDay = { date: string; day: number; kind: "today" | "read" | "unread" | "outside"; reading: ArchiveReading | null };
+
+/**
+ * One month of the archive as weeks of seven, Monday first, a blank (null)
+ * before the 1st and after the last. A day in the archive's range the API did
+ * not list is "unread": never assumed read, never counted.
+ */
+export function monthGrid(month: string, byDate: Map<string, ArchiveReading>, today: string, firstDay: string): (CalendarDay | null)[][] {
+  const first = utc(`${month}-01`);
+  const length = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const cells: (CalendarDay | null)[] = Array((first.getUTCDay() + 6) % 7).fill(null);
+  for (let d = 1; d <= length; d++) {
+    const date = `${month}-${String(d).padStart(2, "0")}`;
+    const reading = byDate.get(date) ?? null;
+    const kind = date === today ? "today" : date > today || date < firstDay ? "outside" : reading?.read ? "read" : "unread";
+    cells.push({ date, day: d, kind, reading });
+  }
+  while (cells.length % 7) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, w) => cells.slice(w * 7, w * 7 + 7));
 }

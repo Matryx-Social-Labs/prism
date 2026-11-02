@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArchiveReading, FeedItem } from "@/lib/api";
-import { SETTLED_DAY_REVALIDATE, YOUNG_DAY_REVALIDATE, archiveRows, bySubject, dayRevalidate, istToday, longDay, parseDay } from "@/lib/archive";
+import { SETTLED_DAY_REVALIDATE, YOUNG_DAY_REVALIDATE, archiveMonths, bySubject, dayRevalidate, dayStrip, istToday, longDay, monthGrid, parseDay } from "@/lib/archive";
 
 describe("parseDay", () => {
   it("takes a strict yyyy-mm-dd that names a real day", () => {
@@ -57,14 +57,64 @@ const day = (date: string, read: boolean): ArchiveReading => ({
   date, read, whole_day: read, read_from: null, read_to: null, settled: true, records: read ? 5 : null, multi_outlet: read ? 2 : null, indexable: false,
 });
 
-describe("archiveRows", () => {
-  it("folds each run of days Prism was not reading into one row", () => {
-    const rows = archiveRows([day("2026-09-17", true), day("2026-09-16", false), day("2026-09-15", false), day("2026-09-14", false), day("2026-09-06", true), day("2026-09-05", false)]);
-    expect(rows).toEqual([
-      { kind: "day", day: day("2026-09-17", true) },
-      { kind: "gap", from: "2026-09-14", to: "2026-09-16" },
-      { kind: "day", day: day("2026-09-06", true) },
-      { kind: "gap", from: "2026-09-05", to: "2026-09-05" },
-    ]);
+// There was no way from Today to yesterday's record: /feed/<date> and /archive
+// existed, linked only from the desktop footer, which a phone never shows.
+describe("dayStrip", () => {
+  const today = "2026-11-02";
+  // Yesterday back, newest first, as /api/v1/archive gives them; 30 Oct not read.
+  const days = ["2026-11-01", "2026-10-31", "2026-10-30", "2026-10-29", "2026-10-28", "2026-10-27", "2026-10-26", "2026-10-25", "2026-10-24", "2026-10-23"]
+    .map((d) => day(d, d !== "2026-10-30"));
+
+  it("starts at today on Today, names yesterday, and dates the rest", () => {
+    const strip = dayStrip(days, null, today);
+    expect(strip.map((d) => d.label)).toEqual(["Today", "Yesterday", "Sat 31 Oct", "Fri 30 Oct", "Thu 29 Oct", "Wed 28 Oct", "Tue 27 Oct"]);
+    expect(strip[0]).toMatchObject({ href: "/feed", current: true, count: null });
+    expect(strip[1]).toMatchObject({ href: "/feed/2026-11-01", current: false, count: 2 });
+  });
+
+  it("does not link a day Prism was not reading, and never prints a 0 for it", () => {
+    const off = dayStrip(days, null, today).find((d) => d.date === "2026-10-30");
+    expect(off).toMatchObject({ href: null, read: false, count: null });
+  });
+
+  it("keeps the day being read in view, three either side", () => {
+    const strip = dayStrip(days, "2026-10-26", today);
+    expect(strip.map((d) => d.date)).toEqual(["2026-10-29", "2026-10-28", "2026-10-27", "2026-10-26", "2026-10-25", "2026-10-24", "2026-10-23"]);
+    expect(strip.filter((d) => d.current).map((d) => d.date)).toEqual(["2026-10-26"]);
+  });
+
+  it("dates every day on a day page, whose cache outlives a word like yesterday", () => {
+    expect(dayStrip(days, "2026-10-31", today).map((d) => d.label).slice(0, 3)).toEqual(["Today", "Sun 1 Nov", "Sat 31 Oct"]);
+  });
+
+  it("stops at the edges instead of running short", () => {
+    expect(dayStrip(days, "2026-10-23", today).map((d) => d.date)[6]).toBe("2026-10-23");
+    expect(dayStrip(days.slice(0, 2), null, today)).toHaveLength(3);
+  });
+});
+
+describe("the archive calendar", () => {
+  const byDate = new Map([day("2026-10-31", true), day("2026-10-30", false), day("2026-11-01", true)].map((d) => [d.date, d]));
+
+  it("lists the months read, newest first", () => {
+    expect(archiveMonths("2026-07-22", "2026-11-02")).toEqual(["2026-11", "2026-10", "2026-09", "2026-08", "2026-07"]);
+  });
+
+  it("lays a month out Monday first, each day today, read, not read or outside the archive", () => {
+    const weeks = monthGrid("2026-11", byDate, "2026-11-02", "2026-07-22");
+    // 1 November 2026 is a Sunday: six blanks before it.
+    expect(weeks[0].slice(0, 6).every((c) => c === null)).toBe(true);
+    expect(weeks[0][6]).toMatchObject({ date: "2026-11-01", kind: "read" });
+    expect(weeks[1][0]).toMatchObject({ date: "2026-11-02", kind: "today" });
+    expect(weeks[1][1]).toMatchObject({ date: "2026-11-03", kind: "outside" });
+    expect(weeks.every((w) => w.length === 7)).toBe(true);
+  });
+
+  it("hatches a day Prism was not reading, and leaves a day before the archive began unmarked", () => {
+    const oct = monthGrid("2026-10", byDate, "2026-11-02", "2026-10-30").flat().filter((c) => c);
+    expect(oct.find((c) => c!.date === "2026-10-30")).toMatchObject({ kind: "unread" });
+    expect(oct.find((c) => c!.date === "2026-10-29")).toMatchObject({ kind: "outside" });
+    // In the archive's range but missing from the API's list: not read, never assumed read.
+    expect(monthGrid("2026-11", new Map(), "2026-11-02", "2026-07-22").flat().find((c) => c?.date === "2026-11-01")).toMatchObject({ kind: "unread" });
   });
 });

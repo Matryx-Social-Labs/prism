@@ -4,9 +4,10 @@ import { notFound, redirect } from "next/navigation";
 import { ChartRow } from "@/components/ChartRow";
 import { MetaLine, PageTitle, ReadingColumns, SubjectTrail } from "@/components/reading/parts";
 import { SectionHead } from "@/components/SectionHead";
+import { DayStrip } from "@/components/DayStrip";
 import { BackBar, EmptyState } from "@/components/ui";
-import { fetchArchiveDay, type ArchiveDay } from "@/lib/api";
-import { bySubject, dayRevalidate, istToday, longDay, parseDay } from "@/lib/archive";
+import { fetchArchive, fetchArchiveDay, type ArchiveDay } from "@/lib/api";
+import { bySubject, dayRevalidate, dayStrip, istToday, longDay, parseDay } from "@/lib/archive";
 import { istTime } from "@/lib/dateline";
 import { NOT_INDEXED, breadcrumbLd, collectionPageLd, feedListItems, jsonLd, robotsUnless, social } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
@@ -72,6 +73,8 @@ export default async function ArchiveDayPage({ params }: Params) {
   const url = `${SITE_URL}/feed/${date}`;
   const long = longDay(date);
   const groups = bySubject(day.items);
+  // On the page's own clock, so the strip never shortens a settled day's cache.
+  const index = await fetchArchive(dayRevalidate(date)).catch(() => null);
   return (
     <>
       <script
@@ -115,6 +118,7 @@ export default async function ArchiveDayPage({ params }: Params) {
               )}
               <ReadingNote day={day} />
             </header>
+            {index && <DayStrip days={dayStrip(index.days, date, index.today)} />}
             {day.read && day.items.length === 0 && (
               <EmptyState title="No record first seen on this day is from two or more outlets">
                 {count(day.single_source ?? 0, "record from one outlet was", "records from one outlet were")} counted; they are not listed.
