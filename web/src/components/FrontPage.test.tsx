@@ -105,6 +105,8 @@ describe("FrontPage — one chart for everyone (D2)", () => {
   });
 });
 
+// The scope pills live on the subject pages since 2026-11-02: Today is the whole
+// day in sections (TodayDesk), the reader's state its own section.
 describe("FrontPage — scope", () => {
   // REGRESSION (carried from the old feed): scope was per-page state re-seeded
   // from the profile on every mount, so picking All and reloading snapped
@@ -112,7 +114,7 @@ describe("FrontPage — scope", () => {
   it("keeps the All the reader picked instead of snapping back to their state", async () => {
     localStorage.setItem("parse.scope.v2", "all");
     loadProfile.mockReturnValue({ state: "IN-KL" });
-    render(<FrontPage />);
+    render(<FrontPage sector="politics" />);
     expect(await screen.findByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /Your state|Kerala/ })).toHaveAttribute("aria-pressed", "false");
   });
@@ -120,7 +122,7 @@ describe("FrontPage — scope", () => {
   // REGRESSION (ISSUE-001): a saved region scope can outlive the state it named.
   it("offers no state pill to a reader with no state, and forgets a saved state scope", async () => {
     localStorage.setItem("parse.scope.v2", "region");
-    render(<FrontPage />);
+    render(<FrontPage sector="politics" />);
     await screen.findAllByText("A story on the chart");
     expect(screen.queryByRole("button", { name: /Your state/ })).toBeNull();
     // National and World are absolute slices; everyone gets them.
@@ -130,7 +132,7 @@ describe("FrontPage — scope", () => {
   });
 
   it("World is what does not involve India, for any reader", async () => {
-    render(<FrontPage />);
+    render(<FrontPage sector="politics" />);
     await screen.findAllByText("A story on the chart");
     await userEvent.click(screen.getByRole("button", { name: "World" }));
     await waitFor(() => expect(lastQuery().scope).toBe("world"));
@@ -138,7 +140,7 @@ describe("FrontPage — scope", () => {
 
   it("persists the pick so it survives a reload and carries to Trending", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
-    render(<FrontPage />);
+    render(<FrontPage sector="politics" />);
     await userEvent.click(await screen.findByRole("button", { name: "National" }));
     expect(localStorage.getItem("parse.scope.v2")).toBe("national");
   });
@@ -148,7 +150,7 @@ describe("FrontPage — scope", () => {
   // and "All" identical to "Your state". Each pill is now its own server slice.
   it("asks the API for each slice instead of filtering one page", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
-    render(<FrontPage />);
+    render(<FrontPage sector="politics" />);
     await screen.findAllByText("A story on the chart");
     expect(lastQuery().scope).toBe("all");
     await userEvent.click(screen.getByRole("button", { name: /Your state|Kerala/ }));
@@ -160,26 +162,44 @@ describe("FrontPage — scope", () => {
 
   it("names the reader's state on the pill once the regions have loaded", async () => {
     loadProfile.mockReturnValue({ state: "IN-KL" });
-    render(<FrontPage />);
+    render(<FrontPage sector="politics" />);
     expect(await screen.findByRole("button", { name: "Kerala" })).toBeInTheDocument();
   });
 });
 
-// Pages v3 · Today: the phone leads with a rail of the day's multi-outlet
-// stories — on All + Today only, never a single-source story.
-describe("FrontPage — top of the record", () => {
-  it("rails the multi-outlet stories on All, most-reported first, and leaves single-source ones to the list", async () => {
+// Today printed its five most reported twice, a card rail and then the head of
+// the list (2026-11-02). The desk prints every record once: the lead, the next
+// four ranked, then sections, the world's last.
+describe("FrontPage — Today's desk", () => {
+  it("prints each record once: the lead, then the most reported, ranked", async () => {
     fetchFeed.mockResolvedValue([item({ id: "a", title: "Two outlets", source_count: 2 }), item({ id: "b", title: "Nine outlets", source_count: 9 }), item({ id: "c", title: "One outlet", source_count: 1 })]);
     render(<FrontPage />);
-    const rail = (await screen.findByRole("heading", { name: "Top of the record" })).closest("section")!;
-    expect(within(rail).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Nine outlets", "Two outlets"]);
-    expect(within(rail).getByText("1 / 2")).toBeInTheDocument();
+    const ranked = (await screen.findByRole("heading", { name: "Most reported today" })).parentElement!;
+    expect(within(ranked).getAllByRole("link").map((a) => a.textContent)).toEqual([expect.stringContaining("Two outlets"), expect.stringContaining("One outlet")]);
+    for (const title of ["Nine outlets", "Two outlets", "One outlet"]) expect(screen.getAllByText(title)).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "Top of the record" })).toBeNull();
+  });
+
+  it("files a story that does not involve India under World, after India's", async () => {
+    fetchFeed.mockResolvedValue([...["a", "b", "c", "d", "e"].map((id, i) => item({ id, title: `Lead ${id}`, source_count: 20 - i })), item({ id: "w", title: "Abroad", source_count: 3, regions: ["US"] }), item({ id: "p", title: "At home", source_count: 4 })]);
+    render(<FrontPage />);
+    const world = (await screen.findByRole("heading", { name: /^World/ })).closest("section")!;
+    expect(within(world).getByText("Abroad")).toBeInTheDocument();
+    expect(within(world).queryByText("At home")).toBeNull();
+  });
+
+  it("reads the whole day: a scope saved from the old pills cannot filter it, and no pill is offered", async () => {
+    localStorage.setItem("parse.scope.v2", "world");
+    render(<FrontPage />);
+    await screen.findAllByText("A story on the chart");
+    expect(lastQuery().scope).toBe("all");
+    expect(screen.queryByRole("group", { name: "Scope" })).toBeNull();
   });
 
   it("is not on a subject page", async () => {
     render(<FrontPage sector="politics" />);
     await screen.findAllByText("A story on the chart");
-    expect(screen.queryByRole("heading", { name: "Top of the record" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Most reported today" })).toBeNull();
   });
 });
 
@@ -258,9 +278,9 @@ describe("FrontPage — coming back", () => {
 describe("FrontPage — has a professional read", () => {
   it("keeps only the rows that earn a lens, counts them against the loaded window, and says so when none do", async () => {
     const user = userEvent.setup();
-    // One outlet each, so the Top of the record rail stays empty and each title is one heading.
+    // On a subject page, where the list and the scope pills are (Today is the desk, TodayDesk).
     fetchFeed.mockResolvedValue([item({ id: "m", title: "Ticker story", tickers: ["INFY"], source_count: 1 }), item({ id: "p", title: "Plain story", source_count: 1 })]);
-    render(<FrontPage />);
+    render(<FrontPage sector="politics" />);
     await screen.findByRole("heading", { name: "Plain story" });
     await user.click(screen.getByRole("button", { name: "Has a professional read" }));
     expect(screen.queryByRole("heading", { name: "Plain story" })).toBeNull();
@@ -269,7 +289,7 @@ describe("FrontPage — has a professional read", () => {
 
     fetchFeed.mockResolvedValue([item({ id: "p", title: "Plain story", source_count: 1 })]);
     await user.click(screen.getByRole("button", { name: "World" }));
-    expect(await screen.findByText("No stories with a professional read today")).toBeInTheDocument();
+    expect(await screen.findByText("No stories with a professional read in Politics today")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Show every story" }));
     expect(screen.getByRole("heading", { name: "Plain story" })).toBeInTheDocument();
   });

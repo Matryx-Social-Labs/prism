@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.137.0] - 2026-11-02
+
+### Changed — Today is one page of sections, every record once
+- Today printed its five most-reported records twice: a card rail at the top, then the same five
+  at the head of the list. On a desk the subject rail and the right column ended after one
+  screen, leaving 8,000px of empty sides beside a two-column stream of sixty cards.
+- Now (patterns from Mobbin: the NYT homepage and Perplexity Discover for the desk, Bloomberg's
+  and Yahoo News's Top News for the phone, Apple News's sections):
+  - the lead beside "Most reported today", the next four ranked with their coverage and a small
+    credited photo, and "Developing over days" under them (each story by its own name);
+  - then the reader's state when they have set one, India by subject in the nav's order, and
+    the world last: six records each, "k of n" and the subject's page for the rest;
+  - the subject chips run across the top with the day strip; the professional-read toggle sits
+    at the end of that row; the scope pills stay on the subject pages, where they still filter.
+- Each record appears once (0 repeated links, from 5). The page is about half as long: 7,844px
+  on a phone (from 14,334), 4,289px on a desk (from 9,312).
+- The day strip takes "today" from the archive it lists, so just after midnight IST it does not
+  call the day before yesterday "yesterday". A Search test that read the clock is pinned.
+
 ## [0.0.136.0] - 2026-11-02
 
 ### Added — yesterday's record and every day before it, one tap from Today
