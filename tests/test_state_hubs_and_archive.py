@@ -347,8 +347,8 @@ async def test_a_states_own_name_is_left_out_of_the_entities_sitemap():
                 ),
                 {"i": str(actor_id), "s": actor},
             )
-            for _ in range(INDEXABLE_MIN_RECORDS):
-                eid = await seed.record(s, 1, dt.datetime.now(dt.UTC), ["IN", "IN-GA"])
+            for _ in range(INDEXABLE_MIN_RECORDS):  # two outlets: only indexed records count
+                eid = await seed.record(s, 2, dt.datetime.now(dt.UTC), ["IN", "IN-GA"])
                 for ent in (state_id, actor_id):
                     link = str(uuid.uuid4())
                     seed.links.append(link)

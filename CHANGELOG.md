@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.134.0] - 2026-11-02
+
+### Changed — an actor page asks to be indexed only when it lists records that are indexed
+- Search Console, 2026-11-02: 5,240 pages indexed and 7,953 discovered but never crawled. Every
+  page in the sitemaps passed the technical checks (1,557 of 1,561 sampled), so the gap is how
+  many pages Google thinks are worth its time. 11,120 of the 27,824 actor pages that asked to be
+  indexed listed fewer than two records that are indexed themselves: a page of one-outlet
+  rewrites, which Google already has from the outlet.
+- The floor is still four records, now counted among the records two or more outlets reported,
+  the record's own rule (`common/outlets.record_indexable`, and its SQL twin
+  `record_indexable_sql`, held to the same answers by a test). Indexable actor pages: 27,824 to
+  9,200. The page, the cast chips that link to it (nofollow below the floor) and the actors
+  sitemap read the one rule. Every page still lists every record.
+
+### Fixed — a story and its lead record had the same title
+- A story is labelled with its lead record's headline, and its page was titled with the label
+  alone, so the two competed for one title: all 25 duplicate titles in the crawl. A story's
+  page is now titled "<label>: the story so far". The share card keeps the label.
+- llms.txt described every story as a provisional grouping. Stories now say Verified or
+  Provisional grouping, and the file says what each means, in the words the page uses.
+
 ## [0.0.133.3] - 2026-11-02
 
 ### Fixed — Vercel was rendering a story's complaint forms for crawlers

@@ -19,7 +19,7 @@ Prism is not a publisher of original reporting and does not rate outlets. A reco
 - [Corrections](https://www.readprism.news/corrections): every correction to a record, with the date and the reason.
 - [How Prism works](https://www.readprism.news/about): one real story followed step by step, what Prism refuses to do, and who answers for it.
 - Subjects: [Politics](https://www.readprism.news/sector/politics) · [Business & Markets](https://www.readprism.news/sector/business) · [Sports](https://www.readprism.news/sector/sports) · [Tech & Cyber](https://www.readprism.news/sector/tech) · [Health & Science](https://www.readprism.news/sector/health) · [Entertainment](https://www.readprism.news/sector/entertainment)
-- [Developing stories](https://www.readprism.news/trending): stories moving across outlets with their related coverage. Groupings are provisional and marked as under review.
+- [Developing stories](https://www.readprism.news/trending): stories moving across outlets, each development dated. A story whose every record was checked as part of it when it joined is marked Verified; one grouped automatically is marked Provisional grouping, related reporting with no chronology implied.
 - Actor pages, readprism.news/entity/<name>: every record naming a person or organisation.
 
 ## Sitemaps

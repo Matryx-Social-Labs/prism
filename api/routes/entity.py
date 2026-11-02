@@ -27,6 +27,7 @@ from common import outlets
 from common.db import get_db
 from common.images import placeholders, report_photo_join
 from common.lenses import get_lens
+from common.outlets import record_indexable_sql
 from common.regions import HUB_SLUGS
 from enrichment.claims import dedupe_sources, speaker_key
 
@@ -37,6 +38,10 @@ router = APIRouter()
 # entities, 5,995 with >= 3. Raised 3 -> 4 on 2026-09-27: 29 of 100 indexable
 # pages had under 150 words and 28 of them were three-record actors, the kind
 # Google files as "crawled - currently not indexed"; at four, 1 of 71 was thin.
+# Since 2026-11-02 the four are INDEXED records (two outlets or more): 11,120 of
+# 27,824 indexable actors listed fewer than two of those, a page of one-outlet
+# rewrites, and Search Console held 7,953 pages discovered but never crawled.
+# Indexable actors 27,824 -> 9,200. The page still lists every served record.
 INDEXABLE_MIN_RECORDS = 4
 MAX_RECORDS = 60
 ENTITY_CACHE = "public, s-maxage=300, stale-while-revalidate=900"
@@ -163,9 +168,8 @@ def indexable_sql(id_column: str) -> str:
         raise ValueError(f"not a column reference: {id_column!r}")
     return f"""(SELECT count(*) FROM (
         SELECT 1 FROM event_entities ee_i JOIN events e_i ON e_i.id = ee_i.event_id
-        WHERE ee_i.entity_id = {id_column}
-          AND COALESCE(jsonb_array_length(e_i.projection->'source_slugs'), 0) > 0
-        LIMIT {INDEXABLE_MIN_RECORDS}) served) >= {INDEXABLE_MIN_RECORDS}"""
+        WHERE ee_i.entity_id = {id_column} AND {record_indexable_sql("e_i")}
+        LIMIT {INDEXABLE_MIN_RECORDS}) indexed) >= {INDEXABLE_MIN_RECORDS}"""
 
 
 # The extractor's type vocabulary is open, and production carries typos and
@@ -211,11 +215,13 @@ async def get_entity(
     if entity is None:
         raise HTTPException(status_code=404, detail="no such entity")
 
-    total = (
+    total, indexed = (
         await db.execute(
             text(
-                """
-                SELECT count(DISTINCT ee.event_id) FROM event_entities ee
+                f"""
+                SELECT count(DISTINCT ee.event_id),
+                       count(DISTINCT ee.event_id) FILTER (WHERE {record_indexable_sql("e")})
+                FROM event_entities ee
                 JOIN events e ON e.id = ee.event_id
                 WHERE ee.entity_id = :eid
                   AND COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
@@ -223,7 +229,7 @@ async def get_entity(
             ),
             {"eid": entity["id"]},
         )
-    ).scalar_one()
+    ).one()
 
     rows = (
         await db.execute(
@@ -268,7 +274,7 @@ async def get_entity(
             aliases=entity["aliases"] or [],
         ),
         record_count=total,
-        indexable=total >= INDEXABLE_MIN_RECORDS,
+        indexable=indexed >= INDEXABLE_MIN_RECORDS,
         records=[build_feed_item(row, active_lens, None, None, registry) for row in rows],
         role=role,
         quote_count=sum(q.speech == "direct" for q in quotes),
@@ -282,20 +288,20 @@ async def get_entity(
 @router.get("/api/v1/sitemap/entities")
 async def sitemap_entities(db: AsyncSession = Depends(get_db)):
     """The actors worth a crawl: slug and last change for every entity in at
-    least INDEXABLE_MIN_RECORDS served records. Not a state's own name: that
+    least INDEXABLE_MIN_RECORDS indexed records. Not a state's own name: that
     address 308s to the state's hub (web/src/app/entity/[slug]), which would
     otherwise compete with it for "<state> news" (audit 02, P1-1)."""
     rows = (
         await db.execute(
             text(
-                """
+                f"""
+                WITH indexed AS (SELECT e.id, e.last_updated_at FROM events e WHERE {record_indexable_sql("e")})
                 SELECT en.slug, max(e.last_updated_at) AS last_updated_at,
                        count(DISTINCT e.id) AS n
                 FROM entities en
                 JOIN event_entities ee ON ee.entity_id = en.id
-                JOIN events e ON e.id = ee.event_id
-                WHERE COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
-                  AND en.slug <> ALL(:state_hubs)
+                JOIN indexed e ON e.id = ee.event_id
+                WHERE en.slug <> ALL(:state_hubs)
                 GROUP BY en.slug
                 HAVING count(DISTINCT e.id) >= :floor
                 ORDER BY n DESC

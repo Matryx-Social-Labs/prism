@@ -48,7 +48,12 @@ async def _db_reachable() -> bool:
         return False
 
 
-async def _seed(n_records: int) -> str:
+# Two outlets: a record of one outlet is not indexed (common/outlets.record_indexable),
+# so it does not count toward its actors' pages either.
+CORROBORATED = ["the_hindu", "ndtv"]
+
+
+async def _seed(n_records: int, sources: list[str] = CORROBORATED) -> str:
     slug = f"t-{uuid.uuid4().hex[:10]}"
     async with session_scope() as s:
         ent = Entity(id=uuid.uuid4(), slug=slug, name="Test Actor", entity_type="person")
@@ -57,7 +62,7 @@ async def _seed(n_records: int) -> str:
         for i in range(n_records):
             ev = Event(
                 id=uuid.uuid4(), title=f"Record {i}", sector="politics", regions=["IN"],
-                last_updated_at=datetime.now(UTC), projection={"source_slugs": ["the_hindu"]},
+                last_updated_at=datetime.now(UTC), projection={"source_slugs": sources},
             )
             s.add(ev)
             await s.flush()
@@ -109,6 +114,24 @@ async def test_an_actor_in_three_records_is_still_a_stub():
     assert body["record_count"] == 3 and body["indexable"] is False
 
 
+async def test_an_actor_whose_records_are_all_one_outlet_is_a_stub_everywhere():
+    """Search Console, 2026-11-02: 7,953 pages discovered and not crawled. 11,120 of
+    27,824 indexable actor pages listed fewer than two records that are indexed
+    themselves, so the page was a list of one-outlet rewrites Google already has.
+    The floor now counts only indexed records, on the page, the chips and the sitemap."""
+    if not await _db_reachable():
+        pytest.skip("no database")
+    slug = await _seed(INDEXABLE_MIN_RECORDS + 2, sources=["the_hindu"])
+    body = (await _get(f"/api/v1/entity/{slug}")).json()
+    assert body["record_count"] == INDEXABLE_MIN_RECORDS + 2, "the page still lists every record"
+    assert body["indexable"] is False
+    listed = {e["slug"] for e in (await _get("/api/v1/sitemap/entities")).json()["entities"]}
+    assert slug not in listed
+    async with session_scope() as s:
+        chip = (await s.execute(text(f"SELECT {indexable_sql('en.id')} FROM entities en WHERE en.slug = :s"), {"s": slug})).scalar_one()
+    assert chip is False, "a chip linking here must say nofollow too"
+
+
 async def test_an_unknown_actor_is_404_not_an_empty_page():
     if not await _db_reachable():
         pytest.skip("no database")
@@ -136,7 +159,7 @@ async def _seed_actor(name: str, events: list[uuid.UUID], extra: int) -> None:
         await s.flush()
         for _ in range(extra):
             ev = Event(id=uuid.uuid4(), title="Other", sector="politics", regions=["IN"],
-                       last_updated_at=_LONG_AGO, projection={"source_slugs": ["the_hindu"]})
+                       last_updated_at=_LONG_AGO, projection={"source_slugs": CORROBORATED})
             s.add(ev)
             events = [*events, ev.id]
         await s.flush()
@@ -153,7 +176,7 @@ async def test_a_record_tells_the_page_which_of_its_actors_are_stubs():
     tag = uuid.uuid4().hex[:8]
     async with session_scope() as s:
         ev = Event(id=uuid.uuid4(), title="The record", sector="politics", regions=["IN"],
-                   last_updated_at=_LONG_AGO, projection={"source_slugs": ["the_hindu"]})
+                   last_updated_at=_LONG_AGO, projection={"source_slugs": CORROBORATED})
         s.add(ev)
     await _seed_actor(f"Fat {tag}", [ev.id], extra=INDEXABLE_MIN_RECORDS - 1)
     await _seed_actor(f"Thin {tag}", [ev.id], extra=INDEXABLE_MIN_RECORDS - 2)

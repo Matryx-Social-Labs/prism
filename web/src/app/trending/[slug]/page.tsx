@@ -28,14 +28,16 @@ function blurb(s: TrendingStoryDetail): string {
 
 // The OG image comes from opengraph-image.tsx in this route (branded card) — we
 // deliberately do NOT set openGraph.images here so that file convention wins.
-// The root template appends "| Prism", so the title is the label alone.
+// The root template appends "| Prism". A story is labelled with its lead
+// record's headline, so the label alone would title two pages the same (25 of
+// 25 duplicate titles, crawl of 2026-11-02); the share card keeps the label.
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const s = await load(slug);
   if (!s) return { title: "Story not found" };
   const description = blurb(s);
   return {
-    title: s.label,
+    title: `${s.label}: the story so far`,
     description,
     alternates: { canonical: `/trending/${s.canonical_slug}` },
     // A provisional grouping drifts: its URL can name one event and its page show another.
