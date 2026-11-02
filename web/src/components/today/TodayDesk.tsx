@@ -57,7 +57,9 @@ function StoryTile({ s }: { s: TrendingStory }) {
         className="group grid h-full content-start gap-2.5 border p-3.5"
         style={{ borderColor: "var(--line)", borderRadius: "var(--r-record)", background: "var(--surface)", color: "var(--ink)" }}
       >
-        <StatusPill status={verified ? "verified" : "provisional"} label={verified ? undefined : "Provisional grouping"} />
+        <span className="justify-self-start">
+          <StatusPill status={verified ? "verified" : "provisional"} label={verified ? undefined : "Provisional grouping"} />
+        </span>
         {/* The story's own name, the one /trending prints: never its lead record's headline. */}
         <span className="underline-offset-4 group-hover:underline" style={{ font: "var(--t-title-s)" }}>{s.label}</span>
         <span className="p-count mt-auto">
@@ -112,7 +114,7 @@ export function TodayDesk({ layout, developing, primaryLang, lastOpened }: { lay
   if (!lead) return null;
   return (
     <div className="grid gap-10">
-      <section aria-labelledby="most-reported" className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-12 lg:gap-8">
+      <section aria-labelledby="most-reported" className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-12 lg:items-start lg:gap-8">
         <ol className="p-print grid lg:col-span-7">
           <ChartRow item={lead} lead draw primaryLang={primaryLang} lastOpened={lead.id === lastOpened} />
         </ol>
