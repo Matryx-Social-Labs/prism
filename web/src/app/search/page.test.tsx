@@ -196,6 +196,9 @@ describe("Search — ways in before a query", () => {
   // The start screen offered six names and nothing else; it now lists the most
   // reported records today and the days before (2026-11-02).
   it("ranks today's most-reported records and offers the days before", async () => {
+    // The strip names yesterday from the clock: pin it to the archive's own today.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-02T06:30:00Z"));
     fetchFeed.mockResolvedValue([item({ id: "a", title: "Two outlets", source_count: 2 }), item({ id: "b", title: "Nine outlets", source_count: 9 })]);
     fetchArchive.mockResolvedValue({ first_day: "2026-10-30", today: "2026-11-02", floor: 20, days: [
       { date: "2026-11-01", read: true, whole_day: true, read_from: null, read_to: null, settled: true, records: 9, multi_outlet: 4, indexable: true },
@@ -205,7 +208,8 @@ describe("Search — ways in before a query", () => {
     const links = screen.getAllByRole("link").map((a) => a.textContent);
     expect(links.indexOf("Nine outlets")).toBeLessThan(links.indexOf("Two outlets"));
     expect(screen.getByRole("navigation", { name: "Days" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /1 November|Yesterday/ })).toHaveAttribute("href", "/feed/2026-11-01");
+    expect(screen.getByRole("link", { name: /^Yesterday/ })).toHaveAttribute("href", "/feed/2026-11-01");
+    vi.useRealTimers();
   });
 });
 

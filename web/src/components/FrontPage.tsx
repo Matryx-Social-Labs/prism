@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { ASK_QUESTIONS, LENS_READS } from "@/lib/billing";
 import { loadSession } from "@/lib/session";
-import { Chart } from "@/components/Chart";
+import { Chart, LAST_OPENED, rememberOpened } from "@/components/Chart";
 import { lensMarkers } from "@/components/ChartRow";
 import { EmptyState } from "@/components/ui";
 import { SubtopicNav } from "@/components/reading/parts";
@@ -13,11 +13,11 @@ import { Masthead } from "@/components/Masthead";
 import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { TodayAside } from "@/components/today/TodayAside";
-import { TopOfRecord } from "@/components/today/TopOfRecord";
+import { TodayDesk } from "@/components/today/TodayDesk";
+import { todaySections } from "@/lib/today";
 import { fetchFeed, fetchTrending, type ArchiveReading, type FeedItem, type SubjectNode, type TrendingStory } from "@/lib/api";
 import { dayStrip, istToday } from "@/lib/archive";
 import { DayStrip } from "@/components/DayStrip";
-import { chartOrder } from "@/lib/chart";
 import { staleSince } from "@/lib/staleness";
 import { istTime, shortDate } from "@/lib/dateline";
 import { loadProfile, type Profile } from "@/lib/profile";
@@ -57,7 +57,7 @@ import { useStateName } from "@/lib/useStateName";
 type Tab = "today" | "foryou";
 const WINDOW = FEED_WINDOW;
 
-export function FrontPage({ sector = null, initial = null, subtopics = [], days = null }: { sector?: string | null; initial?: FeedItem[] | null; subtopics?: SubjectNode[]; days?: ArchiveReading[] | null }) {
+export function FrontPage({ sector = null, initial = null, subtopics = [], days = null, archiveToday = null }: { sector?: string | null; initial?: FeedItem[] | null; subtopics?: SubjectNode[]; days?: ArchiveReading[] | null; archiveToday?: string | null }) {
   const group = sectorGroup(sector);
   const yesterday = days?.find((d) => d.read) ?? null;
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -81,13 +81,25 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
   }, []);
 
   const hasInterests = Boolean(profile?.interests?.length);
+  // Today's desk is the whole day in sections (TodayDesk); a scope saved from the
+  // old chips would filter it with no chip left to undo it. Subject pages keep theirs.
+  const desk = !group && tab === "today";
+  const scopeNow: Scope = desk ? "all" : scope;
+  const [lastOpened, setLastOpened] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setLastOpened(window.localStorage.getItem(LAST_OPENED));
+    } catch {
+      /* storage blocked: no mark */
+    }
+  }, []);
   const stateName = useStateName(profile?.state ?? null);
 
   useEffect(() => {
     if (!ready) return;
     if (seeded.current) {
       seeded.current = false;
-      const isDefault = !(tab === "foryou" && hasInterests) && !profile?.state && scope === "all" && !profile?.languages?.length;
+      const isDefault = !(tab === "foryou" && hasInterests) && !profile?.state && scopeNow === "all" && !profile?.languages?.length;
       if (isDefault) return;
     }
     setError(null);
@@ -96,7 +108,7 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
       sector: group ? sectorParam(group) : undefined,
       interests: tab === "foryou" && hasInterests ? profile?.interests : undefined,
       state: profile?.state ?? undefined,
-      scope: scope === "region" && !profile?.state ? "all" : scope,
+      scope: scopeNow === "region" && !profile?.state ? "all" : scopeNow,
       languages: profile?.languages,
       sort: "latest",
       limit: WINDOW,
@@ -104,7 +116,7 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
       .then((list) => { if (!cancelled) setItems(list); })
       .catch(() => { if (!cancelled) setError("The Prism API is unreachable right now."); });
     return () => { cancelled = true; };
-  }, [ready, tab, hasInterests, profile, group, scope]);
+  }, [ready, tab, hasInterests, profile, group, scopeNow]);
 
   // The right rail: stories developing over days — a different cut from the
   // list, not the same rows twice. Best effort; the list never waits for it.
@@ -120,7 +132,7 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
   // Coming back from a story lands where the reader left the chart, not at the
   // top (founder, 2026-09-20). Keyed by the slice, so Karnataka's offset never
   // restores onto National's list. Search and Stories already do this.
-  useScrollRestore(`feed:${sector ?? "all"}:${tab}:${scope}:scrollY`, items !== null && items.length > 0);
+  useScrollRestore(`feed:${sector ?? "all"}:${tab}:${scopeNow}:scrollY`, items !== null && items.length > 0);
 
   // The scope is a server-side slice (see /feed `scope`); the page IS the slice.
   const scoped = useMemo(() => items ?? [], [items]);
@@ -160,8 +172,7 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
     return parts.join(" · ");
   }, [items, scoped, shown, lensOnly]);
 
-  // Top of the record: the most-reported multi-outlet stories, on All + Today only.
-  const top = useMemo(() => (group || tab !== "today" ? [] : chartOrder(scoped).filter((i) => i.source_count > 1).slice(0, 5)), [group, tab, scoped]);
+  const layout = useMemo(() => (desk ? todaySections(shown, { state: profile?.state ?? null, stateName }) : null), [desk, shown, profile, stateName]);
 
   const primaryLang = profile?.languages?.[0] ?? "en";
   const emptyLabel = group
@@ -182,6 +193,13 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
   ];
   const pick = (s: Scope) => { setScope(s); saveScope(s); };
 
+  const lensToggle = (
+    <button type="button" onClick={() => setLensOnly((v) => !v)} aria-pressed={lensOnly} className="p-chip min-h-8 px-3 text-[13px]">
+                  <i aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: lensOnly ? "var(--paper)" : "var(--lens-markets)" }} />
+                  Has a professional read
+                </button>
+  );
+
   const list = error ? (
     <div className="p-alert p-alert--error" role="status">
       <div>
@@ -196,6 +214,15 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
       title={`No stories with a professional read ${group ? `in ${group.name} ` : ""}today`}
       action={<button type="button" className="p-btn p-btn--text" onClick={() => setLensOnly(false)}>Show every story</button>}
     />
+  ) : desk && layout?.lead ? (
+    <div
+      onClickCapture={(e) => {
+        const id = (e.target as HTMLElement).closest("a[href^='/story/']")?.getAttribute("href")?.split("/story/")[1];
+        if (id) rememberOpened(id);
+      }}
+    >
+      <TodayDesk layout={layout} developing={developing} primaryLang={primaryLang} lastOpened={lastOpened} />
+    </div>
   ) : (
     <Chart items={shown} primaryLang={primaryLang} pageCode={group?.code ?? null} emptyLabel={emptyLabel} />
   );
@@ -203,11 +230,11 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
   return (
     <div className="mx-auto max-w-[var(--shell)] px-[var(--gutter)] pb-[calc(var(--tabbar)+24px)] lg:pb-12">
       <Masthead dateline={dateline.l} datelineM={dateline.m} datelineS={dateline.s} />
-      <div className="lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)]">
-        <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />
+      {/* Today's desk spends the width on the record (TodayDesk); the subject pages keep their rails. */}
+      <div className={desk ? "lg:pt-6" : "lg:grid lg:grid-cols-[var(--rail)_minmax(0,1fr)] lg:gap-8 lg:pt-6 xl:grid-cols-[var(--rail)_minmax(0,1fr)_var(--evidence)]"}>
+        {!desk && <SectorStrip active={group?.slug ?? null} responsiveRail counts={counts} />}
 
         <div className="min-w-0">
-          <TopOfRecord stories={top} />
           <div className="grid gap-3 pt-5 lg:pt-0">
             <SectionHead
               id="chart-title"
@@ -239,19 +266,24 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
               }
             />
             {group && <SubtopicNav all={`/sector/${group.slug}`} nodes={subtopics} />}
-            {!group && days && <DayStrip days={dayStrip(days, null, istToday())} />}
+            {!group && days && <DayStrip days={dayStrip(days, null, archiveToday ?? istToday())} />}
+            {desk && (
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <SectorStrip active={null} counts={counts} />
+                </div>
+                {lensToggle}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
+              {!desk && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
                 {scopes.map(([s, l]) => (
                   <button key={s} onClick={() => pick(s)} aria-pressed={scope === s} className="p-chip min-h-8 px-3 text-[13px]">
                     {l}
                   </button>
                 ))}
-              </div>
-              <button type="button" onClick={() => setLensOnly((v) => !v)} aria-pressed={lensOnly} className="p-chip min-h-8 px-3 text-[13px]">
-                <i aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: lensOnly ? "var(--paper)" : "var(--lens-markets)" }} />
-                Has a professional read
-              </button>
+              </div>}
+              {!desk && lensToggle}
             </div>
           </div>
           <section aria-labelledby="chart-title" className="pt-2 lg:pt-3.5">
@@ -276,7 +308,7 @@ export function FrontPage({ sector = null, initial = null, subtopics = [], days 
           )}
         </div>
 
-        <TodayAside developing={developing} />
+        {!desk && <TodayAside developing={developing} />}
       </div>
     </div>
   );

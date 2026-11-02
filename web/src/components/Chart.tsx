@@ -7,7 +7,7 @@ import { ChartRow } from "@/components/ChartRow";
 
 export { chartOrder } from "@/lib/chart";
 
-const LAST_OPENED = "prism.chart.lastOpened";
+export const LAST_OPENED = "prism.chart.lastOpened";
 
 export function rememberOpened(id: string) {
   try {

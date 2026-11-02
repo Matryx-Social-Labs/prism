@@ -19,13 +19,14 @@ export default async function FeedPage() {
     // API unreachable at render: the client fetches as before.
   }
   // The days before today, for the day strip; without them the strip is left out.
-  const days: ArchiveReading[] | null = (await fetchArchive().catch(() => null))?.days ?? null;
+  const archive = await fetchArchive().catch(() => null);
+  const days: ArchiveReading[] | null = archive?.days ?? null;
   return (
     <>
       {initial && initial.length > 0 && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(itemListLd("Today's record", `${SITE_URL}/feed`, feedListItems(initial))) }} />
       )}
-      <FrontPage initial={initial} days={days} />
+      <FrontPage initial={initial} days={days} archiveToday={archive?.today ?? null} />
     </>
   );
 }
