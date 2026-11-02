@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MetaLine, PageTitle } from "@/components/reading/parts";
-import { SectionHead } from "@/components/SectionHead";
+import { ArchiveCalendar } from "@/components/ArchiveCalendar";
 import { Alert, BackBar } from "@/components/ui";
-import { fetchArchive, type ArchiveReading } from "@/lib/api";
-import { archiveRows, longDay } from "@/lib/archive";
-import { istTime } from "@/lib/dateline";
-import { breadcrumbLd, collectionPageLd, followRel, jsonLd, social } from "@/lib/seo";
+import { fetchArchive } from "@/lib/api";
+import { longDay } from "@/lib/archive";
+import { breadcrumbLd, collectionPageLd, jsonLd, social } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
-// Every day Prism read, newest first (audit 02, P1-2): one address per day,
-// /feed/<date>. A run of days it was not reading is one line that says so —
-// no link, no count, never a 0. A day under the floor stays linked, not followed.
+// Every day Prism read, as months of days, newest first (audit 02, P1-2): one
+// address per day, /feed/<date>. A day it was not reading is hatched — no
+// link, no count, never a 0. A day under the floor stays linked, not followed.
 export const revalidate = 3600;
 
 const title = "The archive: every day's record";
@@ -22,30 +21,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/archive" },
   ...social(title, description, "/archive"),
 };
-
-const at = (iso: string | null) => (iso ? <time dateTime={iso} className="font-mono text-[12px]">{istTime(iso)}</time> : "—");
-
-/** A day read in part says which part; a day after which Prism stopped says when. */
-function DayNote({ day }: { day: ArchiveReading }) {
-  if (day.whole_day && day.settled) return null;
-  return (
-    <span style={{ font: "400 12.5px/1.4 var(--font-read)", color: "var(--ink-3)" }}>
-      {day.settled ? <>read {at(day.read_from)}–{at(day.read_to)} IST</> : <>stopped at {at(day.read_to)} IST, not complete</>}
-    </span>
-  );
-}
-
-function DayRow({ day }: { day: ArchiveReading }) {
-  return (
-    <li className="flex items-baseline justify-between gap-3 border-b py-2.5" style={{ borderColor: "var(--line)" }}>
-      <Link href={`/feed/${day.date}`} rel={followRel(day.indexable)} className="p-link">{longDay(day.date)}</Link>
-      <span className="grid justify-items-end text-right">
-        <span className="p-meta__prov">{day.multi_outlet ?? 0} from two or more outlets</span>
-        <DayNote day={day} />
-      </span>
-    </li>
-  );
-}
 
 export default async function ArchiveIndexPage() {
   const index = await fetchArchive(revalidate).catch(() => null);
@@ -75,25 +50,7 @@ export default async function ArchiveIndexPage() {
         {!index ? (
           <Alert tone="error" title="The archive could not load.">Try again in a minute, or read <Link href="/feed" className="p-link">today&rsquo;s record</Link>.</Alert>
         ) : (
-          <section aria-labelledby="archive-days" className="grid gap-1">
-            <SectionHead id="archive-days" title="Days" count={read.length} sub="newest first" />
-            <ul className="grid">
-              <li className="flex items-baseline justify-between gap-3 border-b py-2.5" style={{ borderColor: "var(--line)" }}>
-                <Link href="/feed" className="p-link">Today</Link>
-                <span style={{ font: "400 13px/1.4 var(--font-read)", color: "var(--ink-3)" }}>the record as it is now</span>
-              </li>
-              {archiveRows(days).map((r) =>
-                r.kind === "day" ? (
-                  <DayRow key={r.day.date} day={r.day} />
-                ) : (
-                  <li key={r.from} className="flex items-baseline justify-between gap-3 border-b border-dashed py-2.5" style={{ borderColor: "var(--line-strong)", color: "var(--ink-3)" }}>
-                    <span>{r.from === r.to ? longDay(r.from) : `${longDay(r.from)} – ${longDay(r.to)}`}</span>
-                    <span style={{ font: "400 13px/1.4 var(--font-read)" }}>Prism was not reading</span>
-                  </li>
-                ),
-              )}
-            </ul>
-          </section>
+          <ArchiveCalendar days={days} firstDay={index.first_day ?? index.today} today={index.today} />
         )}
       </div>
     </>

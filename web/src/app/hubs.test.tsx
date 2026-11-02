@@ -121,7 +121,9 @@ describe("/state — every hub by name, never ranked", () => {
 });
 
 describe("/archive — every day, and the days not read said so", () => {
-  it("links each read day, not following one under the floor or unsettled, and folds the days not read into one line", async () => {
+  // A calendar since 2026-11-02 (Instagram's archive calendar, Mobbin): the same links,
+  // a day not read hatched instead of a folded line, a day read in part dashed.
+  it("links each read day, not following one under the floor or unsettled, and marks the days not read", async () => {
     const doc = await html(ArchiveIndexPage());
     const day = (date: string) => doc.querySelector(`a[href="/feed/${date}"]`);
     expect(day("2026-09-27")?.getAttribute("rel")).toBeNull();
@@ -129,11 +131,11 @@ describe("/archive — every day, and the days not read said so", () => {
     expect(day("2026-09-28")?.getAttribute("rel")).toBe("nofollow");
     expect(day("2026-09-25")).toBeNull();
     expect(day("2026-09-24")).toBeNull();
-    const text = doc.body.textContent!;
-    expect(text).toContain("24 September 2026 – 25 September 2026");
-    expect(text).toContain("Prism was not reading");
-    expect(text).toContain("stopped at 07:41 IST, not complete");
-    expect(text).toContain("read 11:10–16:01 IST");
+    expect(doc.querySelectorAll(".sc-cal__day--off").length).toBeGreaterThanOrEqual(2);
+    expect(doc.body.textContent).toContain("Prism was not reading");
+    expect(day("2026-09-28")?.getAttribute("aria-label")).toMatch(/not complete$/);
+    expect(day("2026-09-23")?.getAttribute("aria-label")).toMatch(/read in part$/);
+    expect(day("2026-09-27")?.classList.contains("sc-cal__day--part")).toBe(false);
   });
 });
 

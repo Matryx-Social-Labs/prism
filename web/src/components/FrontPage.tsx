@@ -14,7 +14,9 @@ import { SectionHead } from "@/components/SectionHead";
 import { SectorStrip } from "@/components/SectorStrip";
 import { TodayAside } from "@/components/today/TodayAside";
 import { TopOfRecord } from "@/components/today/TopOfRecord";
-import { fetchFeed, fetchTrending, type FeedItem, type SubjectNode, type TrendingStory } from "@/lib/api";
+import { fetchFeed, fetchTrending, type ArchiveReading, type FeedItem, type SubjectNode, type TrendingStory } from "@/lib/api";
+import { dayStrip, istToday } from "@/lib/archive";
+import { DayStrip } from "@/components/DayStrip";
 import { chartOrder } from "@/lib/chart";
 import { staleSince } from "@/lib/staleness";
 import { istTime, shortDate } from "@/lib/dateline";
@@ -55,8 +57,9 @@ import { useStateName } from "@/lib/useStateName";
 type Tab = "today" | "foryou";
 const WINDOW = FEED_WINDOW;
 
-export function FrontPage({ sector = null, initial = null, subtopics = [] }: { sector?: string | null; initial?: FeedItem[] | null; subtopics?: SubjectNode[] }) {
+export function FrontPage({ sector = null, initial = null, subtopics = [], days = null }: { sector?: string | null; initial?: FeedItem[] | null; subtopics?: SubjectNode[]; days?: ArchiveReading[] | null }) {
   const group = sectorGroup(sector);
+  const yesterday = days?.find((d) => d.read) ?? null;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
   const [scope, setScope] = useState<Scope>("all");
@@ -236,6 +239,7 @@ export function FrontPage({ sector = null, initial = null, subtopics = [] }: { s
               }
             />
             {group && <SubtopicNav all={`/sector/${group.slug}`} nodes={subtopics} />}
+            {!group && days && <DayStrip days={dayStrip(days, null, istToday())} />}
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Scope">
                 {scopes.map(([s, l]) => (
@@ -257,6 +261,10 @@ export function FrontPage({ sector = null, initial = null, subtopics = [] }: { s
             <div className="mt-7 flex flex-wrap items-baseline gap-3 py-5" style={{ borderTop: "var(--rule-section) solid var(--ink)" }}>
               <p style={{ font: "var(--t-title)" }}>That&rsquo;s today&rsquo;s record.</p>
               <span className="p-count">{tally}</span>
+              {/* Where a reader goes next once today runs out: the day before. */}
+              {!group && yesterday && (
+                <Link href={`/feed/${yesterday.date}`} prefetch={false} className="p-link ml-auto">Yesterday&rsquo;s record →</Link>
+              )}
               {/* Peak-end, inline (04 P2-7); the numbers are common/quota.py's, via lib/billing. */}
               {!signedIn && (
                 <p className="basis-full" style={{ font: "var(--t-body-s)", color: "var(--ink-2)" }}>

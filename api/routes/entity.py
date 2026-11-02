@@ -199,6 +199,9 @@ async def get_entity(
     slug: str,
     response: Response,
     limit: int = Query(default=30, ge=1, le=MAX_RECORDS),
+    # Older records, newest first: the page printed "the latest 30" of thousands
+    # with no way to the rest (2026-11-02). The quotes stay on the newest records.
+    offset: int = Query(default=0, ge=0, le=100_000),
     lens: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> EntityPage:
@@ -243,11 +246,11 @@ async def get_entity(
                 {report_photo_join("e")}
                 WHERE ee.entity_id = :eid
                   AND COALESCE(jsonb_array_length(e.projection->'source_slugs'), 0) > 0
-                ORDER BY e.last_updated_at DESC
-                LIMIT :limit
+                ORDER BY e.last_updated_at DESC, e.id
+                LIMIT :limit OFFSET :offset
                 """
             ),
-            {"eid": entity["id"], "limit": limit, "placeholders": list(await placeholders(db))},
+            {"eid": entity["id"], "limit": limit, "offset": offset, "placeholders": list(await placeholders(db))},
         )
     ).mappings().all()
 
