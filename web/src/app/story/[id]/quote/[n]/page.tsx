@@ -5,7 +5,7 @@ import { ArrowUpRight, Check } from "@/components/icons";
 import { SectionHead } from "@/components/SectionHead";
 import { ShareButton } from "@/components/ShareButton";
 import { BackBar } from "@/components/ui";
-import { fetchEvent, type EventDetail, type FeedItem, type OutletRef } from "@/lib/api";
+import { fetchEvent, unlessMissing, type EventDetail, type FeedItem, type OutletRef } from "@/lib/api";
 import { langName, langNative } from "@/lib/languages";
 import { quoteLink } from "@/lib/quoteLink";
 import { findQuote, isReported, quoteProvenance, saidWords } from "@/lib/quotes";
@@ -17,12 +17,8 @@ import { indexSources } from "@/lib/sources";
 // card). Canonical stays the record, so search does not see a second copy.
 export async function generateMetadata({ params }: { params: Promise<{ id: string; n: string }> }): Promise<Metadata> {
   const { id, n } = await params;
-  let event;
-  try {
-    event = await fetchEvent(id);
-  } catch {
-    return { title: "Story not found" };
-  }
+  const event = await unlessMissing(fetchEvent(id)); // an outage throws: a 5xx, not a 404
+  if (!event) return { title: "Story not found" };
   const q = findQuote(event.claims, n, event.quote_aliases);
   if (!q) return { title: event.title };
   const title = `${saidWords(q.claim, 90)} — ${q.speaker}`;
@@ -83,12 +79,8 @@ function rowOf(event: EventDetail): FeedItem {
  */
 export default async function QuotePage({ params }: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await params;
-  let event: EventDetail;
-  try {
-    event = await fetchEvent(id);
-  } catch {
-    notFound();
-  }
+  const event = await unlessMissing(fetchEvent(id));
+  if (!event) notFound();
   // Merged into another record (see ../../page.tsx). A quote's address is its
   // words, so it follows to the record that now holds them; a pre-27-Sep
   // position named a place in ONE record's list and cannot — the record can.

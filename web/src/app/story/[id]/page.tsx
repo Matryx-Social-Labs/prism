@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { fetchEvent, fetchStateHubs, fetchSubjects, type EventDetail } from "@/lib/api";
+import { fetchEvent, fetchStateHubs, fetchSubjects, unlessMissing, type EventDetail } from "@/lib/api";
 import { StoryView } from "@/components/StoryView";
 import { subjectTrail } from "@/lib/sectors";
 import { breadcrumbLd, eventDescription, jsonLd, newsArticleLd, robotsUnless } from "@/lib/seo";
@@ -14,13 +14,9 @@ export const revalidate = 60;
 
 // Next memoizes native fetch per request, so generateMetadata and the page
 // share one call to fetchEvent.
-async function load(id: string): Promise<EventDetail | null> {
-  try {
-    return await fetchEvent(id);
-  } catch {
-    return null;
-  }
-}
+// null only when the record does not exist: an outage throws, so the page is a
+// 5xx (try again) and never a 404 telling a crawler the record is gone.
+const load = (id: string): Promise<EventDetail | null> => unlessMissing(fetchEvent(id));
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;

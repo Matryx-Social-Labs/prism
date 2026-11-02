@@ -21,13 +21,8 @@ import { SITE_URL } from "@/lib/site";
 // floor is the API's (`INDEXABLE_MIN_RECORDS`) and arrives as `indexable`.
 export const revalidate = 300;
 
-async function load(slug: string): Promise<EntityPayload | null> {
-  try {
-    return await fetchEntity(slug);
-  } catch {
-    return null;
-  }
-}
+// null only for a page that does not exist; an outage throws (a 5xx, not a 404).
+const load = (slug: string): Promise<EntityPayload | null> => fetchEntity(slug);
 
 /**
  * A state's own name has one page, its hub: /entity/karnataka and

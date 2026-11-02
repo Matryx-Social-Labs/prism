@@ -2,6 +2,7 @@
 
 import json
 import time
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import text
@@ -22,7 +23,7 @@ from common.embeddings import check_corpus_model
 from common.freshness import MAX_WINDOW_HOURS, MIN_WINDOW_HOURS, WINDOW_HOURS, pipeline_freshness
 from common.lenses import DEFAULT_LENS, active_lenses
 from common.logging import get_logger
-from common.outlets import monitored, record_indexable
+from common.outlets import monitored, record_indexable, record_indexable_sql
 from common.stream import backlog
 from common.taxonomy import TAXONOMY, display_name
 
@@ -129,16 +130,46 @@ async def get_regions():
     return {"country": "IN", "states": states_payload()}
 
 
+# The records sitemap's newest-report clock, never after the rebuild that took it in.
+_RECORD_LASTMOD = "LEAST(COALESCE((e.projection->>'latest_published_at')::timestamptz, e.last_updated_at), e.last_updated_at)"
+# A record's month in the sitemap: when Prism first saw it, which never changes,
+# so a record never moves between files.
+_RECORD_MONTH = "to_char(e.first_seen_at AT TIME ZONE 'UTC', 'YYYY-MM')"
+SITEMAP_MAX_URLS = 50000  # the sitemap protocol's ceiling per file
+
+
+@router.get("/api/v1/sitemap/records/months")
+async def sitemap_record_months(db: AsyncSession = Depends(get_db)):
+    """The files of the records sitemap index: one per month with an indexed
+    record, newest first, with how many it lists and its newest lastmod. One file
+    stopped at 50,000 URLs and, at ~300 indexable records a day, would have
+    dropped the oldest without a word within three months (2026-11-02)."""
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                SELECT {_RECORD_MONTH}, count(*), max({_RECORD_LASTMOD})
+                FROM events e
+                WHERE e.merged_into IS NULL AND {record_indexable_sql("e")}
+                GROUP BY 1 ORDER BY 1 DESC
+                """
+            )
+        )
+    ).all()
+    return {"months": [{"month": r[0], "records": r[1], "lastmod": r[2].isoformat() if r[2] else None} for r in rows]}
+
+
 @router.get("/api/v1/sitemap/records")
-async def sitemap_records(db: AsyncSession = Depends(get_db)):
-    """Every served record's id and last change, newest first, for the records
-    sitemap — the feed pages at 100 and the archive was invisible to crawlers
-    past the freshest hundred (audit H30). Capped at the sitemap protocol's
-    50,000 URLs per file; page this endpoint when the corpus passes it.
+async def sitemap_records(
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Every indexed record's id and last change, newest first: one month's file
+    of the records sitemap (`month=YYYY-MM`), or all of them up to the protocol's
+    ceiling when no month is given (the single file's old answer).
 
     Only records that ask to be indexed (common/outlets.record_indexable: two
     outlets or more), so the sitemap never offers a page whose robots say no.
-    Two sources is the SQL's cut; two publishers is the rule's.
 
     `lastmod` is the newest report's publication (the projection's
     `latest_published_at`), never after the record was last rebuilt with it:
@@ -148,24 +179,18 @@ async def sitemap_records(db: AsyncSession = Depends(get_db)):
     rows = (
         await db.execute(
             text(
+                f"""
+                SELECT e.id, {_RECORD_LASTMOD}
+                FROM events e
+                WHERE e.merged_into IS NULL AND {record_indexable_sql("e")}
+                  AND (CAST(:month AS text) IS NULL OR {_RECORD_MONTH} = :month)
+                ORDER BY e.last_updated_at DESC LIMIT {SITEMAP_MAX_URLS}
                 """
-                SELECT id,
-                       LEAST(COALESCE((projection->>'latest_published_at')::timestamptz, last_updated_at),
-                             last_updated_at),
-                       projection->'source_slugs'
-                FROM events
-                WHERE COALESCE(jsonb_array_length(projection->'source_slugs'), 0) >= 2
-                  AND merged_into IS NULL
-                ORDER BY last_updated_at DESC LIMIT 50000
-                """
-            )
+            ),
+            {"month": month},
         )
     ).all()
-    reg = await outlets.registry(db)
-    return {"records": [
-        {"id": str(r[0]), "lastmod": r[1].isoformat() if r[1] else None}
-        for r in rows if record_indexable(r[2] or [], reg)
-    ]}
+    return {"records": [{"id": str(r[0]), "lastmod": r[1].isoformat() if r[1] else None} for r in rows]}
 
 
 NEWS_SITEMAP_CAP = 1000  # Google News reads at most 1,000 URLs per sitemap

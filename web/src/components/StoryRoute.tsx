@@ -24,7 +24,7 @@ export function StoryRoute({ slug, currentId, onLoad }: { slug: string; currentI
 
   useEffect(() => {
     let cancelled = false;
-    fetchTrendingStory(slug).then((s) => {
+    fetchTrendingStory(slug).catch(() => null).then((s) => {
       if (cancelled) return;
       setStory(s);
       onLoad?.(s);
