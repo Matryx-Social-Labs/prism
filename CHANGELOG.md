@@ -3,6 +3,13 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.137.1] - 2026-11-02
+
+### Fixed — Today's lead block on a desk
+- With "Developing over days" in the right column, the column outgrew the lead and stretched the
+  lead card into a blank gap above its footer; the columns now align to the top. A developing
+  story's status pill hugs its words instead of running the card's width as a black bar.
+
 ## [0.0.137.0] - 2026-11-02
 
 ### Changed — Today is one page of sections, every record once
