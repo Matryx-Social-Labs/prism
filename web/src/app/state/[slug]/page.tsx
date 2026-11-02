@@ -28,8 +28,9 @@ export function generateStaticParams() {
 /** One-source rows shown under their own dashed head, newest first. */
 const SINGLE_ROWS = 20;
 
-/** Null when the API cannot answer: the page then says "Not counted yet", never 0. */
-const load = (hub: StateHub) => fetchStateHub(hub.code, revalidate).catch(() => null);
+/** Null when the API has no count for the state: the page then says "Not counted yet",
+ *  never 0. An outage throws instead: answered as noindex, the hub would leave the index. */
+const load = (hub: StateHub) => fetchStateHub(hub.code, revalidate);
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;

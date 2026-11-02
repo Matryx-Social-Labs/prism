@@ -60,8 +60,10 @@ describe("/state/<slug> — the floor decides the robots", () => {
     expect((await generateMetadata(params("assam"))).robots).toEqual(NOINDEX);
   });
 
-  it("asks not to be indexed when the counts could not be read, rather than guess", async () => {
-    fetchStateHub.mockRejectedValue(new Error("api down"));
+  it("asks not to be indexed when the API holds no count for the state, rather than guess", async () => {
+    // A 404 from the API (getJson's null). An outage throws instead, so the page is a
+    // 5xx and not a noindex page that leaves the index (app/outage-is-not-gone.test.tsx).
+    fetchStateHub.mockResolvedValue(null);
     expect((await generateMetadata(params("karnataka"))).robots).toEqual(NOINDEX);
   });
 
@@ -86,8 +88,8 @@ describe("/state/<slug> — counts, denominator and line form", () => {
     expect((await page("gujarat")).body.textContent).toContain("No outlet Prism reads has a desk in Gujarat yet");
   });
 
-  it("prints — and Not counted yet when the API cannot answer, never 0", async () => {
-    fetchStateHub.mockRejectedValue(new Error("api down"));
+  it("prints — and Not counted yet when the API holds no count, never 0", async () => {
+    fetchStateHub.mockResolvedValue(null);
     const text = (await page("karnataka")).body.textContent!;
     expect(text).toContain("Not counted yet");
     expect(text).not.toMatch(/\b0 records/);

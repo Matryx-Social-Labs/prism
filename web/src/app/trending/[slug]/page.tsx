@@ -11,13 +11,8 @@ import { jsonLd, robotsUnless, storyLd } from "@/lib/seo";
 // dated from the scaffold and cost a Railway round trip per view).
 export const revalidate = 60;
 
-async function load(slug: string): Promise<TrendingStoryDetail | null> {
-  try {
-    return await fetchTrendingStory(slug);
-  } catch {
-    return null;
-  }
-}
+// null only for a page that does not exist; an outage throws (a 5xx, not a 404).
+const load = (slug: string): Promise<TrendingStoryDetail | null> => fetchTrendingStory(slug);
 
 function blurb(s: TrendingStoryDetail): string {
   const lead = s.developments.find((d) => !d.is_current) ?? s.developments[0];

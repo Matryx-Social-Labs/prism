@@ -1,10 +1,12 @@
 import { API_URL } from "@/lib/api";
 import { SITE_URL } from "@/lib/site";
+import { lastmodTag, unavailable, xmlResponse } from "@/lib/sitemapXml";
 
-// The archive. sitemap.xml lists the static pages, the arcs and the freshest
-// hundred records; this lists every served record (audit H30 — past the
-// freshest hundred, the archive was invisible to crawlers within days). One
-// file until the corpus passes the protocol's 50,000 URLs, then an index.
+// The archive, as an index of one file per month (records-sitemap/<YYYY-MM>.xml).
+// sitemap.xml lists the static pages, the arcs and the freshest hundred records;
+// these list every indexed record (audit H30). One file stopped at the protocol's
+// 50,000 URLs, and October alone added 15,257 records (2026-11-02). The address
+// is the one submitted to Search Console, so it stays and becomes the index.
 //
 // Rendered per request and cached at the edge for an hour, never prerendered:
 // the first deploy baked an EMPTY file because the build ran while the API
@@ -13,27 +15,17 @@ import { SITE_URL } from "@/lib/site";
 // crawler comes back rather than recording a sitemap with nothing in it.
 export const dynamic = "force-dynamic";
 
-const lastmodTag = (t: string | null | undefined) => (t ? `<lastmod>${t}</lastmod>` : "");
-
 export async function GET(): Promise<Response> {
-  // `lastmod` is the newest report's time (api/routes/meta.py), not the
-  // projection rebuild clock; `last_updated_at` is an older API's field.
-  let records: { id: string; lastmod?: string | null; last_updated_at?: string | null }[];
+  let months: { month: string; lastmod: string | null }[];
   try {
-    const res = await fetch(`${API_URL}/api/v1/sitemap/records`, { cache: "no-store" });
+    const res = await fetch(`${API_URL}/api/v1/sitemap/records/months`, { cache: "no-store" });
     if (!res.ok) throw new Error(`api ${res.status}`);
-    records = (await res.json()).records ?? [];
+    months = (await res.json()).months ?? [];
   } catch {
-    return new Response("records unavailable", { status: 503, headers: { "Retry-After": "300" } });
+    return unavailable();
   }
-  const body = records
-    .map((r) => `  <url><loc>${SITE_URL}/story/${r.id}</loc>${lastmodTag(r.lastmod ?? r.last_updated_at)}</url>`)
+  const body = months
+    .map((m) => `  <sitemap><loc>${SITE_URL}/records-sitemap/${m.month}.xml</loc>${lastmodTag(m.lastmod)}</sitemap>`)
     .join("\n");
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
-  return new Response(xml, {
-    headers: {
-      "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
-    },
-  });
+  return xmlResponse(`<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</sitemapindex>\n`);
 }

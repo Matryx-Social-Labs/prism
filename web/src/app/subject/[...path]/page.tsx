@@ -18,13 +18,8 @@ import { SITE_URL } from "@/lib/site";
 // (common/subjects.py); this is the half that makes that true.
 export const revalidate = 120;
 
-async function load(path: string[]): Promise<SubjectPayload | null> {
-  try {
-    return await fetchSubject(path.join("/"));
-  } catch {
-    return null;
-  }
-}
+// null only for a page that does not exist; an outage throws (a 5xx, not a 404).
+const load = (path: string[]): Promise<SubjectPayload | null> => fetchSubject(path.join("/"));
 
 export async function generateMetadata({ params }: { params: Promise<{ path: string[] }> }): Promise<Metadata> {
   const { path } = await params;

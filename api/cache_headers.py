@@ -64,3 +64,24 @@ class PublicCacheHeaders:
             await send(message)
 
         await self.app(scope, receive, send_marked)
+
+
+class NoIndex:
+    """Every API response says `X-Robots-Tag: noindex`: the API is data for the web
+    app, and Search Console had https://api.readprism.news/ under "Not found (404)"
+    (2026-11-02). Pure ASGI, like PublicCacheHeaders, so streams pass untouched."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_marked(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message)["X-Robots-Tag"] = "noindex"
+            await send(message)
+
+        await self.app(scope, receive, send_marked)

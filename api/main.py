@@ -8,7 +8,7 @@ middleware, and routers. Response models live in api/schemas.py.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.cache_headers import PublicCacheHeaders
+from api.cache_headers import NoIndex, PublicCacheHeaders
 from api.deps import PREVIEW_ORIGIN, assert_admin_token_configured
 from api.routes import (
     admin,
@@ -67,6 +67,8 @@ app.add_middleware(
 # route set is identical to the pre-split single-file version.
 # Browser cache headers on the public reads (api/cache_headers.py).
 app.add_middleware(PublicCacheHeaders)
+# Every response, errors included: the API host is never a page (api/cache_headers.py).
+app.add_middleware(NoIndex)
 
 app.include_router(meta.router)
 app.include_router(auth.router)

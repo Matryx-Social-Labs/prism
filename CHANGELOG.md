@@ -3,6 +3,25 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.135.0] - 2026-11-02
+
+### Fixed — an outage told Google that live pages were gone
+- Search Console listed twelve records as "Not found (404)". All twelve were live, and all were
+  last crawled during the October database outages. The record, quote, story, actor and subject
+  pages read any failed API call as "no such page", so a 500 from the API went out as a 404. A
+  state page served itself as noindex instead. Only an API 404 means missing now (`NotFound`,
+  `unlessMissing` in `web/src/lib/api.ts`). Any other failure throws, Next answers 5xx, and
+  Google comes back later.
+- Every API response says `X-Robots-Tag: noindex`. The API is data for the web app, and Search
+  Console had `api.readprism.news/` in its 404 list.
+
+### Changed — the records sitemap is an index of one file per month
+- records-sitemap.xml was one file, capped at the protocol's 50,000 URLs. It listed 19,045
+  records and October alone added 15,257, so within about two months the oldest would have
+  fallen out without a word. It is now an index at the same address (the one submitted to
+  Search Console), pointing to records-sitemap/<YYYY-MM>.xml, one month each by when Prism first
+  saw the record. Search Console then reports indexing per month.
+
 ## [0.0.134.0] - 2026-11-02
 
 ### Changed — an actor page asks to be indexed only when it lists records that are indexed

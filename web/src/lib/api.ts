@@ -448,6 +448,21 @@ export interface StateHubPage extends StateHubCount {
   items: FeedItem[];
 }
 
+/** The API said there is no such thing. Any other failure is an outage, which a
+ *  page answers with a 5xx (try again), never a 404 (gone): read as "missing",
+ *  the October outages told Google twelve live records were gone (2026-11-02). */
+export class NotFound extends Error {}
+
+/** null when the thing does not exist; an outage still throws. */
+export async function unlessMissing<T>(p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof NotFound) return null;
+    throw e;
+  }
+}
+
 /** A settled answer or null; a failure throws, so a page never prints a guess as a count. */
 async function getJson<T>(path: string, revalidate: number): Promise<T | null> {
   const res = await fetch(`${API_URL}${path}`, { next: { revalidate } });
@@ -629,7 +644,8 @@ export async function fetchTrendingStory(slug: string): Promise<TrendingStoryDet
   const res = await fetch(`${API_URL}/api/v1/trending/${encodeURIComponent(slug)}`, {
     next: { revalidate: 120 },
   });
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`trending story failed: ${res.status}`);
   return (await res.json()) as TrendingStoryDetail;
 }
 
@@ -652,7 +668,8 @@ export interface SubjectPage {
 export async function fetchSubject(path: string): Promise<SubjectPage | null> {
   const clean = path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
   const res = await fetch(`${API_URL}/api/v1/subject/${clean}`, { next: { revalidate: 120 } });
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`subject failed: ${res.status}`);
   return (await res.json()) as SubjectPage;
 }
 
@@ -706,7 +723,8 @@ export async function fetchEntity(slug: string): Promise<EntityPage | null> {
   const res = await fetch(`${API_URL}/api/v1/entity/${encodeURIComponent(slug)}`, {
     next: { revalidate: 300 },
   });
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`entity failed: ${res.status}`);
   return (await res.json()) as EntityPage;
 }
 
@@ -933,6 +951,7 @@ export async function fetchEvent(id: string, token?: string | null): Promise<Eve
     headers: authHeaders(token),
     credentials: "include",
   });
+  if (res.status === 404) throw new NotFound(`event ${id}`);
   if (!res.ok) throw new Error(`event failed: ${res.status}`);
   return (await res.json()) as EventDetail;
 }
