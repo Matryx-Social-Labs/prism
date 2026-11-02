@@ -52,3 +52,13 @@ it("a state page fails when the API is down instead of serving itself as noindex
   await expect(stateMeta(p({ slug: "goa" }))).rejects.toBe(down);
   await expect(StateHubRoute(p({ slug: "goa" }))).rejects.toBe(down);
 });
+
+it("a state page still prerenders at build when the API is unreachable", async () => {
+  vi.stubEnv("NEXT_PHASE", "phase-production-build");
+  try {
+    await expect(stateMeta(p({ slug: "goa" }))).resolves.toBeTruthy();
+    await expect(StateHubRoute(p({ slug: "goa" }))).resolves.toBeTruthy();
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});

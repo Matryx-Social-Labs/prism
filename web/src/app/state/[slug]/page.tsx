@@ -1,3 +1,4 @@
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -29,8 +30,15 @@ export function generateStaticParams() {
 const SINGLE_ROWS = 20;
 
 /** Null when the API has no count for the state: the page then says "Not counted yet",
- *  never 0. An outage throws instead: answered as noindex, the hub would leave the index. */
-const load = (hub: StateHub) => fetchStateHub(hub.code, revalidate);
+ *  never 0. At request time an outage throws: answered as noindex, the hub would leave
+ *  the index, while a 5xx keeps the last good page (ISR) or tells the crawler to come
+ *  back. At build the API may be unreachable (CI has none; a deploy can race the API's),
+ *  so the prerender says "Not counted yet" and refreshes within `revalidate`. */
+const load = (hub: StateHub) =>
+  fetchStateHub(hub.code, revalidate).catch((e: unknown) => {
+    if (process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD) return null;
+    throw e;
+  });
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
