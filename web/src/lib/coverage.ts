@@ -1,4 +1,4 @@
-import type { OutletRef } from "@/lib/api";
+import type { EventDetail, OutletRef } from "@/lib/api";
 import { langName } from "@/lib/languages";
 
 /**
@@ -64,4 +64,12 @@ export function coverageText(outlets: OutletRef[], fallbackCount?: number): stri
 export function monitoredText(count: number, monitored: number | null | undefined): string {
   if (!monitored || monitored < count) return `${count} ${count === 1 ? "outlet" : "outlets"}`;
   return `${count} of ${monitored} monitored outlets`;
+}
+
+/** Registered-source facts from a record's own report list, one per feed (three Mint reports are one outlet). */
+export function outletsOf(event: EventDetail | null): OutletRef[] {
+  if (!event) return [];
+  return event.sources
+    .filter((s, i, all) => s.code && s.origin && all.findIndex((t) => t.source_slug === s.source_slug) === i)
+    .map((s) => ({ slug: s.source_slug, publisher: s.publisher ?? s.source_slug, name: s.source_name, code: s.code!, origin: s.origin as Origin, language: s.language ?? null, domain: s.domain ?? null }));
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import robots from "@/app/robots";
 import type { EventDetail, TrendingStoryDetail } from "@/lib/api";
-import { itemListLd, jsonLd, newsArticleLd, siteGraph, storyLd } from "@/lib/seo";
+import { eventDescription, itemListLd, jsonLd, newsArticleLd, siteGraph, storyLd } from "@/lib/seo";
 
 const event = {
   id: "e1",
@@ -115,5 +115,29 @@ describe("robots", () => {
     expect(rules[0].disallow).not.toContain("/grievance"); // the IT Rules page itself stays findable
     const blocked = rules.filter((x) => x.disallow === "/").map((x) => x.userAgent);
     for (const tool of ["AhrefsBot", "SERankingBacklinksBot", "Reflectionbot"]) expect(blocked).toContain(tool);
+  });
+});
+
+describe("a record's search snippet", () => {
+  // Search Console, 2026-11-02: 83% of impressions sat at positions 3-10 at about 2%
+  // CTR, beside the outlets' own articles. What a result adds is the count across
+  // outlets, so the description leads with it, in the page's own words.
+  const src = (slug: string, publisher: string, language: string) =>
+    ({ source_slug: slug, source_name: slug, publisher, code: slug.toUpperCase(), origin: "national", language });
+  const record = (sources: unknown[], summary = "Trump dismissed his press secretary after five days.") =>
+    ({ ...event, summary, sources }) as unknown as EventDetail;
+
+  it("leads with the outlets and languages the page counts, then the brief", () => {
+    const e = record([src("mint", "mint", "en"), src("nbt", "nbt", "hi"), src("ht", "ht", "en"), src("ht_delhi", "ht", "en")]);
+    expect(eventDescription(e)).toBe("3 outlets · 2 languages. Trump dismissed his press secretary after five days.");
+  });
+
+  it("names no language count for a record in one language", () => {
+    expect(eventDescription(record([src("mint", "mint", "en"), src("ht", "ht", "en")]))).toMatch(/^2 outlets\. Trump/);
+  });
+
+  it("stays within the snippet length", () => {
+    const long = record([src("mint", "mint", "en"), src("ht", "ht", "en")], "word ".repeat(80));
+    expect(eventDescription(long).length).toBeLessThanOrEqual(200);
   });
 });

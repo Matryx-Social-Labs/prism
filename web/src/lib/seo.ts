@@ -3,6 +3,7 @@
 // every field is read from the API payload the page already renders, and a
 // publisher's photograph is never declared as ours (DESIGN.md § Images).
 import type { EntityQuote, EntityRef, EventDetail, FeedItem, TrendingStory, TrendingStoryDetail } from "@/lib/api";
+import { coverageText, outletsOf } from "@/lib/coverage";
 import { isReported } from "@/lib/quotes";
 import { entityHref } from "@/lib/entities";
 import { CONTACT_EMAIL, GRIEVANCE_OFFICER, LEGAL_ENTITY } from "@/lib/legal";
@@ -115,8 +116,14 @@ export function firstReportedAt(event: EventDetail): string | null {
   return (event.sources ?? []).map((s) => s.published_at).filter((t): t is string => Boolean(t)).sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
 }
 
+/** A record's search snippet: the outlets and languages the page counts, then its
+ *  brief. Beside the outlets' own articles, the count across them is what a Prism
+ *  result adds; most impressions sat at positions 3-10 at ~2% CTR (2026-11-02). */
 export function eventDescription(event: EventDetail): string {
-  return clip(event.summary ?? event.lens_briefs?.reader ?? event.title);
+  const outlets = outletsOf(event);
+  const coverage = coverageText(outlets, new Set((event.sources ?? []).map((s) => s.source_slug)).size);
+  const brief = event.summary ?? event.lens_briefs?.reader ?? event.title;
+  return clip(event.sources?.length ? `${coverage}. ${brief}` : brief);
 }
 
 /**

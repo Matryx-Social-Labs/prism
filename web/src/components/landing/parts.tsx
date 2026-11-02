@@ -3,19 +3,12 @@ import { ChartRow } from "@/components/ChartRow";
 import { OutletIcon } from "@/components/Coverage";
 import { ArrowRight } from "@/components/icons";
 import type { EventDetail, FeedItem, OutletRef } from "@/lib/api";
-import type { Origin } from "@/lib/coverage";
 import { fallbackCode, indexSources } from "@/lib/sources";
 import { Ago } from "@/components/Ago";
 
 /** Pieces the landing and /about share (Design System v2 · screens/LandingPage). */
 
-/** Registered-source facts from a record's own report list, one per feed (three Mint reports are one outlet). */
-export function outletsOf(event: EventDetail | null): OutletRef[] {
-  if (!event) return [];
-  return event.sources
-    .filter((s, i, all) => s.code && s.origin && all.findIndex((t) => t.source_slug === s.source_slug) === i)
-    .map((s) => ({ slug: s.source_slug, publisher: s.publisher ?? s.source_slug, name: s.source_name, code: s.code!, origin: s.origin as Origin, language: s.language ?? null, domain: s.domain ?? null }));
-}
+export { outletsOf } from "@/lib/coverage"; // moved: seo.ts needs it without React
 
 /** A lead whose newest report is older than this is not called live. */
 export const LIVE_WITHIN_MS = 3 * 60 * 60 * 1000;
