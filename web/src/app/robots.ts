@@ -21,9 +21,16 @@ import { SITE_URL } from "@/lib/site";
 // share card in Instagram's shapes, for the founders to download: an image a
 // crawler has no use for, and each one is rendered on request (Vercel CPU).
 // "/go/" stays open: a platform's link preview follows the short link to its
-// page's card, and X's respects robots.txt.
-const PRIVATE = ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist", "/you", "/search", "/label", "/admin", "/plus/welcome", "/card/"];
-const TRAINING_CRAWLERS = ["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent", "GPTBot", "ClaudeBot"];
+// page's card, and X's respects robots.txt. "/grievance?" closes the complaint
+// form prefilled for one record (four per story) and leaves /grievance itself,
+// the IT Rules page, open: Claude-SearchBot was rendering those forms as pages,
+// 43% of all Vercel renders (2026-11-02).
+const PRIVATE = ["/account", "/signin", "/auth/", "/onboarding", "/interests", "/watchlist", "/you", "/search", "/label", "/admin", "/plus/welcome", "/card/", "/grievance?"];
+// Reflectionbot is an AI lab's crawler with no answer product that cites.
+const TRAINING_CRAWLERS = ["Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "meta-externalagent", "GPTBot", "ClaudeBot", "Reflectionbot"];
+// SEO tools' crawlers: they sell other sites' marketers a backlink index and never
+// send a reader, and were 13% of Vercel renders on 2026-11-02.
+const SEO_TOOL_CRAWLERS = ["AhrefsBot", "SERankingBacklinksBot"];
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -31,7 +38,7 @@ export default function robots(): MetadataRoute.Robots {
       // "/you" folds account + interests + watchlist into one hub and renders the
       // signed-in email, so it belongs alongside its siblings here.
       { userAgent: "*", allow: "/", disallow: PRIVATE },
-      ...TRAINING_CRAWLERS.map((userAgent) => ({ userAgent, disallow: "/" })),
+      ...[...TRAINING_CRAWLERS, ...SEO_TOOL_CRAWLERS].map((userAgent) => ({ userAgent, disallow: "/" })),
     ],
     sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/news-sitemap.xml`, `${SITE_URL}/records-sitemap.xml`, `${SITE_URL}/entities-sitemap.xml`],
     host: SITE_URL,

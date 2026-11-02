@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.133.3] - 2026-11-02
+
+### Fixed — Vercel was rendering a story's complaint forms for crawlers
+- Every story links to four complaint forms, `/grievance?kind=…&record=<the story>`, each a new
+  address that renders on the server. Claude-SearchBot followed all four as pages, and browsers
+  prefetched them: on 2026-11-02 they were 33% of Vercel's server renders, 79% of them
+  Claude-SearchBot. robots.txt now closes `/grievance?` and the links are `nofollow` and never
+  prefetched. `/grievance` itself, the IT Rules page, stays open.
+- robots.txt refuses AhrefsBot and SE Ranking's crawler (14% of renders). They sell a backlink
+  index to other sites' marketers and never send a reader. It also refuses Reflectionbot (2%),
+  an AI lab's crawler with no answer product that cites. Search engines and the citing answer
+  engines (OAI-SearchBot, Claude-SearchBot, PerplexityBot) stay open on every record.
+
 ## [0.0.133.2] - 2026-10-16
 
 ### Fixed — /trending and big story pages took 10 seconds

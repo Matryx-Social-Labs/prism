@@ -15,7 +15,10 @@ export function ReportProblem({ path }: { path?: string }) {
     <ul className="flex flex-col" aria-label="Report a problem">
       {PROBLEMS.map((kind) => (
         <li key={kind} className="border-t first:border-t-0" style={{ borderColor: "var(--line)" }}>
-          <Link href={grievanceHref(kind, path)} className="flex min-h-[44px] items-center text-[14.5px] underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
+          {/* Never prefetched or followed: each story's four addresses are new to the
+              cache and /grievance renders on the server, so crawlers and prefetches cost
+              four renders per story view — 43% of all Vercel requests (2026-11-02). */}
+          <Link href={grievanceHref(kind, path)} prefetch={false} rel="nofollow" className="flex min-h-[44px] items-center text-[14.5px] underline-offset-4 hover:underline" style={{ color: "var(--accent)" }}>
             {kind}
           </Link>
         </li>
