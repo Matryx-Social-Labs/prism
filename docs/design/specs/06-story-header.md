@@ -1,14 +1,17 @@
 # 06 · The story page's "Where it stands" header
 
-Built by T-007 (the counted header and the phone's coverage sheet), completed by T-052. Comp:
-`comps/story-header.html`.
+Built in two steps. **T-007** builds items 2, 3, 5, 6 and 7 below, `Share`, and the phone's `Who reported it`
+sheet, in today's shell. **T-052** adds the returning line (4), `Began` (8), the Follow control, and the wider
+forms of `Who reported it` — each needs something T-007 does not have (read marks from T-035, follow from
+T-050, the shell from T-042). Comp: `comps/story-header.html`.
 
 ## Purpose
 
 A reader arriving cold at a running story learns its shape in a few seconds — how long it has run, how much
 has happened, how widely it is reported, the latest thing and the first — and a returning reader sees how
-much is new. Everything in the header is counted or is a headline already on the record. Prism writes
-nothing here.
+much is new. Everything in the header is counted or is a headline already on the record. The only words of
+Prism's own are the story's name — the same name the Stories list gives it — and nothing is written for this
+header.
 
 ## Where it lives
 
@@ -28,10 +31,13 @@ three, then by day) is T-052's and is not in this spec.
 
    | Figure | Label | Goes to |
    |---|---|---|
-   | `{d}` | `days running` (`day running` for 1) | the first day of the timeline |
-   | `{n}` | `developments` (`records` while the grouping is provisional) | the top of the timeline |
-   | `{k}` | `outlets` | Who reported it |
-   | `{l}` | `languages` | Who reported it, grouped by language |
+   | `{d}` | `days running` (`day running` for 1) | the first development's record, the same link as `Began`; from T-052, Day 1 of the timeline |
+   | `{n}` | `developments` (`development` for 1; `records` / `record` while the grouping is provisional) | the top of the timeline |
+   | `{k}` | `outlets` (`outlet` for 1) | Who reported it |
+   | `{l}` | `languages` (`language` for 1) | Who reported it, at its first language group |
+
+   A stat that is not counted yet keeps its label, prints `—` for the figure with `Not counted yet` under the
+   label, and is not a link.
 
    Figures are grouped by `Intl` (`5,695`). The day count and the outlet count are the same numbers the
    Stories list prints for this story (T-007 makes them one query and tests it).
@@ -39,11 +45,14 @@ three, then by day) is T-052's and is not in this spec.
    the ChevronDown icon: on compact and medium it opens the sheet below; at expanded the list is already
    beside the header and the button is not drawn.
 7. **`Latest`** — under a 1px rule: the eyebrow `Latest` and its time in mono; the development's headline
-   (record voice, title; the link to that record); mono `{k} outlets · {l} languages`. A latest development
-   from one outlet has the dashed left rule and the words `One source so far`.
+   (record voice, title; the link to that record); the line that says whose headline it is, exactly as spec
+   01's headline states give it; mono `{k} outlets · {l} languages`. A latest development from one outlet has
+   the dashed left rule and the words `One source so far`.
 8. **`Began`** — under a 1px rule: the eyebrow `Began` and the date in mono; the first development's headline
-   in the reading voice (`--ink-2`, two lines at most), a link to it.
+   in the reading voice (`--ink-2`, two lines at most), a link to it, with the same whose-headline line.
 9. **Actions:** the Follow control at its default size (spec 02), and `Share` (ghost, with the Share icon).
+   Where the page already has a fixed bar that carries Share (the story's Ask · Share bar on a phone and a
+   tablet), the header's row is Follow alone: Share is on the page once.
 
 ### Who reported it
 
@@ -51,9 +60,12 @@ three, then by day) is T-052's and is not in this spec.
   it`; mono `{k} outlets · {l} languages`; the coverage bar with its legend in words and counts —
   `English national {a} · International {b} · Indian-language {c} · Wire {d}` — then every outlet, grouped by
   language (the language's own name as each group's eyebrow, with its count), one outlet per line with the
-  number of its reports in mono. The sheet scrolls inside; Close at the top right.
-- **Expanded: the evidence rail** beside the header (320): the same title, counts and list, the first twelve
-  outlets and the link `All {k}`, which opens the full list in a right drawer.
+  number of its reports in mono. Groups are ordered by their number of outlets, most first; outlets inside a
+  group by their number of reports, most first; ties by name. The sheet scrolls inside; Close at the top
+  right.
+- **Expanded: the evidence rail** beside the header (320): the same title, counts and legend, then the twelve
+  outlets with the most reports and the link `All {k}`, which opens the full grouped list in a right drawer.
+  Here the `outlets` and `languages` stats move focus to the rail's heading rather than opening anything.
 
 ## States
 
@@ -87,7 +99,10 @@ All strings above. Also:
 | A stat's accessible name | the figure and label together: `100 developments` |
 
 The header never prints a sentence about what the story is. The story's name and the two headlines are the
-only prose, and each is either an outlet's or Prism's labelled headline (D-18).
+only prose. Each headline is an outlet's or Prism's, and says which (D-18; spec 01, headline states). The
+story's name is Prism's label for the story, as everywhere a story is named.
+
+Share text uses the same singulars as the stats: `1 development`, `1 outlet`, `1 language`.
 
 ## Layout
 

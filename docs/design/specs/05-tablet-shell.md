@@ -68,6 +68,7 @@ up; only compact trades it for the back bar.
 
 | State | Behaviour |
 |---|---|
+| Empty · At the free limit | Do not apply: the shell is never empty and nothing in it is metered. |
 | Signed out | Identical. You opens the signed-out You page (`Sign in` is there). At expanded the top bar's right end is `Sign in`. |
 | Loading a destination | The shell does not change; the content area shows that surface's skeleton. The pressed destination becomes current at once. |
 | Offline or the API unreachable | The shell stays; the content area shows the surface's error state. No banner is added to the shell. |
@@ -86,7 +87,7 @@ up; only compact trades it for the back bar.
 | The mark's link in the rail | `Today` (its accessible name) |
 | Skip link, first in the page | `Skip to the content` |
 | Search field (expanded) | placeholder `Search stories, people, places` |
-| Count badge, for a screen reader | `Following, {k} stories moved` |
+| Count badge, for a screen reader | `Following, {k} stories moved` · `Following, 1 story moved` |
 
 ## Motion
 
@@ -116,6 +117,7 @@ BottomTabBar, TopBar (`SiteHeader` + `HeaderNav`), Masthead, SkipLink, Badge. Ic
 | Size-class tokens and the reading-measure rule | T-040, T-042 |
 | The five destinations and Pulse under Following | D-20; T-050 (Following), T-044 |
 | The count of followed stories that moved | T-035 |
+| Until T-050 ships Following | the fourth destination is already labelled `Following`, opens today's `/watchlist`, and carries no count |
 
 ## Decided here
 

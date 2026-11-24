@@ -23,7 +23,9 @@ separately. Every language is shown by its own name in its own script.
    per language that has a finished interface — at first `English` and `हिंदी`. Each cell shows the language's
    own name in the record face of its script; the chosen cell has a 2px ink border and a Check. Under the
    group in `--ink-3`: `The menus and labels. More languages are being added.`
-   Choosing a language re-renders the step in it at once; nothing waits for `Continue`.
+   Choosing a language re-renders the step in it at once; nothing waits for `Continue`. The choice replaces
+   the address prefix and is stored on the device at that moment, so it survives `Skip for now`, a reload or
+   leaving. The grid below does not re-order while the reader is on the step.
    **While only one interface language is finished, question 1 is not drawn** and the step is question 2 alone.
 4. **Question 2 · `Read the news in`** (h2), under a 3px rule. In `--ink-3`: `Headlines and quotes appear in
    these languages when an outlet printed them. Choose none to see every language.` Then a grid of checkbox
@@ -38,24 +40,39 @@ separately. Every language is shown by its own name in its own script.
 5. **A footer bar**, fixed to the bottom of the step: the primary button, then `Skip for now`.
    - The primary carries the count: `Continue with {k} languages` · `Continue with 1 language` · with none
      ticked, `Continue with every language`.
-   - `Skip for now` keeps the defaults: the interface language from the address (`/hi/…`) or else the browser
-     if Prism speaks it or else English; reading languages, every language.
+   - `Skip for now` leaves onboarding, as it does today, and keeps the defaults: the interface language as
+     it stands (whatever the reader chose in question 1, else the address's `/hi/…`, else the browser's if
+     Prism speaks it, else English); reading languages, **the interface language alone**.
+   - A reader who has never seen the step is treated the same as one who skipped it. "Every language" is
+     stored only when a reader presses `Continue with every language`.
 
 ## What the choices do
 
 - **Read Prism in** sets the interface: labels, dates through `Intl`, and the address prefix (D-01: `/hi/`).
   Counts stay in Latin digits in every language.
-- **Read the news in** decides which original-language headlines and quotes are shown as printed. Anything in
-  a language the reader did not tick is shown in the interface language and marked as a translation, with the
-  original one tap away. Ticking none means every language is shown as printed — which is why the button says
-  so. A reader is never shown a script they did not choose without that choice being theirs.
+- **Read the news in** decides which original-language headlines and quotes are shown as printed, on a record
+  and on a story page:
+  - where the same thing exists in a language the reader ticked (an outlet's headline, a quote printed in two
+    languages), that one leads;
+  - text that exists only in a language the reader did not tick is shown in the interface language, marked as
+    a translation, with the original one tap away — **once translation is live** (T-066, through T-018's
+    gate). Until then it is shown as printed with its language named, which is today's rule: Prism does not
+    hide a quote, and does not show a translation it has not checked;
+  - ticking none means no preference: everything is shown as printed. That is why the button says so.
+- **The edition is not varied by reading languages.** It is one document per interface language, the same for
+  every reader of it (T-038); its quote and headline are chosen for that language when the document is
+  written (spec 01).
+- A reader is never shown a script they did not choose without being told what it is: the language is always
+  named beside it.
 - Both are stored in the profile (T-035) and, signed out, on the device.
 
 ## States
 
 | State | What the reader sees |
 |---|---|
+| Loading (the saved choices or the language list have not arrived) | Skeleton cells in the grid's shape; the primary is disabled until they arrive. `Skip for now` works throughout. |
 | Default | As above, with the pre-ticked cells. |
+| Empty · At the free limit | Do not apply: the grid always has the languages Prism reads, and nothing here is metered. |
 | A cell: hover / focus / checked / pressed | `--sunken` ground · the 2px accent focus ring around the cell · 2px ink border and Check · the Button's pressed ground. |
 | Interface language changed | The whole step re-renders in it at once (title, questions, the small names, the buttons). The ticks do not change, except that the new interface language becomes ticked. |
 | None ticked | The primary reads `Continue with every language`. It is never disabled. |
@@ -70,10 +87,11 @@ separately. Every language is shown by its own name in its own script.
 
 Two rows, hairline between, 56px+:
 - `Read Prism in` — the current language by its own name; a select of the finished interface languages.
-  Changing it applies at once and moves the reader to the same page under the new prefix.
+  Changing it applies at once and moves the reader to the same page under the new prefix. Like question 1,
+  this row is not drawn while only one interface language is finished.
 - `Read the news in` — the ticked languages by their own names, comma-separated (`Every language` when none),
-  and `Change`, which opens the grid of question 2 in a Sheet (bottom on compact, dialog from medium) with
-  `Save` and `Cancel`.
+  and `Change`, which opens the grid of question 2 in a Sheet titled `Read the news in`, with `Save` and
+  `Cancel`. Closing it any other way (Escape, the scrim, back) is `Cancel`: nothing is stored.
 
 States: `Saving…` replaces the value while it saves; `That did not save. Try again.` under the row on failure.
 
@@ -88,8 +106,10 @@ server when the request's language asks for it).
 
 ## Copy
 
-All strings above. The Hindi strings shown in the comp are illustrations; T-054's catalogue and its native
-review write the real ones. Rules for the catalogue that follow from this spec:
+All strings above. The offer's sentence, as the catalogue key every language translates into itself:
+`Prism is also in {language}.` · link `Read in {language}` — always shown in the offered language, never in
+English. The Hindi strings shown in the comp are illustrations; T-054's catalogue and its native review write
+the real ones. Rules for the catalogue that follow from this spec:
 
 - A language is always written by its own name (`हिंदी`, `ಕನ್ನಡ`, `اردو`); the name in the interface language
   is the small second line and is never the only label.
@@ -147,7 +167,9 @@ and line height by script — on native this is required). New: `LanguageCell`, 
    and a reader sees that the two answers are different kinds before answering either.
 2. **`Read Prism in` offers only finished interfaces**; the grid offers every language Prism reads. Showing
    thirteen interface languages of which eleven fall back to English would promise what does not exist.
-3. **No minimum and no forced English.** None ticked means every language, and the button says so.
+3. **No minimum and no forced English.** None ticked means every language, and the button says so. A reader
+   who skips or never answers reads in the interface language alone; "every language" is only ever a choice
+   the reader made.
 4. **Own name large, the interface-language name small** (board E2), in the record face of each script, so a
    reader finds theirs by sight.
 5. **The interface language applies at once**, not on `Continue`: the reader checks the result by reading
