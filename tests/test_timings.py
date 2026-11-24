@@ -13,11 +13,13 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import text
 
 from common import stream, timings
 from common.decisions import ChoiceAnswer, NoulAnswer
 from common.stream import get_redis
 from correlation import consumer, verify
+from tests.test_pipeline_recovery import fresh_redis  # noqa: F401 — a client on this test's loop
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -80,7 +82,7 @@ def test_no_observations_have_no_quantile():
 
 # ── the store ──
 
-async def test_a_day_adds_up_and_a_day_with_no_hash_is_unrecorded(monkeypatch):
+async def test_a_day_adds_up_and_a_day_with_no_hash_is_unrecorded(monkeypatch, fresh_redis):  # noqa: F811
     if not await _redis_up():
         pytest.skip("no redis")
     day = dt.date(2001, 1, 1) + dt.timedelta(days=uuid.uuid4().int % 3000)  # a day no one else writes
@@ -102,6 +104,27 @@ async def test_a_day_adds_up_and_a_day_with_no_hash_is_unrecorded(monkeypatch):
         {"name": "match_lock.wait", "n": 4, "p50_ms": 5, "p95_ms": 1000},
     ]
     assert today["counters"] == [{"name": "dead.raw.items.rebill", "n": 3}]
+
+
+async def test_a_stalled_redis_costs_at_most_the_write_timeout(monkeypatch):
+    """The client has no read timeout, and a write can run under the match lock."""
+
+    class _Stalled:
+        def pipeline(self, **_k):
+            return self
+
+        def hincrby(self, *_a):
+            return None
+
+        def expire(self, *_a):
+            return None
+
+        async def execute(self):
+            await asyncio.Event().wait()  # never answers
+
+    monkeypatch.setattr(timings, "get_redis", lambda: _Stalled())
+    monkeypatch.setattr(timings, "WRITE_TIMEOUT_S", 0.01)
+    await asyncio.wait_for(timings.observe("match_lock.held", 5.0), 2)  # returns, raises nothing
 
 
 async def test_a_redis_outage_never_costs_the_call(monkeypatch):
@@ -131,7 +154,7 @@ class _Session:
     async def execute(self, stmt, *_a):
         if "pg_advisory_xact_lock" in str(stmt):
             await asyncio.sleep(self._lock_s)
-        return SimpleNamespace(scalar_one_or_none=lambda: self._attached)
+        return SimpleNamespace(scalar_one_or_none=lambda: self._attached, scalar=lambda: "0")
 
 
 def _scope(session, commit_s: float):
@@ -188,6 +211,47 @@ async def test_a_replayed_message_takes_no_lock_and_records_nothing(monkeypatch,
     monkeypatch.setattr(consumer, "session_scope", _scope(_Session(attached=uuid.uuid4()), commit_s=0))
     await consumer.handle_enriched_item(_payload())
     assert recorded["observe"] == []
+
+
+async def test_waiting_for_the_lock_outlives_the_statement_timeout_and_restores_it(monkeypatch):
+    """REGRESSION: the worker runs with a statement_timeout; a repair tool holding
+    the lock for longer must not get the wait cancelled (and the article
+    dead-lettered). The override comes back for everything after the lock."""
+    from sqlalchemy.exc import DBAPIError, SQLAlchemyError
+
+    from common.db import QUERY_CANCELED, session_scope, sqlstate_in_chain
+
+    try:
+        async with session_scope() as s:
+            await s.execute(text("SELECT 1"))
+    except (SQLAlchemyError, OSError):
+        pytest.skip("no database")
+
+    async def nothing(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(timings, "count", nothing)  # session_scope counts the cancel
+    held = asyncio.Event()
+
+    async def hold() -> None:
+        async with session_scope() as other:
+            await other.execute(text("SELECT pg_advisory_xact_lock(hashtext('correlation.match_or_create'))"))
+            held.set()
+            await asyncio.sleep(0.3)
+
+    holder = asyncio.create_task(hold())
+    await held.wait()
+    seen: dict = {}
+    with pytest.raises(DBAPIError) as caught:
+        async with session_scope(statement_timeout="50ms") as s:
+            await consumer._take_match_lock(s)
+            seen["wait_ms"] = s.info["match_lock"][0]
+            seen["timeout"] = (await s.execute(text("SHOW statement_timeout"))).scalar()
+            await s.execute(text("SELECT pg_sleep(1)"))
+    await holder
+    assert seen["wait_ms"] >= 200, "the wait ran past the 50ms timeout"
+    assert seen["timeout"] == "50ms"
+    assert sqlstate_in_chain(caught.value, {QUERY_CANCELED}), "a slow query after the lock is still cancelled"
 
 
 async def test_attach_takes_the_lock_through_the_timed_helper():
@@ -309,7 +373,7 @@ async def test_queue_age_is_observed_only_for_what_this_sweeper_claimed(monkeypa
     assert name == "analysis.queue_age" and 30_000 <= ms < 40_000
 
 
-async def test_the_queue_reports_what_is_due_and_how_long_it_waited(monkeypatch):
+async def test_the_queue_reports_what_is_due_and_how_long_it_waited(monkeypatch, fresh_redis):  # noqa: F811
     if not await _redis_up():
         pytest.skip("no redis")
     import time

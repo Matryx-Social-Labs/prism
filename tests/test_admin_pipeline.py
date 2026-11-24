@@ -6,15 +6,17 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from api.main import app
-from common import auth, freshness
+from common import auth, freshness, timings
 from common.config import get_settings
 from common.db import session_scope
 from common.stream import get_redis
+from tests.test_pipeline_recovery import fresh_redis  # noqa: F401 — a client on this test's loop
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -45,16 +47,19 @@ async def test_each_stage_is_counted_in_the_hour_it_completed():
     if not await _db_reachable():
         pytest.skip("no database")
     hour = datetime.now(UTC).replace(minute=0, second=0, microsecond=0) - timedelta(hours=100)
-    src, event, done, waiting, art = (uuid.uuid4() for _ in range(5))
+    later = hour + timedelta(hours=1)
+    src, event, done, waiting, late, art = (uuid.uuid4() for _ in range(6))
     async with session_scope() as s:
-        before = _hour_row(await freshness.stage_throughput(s, hours=168), hour)
+        rows = await freshness.stage_throughput(s, hours=168)
+        before = {h: _hour_row(rows, h) for h in (hour, later)}
     try:
         async with session_scope() as s:
             await s.execute(text("INSERT INTO sources (id, slug, name, source_type, publisher, country, language) "
                                  "VALUES (:i, :s, :s, 'rss', :s, 'IN', 'en')"), {"i": src, "s": f"tp-{src.hex[:10]}"})
             await s.execute(text("INSERT INTO events (id, title, summary, last_updated_at) VALUES (:e, 't', 's', now())"),
                             {"e": event})
-            for raw, observed, classified in ((done, 5, 10), (waiting, 40, None)):
+            # `late` is observed in one hour and classified in the next.
+            for raw, observed, classified in ((done, 5, 10), (waiting, 40, None), (late, 50, 70)):
                 await s.execute(
                     text("INSERT INTO raw_items (id, source_id, external_id, url, title, language, raw, relevance, "
                          "observed_at, classified_at) VALUES (:r, :s, :x, :u, 't', 'en', '{}', 'relevant', :o, :c)"),
@@ -68,6 +73,7 @@ async def test_each_stage_is_counted_in_the_hour_it_completed():
                             {"e": event, "a": art, "c": hour + timedelta(minutes=30)})
         async with session_scope() as s:
             rows = await freshness.stage_throughput(s, hours=168)
+            parallel = (await s.execute(text("SHOW max_parallel_workers_per_gather"))).scalar()
             current_only = await freshness.stage_throughput(s, hours=0)
     finally:
         async with session_scope() as s:
@@ -76,16 +82,20 @@ async def test_each_stage_is_counted_in_the_hour_it_completed():
             await s.execute(text("DELETE FROM raw_items WHERE source_id = :s"), {"s": src})
             await s.execute(text("DELETE FROM events WHERE id = :e"), {"e": event})
             await s.execute(text("DELETE FROM sources WHERE id = :s"), {"s": src})
-    after = _hour_row(rows, hour)
-    added = {k: after[k] - before[k] for k in ("observed", "classified", "enriched", "correlated")}
-    assert added == {"observed": 2, "classified": 1, "enriched": 1, "correlated": 1}
+    added = {h: {k: _hour_row(rows, h)[k] - before[h][k] for k in ("observed", "classified", "enriched", "correlated")}
+             for h in (hour, later)}
+    assert added[hour] == {"observed": 3, "classified": 1, "enriched": 1, "correlated": 1}
+    assert added[later] == {"observed": 0, "classified": 1, "enriched": 0, "correlated": 0}
+    assert parallel == "0", "no parallel workers for a whole-table scan"
     assert [r["hour"] for r in rows] == sorted((r["hour"] for r in rows), reverse=True), "newest first"
     assert all(set(r) == {"hour", "observed", "classified", "enriched", "correlated"} for r in rows)
     this_hour = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
     assert all(r["hour"] >= (this_hour - timedelta(hours=1)).isoformat() for r in current_only), "0 clamps to 1 hour"
 
 
-async def test_only_a_founder_reads_the_pipeline_and_the_shape_is_fixed(monkeypatch):
+@pytest_asyncio.fixture(loop_scope="session")
+async def tokens(monkeypatch, fresh_redis):  # noqa: F811
+    """(founder, reader) bearer tokens; skips without the database or Redis."""
     if not await _db_reachable():
         pytest.skip("no database")
     if not await _redis_up():
@@ -98,20 +108,49 @@ async def test_only_a_founder_reads_the_pipeline_and_the_shape_is_fixed(monkeypa
         fb = await auth.create_session(s, founder)
         rb = await auth.create_session(s, reader)
     monkeypatch.setattr(get_settings(), "prism_admin_emails", f"founder-{tag}@example.test")
-    try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-            assert (await c.get("/api/v1/admin/pipeline")).status_code == 401
-            assert (await c.get("/api/v1/admin/pipeline", headers={"Authorization": f"Bearer {rb}"})).status_code == 403
-            assert (await c.get("/api/v1/admin/pipeline?days=31", headers={"Authorization": f"Bearer {fb}"})).status_code == 422
-            r = await c.get("/api/v1/admin/pipeline?days=3", headers={"Authorization": f"Bearer {fb}"})
-        assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
-        body = r.json()
-        assert set(body) == {"days", "sweeper", "throughput"}
-        assert len(body["days"]) == 3
-        assert all(set(d) == {"day", "recorded", "timings", "counters"} for d in body["days"])
-        assert body["sweeper"] is None or set(body["sweeper"]) == {"due", "oldest_due_age_s"}
-        assert isinstance(body["throughput"], list)
-    finally:
-        async with session_scope() as s:
-            await s.execute(text("DELETE FROM sessions WHERE user_id = ANY(:u)"), {"u": [founder, reader]})
-            await s.execute(text("DELETE FROM users WHERE id = ANY(:u)"), {"u": [founder, reader]})
+    yield fb, rb
+    async with session_scope() as s:
+        await s.execute(text("DELETE FROM sessions WHERE user_id = ANY(:u)"), {"u": [founder, reader]})
+        await s.execute(text("DELETE FROM users WHERE id = ANY(:u)"), {"u": [founder, reader]})
+
+
+async def _get(path: str, token: str | None = None):
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        return await c.get(path, headers=headers)
+
+
+async def test_only_a_founder_reads_the_pipeline_and_the_shape_is_fixed(tokens):
+    fb, rb = tokens
+    assert (await _get("/api/v1/admin/pipeline")).status_code == 401
+    assert (await _get("/api/v1/admin/pipeline", rb)).status_code == 403
+    assert (await _get("/api/v1/admin/pipeline?days=31", fb)).status_code == 422
+    r = await _get("/api/v1/admin/pipeline?days=3", fb)
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    body = r.json()
+    assert set(body) == {"days", "sweeper", "throughput"}
+    assert len(body["days"]) == 3
+    assert all(set(d) == {"day", "recorded", "timings", "counters"} for d in body["days"])
+    assert set(body["sweeper"]) == {"due", "oldest_due_age_s"}
+    assert isinstance(body["throughput"], list)
+
+
+async def test_unreadable_timings_blank_only_their_part(tokens, monkeypatch):
+    async def unreadable(*_a, **_k):
+        raise ConnectionError("redis down")
+
+    monkeypatch.setattr(timings, "days", unreadable)
+    r = await _get("/api/v1/admin/pipeline?days=3", tokens[0])
+    assert r.status_code == 200
+    body = r.json()
+    assert body["days"] is None
+    assert isinstance(body["throughput"], list) and set(body["sweeper"]) == {"due", "oldest_due_age_s"}
+
+
+async def test_a_failed_throughput_query_blanks_only_its_part(tokens, monkeypatch):
+    monkeypatch.setattr(freshness, "_THROUGHPUT_SQL", text("SELECT 1 / 0 AS hour"))
+    r = await _get("/api/v1/admin/pipeline?days=3", tokens[0])
+    assert r.status_code == 200, "the aborted transaction must not fail the request"
+    body = r.json()
+    assert body["throughput"] is None
+    assert len(body["days"]) == 3 and set(body["sweeper"]) == {"due", "oldest_due_age_s"}

@@ -366,25 +366,26 @@ async def pipeline_freshness(
 # classified_at on raw_items, an enriched (relevant) item's article fetched_at, an
 # article's membership created_at. One row per raw item and per article
 # (uq_articles_raw_item, uq_event_memberships_article), so no first-of-many here.
+# raw_items (with its article) is read once; each row stamps up to three stages.
 _THROUGHPUT_SQL = text(
     """
     WITH since AS (SELECT date_trunc('hour', now(), 'UTC') - make_interval(hours => :hours - 1) AS t),
-    done AS (
-        SELECT 'observed' AS stage, observed_at AS at FROM raw_items, since WHERE observed_at >= since.t
+    stamps AS (
+        SELECT s.stage, s.at
+        FROM raw_items r
+        LEFT JOIN articles a ON a.raw_item_id = r.id
+        CROSS JOIN LATERAL (VALUES ('observed', r.observed_at), ('classified', r.classified_at),
+                                   ('enriched', CASE WHEN r.relevance = 'relevant' THEN a.fetched_at END)) s(stage, at)
         UNION ALL
-        SELECT 'classified', classified_at FROM raw_items, since WHERE classified_at >= since.t
-        UNION ALL
-        SELECT 'enriched', a.fetched_at FROM articles a JOIN raw_items r ON r.id = a.raw_item_id, since
-        WHERE a.fetched_at >= since.t AND r.relevance = 'relevant'
-        UNION ALL
-        SELECT 'correlated', m.created_at FROM event_memberships m, since WHERE m.created_at >= since.t
+        SELECT 'correlated', m.created_at FROM event_memberships m
     )
     SELECT date_trunc('hour', at, 'UTC') AS hour,
            count(*) FILTER (WHERE stage = 'observed')::int AS observed,
            count(*) FILTER (WHERE stage = 'classified')::int AS classified,
            count(*) FILTER (WHERE stage = 'enriched')::int AS enriched,
            count(*) FILTER (WHERE stage = 'correlated')::int AS correlated
-    FROM done GROUP BY 1 ORDER BY 1 DESC
+    FROM stamps, since WHERE at >= since.t
+    GROUP BY 1 ORDER BY 1 DESC
     """
 )
 
@@ -393,6 +394,8 @@ async def stage_throughput(db: AsyncSession, hours: int = WINDOW_HOURS) -> list[
     """Items completing each stage per UTC hour over the last `hours` hours
     (clamped 1..168; the current hour is partial), newest first. Hours where
     nothing completed are absent."""
-    hours = max(MIN_WINDOW_HOURS, min(MAX_WINDOW_HOURS, int(hours)))
-    rows = (await db.execute(_THROUGHPUT_SQL, {"hours": hours})).mappings().all()
+    # No index on these clocks: whole-table scans. Parallel workers' shared memory filling
+    # /dev/shm took the database down on 2026-10-16 and 2026-10-20; a founder page must not.
+    await db.execute(text("SELECT set_config('max_parallel_workers_per_gather', '0', true)"))
+    rows = (await db.execute(_THROUGHPUT_SQL, {"hours": _clamped(hours)})).mappings().all()
     return [{**r, "hour": r["hour"].isoformat()} for r in rows]

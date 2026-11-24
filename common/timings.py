@@ -13,6 +13,7 @@ A day with no hash is `recorded: False`, never zero.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import math
 import time
@@ -26,6 +27,9 @@ from common.stream import get_redis
 logger = get_logger(__name__)
 
 KEEP_DAYS = 30
+# The client has a connect timeout but no read timeout, and a write can run under
+# the match lock: a stalled Redis must cost at most this, then be dropped.
+WRITE_TIMEOUT_S = 1.0
 # Upper bounds in ms, roughly 1.5x apart: 1 ms to a day.
 BUCKETS_MS = (
     1, 2, 3, 5, 7, 10, 15, 20, 30, 50, 70, 100, 150, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 5000, 7000,
@@ -71,7 +75,7 @@ async def _incr(field: str, n: int) -> None:
         pipe = get_redis().pipeline(transaction=False)
         pipe.hincrby(key, field, n)
         pipe.expire(key, KEEP_DAYS * 86400)
-        await pipe.execute()
+        await asyncio.wait_for(pipe.execute(), WRITE_TIMEOUT_S)
     except Exception as exc:  # noqa: BLE001 — observability never costs a call
         logger.warning("timing_record_failed", field=field, error=str(exc)[:160])
 

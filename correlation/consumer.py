@@ -192,10 +192,21 @@ async def handle_enriched_item(payload: dict) -> None:
 
 async def _take_match_lock(session) -> None:
     """The match-or-create lock, timed: the wait and when it was acquired go on
-    session.info for _record_match_lock once the transaction has ended."""
+    session.info for _record_match_lock once the transaction has ended.
+
+    Waiting for the lock is not a runaway query: a repair tool can hold it for
+    minutes, and the worker's statement_timeout would cancel the wait and
+    eventually dead-letter the article. So the timeout is off for the lock
+    statement only, transaction-locally, and the previous value (the process
+    default or a session_scope override; never RESET, which drops the override)
+    is put back after it."""
+    prev = (await session.execute(text(
+        "SELECT current_setting('statement_timeout') AS prev, set_config('statement_timeout', '0', true)"
+    ))).scalar()
     started = time.perf_counter()
     await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('correlation.match_or_create'))"))
     acquired = time.perf_counter()
+    await session.execute(text("SELECT set_config('statement_timeout', :prev, true)"), {"prev": prev})
     session.info["match_lock"] = ((acquired - started) * 1000, acquired)
 
 
