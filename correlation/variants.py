@@ -47,6 +47,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import text
 
+from common import timings
 from common.config import get_settings
 from common.db import server_settings, session_scope
 from common.decisions import Noul, NoulAnswer, decide
@@ -150,10 +151,11 @@ async def judge(pairs: list[Pair], *, metadata: dict | None = None) -> tuple[lis
         state[f"A_{k}"] = _line(p.variant, p.variant_seen)
         state[f"B_{k}"] = _line(p.survivor, p.survivor_seen)
         questions[f"same_{k}"] = Noul(instructions=SAME_ENTITY.format(a=f"A_{k}", b=f"B_{k}"))
-    d = await asyncio.wait_for(
-        decide(state, questions, trace_name="entity-variant", metadata={"stage": "correlation", **(metadata or {})}),
-        VARIANT_TIMEOUT_S,
-    )
+    async with timings.timed("jev.entity-variant"):
+        d = await asyncio.wait_for(
+            decide(state, questions, trace_name="entity-variant", metadata={"stage": "correlation", **(metadata or {})}),
+            VARIANT_TIMEOUT_S,
+        )
     nouls = []
     for k in range(1, len(pairs) + 1):
         answer = d.answers[f"same_{k}"]
@@ -183,7 +185,11 @@ async def settle(c, pairs: list[Pair], answers: dict[frozenset, tuple[float, str
     floor = get_settings().prism_entity_variant_min
     folded: list[Pair] = []
     async with c.transaction():
+        # The wait outlives the process statement_timeout (as common/db.wait_for_xact_lock); the value comes back after.
+        prev = await c.fetchval("SELECT current_setting('statement_timeout')")
+        await c.execute("SET LOCAL statement_timeout = 0")
         await c.execute(_LOCK)
+        await c.execute("SELECT set_config('statement_timeout', $1, true)", prev)
         for p in pairs:
             if p.key in answers:
                 noul, model = answers[p.key]

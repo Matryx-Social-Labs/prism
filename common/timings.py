@@ -3,9 +3,10 @@
 The API and the worker are separate services sharing Redis, so the store is
 Redis, shaped like common/spend: one hash per UTC day, `timings:<day>`. A
 duration is counted into a fixed bucket (field `<name>|<upper bound ms>`, or
-`|inf` past the last bound); a counter is field `#<name>`. Fixed buckets keep a
-day's record a few dozen integers whatever the traffic, at the price of exact
-quantiles: a p50 or p95 read back is the bucket's upper bound.
+`|inf` past the last bound) and added to `<name>|sum`, so a mean is exact; a
+counter is field `#<name>`. Fixed buckets keep a day's record a few dozen
+integers whatever the traffic, at the price of exact quantiles: a p50 or p95
+read back is the bucket's upper bound.
 
 Recording never fails a call: a Redis error is logged and the call proceeds.
 A day with no hash is `recorded: False`, never zero.
@@ -30,12 +31,15 @@ KEEP_DAYS = 30
 # The client has a connect timeout but no read timeout, and a write can run under
 # the match lock: a stalled Redis must cost at most this, then be dropped.
 WRITE_TIMEOUT_S = 1.0
+# The admin page's read: a stalled Redis fails it (the endpoint shows `days: null`).
+READ_TIMEOUT_S = 3.0
 # Upper bounds in ms, roughly 1.5x apart: 1 ms to a day.
 BUCKETS_MS = (
     1, 2, 3, 5, 7, 10, 15, 20, 30, 50, 70, 100, 150, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 5000, 7000,
     10000, 15000, 30000, 60000, 120000, 300000, 600000, 1800000, 3600000, 14400000, 86400000,
 )
 OVERFLOW = "inf"
+SUM = "sum"
 COUNTER = "#"
 
 
@@ -69,11 +73,13 @@ def quantile(counts: dict[str, int], q: float) -> int | None:
     return None
 
 
-async def _incr(field: str, n: int) -> None:
+async def _incr(field: str, n: int, total: tuple[str, float] | None = None) -> None:
     try:
         key = _key(_today())
         pipe = get_redis().pipeline(transaction=False)
         pipe.hincrby(key, field, n)
+        if total is not None:
+            pipe.hincrbyfloat(key, *total)
         pipe.expire(key, KEEP_DAYS * 86400)
         await asyncio.wait_for(pipe.execute(), WRITE_TIMEOUT_S)
     except Exception as exc:  # noqa: BLE001 — observability never costs a call
@@ -81,11 +87,22 @@ async def _incr(field: str, n: int) -> None:
 
 
 async def observe(name: str, ms: float) -> None:
-    await _incr(f"{name}|{bucket(ms)}", 1)
+    await _incr(f"{name}|{bucket(ms)}", 1, (f"{name}|{SUM}", ms))
 
 
 async def count(name: str, n: int = 1) -> None:
     await _incr(COUNTER + name, n)
+
+
+async def seen_before(key: str, ttl_s: int) -> bool:
+    """Mark `key` seen for ttl_s and say whether it already was. Never raises:
+    when Redis cannot answer, False (unknown is not a repeat)."""
+    try:
+        created = await asyncio.wait_for(get_redis().set(key, 1, nx=True, ex=ttl_s), WRITE_TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 — observability never costs a call
+        logger.warning("seen_before_failed", key=key, error=str(exc)[:160])
+        return False
+    return not created
 
 
 @asynccontextmanager
@@ -103,31 +120,44 @@ async def timed(name: str) -> AsyncIterator[None]:
         await count(f"{name}.error")
         raise
     finally:
-        await observe(name, (time.perf_counter() - start) * 1000)
+        ms = (time.perf_counter() - start) * 1000
+        logger.info("timed", name=name, ms=round(ms, 1))
+        await observe(name, ms)
+
+
+def _row(name: str, counts: dict[str, int], total: float | None) -> dict:
+    """A timing's day. mean_ms is None for a day recorded before sums were."""
+    n = sum(counts.values())
+    return {"name": name, "n": n, "p50_ms": quantile(counts, 0.5), "p95_ms": quantile(counts, 0.95),
+            "mean_ms": round(total / n, 1) if total is not None and n else None}
 
 
 def _day(day: dt.date, h: dict[str, str]) -> dict:
     buckets: dict[str, dict[str, int]] = {}
+    sums: dict[str, float] = {}
     counters = []
     for field, value in h.items():
         if field.startswith(COUNTER):
             counters.append({"name": field[len(COUNTER):], "n": int(value)})
             continue
         name, bound = field.rsplit("|", 1)
-        buckets.setdefault(name, {})[bound] = int(value)
-    rows = [{"name": name, "n": sum(c.values()), "p50_ms": quantile(c, 0.5), "p95_ms": quantile(c, 0.95)}
-            for name, c in buckets.items()]
+        if bound == SUM:
+            sums[name] = float(value)
+        else:
+            buckets.setdefault(name, {})[bound] = int(value)
+    rows = [_row(name, c, sums.get(name)) for name, c in buckets.items()]
     return {"day": day.isoformat(), "recorded": bool(h), "timings": sorted(rows, key=lambda r: r["name"]),
             "counters": sorted(counters, key=lambda r: r["name"])}
 
 
 async def days(n: int, today: dt.date | None = None) -> list[dict]:
     """The last n UTC days, newest first: {day, recorded, timings, counters}.
-    p50_ms/p95_ms are bucket upper bounds (see quantile)."""
+    p50_ms/p95_ms are bucket upper bounds (see quantile); mean_ms is exact.
+    Raises on any Redis error, a stall past READ_TIMEOUT_S included."""
     today = today or _today()
     wanted = [today - dt.timedelta(days=i) for i in range(n)]
     pipe = get_redis().pipeline(transaction=False)
     for d in wanted:
         pipe.hgetall(_key(d))
-    raw = await pipe.execute()
+    raw = await asyncio.wait_for(pipe.execute(), READ_TIMEOUT_S)
     return [_day(d, h or {}) for d, h in zip(wanted, raw, strict=True)]

@@ -32,6 +32,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.config import get_settings
+from common.db import wait_for_xact_lock
 from common.logging import get_logger
 from correlation.stories import (
     BIG_STORY,
@@ -193,7 +194,7 @@ async def apply_merges(session: AsyncSession, merges: list[dict]) -> int:
     """Absorb each planned merge, under the assignment lock, following a story
     that was itself absorbed earlier in the list to where it went. Returns the
     merges applied."""
-    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('stories.assign'))"))
+    await wait_for_xact_lock(session, "stories.assign")
     went: dict[uuid.UUID, uuid.UUID] = {}
     applied = 0
     for m in merges:

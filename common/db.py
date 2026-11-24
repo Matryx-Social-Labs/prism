@@ -21,11 +21,16 @@ API_STATEMENT_TIMEOUT = "30s"
 # worker statement has a measured duration near it; it exists so that none can
 # run unbounded, as the API's could until 2026-10-16.
 WORKER_STATEMENT_TIMEOUT = "120s"
+# Periodic whole-window passes (trending, story merge, partition) run every 10-60
+# minutes off the ingest path; still bounded, which is the point.
+RECONCILER_STATEMENT_TIMEOUT = "600s"
 # A migration that cannot get its lock in this long fails the deploy instead of
 # queueing every reader behind its DDL (PRISM_MIGRATION_LOCK_TIMEOUT overrides).
 MIGRATION_LOCK_TIMEOUT = "5s"
 # Startup settings are checked here so a typo fails at boot with a clear message.
-_DURATION = re.compile(r"\d+(ms|s|min|h)?")
+# A unit is required: a bare number is milliseconds to Postgres, so `120` would
+# cancel every statement after 120 ms. Only `0` (off) stands alone.
+_DURATION = re.compile(r"\d+(ms|s|min|h)|0")
 QUERY_CANCELED = "57014"  # SQLSTATE: statement_timeout (or a cancel) fired
 
 _engine = None
@@ -122,6 +127,24 @@ async def session_scope(statement_timeout: str | None = None) -> AsyncIterator[A
                 logger.warning("statement_timeout_hit", error=str(exc)[:200])
                 await timings.count("db.statement_timeout")
             raise
+
+
+async def wait_for_xact_lock(session: AsyncSession, key: str | int) -> None:
+    """Take a transaction-level advisory lock however long another holder keeps it.
+
+    Waiting for a lock is not a runaway query: a repair tool can hold it for
+    minutes, and the worker's statement_timeout would cancel the wait and
+    eventually dead-letter the message. So the timeout is off for the lock
+    statement only, transaction-locally, and the previous value (the process
+    default or a session_scope override; never RESET, which drops the override)
+    is put back after it. A str key is hashtext(key), an int is the key itself:
+    either must be byte-for-byte the key the tools/ scripts take."""
+    prev = (await session.execute(text(
+        "SELECT current_setting('statement_timeout') AS prev, set_config('statement_timeout', '0', true)"
+    ))).scalar()
+    lock = "hashtext(:key)" if isinstance(key, str) else ":key"  # a fixed fragment; the key itself is bound
+    await session.execute(text(f"SELECT pg_advisory_xact_lock({lock})"), {"key": key})
+    await session.execute(text("SELECT set_config('statement_timeout', :prev, true)"), {"prev": prev})
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:

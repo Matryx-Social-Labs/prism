@@ -18,7 +18,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from common import subjects, timings
 from common.config import get_settings
 from common.countries import gdelt_country_to_iso
-from common.db import session_scope
+from common.db import session_scope, wait_for_xact_lock
 from common.entities import drop_source_names, source_name_slugs
 from common.llm import REASONING_OFF, structured_chat
 from common.logging import get_logger
@@ -192,21 +192,11 @@ async def handle_enriched_item(payload: dict) -> None:
 
 async def _take_match_lock(session) -> None:
     """The match-or-create lock, timed: the wait and when it was acquired go on
-    session.info for _record_match_lock once the transaction has ended.
-
-    Waiting for the lock is not a runaway query: a repair tool can hold it for
-    minutes, and the worker's statement_timeout would cancel the wait and
-    eventually dead-letter the article. So the timeout is off for the lock
-    statement only, transaction-locally, and the previous value (the process
-    default or a session_scope override; never RESET, which drops the override)
-    is put back after it."""
-    prev = (await session.execute(text(
-        "SELECT current_setting('statement_timeout') AS prev, set_config('statement_timeout', '0', true)"
-    ))).scalar()
+    session.info for _record_match_lock once the transaction has ended. The wait
+    outlives the worker's statement_timeout (common/db.wait_for_xact_lock)."""
     started = time.perf_counter()
-    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('correlation.match_or_create'))"))
+    await wait_for_xact_lock(session, "correlation.match_or_create")
     acquired = time.perf_counter()
-    await session.execute(text("SELECT set_config('statement_timeout', :prev, true)"), {"prev": prev})
     session.info["match_lock"] = ((acquired - started) * 1000, acquired)
 
 
@@ -377,7 +367,9 @@ async def run_due_analyses() -> int:
         eid = raw.decode() if isinstance(raw, (bytes, bytearray)) else raw
         if not await redis.zrem(DIRTY_KEY, eid):
             continue  # another sweeper claimed it
-        await timings.observe("analysis.queue_age", (time.time() - due_at) * 1000)
+        queue_age_ms = (time.time() - due_at) * 1000
+        logger.info("analysis_claimed", event_id=eid, queue_age_ms=round(queue_age_ms, 1))
+        await timings.observe("analysis.queue_age", queue_age_ms)
         try:
             await analyze_event_now(uuid.UUID(eid))
             done += 1

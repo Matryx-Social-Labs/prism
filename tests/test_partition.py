@@ -363,14 +363,14 @@ async def test_a_non_empty_partition_still_publishes(monkeypatch):
         async def __aexit__(self, *a):
             return False
 
-    monkeypatch.setattr(partition, "session_scope", lambda: _Session())
+    monkeypatch.setattr(partition, "session_scope", lambda *_a: _Session())
     with pytest.raises(RuntimeError):
         await partition.persist_base_run()
     assert reached, "a real partition was refused"
 
 
 @contextlib.asynccontextmanager
-async def _fake_scope():
+async def _fake_scope(*_a):
     yield object()
 
 

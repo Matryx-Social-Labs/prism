@@ -345,6 +345,8 @@ export interface PipelineTiming {
   n: number;
   p50_ms: number | null;
   p95_ms: number | null;
+  /** Exact, not a bound; absent on a day recorded by an older worker. */
+  mean_ms?: number | null;
 }
 
 export interface PipelineDay {

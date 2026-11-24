@@ -122,15 +122,20 @@ async def _get(path: str, token: str | None = None):
 
 async def test_only_a_founder_reads_the_pipeline_and_the_shape_is_fixed(tokens):
     fb, rb = tokens
+    name = f"test.shape.{uuid.uuid4().hex[:8]}"
+    await timings.observe(name, 12.5)  # today's row, so a timing row's shape is checked
     assert (await _get("/api/v1/admin/pipeline")).status_code == 401
     assert (await _get("/api/v1/admin/pipeline", rb)).status_code == 403
     assert (await _get("/api/v1/admin/pipeline?days=31", fb)).status_code == 422
     r = await _get("/api/v1/admin/pipeline?days=3", fb)
+    await get_redis().hdel(timings._key(timings._today()), f"{name}|15", f"{name}|sum")
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
     body = r.json()
     assert set(body) == {"days", "sweeper", "throughput"}
     assert len(body["days"]) == 3
     assert all(set(d) == {"day", "recorded", "timings", "counters"} for d in body["days"])
+    [row] = [t for t in body["days"][0]["timings"] if t["name"] == name]
+    assert row == {"name": name, "n": 1, "p50_ms": 15, "p95_ms": 15, "mean_ms": 12.5}
     assert set(body["sweeper"]) == {"due", "oldest_due_age_s"}
     assert isinstance(body["throughput"], list)
 

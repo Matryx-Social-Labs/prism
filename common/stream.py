@@ -184,9 +184,12 @@ HEARTBEAT_S = 60
 # the entry to another slot, and requeue_stalled's "still queued" stops protecting it.
 HEARTBEAT_MAX_S = 1800
 # A statement that timed out is retried while the database may only have been
-# busy; one that times out on every delivery is the query, not the load, and each
-# enrichment redelivery re-pays for the extraction. From this delivery it dead-letters.
-STATEMENT_TIMEOUT_DELIVERIES = 3
+# busy; one that keeps timing out is the query, not the load, and each enrichment
+# redelivery re-pays for the extraction. The entry's timeouts are counted (not its
+# deliveries: a reclaim after a deploy is not a timeout); this one dead-letters.
+STATEMENT_TIMEOUTS_BEFORE_DEAD = 3
+STATEMENT_TIMEOUTS_TTL_S = 86400
+COUNT_TIMEOUT_S = 1.0  # the client has no read timeout; a stalled count leaves the entry pending
 async def consume(
     topic: str,
     group: str,
@@ -416,7 +419,7 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        if _is_transient(exc) or await _timed_out_early(r, topic, group, entry_id, exc):
+        if _is_transient(exc) or await _timed_out_early(r, topic, entry_id, exc):
             # Infrastructure is down, not the message: leave it pending so
             # XAUTOCLAIM redelivers it, and slow down instead of burning the
             # queue (a DB outage once acked-and-dropped 885 messages here).
@@ -438,11 +441,21 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
     await r.xack(topic, group, entry_id)
 
 
-async def _timed_out_early(r, topic: str, group: str, entry_id, exc: BaseException) -> bool:
-    """A statement timeout before its STATEMENT_TIMEOUT_DELIVERIES-th delivery."""
+async def _timed_out_early(r, topic: str, entry_id, exc: BaseException) -> bool:
+    """A statement timeout before the entry's STATEMENT_TIMEOUTS_BEFORE_DEAD-th,
+    or one Redis could not count (left pending, as any transient failure)."""
     if not sqlstate_in_chain(exc, {QUERY_CANCELED}):
         return False
-    return await _deliveries(r, topic, group, entry_id) < STATEMENT_TIMEOUT_DELIVERIES
+    key = f"stmt_timeouts:{topic}:{entry_id}"
+    try:
+        pipe = r.pipeline(transaction=False)
+        pipe.incr(key)
+        pipe.expire(key, STATEMENT_TIMEOUTS_TTL_S)
+        timeouts, _ = await asyncio.wait_for(pipe.execute(), COUNT_TIMEOUT_S)
+    except Exception as exc_count:  # noqa: BLE001 — not knowing is not a reason to drop it
+        logger.warning("statement_timeout_count_failed", topic=topic, entry_id=entry_id, error=str(exc_count)[:160])
+        return True
+    return int(timeouts) < STATEMENT_TIMEOUTS_BEFORE_DEAD
 
 
 def _is_transient(exc: BaseException | None) -> bool:

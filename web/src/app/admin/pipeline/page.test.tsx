@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 
 import PipelinePage from "@/app/admin/pipeline/page";
@@ -15,8 +15,11 @@ const pipeline: Pipeline = {
       day: "2026-11-25",
       recorded: true,
       timings: [
-        { name: "match_lock.held", n: 1234, p50_ms: 700, p95_ms: 1500 },
-        { name: "analysis.queue_age", n: 40, p50_ms: 300_000, p95_ms: null },
+        { name: "match_lock.held", n: 1234, p50_ms: 700, p95_ms: 1500, mean_ms: 812 },
+        { name: "analysis.queue_age", n: 40, p50_ms: 300_000, p95_ms: null, mean_ms: null },
+        { name: "jev.story-assign", n: 7, p50_ms: 2000, p95_ms: 5000, mean_ms: 2400 },
+        { name: "jev.entity-variant", n: 9, p50_ms: 1000, p95_ms: 2000, mean_ms: 1100 },
+        // A day recorded by an older worker: no mean at all.
         { name: "something.new", n: 3, p50_ms: 5, p95_ms: 10 },
       ],
       counters: [{ name: "dead.classified.items.rebill", n: 2 }],
@@ -36,7 +39,11 @@ const region = async (name: string) => within(await screen.findByRole("region", 
 
 beforeEach(() => {
   fetchPipeline.mockReset().mockResolvedValue(pipeline);
+  // Twenty minutes into the newest hour the fixture reports.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-25T09:20:00Z"));
 });
+afterEach(() => vi.useRealTimers());
 
 describe("the pipeline page", () => {
   it("prints each timing as an upper bound under a plain-word name", async () => {
@@ -78,7 +85,34 @@ describe("the pipeline page", () => {
     render(<PipelinePage />);
     const now = await region("Now");
     expect(now.getByRole("row", { name: /Sweeper/ })).toHaveTextContent("3 due · oldest 12.4 s");
-    expect(now.getByRole("row", { name: /Newest hour/ })).toHaveTextContent("120");
+    expect(now.getByRole("row", { name: /This hour so far/ })).toHaveTextContent("120");
+  });
+
+  it("calls the newest hour finished once it is over, and marks only a filling hour in the table", async () => {
+    vi.setSystemTime(new Date("2026-11-25T11:00:00Z"));
+    render(<PipelinePage />);
+    expect((await region("Now")).getByRole("row", { name: /Newest hour/ })).not.toHaveTextContent("so far");
+    expect((await region("Articles per hour, last 24 hours")).getAllByRole("row")[1]).not.toHaveTextContent("so far");
+  });
+
+  it("prints the mean as an exact duration, and a missing mean as not recorded, never 0", async () => {
+    render(<PipelinePage />);
+    const day = within((await region("Timings by day")).getByRole("group", { name: "2026-11-25" }));
+    const held = day.getByRole("row", { name: /Match lock — held/ });
+    expect(held).toHaveTextContent("812 ms");
+    expect(held).not.toHaveTextContent("≤ 812");
+    for (const name of [/Analysis queue — time past due/, /something\.new/]) {
+      const row = day.getByRole("row", { name });
+      expect(row).toHaveTextContent("not recorded");
+      expect(row).not.toHaveTextContent(/\b0\b/);
+    }
+  });
+
+  it("names the story-assignment and name-variant judge calls in plain words", async () => {
+    render(<PipelinePage />);
+    const day = within((await region("Timings by day")).getByRole("group", { name: "2026-11-25" }));
+    expect(day.getByRole("row", { name: /Judge call — which story\?/ })).toHaveTextContent("2.4 s");
+    expect(day.getByRole("row", { name: /Judge call — same name\?/ })).toHaveTextContent("1.1 s");
   });
 
   it("says the sweeper is not available when the queue could not be read", async () => {
@@ -130,6 +164,8 @@ describe("the pipeline page", () => {
     render(<PipelinePage />);
     const rows = (await region("Articles per hour, last 24 hours")).getAllByRole("row").slice(1);
     expect(rows[0]).toHaveTextContent("120");
+    expect(rows[0]).toHaveTextContent("so far");
+    expect(rows[1]).not.toHaveTextContent("so far");
     expect(rows[0]).toHaveTextContent("59");
     expect(rows[1]).toHaveTextContent("90");
   });

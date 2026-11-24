@@ -32,7 +32,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from common.config import get_settings
-from common.db import session_scope
+from common.db import RECONCILER_STATEMENT_TIMEOUT, session_scope, wait_for_xact_lock
 from common.decisions import Noul, NoulAnswer, decide
 from common.llm import structured_chat
 from common.logging import get_logger
@@ -929,7 +929,7 @@ def merge_edges(
 async def compute_partition(resolution: float = LEIDEN_RESOLUTION_V2, llm_veto: bool = False) -> dict:
     """Load the graph, partition into stories, build each story's branch tree.
     Read-only; returns a structured result for validation or persistence."""
-    async with session_scope() as session:
+    async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
         nodes = await _load_nodes(session)
         entity_edges = await _load_edges(session)
         emb_edges = await _load_embedding_edges(session)
@@ -1129,8 +1129,8 @@ async def persist_base_run(resolution: float = LEIDEN_RESOLUTION_V2) -> str | No
             hint="no event is newer than the story window; the previous run stays current",
         )
         return None
-    async with session_scope() as session:
-        await session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _PARTITION_LOCK_KEY})
+    async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
+        await wait_for_xact_lock(session, _PARTITION_LOCK_KEY)
         run_id = uuid.uuid4()
         await session.execute(
             text("INSERT INTO partition_runs (id, status, veto_state, resolution, stats) "
@@ -1157,7 +1157,7 @@ async def persist_veto_overlay() -> str | None:
     version = veto_config_version()
     model = veto_model()
     # Phase 1 (no lock): read the current base, run the veto, finalize. Verdicts persist.
-    async with session_scope() as session:
+    async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
         base = (
             await session.execute(text("SELECT id::text AS id, veto_state FROM partition_runs WHERE status='current'"))
         ).mappings().first()
@@ -1181,8 +1181,8 @@ async def persist_veto_overlay() -> str | None:
         veto_log = await _apply_veto(session, by_story, model, version=version, base_run_id=base_id)
         stories = await _finalize_stories(session, by_story, edge_w)
     # Phase 2 (lock + CAS): publish only if the base is still current.
-    async with session_scope() as session:
-        await session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _PARTITION_LOCK_KEY})
+    async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
+        await wait_for_xact_lock(session, _PARTITION_LOCK_KEY)
         still = (await session.execute(text("SELECT id::text FROM partition_runs WHERE status='current'"))).scalar()
         if still != base_id:
             logger.info("veto_overlay_discarded_stale_base", base=base_id, current=still)

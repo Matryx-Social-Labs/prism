@@ -15,6 +15,7 @@ import { Alert, EmptyState } from "@/components/ui";
 import { bound, duration, fetchPipeline, istTime, type Pipeline, type PipelineDay } from "@/lib/admin";
 
 const DAYS = 7;
+const HOUR_MS = 3_600_000;
 
 const TIMING_LABEL: Record<string, string> = {
   "match_lock.wait": "Match lock — waiting",
@@ -23,6 +24,8 @@ const TIMING_LABEL: Record<string, string> = {
   "jev.story-verify": "Judge call — same story?",
   "jev.event-escalate": "Judge call — second opinion",
   "analysis.queue_age": "Analysis queue — time past due",
+  "jev.story-assign": "Judge call — which story?",
+  "jev.entity-variant": "Judge call — same name?",
 };
 
 function Day({ day, children }: { day: PipelineDay; children: React.ReactNode }) {
@@ -35,9 +38,21 @@ function Day({ day, children }: { day: PipelineDay; children: React.ReactNode })
 }
 
 /** One section of per-day blocks; days null means the store could not be read. */
-function ByDay({ title, sub, days, render }: { title: string; sub: string; days: PipelineDay[] | null; render: (d: PipelineDay) => React.ReactNode }) {
+function ByDay({
+  title,
+  sub,
+  hint,
+  days,
+  render,
+}: {
+  title: string;
+  sub: string;
+  hint?: string;
+  days: PipelineDay[] | null;
+  render: (d: PipelineDay) => React.ReactNode;
+}) {
   return (
-    <AdminSection title={title} sub={sub}>
+    <AdminSection title={title} sub={sub} hint={hint}>
       {days === null ? (
         <Quiet>not available</Quiet>
       ) : days.length ? (
@@ -78,6 +93,8 @@ export default function PipelinePage() {
   const days = data?.days ?? null;
   const hours = data?.throughput ?? null;
   const newest = hours?.[0];
+  // The current hour is still filling: a partial count, not a slow hour.
+  const filling = !!newest && Date.now() - Date.parse(newest.hour) < HOUR_MS;
   // Nothing recorded, as distinct from a part that could not be read (null).
   const empty = days !== null && hours !== null && !days.some((d) => d.recorded) && hours.length === 0;
 
@@ -100,7 +117,7 @@ export default function PipelinePage() {
               rows: [
                 ["Sweeper", sweeperLine(data.sweeper)],
                 [
-                  newest ? `Newest hour · ${istTime(newest.hour)} IST` : "Newest hour",
+                  newest ? `${filling ? "This hour so far" : "Newest hour"} · ${istTime(newest.hour)} IST` : "Newest hour",
                   hours === null
                     ? "not available"
                     : newest
@@ -117,14 +134,21 @@ export default function PipelinePage() {
         <>
           <ByDay
             title="Timings by day"
-            sub="UTC DAY · COUNT · P50 · P95 · UPPER BOUNDS"
+            sub="UTC DAY · COUNT · MEAN · P50 · P95"
+            hint="p50 and p95 are the upper bound of a bucket (the true value is at most this); the mean is exact. Correlation takes one article at a time, so the lock wait is near zero by design: the queue is in the stream, not at the lock."
             days={days}
             render={(d) =>
               d.timings.length ? (
                 <DataTable
                   table={{
-                    columns: ["Measure", "Count", "p50", "p95"],
-                    rows: d.timings.map((t) => [TIMING_LABEL[t.name] ?? t.name, t.n, bound(t.p50_ms), bound(t.p95_ms)]),
+                    columns: ["Measure", "Count", "Mean", "p50", "p95"],
+                    rows: d.timings.map((t) => [
+                      TIMING_LABEL[t.name] ?? t.name,
+                      t.n,
+                      t.mean_ms == null ? "not recorded" : duration(t.mean_ms),
+                      bound(t.p50_ms),
+                      bound(t.p95_ms),
+                    ]),
                   }}
                 />
               ) : (
@@ -155,7 +179,7 @@ export default function PipelinePage() {
             <DataTable
               table={{
                 columns: ["Hour (IST)", "Observed", "Classified", "Enriched", "Correlated"],
-                rows: hours.map((h) => [istTime(h.hour), h.observed, h.classified, h.enriched, h.correlated]),
+                rows: hours.map((h, i) => [`${istTime(h.hour)}${i === 0 && filling ? " · so far" : ""}`, h.observed, h.classified, h.enriched, h.correlated]),
               }}
             />
           ) : (

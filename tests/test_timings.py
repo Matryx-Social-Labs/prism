@@ -8,12 +8,13 @@ asserts the original exception still reaches the caller.
 
 import asyncio
 import datetime as dt
+import time
 import uuid
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import text
+import pytest_asyncio
 
 from common import stream, timings
 from common.decisions import ChoiceAnswer, NoulAnswer
@@ -111,8 +112,8 @@ async def test_a_day_adds_up_and_a_day_with_no_hash_is_unrecorded(monkeypatch, f
     assert before == {"day": (day - dt.timedelta(days=1)).isoformat(), "recorded": False, "timings": [], "counters": []}
     assert today["recorded"] is True
     assert today["timings"] == [
-        {"name": "jev.event-verify", "n": 1, "p50_ms": 300, "p95_ms": 300},
-        {"name": "match_lock.wait", "n": 4, "p50_ms": 5, "p95_ms": 1000},
+        {"name": "jev.event-verify", "n": 1, "p50_ms": 300, "p95_ms": 300, "mean_ms": 250.0},
+        {"name": "match_lock.wait", "n": 4, "p50_ms": 5, "p95_ms": 1000, "mean_ms": 227.8},
     ]
     assert today["counters"] == [{"name": "dead.raw.items.rebill", "n": 3}]
 
@@ -125,6 +126,9 @@ async def test_a_stalled_redis_costs_at_most_the_write_timeout(monkeypatch):
             return self
 
         def hincrby(self, *_a):
+            return None
+
+        def hincrbyfloat(self, *_a):
             return None
 
         def expire(self, *_a):
@@ -142,6 +146,47 @@ async def test_a_redis_outage_never_costs_the_call(monkeypatch):
     monkeypatch.setattr(timings, "get_redis", lambda: _Broken())
     await timings.observe("match_lock.wait", 12.0)  # must not raise
     await timings.count("jev.event-verify.timeout")  # must not raise
+
+
+def test_a_day_recorded_before_sums_has_no_mean():
+    row = timings._day(dt.date(2001, 1, 1), {"match_lock.wait|5": "2"})["timings"][0]
+    assert row == {"name": "match_lock.wait", "n": 2, "p50_ms": 5, "p95_ms": 5, "mean_ms": None}
+
+
+@pytest.fixture
+def log():
+    """Every logger.info call, (message, fields), from any module patched with it."""
+    seen: list[tuple[str, dict]] = []
+    return seen, SimpleNamespace(info=lambda msg, **kw: seen.append((msg, kw)),
+                                 warning=lambda *_a, **_k: None, exception=lambda *_a, **_k: None)
+
+
+async def test_a_timed_block_is_logged_with_its_name_and_ms(monkeypatch, recorded, log):
+    seen, logger = log
+    monkeypatch.setattr(timings, "logger", logger)
+    async with timings.timed("block"):
+        await asyncio.sleep(0.01)
+    [(msg, kw)] = seen
+    assert msg == "timed" and kw["name"] == "block" and kw["ms"] >= 10
+
+
+async def test_reading_the_days_from_a_stalled_redis_raises_in_bounded_time(monkeypatch):
+    class _Stalled:
+        def pipeline(self, **_k):
+            return self
+
+        def hgetall(self, *_a):
+            return None
+
+        async def execute(self):
+            await asyncio.Event().wait()  # never answers
+
+    monkeypatch.setattr(timings, "get_redis", lambda: _Stalled())
+    monkeypatch.setattr(timings, "READ_TIMEOUT_S", 0.01)
+    started = time.perf_counter()
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(timings.days(3), 2)
+    assert time.perf_counter() - started < 1, "unbounded: only this test's own guard stopped it"
 
 
 # ── the match lock ──
@@ -222,47 +267,6 @@ async def test_a_replayed_message_takes_no_lock_and_records_nothing(monkeypatch,
     monkeypatch.setattr(consumer, "session_scope", _scope(_Session(attached=uuid.uuid4()), commit_s=0))
     await consumer.handle_enriched_item(_payload())
     assert recorded["observe"] == []
-
-
-async def test_waiting_for_the_lock_outlives_the_statement_timeout_and_restores_it(monkeypatch):
-    """REGRESSION: the worker runs with a statement_timeout; a repair tool holding
-    the lock for longer must not get the wait cancelled (and the article
-    dead-lettered). The override comes back for everything after the lock."""
-    from sqlalchemy.exc import DBAPIError, SQLAlchemyError
-
-    from common.db import QUERY_CANCELED, session_scope, sqlstate_in_chain
-
-    try:
-        async with session_scope() as s:
-            await s.execute(text("SELECT 1"))
-    except (SQLAlchemyError, OSError):
-        pytest.skip("no database")
-
-    async def nothing(*_a, **_k):
-        return None
-
-    monkeypatch.setattr(timings, "count", nothing)  # session_scope counts the cancel
-    held = asyncio.Event()
-
-    async def hold() -> None:
-        async with session_scope() as other:
-            await other.execute(text("SELECT pg_advisory_xact_lock(hashtext('correlation.match_or_create'))"))
-            held.set()
-            await asyncio.sleep(0.3)
-
-    holder = asyncio.create_task(hold())
-    await held.wait()
-    seen: dict = {}
-    with pytest.raises(DBAPIError) as caught:
-        async with session_scope(statement_timeout="50ms") as s:
-            await consumer._take_match_lock(s)
-            seen["wait_ms"] = s.info["match_lock"][0]
-            seen["timeout"] = (await s.execute(text("SHOW statement_timeout"))).scalar()
-            await s.execute(text("SELECT pg_sleep(1)"))
-    await holder
-    assert seen["wait_ms"] >= 200, "the wait ran past the 50ms timeout"
-    assert seen["timeout"] == "50ms"
-    assert sqlstate_in_chain(caught.value, {QUERY_CANCELED}), "a slow query after the lock is still cancelled"
 
 
 async def test_a_cancelled_block_is_timed_not_counted_as_an_error_and_still_raised(recorded):
@@ -360,6 +364,37 @@ async def test_a_lede_reading_is_timed_as_an_escalation(monkeypatch, recorded):
     assert [name for name, _ in recorded["observe"]] == ["jev.event-escalate"]
 
 
+def _story_assign():
+    from correlation import stories
+
+    rec = SimpleNamespace(id=uuid.uuid4(), at=dt.datetime(2026, 1, 1), title="t", summary=None)
+    return stories, stories._judge(rec, ["story"])
+
+
+def _entity_variant():
+    from correlation import variants
+
+    name = SimpleNamespace(name="a", kind="person")
+    pair = SimpleNamespace(variant=name, survivor=name, variant_seen="x", survivor_seen="y")
+    return variants, variants.judge([pair])
+
+
+@pytest.mark.parametrize(("call", "kind"), [(_story_assign, "jev.story-assign"),
+                                            (_entity_variant, "jev.entity-variant")])
+async def test_every_judge_call_is_timed_under_its_kind(monkeypatch, recorded, call, kind):
+    boom = ValueError("no answer")
+
+    async def broken(*_a, **_k):
+        raise boom
+
+    module, pending = call()
+    monkeypatch.setattr(module, "decide", broken)
+    with pytest.raises(ValueError) as caught:
+        await pending
+    assert caught.value is boom
+    assert [name for name, _ in recorded["observe"]] == [kind]
+
+
 # ── the analysis sweeper ──
 
 class _Dirty:
@@ -379,9 +414,11 @@ class _Dirty:
         return 1
 
 
-async def test_queue_age_is_observed_only_for_what_this_sweeper_claimed(monkeypatch, recorded):
+async def test_queue_age_is_observed_only_for_what_this_sweeper_claimed(monkeypatch, recorded, log):
     import time
 
+    logged, logger = log
+    monkeypatch.setattr(consumer, "logger", logger)
     now = time.time()
     mine, theirs = str(uuid.uuid4()), str(uuid.uuid4())
     monkeypatch.setattr(consumer, "get_redis", lambda: _Dirty({mine: now - 30, theirs: now - 60}, frozenset({theirs})))
@@ -393,6 +430,7 @@ async def test_queue_age_is_observed_only_for_what_this_sweeper_claimed(monkeypa
     assert await consumer.run_due_analyses() == 1
     [(name, ms)] = recorded["observe"]
     assert name == "analysis.queue_age" and 30_000 <= ms < 40_000
+    assert logged == [("analysis_claimed", {"event_id": mine, "queue_age_ms": round(ms, 1)})]
 
 
 async def test_the_queue_reports_what_is_due_and_how_long_it_waited(monkeypatch, fresh_redis):  # noqa: F811
@@ -450,3 +488,78 @@ async def test_a_broken_counter_never_stops_the_dead_letter(monkeypatch):
     r = _Stream()
     await stream._dead_letter(r, "raw.items", "classification", "1-0", {"data": "{}"}, KeyError("x"))
     assert [topic for topic, _ in r.dead] == ["raw.items.dead"]
+
+
+# ── re-bills: a raw item's extraction paid for twice ──
+
+class _Crash(Exception):
+    """The worker killed between the paid extraction and the insert (a deploy)."""
+
+
+async def _extract_and_crash(monkeypatch, rid) -> None:
+    import enrichment.consumer as ec
+
+    async def crash(_chunks):
+        raise _Crash
+
+    monkeypatch.setattr(ec, "embed_texts", crash)
+    with pytest.raises(_Crash):
+        await ec.handle_classified_item({"raw_item_id": str(rid)})
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def raw_item(monkeypatch, fresh_redis):  # noqa: F811
+    """A relevant raw item the stubbed extractor will pay for; its paid mark removed after."""
+    from tests import test_enrichment_text_guard as guard
+
+    if not await guard._db_reachable():
+        pytest.skip("no database")
+    tag = uuid.uuid4().hex[:8]
+    async with guard.session_scope() as s:
+        sid = await guard._source(s, tag)
+        rid = await guard._raw(s, sid, f"https://example.test/{tag}/rebill", guard.STORY_TITLE, guard.FEED_BODY)
+    guard._stub_pipeline(monkeypatch, guard.FEED_BODY * 6)
+    yield rid
+    try:
+        await get_redis().delete(f"extract:paid:{rid}")
+    except Exception:  # noqa: BLE001 — the Redis-down case never set it
+        pass
+    await guard._purge(sid)
+
+
+async def test_a_crash_redelivery_that_pays_again_is_a_rebill(monkeypatch, recorded, raw_item):
+    """REGRESSION: the redelivered item found no article, paid again, inserted
+    fine, and nothing counted it."""
+    if not await _redis_up():
+        pytest.skip("no redis")
+    await _extract_and_crash(monkeypatch, raw_item)
+    assert recorded["count"] == [], "a first extraction is not a re-bill"
+    await _extract_and_crash(monkeypatch, raw_item)
+    assert recorded["count"] == [("extract.rebill", 1)]
+
+
+async def test_reusing_an_extraction_is_never_a_rebill(monkeypatch, recorded, raw_item):
+    import enrichment.consumer as ec
+
+    async def reused(_url):
+        return "the text", {"shared": {"headline_summary": "already extracted"}}, "openrouter:test"
+
+    async def never(**_k):
+        raise AssertionError("paid for a reused extraction")
+
+    monkeypatch.setattr(ec, "_extraction_for_same_url", reused)
+    monkeypatch.setattr(ec, "structured_chat", never)
+    for _ in range(2):
+        await _extract_and_crash(monkeypatch, raw_item)
+    assert recorded["count"] == []
+
+
+async def test_a_redis_outage_neither_fails_the_extraction_nor_counts_a_rebill(monkeypatch, recorded, raw_item):
+    class _Down:
+        async def set(self, *_a, **_k):
+            raise ConnectionError("redis down")
+
+    monkeypatch.setattr(timings, "get_redis", lambda: _Down())
+    for _ in range(2):
+        await _extract_and_crash(monkeypatch, raw_item)  # reaches the crash after the mark: nothing raised by it
+    assert recorded["count"] == []
