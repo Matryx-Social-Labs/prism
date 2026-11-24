@@ -3,6 +3,23 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.137.5] - 2026-11-25
+
+### Added — the design audit the redesign starts from (documents only; no reader-facing change)
+- `docs/design/v3/00-audit.md`: a verdict on the interface as it is on the live site, and the brief the
+  three design directions are drawn from. It holds the measured baseline for the first screen of Today, a
+  record, a running story and search (Today: 39 pieces of text, 18 type styles, 20 controls, the first
+  headline 65% down); the ten worst problems, each with a screenshot; a verdict of keep, simplify, merge
+  or remove on 26 recurring devices, each with a reference; what works and must survive; the limits and
+  scores every direction is checked against; the words a newcomer must learn and their plain
+  replacements; and the accessibility constraints, each marked as WCAG's or the house's.
+- The evidence beside it, so the numbers can be re-run: `audit-data/` (the two measuring scripts and their
+  output, the capture log, a census of words and line devices in the code, five independent critiques made
+  from screenshots alone) and `audit-shots/` (the 18 screenshots the audit cites).
+- Found on the way: no hatching is drawn on any page measured and no dashed line is on the first screen of
+  Today, a record or a story; the clutter there is repetition, small grey text and controls. In the code
+  the dashed line carries twelve meanings.
+
 ## [0.0.137.4] - 2026-11-25
 
 ### Changed — every `make` test target starts from an empty test database (developer tooling)
