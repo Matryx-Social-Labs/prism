@@ -117,9 +117,9 @@ async def _still_queued(pending: list, unenriched: list, uncorrelated: list) -> 
     """Drop the items still unacked on the topic their next stage reads. When
     Redis cannot say, drop nothing: every handler is idempotent, and a duplicate
     costs less than an item never recovered."""
-    groups = dict(stream.TOPIC_GROUPS)
-    try:
-        queued = {t: await stream.unacked_raw_item_ids(t, groups[t]) for t in groups}
+    stalled = {stream.RAW_ITEMS: pending, stream.CLASSIFIED_ITEMS: unenriched, stream.ENRICHED_ITEMS: uncorrelated}
+    try:  # only the topics with something stalled: nothing stalled, no Redis read
+        queued = {t: await stream.unacked_raw_item_ids(t, g) if stalled[t] else set() for t, g in stream.TOPIC_GROUPS}
     except Exception as exc:  # noqa: BLE001
         logger.warning("queued_items_unknown", error=str(exc)[:160])
         return pending, unenriched, uncorrelated, 0

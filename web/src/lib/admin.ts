@@ -363,11 +363,13 @@ export interface PipelineHour {
   correlated: number;
 }
 
+/** Each part is null when it could not be read: not available, never empty or zero. */
 export interface Pipeline {
-  days: PipelineDay[];
-  /** Null when the queue could not be read; oldest_due_age_s null when nothing is due. */
+  days: PipelineDay[] | null;
+  /** oldest_due_age_s is null when nothing is due. */
   sweeper: { due: number; oldest_due_age_s: number | null } | null;
-  throughput: PipelineHour[];
+  /** Newest hour first. */
+  throughput: PipelineHour[] | null;
 }
 
 export const fetchPipeline = (s: Session, days: number) => adminCall<Pipeline>(s, `/api/v1/admin/pipeline?days=${days}`);

@@ -8,7 +8,7 @@ the API unavailable.
 
 import asyncio
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -267,7 +267,8 @@ async def cached(db: AsyncSession, *, window_hours: int = WINDOW_HOURS) -> dict[
         hit = _cache.get(window_hours)
         if hit is not None and time.monotonic() - hit[0] < CACHE_TTL_S:
             return hit[1]
-        result = await pipeline_freshness(db, window_hours=window_hours)
+        # as_of: when the query ran, so a cached answer is not read as now.
+        result = {**await pipeline_freshness(db, window_hours=window_hours), "as_of": datetime.now(UTC).isoformat()}
         _cache[window_hours] = (time.monotonic(), result)
         return result
 

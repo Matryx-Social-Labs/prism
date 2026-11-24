@@ -5,6 +5,7 @@ able to pile queries onto a database that is already struggling.
 """
 
 import asyncio
+from datetime import datetime
 
 import pytest
 
@@ -65,3 +66,11 @@ async def test_concurrent_probes_at_expiry_run_one_query(calls):
     results = await asyncio.gather(*(freshness.cached(None) for _ in range(5)))
     assert calls == [freshness.WINDOW_HOURS]
     assert all(r == results[0] for r in results)
+
+
+async def test_a_cached_answer_says_when_its_query_ran(calls):
+    first = await freshness.cached(None)
+    await asyncio.sleep(0.01)
+    second = await freshness.cached(None)
+    assert datetime.fromisoformat(first["as_of"]).tzinfo is not None
+    assert second["as_of"] == first["as_of"]

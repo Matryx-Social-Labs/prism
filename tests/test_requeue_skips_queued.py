@@ -143,7 +143,9 @@ async def test_an_item_still_queued_is_not_republished_and_one_that_is_not_is(mo
     enriched = {m["article_id"] for t, m in published if t == stream.ENRICHED_ITEMS}
     assert lost in raw and queued not in raw
     assert str(lost_art) in enriched and str(queued_art) not in enriched
-    assert set(asked) == set(stream.TOPIC_GROUPS), "each topic asked of the group that consumes it"
+    # Each topic asked of the group that consumes it, and only where something stalled.
+    assert {(stream.RAW_ITEMS, "classification"), (stream.ENRICHED_ITEMS, "correlation")} <= set(asked)
+    assert set(asked) <= set(stream.TOPIC_GROUPS)
 
 
 async def test_when_redis_cannot_say_everything_stalled_is_republished(monkeypatch):
@@ -160,3 +162,40 @@ async def test_when_redis_cannot_say_everything_stalled_is_republished(monkeypat
 
     assert stalled in {m["raw_item_id"] for t, m in published if t == stream.RAW_ITEMS}
     assert "queued_items_unknown" in warnings
+
+
+async def test_nothing_stalled_asks_redis_nothing(monkeypatch):
+    async def none_stalled(limit):
+        return [], [], []
+
+    asked: list[str] = []
+
+    async def unacked(topic, group):  # recorded, not raised: _still_queued swallows errors
+        asked.append(topic)
+        return set()
+
+    monkeypatch.setattr(runner, "_stalled", none_stalled)
+    assert await _requeue(monkeypatch, unacked) == []
+    assert asked == []
+
+
+async def test_a_hung_handler_stops_renewing_its_claim(monkeypatch):
+    # Arrange: sleep returns at once, so only the bound can end the loop
+    claims: list[str] = []
+
+    class R:
+        async def xclaim(self, *a, **kw):
+            claims.append("x")
+
+    async def no_sleep(_s):
+        # An unbounded loop never yields here, so it is stopped by count, not by a clock.
+        if len(claims) > 10 * stream.HEARTBEAT_MAX_S:
+            raise AssertionError("the heartbeat never stops")
+
+    monkeypatch.setattr(stream.asyncio, "sleep", no_sleep)
+
+    # Act
+    await stream._heartbeat(R(), "t", "g", "c", "1-1")
+
+    # Assert
+    assert len(claims) == stream.HEARTBEAT_MAX_S // stream.HEARTBEAT_S

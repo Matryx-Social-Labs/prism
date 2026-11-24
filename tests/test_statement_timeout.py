@@ -77,12 +77,16 @@ async def test_setting_the_default_after_the_engine_exists_raises(fresh_engine):
 
 
 @pytest.mark.parametrize("value", ["120 s", "1s'; DROP TABLE x; --", "", "s", "5sec", "-1"])
-async def test_a_timeout_that_is_not_a_plain_duration_is_refused(value, monkeypatch):
+def test_a_startup_timeout_that_is_not_a_plain_duration_fails_at_boot(value, monkeypatch):
     monkeypatch.setattr(db, "_engine", None)
     monkeypatch.setattr(db, "_default_statement_timeout", None)
     with pytest.raises(ValueError):
         db.set_default_statement_timeout(value)
-    with pytest.raises(ValueError):
+
+
+@pytest.mark.parametrize("value", ["1s'; DROP TABLE x; --", "5sec", "-1"])
+async def test_a_scope_override_is_bound_and_validated_by_postgres(value, fresh_engine):
+    with pytest.raises(DBAPIError):
         async with db.session_scope(statement_timeout=value):
             pass
 
@@ -92,31 +96,79 @@ async def test_a_scope_override_cancels_a_long_statement_and_is_counted(fresh_en
     exc, counted = await _cancelled_statement(monkeypatch)
 
     # Assert
-    assert stream.sqlstate_in_chain(exc, {"57014"})
+    assert db.sqlstate_in_chain(exc, {db.QUERY_CANCELED})
     assert counted == ["db.statement_timeout"]
 
 
-async def test_a_cancelled_statement_is_transient_not_dead_lettered(fresh_engine, monkeypatch):
+class _Redis:
+    """Just enough of a stream for _handle_one: delivery count, ack, dead letter."""
+
+    def __init__(self, delivered: int):
+        self.delivered, self.acked, self.dead = delivered, [], []
+
+    async def xpending_range(self, topic, group, min, max, count):
+        return [{"times_delivered": self.delivered}]
+
+    async def xadd(self, topic, fields, **kw):
+        self.dead.append(topic)
+
+    async def xack(self, topic, group, entry_id):
+        self.acked.append(entry_id)
+
+    def pipeline(self, transaction=False):
+        return self
+
+    def incr(self, key):
+        pass
+
+    def expire(self, key, ttl):
+        pass
+
+    async def execute(self):
+        return []
+
+
+async def _handle(exc: BaseException, delivered: int, monkeypatch) -> tuple[_Redis, list[str]]:
+    counted: list[str] = []
+
+    async def count(name: str, n: int = 1) -> None:
+        counted.append(name)
+
+    async def no_sleep(_s):
+        pass
+
+    async def handler(payload):
+        raise exc
+
+    monkeypatch.setattr(timings, "count", count)
+    monkeypatch.setattr(stream.asyncio, "sleep", no_sleep)
+    r = _Redis(delivered)
+    await stream._handle_one(r, "t", "g", handler, ("1-1", {"data": '{"raw_item_id": "x"}'}))
+    return r, counted
+
+
+@pytest.mark.parametrize("delivered", [1, 2])
+async def test_a_timed_out_statement_is_left_pending_on_its_first_deliveries(delivered, fresh_engine, monkeypatch):
     exc, _ = await _cancelled_statement(monkeypatch)
-    assert stream._is_transient(exc)
+    r, _ = await _handle(exc, delivered, monkeypatch)
+    assert r.acked == [] and r.dead == []
 
 
-async def test_a_lock_that_cannot_be_had_in_time_is_transient(fresh_engine):
-    # Arrange: one connection holds an advisory lock for its transaction
-    key = 727_002
-    async with db.get_engine().connect() as holder:
-        await holder.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": key})
+async def test_a_statement_that_times_out_on_every_delivery_is_dead_lettered(fresh_engine, monkeypatch):
+    # Arrange
+    exc, _ = await _cancelled_statement(monkeypatch)
 
-        # Act: another waits for it under a short lock_timeout
-        with pytest.raises(DBAPIError) as caught:
-            async with db.session_scope() as s:
-                await s.execute(text("SET LOCAL lock_timeout = '50ms'"))
-                await s.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": key})
-        await holder.rollback()
+    # Act
+    r, counted = await _handle(exc, stream.STATEMENT_TIMEOUT_DELIVERIES, monkeypatch)
 
     # Assert
-    assert stream.sqlstate_in_chain(caught.value, {"55P03"})
-    assert stream._is_transient(caught.value)
+    assert r.acked == ["1-1"] and r.dead == ["t.dead"]
+    assert "dead.t.statement_timeout" in counted
+
+
+async def test_a_connection_error_never_dead_letters(monkeypatch):
+    r, _ = await _handle(ConnectionError("db away"), 50, monkeypatch)
+    assert r.acked == [] and r.dead == []
 
 
 async def test_an_ordinary_failure_is_still_permanent(fresh_engine):
@@ -128,7 +180,7 @@ async def test_an_ordinary_failure_is_still_permanent(fresh_engine):
     assert not stream._is_transient(ValueError("bad payload"))
 
 
-@pytest.mark.parametrize(("env", "expected"), [(None, "5s"), ("3s", "3s")])
+@pytest.mark.parametrize(("env", "expected"), [(None, "5s"), ("", "5s"), ("3s", "3s")])
 async def test_migrations_connect_under_a_lock_timeout(env, expected, monkeypatch):
     if not await _db_reachable():
         pytest.skip("no database")

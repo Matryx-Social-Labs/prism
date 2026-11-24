@@ -25,9 +25,10 @@ const pipeline: Pipeline = {
     { day: "2026-11-23", recorded: false, timings: [], counters: [] },
   ],
   sweeper: { due: 3, oldest_due_age_s: 12.4 },
+  // API order: newest first.
   throughput: [
-    { hour: "2026-11-25T08:00:00+00:00", observed: 90, classified: 88, enriched: 40, correlated: 39 },
     { hour: "2026-11-25T09:00:00+00:00", observed: 120, classified: 118, enriched: 60, correlated: 59 },
+    { hour: "2026-11-25T08:00:00+00:00", observed: 90, classified: 88, enriched: 40, correlated: 39 },
   ],
 };
 
@@ -89,7 +90,7 @@ describe("the pipeline page", () => {
   });
 
   it("says nothing is recorded yet instead of drawing empty tables", async () => {
-    fetchPipeline.mockResolvedValue({ days: pipeline.days.map((d) => ({ ...d, recorded: false, timings: [], counters: [] })), sweeper: null, throughput: [] });
+    fetchPipeline.mockResolvedValue({ days: (pipeline.days ?? []).map((d) => ({ ...d, recorded: false, timings: [], counters: [] })), sweeper: null, throughput: [] });
     render(<PipelinePage />);
     expect(await screen.findByText("Nothing recorded yet")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Timings by day" })).not.toBeInTheDocument();
@@ -100,6 +101,29 @@ describe("the pipeline page", () => {
     fetchPipeline.mockRejectedValue(new Error("API 500"));
     render(<PipelinePage />);
     expect(await screen.findByRole("alert")).toHaveTextContent("API 500");
+  });
+
+  it("says the timings are not available when the store could not be read, and still shows the hours", async () => {
+    fetchPipeline.mockResolvedValue({ ...pipeline, days: null });
+    render(<PipelinePage />);
+    for (const name of ["Timings by day", "Counters by day"]) {
+      const section = (await screen.findByRole("region", { name })) as HTMLElement;
+      expect(section).toHaveTextContent("not available");
+      expect(section).not.toHaveTextContent(/\b0\b|none|not recorded/);
+    }
+    expect(screen.queryByText("Nothing recorded yet")).not.toBeInTheDocument();
+    expect((await region("Articles per hour, last 24 hours")).getAllByRole("row")).toHaveLength(3);
+  });
+
+  it("says the hours are not available when the hourly query failed, and still shows the days", async () => {
+    fetchPipeline.mockResolvedValue({ ...pipeline, throughput: null });
+    render(<PipelinePage />);
+    const hours = (await screen.findByRole("region", { name: "Articles per hour, last 24 hours" })) as HTMLElement;
+    expect(hours).toHaveTextContent("not available");
+    expect(hours).not.toHaveTextContent(/\b0\b|No hours/);
+    expect((await region("Now")).getByRole("row", { name: /Newest hour/ })).toHaveTextContent("not available");
+    expect((await region("Timings by day")).getByRole("row", { name: /Match lock — held/ })).toBeInTheDocument();
+    expect(screen.queryByText("Nothing recorded yet")).not.toBeInTheDocument();
   });
 
   it("lists the last 24 hours, newest first", async () => {

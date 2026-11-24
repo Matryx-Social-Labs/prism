@@ -10,10 +10,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from common import timings
 from common.config import get_settings
 from common.logging import get_logger
-from common.stream import QUERY_CANCELED, sqlstate_in_chain
 
 logger = get_logger(__name__)
 
@@ -26,13 +24,27 @@ WORKER_STATEMENT_TIMEOUT = "120s"
 # A migration that cannot get its lock in this long fails the deploy instead of
 # queueing every reader behind its DDL (PRISM_MIGRATION_LOCK_TIMEOUT overrides).
 MIGRATION_LOCK_TIMEOUT = "5s"
-# `SET` takes no bind parameters, so every value is checked before it is spliced.
+# Startup settings are checked here so a typo fails at boot with a clear message.
 _DURATION = re.compile(r"\d+(ms|s|min|h)?")
+QUERY_CANCELED = "57014"  # SQLSTATE: statement_timeout (or a cancel) fired
 
 _engine = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 # None until the worker sets it at startup; the API and tools/ never do.
 _default_statement_timeout: str | None = None
+
+
+def sqlstate_in_chain(exc: BaseException | None, codes: set[str]) -> bool:
+    """Whether a Postgres error with one of these SQLSTATEs is anywhere in the
+    chain. asyncpg errors and SQLAlchemy's asyncpg adapter both carry `.sqlstate`;
+    SQLAlchemy raises its DBAPIError from the adapter, so `__cause__` reaches it."""
+    seen: set[int] = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if getattr(exc, "sqlstate", None) in codes:
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
 
 
 def _duration(value: str) -> str:
@@ -59,7 +71,7 @@ def server_settings() -> dict[str, str]:
 
 def migration_connect_args() -> dict:
     """connect_args for alembic's engine (db/env.py)."""
-    timeout = os.environ.get("PRISM_MIGRATION_LOCK_TIMEOUT", MIGRATION_LOCK_TIMEOUT)
+    timeout = os.environ.get("PRISM_MIGRATION_LOCK_TIMEOUT") or MIGRATION_LOCK_TIMEOUT
     return {"server_settings": {"lock_timeout": _duration(timeout)}}
 
 
@@ -93,16 +105,20 @@ async def session_scope(statement_timeout: str | None = None) -> AsyncIterator[A
 
     `statement_timeout` overrides the process default for this transaction only
     (a caller that commits mid-scope loses it with the transaction)."""
-    override = None if statement_timeout is None else _duration(statement_timeout)
     async with get_session_factory()() as session:
         try:
-            if override is not None:
-                await session.execute(text(f"SET LOCAL statement_timeout = '{override}'"))
+            if statement_timeout is not None:
+                # Bound, and Postgres validates it: a bad value fails here.
+                await session.execute(
+                    text("SELECT set_config('statement_timeout', :v, true)"), {"v": statement_timeout}
+                )
             yield session
             await session.commit()
         except Exception as exc:
             await session.rollback()
             if sqlstate_in_chain(exc, {QUERY_CANCELED}):
+                from common import timings  # here: timings -> stream -> db at import
+
                 logger.warning("statement_timeout_hit", error=str(exc)[:200])
                 await timings.count("db.statement_timeout")
             raise

@@ -252,7 +252,7 @@ async def _health_server() -> None:
 
 
 async def main(stages: list[str]) -> None:
-    statement_timeout = os.environ.get("PRISM_WORKER_STATEMENT_TIMEOUT", WORKER_STATEMENT_TIMEOUT)
+    statement_timeout = os.environ.get("PRISM_WORKER_STATEMENT_TIMEOUT") or WORKER_STATEMENT_TIMEOUT
     set_default_statement_timeout(statement_timeout)
     logger.info("worker_starting", stages=stages, consumer=CONSUMER_NAME, statement_timeout=statement_timeout)
 

@@ -34,6 +34,25 @@ function Day({ day, children }: { day: PipelineDay; children: React.ReactNode })
   );
 }
 
+/** One section of per-day blocks; days null means the store could not be read. */
+function ByDay({ title, sub, days, render }: { title: string; sub: string; days: PipelineDay[] | null; render: (d: PipelineDay) => React.ReactNode }) {
+  return (
+    <AdminSection title={title} sub={sub}>
+      {days === null ? (
+        <Quiet>not available</Quiet>
+      ) : days.length ? (
+        days.map((d) => (
+          <Day key={d.day} day={d}>
+            {render(d)}
+          </Day>
+        ))
+      ) : (
+        <Quiet>Nothing recorded yet.</Quiet>
+      )}
+    </AdminSection>
+  );
+}
+
 function sweeperLine(sweeper: Pipeline["sweeper"]): string {
   if (!sweeper) return "not available";
   const age = sweeper.oldest_due_age_s;
@@ -56,10 +75,11 @@ export default function PipelinePage() {
     };
   }, [session]);
 
-  const recorded = data?.days.filter((d) => d.recorded) ?? [];
-  const hours = [...(data?.throughput ?? [])].sort((a, b) => b.hour.localeCompare(a.hour));
-  const newest = hours[0];
-  const empty = recorded.length === 0 && hours.length === 0;
+  const days = data?.days ?? null;
+  const hours = data?.throughput ?? null;
+  const newest = hours?.[0];
+  // Nothing recorded, as distinct from a part that could not be read (null).
+  const empty = days !== null && hours !== null && !days.some((d) => d.recorded) && hours.length === 0;
 
   return (
     <>
@@ -81,7 +101,9 @@ export default function PipelinePage() {
                 ["Sweeper", sweeperLine(data.sweeper)],
                 [
                   newest ? `Newest hour · ${istTime(newest.hour)} IST` : "Newest hour",
-                  newest
+                  hours === null
+                    ? "not available"
+                    : newest
                     ? `${newest.observed} observed · ${newest.classified} classified · ${newest.enriched} enriched · ${newest.correlated} correlated`
                     : "no hours recorded",
                 ],
@@ -91,41 +113,45 @@ export default function PipelinePage() {
         </AdminSection>
       )}
 
-      {data && recorded.length > 0 && (
+      {data && !empty && (
         <>
-          <AdminSection title="Timings by day" sub="UTC DAY · COUNT · P50 · P95 · UPPER BOUNDS">
-            {data.days.map((d) => (
-              <Day key={d.day} day={d}>
-                {d.timings.length ? (
-                  <DataTable
-                    table={{
-                      columns: ["Measure", "Count", "p50", "p95"],
-                      rows: d.timings.map((t) => [TIMING_LABEL[t.name] ?? t.name, t.n, bound(t.p50_ms), bound(t.p95_ms)]),
-                    }}
-                  />
-                ) : (
-                  <Quiet>none</Quiet>
-                )}
-              </Day>
-            ))}
-          </AdminSection>
-          <AdminSection title="Counters by day" sub="UTC DAY · NAME · COUNT">
-            {data.days.map((d) => (
-              <Day key={d.day} day={d}>
-                {d.counters.length ? (
-                  <DataTable table={{ columns: ["Counter", "Count"], rows: d.counters.map((c) => [c.name, c.n]) }} />
-                ) : (
-                  <Quiet>none</Quiet>
-                )}
-              </Day>
-            ))}
-          </AdminSection>
+          <ByDay
+            title="Timings by day"
+            sub="UTC DAY · COUNT · P50 · P95 · UPPER BOUNDS"
+            days={days}
+            render={(d) =>
+              d.timings.length ? (
+                <DataTable
+                  table={{
+                    columns: ["Measure", "Count", "p50", "p95"],
+                    rows: d.timings.map((t) => [TIMING_LABEL[t.name] ?? t.name, t.n, bound(t.p50_ms), bound(t.p95_ms)]),
+                  }}
+                />
+              ) : (
+                <Quiet>none</Quiet>
+              )
+            }
+          />
+          <ByDay
+            title="Counters by day"
+            sub="UTC DAY · NAME · COUNT"
+            days={days}
+            render={(d) =>
+              d.counters.length ? (
+                <DataTable table={{ columns: ["Counter", "Count"], rows: d.counters.map((c) => [c.name, c.n]) }} />
+              ) : (
+                <Quiet>none</Quiet>
+              )
+            }
+          />
         </>
       )}
 
       {data && !empty && (
         <AdminSection title="Articles per hour, last 24 hours" sub="IST HOUR · NEWEST FIRST">
-          {hours.length ? (
+          {hours === null ? (
+            <Quiet>not available</Quiet>
+          ) : hours.length ? (
             <DataTable
               table={{
                 columns: ["Hour (IST)", "Observed", "Classified", "Enriched", "Correlated"],

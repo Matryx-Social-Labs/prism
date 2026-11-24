@@ -14,6 +14,7 @@ from collections.abc import Awaitable, Callable
 import redis.asyncio as aioredis
 
 from common.config import get_settings
+from common.db import QUERY_CANCELED, sqlstate_in_chain
 from common.logging import get_logger
 
 logger = get_logger(__name__)
@@ -179,6 +180,13 @@ STALE_CLAIM_IDLE_MS = 300_000  # reclaim messages a dead consumer held > 5 min
 # model) is never mistaken for a dead consumer's and worked twice. Measured
 # 2026-09-17: six raw items got two articles each this way under the 402s.
 HEARTBEAT_S = 60
+# A handler hung past this stops renewing: its idle clock runs, XAUTOCLAIM hands
+# the entry to another slot, and requeue_stalled's "still queued" stops protecting it.
+HEARTBEAT_MAX_S = 1800
+# A statement that timed out is retried while the database may only have been
+# busy; one that times out on every delivery is the query, not the load, and each
+# enrichment redelivery re-pays for the extraction. From this delivery it dead-letters.
+STATEMENT_TIMEOUT_DELIVERIES = 3
 async def consume(
     topic: str,
     group: str,
@@ -324,8 +332,8 @@ async def _deliveries(r, topic: str, group: str, entry_id) -> int:
 
 async def _heartbeat(r, topic: str, group: str, consumer_name: str, entry_id) -> None:
     """Renew our claim on a long-running message. JUSTID resets the idle clock
-    without counting as a delivery."""
-    while True:
+    without counting as a delivery. Bounded by HEARTBEAT_MAX_S."""
+    for _ in range(int(HEARTBEAT_MAX_S // HEARTBEAT_S)):  # int: tests shrink HEARTBEAT_S
         await asyncio.sleep(HEARTBEAT_S)
         try:
             await r.xclaim(topic, group, consumer_name, min_idle_time=0, message_ids=[entry_id], justid=True)
@@ -390,7 +398,12 @@ async def _dead_letter(r, topic: str, group: str, entry_id, fields: dict, exc: E
 
     # A lost insert race on articles.raw_item_id: enrichment paid for an
     # extraction that a twin already stored — a re-bill.
-    cause = "rebill" if "uq_articles_raw_item" in str(exc) else type(exc).__name__
+    if "uq_articles_raw_item" in str(exc):
+        cause = "rebill"
+    elif sqlstate_in_chain(exc, {QUERY_CANCELED}):
+        cause = "statement_timeout"
+    else:
+        cause = type(exc).__name__
     await timings.count(f"dead.{topic}.{cause}")
 
 
@@ -403,7 +416,7 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        if _is_transient(exc):
+        if _is_transient(exc) or await _timed_out_early(r, topic, group, entry_id, exc):
             # Infrastructure is down, not the message: leave it pending so
             # XAUTOCLAIM redelivers it, and slow down instead of burning the
             # queue (a DB outage once acked-and-dropped 885 messages here).
@@ -425,30 +438,15 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
     await r.xack(topic, group, entry_id)
 
 
-QUERY_CANCELED = "57014"  # statement_timeout (or a cancel) fired
-LOCK_NOT_AVAILABLE = "55P03"  # lock_timeout fired
-
-
-def sqlstate_in_chain(exc: BaseException | None, codes: set[str]) -> bool:
-    """Whether a Postgres error with one of these SQLSTATEs is anywhere in the
-    chain. asyncpg errors and SQLAlchemy's asyncpg adapter both carry `.sqlstate`;
-    SQLAlchemy raises its DBAPIError from the adapter, so `__cause__` reaches it."""
-    seen: set[int] = set()
-    while exc is not None and id(exc) not in seen:
-        seen.add(id(exc))
-        if getattr(exc, "sqlstate", None) in codes:
-            return True
-        exc = exc.__cause__ or exc.__context__
-    return False
+async def _timed_out_early(r, topic: str, group: str, entry_id, exc: BaseException) -> bool:
+    """A statement timeout before its STATEMENT_TIMEOUT_DELIVERIES-th delivery."""
+    if not sqlstate_in_chain(exc, {QUERY_CANCELED}):
+        return False
+    return await _deliveries(r, topic, group, entry_id) < STATEMENT_TIMEOUT_DELIVERIES
 
 
 def _is_transient(exc: BaseException | None) -> bool:
-    """Connection-level failures anywhere in the exception chain, and a statement
-    cancelled by statement_timeout or lock_timeout: that is the database being
-    busy, not the message being bad, and three dead letters fail an article for
-    good (ingestion/runner._given_up)."""
-    if sqlstate_in_chain(exc, {QUERY_CANCELED, LOCK_NOT_AVAILABLE}):
-        return True
+    """Connection-level failures anywhere in the exception chain."""
     seen: set[int] = set()
     while exc is not None and id(exc) not in seen:
         seen.add(id(exc))
