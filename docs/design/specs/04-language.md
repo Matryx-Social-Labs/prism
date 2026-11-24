@@ -21,8 +21,10 @@ separately. Every language is shown by its own name in its own script.
 2. `Your languages` — h1, record voice, display-l.
 3. **Question 1 · `Read Prism in`** (h2, reading voice 600), under a 3px rule. A radio group: one large cell
    per language that has a finished interface — at first `English` and `हिंदी`. Each cell shows the language's
-   own name in the record face of its script; the chosen cell has a 2px ink border and a Check. Under the
-   group in `--ink-3`: `The menus and labels. More languages are being added.`
+   own name in the record face of its script; the chosen cell has a 2px ink border and a Check. Before the
+   cells, as the group's description: `Choosing one changes this page at once.` Under the group in `--ink-3`:
+   `The menus and labels. More languages are being added.` The change happens in place and focus stays on the
+   chosen control.
    Choosing a language re-renders the step in it at once; nothing waits for `Continue`. The choice replaces
    the address prefix and is stored on the device at that moment, so it survives `Skip for now`, a reload or
    leaving. The grid below does not re-order while the reader is on the step.
@@ -80,14 +82,15 @@ separately. Every language is shown by its own name in its own script.
 | Could not save | An error alert above the buttons: `That did not save. Try again.` The choices stay as set. |
 | Signed out | The same step; stored on the device and in the address prefix. |
 | Returning to the step | It shows what was last saved, not the defaults. |
-| Urdu | Its cell is `dir="rtl"` with `lang="ur"`, set in Nastaliq with the taller line it needs; the cell does not clip the script's descenders. |
+| Urdu | Its name carries `lang="ur"` and `dir="rtl"` (on the name, not the cell, so the Check and the second line keep their side), set in Nastaliq with the taller line it needs; the cell does not clip the script's descenders. |
 | A language added to Prism later | It appears in the grid with no change to copy; it appears in question 1 only when its interface is finished. |
 
 ### `/you` · Languages
 
 Two rows, hairline between, 56px+:
-- `Read Prism in` — the current language by its own name; a select of the finished interface languages.
-  Changing it applies at once and moves the reader to the same page under the new prefix. Like question 1,
+- `Read Prism in` — the current language by its own name; a select of the finished interface languages,
+  described by the same sentence (`Choosing one changes this page at once.`). Changing it applies at once and
+  moves the reader to the same page under the new prefix, with focus back on the select. Like question 1,
   this row is not drawn while only one interface language is finished.
 - `Read the news in` — the ticked languages by their own names, comma-separated (`Every language` when none),
   and `Change`, which opens the grid of question 2 in a Sheet titled `Read the news in`, with `Save` and

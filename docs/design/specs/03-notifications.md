@@ -123,7 +123,14 @@ over 220ms so the timeline does not jump. Reduced motion: instant.
 ## Accessibility
 
 - The sheet is a modal dialog labelled by its title; focus starts on the title, is trapped, and returns to
-  the control that opened it. Escape is `Not now`.
+  the control that opened it. Escape is `Not now`. If the opener no longer exists when the sheet closes (the
+  toast has gone, the card was removed, the end block's button was replaced), focus goes to that story's
+  Follow control, or to `Change` on the end block. When the sheet's body is replaced (blocked, email sent),
+  focus moves to the new title.
+- `Daily` · `Weekly` · `Off` is a radio group named `Email`, not tabs.
+- The email field is `type="email"` with `autocomplete="email"`. Confirming an address is a link in the email,
+  never a code to copy.
+- While busy a button is `aria-busy` and `aria-disabled`, not `disabled`.
 - Switches are `role="switch"`; each sentence is the switch's description.
 - The time control is a native `<select>` with the label `Time`; the zone is text, not part of the value.
 - `Not now` is a real button with a 44px target and the same width as the primary: declining is as easy as

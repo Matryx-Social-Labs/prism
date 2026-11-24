@@ -50,11 +50,16 @@ The same two things at every width:
 
 ### After the press
 
-| Event | Toast (`role="status"`, 6 seconds, one at a time) |
+| Event | Toast (`role="status"`, one at a time) |
 |---|---|
 | Followed, signed in | `Following. Changes to this story appear in Following.` — action `Turn on alerts`, shown only while alerts are off for this story |
 | Followed, signed out | `Following on this device.` — action `Sign in to keep it` |
 | Unfollowed | `Unfollowed.` — action `Undo` |
+
+A toast with no action leaves after 6 seconds. A toast that carries an action (`Undo`, `Turn on alerts`,
+`Sign in to keep it`) stays until the action is used, the reader dismisses it (`Dismiss`), or the next toast
+replaces it: an action a reader cannot reach in time is not an action. Unfollowing is final when its toast
+goes; until then `Undo` restores the follow and its alert setting.
 
 A signed-out follow works at once (T-035 keeps it on the device and the server); sign-in is offered, never
 required. On a story page the first follow also shows the inline card of spec 03 under the header.
@@ -67,7 +72,8 @@ follow is not made. A Sheet opens instead:
 1. `You follow 5 of 5 stories` — record voice, display-m.
 2. Five square segments, all ink (the count, drawn).
 3. `Following is free for 5 stories. Unfollow one to follow this, or follow without a limit on Plus.`
-4. `Your 5 stories` — the five, one line each, each with `Unfollow`. Unfollowing one here makes the pending
+4. `Your 5 stories` — the five, one line each, each with `Unfollow` (named `Unfollow {story}` for assistive
+   technology). Unfollowing one here makes the pending
    follow at once and closes the sheet with the toast `Following. Changes to this story appear in Following.`
 5. `Plus adds` — four lines, each with a Check: `Unlimited follows` · `Alerts through a closer reading` ·
    `A weekly brief of what changed, per story` · `Ask across the whole story`.
@@ -162,11 +168,17 @@ fades in 140ms. The toast rises 8px over 220ms. A `New` badge does not pulse. Re
 
 ## Accessibility
 
-- The control is a `<button>`; in the following state it has `aria-haspopup="dialog"` (compact) or `"menu"`
-  (popover) and `aria-expanded`. Its name includes the story: `Follow {story}`, `Following {story}`.
+- The control is a `<button>`; in the following state it has `aria-haspopup="dialog"` and `aria-expanded` at
+  every width — what opens holds a switch and a button, not menu items, so it is never announced as a menu.
+  Its name includes the story: `Follow {story}`, `Following {story}`.
+- What opens is a dialog named by the story: modal as a sheet, non-modal as a popover. On open, focus moves
+  to the switch, or to `Unfollow` where there is no switch. The popover follows the control in tab order.
+- While busy the control is `aria-busy` and `aria-disabled`, not `disabled`: it keeps focus and stays
+  readable.
 - The alerts row is `role="switch"` with `aria-checked`; its sentence is its description.
 - The sheet and the dialog trap focus and restore it; the popover closes on Escape and on focus leaving it.
-- A toast is announced politely; its action is reachable by keyboard and the toast stays while it has focus.
+- Toasts appear in one region named `Notifications`, announced politely; a toast's action is reachable by
+  keyboard, and the toast stays while it has focus or the pointer.
 - "New" is a word; the divider's text is real text, not a pseudo-element.
 
 ## Primitives

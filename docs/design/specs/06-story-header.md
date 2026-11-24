@@ -124,11 +124,12 @@ page is. The sheet arrives from its edge (220ms). Reduced motion: instant.
 
 ## Accessibility
 
-- The stats are a `<dl>`-like list of links; each link's name is its figure and label together, and the
-  order is the reading order.
+- The stats are a `<ul>`; each item's name is its figure and label together, and the order is the reading
+  order. `days running` and `developments` are links. `outlets` and `languages` open a sheet below expanded,
+  so there they are `<button aria-haspopup="dialog">`; at expanded they move focus to the rail's heading.
 - The returning line is text, not a live region.
 - The coverage bar is never the only carrier: its count is beside it and the legend is in the sheet.
-- `Who reported it` is a `<button>` with `aria-expanded`; the sheet is a labelled modal dialog with a focus
+- `Who reported it` is a `<button aria-haspopup="dialog">`; the sheet is a labelled modal dialog with a focus
   trap; language group names carry their `lang`.
 - Stale is 62% opacity and the words `Last development`; one source is a dashed rule and the words.
 - Contrast holds at 62%: `--ink` at 62% is 5.0:1 on paper and 7.0:1 on the dark ground; the mono line in that

@@ -138,8 +138,11 @@ The `Show` pill swaps the list in place with the row print-in. Reduced motion: a
 
 ## Accessibility
 
-- The items are an `<ol>`; each is an `<article>` whose h2 is the headline link. The numeral is the list
-  marker's visual form and is `aria-hidden`; the order is conveyed by the list.
+- The items are an `<ol role="list">` (the explicit role keeps the list announced where the marker is
+  hidden); each is an `<article>` whose h2 is the headline link. The numeral is the list marker's visual form
+  and is `aria-hidden`; the order is conveyed by the list.
+- `See the original` is a `<button aria-pressed>`; the headline it swaps in carries its `lang` (and `dir`).
+- When the reader presses `Show`, focus moves to the first new item's headline.
 - `{k} of {n} read` is plain text, not a live region: it must not announce while the reader scrolls.
 - The end block is a `<section>` labelled by its h2. Reaching it moves no focus.
 - Follow, the story link and the headline are separate tab stops in reading order; every target is 44px.

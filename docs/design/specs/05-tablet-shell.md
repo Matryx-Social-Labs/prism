@@ -102,7 +102,10 @@ as `DESIGN.md` · Layout has them.
 - Every destination is a link with a visible label at every width — there is no icon-only form.
 - Cells are 80 × 64: over the 44px floor. The focus ring is never clipped by the rail's edge (2px inset on the
   right).
-- The count is text inside the link, so it is read with the label.
+- The link's accessible name carries the true count (`Following, 12 stories moved`); the visible badge, which
+  caps at `9+`, is `aria-hidden`.
+- A destination that is current because the reader came through it to a leaf page takes
+  `aria-current="true"`; `"page"` is only for the destination's own page.
 
 ## Primitives
 

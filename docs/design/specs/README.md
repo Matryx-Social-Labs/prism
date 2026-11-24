@@ -31,6 +31,11 @@ compact, medium and expanded · motion · accessibility · primitives · depends
 - **Primitives** are named as `DESIGN.md` · Components names them (Button, Chip, Sheet, Toast, ToggleRow …).
   T-041 builds them; a surface built before T-041 lands uses the `.p-*` class of the same name.
 - **A state the spec lists is required.** A state it does not list does not exist: ask, do not invent.
+- **How states are announced, on every surface.** A "could not …" or "did not save" message is
+  `role="alert"`. `Saving…`, `Following…` and the result that follows are `role="status"`. A skeleton's
+  container is `aria-busy="true"` with a visually hidden `Loading`. A busy control is `aria-busy` and
+  `aria-disabled`, never `disabled`, so it keeps focus. A focused control is never left under fixed or sticky
+  chrome: the page reserves scroll padding for whatever is fixed at that width.
 
 ## The comps
 
