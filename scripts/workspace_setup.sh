@@ -20,17 +20,18 @@ if [ "$(grep -cxF "$begin" "$env_source" || true)" != "$(grep -cxF "$end" "$env_
 fi
 echo "env: from $env_source"
 
+compose="docker compose -p prism -f $main/docker-compose.yml"
 if (exec 3<>/dev/tcp/127.0.0.1/5432) 2>/dev/null; then
   echo "postgres: using what listens on 5432"
 else
   echo "postgres: starting the compose postgres"
-  compose="docker compose -p prism -f $main/docker-compose.yml"
   # Two workspaces set up at once both get here; the loser's `up` fails on the
   # container name. The connect loop below decides whether Postgres is there.
   $compose up -d --wait postgres || true
-  # Redis below comes back after a reboot; without this Postgres would not.
-  docker update --restart unless-stopped "$($compose ps -q postgres)" >/dev/null
 fi
+# Redis below comes back after a reboot; without this the compose Postgres would not.
+pg_container=$($compose ps -aq postgres)
+[ -z "$pg_container" ] || docker update --restart unless-stopped "$pg_container" >/dev/null
 
 if docker container inspect "$redis_container" >/dev/null 2>&1; then
   docker start "$redis_container" >/dev/null

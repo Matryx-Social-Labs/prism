@@ -3,7 +3,7 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
-## [0.0.137.2] - 2026-11-24
+## [0.0.137.2] - 2026-11-25
 
 ### Added — a workspace sets itself up, on its own data (developer tooling; no reader-facing change)
 - `bash scripts/workspace_setup.sh` takes a fresh worktree to a green `make check` in one step: the

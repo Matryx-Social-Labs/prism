@@ -6,6 +6,7 @@ import sys
 
 import pytest
 
+from scripts.fresh_test_db import refusal as drop_refusal
 from tests.conftest import database_refusal
 
 LOCAL = "postgresql+asyncpg://prism:prism@localhost:5432"
@@ -45,3 +46,21 @@ def test_the_session_exits_2_before_any_test_when_the_database_is_not_a_test_one
     )
     assert run.returncode == 2, run.stdout + run.stderr
     assert "Refusing to run tests" in run.stdout + run.stderr
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://prism:prism@localhost:5432/prism",
+        "postgresql://u:p@proxy.rlwy.net:41234/stage_test",  # a _test name on another host is still not ours to drop
+        "postgresql://prism:prism@localhost:5432/prism_test?database=prism",
+        'postgresql://prism:prism@localhost:5432/x"; DROP DATABASE prism; --_test',
+        "",
+    ],
+)
+def test_make_check_will_not_drop_anything_but_a_local_test_database(url: str) -> None:
+    assert drop_refusal(url)
+
+
+def test_make_check_may_recreate_a_local_test_database() -> None:
+    assert drop_refusal("postgresql://prism:prism@localhost:5432/prism_port_au_prince_test") is None
