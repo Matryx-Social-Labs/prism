@@ -1,46 +1,59 @@
-"""Refuse to run the DB-backed tests against anything but a local database.
+"""Run the DB-backed tests only on a database whose name ends in _test.
 
-There is no test database in this project — `DATABASE_URL` is whatever the
-developer has configured, and several tests here are destructive by nature:
-they INSERT events, publish partition runs, and run
+Several tests here are destructive by nature: they INSERT events, publish
+partition runs, and run
 `UPDATE partition_runs SET status='superseded' WHERE status='current'`, which
 detaches every live storyline.
 
-`_db_reachable()` in the test modules only asks whether *a* database answers, so
-a production URL passes that check more easily than a stopped local one. This
-repo does reach production over the Railway public proxy for admin queries, so a
-`DATABASE_URL` left exported in a shell is a real path to running the suite
-against live data.
+Each workspace has its own test database, `prism_<workspace>_test`, created by
+`scripts/workspace_setup.sh` and named in `.env` as `TEST_DATABASE_URL`. This
+module points `DATABASE_URL` at it before anything reads settings, so the suite
+never touches the workspace's dev database. CI names its database `prism_test`.
+
+The guard then refuses any database whose name does not end in `_test`. A local
+host used to be enough, and that is how the shared dev database filled with
+fixture rows. `_db_reachable()` in the test modules only asks whether *a*
+database answers, so a production URL passes that check more easily than a
+stopped local one, and this repo does reach production over the Railway public
+proxy for admin queries.
 
 Fail loudly rather than skip: a skip would look like a pass in CI.
 """
 
-from urllib.parse import urlparse
+import os
+from urllib.parse import parse_qs, urlparse
 
 import pytest
+from dotenv import dotenv_values
 
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "db", "postgres"}
+_test_database_url = os.environ.get("TEST_DATABASE_URL") or dotenv_values(".env").get("TEST_DATABASE_URL")
+if _test_database_url:
+    os.environ["DATABASE_URL"] = _test_database_url
+
+
+def database_refusal(url: str) -> str | None:
+    """Why the suite must not run against `url`, or None when it may."""
+    parsed = urlparse(url)
+    name = parsed.path.lstrip("/")
+    # `?database=` overrides the path in SQLAlchemy's asyncpg dialect.
+    if name.endswith("_test") and "database" not in parse_qs(parsed.query):
+        return None
+    return (
+        f"Refusing to run tests against database {name!r} on {parsed.hostname!r}: "
+        "its name does not end in _test.\n"
+        "These tests insert events and supersede partition runs — they would corrupt it.\n"
+        "Run `bash scripts/workspace_setup.sh` to create this workspace's test database, "
+        "or set TEST_DATABASE_URL to a database whose name ends in _test."
+    )
 
 
 @pytest.fixture(scope="session", autouse=True)
-def refuse_non_local_database() -> None:
+def refuse_non_test_database() -> None:
     from common.config import get_settings
 
-    url = getattr(get_settings(), "database_url", "") or ""
-    if not url:
-        return  # nothing configured; the per-test _db_reachable guards handle it
-
-    host = urlparse(url.replace("postgresql+asyncpg://", "postgresql://")).hostname
-    name = (urlparse(url).path or "").lstrip("/")
-    if host in _LOCAL_HOSTS or name.endswith("_test"):
-        return
-
-    pytest.exit(
-        f"Refusing to run tests against a non-local database (host={host!r}, db={name!r}).\n"
-        "These tests insert events and supersede partition runs — they would corrupt it.\n"
-        "Point DATABASE_URL at localhost, or name the database with a _test suffix.",
-        returncode=2,
-    )
+    refusal = database_refusal(get_settings().database_url)
+    if refusal:
+        pytest.exit(refusal, returncode=2)
 
 
 @pytest.fixture(autouse=True)

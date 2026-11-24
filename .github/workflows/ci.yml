@@ -37,11 +37,11 @@ jobs:
         env:
           POSTGRES_USER: prism
           POSTGRES_PASSWORD: prism
-          POSTGRES_DB: prism
+          POSTGRES_DB: prism_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U prism -d prism"
+          --health-cmd "pg_isready -U prism -d prism_test"
           --health-interval 5s --health-timeout 5s --health-retries 12
       redis:
         image: redis:7
@@ -52,7 +52,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 12
 
     env:
-      DATABASE_URL: postgresql+asyncpg://prism:prism@localhost:5432/prism
+      DATABASE_URL: postgresql+asyncpg://prism:prism@localhost:5432/prism_test  # tests/conftest.py refuses a name without _test
       REDIS_URL: redis://localhost:6379/0
 
     steps:
@@ -80,6 +80,11 @@ jobs:
           import enrichment.consumer, correlation.consumer
           import agent.rag, personalization.ranking, common.lenses
           print('all modules import cleanly')"
+
+      - name: Migrations have a single head
+        # Two branches that each add a migration merge cleanly in git and leave
+        # alembic with two heads; `upgrade head` then refuses on deploy.
+        run: test "$(uv run alembic heads | wc -l)" -eq 1 || { uv run alembic heads; exit 1; }
 
       - name: Migrate (exercises alembic upgrade head + downgrade)
         # upgrade builds the whole schema; a down/up round-trip proves each

@@ -41,15 +41,30 @@ test-db:  ## Python tests, FAILING (not skipping) if Postgres is absent.
 web:  ## Web tests + typecheck + build
 	cd web && npm test && npm run lint && npx tsc --noEmit && ./scripts/retry-next-font.sh npm run build && npm run check:guides && npm run check:charts
 
+# The workspace's test database (scripts/workspace_setup.sh writes it to .env).
+# `check` migrates and tests THAT database. Exported only when set (an empty
+# DATABASE_URL would reach pydantic as ""); the first line of `check` then
+# refuses anything that is not a _test database, before alembic can downgrade it.
+TEST_DATABASE_URL ?= $(shell sed -n 's/^TEST_DATABASE_URL=//p' .env 2>/dev/null | tail -1)
+ifneq ($(TEST_DATABASE_URL),)
+check: export DATABASE_URL = $(TEST_DATABASE_URL)
+endif
+
 # `fmt-check` is deliberately NOT part of `check`. The repo has never been
 # formatted: 87 of 151 files would change. Doing that mid-rebuild would bury
 # every real diff in whitespace and make review impossible. Land it as its own
 # commit at a clean boundary (after Phase 0), then add fmt-check to this target.
 check: lint  ## THE GATE — everything CI runs, plus a typecheck CI never did
+	@case "$$DATABASE_URL" in *_test) ;; *) \
+		echo "  check: refusing, DATABASE_URL is not a _test database (TEST_DATABASE_URL missing from .env?)."; \
+		echo "  Run: bash scripts/workspace_setup.sh"; exit 1;; esac
+	uv run python scripts/fresh_test_db.py
 	uv run python design/gen_css.py --check
 	uv run python -c "import api.main, worker.__main__, ingestion.runner, \
 classification.consumer, enrichment.consumer, correlation.consumer, \
 agent.rag, personalization.ranking, common.lenses"
+	@test "$$(uv run alembic heads | wc -l | tr -d ' ')" = 1 \
+		|| { echo "  alembic did not report exactly one head:"; uv run alembic heads; exit 1; }
 	uv run alembic upgrade head
 	uv run alembic downgrade -1
 	uv run alembic upgrade head
@@ -84,8 +99,7 @@ promote:  ## Ship dev to main (prod) by FAST-FORWARD — main can never lead dev
 	git push origin origin/dev:main
 
 seed:  ## Load the offline fixture corpus into the DEV db (no API keys, no LLM spend)
-	DATABASE_URL=postgresql+asyncpg://prism:prism@localhost:5432/prism \
-		uv run python -m tools.load_fixtures
+	uv run python -m tools.load_fixtures
 
 sweep:  ## Offline story-layer sweep against the snapshot (zero LLM cost)
 	uv run python -m tools.sweep_partition --cv
