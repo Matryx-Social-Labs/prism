@@ -41,6 +41,14 @@ test-db:  ## Python tests, FAILING (not skipping) if Postgres is absent.
 web:  ## Web tests + typecheck + build
 	cd web && npm test && npm run lint && npx tsc --noEmit && ./scripts/retry-next-font.sh npm run build && npm run check:guides && npm run check:charts
 
+# The workspace's test database (scripts/workspace_setup.sh writes it to .env).
+# `check` migrates and tests THAT database, never the dev one. Exported only
+# when set: an empty DATABASE_URL would reach pydantic as "".
+TEST_DATABASE_URL ?= $(shell sed -n 's/^TEST_DATABASE_URL=//p' .env 2>/dev/null | tail -1)
+ifneq ($(TEST_DATABASE_URL),)
+check: export DATABASE_URL = $(TEST_DATABASE_URL)
+endif
+
 # `fmt-check` is deliberately NOT part of `check`. The repo has never been
 # formatted: 87 of 151 files would change. Doing that mid-rebuild would bury
 # every real diff in whitespace and make review impossible. Land it as its own
@@ -50,6 +58,8 @@ check: lint  ## THE GATE — everything CI runs, plus a typecheck CI never did
 	uv run python -c "import api.main, worker.__main__, ingestion.runner, \
 classification.consumer, enrichment.consumer, correlation.consumer, \
 agent.rag, personalization.ranking, common.lenses"
+	@test "$$(uv run alembic heads | wc -l | tr -d ' ')" = 1 \
+		|| { echo "  alembic has more than one head; merge them first:"; uv run alembic heads; exit 1; }
 	uv run alembic upgrade head
 	uv run alembic downgrade -1
 	uv run alembic upgrade head
