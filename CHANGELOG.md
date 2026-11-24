@@ -3,6 +3,19 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.137.3] - 2026-11-25
+
+### Added — behaviour specs for six surfaces not yet built (documents only; no reader-facing change)
+- `docs/design/specs/`: what each new surface does and says — the edition and its end block, Follow and
+  Following, the notification explanation and settings, the language step, navigation at each size class,
+  and the story page's "Where it stands" header. Each gives its purpose, its content in order, every state,
+  the exact copy, its rules and what it needs from the API. None says how anything looks: the design system
+  is being redesigned from scratch, and these are what the new screens are drawn from.
+- Decided in them: the edition's read marks stay on the device; what a reader has read of a followed story
+  is kept only if they agree; following is free for five stories and nothing is unfollowed for a reader who
+  ends up over; notifications are only ever turned on by the reader's own press; a skipped language step
+  reads in the interface language alone; the same five destinations in one order at every width.
+
 ## [0.0.137.2] - 2026-11-25
 
 ### Added — a workspace sets itself up, on its own data (developer tooling; no reader-facing change)
