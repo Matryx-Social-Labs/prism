@@ -30,9 +30,11 @@ Beside them, on every page: the wordmark, which leads to `Today`; and a skip lin
 
 | Size class | Width | Must provide |
 |---|---|---|
-| Compact | < 600 | All five, each one press away, each with its name visible. |
-| Medium | 600–1023 | All five, each one press away, each with its name visible. This tier gets a form of its own: it is not the compact form stretched and not the expanded form squeezed. |
+| Compact | < 600 | On an `app` page: all five, each one press away, each with its name visible. |
+| Medium | 600–1023 | On an `app` page: all five, each one press away, each with its name visible. This tier gets a form of its own: it is not the compact form stretched and not the expanded form squeezed. |
 | Expanded and up | ≥ 1024 | All five, each one press away, each with its name visible. `Search` may be the search field itself, labelled `Search`. |
+
+On a `record` page at compact the five are behind `Menu` (rule 4).
 
 Width alone decides the size class; height is not consulted, so a phone held sideways is medium.
 
@@ -75,7 +77,7 @@ A route declares which kind it is (T-042 replaces today's lists of route prefixe
 | The search field, where Search is a field | placeholder `Search stories, people, places` |
 | `Following` with a number, for assistive technology | `Following, {k} stories moved` · `Following, 1 story moved` |
 | The control that opens the five on a compact `record` page | `Menu` (its accessible name) |
-| The way back on a `record` page | The way back goes to the previous Prism page and is named for it: `Back to Today`, `Back to Stories`, `Back to Search`, `Back to Following`, `Back to the story` (from a record opened from a story). With no previous Prism page: `Back to Stories` on a story page, `Back to Today` on any other. |
+| The way back on a `record` page | The way back goes to the previous Prism page and is named for it: `Back to Today`, `Back to Stories`, `Back to Search`, `Back to Following`, `Back to the story` (from a record opened from a story). With no previous Prism page: `Back to Stories` on a story page, `Back to Today` on any other. From any other page (a person, a subject, another record): `Back`. |
 
 The names do not change with width, are never abbreviated, and are never replaced by a symbol alone.
 `Watchlist` and `Pulse` are no longer destinations.
@@ -83,7 +85,8 @@ The names do not change with width, are never abbreviated, and are never replace
 ## Rules
 
 1. Five destinations, one order, one set of names, at every width (D-20).
-2. Every destination shows its name at every width. A symbol may accompany a name; it never replaces it.
+2. Every destination shows its name at every width (on a compact `record` page, each name is visible once
+   `Menu` is open). A symbol may accompany a name; it never replaces it.
 3. Navigation holds the five and the wordmark, and nothing else: no theme control, no link to Plus, no
    sign-in beside `You`. Those live on the pages they belong to.
 4. From any `app` or `record` page the five are reachable (PLAN §4.2: a leaf page keeps the global
@@ -98,7 +101,8 @@ The names do not change with width, are never abbreviated, and are never replace
    T-083's decision; that prose never runs wider than the reading measure is a standing rule of the product.
 9. The way back goes to the previous Prism page and is named for it: `Back to Today`, `Back to Stories`,
    `Back to Search`, `Back to Following`, `Back to the story` (from a record opened from a story). With no
-   previous Prism page: `Back to Stories` on a story page, `Back to Today` on any other.
+   previous Prism page: `Back to Stories` on a story page, `Back to Today` on any other. From any other page (a
+   person, a subject, another record): `Back`.
 
 ## Accessibility behaviour
 

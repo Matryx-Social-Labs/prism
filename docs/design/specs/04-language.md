@@ -82,7 +82,7 @@ space when the request's language asks for it).
 | Default | As above, with the pre-ticked options. |
 | Interface language changed | The whole step re-renders in it at once (title, questions, the second-line names, the buttons). The ticks do not change, except that the new interface language becomes ticked. |
 | None ticked | The main action reads `Continue with every language`. It is never disabled. |
-| Busy | The main action reads `Saving…`, disabled. |
+| Busy | The main action reads `Saving…`, busy and cannot be pressed again (`aria-busy`, `aria-disabled`). |
 | Error (could not save) | An error message above the buttons: `That did not save. Try again.` The choices stay as set. |
 | Signed out | The same step; stored on the device and in the address prefix. |
 | At the free limit | Does not apply: nothing here is metered. |
@@ -115,7 +115,8 @@ the real ones. Rules for the catalogue that follow from this spec:
 5. Pre-ticked: the interface language, and any language in `navigator.languages` that is in the list. Nothing
    else; English is not ticked for a reader who did not ask for it.
 6. The main action is `Continue with {k} languages` · `Continue with 1 language` · `Continue with every
-   language` (none ticked). With none ticked it is never disabled; while saving it reads `Saving…`, disabled.
+   language` (none ticked). With none ticked it is never disabled; while saving it reads `Saving…`, busy and cannot be
+   pressed again (`aria-busy`, `aria-disabled`).
 7. `Skip for now` leaves onboarding and keeps the defaults: the interface language as it stands (the reader's
    choice in question 1, else the address's `/hi/…`, else the browser's if Prism speaks it, else English), and
    reading languages = the interface language alone. A reader who never saw the step is treated as one who
@@ -131,7 +132,7 @@ the real ones. Rules for the catalogue that follow from this spec:
 13. A language added later needs no change to copy.
 14. The address decides the page's language (`/hi/…` is in Hindi for everyone) and never changes a reader's
     stored choice. A reader with a stored choice who opens an address in another language sees that page as
-    addressed, with the offer to read it in their own language.
+    addressed.
 15. At sign-in, the account's stored choices replace the device's; a new account takes the device's.
 
 ### What the choices do

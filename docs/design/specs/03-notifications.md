@@ -75,7 +75,7 @@ The explanation:
 | State | What the reader is given / what happens |
 |---|---|
 | Default | As above. |
-| Busy (Loading) | The main action reads `Turning on…`, disabled, `aria-busy`. The system prompt is on screen. |
+| Busy (Loading) | The main action reads `Turning on…`, busy and cannot be pressed again (`aria-busy`, `aria-disabled`). The system prompt is on screen. |
 | Granted | The panel closes; the offer, if any, goes. A brief confirmation message, by what was turned on: `Alerts are on.` (follow alerts, with or without the daily one) · `You'll be told at {HH:MM}.` (the daily one alone). `Turn on` with `Stories you follow` on sets alerts on for every story the reader follows now and for later follows; each can be switched off on its own. |
 | Permission was already granted (a second press, another story) | No panel. That story's alerts turn on at once; message `Alerts are on for this story.` |
 | Not now | The panel closes. Nothing is stored against the reader except that the offer was answered. The system prompt has not been spent. |
@@ -84,7 +84,7 @@ The explanation:
 | This browser cannot notify (an in-app browser, iOS Safari outside the home screen) | Title `Get told by email`; `This browser cannot show notifications. The same two messages can come by email.`; the two switches; an `Email` field (filled and read-only when signed in); the main action `Send by email`; `Not now`. |
 | Email, signed in | `Send by email` reads `Sending…`, then the panel closes with the brief confirmation message `These will come to {address}.` No confirmation step: the address is the account's. |
 | Email, an address that is not one | Under the field: `Enter a valid email address.` Nothing is sent. |
-| Email sent for confirmation (signed out) | `Send by email` reads `Sending…`; then the panel's body becomes `Check {address} and confirm. Nothing is sent until you do.` with `Done`. |
+| Email sent for confirmation (signed out) | `Send by email` reads `Sending…`; then the panel's body becomes `Check {address} and confirm. Nothing else is sent until you do.` with `Done`. |
 | The confirmation link is opened | It opens `/you` · Notifications with `Email confirmed.` above the section — or, when the link is more than 24 hours old, `That link has expired.` with `Send another`. |
 | Both switches off | The main action is disabled; under it: `Choose at least one, or Not now.` |
 | Error — could not save | An error message above the buttons: `That did not save. Try again.` The switches keep what the reader set. |
@@ -161,7 +161,7 @@ Every string is given where it appears above.
 - `Daily` · `Weekly` · `Off` is a radio group named `Email`, not tabs.
 - The email field is `type="email"` with `autocomplete="email"`. Confirming an address is a link in the email,
   never a code to copy.
-- While busy a button is `aria-busy` and `aria-disabled`, not `disabled`.
+- While busy a button is busy and cannot be pressed again (`aria-busy`, `aria-disabled`).
 - Switches are `role="switch"`; each sentence is the switch's description.
 - The time control is a native `<select>` with the label `Time`; the zone is text, not part of the value.
 - `Not now` is a real button: declining is as easy as accepting (India's dark-pattern guidelines).

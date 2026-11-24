@@ -36,8 +36,9 @@ Whether alerts are on is said in words inside what opens, never by a second symb
 The same two things at every size:
 
 1. A switch: `Alerts for this story`, and under the label: `When a development is reported by 2 or more
-   outlets. At most 3 a day.` It is on when alerts are on for this device or email; turning it on with no
-   permission yet opens the explanation (spec 03). On a person, subject or company there is no switch: Prism
+   outlets. At most 3 a day.` It shows the story's own setting, which is the reader's and the same on every
+   device (spec 03, `Per story`). When `Stories you follow` is off on this device, `Alerts are off on this
+   device.` is shown under it. Turning it on with no permission yet opens the explanation (spec 03). On a person, subject or company there is no switch: Prism
    sends alerts for stories only.
 2. `Unfollow` — a plain row. It is not shown as destructive: it can be undone.
 
@@ -53,12 +54,12 @@ T-083 draws both.
 | Event | Brief confirmation message (`role="status"`, one at a time) |
 |---|---|
 | Followed, signed in | `Following. Changes to this story appear in Following.` — action `Turn on alerts` |
-| Followed, signed out | `Following on this device.` — no action |
+| Followed, signed out | `Following on this device.` — action `Turn on alerts` |
 | Followed a person, subject or company | `Following. Stories on {name} appear in Following.` — no action |
 | Unfollowed | `Unfollowed.` — action `Undo` |
 
-`Turn on alerts` is offered on the message only while alerts are off for this story, no offer of the same
-thing is on screen (spec 03), and the reader has never pressed `Not now` on this device. After a `Not now`,
+`Turn on alerts` is offered on the message, signed in or signed out, only while alerts are off for this story,
+no offer of the same thing is on screen (spec 03), and the reader has never pressed `Not now` on this device. After a `Not now`,
 Prism does not raise alerts again; the switch inside what opens and the settings remain.
 
 A message with no action leaves after 6 seconds. A message that carries an action (`Undo`, `Turn on alerts`)
@@ -66,15 +67,16 @@ stays until the action is used, the reader dismisses it (`Dismiss`), or the next
 replaces it: an action a reader cannot reach in time is not an action. Unfollowing is final when its message
 goes; until then `Undo` restores the follow and its alert setting.
 
-A signed-out follow works at once (T-035 keeps it on the device and the server); sign-in is never
-required. On a story page the first follow also shows the offer of spec 03, in place under the story's header.
+A signed-out follow works at once (T-035 keeps it on the device and the server); sign-in is offered on the
+Following tab, never on the follow itself. On a story page the first follow also shows the offer of spec 03, in place under the story's header.
 
 ### The first follow on a device: remembering what was read
 
 "New since you read" needs Prism to keep which developments a reader has seen. That is reading history, and
 it is kept only with the reader's agreement (D-12). So the first follow on a device asks once, where the
 follow was pressed — an offer in place under the header on a story page (ahead of the alerts offer, which
-waits for this answer), a panel elsewhere:
+waits for this answer), a panel elsewhere. The panel blocks the page; focus moves to it and returns to the
+control that was pressed. Closing it without an answer is 'Not answered'.
 
 `Prism can remember what you have read in the stories you follow, so it can show you what is new. Prism keeps
 it until you turn this off.` — `Remember` · `Don't remember`. Neither is pre-selected and the two are offered equally.
@@ -82,15 +84,15 @@ it until you turn this off.` — `Remember` · `Don't remember`. Neither is pre-
 | Answer | What follows |
 |---|---|
 | `Remember` | Read marks are kept (T-035). Everything in "New since you read" and the counts in Following work. |
-| `Don't remember` | The follow stands. Nothing about reading followed stories is sent or kept. A story page shows no "new" line, no `New` words and no divider; Following lists every followed story under one heading, `Your stories`, newest development first, each with `latest {time}` in place of a count of new. Alerts still work: they depend on the story moving, not on what was read. |
+| `Don't remember` | The follow stands. No read marks are sent or kept. A story page shows no "new" line, no `New` words and no divider; Following lists every followed story under one heading, `Your stories`, newest development first, each with `latest {time}` in place of a count of new. Alerts still work: they depend on the story moving, not on what was read. |
 | Not answered (closed, or left) | Treated as `Don't remember`; asked again at the next follow, once. |
 
 Signed in, the answer belongs to the account and is asked once, not once per device. T-035's rule for a
 child's account applies: it is never asked and nothing is kept.
 
 The answer can be changed on `/you` · Privacy: `Remember what I read in followed stories` (a switch). Turning
-it off deletes what was kept. The wording of this ask is the one sentence in these specs that touches the
-law; counsel reads it before it ships (FA-02).
+it off deletes what was kept. Counsel reads the wording of this ask, and of the email step in spec 03, before
+either ships (FA-02).
 
 ### The free limit (D-17)
 
@@ -149,7 +151,8 @@ On a story's timeline, newest first, for a reader who has read this story before
    control.
 4. `People, subjects and companies` — a heading. One row per followed person, subject or company: its name and
    the `Following` control. Then `Stories on what you follow`, as story rows. Then the link `Market Pulse →`.
-   With none followed, the section is only the link `Market Pulse →`.
+   With none followed, the section is only the link `Market Pulse →`. A ticker followed today is listed as its
+   company, a sector as its subject; nothing a reader follows on today's Watchlist is dropped.
 
 ## States
 
@@ -163,8 +166,8 @@ On a story's timeline, newest first, for a reader who has read this story before
 | Follow state not loaded / failed | See The control: `Follow`, busy while not loaded; `Follow`, nothing said, if it failed. |
 | Error — the control | Could not save: see The control. |
 | Error — the Following tab | An error message: `Your stories could not load.` with `Try again`. |
-| Signed out — a follow | `Following on this device.` with no action (see After the press). |
-| Signed out — the Following tab | The tab as above, with a message (not an error) first: `These are kept on this device.` — link `Sign in to keep them everywhere`. |
+| Signed out — a follow | `Following on this device.` with the action `Turn on alerts` (see After the press). |
+| Signed out — the Following tab | The tab as above, with a message (not an error) first: `You follow these on this device only.` — link `Sign in to keep them everywhere`. |
 | At the free limit | The count reads `5 of 5 stories`; nothing else changes until a sixth follow is tried, which opens the panel in "The free limit" (both forms: Plus on sale, Plus not on sale). |
 | A followed story that has ended or merged | It stays in `Nothing new` under its current name; a merged story opens its successor. Nothing is removed silently. |
 
@@ -194,15 +197,16 @@ Every string is given where it appears above. Names for assistive technology:
 5. A message with no action leaves after 6 seconds; a message with an action stays until the action is used,
    it is dismissed, or the next message replaces it. One message at a time.
 6. `Turn on alerts` is offered on the message only while alerts are off for this story, no offer of the same
-   thing is on screen, and the reader has never pressed `Not now` on this device. After `Not now` Prism does
-   not raise alerts again.
-7. A signed-out follow works at once and is kept on the device and the server (T-035); sign-in is never
-   required. Its message is `Following on this device.`, with no action.
+   thing is on screen, and the reader has never pressed `Not now` on this device; this holds signed in or signed
+   out. After `Not now` Prism does not raise alerts again.
+7. A signed-out follow works at once and is kept on the device and the server (T-035). Its message is
+   `Following on this device.`, with the action `Turn on alerts` on the conditions of rule 6; sign-in is offered
+   on the Following tab, never on the follow itself.
 8. The first follow on a device asks once whether Prism may remember what was read (D-12); no answer counts
    as `Don't remember` and the ask is repeated once at the next follow. The answer is changed on `/you` ·
    Privacy; turning it off deletes what was kept. Signed in, the answer belongs to the account and is asked
    once, not once per device; T-035's rule for a child's account applies: it is never asked and nothing is
-   kept. Counsel reads the wording before it ships (FA-02).
+   kept. Counsel reads the wording of this ask, and of the email step in spec 03, before either ships (FA-02).
 9. Following and its alerts are free for 5 stories. Only stories count toward 5; people, subjects and
    companies are today's free Watchlist and stay free. The sixth follow is not made; the limit is enforced on
    the server.
@@ -234,7 +238,7 @@ Every string is given where it appears above. Names for assistive technology:
 - While busy the control is `aria-busy` and `aria-disabled`, not `disabled`: it keeps focus and stays
   readable.
 - The alerts row is `role="switch"` with `aria-checked`; its sentence is its description.
-- The modal panels (what opens at compact, the limit panel) trap focus and restore it; the non-modal
+- The modal panels (what opens at compact, the limit panel, the first-follow ask panel) trap focus and restore it; the non-modal
   panel closes on Escape and on focus leaving it.
 - Confirmation messages appear in one region named `Notifications`, announced politely; a message's action is
   reachable by keyboard, and the message stays while it has focus or the pointer.
@@ -249,6 +253,8 @@ Every string is given where it appears above. Names for assistive technology:
 | The limit enforced on the server, with a refusal the client can explain | T-050 (D-17) |
 | Whether Plus can be bought today | the billing configuration the Plus page already reads |
 | Alert switch per follow | T-036 (stores it), T-053 (asks permission) |
+| Unfollow-one-and-follow-another as one request (both or neither) | T-050 |
+| Deleting kept read marks when the reader turns remembering off; one answer per account | T-035 |
 
 ## Decided here
 
@@ -265,7 +271,8 @@ Every string is given where it appears above. Names for assistive technology:
 5. **Only stories count toward 5.** D-17 says "5 stories"; people, subjects and companies are today's free
    Watchlist and stay free.
 6. **Newest first, so "new" is at the top**; the divider marks where the reader had got to rather than where
-   new begins.
+   new begins. A notification therefore opens the story at the top. This replaces 'opens at the marker' in
+   T-050, T-053 and T-083: with newest first, the top is where the unseen developments are.
 
 ## References
 

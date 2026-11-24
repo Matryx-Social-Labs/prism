@@ -82,7 +82,7 @@ three, then by day) is T-052's and is not in this spec.
 | Follow state and the unseen count not loaded yet | The header is complete without them; the Follow control shows `Follow` and is busy; no returning line yet. |
 | They failed to load | `Follow`; nothing is said; no returning line. |
 | Signed out | Identical; Follow works at once (spec 02). |
-| At the free limit | Follow opens the limit message (spec 02). |
+| At the free limit | Follow opens the limit panel (spec 02). |
 | Hindi interface | Labels and headings from the catalogue; figures stay in Latin digits; plural forms through `Intl`. The story's name is Prism's label: until translation is live (T-066) it is shown as written, with its `lang`; after, in the interface language, marked as a translation when it is one. |
 
 ## Copy
@@ -100,7 +100,9 @@ story's name is Prism's label for the story, as everywhere a story is named. Unt
 (T-066) the name is shown as written, with its `lang`; after, in the interface language, marked as a
 translation when it is one.
 
-Share text uses the same singulars as the figures: `1 development`, `1 outlet`, `1 language`.
+Share text uses the same singulars as the figures: `1 development`, `1 outlet`, `1 language`. While the grouping
+is provisional it uses `reports` / `report` in place of `developments` / `development`: `{story name} — {n}
+reports, {k} outlets, {l} languages.` / `1 report`.
 
 ## Rules
 

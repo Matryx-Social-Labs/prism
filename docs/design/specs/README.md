@@ -30,7 +30,7 @@ accessibility behaviour · needs from the API · decided here · references.
 - **Copy** is the exact English sentence, with slots in braces: `{k} outlets`. A slot is filled from live data
   or it is not printed; a spec never supplies a figure. Every counted noun takes its singular (`1 story`,
   `1 outlet`, `1 language`, `your 1 story`), through `Intl` plural rules in every language. A time on the
-  reader's current day prints as `{HH:MM}`; on another day, `{Mon HH:MM}`. Where a spec writes `IST` in a
+  reader's current day prints as `{HH:MM}`; on another day, `{Mon HH:MM}`; more than six days ago, `{24 Nov}`. Where a spec writes `IST` in a
   sentence, the product prints the reader's own zone. Counts stay in Latin digits in every language (D-01).
   Hindi strings are written by T-054's catalogue and reviewed by a native reader, not here.
 - **A state the spec lists is required.** A state it does not list does not exist: ask, do not invent.
@@ -47,7 +47,8 @@ accessibility behaviour · needs from the API · decided here · references.
 These are fixed whatever the product comes to look like (D-23), and every spec assumes them:
 
 1. Counts are counted and printed as numbers. Below 30 a share is "3 of 4", never a percentage. A figure not
-   yet counted is `—` with `Not counted yet`, never 0.
+   yet counted is `—` with `Not counted yet`, never 0. `{k} outlets` counts independent origins once T-014 lands (D-22): a wire story carried by many
+   outlets is one origin, listed as `{Wire}, carried by {c} outlets`.
 2. A quote is the exact words, in the language it was printed in, with its speaker, outlet and time — or it
    is absent. A translation says it is one.
 3. Nothing Prism writes is shown as fact unless it has been checked against the reports, and it is labelled
@@ -62,8 +63,8 @@ These are fixed whatever the product comes to look like (D-23), and every spec a
    screen.
 7. Every script Prism reads carries its `lang` (and `dir` where it runs right to left).
 8. Declining is always as easy as accepting, and is not asked again.
-9. What a reader has read is kept on their device. It is kept by Prism only for stories they follow, and only
-   if they agreed (spec 02).
+9. Which items and developments a reader has read is kept on their device. Prism keeps it only for stories
+   they follow, and only if they agreed (spec 02). Counting events (T-058) carry no list of what was read.
 
 ## For the visual system: what the reviews of the first draft found
 

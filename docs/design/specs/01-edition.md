@@ -31,7 +31,7 @@ sends a returning reader to `/feed`. The explanation of spec 03 is opened from t
    1. **The headline.** It wraps; it is never truncated. It is the link to the record, and the whole item is
       its target. Items the reader has read are marked as read (in words or a mark with a text equivalent,
       never by colour alone).
-   2. **Whose headline it is** — one of the four states in "Headline states" below.
+   2. **Whose headline it is** — one of the five states in "Headline states" below.
    3. **The count, as a sentence**: `Reported by {k} outlets in {l} languages`, then ` · ` and the time of the
       latest report. One language prints `in 1 language`.
    4. **One exact quote**, when the document carries one — only direct speech in the language it was printed
@@ -48,7 +48,8 @@ sends a returning reader to `/feed`. The explanation of spec 03 is opened from t
    3. **Your stories** — the per-reader slot (one request; everything above it came from the document).
       Up to three followed stories, moved ones first: the story's name, then `{k} new since you read`, or
       `Nothing new since {day HH:MM}`. Then the link `Following →`. A reader who follows nothing sees one
-      line: `Follow a story and its changes appear here.` This slot is not one of the `n` items and does not
+      line: `Follow a story and its changes appear here.` For a reader who has not agreed to Prism remembering what they
+      read (spec 02), each line is the story's name and `latest {time}`. This slot is not one of the `n` items and does not
       move the count. While its request is in flight it is a loading state with no text; if the request fails
       the slot is left out and nothing is said — the edition is complete without it.
    4. The main action: `Tell me when tomorrow's edition is ready` (opens the explanation in spec 03). Once the
@@ -65,15 +66,15 @@ sends a returning reader to `/feed`. The explanation of spec 03 is opened from t
 | State | When | The headline | The line under it |
 |---|---|---|---|
 | Prism's | two or more independent reports, and Prism's headline has passed its check (T-018) | Prism's | `Prism's headline, from {k} reports` |
-| An outlet's own | one independent report, or before the check exists | the lead outlet's, as printed | `{Outlet}'s headline` |
-| An outlet's, in the reader's language | an outlet wrote one in the interface language | that outlet's, as printed | `{Outlet}'s headline` (in the interface language) |
+| An outlet's own | Prism's headline is not shown, and the lead outlet's own is in the interface language | the lead outlet's, as printed | `{Outlet}'s headline` |
+| An outlet's, in the reader's language | Prism's headline is not shown, the lead outlet's is not in the interface language, and another outlet wrote one in it | that outlet's, as printed | `{Outlet}'s headline` (in the interface language) |
 | Translated | no outlet wrote it in the interface language | a translation of the lead outlet's | `Translated from {Language} · {Outlet}'s headline · See the original` — `See the original` swaps the original in, in place; the line then reads `{Outlet}'s headline in {Language} · See the translation` |
-| Another language, as printed | no outlet wrote it in the interface language and translation is not live | the lead outlet's, as printed, with its `lang` | `{Outlet}'s headline in {Language}` |
+| Another language, as printed | no outlet wrote it in the interface language and translation is not live | the lead outlet's, as printed, in its own language, with its `lang` | `{Outlet}'s headline in {Language}` |
 
-Which state an item is in, first match wins: Prism's headline when it exists and has passed its check; else
-an outlet's own in the interface language; else Translated, once translation is live; else Another language,
-as printed, the last fallback. Until T-018 is live the edition shows only the second and third states and
-that last fallback.
+Which state an item is in, first match wins: Prism's headline, when it exists and has passed its check; else
+the lead outlet's own, when it is in the interface language; else another outlet's in the interface language;
+else Translated, once translation is live; else the lead outlet's as printed, in its own language. Until T-018
+is live the edition shows only the second and third states and that last fallback.
 
 ## States
 
@@ -129,8 +130,9 @@ Every string is given where it appears above. The rest:
    a finish.
 10. The breaking strip, when it exists, is above the edition head and outside the count.
 11. A muted subject's items are left out; `n` is the number shown; no gap, no notice.
-12. What a reader has read of the edition never leaves the device. (What they have read of a followed story
-    is kept only with their agreement: spec 02.)
+12. Which items a reader has read never leaves the device. The opened and finished events (T-058) carry no
+    list of items, and a reader or device id only with the reader's agreement (D-12). (What a reader has read
+    of a followed story is kept only with their agreement: spec 02.)
 13. The edition itself is never metered; the Follow control on an item opens the limit panel at the free
     limit.
 14. Once the daily notification or the daily email is on, the end block says when the reader will be told,
@@ -162,6 +164,7 @@ Every string is given where it appears above. The rest:
 | The Follow control and the limit panel | spec 02, T-050 |
 | The explanation | spec 03, T-053 |
 | Prism's headline passing a check; translation | T-018; T-054 and T-066 |
+| A document for every day, with 0 to 7 items; 'not written yet' distinguishable from 'written, with no items'; the hour it is written available when there is no document | T-038 (its selection rule says 5–7; a quiet day gives fewer) |
 
 ## Decided here
 
