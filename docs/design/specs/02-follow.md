@@ -1,175 +1,164 @@
 # 02 · Follow, "Following", the Following tab
 
-Built by T-050. Comps: `comps/follow-b.html` (the form taken), `comps/following.html` (the tab, the free
-limit, "new since you read"); the two forms not taken in `comps/follow-a.html` and `-c.html`.
+Built by T-050.
 
 ## Purpose
 
 The promise on the masthead becomes something a reader can do: follow a story, come back, and see only what
 moved. One control, the same everywhere a story is named; one place that lists what the reader follows.
 
-## Where it lives
+## Where it appears
 
 - **The control:** the head of a story page (spec 06); a record's "Part of" block; an edition item's story
   line (spec 01); a row in Stories; the Following tab; a person, subject or company page.
 - **The Following tab:** the fourth of the five destinations (D-20), replacing Watchlist. Tickers, sectors
   and Market Pulse live under it. Its address is `/following`; `/watchlist` redirects to it.
+- **What opens from `Following`:** pressing the control once the reader follows.
 
-## The control
+## Content, in order
 
-| State | Looks like | Says |
+### The control
+
+| State | What the reader is given / what happens | Says |
 |---|---|---|
-| Default | secondary Button; small (36 drawn, 44 target) in rows, default size in a story head | `Follow` |
-| Hover / pressed | the Button's own states; no lift | |
-| Focus | the 2px accent focus ring | |
-| Busy | the words change; `aria-busy`, disabled; no spinner | `Following…` / `Unfollowing…` |
-| Following | the same shape with ink text and a 1px ink border (a solid line means on) and the ChevronDown icon; `aria-haspopup`, `aria-expanded` | `Following` |
-| Following, open | see "What opens" | |
-| Could not save | the control returns to what it was. In a story head the sentence is under it, in `--danger`, reading voice. In a row there is no room for a sentence without moving the row's neighbours, so there it is a toast with the action `Try again` | `That did not save. Try again.` |
+| Default | The control | `Follow` |
+| Busy | The words change; `aria-busy`, disabled; no spinner | `Following…` / `Unfollowing…` |
+| Following | The control says `Following`; `aria-haspopup`, `aria-expanded` | `Following` |
+| Following, open | see "What opens from `Following`" | |
+| Could not save | The control returns to what it was. In a story head the sentence is shown under it. In a row there is no room for a sentence without moving the row's neighbours, so there it is a brief confirmation message with the action `Try again` | `That did not save. Try again.` |
 
-The control never changes width class between states: `Follow` and `Following` + chevron fit the same row at
-360px. It is never an icon alone and never the ▾ glyph. No bell on the control: whether alerts are on is said
-inside, in words.
+Whether alerts are on is said in words inside what opens, never by a second symbol on the control.
 
-### What opens behind the chevron
+### What opens from `Following`
 
-The same two things at every width:
+The same two things at every size:
 
-1. A switch: `Alerts for this story`, and under the label in `--ink-3`: `When a development is reported by 2
-   or more outlets. At most 3 a day.` It is on when alerts are on for this device or email; turning it on with
-   no permission yet opens the explanation (spec 03). On a person, subject or company there is no switch:
-   Prism sends alerts for stories only.
-2. `Unfollow` — a plain row, ink text. It is not styled as destructive: it can be undone.
+1. A switch: `Alerts for this story`, and under the label: `When a development is reported by 2 or more
+   outlets. At most 3 a day.` It is on when alerts are on for this device or email; turning it on with no
+   permission yet opens the explanation (spec 03). On a person, subject or company there is no switch: Prism
+   sends alerts for stories only.
+2. `Unfollow` — a plain row. It is not shown as destructive: it can be undone.
 
-- **Compact:** a bottom Sheet with the story's name as its title (reading voice 600, two lines) and a Close
-  button; rows at least 56px tall. Scrim; Escape and a tap on the scrim close it; focus is trapped inside and
-  returns to the control.
-- **Medium and up:** a popover under the control's right edge, 280px wide, `--elevated`, 1px line, 8px radius,
-  `--shadow-2`; rows at least 44px. Escape and a click outside close it; focus returns to the control.
+- **On a small screen** a panel opens that blocks the page (modal) and names the story, with a `Close`
+  button. Escape and a tap outside the panel close it; focus is trapped inside and returns to the control.
+- **On a larger screen** a panel opens next to the control that does not block the page. Escape and a click
+  outside close it; focus returns to the control.
+
+T-083 draws both.
 
 ### After the press
 
-| Event | Toast (`role="status"`, one at a time) |
+| Event | Brief confirmation message (`role="status"`, one at a time) |
 |---|---|
 | Followed, signed in | `Following. Changes to this story appear in Following.` — action `Turn on alerts` |
 | Followed, signed out | `Following on this device.` — action `Sign in to keep it` |
 | Followed a person, subject or company | `Following. Stories on {name} appear in Following.` — no action |
 | Unfollowed | `Unfollowed.` — action `Undo` |
 
-`Turn on alerts` is offered on the toast only while alerts are off for this story, no card offering the same
+`Turn on alerts` is offered on the message only while alerts are off for this story, no offer of the same
 thing is on screen (spec 03), and the reader has never pressed `Not now` on this device. After a `Not now`,
-Prism does not raise alerts again; the switch behind the chevron and the settings remain.
+Prism does not raise alerts again; the switch inside what opens and the settings remain.
 
-A toast with no action leaves after 6 seconds. A toast that carries an action (`Undo`, `Turn on alerts`,
-`Sign in to keep it`) stays until the action is used, the reader dismisses it (`Dismiss`), or the next toast
-replaces it: an action a reader cannot reach in time is not an action. Unfollowing is final when its toast
+A message with no action leaves after 6 seconds. A message that carries an action (`Undo`, `Turn on alerts`,
+`Sign in to keep it`) stays until the action is used, the reader dismisses it (`Dismiss`), or the next message
+replaces it: an action a reader cannot reach in time is not an action. Unfollowing is final when its message
 goes; until then `Undo` restores the follow and its alert setting.
 
 A signed-out follow works at once (T-035 keeps it on the device and the server); sign-in is offered, never
-required. On a story page the first follow also shows the inline card of spec 03 under the header.
+required. On a story page the first follow also shows the offer of spec 03, in place under the story's header.
 
 ### The first follow on a device: remembering what was read
 
 "New since you read" needs Prism to keep which developments a reader has seen. That is reading history, and
 it is kept only with the reader's agreement (D-12). So the first follow on a device asks once, where the
-follow was pressed — a card under the header on a story page (ahead of the alerts card, which waits for this
-answer), a sheet elsewhere:
+follow was pressed — an offer in place under the header on a story page (ahead of the alerts offer, which
+waits for this answer), a panel elsewhere:
 
 `Prism can remember what you have read in the stories you follow, so it can show you what is new.` —
-`Remember` · `Don't remember`. Neither is pre-selected and the two are the same size.
+`Remember` · `Don't remember`. Neither is pre-selected and the two are offered equally.
 
 | Answer | What follows |
 |---|---|
 | `Remember` | Read marks are kept (T-035). Everything in "New since you read" and the counts in Following work. |
-| `Don't remember` | The follow stands. Nothing about reading is sent or kept. A story page shows no "new" line, badges or divider; Following lists every followed story under one heading, `Your stories`, newest development first, each with `latest {time}` in place of a count of new. Alerts still work: they depend on the story moving, not on what was read. |
+| `Don't remember` | The follow stands. Nothing about reading is sent or kept. A story page shows no "new" line, no `New` words and no divider; Following lists every followed story under one heading, `Your stories`, newest development first, each with `latest {time}` in place of a count of new. Alerts still work: they depend on the story moving, not on what was read. |
 | Not answered (closed, or left) | Treated as `Don't remember`; asked again at the next follow, once. |
 
 The answer can be changed on `/you` · Privacy: `Remember what I read in followed stories` (a switch). Turning
 it off deletes what was kept. The wording of this ask is the one sentence in these specs that touches the
 law; counsel reads it before it ships (FA-02).
 
-## The free limit (D-17)
+### The free limit (D-17)
 
 Following and its alerts are free for 5 stories; people, subjects and companies do not count. The sixth
-follow is not made. A Sheet opens instead:
+follow is not made. A panel opens instead, in this order:
 
-1. `You follow 5 of 5 stories` — record voice, display-m.
-2. Five square segments, all ink (the count, drawn).
-3. `Following is free for 5 stories. Unfollow one to follow this, or follow without a limit on Plus.`
-4. `Your 5 stories` — the five, one line each, each with `Unfollow` (named `Unfollow {story}` for assistive
-   technology); the toast then reads `Following. Unfollowed {story}.` with `Undo`, which restores that follow
-   and withdraws the new one. Unfollowing one here makes the pending
-   follow at once and closes the sheet with the toast `Following. Changes to this story appear in Following.`
-5. `Plus adds` — up to four lines, each with a Check: `Unlimited follows` · `Alerts through a closer reading` ·
-   `A weekly brief of what changed, per story` · `Ask across the whole story`. A line is drawn only when its
-   feature is live for a Plus reader today; the list never promises what Plus does not yet do.
-6. Primary `See Plus` (to `/plus`, where the price and renewal terms are; none are restated here). Under it
-   `Not now`.
+1. `You follow 5 of 5 stories`.
+2. `Following is free for 5 stories. Unfollow one to follow this, or follow without a limit on Plus.`
+3. `Your 5 stories` — the five, one line each, each with `Unfollow` (named `Unfollow {story}` for assistive
+   technology); the message then reads `Following. Unfollowed {story}.` with `Undo`, which restores that
+   follow and withdraws the new one. Unfollowing one here makes the pending follow at once and closes the
+   panel with the message `Following. Changes to this story appear in Following.`
+4. `Plus adds` — up to four lines: `Unlimited follows` · `Alerts through a closer reading` · `A weekly brief of
+   what changed, per story` · `Ask across the whole story`. A line is shown only when its feature is live for
+   a Plus reader today; the list never promises what Plus does not yet do.
+5. The main action `See Plus` (to `/plus`, where the price and renewal terms are; none are restated here).
+   Under it `Not now`.
 
-**While Plus is not on sale** (checkout is hidden today): items 5 and 6's primary button are not drawn, and
-the sentence is `Following is free for 5 stories. Unfollow one to follow this.` The limit is enforced on the
-server; the sheet is how the refusal is explained, whichever surface the press came from.
+**While Plus is not on sale** (checkout is hidden today): item 4 and the main action are not shown, and the
+sentence is `Following is free for 5 stories. Unfollow one to follow this.` The limit is enforced on the
+server; the panel is how the refusal is explained, whichever surface the press came from.
 
 **Over the limit.** A reader can hold more than 5 without having broken a rule: follows made on a device and
 on an account are merged at sign-in, and a Plus plan can end. Nothing is ever unfollowed for them. The count
 in Following reads `{k} stories · 5 are free`; alerts keep working for all of them; and a further follow opens
-the sheet titled `You follow {k} stories`, with no segments, the sentence `Following is free for 5 stories.
-Unfollow {k−4} to follow this, or follow without a limit on Plus.` and every followed story in the list.
+the panel titled `You follow {k} stories`, with the sentence `Following is free for 5 stories. Unfollow {k−4}
+to follow this, or follow without a limit on Plus.` and every followed story in the list.
 
-## "New since you read"
+### "New since you read"
 
 On a story's timeline, newest first, for a reader who has read this story before:
 
-- Above the first row: `{k} new since you read` and, in mono, the day and time of the last read.
-- Each unseen development carries a badge with the word `New` (ink badge; a word, not a colour).
-- Between the last unseen and the first seen row, a divider: a 1px `--line-strong` rule broken by
-  `You read up to here` and the same day and time in mono.
+- Above the first row: `{k} new since you read` and the day and time of the last read.
+- Each unseen development carries the word `New` beside it.
+- Between the last unseen and the first seen row, a divider labelled `You read up to here`, with the same day
+  and time.
 - The same count is in the story header (spec 06). A notification opens the story at the top, where the
   count and the unseen rows are: with newest first, "the marker" T-050 and T-053 speak of is the count line
   above the first row, and the page does not scroll down to the divider.
 - The read mark moves when the divider has scrolled into view, or when the reader leaves the page having
-  opened it; the badges stay for the rest of that visit.
+  opened it; the `New` words stay for the rest of that visit.
 - More unseen than one page holds (30, T-007): the count is the true count, the divider is on a later page,
   and `Older developments` loads toward it.
-- First visit, or nothing new: no line, no badges, no divider.
+- First visit, or nothing new: no line, no `New` words, no divider.
 
-## The Following tab
+### The Following tab
 
-Content, in order:
-
-1. `Following` — h1, record voice, display-l. At its right in mono: `{k} of 5 stories` on the free plan,
-   `{k} stories` on Plus.
-2. `Moved since you read` — section head (3px rule). Stories with unseen developments, newest movement
-   first. Each row: the story's name (record voice, title; the link, opening the story at the top);
-   mono `{k} new · latest {time}`; the latest development's headline (reading voice, `--ink-2`, two lines);
-   the `Following` control (small) at the right. A latest development from one outlet gets the dashed rule
-   and `One source so far`.
-3. `Nothing new` — section head. The rest, one row each: the name, then `Nothing new since {day HH:MM}` in
-   `--ink-3`, the control at the right.
-4. `People, subjects and companies` — section head. The chips Watchlist has today (followed ones with a
-   Check), then `Stories on what you follow` as rows, then the link `Market Pulse →`.
-
-| State | What the reader sees |
-|---|---|
-| Loading | The h1 and three skeleton rows with a row's geometry. |
-| Nothing followed yet | `You are not following a story yet.` / `Follow a story to see only what changed since you last read.` Then `Most reported this week`: the three most-reported running stories (live, from the stories list), each with mono `{d} developments · {k} outlets` and `Follow`. |
-| Followed, nothing moved | Under the h1: `Nothing new on your {k} stories since {HH:MM}.` Then the `Nothing new` rows. No `Moved` section. |
-| Signed out | The tab as above, with an info alert first: `These are kept on this device.` — link `Sign in to keep them everywhere`. |
-| Could not load | Error alert: `Your stories could not load.` with `Try again`. |
-| At the limit | The count reads `5 of 5 stories`; nothing else changes until a sixth follow is tried. |
-| A followed story that has ended or merged | It stays in `Nothing new` under its current name; a merged story opens its successor. Nothing is removed silently. |
+1. `Following` — the page heading. With it: `{k} of 5 stories` on the free plan, `{k} stories` on Plus.
+2. `Moved since you read` — a heading. Stories with unseen developments, newest movement first. Each row: the
+   story's name (the link, opening the story at the top); `{k} new · latest {time}`; the latest
+   development's headline (two lines); the `Following` control. A latest development from one outlet is
+   marked in words: `One source so far`.
+3. `Nothing new` — a heading. The rest, one row each: the name, then `Nothing new since {day HH:MM}`, and the
+   control.
+4. `People, subjects and companies` — a heading. The people, subjects and companies Watchlist has today
+   (followed ones marked as followed), then `Stories on what you follow` as rows, then the link
+   `Market Pulse →`.
 
 ## States
 
-Every state is in the table of the part it belongs to. The five every spec must name:
-
-| State | Where it is specified |
+| State | What the reader is given / what happens |
 |---|---|
-| Empty | The Following tab · "Nothing followed yet" and "Followed, nothing moved"; "New since you read" · first visit |
-| Loading | The control · Busy; the Following tab · Loading |
-| Error | The control · Could not save; the Following tab · Could not load |
-| Signed out | "After the press" · Followed, signed out; the Following tab · Signed out |
-| At the free limit | "The free limit" (both forms: Plus on sale, Plus not on sale) |
+| Loading — the control | Busy: the words change to `Following…` / `Unfollowing…` (see The control). |
+| Loading — the Following tab | The heading and a loading state with no text in place of three rows; announced as loading to assistive technology. |
+| Empty — nothing followed yet | `You are not following a story yet.` / `Follow a story to see only what changed since you last read.` Then `Most reported this week`: the three most-reported running stories (live, from the stories list), each with `{d} developments · {k} outlets` and `Follow`. |
+| Empty — followed, nothing moved | Under the heading: `Nothing new on your {k} stories since {HH:MM}.` Then the `Nothing new` rows. No `Moved` section. |
+| Empty — "New since you read", first visit | No line, no `New` words, no divider. |
+| Error — the control | Could not save: see The control. |
+| Error — the Following tab | An error message: `Your stories could not load.` with `Try again`. |
+| Signed out — a follow | `Following on this device.` with `Sign in to keep it` (see After the press). |
+| Signed out — the Following tab | The tab as above, with a message (not an error) first: `These are kept on this device.` — link `Sign in to keep them everywhere`. |
+| At the free limit | The count reads `5 of 5 stories`; nothing else changes until a sixth follow is tried, which opens the panel in "The free limit" (both forms: Plus on sale, Plus not on sale). |
+| A followed story that has ended or merged | It stays in `Nothing new` under its current name; a merged story opens its successor. Nothing is removed silently. |
 
 ## Copy
 
@@ -178,49 +167,69 @@ Every string is given where it appears above. Names for assistive technology:
 | Where | String |
 |---|---|
 | The control | `Follow {story}` · `Following {story}` |
-| The sheet's close button | `Close` |
+| The panel's close button | `Close` |
 | The alerts switch | `Alerts for this story` |
-| The limit sheet's segments | `5 of 5 stories followed` |
 
 "Follow" is the only verb: never "subscribe", "track", "save" or "watch". The destination is `Following`.
 
-## Layout
+## Rules
 
-| | Compact < 600 | Medium 600–1023 | Expanded ≥ 1024 |
-|---|---|---|---|
-| Control in a row | at the row's right; the name wraps beside it | same | same |
-| What opens | bottom Sheet | popover | popover |
-| Limit sheet | bottom Sheet, scrolls inside | dialog, 480 wide | dialog, 480 wide |
-| Following tab | one column, gutter 16; sections stacked | 640 column beside the rail | 640 column (stories) + 320 right rail holding `People, subjects and companies`, gap 48 |
-| Toast | above the tab bar, 16 from the edges | bottom centre of the content area | bottom centre |
+1. One control, the same everywhere a story is named. "Follow" is the only verb; the destination is
+   `Following`.
+2. There is no separate alert control on it: whether alerts are on is said in words inside what opens, never
+   by a second symbol on the control.
+3. What opens holds the same two things at every size: the alerts switch (stories only; none on a person,
+   subject or company) and `Unfollow`. On a small screen it blocks the page and names the story; on a larger
+   screen it does not block the page.
+4. Unfollow is plain and undoable, not shown as destructive and not confirmed. `Undo` restores the follow and
+   its alert setting until its message goes.
+5. A message with no action leaves after 6 seconds; a message with an action stays until the action is used,
+   it is dismissed, or the next message replaces it. One message at a time.
+6. `Turn on alerts` is offered on the message only while alerts are off for this story, no offer of the same
+   thing is on screen, and the reader has never pressed `Not now` on this device. After `Not now` Prism does
+   not raise alerts again.
+7. A signed-out follow works at once and is kept on the device and the server (T-035); sign-in is offered,
+   never required.
+8. The first follow on a device asks once whether Prism may remember what was read (D-12); no answer counts
+   as `Don't remember` and the ask is repeated once at the next follow. The answer is changed on `/you` ·
+   Privacy; turning it off deletes what was kept. Counsel reads the wording before it ships (FA-02).
+9. Following and its alerts are free for 5 stories. Only stories count toward 5; people, subjects and
+   companies are today's free Watchlist and stay free. The sixth follow is not made; the limit is enforced on
+   the server.
+10. The limit offers two ways on (unfollow one, or Plus), and one while Plus is not on sale. Unfollowing one
+    from the panel completes the follow the reader asked for. A Plus line is shown only when its feature is
+    live.
+11. Nothing is ever unfollowed for a reader who is over the limit (follows merged at sign-in, a Plus plan that ended); their
+    alerts keep working.
+12. Newest first, so "new" is at the top. The divider marks where the reader had got to rather than where
+    new begins. The read mark moves when the divider has scrolled into view, or when the reader leaves the
+    page having opened it.
+13. With more unseen developments than one page holds (30, T-007), the count is the true count and the
+    divider is on a later page.
+14. In Following, stories with unseen developments are first, newest movement first; the rest follow under
+    `Nothing new`. A story that has ended or merged is never removed silently.
+15. `Don't remember` changes what is shown, not whether alerts work: they depend on the story moving, not on
+    what was read.
 
-## Motion
-
-The control changes state without moving its neighbours. Sheets arrive from their edge (220ms); the popover
-fades in 140ms. The toast rises 8px over 220ms. A `New` badge does not pulse. Reduced motion: instant.
-
-## Accessibility
+## Accessibility behaviour
 
 - The control is a `<button>`; in the following state it has `aria-haspopup="dialog"` and `aria-expanded` at
-  every width — what opens holds a switch and a button, not menu items, so it is never announced as a menu.
+  every size — what opens holds a switch and a button, not menu items, so it is never announced as a menu.
   Its name includes the story: `Follow {story}`, `Following {story}`.
-- What opens is a dialog named by the story: modal as a sheet, non-modal as a popover. On open, focus moves
-  to the switch, or to `Unfollow` where there is no switch. The popover follows the control in tab order.
+- What opens is a dialog named by the story: modal on a small screen, non-modal on a larger one. On open,
+  focus moves to the switch, or to `Unfollow` where there is no switch. The non-modal panel follows the
+  control in tab order.
 - While busy the control is `aria-busy` and `aria-disabled`, not `disabled`: it keeps focus and stays
   readable.
 - The alerts row is `role="switch"` with `aria-checked`; its sentence is its description.
-- The sheet and the dialog trap focus and restore it; the popover closes on Escape and on focus leaving it.
-- Toasts appear in one region named `Notifications`, announced politely; a toast's action is reachable by
-  keyboard, and the toast stays while it has focus or the pointer.
+- The modal panels (what opens on a small screen, the limit panel) trap focus and restore it; the non-modal
+  panel closes on Escape and on focus leaving it.
+- Confirmation messages appear in one region named `Notifications`, announced politely; a message's action is
+  reachable by keyboard, and the message stays while it has focus or the pointer.
 - "New" is a word; the divider's text is real text, not a pseudo-element.
+- Loading states are announced as loading.
 
-## Primitives
-
-Button, Sheet (with a focus trap — today's does not have one), Popover, ToggleRow, Toast with one host for
-the whole app (today each component keeps its own), Badge, SectionHead, Skeleton, Alert, Chip, EmptyState.
-New: `FollowButton`, `NewSinceDivider`, `LimitSheet`.
-
-## Depends on
+## Needs from the API
 
 | Needs | From |
 |---|---|
@@ -231,22 +240,20 @@ New: `FollowButton`, `NewSinceDivider`, `LimitSheet`.
 
 ## Decided here
 
-1. **One control; what opens is a sheet on a phone and a popover from 600.** Three forms were drawn. A is a
-   popover at every width; B is this one; C opens in place under the control. A's popover is a 280px box with
-   a switch and a sentence inside, hanging off a 36px button at the edge of a 360px screen — the targets are
-   reachable but cramped, and it covers the row it belongs to. C pushes the page down, which in an edition
-   row or a Stories list moves everything the reader was about to tap. B gives a phone a thumb-height sheet
-   that names the story it is about, and gives a pointer a menu next to the control.
-2. **No bell on the control.** A second icon would carry meaning without a word; the alert state is one row
-   inside.
-3. **Unfollow is plain and undoable**, not red and not confirmed.
-4. **The limit sheet offers two ways on, and one while Plus is not sold.** Unfollowing one from the sheet
+1. **One control; the same two things open at every size.** On a phone they open in a panel that blocks the
+   page and names the story; on a larger screen they open in a panel next to the control. Three forms were
+   drawn: a non-modal panel at every size, this one, and one that opens in place under the control. The first
+   covers the row it belongs to and is cramped on a phone; the third pushes the page down, which in an
+   edition item or a Stories list moves everything the reader was about to tap.
+2. **No separate alert control on the Follow control.** A second symbol would carry meaning without a word;
+   the alert state is one row inside, in words.
+3. **Unfollow is plain and undoable**, not shown as destructive and not confirmed.
+4. **The limit offers two ways on, and one while Plus is not sold.** Unfollowing one from the panel
    completes the follow the reader asked for.
 5. **Only stories count toward 5.** D-17 says "5 stories"; people, subjects and companies are today's free
    Watchlist and stay free.
 6. **Newest first, so "new" is at the top**; the divider marks where the reader had got to rather than where
    new begins.
-7. **Following uses the Watchlist icon** until T-043 draws a Following glyph.
 
 ## References
 
