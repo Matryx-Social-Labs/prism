@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common import timings
 from common.config import get_settings
 from common.decisions import Choice, ChoiceAnswer, Noul, NoulAnswer, decide
 from common.logging import get_logger
@@ -232,10 +233,13 @@ async def judge_story(
     if follows:
         questions |= {f"story_{k}": Noul(instructions=SAME_STORY.format(a="ARTICLE", b=f"EVENT_{k}"))
                       for k in range(1, len(asked) + 1)}
-    d = await asyncio.wait_for(
-        decide(state, questions, trace_name="event-verify", metadata={"stage": "correlation", "article_id": str(article_id)}),
-        VERIFY_TIMEOUT_S,
-    )
+    # Wall time, quota waits and the timeout included: it is what the match lock holds.
+    async with timings.timed("jev.story-verify" if follows else "jev.event-verify"):
+        d = await asyncio.wait_for(
+            decide(state, questions, trace_name="event-verify",
+                   metadata={"stage": "correlation", "article_id": str(article_id)}),
+            VERIFY_TIMEOUT_S,
+        )
     verdicts = []
     for k, c in enumerate(asked, 1):
         same = d.answers[f"same_{k}"]
@@ -313,10 +317,11 @@ async def judge_ledes(*, article_id: uuid.UUID, report: str, record: str) -> tup
     """(p same, p later development) on the opening texts: the lower "same" and
     the higher "later development" of two readings, one in each order. Network
     only, as judge(); a failure in either raises for the caller."""
-    (s1, f1, model, c1), (s2, f2, _, c2) = await asyncio.wait_for(
-        asyncio.gather(_relation(report, record, article_id), _relation(record, report, article_id)),
-        VERIFY_TIMEOUT_S,
-    )
+    async with timings.timed("jev.event-escalate"):
+        (s1, f1, model, c1), (s2, f2, _, c2) = await asyncio.wait_for(
+            asyncio.gather(_relation(report, record, article_id), _relation(record, report, article_id)),
+            VERIFY_TIMEOUT_S,
+        )
     return min(s1, s2), max(f1, f2), model, c1 + c2
 
 

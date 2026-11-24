@@ -337,6 +337,54 @@ export function runwayDays(data: Spend): number | null {
   return Math.max(0, (data.balance.balance - data.floor) / perDay);
 }
 
+// ── Pipeline timings (api/routes/admin_metrics.py) ───────────────────────────
+
+/** p50/p95 are a histogram bucket's upper bound; null past the largest (24 h). */
+export interface PipelineTiming {
+  name: string;
+  n: number;
+  p50_ms: number | null;
+  p95_ms: number | null;
+}
+
+export interface PipelineDay {
+  day: string;
+  /** False when nothing was recorded that day: absent, not zero. */
+  recorded: boolean;
+  timings: PipelineTiming[];
+  counters: Array<{ name: string; n: number }>;
+}
+
+export interface PipelineHour {
+  hour: string;
+  observed: number;
+  classified: number;
+  enriched: number;
+  correlated: number;
+}
+
+export interface Pipeline {
+  days: PipelineDay[];
+  /** Null when the queue could not be read; oldest_due_age_s null when nothing is due. */
+  sweeper: { due: number; oldest_due_age_s: number | null } | null;
+  throughput: PipelineHour[];
+}
+
+export const fetchPipeline = (s: Session, days: number) => adminCall<Pipeline>(s, `/api/v1/admin/pipeline?days=${days}`);
+
+const trim = (v: number) => String(Number(v.toFixed(1)));
+
+/** 700 ms · 1.5 s · 5 min · 2 h. */
+export function duration(ms: number): string {
+  if (ms < 1000) return `${trim(ms)} ms`;
+  if (ms < 60_000) return `${trim(ms / 1000)} s`;
+  if (ms < 3_600_000) return `${trim(ms / 60_000)} min`;
+  return `${trim(ms / 3_600_000)} h`;
+}
+
+/** A bucket's upper bound: the true value is at most this. */
+export const bound = (ms: number | null) => (ms === null ? "over 24 h" : `≤ ${duration(ms)}`);
+
 // ── Grievances (api/routes/grievances.py) ─────────────────────────────────────
 
 export type GrievanceStatus = "open" | "resolved" | "rejected";

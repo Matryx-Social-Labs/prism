@@ -334,6 +334,12 @@ async def _dead_letter(r, topic: str, group: str, entry_id, fields: dict, exc: E
         )
     except Exception:  # noqa: BLE001
         logger.exception("dead_letter_failed", topic=topic, entry_id=entry_id)
+    from common import timings  # here, not at the top: timings imports get_redis from this module
+
+    # A lost insert race on articles.raw_item_id: enrichment paid for an
+    # extraction that a twin already stored — a re-bill.
+    cause = "rebill" if "uq_articles_raw_item" in str(exc) else type(exc).__name__
+    await timings.count(f"dead.{topic}.{cause}")
 
 
 async def _handle_one(r, topic: str, group: str, handler, message, consumer_name: str = "") -> None:

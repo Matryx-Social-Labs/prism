@@ -104,4 +104,5 @@ async def test_match_or_create_holds_the_advisory_lock():
     import inspect
 
     src = inspect.getsource(consumer._attach)
-    assert "pg_advisory_xact_lock" in src.split("raw_item = ")[0], "the lock must precede the match"
+    assert "_take_match_lock(session)" in src.split("raw_item = ")[0], "the lock must precede the match"
+    assert "pg_advisory_xact_lock" in inspect.getsource(consumer._take_match_lock)

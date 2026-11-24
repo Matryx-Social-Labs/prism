@@ -15,7 +15,7 @@ from contextlib import nullcontext
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from common import subjects
+from common import subjects, timings
 from common.config import get_settings
 from common.countries import gdelt_country_to_iso
 from common.db import session_scope
@@ -142,24 +142,30 @@ async def handle_enriched_item(payload: dict) -> None:
     article_id = uuid.UUID(payload["article_id"])
     enrichment_id = uuid.UUID(payload["enrichment_id"])
 
-    async with session_scope() as session:
-        enrichment = await session.get(Enrichment, enrichment_id)
-        article = await session.get(Article, article_id)
-        if enrichment is None or article is None:
-            logger.warning("enrichment_or_article_missing", enrichment_id=str(enrichment_id), article_id=str(article_id))
-            return
-        shared = enrichment.shared_fields or {}
-        # A replayed message (the stream redelivers after any failure past the
-        # first commit below) resumes at the projection rebuild instead of
-        # returning: the article is attached, but the projection, the brief and
-        # the analysis mark may not have happened (audit C4).
-        attached = (
-            await session.execute(select(EventMembership.event_id).where(EventMembership.article_id == article_id))
-        ).scalar_one_or_none()
-        if attached is not None:
-            event_id, is_new_event = attached, False
-        else:
-            event_id, is_new_event = await _attach(session, article, enrichment, shared, article_id, cve_ids_of(enrichment))
+    session = None
+    try:
+        async with session_scope() as session:
+            enrichment = await session.get(Enrichment, enrichment_id)
+            article = await session.get(Article, article_id)
+            if enrichment is None or article is None:
+                logger.warning("enrichment_or_article_missing", enrichment_id=str(enrichment_id), article_id=str(article_id))
+                return
+            shared = enrichment.shared_fields or {}
+            # A replayed message (the stream redelivers after any failure past the
+            # first commit below) resumes at the projection rebuild instead of
+            # returning: the article is attached, but the projection, the brief and
+            # the analysis mark may not have happened (audit C4).
+            attached = (
+                await session.execute(select(EventMembership.event_id).where(EventMembership.article_id == article_id))
+            ).scalar_one_or_none()
+            if attached is not None:
+                event_id, is_new_event = attached, False
+            else:
+                event_id, is_new_event = await _attach(session, article, enrichment, shared, article_id,
+                                                       cve_ids_of(enrichment))
+    finally:
+        # The commit or rollback above is what releases the lock.
+        await _record_match_lock(session, article_id)
 
     # Real-time path: rebuild the served projection (fast, DB-only) and publish so
     # the feed reflects the new coverage immediately — before any LLM runs.
@@ -184,6 +190,28 @@ async def handle_enriched_item(payload: dict) -> None:
             logger.exception("entity_variant_reconcile_failed", article_id=str(article_id))
 
 
+async def _take_match_lock(session) -> None:
+    """The match-or-create lock, timed: the wait and when it was acquired go on
+    session.info for _record_match_lock once the transaction has ended."""
+    started = time.perf_counter()
+    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('correlation.match_or_create'))"))
+    acquired = time.perf_counter()
+    session.info["match_lock"] = ((acquired - started) * 1000, acquired)
+
+
+async def _record_match_lock(session, article_id: uuid.UUID) -> None:
+    """How long this article waited for the lock and held it (until its
+    transaction ended). Nothing when no lock was taken (a replay)."""
+    lock = session.info.get("match_lock") if session is not None else None
+    if lock is None:
+        return
+    wait_ms, acquired = lock
+    held_ms = (time.perf_counter() - acquired) * 1000
+    logger.info("match_lock", wait_ms=round(wait_ms, 1), held_ms=round(held_ms, 1), article_id=str(article_id))
+    await timings.observe("match_lock.wait", wait_ms)
+    await timings.observe("match_lock.held", held_ms)
+
+
 def cve_ids_of(enrichment: Enrichment) -> list[str]:
     lens = (enrichment.lens_fields or {}).get("cyber") or {}
     return lens.get("cve_ids") or []
@@ -201,7 +229,7 @@ async def _attach(session, article: Article, enrichment: Enrichment, shared: dic
     serialised, but on the database, where a rule cannot be forgotten; the
     unique constraint on article_id (migration a7c3e91d4b28) makes the bad
     state unrepresentable even so (audit C3)."""
-    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('correlation.match_or_create'))"))
+    await _take_match_lock(session)
     raw_item = await session.get(RawItem, article.raw_item_id)
     title = raw_item.title if raw_item else "(untitled)"
     url = (raw_item.url_canonical or raw_item.url) if raw_item else None
@@ -332,12 +360,13 @@ async def run_due_analyses() -> int:
     """Drain events whose debounce has elapsed and analyze each once."""
     redis = get_redis()
     now = time.time()
-    due = await redis.zrangebyscore(DIRTY_KEY, 0, now, start=0, num=SWEEP_BATCH)
+    due = await redis.zrangebyscore(DIRTY_KEY, 0, now, start=0, num=SWEEP_BATCH, withscores=True)
     done = 0
-    for raw in due:
+    for raw, due_at in due:
         eid = raw.decode() if isinstance(raw, (bytes, bytearray)) else raw
         if not await redis.zrem(DIRTY_KEY, eid):
             continue  # another sweeper claimed it
+        await timings.observe("analysis.queue_age", (time.time() - due_at) * 1000)
         try:
             await analyze_event_now(uuid.UUID(eid))
             done += 1
@@ -354,6 +383,21 @@ async def run_due_analyses() -> int:
             except Exception:
                 logger.exception("analysis_requeue_failed", event_id=eid)
     return done
+
+
+async def analysis_queue() -> dict | None:
+    """How many analyses are due and how long the oldest has waited; None when
+    Redis cannot be read (unknown, not empty)."""
+    now = time.time()
+    try:
+        pipe = get_redis().pipeline(transaction=False)
+        pipe.zcount(DIRTY_KEY, 0, now)
+        pipe.zrange(DIRTY_KEY, 0, 0, withscores=True)
+        due, oldest = await pipe.execute()
+    except Exception as exc:  # noqa: BLE001 — a report, never a failure
+        logger.warning("analysis_queue_unavailable", error=str(exc)[:160])
+        return None
+    return {"due": int(due), "oldest_due_age_s": round(now - oldest[0][1], 1) if due and oldest else None}
 
 
 async def analyze_event_now(event_id: uuid.UUID) -> None:
