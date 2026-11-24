@@ -21,7 +21,7 @@ Fail loudly rather than skip: a skip would look like a pass in CI.
 """
 
 import os
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from dotenv import dotenv_values
@@ -35,7 +35,8 @@ def database_refusal(url: str) -> str | None:
     """Why the suite must not run against `url`, or None when it may."""
     parsed = urlparse(url)
     name = parsed.path.lstrip("/")
-    if name.endswith("_test"):
+    # `?database=` overrides the path in SQLAlchemy's asyncpg dialect.
+    if name.endswith("_test") and "database" not in parse_qs(parsed.query):
         return None
     return (
         f"Refusing to run tests against database {name!r} on {parsed.hostname!r}: "

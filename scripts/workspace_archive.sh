@@ -7,19 +7,24 @@ cd "$(dirname "$0")/.." || exit 0
 
 if [ -x .venv/bin/python ]; then
   # The only names this can drop are prism_<ws> and prism_<ws>_test, built
-  # from the workspace slug ([a-z0-9_] only) in workspace_names.sh.
-  PG_ADMIN="$pg_admin" .venv/bin/python - "$db" "$test_db" <<'PY' \
-    || echo "archive: could not drop $db and $test_db; they are left behind" >&2
+  # from this directory's name ([a-z0-9_] only) in workspace_names.sh.
+  PG_ADMIN="$pg_admin" .venv/bin/python - "$db" "$test_db" <<'PY'
 import asyncio, os, sys
 
 import asyncpg
 
 
 async def main() -> None:
-    conn = await asyncpg.connect(f"postgresql://{os.environ['PG_ADMIN']}/postgres", timeout=5)
+    try:
+        conn = await asyncpg.connect(f"postgresql://{os.environ['PG_ADMIN']}/postgres", timeout=5)
+    except Exception as exc:
+        sys.exit(f"archive: postgres unreachable ({exc!r}); left behind: {', '.join(sys.argv[1:])}")
     for name in sys.argv[1:]:
-        await conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
-        print(f"archive: dropped {name}")
+        try:
+            await conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+            print(f"archive: dropped {name}")
+        except Exception as exc:
+            print(f"archive: could not drop {name}, left behind: {exc!r}", file=sys.stderr)
     await conn.close()
 
 
@@ -29,7 +34,8 @@ else
   echo "archive: no .venv, so $db and $test_db are left behind" >&2
 fi
 
-docker rm -f "$redis_container" >/dev/null 2>&1 \
+# -v: redis:7-alpine declares a /data volume that would otherwise outlive it.
+docker rm -fv "$redis_container" >/dev/null \
   && echo "archive: no $redis_container container remains" \
   || echo "archive: could not remove $redis_container" >&2
 exit 0

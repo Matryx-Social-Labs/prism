@@ -1,19 +1,47 @@
 """The suite runs only on a database whose name ends in _test (tests/conftest.py)."""
 
+import os
+import subprocess
+import sys
+
+import pytest
+
 from tests.conftest import database_refusal
 
-
-def test_refuses_the_shared_local_dev_database() -> None:
-    assert database_refusal("postgresql+asyncpg://prism:prism@localhost:5432/prism")
+LOCAL = "postgresql+asyncpg://prism:prism@localhost:5432"
 
 
-def test_refuses_a_production_host_without_the_test_suffix() -> None:
-    assert database_refusal("postgresql+asyncpg://u:p@proxy.rlwy.net:41234/railway")
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"{LOCAL}/prism",  # the shared dev database: a local host is not enough
+        "postgresql+asyncpg://u:p@proxy.rlwy.net:41234/railway",
+        f"{LOCAL}/prism_test_backup",
+        f"{LOCAL}/prism_latest",
+        f"{LOCAL}/prism?application_name=x_test",
+        "postgresql+asyncpg://u:p@db_test.example:5432/prism",
+        f"{LOCAL}/prism_test?database=prism",  # the query names the database SQLAlchemy opens
+        LOCAL,
+    ],
+)
+def test_refuses_a_database_not_named_test(url: str) -> None:
+    assert database_refusal(url)
 
 
-def test_accepts_a_workspace_test_database() -> None:
-    assert database_refusal("postgresql+asyncpg://prism:prism@localhost:5432/prism_port_au_prince_test") is None
+@pytest.mark.parametrize(
+    "url", [f"{LOCAL}/prism_port_au_prince_test", f"{LOCAL}/prism_test", f"{LOCAL}/prism_test?ssl=require"]
+)
+def test_accepts_a_test_database(url: str) -> None:
+    assert database_refusal(url) is None
 
 
-def test_accepts_the_ci_test_database() -> None:
-    assert database_refusal("postgresql+asyncpg://prism:prism@localhost:5432/prism_test") is None
+def test_the_session_exits_2_before_any_test_when_the_database_is_not_a_test_one() -> None:
+    """The wiring, not the rule: TEST_DATABASE_URL reaches settings and the refusal stops the run."""
+    run = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", __file__, "-k", "accepts"],
+        env={**os.environ, "TEST_DATABASE_URL": f"{LOCAL}/prism"},
+        capture_output=True,
+        text=True,
+    )
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "Refusing to run tests" in run.stdout + run.stderr
