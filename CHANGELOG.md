@@ -12,6 +12,7 @@ Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
   row are now green (1,435 passed each). The single-head check runs before anything is dropped.
 - Comments in six test files and two messages in `tools/load_fixtures.py` still described the time
   before a test database existed; they are corrected.
+
 ## [0.0.137.3] - 2026-11-25
 
 ### Added — behaviour specs for six surfaces not yet built (documents only; no reader-facing change)
