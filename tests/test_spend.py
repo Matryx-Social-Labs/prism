@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from common import llm, spend
 from common.stream import get_redis
+from tests.test_pipeline_recovery import fresh_redis  # noqa: F401 — a client on this test's loop
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -162,7 +163,7 @@ def test_usage_reads_openrouter_cost_and_cached_tokens():
     assert spend.usage_of(SimpleNamespace()) == (0, 0, 0, None)
 
 
-async def test_the_ledger_adds_up_per_stage_and_day():
+async def test_the_ledger_adds_up_per_stage_and_day(fresh_redis):  # noqa: F811
     if not await _redis_up():
         pytest.skip("no redis")
     day = dt.date(2001, 1, 1) + dt.timedelta(days=uuid.uuid4().int % 3000)  # a day no one else writes

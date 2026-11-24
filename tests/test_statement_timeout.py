@@ -197,3 +197,34 @@ async def test_migrations_connect_under_a_lock_timeout(env, expected, monkeypatc
             assert (await conn.execute(text("SHOW lock_timeout"))).scalar() == expected
     finally:
         await engine.dispose()
+
+
+class _StopMain(Exception):
+    """Raised by the log line after the call, so `main` stops before it starts any task."""
+
+
+def _stop(*_a, **_k):
+    raise _StopMain
+
+
+@pytest.mark.parametrize(("env", "expected"), [(None, "120s"), ("45s", "45s"), ("", "120s")])
+async def test_worker_startup_sets_the_statement_timeout(monkeypatch, env, expected):
+    # Arrange: record the call; the startup log line right after it stops main
+    from types import SimpleNamespace
+
+    from worker import __main__ as worker_main
+
+    seen: list[str] = []
+    monkeypatch.setattr(worker_main, "set_default_statement_timeout", seen.append)
+    monkeypatch.setattr(worker_main, "logger", SimpleNamespace(info=_stop))
+    if env is None:
+        monkeypatch.delenv("PRISM_WORKER_STATEMENT_TIMEOUT", raising=False)
+    else:
+        monkeypatch.setenv("PRISM_WORKER_STATEMENT_TIMEOUT", env)
+
+    # Act
+    with pytest.raises(_StopMain):
+        await worker_main.main(["correlation"])
+
+    # Assert
+    assert seen == [expected]

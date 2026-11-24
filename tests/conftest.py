@@ -100,7 +100,7 @@ def _fresh_freshness_cache():
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Turn a "no database" SKIP into a FAILURE when PRISM_REQUIRE_DB=1.
+    """Turn a "no database" or "no redis" SKIP into a FAILURE when PRISM_REQUIRE_DB=1.
 
     20 test modules guard themselves with `_db_reachable()` and skip when
     Postgres is absent. That is right for a laptop with no docker running, and
@@ -123,11 +123,16 @@ def pytest_runtest_makereport(item, call):
     if not os.environ.get("PRISM_REQUIRE_DB"):
         return
     report = outcome.get_result()
-    if report.skipped and "no database" in str(report.longrepr):
+    if not report.skipped:
+        return
+    # Redis too: CI and `make check` have it, and a client bound to an earlier
+    # test's closed loop surfaces as exactly this skip (tests/test_pipeline_recovery.fresh_redis).
+    missing = next((m for m in ("no database", "no redis") if m in str(report.longrepr)), None)
+    if missing:
         report.outcome = "failed"
         report.longrepr = (
-            f"{item.nodeid}: skipped for 'no database' while PRISM_REQUIRE_DB=1.\n"
-            "A database-backed test that cannot reach a database is a FAILURE here, "
+            f"{item.nodeid}: skipped for '{missing}' while PRISM_REQUIRE_DB=1.\n"
+            "A test that needs a service it cannot reach is a FAILURE here, "
             "not a skip — otherwise the suite reports green having silently not run.\n"
-            "Start one with:  docker compose up -d postgres"
+            "Start them with:  docker compose up -d postgres redis"
         )

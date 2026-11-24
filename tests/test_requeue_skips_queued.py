@@ -164,6 +164,37 @@ async def test_when_redis_cannot_say_everything_stalled_is_republished(monkeypat
     assert "queued_items_unknown" in warnings
 
 
+async def test_a_still_queued_item_is_never_given_up_whatever_its_failure_count(monkeypatch):
+    if not await _db_reachable():
+        pytest.skip("no database")
+    # Arrange: stalled by the database, unacked on its topic, and at the give-up count
+    queued = await _seed_pending()
+    alerted: list[str] = []
+
+    async def unacked(topic, group):
+        return {queued} if topic == stream.RAW_ITEMS else set()
+
+    async def failures(ids):
+        return {i: runner.MAX_PERMANENT_FAILURES for i in ids if i == queued}
+
+    async def notify(key, subject, body, **kw):
+        alerted.append(subject)
+        return True
+
+    monkeypatch.setattr(stream, "permanent_failures", failures)
+    monkeypatch.setattr(runner.alerts, "notify", notify)
+
+    # Act
+    published = await _requeue(monkeypatch, unacked)
+
+    # Assert: its queued copy decides whether it fails again, so nothing happens to it now
+    assert queued not in {m.get("raw_item_id") for _t, m in published}
+    async with session_scope() as s:
+        relevance = (await s.execute(text("SELECT relevance FROM raw_items WHERE id = :i"), {"i": queued})).scalar_one()
+    assert relevance == "pending"
+    assert alerted == []
+
+
 async def test_nothing_stalled_asks_redis_nothing(monkeypatch):
     async def none_stalled(limit):
         return [], [], []

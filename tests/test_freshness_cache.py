@@ -74,3 +74,25 @@ async def test_a_cached_answer_says_when_its_query_ran(calls):
     second = await freshness.cached(None)
     assert datetime.fromisoformat(first["as_of"]).tzinfo is not None
     assert second["as_of"] == first["as_of"]
+
+
+async def test_healthz_twice_runs_the_freshness_query_once(calls, monkeypatch):
+    # Arrange: everything else /healthz reads is stubbed; only freshness is counted
+    from api.routes import meta
+
+    async def nothing(*_args, **_kwargs):
+        return {}
+
+    class _Db:
+        async def execute(self, _statement):
+            return None
+
+    monkeypatch.setattr(meta, "backlog", nothing)
+    monkeypatch.setattr(meta, "check_corpus_model", nothing)
+
+    # Act
+    for _ in range(2):
+        await meta.healthz(db=_Db(), freshness_window_hours=freshness.WINDOW_HOURS)
+
+    # Assert
+    assert calls == [freshness.WINDOW_HOURS]

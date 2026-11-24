@@ -71,6 +71,17 @@ def test_a_quantile_is_the_upper_bound_of_the_bucket_that_holds_it():
     assert timings.quantile(counts, 0.96) == 1000
 
 
+def test_buckets_are_ordered_as_numbers_not_as_strings():
+    # Arrange: as strings "10" < "1000" < "5", so a string sort puts the median in "1000"
+    counts = {"5": 1, "10": 1, "1000": 1}
+
+    # Act
+    median = timings.quantile(counts, 0.5)
+
+    # Assert
+    assert median == 10
+
+
 def test_a_quantile_in_the_overflow_bucket_is_unknown_not_a_number():
     assert timings.quantile({"5": 1, "inf": 9}, 0.5) is None
     assert timings.quantile({"5": 1, "inf": 9}, 0.05) == 5
@@ -252,6 +263,17 @@ async def test_waiting_for_the_lock_outlives_the_statement_timeout_and_restores_
     assert seen["wait_ms"] >= 200, "the wait ran past the 50ms timeout"
     assert seen["timeout"] == "50ms"
     assert sqlstate_in_chain(caught.value, {QUERY_CANCELED}), "a slow query after the lock is still cancelled"
+
+
+async def test_a_cancelled_block_is_timed_not_counted_as_an_error_and_still_raised(recorded):
+    # Act
+    with pytest.raises(asyncio.CancelledError):
+        async with timings.timed("block"):
+            raise asyncio.CancelledError
+
+    # Assert: a cancellation is the caller's decision, not the block failing
+    assert recorded["count"] == []
+    assert [name for name, _ms in recorded["observe"]] == ["block"]
 
 
 async def test_attach_takes_the_lock_through_the_timed_helper():
