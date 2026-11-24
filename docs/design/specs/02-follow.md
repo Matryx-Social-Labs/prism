@@ -13,8 +13,7 @@ moved. One control, the same everywhere a story is named; one place that lists w
 - **The control:** the head of a story page (spec 06); a record's "Part of" block; an edition item's story
   line (spec 01); a row in Stories; the Following tab; a person, subject or company page.
 - **The Following tab:** the fourth of the five destinations (D-20), replacing Watchlist. Tickers, sectors
-  and Market Pulse live under it. T-050 chooses the address; `/following` with `/watchlist` redirecting is
-  the recommendation.
+  and Market Pulse live under it. Its address is `/following`; `/watchlist` redirects to it.
 
 ## The control
 
@@ -26,7 +25,7 @@ moved. One control, the same everywhere a story is named; one place that lists w
 | Busy | the words change; `aria-busy`, disabled; no spinner | `Following…` / `Unfollowing…` |
 | Following | the same shape with ink text and a 1px ink border (a solid line means on) and the ChevronDown icon; `aria-haspopup`, `aria-expanded` | `Following` |
 | Following, open | see "What opens" | |
-| Could not save | the control returns to what it was; under it, in `--danger`, reading voice | `That did not save. Try again.` |
+| Could not save | the control returns to what it was. In a story head the sentence is under it, in `--danger`, reading voice. In a row there is no room for a sentence without moving the row's neighbours, so there it is a toast with the action `Try again` | `That did not save. Try again.` |
 
 The control never changes width class between states: `Follow` and `Following` + chevron fit the same row at
 360px. It is never an icon alone and never the ▾ glyph. No bell on the control: whether alerts are on is said
@@ -52,9 +51,14 @@ The same two things at every width:
 
 | Event | Toast (`role="status"`, one at a time) |
 |---|---|
-| Followed, signed in | `Following. Changes to this story appear in Following.` — action `Turn on alerts`, shown only while alerts are off for this story |
+| Followed, signed in | `Following. Changes to this story appear in Following.` — action `Turn on alerts` |
 | Followed, signed out | `Following on this device.` — action `Sign in to keep it` |
+| Followed a person, subject or company | `Following. Stories on {name} appear in Following.` — no action |
 | Unfollowed | `Unfollowed.` — action `Undo` |
+
+`Turn on alerts` is offered on the toast only while alerts are off for this story, no card offering the same
+thing is on screen (spec 03), and the reader has never pressed `Not now` on this device. After a `Not now`,
+Prism does not raise alerts again; the switch behind the chevron and the settings remain.
 
 A toast with no action leaves after 6 seconds. A toast that carries an action (`Undo`, `Turn on alerts`,
 `Sign in to keep it`) stays until the action is used, the reader dismisses it (`Dismiss`), or the next toast
@@ -63,6 +67,26 @@ goes; until then `Undo` restores the follow and its alert setting.
 
 A signed-out follow works at once (T-035 keeps it on the device and the server); sign-in is offered, never
 required. On a story page the first follow also shows the inline card of spec 03 under the header.
+
+### The first follow on a device: remembering what was read
+
+"New since you read" needs Prism to keep which developments a reader has seen. That is reading history, and
+it is kept only with the reader's agreement (D-12). So the first follow on a device asks once, where the
+follow was pressed — a card under the header on a story page (ahead of the alerts card, which waits for this
+answer), a sheet elsewhere:
+
+`Prism can remember what you have read in the stories you follow, so it can show you what is new.` —
+`Remember` · `Don't remember`. Neither is pre-selected and the two are the same size.
+
+| Answer | What follows |
+|---|---|
+| `Remember` | Read marks are kept (T-035). Everything in "New since you read" and the counts in Following work. |
+| `Don't remember` | The follow stands. Nothing about reading is sent or kept. A story page shows no "new" line, badges or divider; Following lists every followed story under one heading, `Your stories`, newest development first, each with `latest {time}` in place of a count of new. Alerts still work: they depend on the story moving, not on what was read. |
+| Not answered (closed, or left) | Treated as `Don't remember`; asked again at the next follow, once. |
+
+The answer can be changed on `/you` · Privacy: `Remember what I read in followed stories` (a switch). Turning
+it off deletes what was kept. The wording of this ask is the one sentence in these specs that touches the
+law; counsel reads it before it ships (FA-02).
 
 ## The free limit (D-17)
 
@@ -73,16 +97,24 @@ follow is not made. A Sheet opens instead:
 2. Five square segments, all ink (the count, drawn).
 3. `Following is free for 5 stories. Unfollow one to follow this, or follow without a limit on Plus.`
 4. `Your 5 stories` — the five, one line each, each with `Unfollow` (named `Unfollow {story}` for assistive
-   technology). Unfollowing one here makes the pending
+   technology); the toast then reads `Following. Unfollowed {story}.` with `Undo`, which restores that follow
+   and withdraws the new one. Unfollowing one here makes the pending
    follow at once and closes the sheet with the toast `Following. Changes to this story appear in Following.`
-5. `Plus adds` — four lines, each with a Check: `Unlimited follows` · `Alerts through a closer reading` ·
-   `A weekly brief of what changed, per story` · `Ask across the whole story`.
+5. `Plus adds` — up to four lines, each with a Check: `Unlimited follows` · `Alerts through a closer reading` ·
+   `A weekly brief of what changed, per story` · `Ask across the whole story`. A line is drawn only when its
+   feature is live for a Plus reader today; the list never promises what Plus does not yet do.
 6. Primary `See Plus` (to `/plus`, where the price and renewal terms are; none are restated here). Under it
    `Not now`.
 
 **While Plus is not on sale** (checkout is hidden today): items 5 and 6's primary button are not drawn, and
 the sentence is `Following is free for 5 stories. Unfollow one to follow this.` The limit is enforced on the
 server; the sheet is how the refusal is explained, whichever surface the press came from.
+
+**Over the limit.** A reader can hold more than 5 without having broken a rule: follows made on a device and
+on an account are merged at sign-in, and a Plus plan can end. Nothing is ever unfollowed for them. The count
+in Following reads `{k} stories · 5 are free`; alerts keep working for all of them; and a further follow opens
+the sheet titled `You follow {k} stories`, with no segments, the sentence `Following is free for 5 stories.
+Unfollow {k−4} to follow this, or follow without a limit on Plus.` and every followed story in the list.
 
 ## "New since you read"
 
@@ -93,7 +125,8 @@ On a story's timeline, newest first, for a reader who has read this story before
 - Between the last unseen and the first seen row, a divider: a 1px `--line-strong` rule broken by
   `You read up to here` and the same day and time in mono.
 - The same count is in the story header (spec 06). A notification opens the story at the top, where the
-  count and the unseen rows are.
+  count and the unseen rows are: with newest first, "the marker" T-050 and T-053 speak of is the count line
+  above the first row, and the page does not scroll down to the divider.
 - The read mark moves when the divider has scrolled into view, or when the reader leaves the page having
   opened it; the badges stay for the rest of that visit.
 - More unseen than one page holds (30, T-007): the count is the true count, the divider is on a later page,

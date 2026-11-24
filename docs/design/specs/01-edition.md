@@ -44,7 +44,8 @@ sends a returning reader to `/feed`.
       language`. Directly under it, the coverage bar at the full width of the text column, at its ordinary
       height. (When T-014 lands and counts become independent origins, the words follow T-046's vocabulary;
       the position does not change.)
-   5. **One exact quote**, when the document carries one: the words in record italic inside quotation marks,
+   5. **One exact quote**, when the document carries one — only direct speech in the language it was printed
+      in; never reported speech and never an outlet's translation: the words in record italic inside quotation marks,
       in the language they were printed in; then one provenance line — speaker (reading voice 600) · role ·
       the language's own name when it is not the interface language · outlet · time (mono). No quote in the
       document: nothing is drawn.
@@ -61,10 +62,14 @@ sends a returning reader to `/feed`.
       Up to three followed stories, moved ones first: the story's name, then mono `{k} new since you read`,
       or reading voice `Nothing new since {day HH:MM}`. Then the link `Following →`. A reader who follows
       nothing sees one line: `Follow a story and its changes appear here.` This slot is not one of the
-      `n` items and does not move the count.
+      `n` items and does not move the count. While its request is in flight it is one skeleton line; if the
+      request fails the slot is left out and nothing is said — the edition is complete without it.
    5. One primary action: `Tell me when tomorrow's edition is ready` (opens the explanation in spec 03).
-      Once it is on, the button is replaced by the line `You'll be told at {HH:MM}.` and the link `Change`.
-   6. `Share today's edition` — ghost button with the Share icon.
+      Once the daily notification or the daily email is on, the button is replaced by the line `You'll be
+      told at {HH:MM}.` (the reader's own daily time) and the link `Change`, which opens `/you` ·
+      Notifications.
+   6. `Share today's edition` — ghost button with the Share icon. It is the ShareButton the app has: the
+      system share sheet where there is one, otherwise it copies the link to `/feed` and says so in a toast.
 7. **`Everything reported today`** — section head (3px rule), then the chart as it is today. Its loading,
    empty and error states are its own and unchanged.
 
@@ -75,9 +80,12 @@ sends a returning reader to `/feed`.
 | Prism's | two or more independent reports, and Prism's headline has passed its check (T-018) | Prism's | `Prism's headline, from {k} reports` |
 | An outlet's own | one independent report, or before the check exists | the lead outlet's, as printed | `{Outlet}'s headline` |
 | An outlet's, in the reader's language | an outlet wrote one in the interface language | that outlet's, as printed | `{Outlet}'s headline` (in the interface language) |
-| Translated | no outlet wrote it in the interface language | a translation of the lead outlet's | `Translated from {Language} · {Outlet}'s headline · See the original` — `See the original` swaps the original in, in place |
+| Translated | no outlet wrote it in the interface language | a translation of the lead outlet's | `Translated from {Language} · {Outlet}'s headline · See the original` — `See the original` swaps the original in, in place; the line then reads `{Outlet}'s headline in {Language} · See the translation` |
 
-Until T-018 is live the edition shows only the second and third states.
+Which state an item is in, first match wins: Prism's headline when it exists and has passed its check; else
+an outlet's own in the interface language; else Translated, once translation is live; else the lead outlet's
+as printed, with the language named. Until T-018 is live the edition shows only the second and third states
+and that last fallback.
 
 ## States
 
@@ -85,15 +93,16 @@ Until T-018 is live the edition shows only the second and third states.
 |---|---|
 | Loading | The head with a skeleton bar for the provenance line; five skeleton rows with a row's geometry (numeral block, count line, two headline lines), cut square. No spinner, no words. |
 | Ready | As above. |
-| Not ready yet (before the day's first edition) | An info alert: `Today's edition is not ready yet.` / `It is written at {HH:MM}. Yesterday's is below.` Then yesterday's edition under the head `Yesterday · {Mon 23 Nov}`, complete with its own end block. |
+| Not ready yet (before the day's first edition) | An info alert: `Today's edition is not ready yet.` / `It is written at {HH:MM}. Yesterday's is below.` Then yesterday's edition under the head `Yesterday · {Mon 23 Nov}`. Its end block says `You're up to date with yesterday`, then `Today's edition is ready at {HH:MM}.` and the button `Tell me when today's edition is ready`; it has no Share, and reaching it is not a finish (T-058 counts only the current day's edition). |
 | A quiet day (fewer than five qualified) | The edition prints what there is: `3 stories`, three rows, `3 of 3`. Never padded. |
 | No edition at all (nothing qualified, and no yesterday) | The head, then `No edition today.` and the chart directly below. |
 | Could not load | An error alert: `Today's edition could not load.` with `Try again`. The chart below loads on its own request and still shows. |
 | Partly read (returning the same day) | Read items keep their Check; the progress rule and `{k} of {n} read` are restored from the read marks (T-035), on any device when signed in. |
 | Finished earlier today | Under the head: Check icon, `You finished today's edition at {HH:MM}.` and the link `Jump to everything reported today`. The rows stay, all checked. |
-| Changed since the reader read it | A pill between the head and item 1: `{k} new since you read · Show`. The list does not reorder until the reader presses it. |
+| Changed since the reader read it | A pill between the head and item 1: `{k} new since you read · Show`. The list does not reorder until the reader presses it. After `Show`: `n` is the new edition's count; items the reader had read keep their Check; new items are unread; and "finished" no longer holds if any item is unread — the end block is reached again to finish. |
 | Offline (the app; the web has no offline copy yet) | An info alert: `You are offline.` / `This is the edition saved at {HH:MM}.` Then the saved edition. On the web, offline is "Could not load". |
 | Signed out | Identical. Read marks and follows are kept on the device (T-035). |
+| The reader has not agreed to Prism remembering what they read (spec 02, first follow) | Read marks stay on this device and are not sent; the edition works the same on this device and starts unread on another. |
 | At the free follow limit | The Follow control on a row opens the limit sheet (spec 02). The edition itself is never metered. |
 | A muted subject | Its items are not in the list; `n` is the number shown. No gap, no notice. |
 | Reduced motion | No print-in, no rule animation; state changes are instant. |

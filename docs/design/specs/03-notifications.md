@@ -34,14 +34,16 @@ Content, in order:
 
 1. **Title** (record voice, display-m), by where it was opened:
    `Get told when this story moves` (from a follow) · `Get told when tomorrow's edition is ready` (from the
-   end block) · `Get told by email` (when this browser cannot notify).
+   end block) · `Get told when your stories move` (from a switch in settings) · `Get told by email` (when this
+   browser cannot notify).
 2. **Two switches**, the one the reader came for first and on, the other off:
    - `Stories you follow` — `When a followed story gains a development reported by 2 or more outlets. At most
      3 a day.`
    - `The daily edition` — `Once a day at {HH:MM} IST, when the edition is ready.` (07:30 until the reader
      changes it; the zone is the reader's, printed.)
-3. **A fact line** with the Info icon: `Nothing between 22:00 and 07:00. A notification carries a headline and
-   the count of outlets, nothing else.`
+3. **A fact line** with the Info icon: `Nothing between 22:00 and 07:00. An alert carries the development's
+   headline and how many outlets and languages reported it; the daily one carries the edition's counts.
+   Nothing else.`
 4. **`What one looks like`** — one specimen row in the shape of a notification: the mark, `readPrism.news`,
    then real text. From a follow: the story's latest development that two or more outlets reported, and
    `{k} outlets · {l} languages`. From the end block: today's line, `Today: {n} stories · about {m} minutes ·
@@ -53,11 +55,16 @@ Content, in order:
 |---|---|
 | Default | As above. |
 | Busy | The primary reads `Turning on…`, disabled, `aria-busy`. The system prompt is on screen. |
-| Granted | The sheet closes; toast `Alerts are on.` The card, if any, goes. |
+| Granted | The sheet closes; the card, if any, goes. Toast, by what was turned on: `Alerts are on.` (follow alerts, with or without the daily one) · `You'll be told at {HH:MM}.` (the daily one alone). `Turn on` with `Stories you follow` on sets alerts on for every story the reader follows now and for later follows; each can be switched off on its own. |
+| Permission was already granted (a second press, another story) | No sheet. That story's alerts turn on at once; toast `Alerts are on for this story.` |
 | Not now | The sheet closes. Nothing is stored against the reader except that the card was answered. The system prompt has not been spent. |
-| Dismissed at the system prompt, or blocked earlier | Title `Notifications are blocked for this site`; `Your browser is set to block them. Allow notifications for readprism.news in the browser's site settings, then come back.`; secondary `Use email instead`; `Not now`. |
+| Dismissed at the system prompt (closed without an answer) | Permission is still undecided. The sheet returns to Default with the switches as the reader set them; nothing is said. |
+| Blocked (denied at the system prompt now, or earlier) | Title `Notifications are blocked for this site`; `Your browser is set to block them. Allow notifications for readprism.news in the browser's site settings, then come back.`; secondary `Use email instead`; `Not now`. |
 | This browser cannot notify (an in-app browser, iOS Safari outside the home screen) | Title `Get told by email`; `This browser cannot show notifications. The same two messages can come by email.`; the two switches; an `Email` field (filled and read-only when signed in); primary `Send by email`; `Not now`. |
-| Email sent for confirmation (signed out) | The sheet's body becomes `Check {address} and confirm. Nothing is sent until you do.` with `Done`. |
+| Email, signed in | `Send by email` reads `Sending…`, then the sheet closes with the toast `These will come to {address}.` No confirmation step: the address is the account's. |
+| Email, an address that is not one | Under the field: `Enter a valid email address.` Nothing is sent. |
+| Email sent for confirmation (signed out) | `Send by email` reads `Sending…`; then the sheet's body becomes `Check {address} and confirm. Nothing is sent until you do.` with `Done`. |
+| The confirmation link is opened | It opens `/you` · Notifications with `Email confirmed.` above the section — or, when the link is more than 24 hours old, `That link has expired.` with `Send another`. |
 | Both switches off | The primary is disabled; under it: `Choose at least one, or Not now.` |
 | Could not save | An error alert above the buttons: `That did not save. Try again.` The switches keep what the reader set. |
 
@@ -76,8 +83,8 @@ In order:
 5. `Per story` — every followed story on a row with its own switch (`Alerts for {story}`). Off here is the
    same as off in the story's follow menu. With no follows: `You are not following a story yet.`
 6. Section head `Email`. A segmented control `Daily` · `Weekly` · `Off`; under it the sentence for the
-   choice: `Today's edition by email, at the time above.` / `The week's record by email, Sunday morning
-   (IST).` / nothing. Signed out, an `Email` field appears above it and a choice other than `Off` sends a
+   choice: `Today's edition by email, at the time above.` / `The week's most-reported stories by email,
+   Sunday morning (IST).` / nothing. Signed out, an `Email` field appears above it and a choice other than `Off` sends a
    confirmation first. This replaces the weekly checkbox on `/account`.
 7. A fact line: `Nothing is sent between 22:00 and 07:00.`
 
@@ -86,7 +93,9 @@ In order:
 | Loading | Skeleton rows with the rows' geometry. |
 | Permission never asked | Status `off`; both switches off; turning one on opens the sheet. |
 | Blocked | Status `blocked by the browser`; the switches are off and pressing one opens the blocked sheet. Email still works. |
-| Cannot notify | The status line reads `This browser cannot show notifications.` and the two switches are not drawn; `Email` is first. |
+| Cannot notify | The status line reads `This browser cannot show notifications.` Both switches and the time stay, and act on email: their sentences end `by email` (`Arrives by email at {HH:MM} {zone} …`, `… At most 3 a day, by email.`). Turning one on with no confirmed address asks for one. |
+| A second device | The status line and the two switches are per device: each device is turned on by its own press. The daily time, `Per story` and `Email` are the reader's and are the same everywhere when signed in. |
+| `Stories you follow` off | The `Per story` switches are disabled and keep their positions; under the eyebrow: `Alerts are off for every story.` |
 | Could not load / save | `Your notification settings could not load.` with `Try again` / under the changed row, `That did not save. Try again.` and the control returns to what it was. |
 | Signed out | Everything works on this device; under the section: `Sign in to use the same settings on every device.` |
 
@@ -160,8 +169,8 @@ Toast, Skeleton, SectionHead. New: `NotifyExplain`, `NotifyCard`.
    controls would be two more things to get wrong at 7 in the morning.
 3. **The daily time is offered from 07:00 to 21:30**, so a chosen time can never fall inside quiet hours.
 4. **The sheet does not promise "an outlet's own words".** D-18 allows Prism's labelled headline on a
-   happening with two or more independent reports, so the sentence says what is always true: a headline and
-   the count of outlets, nothing else.
+   happening with two or more independent reports, so the sentence says what is always true: an alert is a
+   headline and its counts, the daily one is the edition's counts, and neither carries anything else.
 5. **Email is the way on where the browser cannot notify**, and needs no account — an address and one
    confirmation.
 6. **"Not now" costs the reader nothing** and is never followed by another ask from Prism.

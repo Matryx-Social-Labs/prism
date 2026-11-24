@@ -26,7 +26,10 @@ compact, medium and expanded · motion · accessibility · primitives · depends
   · large 1280–1535 · xlarge ≥ 1536. A spec gives compact, medium and expanded; large and xlarge are expanded
   unless the spec says otherwise.
 - **Copy** is given as the exact English sentence, with slots in braces: `{k} outlets`. A slot is filled from
-  live data or it is not printed; a spec never supplies a figure. Hindi strings are written by T-054's
+  live data or it is not printed; a spec never supplies a figure. Every counted noun takes its singular
+  (`1 story`, `1 outlet`, `1 language`, `your 1 story`), through `Intl` plural rules in every language. A
+  time on the reader's current day prints as `{HH:MM}`; on another day, `{Mon HH:MM}`. Where a spec writes
+  `IST` in a sentence, the product prints the reader's own zone. Hindi strings are written by T-054's
   catalogue and reviewed by a native reader, not here.
 - **Primitives** are named as `DESIGN.md` · Components names them (Button, Chip, Sheet, Toast, ToggleRow …).
   T-041 builds them; a surface built before T-041 lands uses the `.p-*` class of the same name.
