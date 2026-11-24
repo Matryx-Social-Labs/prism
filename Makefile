@@ -58,6 +58,7 @@ check: lint  ## THE GATE — everything CI runs, plus a typecheck CI never did
 	@case "$$DATABASE_URL" in *_test) ;; *) \
 		echo "  check: refusing, DATABASE_URL is not a _test database (TEST_DATABASE_URL missing from .env?)."; \
 		echo "  Run: bash scripts/workspace_setup.sh"; exit 1;; esac
+	uv run python scripts/fresh_test_db.py
 	uv run python design/gen_css.py --check
 	uv run python -c "import api.main, worker.__main__, ingestion.runner, \
 classification.consumer, enrichment.consumer, correlation.consumer, \
