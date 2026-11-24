@@ -35,7 +35,8 @@ accessibility behaviour · needs from the API · decided here · references.
   Hindi strings are written by T-054's catalogue and reviewed by a native reader, not here.
 - **A state the spec lists is required.** A state it does not list does not exist: ask, do not invent.
 - **Size classes**, where a spec mentions them, are the programme's (PLAN §4.2): compact < 600 · medium
-  600–1023 · expanded 1024–1279 · large 1280–1535 · xlarge ≥ 1536. Only spec 05 depends on them.
+  600–1023 · expanded 1024–1279 · large 1280–1535 · xlarge ≥ 1536. Specs name a size class only where behaviour
+  differs by width.
 - **Words for containers are neutral on purpose.** "A panel opens" means something opens that holds the
   listed content; whether it rises from the bottom, sits beside the control or fills the screen is T-083's.
   What the spec fixes is what is in it, whether it blocks the page behind it, how it closes and where focus
@@ -61,6 +62,8 @@ These are fixed whatever the product comes to look like (D-23), and every spec a
    screen.
 7. Every script Prism reads carries its `lang` (and `dir` where it runs right to left).
 8. Declining is always as easy as accepting, and is not asked again.
+9. What a reader has read is kept on their device. It is kept by Prism only for stories they follow, and only
+   if they agreed (spec 02).
 
 ## For the visual system: what the reviews of the first draft found
 

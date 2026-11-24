@@ -25,7 +25,7 @@ as a second line.
 3. **Question 1 · `Read Prism in`.** A radio group: one option per language that has a finished interface — at
    first `English` and `हिंदी`. Each option shows the language's own name in its own script; the chosen option
    is marked as chosen. Before the options, as the group's description: `Choosing one changes this page at
-   once.` Under the group: `The menus and labels. More languages are being added.` The change happens in
+   once.` Under the group: `The menus and labels.` The change happens in
    place and focus stays on the chosen control.
    Choosing a language re-renders the step in it at once; nothing waits for `Continue`. The choice replaces
    the address prefix and is stored on the device at that moment, so it survives `Skip for now`, a reload or
@@ -41,7 +41,7 @@ as a second line.
      most first (the order `/sources` already uses).
    - Pre-ticked: the interface language, and any language the browser lists (`navigator.languages`) that is
      in the list. Nothing else. English is not ticked for a reader who did not ask for it.
-5. **The actions**, always within reach at the bottom of the step: the main action, then `Skip for now`.
+5. **The actions**, always within reach: the main action, then `Skip for now`.
    - The main action carries the count: `Continue with {k} languages` · `Continue with 1 language` · with none
      ticked, `Continue with every language`.
    - `Skip for now` leaves onboarding, as it does today, and keeps the defaults: the interface language as
@@ -129,6 +129,10 @@ the real ones. Rules for the catalogue that follow from this spec:
     reader has made no language choice; once only per device, whether dismissed or followed; never to
     crawlers; following it sets the interface language and goes to the same page under `/hi/`.
 13. A language added later needs no change to copy.
+14. The address decides the page's language (`/hi/…` is in Hindi for everyone) and never changes a reader's
+    stored choice. A reader with a stored choice who opens an address in another language sees that page as
+    addressed, with the offer to read it in their own language.
+15. At sign-in, the account's stored choices replace the device's; a new account takes the device's.
 
 ### What the choices do
 

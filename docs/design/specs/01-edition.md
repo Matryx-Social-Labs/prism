@@ -16,12 +16,12 @@ sends a returning reader to `/feed`. The explanation of spec 03 is opened from t
 
 ## Content, in order
 
-1. **Navigation** for the size class (spec 05), which prints the date where it has a masthead.
+1. **Navigation** for the size class (spec 05).
 2. **Breaking strip — a reserved slot.** If T-021 ships a breaking strip (D-10 is open), it sits here, above
    the edition head, and is outside the edition's count. This spec gives it no design; until T-021, the slot
    is empty and takes no space.
 3. **Edition head.**
-   - `Today` — the page heading.
+   - `Today · {Tue 24 Nov}` — the page heading; the edition head prints its own date.
    - One provenance line: `{n} stories · about {m} min · updated {HH:MM}`. `{m}` is the reading time the
      edition document carries; when the document has none, the middle fact is left out, not estimated in the
      browser. `updated` is the document's version time, in the reader's zone.
@@ -33,9 +33,7 @@ sends a returning reader to `/feed`. The explanation of spec 03 is opened from t
       never by colour alone).
    2. **Whose headline it is** — one of the four states in "Headline states" below.
    3. **The count, as a sentence**: `Reported by {k} outlets in {l} languages`, then ` · ` and the time of the
-      latest report. One language prints `in 1 language`. Directly under it, the split by kind of outlet,
-      each part with its count in words. (When T-014 lands and counts become independent origins, the words
-      follow T-046's vocabulary; the position does not change.)
+      latest report. One language prints `in 1 language`.
    4. **One exact quote**, when the document carries one — only direct speech in the language it was printed
       in; never reported speech and never an outlet's translation: the words inside quotation marks, in the
       language they were printed in; then one provenance line — speaker · role · the language's own name when
@@ -47,18 +45,16 @@ sends a returning reader to `/feed`. The explanation of spec 03 is opened from t
    2. `{n} of {n} · updated {HH:MM}`, and, when the reader went from the first item to the end block in one
       sitting of under 15 minutes, ` · {m} min` (measured, whole minutes, "under 1 min" below one). A longer
       or interrupted sitting prints no time.
-   3. `Tomorrow's edition is ready at {HH:MM}.` — the hour from the document. Omitted when the document does
-      not carry it.
-   4. **Your stories** — the per-reader slot (one request; everything above it came from the document).
+   3. **Your stories** — the per-reader slot (one request; everything above it came from the document).
       Up to three followed stories, moved ones first: the story's name, then `{k} new since you read`, or
       `Nothing new since {day HH:MM}`. Then the link `Following →`. A reader who follows nothing sees one
       line: `Follow a story and its changes appear here.` This slot is not one of the `n` items and does not
       move the count. While its request is in flight it is a loading state with no text; if the request fails
       the slot is left out and nothing is said — the edition is complete without it.
-   5. The main action: `Tell me when tomorrow's edition is ready` (opens the explanation in spec 03). Once the
+   4. The main action: `Tell me when tomorrow's edition is ready` (opens the explanation in spec 03). Once the
       daily notification or the daily email is on, the action is replaced by the line `You'll be told at
       {HH:MM}.` (the reader's own daily time) and the link `Change`, which opens `/you` · Notifications.
-   6. `Share today's edition` — a second action. It is the ShareButton the app has: the system share sheet
+   5. `Share today's edition` — a second action. It is the ShareButton the app has: the system share sheet
       where there is one, otherwise it copies the link to `/feed` and says so in a brief confirmation
       message.
 6. **`Everything reported today`** — a heading, then the chart as it is today. Its loading, empty and error
@@ -72,29 +68,32 @@ sends a returning reader to `/feed`. The explanation of spec 03 is opened from t
 | An outlet's own | one independent report, or before the check exists | the lead outlet's, as printed | `{Outlet}'s headline` |
 | An outlet's, in the reader's language | an outlet wrote one in the interface language | that outlet's, as printed | `{Outlet}'s headline` (in the interface language) |
 | Translated | no outlet wrote it in the interface language | a translation of the lead outlet's | `Translated from {Language} · {Outlet}'s headline · See the original` — `See the original` swaps the original in, in place; the line then reads `{Outlet}'s headline in {Language} · See the translation` |
+| Another language, as printed | no outlet wrote it in the interface language and translation is not live | the lead outlet's, as printed, with its `lang` | `{Outlet}'s headline in {Language}` |
 
 Which state an item is in, first match wins: Prism's headline when it exists and has passed its check; else
-an outlet's own in the interface language; else Translated, once translation is live; else the lead outlet's
-as printed, with the language named. Until T-018 is live the edition shows only the second and third states
-and that last fallback.
+an outlet's own in the interface language; else Translated, once translation is live; else Another language,
+as printed, the last fallback. Until T-018 is live the edition shows only the second and third states and
+that last fallback.
 
 ## States
 
 | State | What the reader is given |
 |---|---|
-| Loading | The head with a loading state with no text for the provenance line, and five items' worth of loading state with no text. No spinner, no words. It is announced as loading to assistive technology. |
+| Loading | The head with a loading state with no text for the provenance line, and five items' worth of loading state with no text. It is announced as loading to assistive technology. |
 | Ready | As above. |
-| Empty — no edition at all (nothing qualified, and no yesterday) | The head, then `No edition today.` and the chart directly below. |
+| Empty — today's edition has no items (nothing qualified) | The head, then `No edition today.` then everything reported today, directly below. Yesterday's edition is not shown in its place. |
 | A quiet day (fewer than five qualified) | The edition prints what there is: `3 stories`, three items, `3 of 3`. Never padded. |
-| Not ready yet (before the day's first edition) | A message (not an error): `Today's edition is not ready yet.` / `It is written at {HH:MM}. Yesterday's is below.` Then yesterday's edition under the head `Yesterday · {Mon 23 Nov}`. Its end block says `You're up to date with yesterday`, then `Today's edition is ready at {HH:MM}.` and the action `Tell me when today's edition is ready`; it has no Share, and reaching it is not a finish (T-058 counts only the current day's edition). |
+| Not ready yet, and yesterday's exists | A message (not an error): `Today's edition is not ready yet.` / `It is written at {HH:MM}. Yesterday's is below.` Then yesterday's edition under the head `Yesterday · {Mon 23 Nov}`. Its end block says `You're up to date with yesterday` and the action `Tell me when today's edition is ready`; it has no Share, and reaching it is not a finish (T-058 counts only the current day's edition). |
+| Not ready yet, and there is no yesterday's | A message (not an error): `Today's edition is not ready yet.` / `It is written at {HH:MM}.` then everything reported today. |
 | Error — could not load | An error message: `Today's edition could not load.` with `Try again`. The chart below loads on its own request and still shows. |
-| Partly read (returning the same day) | Read items stay marked as read; reading progress and `{k} of {n} read` are restored from the read marks (T-035), on any device when signed in. |
+| Partly read (returning the same day) | Read items stay marked; `{k} of {n} read` is restored from this device's read marks (T-035). |
 | Finished earlier today | Under the head: `You finished today's edition at {HH:MM}.` and the link `Jump to everything reported today`. The items stay, all marked as read. |
-| Changed since the reader read it | A line between the head and item 1: `{k} new since you read · Show`. The list does not reorder until the reader presses `Show`. After `Show`: `n` is the new edition's count; items the reader had read stay marked as read; new items are unread; and "finished" no longer holds if any item is unread — the end block is reached again to finish. |
+| Changed since the reader read it | Checked when the page loads, never while it is open. A reader with no read marks today gets the newest version and no message. Otherwise `{k}` counts items the reader has not seen; when it is zero (only the order changed) the newest version is applied silently on the next load; when it is one or more, `{k} new since you read · Show`. On `Show`: n is the new edition's count; items the reader had read stay marked; new items are unread; an item no longer in the edition goes; 'finished' no longer holds if any item is unread. |
 | Offline (the app; the web has no offline copy yet) | A message (not an error): `You are offline.` / `This is the edition saved at {HH:MM}.` Then the saved edition. On the web, offline is "Could not load". |
 | Signed out | Identical. Read marks and follows are kept on the device (T-035). |
-| The reader has not agreed to Prism remembering what they read (spec 02, first follow) | Read marks stay on this device and are not sent; the edition works the same on this device and starts unread on another. |
 | At the free limit (follow limit) | The Follow control on an item opens the limit panel (spec 02). The edition itself is never metered. |
+| Follow state not loaded yet | Each Follow control shows `Follow` and is busy (`aria-busy`); the edition itself is fully usable. |
+| Follow state failed to load | Each control shows `Follow`; nothing is said; the `Your stories` slot is left out. |
 | A muted subject | Its items are not in the list; `n` is the number shown. No gap, no notice. |
 
 ## Copy
@@ -130,8 +129,8 @@ Every string is given where it appears above. The rest:
    a finish.
 10. The breaking strip, when it exists, is above the edition head and outside the count.
 11. A muted subject's items are left out; `n` is the number shown; no gap, no notice.
-12. Read marks are kept on the device and are sent only when the reader has agreed (spec 02, first follow);
-    when signed in they follow the reader to any device.
+12. What a reader has read of the edition never leaves the device. (What they have read of a followed story
+    is kept only with their agreement: spec 02.)
 13. The edition itself is never metered; the Follow control on an item opens the limit panel at the free
     limit.
 14. Once the daily notification or the daily email is on, the end block says when the reader will be told,
@@ -149,7 +148,7 @@ Every string is given where it appears above. The rest:
 - `{k} of {n} read` is plain text, not a live region: it must not announce while the reader scrolls.
 - The end block is a `<section>` labelled by its heading. Reaching it moves no focus.
 - Follow, the story link and the headline are separate tab stops in reading order.
-- The split by kind of outlet always has its count in words; a quote in another script carries its `lang`.
+- A quote in another script carries its `lang`.
 - A read item is also marked as read for assistive technology (`Read`).
 - Loading states are announced as loading.
 
@@ -157,8 +156,8 @@ Every string is given where it appears above. The rest:
 
 | Needs | From |
 |---|---|
-| Per item: headline and whose it is, outlet and language counts, the split by kind of outlet, latest report time, one quote with speaker / role / outlet / time / language, the story's name, slug and development count | T-038's document |
-| Reading time, version time, tomorrow's hour | T-038's document (each optional; the line that prints it is omitted without it) |
+| Per item: headline and whose it is, outlet and language counts, latest report time, one quote with speaker / role / outlet / time / language, the story's name, slug and development count | T-038's document |
+| Reading time, version time, the hour the edition is written | T-038's document (each optional; the line that prints it is omitted without it) |
 | Read marks, the followed-stories line | T-035 |
 | The Follow control and the limit panel | spec 02, T-050 |
 | The explanation | spec 03, T-053 |

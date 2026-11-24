@@ -32,7 +32,7 @@ Beside them, on every page: the wordmark, which leads to `Today`; and a skip lin
 |---|---|---|
 | Compact | < 600 | All five, each one press away, each with its name visible. |
 | Medium | 600–1023 | All five, each one press away, each with its name visible. This tier gets a form of its own: it is not the compact form stretched and not the expanded form squeezed. |
-| Expanded and up | ≥ 1024 | All five, each one press away. `Search` may be the search field itself rather than a link to it, and `You` may be the reader's avatar or `Sign in` — they are still the same two destinations, in the same order. |
+| Expanded and up | ≥ 1024 | All five, each one press away, each with its name visible. `Search` may be the search field itself, labelled `Search`. |
 
 Width alone decides the size class; height is not consulted, so a phone held sideways is medium.
 
@@ -43,7 +43,7 @@ A route declares which kind it is (T-042 replaces today's lists of route prefixe
 | Kind | Navigation it carries | Routes |
 |---|---|---|
 | `app` | the five | Today, Stories, Search, Following, You and their sections |
-| `record` | a way back, named for where it goes (`Back to Stories`), and the five | a record, a story, a quote, a person or subject page, Sources, legal, Corrections |
+| `record` | a way back, and the five (at compact, behind `Menu`) | a record, a story, a quote, a person or subject page, Sources, legal, Corrections |
 | `bare` | the wordmark only | onboarding, sign-in |
 | `own` | the page provides its own | the landing and `/about`, `/plus`, the labeller, the admin |
 
@@ -54,7 +54,7 @@ A route declares which kind it is (T-042 replaces today's lists of route prefixe
 | Empty · At the free limit | Do not apply: navigation is never empty and nothing in it is metered. |
 | Loading a destination | Navigation does not change. The pressed destination becomes current at once; the page's own loading state shows in the content. |
 | Error (offline, or the service unreachable) | Navigation stays and works; the page's own error state shows in the content. Navigation adds no message of its own. |
-| Signed out | Identical. `You` opens the signed-out You page, where `Sign in` is; where `You` is shown as an avatar, it is shown as `Sign in`. |
+| Signed out | Identical. `You` opens the signed-out You page, where `Sign in` is. |
 | Current destination | Exactly one destination is marked current on an `app` page, in a way that does not depend on colour alone. |
 | On a `record` page | The destination the reader came through stays marked (a record opened from Today keeps `Today`). Reached from outside — a shared link, a search engine, a reload with no history — none is marked. |
 | Followed stories have moved | `Following` carries the number of followed stories with something new, as a number (`9+` above nine), never as a bare mark. No other destination ever carries a count. |
@@ -74,7 +74,8 @@ A route declares which kind it is (T-042 replaces today's lists of route prefixe
 | Skip link | `Skip to the content` |
 | The search field, where Search is a field | placeholder `Search stories, people, places` |
 | `Following` with a number, for assistive technology | `Following, {k} stories moved` · `Following, 1 story moved` |
-| The way back on a `record` page | `Back to {destination}` — `Back to Today`, `Back to Stories`, `Back to Search`, `Back to Following`; with no history, `Back to Today` |
+| The control that opens the five on a compact `record` page | `Menu` (its accessible name) |
+| The way back on a `record` page | The way back goes to the previous Prism page and is named for it: `Back to Today`, `Back to Stories`, `Back to Search`, `Back to Following`, `Back to the story` (from a record opened from a story). With no previous Prism page: `Back to Stories` on a story page, `Back to Today` on any other. |
 
 The names do not change with width, are never abbreviated, and are never replaced by a symbol alone.
 `Watchlist` and `Pulse` are no longer destinations.
@@ -86,15 +87,18 @@ The names do not change with width, are never abbreviated, and are never replace
 3. Navigation holds the five and the wordmark, and nothing else: no theme control, no link to Plus, no
    sign-in beside `You`. Those live on the pages they belong to.
 4. From any `app` or `record` page the five are reachable (PLAN §4.2: a leaf page keeps the global
-   navigation). On a compact `record` page they may sit one press further away than on an `app` page, so that
-   the page's own actions (a story's Ask and Share) are not crowded out — but they are never absent, and the
-   way back is always present. T-083 draws how.
+   navigation). At compact, a `record` page reaches them through one control named `Menu`, so that the page's
+   own actions are not crowded out; pressing it shows the five in order, with the same names and the same
+   count on `Following`. From medium up a `record` page carries the five as an `app` page does.
 5. A page's own fixed actions and the navigation never overlap, and never together hide the control that has
    focus.
 6. Only `Following` carries a count, and the count is a number.
 7. Navigation never moves the reader on its own: no redirect on resize, no auto-advance.
 8. The medium tier (600–1023) is designed for itself. Whether its content is one reading column or more is
    T-083's decision; that prose never runs wider than the reading measure is a standing rule of the product.
+9. The way back goes to the previous Prism page and is named for it: `Back to Today`, `Back to Stories`,
+   `Back to Search`, `Back to Following`, `Back to the story` (from a record opened from a story). With no
+   previous Prism page: `Back to Stories` on a story page, `Back to Today` on any other.
 
 ## Accessibility behaviour
 
@@ -125,7 +129,7 @@ The names do not change with width, are never abbreviated, and are never replace
    has no key.
 3. **Nothing else lives in navigation.** Every extra item there is on every page; the default answer to
    "should this be here?" is no.
-4. **A leaf page keeps the five**, on a phone too. Today a phone reader on a story has only a way back; PLAN
+4. **A leaf page keeps the five**, on a phone too (at compact, behind `Menu`). Today a phone reader on a story has only a way back; PLAN
    §4.2 asks for global navigation on leaf pages, and a reader who arrived from a shared link has nowhere to
    go back to.
 5. **The count on `Following` is a number**, and it is the only count in navigation.

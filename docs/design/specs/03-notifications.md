@@ -33,9 +33,10 @@ in.
 
 In order:
 
-1. **Title**, by where it was opened: `Get told when this story moves` (from a follow) · `Get told when
-   tomorrow's edition is ready` (from the end block) · `Get told when your stories move` (from a switch in
-   settings) · `Get told by email` (when this browser cannot notify).
+1. **Title**, by where it was opened, exactly four: `Get told when this story moves` (from a follow) ·
+   `Get told when your stories move` (from the follow switch in settings) · `Get told when the edition is
+   ready` (from the end block, on today's or yesterday's edition, and from the daily switch in settings) ·
+   `Get told by email` (this browser cannot notify).
 2. **Two switches**, the one the reader came for first and on, the other off:
    - `Stories you follow` — `When a followed story gains a development reported by 2 or more outlets. At most
      3 a day.`
@@ -43,12 +44,8 @@ In order:
      changes it; the zone is the reader's, printed.)
 3. **A fact line**: `Nothing between 22:00 and 07:00. An alert carries the development's headline and how
    many outlets and languages reported it; the daily one carries the edition's counts. Nothing else.`
-4. **`What one looks like`** — one specimen in the shape of a notification: the mark, `readPrism.news`, then
-   real text. From a follow: the story's latest development that two or more outlets reported, and
-   `{k} outlets · {l} languages`. From the end block: today's line, `Today: {n} stories · about {m} minutes ·
-   lead reported by {k} outlets in {l} languages`. If there is nothing real to show (no such development
-   yet), this block is left out.
-5. **The main action** `Turn on`. **Under it** `Not now`, a button giving the same ease of choice.
+   The daily notification opens `/feed`. A follow alert opens that story at the top (spec 02).
+4. **The main action** `Turn on`. **Under it** `Not now`, a button giving the same ease of choice.
 
 ### Settings (`/you` · Notifications)
 
@@ -99,11 +96,11 @@ Settings:
 | Loading | A loading state with no text, shaped like the rows; announced as loading to assistive technology. |
 | Permission never asked | Status `off`; both switches off; turning one on opens the explanation. |
 | Blocked | Status `blocked by the browser`; the switches are off and pressing one opens the blocked state. Email still works. |
-| Cannot notify | The status line reads `This browser cannot show notifications.` Both switches and the time stay, and act on email: their sentences end `by email` (`Arrives by email at {HH:MM} {zone} …`, `… At most 3 a day, by email.`). Turning one on with no confirmed address asks for one. |
+| Cannot notify | The status line reads `This browser cannot show notifications.` Both switches and the time stay, and act on email: their sentences end `by email` (`Arrives by email at {HH:MM} {zone} …`, `… At most 3 a day, by email.`). Turning one on with no confirmed address asks for one. There `The daily edition` switch and `Email: Daily` are one setting: either turns the other on or off. |
 | A second device | The status line and the two switches are per device: each device is turned on by its own press. The daily time, `Per story` and `Email` are the reader's and are the same everywhere when signed in. |
-| `Stories you follow` off | The `Per story` switches are disabled and keep their positions; under `Per story`: `Alerts are off for every story.` |
+| `Stories you follow` off | The `Per story` switches are shown as they are, with `Alerts are off on this device.` above them; no story's switch is changed. |
 | Error — could not load / save | `Your notification settings could not load.` with `Try again` / under the changed row, `That did not save. Try again.` and the control returns to what it was. |
-| Empty | `Per story` with no follows: `You are not following a story yet.` The explanation, with nothing real to show: `What one looks like` is left out. |
+| Empty | `Per story` with no follows: `You are not following a story yet.` |
 | Signed out | Everything works on this device; under the section: `Sign in to use the same settings on every device.` |
 | At the free limit | Does not apply: notifications are not metered. Alerts through a closer reading are a Plus feature (D-17) and get their own row when they exist; nothing here is locked. |
 
@@ -136,12 +133,15 @@ Every string is given where it appears above.
 7. `Turn on` with `Stories you follow` on sets alerts on for every story the reader follows now and for later
    follows; each can be switched off on its own. Off in `Per story` is the same as off in the story's own
    alerts switch.
-8. With `Stories you follow` off, the `Per story` switches are disabled and keep their positions.
+8. An alert reaches a device when that story's switch and that device's `Stories you follow` are both on.
+   Turning a story's switch on turns that device's `Stories you follow` on too. Turning `Stories you follow`
+   off does not change any story's switch; it silences them on this device, and the `Per story` switches are
+   shown as they are, with `Alerts are off on this device.` above them.
 9. With both switches off, the main action is disabled.
 10. A notification carries a headline and its counts (the daily one, the edition's counts) and nothing else.
     The sentences do not promise "an outlet's own words": D-18 allows Prism's labelled headline on a
     happening with two or more independent reports, so the sentence says what is always true.
-11. The specimen is real text or is left out; it is never invented.
+11. The daily notification opens `/feed`. A follow alert opens that story at the top (spec 02).
 12. Permission already granted: no panel, that story's alerts turn on at once. Dismissed at the system
     prompt: permission stays undecided and nothing is said.
 13. Email is the way on where the browser cannot notify, and needs no account — an address and one
@@ -165,7 +165,6 @@ Every string is given where it appears above.
 - Switches are `role="switch"`; each sentence is the switch's description.
 - The time control is a native `<select>` with the label `Time`; the zone is text, not part of the value.
 - `Not now` is a real button: declining is as easy as accepting (India's dark-pattern guidelines).
-- The specimen is marked as an example for screen readers (`aria-label="Example notification"`).
 - Loading states are announced as loading.
 
 ## Needs from the API
@@ -176,6 +175,7 @@ Every string is given where it appears above.
 | The policy the sentences state: two or more outlets, at most 3 a day with the overflow held for the morning, nothing 22:00–07:00 | T-036 |
 | Web-push keys | FA-16 |
 | A daily email, and a confirmation step for an address typed by a signed-out reader | T-036 / T-053 |
+| Follow alerts by email | T-036 (its email sender today is the daily one; alerts by email must be added there) |
 
 ## Decided here
 
