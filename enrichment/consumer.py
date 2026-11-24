@@ -107,6 +107,11 @@ async def handle_classified_item(payload: dict) -> None:
             published_at=str(published_at or "unknown"),
             text=clean_text[:MAX_EXTRACT_CHARS],
         )
+        # Counted before the call, so an attempt that never returns (a kill
+        # mid-call, a timeout, two invalid answers) is seen too: the upper bound
+        # on paying twice. extract.rebill below is the lower one.
+        if await timings.seen_before(f"extract:tried:{raw_item_id}", PAID_MARK_TTL_S):
+            await timings.count("extract.reattempt")
         extraction = await structured_chat(
             model=extract_model,
             messages=messages,

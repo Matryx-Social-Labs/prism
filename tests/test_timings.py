@@ -521,7 +521,7 @@ async def raw_item(monkeypatch, fresh_redis):  # noqa: F811
     guard._stub_pipeline(monkeypatch, guard.FEED_BODY * 6)
     yield rid
     try:
-        await get_redis().delete(f"extract:paid:{rid}")
+        await get_redis().delete(f"extract:paid:{rid}", f"extract:tried:{rid}")
     except Exception:  # noqa: BLE001 — the Redis-down case never set it
         pass
     await guard._purge(sid)
@@ -535,7 +535,24 @@ async def test_a_crash_redelivery_that_pays_again_is_a_rebill(monkeypatch, recor
     await _extract_and_crash(monkeypatch, raw_item)
     assert recorded["count"] == [], "a first extraction is not a re-bill"
     await _extract_and_crash(monkeypatch, raw_item)
-    assert recorded["count"] == [("extract.rebill", 1)]
+    assert recorded["count"] == [("extract.reattempt", 1), ("extract.rebill", 1)]
+
+
+async def test_a_second_attempt_whose_call_never_returned_is_a_reattempt_not_a_rebill(monkeypatch, recorded, raw_item):
+    """A kill mid-call or two invalid answers leave no paid mark; the attempt is still counted."""
+    import enrichment.consumer as ec
+
+    if not await _redis_up():
+        pytest.skip("no redis")
+
+    async def never_returns(**_kwargs):
+        raise _Crash
+
+    monkeypatch.setattr(ec, "structured_chat", never_returns)
+    for _ in range(2):
+        with pytest.raises(_Crash):
+            await ec.handle_classified_item({"raw_item_id": str(raw_item)})
+    assert recorded["count"] == [("extract.reattempt", 1)]
 
 
 async def test_reusing_an_extraction_is_never_a_rebill(monkeypatch, recorded, raw_item):

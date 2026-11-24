@@ -3,6 +3,44 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.137.6] - 2026-11-25
+
+### Added — the pipeline's timings on `/admin/pipeline` (founders)
+- The founder page now shows how long the slow parts take, per day: the wait for and hold of the match
+  lock, each Jev call (event verify, story verify, escalation, story assign, entity variant) and how far
+  past due the analysis queue runs, as a count with a p50, p95 and mean. It also shows the analysis queue
+  now and articles per hour per stage over the last 24 hours. Nothing was measured before, so the
+  throughput figures in the audit were estimates; these are the first recorded ones.
+- Counters sit beside them: Jev timeouts and errors, extractions paid for twice (`extract.rebill`, with
+  `extract.reattempt` as the upper bound: attempts that never returned are counted there),
+  statements cancelled by the new timeout, and dead letters by topic and cause.
+- `GET /api/v1/admin/pipeline?days=7` serves it. Each part comes back `null` when it cannot be read, so
+  one unreadable store does not blank the page. Percentiles are the upper bound of a bucket; the mean is
+  exact. Details in `docs/PIPELINE.md` §2.
+
+### Changed — the worker cannot run an unbounded query; recovery stops re-sending queued work
+- Every worker statement now stops after 120 s (`PRISM_WORKER_STATEMENT_TIMEOUT`, `0` turns it off, a unit
+  is required). The periodic passes (trending, story merge, partition, veto) get 600 s. Waiting for an
+  advisory lock is exempt, because a repair tool can hold one for minutes. A message whose statement is
+  cancelled stays pending and is retried; the third timeout of the same entry dead-letters it with cause
+  `statement_timeout`, which feeds the existing give-up-after-three rule and its founder email.
+- Migrations run with a 5 s lock timeout (`PRISM_MIGRATION_LOCK_TIMEOUT`), so one that cannot get its lock
+  fails the deploy instead of queueing every reader behind it. `CREATE INDEX CONCURRENTLY` switches the
+  timeout off around the build; the rule is in `db/README.md`.
+- `requeue_stalled` no longer republishes an item whose message is still unacked in its stage's stream; it
+  was waiting its turn, and a second copy in the queue is how one extraction gets paid for twice. If Redis
+  cannot answer, it requeues as before.
+- A hung handler's message is released after 30 minutes: the heartbeat stops renewing it, so another slot
+  can reclaim it.
+- `/healthz` runs its freshness query at most once a minute per window, a failed answer included, and the
+  answer carries `as_of`.
+
+### For developers
+- A missing Redis now fails the strict test run (`make test-db`, `make check`) instead of skipping.
+- `tests/test_spend.py`'s store test runs in the full suite.
+
+Nothing a reader sees changes and no flag default changes. The worker timeout is the change most able to
+surprise in production; `PRISM_WORKER_STATEMENT_TIMEOUT=0` on the worker switches it off.
 ## [0.0.137.5] - 2026-11-25
 
 ### Added — the design audit the redesign starts from (documents only; no reader-facing change)

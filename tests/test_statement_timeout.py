@@ -387,3 +387,12 @@ async def test_the_partition_graph_load_runs_under_the_reconciler_timeout(monkey
     with pytest.raises(_Stop):
         await partition.compute_partition()
     assert seen == [db.RECONCILER_STATEMENT_TIMEOUT]
+
+
+async def test_a_worker_timeout_switched_off_is_not_capped_by_an_override(monkeypatch):
+    if not await _db_reachable():
+        pytest.skip("no database")
+    monkeypatch.setattr(db, "_default_statement_timeout", "0")
+    async with db.session_scope(statement_timeout="50ms") as s:
+        shown = (await s.execute(text("SHOW statement_timeout"))).scalar()
+    assert shown != "50ms"

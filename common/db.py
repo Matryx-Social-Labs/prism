@@ -112,7 +112,8 @@ async def session_scope(statement_timeout: str | None = None) -> AsyncIterator[A
     (a caller that commits mid-scope loses it with the transaction)."""
     async with get_session_factory()() as session:
         try:
-            if statement_timeout is not None:
+            # Off means off: PRISM_WORKER_STATEMENT_TIMEOUT=0 is not capped by an override.
+            if statement_timeout is not None and _default_statement_timeout != "0":
                 # Bound, and Postgres validates it: a bad value fails here.
                 await session.execute(
                     text("SELECT set_config('statement_timeout', :v, true)"), {"v": statement_timeout}
