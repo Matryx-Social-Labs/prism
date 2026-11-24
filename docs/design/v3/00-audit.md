@@ -52,7 +52,7 @@ First screen at 390×844, light theme, not scrolled. Measured by `measure.js` an
 | Type styles (family × size × weight × case) | 18 | 16 | 11 | 14 |
 | Font sizes | 13 | 12 | 9 | 10 |
 | Pieces of text in monospace | 14 | 5 | 18 | 8 |
-| Text under 12 px | 19 of 39 | 11 of 39 | 17 of 47 | 11 of 30 |
+| Text under 12 px | 19 of 39 | 11 of 39 | 17 of 47 | 11 of 30 (that run saw 30 pieces) |
 | Smallest text | 9.5 px | 10.5 px | 11 px | 11 px |
 | Text colours · fill colours | 4 · 9 | 6 · 9 | 4 · 6 | 4 · 8 |
 | Targets under 44 px | 7 | 4 | 13 | 6 |
@@ -202,7 +202,7 @@ noted): *sure*, *guess* or *no idea*. **Verdict:** keep · simplify · merge · 
 | 6 | **Grey bar** under each title on the Stories list | None: it is the same on every row | read as decoration ×4 | Count as an eyebrow (8.2) | **Remove** |
 | 7 | **Outlet-logo stack** "+6" on cards and records | Which outlets | sure ×4 that outlets are meant; logos are 16–22 px and unnamed, so not which | No logos on the card; the count is the credential (8.1). Who reported is a plain list with names (8.4) | **Merge** into the one count line. Logos stay only beside an outlet's name |
 | 8 | **Language codes** "EN·HI·OR" on card meta lines | Which languages reported it | guess ×4 ("OR is Odia?") | Languages by their own names (E2) | **Remove** from rows; "in 3 languages" where it matters, names inside the record |
-| 9 | **Monospace meta lines and uppercase eyebrows** (14 mono items on Today's first screen; 4–6 meta lines a screen; eyebrow class on 48 lines) | Time, counts, where a fact came from | "this is data, but used for sentences too" | One meta line per row, two items (1.1, 1.2, 1.3, 4.1) | **Simplify.** One meta line per row, at most two items, 12 px or more, never a sentence in monospace. Whether monospace survives is T-081's. Problem 3.9 |
+| 9 | **Monospace meta lines and uppercase eyebrows** (14 mono items on Today's first screen; 4–6 meta lines a screen; eyebrow class on 48 lines) | Time, counts, where a fact came from | "this is data, but used for sentences too" | One meta line per row, two items (1.1, 1.2, 1.3, 4.1) | **Simplify.** Where no spec lists the lines, one line of facts per row with at most two items; always 12 px or more; never a sentence in monospace. Whether monospace survives is T-081's. Problem 3.9 |
 | 10 | **Stat tiles** (9 · 3 · 11) on a record; each is a button that jumps down the page | Outlets, languages, reports | guess ×3, no idea ×1; nobody knew they could be tapped | One number, one sentence (12.3); the count heads the section (8.3) | **Merge** on a record: the count sentence beneath them already says it. Where a spec keeps counted figures as links (the story header, spec 06) they stay: each printed once, each opening what it counts, each looking like the link it is. Problem 3.3 |
 | 11 | **Status pills**: "Verified record", "Verified", provisional, single, corrected (9 components) | The state of a record or story | no idea ×2, guess ×2 for "Verified" | A state is a word and appears only when true (9.1, 9.2, 1.2) | **Simplify.** No badge for the normal state. Words for the exceptions (one source, provisional grouping, corrected). In a mixed list every row says whether its story is moving or has gone quiet, or sits under a heading that does; never by the absence of a mark. Problem 3.6 |
 | 12 | **Chip rows**: subjects with counts on Today and Search, 10 kinds and 8 names on a story (59 uses in about 30 files) | Filter the list | sure ×3 for subject chips; guess for "The event 1969"; no idea ×4 for "Following" | One "Filter by" control (10.1–10.4); or text tabs for kinds (4.2, 4.4) | **Simplify.** At most one chip row on a screen, on one line. A story's ten kinds and eight names do not both sit above its timeline; the name chips merge with the list of people and organisations named |
@@ -284,7 +284,7 @@ targets count what a design adds to it, and never ask a design to drop something
 
 | Measure | Today · record · story · search, now | Aim | How it is counted |
 |---|---|---|---|
-| Pieces of text on the first screen | 39 · 39 · 47 · 32 | Today: at most half, 20 | script (`textElements`) |
+| Pieces of text on the first screen | 39 · 39 · 47 · 32 | Today: 24 or fewer, which is navigation's six, the edition's heading and its one line, and two items as spec 01 lists them | script (`textElements`) |
 | Controls on the first screen | 20 · 25 · 14 · 16 | Today: 12, which is navigation's six and two items of the edition | script (`controls`) |
 | Type styles on a first screen | 18 · 16 · 11 · 14 | 8 or fewer | script (`typeStyles`), on a Latin screen, the wordmark left out. Counted separately per script, since each script has its own family |
 | Font sizes on a first screen | 13 · 12 · 9 · 10 | 5 or fewer | the same |
@@ -293,7 +293,7 @@ targets count what a design adds to it, and never ask a design to drop something
 | Text colours · fill colours | 4·9 · 6·9 · 4·6 · 4·8 | reported | script |
 | Pinned height | 110 · 161 · 52 · 110 px | limit 13 | script (`pinned`) |
 | Families of pill, badge and chip | 7, plus 14 one-offs | reported, each with its one job | the component sheet |
-| Colour properties | 150, of which 105 literal colours | reported | the direction's palette |
+| Custom properties in the stylesheet | 150: 105 literal colours and about 26 aliases | reported | the direction's palette |
 
 Text size, target size and contrast are in §8's accessibility list; `audit-data/a11y.js` measures them. It
 has no check for the gap between targets: that one is by eye.
@@ -340,7 +340,7 @@ story; the Stories destination means the running kind. Every count carries its n
 | Ask this story · Ask the record · Ask · Dig deeper · Not in sources · Limit | one feature, four names | "Ask about this story" · "Not in the reports" · "Daily limit reached" |
 | reported (on a quote) · translation | easily missed | "Reported, not a direct quote" · "Translated" |
 | On X · First on X · Signal, not coverage · Heard on | "signal" is internal | "Posts on X" · "Posts, not news reports" · "From podcasts" |
-| Not counted · not read · Not read yet | one state, three phrasings | `Not counted yet` (specs README) |
+| Not counted · not read · Not read yet | two states, three phrasings | "Not counted" for a day Prism was not reading; `Not counted yet` for a figure still to come (specs README) |
 | quiet since 24 Nov 14:22 (header) | unexplained | Removed with the header slot. A quiet story is `Nothing new in {d} days.` (spec 06) |
 | Scope · National | internal | "Where": "All India" or the state's name |
 | Hub · Sector · Subject · Entity | page types | "Subject"; a person, organisation or place by its name |
@@ -357,8 +357,8 @@ running story and search results.
 ### Principles
 1. **Subtract first.** The default answer to "should this element be here?" is no. An element stays when a
    first-time reader can say what it means without a key.
-2. **A number is printed once in a screenful**, in words and digits, and means the same thing wherever it
-   appears.
+2. **A number is printed once in a screenful**, unless a spec prints it again, and means the same thing
+   wherever it appears.
 3. **Words carry state.** One source, provisional, moving, gone quiet, corrected: each is a word. Form may
    repeat what the word says; it never replaces it, and one form never means two things.
 4. **The headline before the photographs, and the latest before the history.** On a phone record the
@@ -404,11 +404,12 @@ Each is marked **WCAG** (required at level AA, with its number) or **house** (Pr
 5. **WCAG 1.4.11.** At least 3:1 for lines that carry state, control borders, meaningful icons, focus rings,
    and neighbouring segments of anything drawn as a split.
 6. **House.** Pinned bars as limit 13 in §6.1.
-7. **WCAG 2.4.7, 2.4.11.** Every element that takes focus shows a focus ring of at least 2 px and 3:1, in
-   both themes, never hidden under a pinned bar.
+7. **WCAG 2.4.7, 2.4.11; house figures.** Every element that takes focus shows a visible focus ring, in both
+   themes, never hidden under a pinned bar. The house figures are 2 px and 3:1.
 8. **WCAG 1.4.4, 1.4.10.** At 320 px wide and at 200% text, nothing is lost and nothing scrolls sideways;
    zoom is never disabled.
-9. **WCAG 1.4.12; house figures.** No clipped or touching glyph in any of the 13 scripts. Start from a line
+9. **House; WCAG 1.4.12 for spacing a reader sets.** No clipped or touching glyph in any of the 13 scripts,
+   including when a reader widens the spacing. Start from a line
    height of 1.6 for Indic scripts and 1.8 for Urdu, and confirm by testing. No letter-spacing and no
    capitals on a non-Latin script. Italics on Latin text only.
 10. **WCAG 3.1.2.** Every headline, quote and outlet name that is not in the interface language carries its
@@ -417,12 +418,14 @@ Each is marked **WCAG** (required at level AA, with its number) or **house** (Pr
     arrows and other directional icons mirror; Latin names, digits and `[n]` inside it are isolated.
 12. **WCAG 1.3.1, 2.4.6.** One main heading a page; sections are real headings, so removing the pinned
     section tabs loses no way of jumping.
-13. **WCAG 2.2.2, 2.3.3.** Nothing advances by itself without a pause control, for anyone. With reduced
-    motion, nothing moves.
-14. **WCAG 2.5.7.** Every swipe (a photo deck, a day strip) has a button of 44 px that does the same.
+13. **WCAG 2.2.2; fixed.** Nothing advances by itself without a pause control, for anyone. With reduced
+    motion, nothing moves (Prism's fixed rule; WCAG asks this only at level AAA).
+14. **WCAG 2.5.1, 2.5.7.** Every swipe or drag (a photo deck, a day strip) has a button of 44 px that does
+    the same.
 15. **WCAG 4.1.3.** A changed filter count, a limit reached, an answer arriving and a changed reading are
     announced as status messages.
-16. **WCAG 3.2.6.** Help and the grievance contact are in the same place at every width.
+16. **WCAG 3.2.6; house for widths.** Help and the grievance contact are in the same place on every page,
+    and at every width.
 
 ### Open — decide on merit
 Palette; typefaces; the mark's drawing; every line and rule; whether any dashed form survives; whether
