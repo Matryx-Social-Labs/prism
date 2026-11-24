@@ -3,6 +3,27 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.137.2] - 2026-11-24
+
+### Added — a workspace sets itself up, on its own data (developer tooling; no reader-facing change)
+- `bash scripts/workspace_setup.sh` takes a fresh worktree to a green `make check` in one step: the
+  shared Postgres, a Redis container of its own, the venv on Python 3.13, `web/node_modules`, two
+  databases named after the checkout (`prism_<workspace>`, `prism_<workspace>_test`), migrations, and
+  a `.env` that points at them and carries no model or X key. `scripts/workspace_archive.sh` removes
+  what it made. Two checkouts ran the whole gate at the same time: 1,429 backend tests and 1,077 web
+  tests passed in each, and each wrote only to its own test database.
+- The backend tests run on `TEST_DATABASE_URL` and refuse (exit 2) any database whose name does not
+  end in `_test`. A local host used to be enough, which is how the shared dev database filled with
+  test rows. `make check` refuses the same way before its migration round-trip, and starts from an
+  empty test database: the suite leaves 165 events a run, and by the fourth run on one database a
+  feed test could no longer find the rows it had seeded.
+- CI fails when alembic has more than one head; its database is now `prism_test`.
+
+### Fixed
+- `.env.example`: seven empty keys followed by a comment (`KEY=   # note`) were read by python-dotenv
+  as the comment's text, so a copied file failed six billing tests on an "ISO date". They are `KEY=""`.
+- `make seed` loads into the database `.env` names instead of always the shared `prism`.
+
 ## [0.0.137.1] - 2026-11-02
 
 ### Fixed — Today's lead block on a desk
