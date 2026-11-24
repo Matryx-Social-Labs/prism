@@ -97,3 +97,5 @@ Interactive shots: record-390-lens.png = "Show all 11" reports expanded on the l
 - you-1440.png -> https://www.readprism.news/you
 - you-390-y2.png -> https://www.readprism.news/you
 - you-390.png -> https://www.readprism.news/you
+
+a11y.js re-run (corrected, 9 runs at 390x844 scroll 0): 2026-11-24T19:28:38Z to 19:29:45Z (00:58-00:59 IST 25 Nov); light x7, dark x2 via header toggle; light restored.

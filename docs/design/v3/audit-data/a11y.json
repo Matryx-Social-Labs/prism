@@ -24,17 +24,17 @@
     "h": 36
    },
    {
-    "label": "Politics 23",
+    "label": "Politics 16",
     "w": 90,
     "h": 36
    },
    {
-    "label": "Business & Markets 3",
+    "label": "Business & Markets 7",
     "w": 154,
     "h": 36
    },
    {
-    "label": "Sports 3",
+    "label": "Sports 4",
     "w": 81,
     "h": 36
    },
@@ -44,82 +44,11 @@
     "h": 32
    }
   ],
-  "textElements": 37,
-  "textUnderAA": 10,
-  "textUnderAAList": [
-   {
-    "text": "readPrism.news",
-    "px": 19,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "read",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": ".news",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "WED, 25 NOV",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Aaj Tak",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Today",
-    "px": 11,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Stories",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Search",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Watchlist",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "You",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   }
-  ],
+  "textElements": 39,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
   "smallestTextPx": 9.5,
-  "textUnder12px": 18,
+  "textUnder12px": 19,
   "name": "today-390"
  },
  {
@@ -153,86 +82,8 @@
    }
   ],
   "textElements": 39,
-  "textUnderAA": 11,
-  "textUnderAAList": [
-   {
-    "text": "readPrism.news",
-    "px": 19,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "read",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": ".news",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Navbharat Times",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "The Hindu",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Deccan Herald",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Dharitri",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "The Economic Times",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "The Times of India",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Hindustan Times",
-    "px": 10.5,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "1 / 7",
-    "px": 11,
-    "ratio": 1.12,
-    "need": 4.5,
-    "overImage": false
-   }
-  ],
+  "textUnderAA": 0,
+  "textUnderAAList": [],
   "smallestTextPx": 10.5,
   "textUnder12px": 11,
   "name": "record-390"
@@ -313,29 +164,8 @@
    }
   ],
   "textElements": 47,
-  "textUnderAA": 4,
+  "textUnderAA": 1,
   "textUnderAAList": [
-   {
-    "text": "readPrism.news",
-    "px": 19,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "read",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": ".news",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
    {
     "text": "5695",
     "px": 11.5,
@@ -384,72 +214,8 @@
    }
   ],
   "textElements": 50,
-  "textUnderAA": 9,
-  "textUnderAAList": [
-   {
-    "text": "readPrism.news",
-    "px": 19,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "read",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": ".news",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "00:47 IST",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Today",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Stories",
-    "px": 11,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Search",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Watchlist",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "You",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   }
-  ],
+  "textUnderAA": 0,
+  "textUnderAAList": [],
   "smallestTextPx": 11,
   "textUnder12px": 26,
   "name": "stories-390"
@@ -494,75 +260,11 @@
     "h": 36
    }
   ],
-  "textElements": 32,
-  "textUnderAA": 9,
-  "textUnderAAList": [
-   {
-    "text": "readPrism.news",
-    "px": 19,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "read",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": ".news",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "SEARCH",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Today",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Stories",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Search",
-    "px": 11,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Watchlist",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "You",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   }
-  ],
+  "textElements": 30,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
   "smallestTextPx": 11,
-  "textUnder12px": 12,
+  "textUnder12px": 11,
   "name": "search-390"
  },
  {
@@ -591,72 +293,8 @@
    }
   ],
   "textElements": 25,
-  "textUnderAA": 9,
-  "textUnderAAList": [
-   {
-    "text": "readPrism.news",
-    "px": 19,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "read",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": ".news",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "YOU",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Today",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Stories",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Search",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "Watchlist",
-    "px": 11,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "You",
-    "px": 11,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   }
-  ],
+  "textUnderAA": 0,
+  "textUnderAAList": [],
   "smallestTextPx": 11,
   "textUnder12px": 7,
   "name": "you-390"
@@ -687,30 +325,8 @@
    }
   ],
   "textElements": 24,
-  "textUnderAA": 3,
-  "textUnderAAList": [
-   {
-    "text": "readPrism.news",
-    "px": 19,
-    "ratio": 1.01,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": "read",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   },
-   {
-    "text": ".news",
-    "px": 19,
-    "ratio": 2.9,
-    "need": 4.5,
-    "overImage": false
-   }
-  ],
+  "textUnderAA": 0,
+  "textUnderAAList": [],
   "smallestTextPx": 11,
   "textUnder12px": 2,
   "name": "plus-390"
@@ -740,12 +356,12 @@
     "h": 36
    },
    {
-    "label": "Politics 23",
+    "label": "Politics 14",
     "w": 90,
     "h": 36
    },
    {
-    "label": "Business & Markets 3",
+    "label": "Business & Markets 8",
     "w": 154,
     "h": 36
    },
@@ -760,11 +376,11 @@
     "h": 32
    }
   ],
-  "textElements": 37,
+  "textElements": 39,
   "textUnderAA": 0,
   "textUnderAAList": [],
   "smallestTextPx": 9.5,
-  "textUnder12px": 18,
+  "textUnder12px": 19,
   "name": "today-390-dark"
  },
  {
