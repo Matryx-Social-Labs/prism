@@ -1,0 +1,1109 @@
+[
+ {
+  "url": "/feed",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 0,
+  "pageHeight": 9926,
+  "inViewport": {
+   "textElements": 39,
+   "controls": 20,
+   "pictures": 13,
+   "monoTextElements": 14,
+   "uppercaseTextElements": 2,
+   "pillsAndChips": 1,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Geist Mono | 11px | 400 | normal | uppercase": 1,
+    "Newsreader | 23px | 600 | normal | none": 2,
+    "Geist Mono | 12px | 400 | normal | none": 1,
+    "Anek Latin | 13px | 500 | normal | none": 2,
+    "Anek Latin | 14px | 600 | normal | none": 5,
+    "Geist Mono | 11.5px | 400 | normal | none": 8,
+    "Anek Latin | 13.5px | 500 | normal | none": 3,
+    "Geist Mono | 11px | 400 | normal | none": 3,
+    "Anek Latin | 10.5px | 500 | normal | none": 1,
+    "Anek Latin | 12.5px | 600 | normal | none": 1,
+    "Anek Latin | 16px | 400 | normal | none": 1,
+    "Geist Mono | 9.5px | 500 | normal | none": 1,
+    "Anek Latin | 12.5px | 600 | normal | uppercase": 1,
+    "Newsreader | 16.5px | 600 | normal | none": 1,
+    "Anek Latin | 11px | 600 | normal | none": 1,
+    "Anek Latin | 11px | 500 | normal | none": 4
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 7,
+    "rgb(91, 96, 105)": 21,
+    "rgb(63, 67, 74)": 9,
+    "rgb(247, 246, 242)": 2
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 3,
+    "rgb(255, 255, 255)": 10,
+    "rgb(17, 19, 23)": 1,
+    "rgb(17, 122, 72)": 1,
+    "rgb(238, 236, 230)": 3,
+    "rgb(142, 139, 130)": 2,
+    "rgb(30, 58, 110)": 1,
+    "rgb(196, 71, 15)": 1,
+    "rgb(11, 87, 208)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 30,
+    "solid 3px": 3,
+    "solid 2px": 21
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "p-masthead glass sticky top-0 z-30 -mx-[var(--gutter)] grid h-[var(--m",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news WED, 25 NOV"
+    },
+    {
+     "tag": "nav",
+     "cls": "glass fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidde",
+     "position": "fixed",
+     "top": 786,
+     "visibleHeight": 58,
+     "width": 390,
+     "text": "Today Stories Search Watchlist You"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 1241,
+   "lineKinds": {
+    "solid 1px": 155,
+    "solid 2px": 386,
+    "solid 3px": 12,
+    "dashed 1px": 48
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "today-390-y0"
+ },
+ {
+  "url": "/feed",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 1688,
+  "pageHeight": 9926,
+  "inViewport": {
+   "textElements": 35,
+   "controls": 13,
+   "pictures": 19,
+   "monoTextElements": 15,
+   "uppercaseTextElements": 1,
+   "pillsAndChips": 0,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Geist Mono | 11px | 400 | normal | uppercase": 1,
+    "Geist Mono | 11.5px | 400 | normal | none": 10,
+    "Anek Latin | 13.5px | 600 | normal | none": 2,
+    "Newsreader | 23px | 600 | normal | none": 1,
+    "Geist Mono | 13px | 400 | normal | none": 1,
+    "Geist Mono | 12px | 400 | normal | none": 1,
+    "Anek Latin | 12.5px | 600 | normal | none": 3,
+    "Newsreader | 18px | 600 | normal | none": 3,
+    "Anek Latin | 14.5px | 400 | normal | none": 3,
+    "Geist Mono | 9.5px | 500 | normal | none": 2,
+    "Anek Latin | 11px | 600 | normal | none": 1,
+    "Anek Latin | 11px | 500 | normal | none": 4
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 6,
+    "rgb(91, 96, 105)": 19,
+    "rgb(11, 87, 208)": 2,
+    "rgb(63, 67, 74)": 8
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 5,
+    "rgb(255, 255, 255)": 13,
+    "rgb(142, 139, 130)": 6,
+    "rgb(238, 236, 230)": 5,
+    "rgb(30, 58, 110)": 2,
+    "rgb(196, 71, 15)": 2,
+    "rgb(11, 87, 208)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 18,
+    "solid 3px": 1,
+    "solid 2px": 44
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "p-masthead glass sticky top-0 z-30 -mx-[var(--gutter)] grid h-[var(--m",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news WED, 25 NOV"
+    },
+    {
+     "tag": "nav",
+     "cls": "glass fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidde",
+     "position": "fixed",
+     "top": 786,
+     "visibleHeight": 58,
+     "width": 390,
+     "text": "Today Stories Search Watchlist You"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 1241,
+   "lineKinds": {
+    "solid 1px": 155,
+    "solid 2px": 386,
+    "solid 3px": 12,
+    "dashed 1px": 48
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "today-390-y1688"
+ },
+ {
+  "url": "/feed",
+  "viewport": [
+   1440,
+   900
+  ],
+  "scrollY": 0,
+  "pageHeight": 4932,
+  "inViewport": {
+   "textElements": 70,
+   "controls": 34,
+   "pictures": 17,
+   "monoTextElements": 29,
+   "uppercaseTextElements": 2,
+   "pillsAndChips": 1,
+   "typeStyles": {
+    "Newsreader | 23px | 600 | normal | none": 3,
+    "Newsreader | 23px | 400 | normal | none": 2,
+    "Anek Latin | 14.5px | 600 | normal | none": 5,
+    "Geist Mono | 11px | 500 | normal | none": 1,
+    "Anek Latin | 13.5px | 600 | normal | none": 1,
+    "Geist Mono | 12px | 400 | normal | none": 1,
+    "Anek Latin | 13px | 500 | normal | none": 2,
+    "Anek Latin | 14px | 600 | normal | none": 8,
+    "Geist Mono | 11.5px | 400 | normal | none": 19,
+    "Anek Latin | 13.5px | 500 | normal | none": 9,
+    "Geist Mono | 11px | 400 | normal | none": 7,
+    "Anek Latin | 10.5px | 500 | normal | none": 1,
+    "Anek Latin | 12.5px | 600 | normal | none": 1,
+    "Anek Latin | 16px | 400 | normal | none": 1,
+    "Geist Mono | 9.5px | 500 | normal | none": 1,
+    "Anek Latin | 12.5px | 600 | normal | uppercase": 2,
+    "Newsreader | 16.5px | 600 | normal | none": 5,
+    "Anek Latin | 12px | 600 | normal | none": 1
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 12,
+    "rgb(91, 96, 105)": 31,
+    "rgb(63, 67, 74)": 22,
+    "rgb(11, 87, 208)": 2,
+    "rgb(247, 246, 242)": 3
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 6,
+    "rgb(255, 255, 255)": 22,
+    "rgb(17, 19, 23)": 2,
+    "rgb(17, 122, 72)": 1,
+    "rgb(238, 236, 230)": 6,
+    "rgb(142, 139, 130)": 2,
+    "rgb(30, 58, 110)": 5,
+    "rgb(196, 71, 15)": 5
+   },
+   "lineKinds": {
+    "solid 1px": 67,
+    "solid 2px": 38,
+    "solid 3px": 4
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "hidden lg:block glass sticky top-0 z-40 h-[var(--masthead)] border-b s",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 60,
+     "width": 1440,
+     "text": "readPrism.news Today Stories Pulse Watchlist / Plu"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 1241,
+   "lineKinds": {
+    "solid 1px": 155,
+    "solid 2px": 386,
+    "solid 3px": 12,
+    "dashed 1px": 48
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "today-1440-y0"
+ },
+ {
+  "url": "/story/dc071020-88ec-4816-bb35-52431b5ec6b3",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 0,
+  "pageHeight": 21034,
+  "inViewport": {
+   "textElements": 39,
+   "controls": 25,
+   "pictures": 28,
+   "monoTextElements": 5,
+   "uppercaseTextElements": 0,
+   "pillsAndChips": 7,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Anek Latin | 14px | 600 | normal | none": 4,
+    "Anek Latin | 12px | 600 | normal | none": 1,
+    "Geist Mono | 11.5px | 400 | normal | none": 3,
+    "Anek Latin | 12.5px | 600 | normal | none": 3,
+    "Newsreader | 30px | 600 | normal | none": 1,
+    "Anek Latin | 13px | 500 | normal | none": 1,
+    "Anek Latin | 17px | 400 | normal | none": 5,
+    "Newsreader | 22px | 600 | normal | none": 3,
+    "Anek Latin | 12px | 500 | normal | none": 3,
+    "Anek Latin | 10.5px | 500 | normal | none": 7,
+    "Geist Mono | 11px | 400 | normal | none": 1,
+    "Anek Latin | 12.5px | 400 | normal | none": 1,
+    "Anek Latin | 14.5px | 600 | normal | none": 2,
+    "Geist Mono | 12px | 400 | normal | none": 1
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 20,
+    "rgb(91, 96, 105)": 13,
+    "rgb(247, 246, 242)": 1,
+    "rgb(63, 67, 74)": 2,
+    "rgb(11, 87, 208)": 1,
+    "rgb(255, 255, 255)": 2
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 8,
+    "rgb(247, 246, 242)": 1,
+    "rgb(17, 19, 23)": 1,
+    "rgb(142, 139, 130)": 2,
+    "rgb(255, 255, 255)": 13,
+    "rgb(238, 236, 230)": 13,
+    "color(srgb 0.968627 0.964706 0.94902 / 0.88)": 3,
+    "color(srgb 0.968627 0.964706 0.94902 / 0.94)": 1,
+    "rgb(11, 87, 208)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 26,
+    "solid 2px": 29
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "div",
+     "cls": "sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 border-b",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news"
+    },
+    {
+     "tag": "nav",
+     "cls": "sc-tabs sticky top-[var(--masthead)] z-[25] px-2 lg:hidden",
+     "position": "sticky",
+     "top": 52,
+     "visibleHeight": 44,
+     "width": 390,
+     "text": "Brief What changed Who said what How it unfolded W"
+    },
+    {
+     "tag": "div",
+     "cls": "fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t px-3 pt-2.5 lg:hidde",
+     "position": "fixed",
+     "top": 779,
+     "visibleHeight": 65,
+     "width": 390,
+     "text": "Ask \u00b7 11 reports Share"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 1993,
+   "lineKinds": {
+    "solid 1px": 777,
+    "solid 2px": 169,
+    "solid 3px": 11
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "record-390-y0"
+ },
+ {
+  "url": "/story/dc071020-88ec-4816-bb35-52431b5ec6b3",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 1688,
+  "pageHeight": 21034,
+  "inViewport": {
+   "textElements": 35,
+   "controls": 12,
+   "pictures": 10,
+   "monoTextElements": 8,
+   "uppercaseTextElements": 1,
+   "pillsAndChips": 0,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Anek Latin | 14px | 600 | normal | none": 4,
+    "Anek Latin | 17px | 400 | normal | none": 3,
+    "Anek Latin | 12.5px | 600 | normal | uppercase": 1,
+    "Anek Latin | 14.5px | 400 | normal | none": 4,
+    "Anek Latin | 13px | 400 | normal | none": 1,
+    "Anek Latin | 13.5px | 600 | normal | none": 1,
+    "Geist Mono | 11.5px | 400 | normal | none": 7,
+    "Newsreader | 23px | 600 | normal | none": 1,
+    "Anek Latin | 13.5px | 400 | normal | none": 1,
+    "Anek Latin | 13px | 600 | normal | none": 3,
+    "Anek Latin | 15px | 500 | normal | none": 3,
+    "Anek Latin | 14.5px | 600 | normal | none": 2,
+    "Geist Mono | 12px | 400 | normal | none": 1
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 14,
+    "rgb(91, 96, 105)": 15,
+    "rgb(63, 67, 74)": 4,
+    "rgb(255, 255, 255)": 2
+   },
+   "fillColours": {
+    "rgb(17, 19, 23)": 7,
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 1,
+    "rgb(247, 246, 242)": 1,
+    "rgb(255, 255, 255)": 7,
+    "rgb(142, 139, 130)": 3,
+    "color(srgb 0.968627 0.964706 0.94902 / 0.94)": 1,
+    "rgb(11, 87, 208)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 14,
+    "solid 2px": 14,
+    "solid 3px": 1
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "div",
+     "cls": "sc-progress",
+     "position": "fixed",
+     "top": 0,
+     "visibleHeight": 2,
+     "width": 33,
+     "text": ""
+    },
+    {
+     "tag": "div",
+     "cls": "sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 border-b",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news"
+    },
+    {
+     "tag": "nav",
+     "cls": "sc-tabs sticky top-[var(--masthead)] z-[25] px-2 lg:hidden",
+     "position": "sticky",
+     "top": 52,
+     "visibleHeight": 44,
+     "width": 390,
+     "text": "Brief What changed Who said what How it unfolded W"
+    },
+    {
+     "tag": "div",
+     "cls": "fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t px-3 pt-2.5 lg:hidde",
+     "position": "fixed",
+     "top": 779,
+     "visibleHeight": 65,
+     "width": 390,
+     "text": "Ask \u00b7 11 reports Share"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 1993,
+   "lineKinds": {
+    "solid 1px": 777,
+    "solid 2px": 169,
+    "solid 3px": 11
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "record-390-y1688"
+ },
+ {
+  "url": "/story/dc071020-88ec-4816-bb35-52431b5ec6b3",
+  "viewport": [
+   1440,
+   900
+  ],
+  "scrollY": 0,
+  "pageHeight": 14691,
+  "inViewport": {
+   "textElements": 98,
+   "controls": 47,
+   "pictures": 51,
+   "monoTextElements": 31,
+   "uppercaseTextElements": 3,
+   "pillsAndChips": 8,
+   "typeStyles": {
+    "Newsreader | 23px | 600 | normal | none": 1,
+    "Newsreader | 23px | 400 | normal | none": 2,
+    "Anek Latin | 14.5px | 600 | normal | none": 5,
+    "Geist Mono | 11px | 500 | normal | none": 1,
+    "Anek Latin | 13.5px | 600 | normal | none": 4,
+    "Anek Latin | 12.5px | 600 | normal | uppercase": 2,
+    "Anek Latin | 14px | 600 | normal | none": 1,
+    "Anek Latin | 14px | 500 | normal | none": 14,
+    "Geist Mono | 11px | 400 | normal | none": 6,
+    "Anek Latin | 12px | 600 | normal | none": 1,
+    "Geist Mono | 11.5px | 400 | normal | none": 19,
+    "Anek Latin | 12.5px | 600 | normal | none": 3,
+    "Newsreader | 30px | 600 | normal | none": 1,
+    "Anek Latin | 13px | 500 | normal | none": 1,
+    "Anek Latin | 17px | 400 | normal | none": 5,
+    "Newsreader | 22px | 600 | normal | none": 5,
+    "Anek Latin | 12px | 500 | normal | none": 5,
+    "Geist Mono | 9.5px | 500 | normal | none": 1,
+    "Geist Mono | 12px | 400 | normal | none": 3,
+    "Anek Latin | 10.5px | 500 | normal | none": 8,
+    "Anek Latin | 12.5px | 400 | normal | none": 1,
+    "Geist Mono | 12.5px | 600 | normal | uppercase": 1,
+    "Anek Latin | 13px | 600 | normal | none": 8
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 39,
+    "rgb(91, 96, 105)": 40,
+    "rgb(63, 67, 74)": 13,
+    "rgb(11, 87, 208)": 5,
+    "rgb(247, 246, 242)": 1
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 9,
+    "rgb(255, 255, 255)": 35,
+    "rgb(17, 19, 23)": 1,
+    "rgb(142, 139, 130)": 2,
+    "rgb(238, 236, 230)": 17,
+    "rgb(30, 58, 110)": 1,
+    "rgb(196, 71, 15)": 1,
+    "color(srgb 0.968627 0.964706 0.94902 / 0.88)": 3
+   },
+   "lineKinds": {
+    "solid 1px": 64,
+    "solid 2px": 92,
+    "solid 3px": 1
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "hidden lg:block glass sticky top-0 z-40 h-[var(--masthead)] border-b s",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 60,
+     "width": 1440,
+     "text": "readPrism.news Today Stories Pulse Watchlist / Plu"
+    },
+    {
+     "tag": "aside",
+     "cls": "hidden lg:block lg:sticky lg:top-[calc(var(--topbar)+28px)] lg:self-st",
+     "position": "sticky",
+     "top": 88,
+     "visibleHeight": 316,
+     "width": 220,
+     "text": "ON THIS STORY Brief What changed 11 Who said what"
+    },
+    {
+     "tag": "aside",
+     "cls": "hidden xl:grid xl:content-start xl:gap-7 self-end",
+     "position": "sticky",
+     "top": 88,
+     "visibleHeight": 812,
+     "width": 320,
+     "text": "REPORTS \u00b7 11 Navbharat Times 39m ago [1] \u0905\u0916\u093f\u0932\u0947\u0936 \u092f\u093e"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 2001,
+   "lineKinds": {
+    "solid 1px": 777,
+    "solid 2px": 173,
+    "solid 3px": 11
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "record-1440-y0"
+ },
+ {
+  "url": "/trending/the-election-commission-and-voter-roll-row-12e8b2",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 0,
+  "pageHeight": 587895,
+  "inViewport": {
+   "textElements": 47,
+   "controls": 14,
+   "pictures": 3,
+   "monoTextElements": 18,
+   "uppercaseTextElements": 0,
+   "pillsAndChips": 0,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Anek Latin | 12px | 600 | normal | none": 1,
+    "Anek Latin | 12.5px | 600 | normal | none": 2,
+    "Geist Mono | 11.5px | 400 | normal | none": 14,
+    "Newsreader | 23px | 600 | normal | none": 2,
+    "Anek Latin | 16px | 400 | normal | none": 1,
+    "Geist Mono | 12px | 400 | normal | none": 1,
+    "Anek Latin | 13.5px | 500 | normal | none": 18,
+    "Geist Mono | 11px | 400 | normal | none": 3,
+    "Anek Latin | 15px | 500 | normal | none": 2
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 3,
+    "rgb(91, 96, 105)": 21,
+    "rgb(247, 246, 242)": 2,
+    "rgb(63, 67, 74)": 21
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 1,
+    "rgb(17, 19, 23)": 2,
+    "rgb(142, 139, 130)": 3,
+    "rgb(255, 255, 255)": 17,
+    "rgb(223, 221, 214)": 1,
+    "rgb(247, 246, 242)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 77,
+    "solid 3px": 1
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "glass sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 bo",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 43941,
+   "lineKinds": {
+    "solid 1px": 22924,
+    "solid 2px": 81,
+    "solid 3px": 8
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "story-390-y0"
+ },
+ {
+  "url": "/trending/the-election-commission-and-voter-roll-row-12e8b2",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 1688,
+  "pageHeight": 587895,
+  "inViewport": {
+   "textElements": 25,
+   "controls": 8,
+   "pictures": 5,
+   "monoTextElements": 12,
+   "uppercaseTextElements": 0,
+   "pillsAndChips": 0,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Anek Latin | 14.5px | 400 | normal | none": 4,
+    "Geist Mono | 11.5px | 400 | normal | none": 6,
+    "Geist Mono | 11px | 400 | normal | none": 6,
+    "Anek Latin | 15px | 500 | normal | none": 6
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 1,
+    "rgb(91, 96, 105)": 18,
+    "rgb(63, 67, 74)": 6
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 1,
+    "rgb(223, 221, 214)": 1,
+    "rgb(247, 246, 242)": 6
+   },
+   "lineKinds": {
+    "solid 1px": 25
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "glass sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 bo",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 43942,
+   "lineKinds": {
+    "solid 1px": 22924,
+    "solid 2px": 81,
+    "solid 3px": 8
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "story-390-y1688"
+ },
+ {
+  "url": "/trending/the-election-commission-and-voter-roll-row-12e8b2",
+  "viewport": [
+   1440,
+   900
+  ],
+  "scrollY": 0,
+  "pageHeight": 408288,
+  "inViewport": {
+   "textElements": 101,
+   "controls": 28,
+   "pictures": 14,
+   "monoTextElements": 44,
+   "uppercaseTextElements": 4,
+   "pillsAndChips": 0,
+   "typeStyles": {
+    "Newsreader | 23px | 600 | normal | none": 2,
+    "Newsreader | 23px | 400 | normal | none": 2,
+    "Anek Latin | 14.5px | 600 | normal | none": 6,
+    "Geist Mono | 11px | 500 | normal | none": 1,
+    "Anek Latin | 13.5px | 600 | normal | none": 1,
+    "Anek Latin | 12px | 600 | normal | none": 1,
+    "Anek Latin | 12.5px | 600 | normal | none": 3,
+    "Geist Mono | 11.5px | 400 | normal | none": 28,
+    "Newsreader | 30px | 600 | normal | none": 1,
+    "Anek Latin | 16px | 400 | normal | none": 1,
+    "Geist Mono | 12px | 400 | normal | none": 1,
+    "Anek Latin | 13.5px | 500 | normal | none": 18,
+    "Geist Mono | 11px | 400 | normal | none": 12,
+    "Anek Latin | 15px | 500 | normal | none": 16,
+    "Anek Latin | 12.5px | 600 | normal | uppercase": 3,
+    "Anek Latin | 13px | 600 | normal | none": 1,
+    "Geist Mono | 12.5px | 400 | normal | none": 1,
+    "Anek Latin | 12.5px | 400 | normal | none": 2,
+    "Geist Mono | 12.5px | 600 | normal | uppercase": 1
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 16,
+    "rgb(91, 96, 105)": 49,
+    "rgb(63, 67, 74)": 32,
+    "rgb(11, 87, 208)": 2,
+    "rgb(247, 246, 242)": 2
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 1,
+    "rgb(255, 255, 255)": 29,
+    "rgb(17, 19, 23)": 65,
+    "rgb(142, 139, 130)": 3,
+    "rgb(223, 221, 214)": 1,
+    "rgb(247, 246, 242)": 7,
+    "rgb(30, 58, 110)": 2,
+    "rgb(196, 71, 15)": 2
+   },
+   "lineKinds": {
+    "solid 1px": 125,
+    "solid 2px": 37,
+    "solid 3px": 4
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "hidden lg:block glass sticky top-0 z-40 h-[var(--masthead)] border-b s",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 60,
+     "width": 1440,
+     "text": "readPrism.news Today Stories Pulse Watchlist / Plu"
+    },
+    {
+     "tag": "aside",
+     "cls": "grid min-w-0 content-start gap-6 self-end",
+     "position": "sticky",
+     "top": 92,
+     "visibleHeight": 808,
+     "width": 340,
+     "text": "SOURCES PER DAY Attention \u00b7 sources per day Table "
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 43942,
+   "lineKinds": {
+    "solid 1px": 22924,
+    "solid 2px": 81,
+    "solid 3px": 8
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "story-1440-y0"
+ },
+ {
+  "url": "/trending",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 0,
+  "pageHeight": 3804,
+  "inViewport": {
+   "textElements": 50,
+   "controls": 16,
+   "pictures": 12,
+   "monoTextElements": 21,
+   "uppercaseTextElements": 1,
+   "pillsAndChips": 0,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Geist Mono | 11px | 400 | normal | uppercase": 1,
+    "Newsreader | 23px | 600 | normal | none": 1,
+    "Anek Latin | 14.5px | 400 | normal | none": 1,
+    "Anek Latin | 13.5px | 500 | normal | none": 4,
+    "Geist Mono | 11.5px | 400 | normal | none": 20,
+    "Anek Latin | 12px | 600 | normal | none": 5,
+    "Anek Latin | 12.5px | 600 | normal | none": 5,
+    "Newsreader | 18px | 600 | normal | none": 5,
+    "Anek Latin | 11px | 500 | normal | none": 4,
+    "Anek Latin | 11px | 600 | normal | none": 1
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 8,
+    "rgb(91, 96, 105)": 28,
+    "rgb(247, 246, 242)": 6,
+    "rgb(63, 67, 74)": 8
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 2,
+    "rgb(17, 19, 23)": 6,
+    "rgb(255, 255, 255)": 3,
+    "rgb(142, 139, 130)": 10,
+    "rgb(63, 67, 74)": 4,
+    "rgb(11, 87, 208)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 23
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "p-masthead glass sticky top-0 z-30 -mx-[var(--gutter)] grid h-[var(--m",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news 00:51 IST"
+    },
+    {
+     "tag": "nav",
+     "cls": "glass fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidde",
+     "position": "fixed",
+     "top": 786,
+     "visibleHeight": 58,
+     "width": 390,
+     "text": "Today Stories Search Watchlist You"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 691,
+   "lineKinds": {
+    "solid 1px": 76,
+    "solid 2px": 1
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "stories-390-y0"
+ },
+ {
+  "url": "/search",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 0,
+  "pageHeight": 6854,
+  "inViewport": {
+   "textElements": 32,
+   "controls": 16,
+   "pictures": 13,
+   "monoTextElements": 8,
+   "uppercaseTextElements": 1,
+   "pillsAndChips": 0,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Geist Mono | 11px | 400 | normal | uppercase": 1,
+    "Anek Latin | 14px | 600 | normal | none": 1,
+    "Anek Latin | 13.5px | 600 | normal | none": 1,
+    "Newsreader | 23px | 600 | normal | none": 1,
+    "Geist Mono | 12px | 400 | normal | none": 1,
+    "Anek Latin | 13.5px | 500 | normal | none": 4,
+    "Anek Latin | 12.5px | 600 | normal | none": 3,
+    "Geist Mono | 11.5px | 400 | normal | none": 6,
+    "Newsreader | 18px | 600 | normal | none": 3,
+    "Anek Latin | 14.5px | 400 | normal | none": 3,
+    "Anek Latin | 11px | 500 | normal | none": 4,
+    "Anek Latin | 11px | 600 | normal | none": 1
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 7,
+    "rgb(91, 96, 105)": 14,
+    "rgb(63, 67, 74)": 10,
+    "rgb(247, 246, 242)": 1
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 4,
+    "rgb(255, 255, 255)": 11,
+    "rgb(17, 19, 23)": 1,
+    "rgb(142, 139, 130)": 4,
+    "rgb(238, 236, 230)": 2,
+    "rgb(30, 58, 110)": 1,
+    "rgb(196, 71, 15)": 1,
+    "rgb(11, 87, 208)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 26,
+    "solid 3px": 1,
+    "dashed 1px": 8,
+    "solid 2px": 16
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "header",
+     "cls": "p-masthead glass sticky top-0 z-30 -mx-[var(--gutter)] grid h-[var(--m",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news SEARCH"
+    },
+    {
+     "tag": "nav",
+     "cls": "glass fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t lg:hidde",
+     "position": "fixed",
+     "top": 786,
+     "visibleHeight": 58,
+     "width": 390,
+     "text": "Today Stories Search Watchlist You"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 905,
+   "lineKinds": {
+    "solid 1px": 100,
+    "solid 2px": 281,
+    "solid 3px": 1,
+    "dashed 1px": 71
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "search-390-y0"
+ },
+ {
+  "url": "/story/5cbb9bd5-9077-4917-8a2b-0efd0f30ed86",
+  "viewport": [
+   390,
+   844
+  ],
+  "scrollY": 0,
+  "pageHeight": 5266,
+  "inViewport": {
+   "textElements": 37,
+   "controls": 23,
+   "pictures": 29,
+   "monoTextElements": 8,
+   "uppercaseTextElements": 0,
+   "pillsAndChips": 6,
+   "typeStyles": {
+    "Newsreader | 19px | 600 | normal | none": 1,
+    "Newsreader | 19px | 400 | normal | none": 2,
+    "Anek Latin | 14px | 600 | normal | none": 5,
+    "Geist Mono | 11.5px | 400 | normal | none": 3,
+    "Anek Latin | 12.5px | 600 | normal | none": 3,
+    "Newsreader | 30px | 600 | normal | none": 1,
+    "Anek Latin | 13px | 500 | normal | none": 1,
+    "Anek Latin | 17px | 400 | normal | none": 1,
+    "Newsreader | 22px | 600 | normal | none": 3,
+    "Anek Latin | 12px | 500 | normal | none": 3,
+    "Geist Mono | 9.5px | 500 | normal | none": 1,
+    "Geist Mono | 12px | 400 | normal | none": 3,
+    "Anek Latin | 10.5px | 500 | normal | none": 6,
+    "Geist Mono | 11px | 400 | normal | none": 1,
+    "Anek Latin | 12.5px | 400 | normal | none": 1,
+    "Anek Latin | 14.5px | 600 | normal | none": 2
+   },
+   "textColours": {
+    "rgb(17, 19, 23)": 15,
+    "rgb(91, 96, 105)": 16,
+    "rgb(63, 67, 74)": 3,
+    "rgb(11, 87, 208)": 1,
+    "rgb(255, 255, 255)": 2
+   },
+   "fillColours": {
+    "color(srgb 0.968627 0.964706 0.94902 / 0.92)": 7,
+    "rgb(247, 246, 242)": 1,
+    "rgb(142, 139, 130)": 2,
+    "rgb(255, 255, 255)": 14,
+    "rgb(238, 236, 230)": 13,
+    "rgb(30, 58, 110)": 1,
+    "rgb(196, 71, 15)": 1,
+    "color(srgb 0.968627 0.964706 0.94902 / 0.88)": 3,
+    "color(srgb 0.968627 0.964706 0.94902 / 0.94)": 1,
+    "rgb(11, 87, 208)": 1
+   },
+   "lineKinds": {
+    "solid 1px": 18,
+    "solid 2px": 45
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 1,
+   "hatchedOrStriped": 0,
+   "gradients": 0,
+   "pinned": [
+    {
+     "tag": "div",
+     "cls": "sticky top-0 z-30 flex h-[var(--masthead)] items-center gap-2 border-b",
+     "position": "sticky",
+     "top": 0,
+     "visibleHeight": 52,
+     "width": 390,
+     "text": "readPrism.news"
+    },
+    {
+     "tag": "nav",
+     "cls": "sc-tabs sticky top-[var(--masthead)] z-[25] px-2 lg:hidden",
+     "position": "sticky",
+     "top": 52,
+     "visibleHeight": 44,
+     "width": 390,
+     "text": "Brief What changed Why it matters Coverage Ask"
+    },
+    {
+     "tag": "div",
+     "cls": "fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t px-3 pt-2.5 lg:hidde",
+     "position": "fixed",
+     "top": 779,
+     "visibleHeight": 65,
+     "width": 390,
+     "text": "Ask \u00b7 12 reports Share"
+    }
+   ]
+  },
+  "wholePage": {
+   "elements": 829,
+   "lineKinds": {
+    "solid 1px": 174,
+    "solid 2px": 155,
+    "solid 3px": 8
+   },
+   "svgDashedStrokes": 0,
+   "svgPatternFills": 4,
+   "hatchedOrStriped": 0
+  },
+  "name": "record-lens-390-y0"
+ }
+]
