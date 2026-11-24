@@ -36,9 +36,7 @@ async def _db_reachable() -> bool:
 async def _story(shape: list[tuple[int, int | None, bool]]):
     """Build a partition run whose story is `shape` = [(idx, parent_idx|None, off_spine)].
 
-    Tears itself down on exit. There is no test database here — DATABASE_URL is
-    the developer's own — so a test that inserts and walks away pollutes the dev
-    feed with fake developments. Worse, making a run 'current' requires retiring
+    Tears itself down on exit. Making a run 'current' requires retiring
     the existing one (partial-unique index), which detaches the real storylines
     the local trending page reads. Both get restored below.
     """

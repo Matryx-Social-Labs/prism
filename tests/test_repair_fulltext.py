@@ -6,13 +6,13 @@ fetch. An event founded by bad text and made mostly of it is dissolved; one that
 is mostly real reporting keeps its id and loses only the bad members.
 """
 
-import os
 import re
 import uuid
 
 import asyncpg
 import pytest
 
+from common.config import get_settings
 from tools.repair import apply_fulltext, report_fulltext
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
@@ -33,7 +33,7 @@ W = "[" + ",".join(["0", "1"] + ["0"] * 766) + "]"
 
 
 def _dsn() -> str:
-    return re.sub(r"^postgresql\+asyncpg://", "postgresql://", os.environ.get("DATABASE_URL", ""))
+    return re.sub(r"^postgresql\+asyncpg://", "postgresql://", get_settings().database_url)
 
 
 async def _connect():

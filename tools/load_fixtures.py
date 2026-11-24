@@ -90,8 +90,8 @@ def _refuse_non_local() -> None:
         raise SystemExit(
             f"refusing to load fixtures into {name!r}: that is the test database.\n"
             "pytest assumes it owns those tables, and fixture rows break tests that\n"
-            "count. Point DATABASE_URL at the dev database instead, e.g.\n"
-            "  DATABASE_URL=postgresql+asyncpg://prism:prism@localhost:5432/prism make seed"
+            "count. `make seed` loads into the DATABASE_URL that .env names; point that\n"
+            "at the dev database (scripts/workspace_setup.sh writes prism_<workspace>)."
         )
     if host in LOCAL_HOSTS:
         return

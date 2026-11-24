@@ -7,7 +7,7 @@
 # There was no task runner before this; every command was a hand-typed
 # `uv run ...`, which is how the CI job and the local habit drifted apart.
 
-.PHONY: help up down check lint fmt fmt-check test test-db web seed sweep score clean promote
+.PHONY: help up down check lint fmt fmt-check test test-db fresh-test-db web seed sweep score clean promote
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -33,39 +33,45 @@ fmt:  ## Apply formatting
 	uv run ruff check --fix .
 
 test:  ## Python tests. Skips DB tests if Postgres is absent.
+	-@$(MAKE) --no-print-directory fresh-test-db
 	uv run pytest -q
 
-test-db:  ## Python tests, FAILING (not skipping) if Postgres is absent.
+test-db: fresh-test-db  ## Python tests, FAILING (not skipping) if Postgres is absent.
 	PRISM_REQUIRE_DB=1 uv run pytest -q
 
 web:  ## Web tests + typecheck + build
 	cd web && npm test && npm run lint && npx tsc --noEmit && ./scripts/retry-next-font.sh npm run build && npm run check:guides && npm run check:charts
 
 # The workspace's test database (scripts/workspace_setup.sh writes it to .env).
-# `check` migrates and tests THAT database. Exported only when set (an empty
-# DATABASE_URL would reach pydantic as ""); the first line of `check` then
-# refuses anything that is not a _test database, before alembic can downgrade it.
+# The test targets migrate and test THAT database. Exported only when set (an
+# empty DATABASE_URL would reach pydantic as ""); `fresh-test-db` then refuses
+# anything that is not a _test database, before alembic can touch it.
 TEST_DATABASE_URL ?= $(shell sed -n 's/^TEST_DATABASE_URL=//p' .env 2>/dev/null | tail -1)
 ifneq ($(TEST_DATABASE_URL),)
-check: export DATABASE_URL = $(TEST_DATABASE_URL)
+check test test-db fresh-test-db: export DATABASE_URL = $(TEST_DATABASE_URL)
 endif
+
+# The suite is written for CI's empty database: it leaves 165 events a run, and
+# on about the fourth run against the same database tests/test_geo.py no longer
+# finds the rows it seeded. Every test target starts from here instead.
+fresh-test-db:  ## Drop, recreate and migrate the test database (what CI starts from)
+	@case "$$DATABASE_URL" in *_test) ;; *) \
+		echo "  refusing: DATABASE_URL is not a _test database (TEST_DATABASE_URL missing from .env?)."; \
+		echo "  Run: bash scripts/workspace_setup.sh"; exit 1;; esac
+	uv run python scripts/fresh_test_db.py
+	@test "$$(uv run alembic heads | wc -l | tr -d ' ')" = 1 \
+		|| { echo "  alembic did not report exactly one head:"; uv run alembic heads; exit 1; }
+	uv run alembic upgrade head
 
 # `fmt-check` is deliberately NOT part of `check`. The repo has never been
 # formatted: 87 of 151 files would change. Doing that mid-rebuild would bury
 # every real diff in whitespace and make review impossible. Land it as its own
 # commit at a clean boundary (after Phase 0), then add fmt-check to this target.
-check: lint  ## THE GATE — everything CI runs, plus a typecheck CI never did
-	@case "$$DATABASE_URL" in *_test) ;; *) \
-		echo "  check: refusing, DATABASE_URL is not a _test database (TEST_DATABASE_URL missing from .env?)."; \
-		echo "  Run: bash scripts/workspace_setup.sh"; exit 1;; esac
-	uv run python scripts/fresh_test_db.py
+check: lint fresh-test-db  ## THE GATE — everything CI runs, plus a typecheck CI never did
 	uv run python design/gen_css.py --check
 	uv run python -c "import api.main, worker.__main__, ingestion.runner, \
 classification.consumer, enrichment.consumer, correlation.consumer, \
 agent.rag, personalization.ranking, common.lenses"
-	@test "$$(uv run alembic heads | wc -l | tr -d ' ')" = 1 \
-		|| { echo "  alembic did not report exactly one head:"; uv run alembic heads; exit 1; }
-	uv run alembic upgrade head
 	uv run alembic downgrade -1
 	uv run alembic upgrade head
 	PRISM_REQUIRE_DB=1 uv run pytest -q
