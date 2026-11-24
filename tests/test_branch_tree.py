@@ -37,8 +37,8 @@ async def _story(shape: list[tuple[int, int | None, bool]]):
     """Build a partition run whose story is `shape` = [(idx, parent_idx|None, off_spine)].
 
     Tears itself down on exit. Making a run 'current' requires retiring
-    the existing one (partial-unique index), which detaches the real storylines
-    the local trending page reads. Both get restored below.
+    the existing one (partial-unique index), which would detach any storyline
+    another test left current; the old run is restored below.
     """
     ids = [uuid.uuid4() for _ in shape]
     run_id = uuid.uuid4()
@@ -80,7 +80,7 @@ async def _story(shape: list[tuple[int, int | None, bool]]):
                 text("DELETE FROM events WHERE id = ANY(CAST(:e AS uuid[]))"),
                 {"e": [str(i) for i in ids]},
             )
-            if prior:  # hand the dev's real storylines back
+            if prior:  # hand the earlier current run back
                 await s.execute(
                     text("UPDATE partition_runs SET status='current' WHERE id = :p"),
                     {"p": str(prior)},

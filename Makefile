@@ -32,11 +32,12 @@ fmt:  ## Apply formatting
 	uv run ruff format .
 	uv run ruff check --fix .
 
-test:  ## Python tests. Skips DB tests if Postgres is absent.
-	-@$(MAKE) --no-print-directory fresh-test-db
+# Both DROP and recreate the test database first: one run at a time per
+# checkout. With no Postgres at all, `uv run pytest -q` still skips the DB tests.
+test: fresh-test-db  ## Python tests on a fresh test database
 	uv run pytest -q
 
-test-db: fresh-test-db  ## Python tests, FAILING (not skipping) if Postgres is absent.
+test-db: fresh-test-db  ## The same, and a DB test that cannot reach the database FAILS instead of skipping
 	PRISM_REQUIRE_DB=1 uv run pytest -q
 
 web:  ## Web tests + typecheck + build
@@ -58,9 +59,9 @@ fresh-test-db:  ## Drop, recreate and migrate the test database (what CI starts 
 	@case "$$DATABASE_URL" in *_test) ;; *) \
 		echo "  refusing: DATABASE_URL is not a _test database (TEST_DATABASE_URL missing from .env?)."; \
 		echo "  Run: bash scripts/workspace_setup.sh"; exit 1;; esac
-	uv run python scripts/fresh_test_db.py
 	@test "$$(uv run alembic heads | wc -l | tr -d ' ')" = 1 \
 		|| { echo "  alembic did not report exactly one head:"; uv run alembic heads; exit 1; }
+	uv run python scripts/fresh_test_db.py
 	uv run alembic upgrade head
 
 # `fmt-check` is deliberately NOT part of `check`. The repo has never been
