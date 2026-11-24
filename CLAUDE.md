@@ -17,16 +17,23 @@ Core rules worth restating (the system is Design System v2, 2026-09-24, from the
 - The signature motion is the lens flip (scan line + re-ink, paced by block height, reduced-motion = instant swap). Never a crossfade. Rows print in; publisher photos fade in (320ms); the story's photo deck advances with a 5° tilt.
 - Routing: `/` is the landing for a first visitor and redirects returning readers (cookie `prism.returning`) to `/feed`, which is always the chart; `/about` is the landing's permanent address.
 
+## Programme
+Work is organised in `~/prism-program/`; read its `STATE.md` first. One task per workspace,
+on its own branch; pull requests go to `dev`. A new workspace is prepared by
+`bash scripts/workspace_setup.sh`: it gets its own databases (`prism_<workspace>` and
+`prism_<workspace>_test`), its own Redis container, and no model keys.
+
 ## Web tests
 The Next.js app has a test suite as of v0.0.70.0: `cd web && npm test` (vitest + jsdom +
 Testing Library; `npm run test:watch` while iterating). Tests live beside the code as
 `web/src/**/*.test.ts(x)`, config in `web/vitest.config.ts`, jsdom shims in
 `web/vitest.setup.ts`. CI runs it in the `web` job, so a failing test blocks the PR.
-Backend tests: `uv run pytest -q`. As of v0.0.72.0 the suite hard-exits (code 2, not a skip)
-if `DATABASE_URL` points anywhere but `localhost`/`127.0.0.1`/`db`/`postgres` or a `*_test`
-database — the DB tests insert events and supersede partition runs, and this repo reaches prod
+Backend tests: `uv run pytest -q`. The suite runs on `TEST_DATABASE_URL` when it is set (in
+the environment or `.env`) and hard-exits (code 2, not a skip) unless the database name ends
+in `_test`. The DB tests insert events and supersede partition runs, and this repo reaches prod
 over the Railway proxy for admin queries, so a leftover exported URL was a live path to
-corrupting production. Guard is `tests/conftest.py`.
+corrupting production; a local host alone is not enough either, because that is how the shared
+dev database filled with fixture rows. Guard is `tests/conftest.py`.
 
 Two jsdom traps that make a test pass without testing anything — both cost real debugging
 time here, so check for them when writing or reviewing web tests:
