@@ -39,7 +39,7 @@ else
   # pick another after a restart; re-run this script to refresh REDIS_URL.
   docker run -d --name "$redis_container" --restart unless-stopped \
     -p "127.0.0.1:${CONDUCTOR_PORT:+$((CONDUCTOR_PORT + 9))}:6379" redis:7-alpine >/dev/null \
-    || { docker rm -fv "$redis_container" >/dev/null 2>&1; exit 1; }  # a failed run leaves a dead container that blocks the next one
+    || { docker rm -fv "$redis_container" >/dev/null 2>&1; false; }  # a failed run leaves a dead container that blocks the next one
 fi
 redis_port=$(docker port "$redis_container" 6379/tcp | head -1 | sed 's/.*://')
 echo "redis: $redis_container on port $redis_port"
