@@ -1,0 +1,423 @@
+[
+ {
+  "url": "/feed",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 20,
+  "targetsUnder44": 7,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "For you \u00b7 pick subjects \u2192",
+    "w": 161,
+    "h": 32
+   },
+   {
+    "label": "All stories 60",
+    "w": 105,
+    "h": 36
+   },
+   {
+    "label": "Politics 16",
+    "w": 90,
+    "h": 36
+   },
+   {
+    "label": "Business & Markets 7",
+    "w": 154,
+    "h": 36
+   },
+   {
+    "label": "Sports 4",
+    "w": 81,
+    "h": 36
+   },
+   {
+    "label": "Has a professional read",
+    "w": 168,
+    "h": 32
+   }
+  ],
+  "textElements": 39,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 9.5,
+  "textUnder12px": 19,
+  "name": "today-390"
+ },
+ {
+  "url": "/story/dc071020-88ec-4816-bb35-52431b5ec6b3",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 25,
+  "targetsUnder44": 4,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "Elections",
+    "w": 51,
+    "h": 16
+   },
+   {
+    "label": "Uttar Pradesh",
+    "w": 100,
+    "h": 18
+   },
+   {
+    "label": "Congress",
+    "w": 65,
+    "h": 18
+   }
+  ],
+  "textElements": 39,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 10.5,
+  "textUnder12px": 11,
+  "name": "record-390"
+ },
+ {
+  "url": "/trending/the-election-commission-and-voter-roll-row-12e8b2",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 14,
+  "targetsUnder44": 13,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "All 5695",
+    "w": 79,
+    "h": 36
+   },
+   {
+    "label": "The event 1969",
+    "w": 121,
+    "h": 36
+   },
+   {
+    "label": "Investigation 562",
+    "w": 132,
+    "h": 36
+   },
+   {
+    "label": "Response 825",
+    "w": 113,
+    "h": 36
+   },
+   {
+    "label": "Diplomacy 47",
+    "w": 109,
+    "h": 36
+   },
+   {
+    "label": "People 19",
+    "w": 89,
+    "h": 36
+   },
+   {
+    "label": "Reactions 718",
+    "w": 113,
+    "h": 36
+   },
+   {
+    "label": "Politics 1418",
+    "w": 106,
+    "h": 36
+   },
+   {
+    "label": "Impact 125",
+    "w": 97,
+    "h": 36
+   },
+   {
+    "label": "Explainers 12",
+    "w": 110,
+    "h": 36
+   },
+   {
+    "label": "Long queues at Delhi SIR centers cause l",
+    "w": 260,
+    "h": 42
+   },
+   {
+    "label": "Background of Election Commissioners Suk",
+    "w": 260,
+    "h": 42
+   }
+  ],
+  "textElements": 47,
+  "textUnderAA": 1,
+  "textUnderAAList": [
+   {
+    "text": "5695",
+    "px": 11.5,
+    "ratio": 2.94,
+    "need": 4.5,
+    "overImage": false
+   }
+  ],
+  "smallestTextPx": 11,
+  "textUnder12px": 17,
+  "name": "story-390"
+ },
+ {
+  "url": "/trending",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 16,
+  "targetsUnder44": 5,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "All stories",
+    "w": 86,
+    "h": 36
+   },
+   {
+    "label": "Politics",
+    "w": 71,
+    "h": 36
+   },
+   {
+    "label": "Business & Markets",
+    "w": 141,
+    "h": 36
+   },
+   {
+    "label": "Sports",
+    "w": 68,
+    "h": 36
+   }
+  ],
+  "textElements": 50,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 11,
+  "textUnder12px": 26,
+  "name": "stories-390"
+ },
+ {
+  "url": "/search",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 16,
+  "targetsUnder44": 6,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "Clear",
+    "w": 55,
+    "h": 36
+   },
+   {
+    "label": "All stories",
+    "w": 86,
+    "h": 36
+   },
+   {
+    "label": "Politics",
+    "w": 71,
+    "h": 36
+   },
+   {
+    "label": "Business & Markets",
+    "w": 141,
+    "h": 36
+   },
+   {
+    "label": "Sports",
+    "w": 68,
+    "h": 36
+   }
+  ],
+  "textElements": 30,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 11,
+  "textUnder12px": 11,
+  "name": "search-390"
+ },
+ {
+  "url": "/you",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 12,
+  "targetsUnder44": 3,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "Choose subjects",
+    "w": 120,
+    "h": 36
+   },
+   {
+    "label": "Sign in",
+    "w": 65,
+    "h": 36
+   }
+  ],
+  "textElements": 25,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 11,
+  "textUnder12px": 7,
+  "name": "you-390"
+ },
+ {
+  "url": "/plus",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 4,
+  "targetsUnder44": 3,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "Monthly",
+    "w": 76,
+    "h": 38
+   },
+   {
+    "label": "Yearly save \u20b9589",
+    "w": 129,
+    "h": 38
+   }
+  ],
+  "textElements": 24,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 11,
+  "textUnder12px": 2,
+  "name": "plus-390"
+ },
+ {
+  "url": "/feed",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 20,
+  "targetsUnder44": 7,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "For you \u00b7 pick subjects \u2192",
+    "w": 161,
+    "h": 32
+   },
+   {
+    "label": "All stories 60",
+    "w": 105,
+    "h": 36
+   },
+   {
+    "label": "Politics 14",
+    "w": 90,
+    "h": 36
+   },
+   {
+    "label": "Business & Markets 8",
+    "w": 154,
+    "h": 36
+   },
+   {
+    "label": "Sports 3",
+    "w": 81,
+    "h": 36
+   },
+   {
+    "label": "Has a professional read",
+    "w": 168,
+    "h": 32
+   }
+  ],
+  "textElements": 39,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 9.5,
+  "textUnder12px": 19,
+  "name": "today-390-dark"
+ },
+ {
+  "url": "/story/dc071020-88ec-4816-bb35-52431b5ec6b3",
+  "viewport": [
+   390,
+   844
+  ],
+  "controls": 25,
+  "targetsUnder44": 4,
+  "targetsUnder44List": [
+   {
+    "label": "readPrism.news",
+    "w": 150,
+    "h": 20
+   },
+   {
+    "label": "Elections",
+    "w": 51,
+    "h": 16
+   },
+   {
+    "label": "Uttar Pradesh",
+    "w": 100,
+    "h": 18
+   },
+   {
+    "label": "Congress",
+    "w": 65,
+    "h": 18
+   }
+  ],
+  "textElements": 40,
+  "textUnderAA": 0,
+  "textUnderAAList": [],
+  "smallestTextPx": 10.5,
+  "textUnder12px": 12,
+  "name": "record-390-dark"
+ }
+]
