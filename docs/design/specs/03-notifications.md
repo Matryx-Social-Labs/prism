@@ -90,7 +90,17 @@ In order:
 | Could not load / save | `Your notification settings could not load.` with `Try again` / under the changed row, `That did not save. Try again.` and the control returns to what it was. |
 | Signed out | Everything works on this device; under the section: `Sign in to use the same settings on every device.` |
 
-## Copy rules
+## States
+
+| State | Where it is specified |
+|---|---|
+| Empty | Settings · `Per story` with no follows; the sheet · nothing real to show in `What one looks like` |
+| Loading | The sheet · Busy; settings · Loading |
+| Error | The sheet · Could not save, Blocked, Cannot notify; settings · Could not load / save |
+| Signed out | The sheet · Cannot notify and Email sent for confirmation; settings · Signed out |
+| At the free limit | Not applicable: notifications are not metered. Alerts through a closer reading are a Plus feature (D-17) and get their own row when they exist; nothing here is locked. |
+
+## Copy
 
 - A notification's own text is not written here: T-036 builds it from a headline and counts. This spec's
   sentences describe it and must stay true to it — if the policy changes (the cap, the hours, the two-outlet

@@ -95,7 +95,7 @@ only prose, and each is either an outlet's or Prism's labelled headline (D-18).
 |---|---|---|---|
 | Column | full width, gutter 16 | 640 beside the rail | 640 + the evidence rail 320, gap 48 |
 | Stats | four in a row; 2 × 2 below 420 | four in a row | four in a row |
-| Actions | a row under `Began`; Follow first | same | at the right of the h1's row; the h1 keeps at least 60% of the column |
+| Actions | a row under `Began`; Follow first | same | at the right end of the meta line's row, above the h1; the h1 keeps the full column |
 | Who reported it | the button, opening a bottom sheet | the button, opening a dialog | the evidence rail, open; no button |
 | First viewport at 390 × 740 | the name (up to three lines), the stats, the bar and the start of `Latest` are above the fold; a name longer than three lines pushes `Latest` down and that is accepted | | |
 

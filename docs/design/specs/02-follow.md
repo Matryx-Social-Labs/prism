@@ -120,6 +120,31 @@ Content, in order:
 | At the limit | The count reads `5 of 5 stories`; nothing else changes until a sixth follow is tried. |
 | A followed story that has ended or merged | It stays in `Nothing new` under its current name; a merged story opens its successor. Nothing is removed silently. |
 
+## States
+
+Every state is in the table of the part it belongs to. The five every spec must name:
+
+| State | Where it is specified |
+|---|---|
+| Empty | The Following tab · "Nothing followed yet" and "Followed, nothing moved"; "New since you read" · first visit |
+| Loading | The control · Busy; the Following tab · Loading |
+| Error | The control · Could not save; the Following tab · Could not load |
+| Signed out | "After the press" · Followed, signed out; the Following tab · Signed out |
+| At the free limit | "The free limit" (both forms: Plus on sale, Plus not on sale) |
+
+## Copy
+
+Every string is given where it appears above. Names for assistive technology:
+
+| Where | String |
+|---|---|
+| The control | `Follow {story}` · `Following {story}` |
+| The sheet's close button | `Close` |
+| The alerts switch | `Alerts for this story` |
+| The limit sheet's segments | `5 of 5 stories followed` |
+
+"Follow" is the only verb: never "subscribe", "track", "save" or "watch". The destination is `Following`.
+
 ## Layout
 
 | | Compact < 600 | Medium 600–1023 | Expanded ≥ 1024 |

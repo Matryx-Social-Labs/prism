@@ -105,7 +105,7 @@ review write the real ones. Rules for the catalogue that follow from this spec:
 | Column | full width, gutter 16 | 640 centred | 640 centred |
 | Question 1 | cells side by side, equal width, min-height 64 | same | same |
 | Question 2 grid | 2 columns, gap 8, cells min-height 64 | 3 columns | 4 columns |
-| Footer bar | fixed, paper with a hairline top; the primary full width, `Skip for now` under it; the grid has bottom padding equal to the bar so the last row is never covered | fixed; buttons side by side at the column's right | same |
+| Footer bar | fixed, paper with a hairline top; the primary takes the free width with `Skip for now` beside it, and the two stack (primary first) when the labels do not fit on one line; the grid has bottom padding equal to the bar so the last row is never covered | fixed; buttons side by side at the column's right | same |
 | `/you` rows | value under the label | value at the right | value at the right |
 
 With 13 languages the grid is seven rows on a phone and scrolls a little under question 1; the footer bar
