@@ -40,8 +40,7 @@ def _n(i: str, actors: dict | None = None, srcs: int = 1) -> Node:
 async def _events(titles: list[str]):
     """Insert throwaway events and remove them again.
 
-    DATABASE_URL here is the developer's own database — there is no separate test
-    DB — so events left behind show up as fake developments in the local feed.
+    Events left behind are read by later tests in the same run.
     """
     ids = [uuid.uuid4() for _ in titles]
     async with session_scope() as s:

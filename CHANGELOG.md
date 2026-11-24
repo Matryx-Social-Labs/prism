@@ -3,6 +3,16 @@
 All notable changes to Prism are documented here.
 Format: [MAJOR.MINOR.PATCH.MICRO] — dated YYYY-MM-DD.
 
+## [0.0.137.4] - 2026-11-25
+
+### Changed — every `make` test target starts from an empty test database (developer tooling)
+- `make test` and `make test-db` now drop, recreate and migrate the test database first, through the
+  same `fresh-test-db` target `make check` uses. The suite leaves 165 events a run, and on about the
+  fourth run against one database a feed test could not find the rows it had seeded; five runs in a
+  row are now green (1,435 passed each). The single-head check runs before anything is dropped.
+- Comments in six test files and two messages in `tools/load_fixtures.py` still described the time
+  before a test database existed; they are corrected.
+
 ## [0.0.137.3] - 2026-11-25
 
 ### Added — behaviour specs for six surfaces not yet built (documents only; no reader-facing change)

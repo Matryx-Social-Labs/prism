@@ -39,8 +39,7 @@ async def _cleanup():
     connection down across loops — which surfaces as an unrelated-looking
     "attached to a different loop" error at teardown, not as a failing test.
 
-    These tests run against the developer's own database — there is no separate
-    test DB — so rows left behind are not merely untidy: test_personalization
+    Every test in a run shares one database, so rows left behind are not merely untidy: test_personalization
     asserts over the whole `events` table and started failing on ordering when
     this module seeded events and walked away. A test that breaks another test
     is a broken test.

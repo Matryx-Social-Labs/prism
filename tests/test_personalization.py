@@ -42,9 +42,8 @@ async def _cyber_corpus(records: int = 200):
 
     Records are stamped NEWER than the news, which is the production shape — NVD
     re-scans and re-stamps thousands of rows a day, so raw records are
-    permanently "latest". Everything is deleted again on exit: DATABASE_URL is
-    the developer's own database, there is no test DB, and rows left behind show
-    up as fake stories in the local feed.
+    permanently "latest". Everything is deleted again on exit, so later tests in
+    the same run do not read these rows.
     """
     record_ids = [uuid.uuid4() for _ in range(records)]
     news_ids = {shape: uuid.uuid4() for shape in _NEWS_SHAPES}

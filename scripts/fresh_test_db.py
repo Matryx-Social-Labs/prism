@@ -2,8 +2,9 @@
 
 The suite is written for CI's empty database: every run leaves ~165 events
 behind, and by the fourth run on the same database tests that read one feed
-page (tests/test_geo.py) no longer find the rows they seeded. `make check` runs
-this first, so the gate sees what CI sees however long the workspace has lived.
+page (tests/test_geo.py) no longer find the rows they seeded. The Makefile's
+test targets (`check`, `test`, `test-db`) run this first, so they see what CI
+sees however long the workspace has lived.
 """
 
 import asyncio
