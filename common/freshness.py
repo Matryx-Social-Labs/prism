@@ -6,6 +6,8 @@ called by ``/healthz``: observability may be unavailable, but must never make
 the API unavailable.
 """
 
+import asyncio
+import time
 from datetime import datetime
 from typing import Any
 
@@ -238,6 +240,38 @@ def _latency(row: Any, prefix: str, samples: int) -> dict[str, int | float | Non
     }
 
 
+def _clamped(window_hours: int) -> int:
+    return max(MIN_WINDOW_HOURS, min(MAX_WINDOW_HOURS, int(window_hours)))
+
+
+# /healthz reads freshness from here: the query scans whole tables, and a probe
+# every few seconds must not be able to pile copies onto a struggling database.
+CACHE_TTL_S = 60
+_cache: dict[int, tuple[float, dict[str, Any]]] = {}
+_cache_lock = asyncio.Lock()
+
+
+def reset_cache() -> None:
+    """Forget every cached result (tests: each runs on its own event loop)."""
+    global _cache_lock
+    _cache.clear()
+    _cache_lock = asyncio.Lock()
+
+
+async def cached(db: AsyncSession, *, window_hours: int = WINDOW_HOURS) -> dict[str, Any]:
+    """`pipeline_freshness`, at most once a minute per window in this process.
+    The "unavailable" answer is cached too: that is when a re-run hurts most."""
+    window_hours = _clamped(window_hours)
+    # ponytail: one lock for all windows; probes ask for one window in practice.
+    async with _cache_lock:
+        hit = _cache.get(window_hours)
+        if hit is not None and time.monotonic() - hit[0] < CACHE_TTL_S:
+            return hit[1]
+        result = await pipeline_freshness(db, window_hours=window_hours)
+        _cache[window_hours] = (time.monotonic(), result)
+        return result
+
+
 async def pipeline_freshness(
     db: AsyncSession,
     *,
@@ -254,7 +288,7 @@ async def pipeline_freshness(
     ``newest_observed_at`` then says since when. It is telemetry, not
     liveness: ``/healthz`` still answers "ok" on a paused pipeline.
     """
-    window_hours = max(MIN_WINDOW_HOURS, min(MAX_WINDOW_HOURS, int(window_hours)))
+    window_hours = _clamped(window_hours)
     try:
         result = await db.execute(_FRESHNESS_SQL, {"window_hours": window_hours})
         row = result.mappings().one()

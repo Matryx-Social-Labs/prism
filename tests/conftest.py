@@ -85,6 +85,16 @@ async def _dispose_engine_between_tests():
         await engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_freshness_cache():
+    """/healthz caches freshness for a minute per process; every test starts
+    without one (and with a lock not bound to an earlier test's loop)."""
+    from common import freshness
+
+    freshness.reset_cache()
+    yield
+
+
 # --- PRISM_REQUIRE_DB: make skip-as-pass impossible in CI ---------------------
 
 

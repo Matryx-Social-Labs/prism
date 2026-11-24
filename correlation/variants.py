@@ -48,7 +48,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 
 from common.config import get_settings
-from common.db import session_scope
+from common.db import server_settings, session_scope
 from common.decisions import Noul, NoulAnswer, decide
 from common.logging import get_logger
 from correlation import entity_fold
@@ -230,7 +230,7 @@ async def connect():
     import asyncpg
 
     url = re.sub(r"^postgres(ql)?(\+asyncpg)?://", "postgresql://", get_settings().database_url)
-    return await asyncpg.connect(url, timeout=10)
+    return await asyncpg.connect(url, timeout=10, server_settings=server_settings())
 
 
 # The record's live cast of the types that fold, and which of it this article named.

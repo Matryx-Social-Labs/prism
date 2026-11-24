@@ -111,6 +111,58 @@ async def backlog() -> dict[str, dict[str, int]]:
     return out
 
 
+_PAGE = 1000  # entries per Redis call in unacked_raw_item_ids
+
+
+def _raw_item_id(fields: dict) -> str | None:
+    try:
+        raw_item_id = json.loads(fields["data"])["raw_item_id"]
+    except (KeyError, TypeError, ValueError):
+        return None
+    return str(raw_item_id) if raw_item_id else None
+
+
+async def _ids_after(r, topic: str, start: str) -> set[str]:
+    """raw_item_ids of every entry after `start` (exclusive), page by page."""
+    out: set[str] = set()
+    while True:
+        page = await r.xrange(topic, min=f"({start}", max="+", count=_PAGE)
+        out |= {i for _, fields in page if (i := _raw_item_id(fields))}
+        if len(page) < _PAGE:
+            return out
+        start = page[-1][0]
+
+
+async def _ids_pending(r, topic: str, group: str) -> set[str]:
+    """raw_item_ids of the entries `group` was handed and has not acked."""
+    out: set[str] = set()
+    start = "-"
+    while True:
+        rows = await r.xpending_range(topic, group, min=start, max="+", count=_PAGE)
+        pipe = r.pipeline(transaction=False)
+        for row in rows:
+            pipe.xrange(topic, min=row["message_id"], max=row["message_id"], count=1)
+        for found in await pipe.execute() if rows else []:
+            out |= {i for _, fields in found if (i := _raw_item_id(fields))}
+        if len(rows) < _PAGE:
+            return out
+        start = f"({rows[-1]['message_id']}"
+
+
+async def unacked_raw_item_ids(topic: str, group: str) -> set[str]:
+    """The raw_item_id of every entry of `topic` that `group` has not acked:
+    handed out and pending, or never handed out at all. Raises when Redis cannot
+    answer; the caller decides what not knowing means."""
+    r = get_redis()
+    if not await r.exists(topic):
+        return set()
+    groups = await r.xinfo_groups(topic)
+    info = next((g for g in groups if str(g.get("name")) == group), None)
+    if info is None:  # nothing has consumed this topic yet
+        return await _ids_after(r, topic, "0-0")
+    return await _ids_pending(r, topic, group) | await _ids_after(r, topic, str(info["last-delivered-id"]))
+
+
 async def publish(topic: str, message: dict) -> str:
     """Publish a JSON message to a topic. Returns the stream entry id."""
     r = get_redis()
@@ -373,8 +425,30 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
     await r.xack(topic, group, entry_id)
 
 
+QUERY_CANCELED = "57014"  # statement_timeout (or a cancel) fired
+LOCK_NOT_AVAILABLE = "55P03"  # lock_timeout fired
+
+
+def sqlstate_in_chain(exc: BaseException | None, codes: set[str]) -> bool:
+    """Whether a Postgres error with one of these SQLSTATEs is anywhere in the
+    chain. asyncpg errors and SQLAlchemy's asyncpg adapter both carry `.sqlstate`;
+    SQLAlchemy raises its DBAPIError from the adapter, so `__cause__` reaches it."""
+    seen: set[int] = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if getattr(exc, "sqlstate", None) in codes:
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
 def _is_transient(exc: BaseException | None) -> bool:
-    """Connection-level failures anywhere in the exception chain."""
+    """Connection-level failures anywhere in the exception chain, and a statement
+    cancelled by statement_timeout or lock_timeout: that is the database being
+    busy, not the message being bad, and three dead letters fail an article for
+    good (ingestion/runner._given_up)."""
+    if sqlstate_in_chain(exc, {QUERY_CANCELED, LOCK_NOT_AVAILABLE}):
+        return True
     seen: set[int] = set()
     while exc is not None and id(exc) not in seen:
         seen.add(id(exc))

@@ -1,3 +1,5 @@
+import os
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -8,13 +10,57 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from common import timings
 from common.config import get_settings
+from common.logging import get_logger
+from common.stream import QUERY_CANCELED, sqlstate_in_chain
+
+logger = get_logger(__name__)
 
 # Longest any one statement may run inside an API request.
 API_STATEMENT_TIMEOUT = "30s"
+# The worker's default (PRISM_WORKER_STATEMENT_TIMEOUT overrides; 0 = off). No
+# worker statement has a measured duration near it; it exists so that none can
+# run unbounded, as the API's could until 2026-10-16.
+WORKER_STATEMENT_TIMEOUT = "120s"
+# A migration that cannot get its lock in this long fails the deploy instead of
+# queueing every reader behind its DDL (PRISM_MIGRATION_LOCK_TIMEOUT overrides).
+MIGRATION_LOCK_TIMEOUT = "5s"
+# `SET` takes no bind parameters, so every value is checked before it is spliced.
+_DURATION = re.compile(r"\d+(ms|s|min|h)?")
 
 _engine = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
+# None until the worker sets it at startup; the API and tools/ never do.
+_default_statement_timeout: str | None = None
+
+
+def _duration(value: str) -> str:
+    if not isinstance(value, str) or not _DURATION.fullmatch(value):
+        raise ValueError(f"not a Postgres duration: {value!r}")
+    return value
+
+
+def set_default_statement_timeout(value: str | None) -> None:
+    """The statement_timeout every connection of this process starts with."""
+    global _default_statement_timeout
+    if _engine is not None:
+        raise RuntimeError("set the default statement timeout before the engine exists")
+    _default_statement_timeout = None if value is None else _duration(value)
+
+
+def server_settings() -> dict[str, str]:
+    """asyncpg startup settings carrying the process default, for any connection
+    this process opens (the pool, and correlation/variants' own)."""
+    if _default_statement_timeout is None:
+        return {}
+    return {"statement_timeout": _default_statement_timeout}
+
+
+def migration_connect_args() -> dict:
+    """connect_args for alembic's engine (db/env.py)."""
+    timeout = os.environ.get("PRISM_MIGRATION_LOCK_TIMEOUT", MIGRATION_LOCK_TIMEOUT)
+    return {"server_settings": {"lock_timeout": _duration(timeout)}}
 
 
 def get_engine():
@@ -27,6 +73,9 @@ def get_engine():
             pool_pre_ping=True,
             pool_size=20,
             max_overflow=20,
+            # A startup setting, so every pooled connection carries it with no
+            # per-transaction round trip; SET LOCAL still overrides it.
+            connect_args={"server_settings": server_settings()},
         )
     return _engine
 
@@ -39,14 +88,23 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 @asynccontextmanager
-async def session_scope() -> AsyncIterator[AsyncSession]:
-    """Transactional scope: commits on success, rolls back on error."""
+async def session_scope(statement_timeout: str | None = None) -> AsyncIterator[AsyncSession]:
+    """Transactional scope: commits on success, rolls back on error.
+
+    `statement_timeout` overrides the process default for this transaction only
+    (a caller that commits mid-scope loses it with the transaction)."""
+    override = None if statement_timeout is None else _duration(statement_timeout)
     async with get_session_factory()() as session:
         try:
+            if override is not None:
+                await session.execute(text(f"SET LOCAL statement_timeout = '{override}'"))
             yield session
             await session.commit()
-        except Exception:
+        except Exception as exc:
             await session.rollback()
+            if sqlstate_in_chain(exc, {QUERY_CANCELED}):
+                logger.warning("statement_timeout_hit", error=str(exc)[:200])
+                await timings.count("db.statement_timeout")
             raise
 
 
