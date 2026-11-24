@@ -77,9 +77,63 @@ async def requeue_stalled(limit: int = 500) -> int:
     stopped the pipeline mid-flight (audit H9).
 
     An item that dead-lettered MAX_PERMANENT_FAILURES times is given up
-    instead (_given_up): it was paid for each time and would be forever.
+    instead (_given_up): it was paid for each time and would be forever. One
+    still unacked on its topic is skipped (_still_queued): it is waiting its
+    turn, and another copy would be paid for twice.
     """
-    requeued = 0
+    pending, unenriched, uncorrelated = await _stalled(limit)
+    # Skipped BEFORE _given_up: an item still queued has not failed again, and
+    # its queued copy is the attempt that decides whether it does.
+    pending, unenriched, uncorrelated, skipped = await _still_queued(pending, unenriched, uncorrelated)
+    spent = await _given_up([*pending, *unenriched, *(row["raw_item_id"] for row in uncorrelated)])
+    pending = [i for i in pending if str(i) not in spent]
+    unenriched = [i for i in unenriched if str(i) not in spent]
+    uncorrelated = [row for row in uncorrelated if str(row["raw_item_id"]) not in spent]
+
+    messages = [
+        *((stream.RAW_ITEMS, RawItemMessage(raw_item_id=str(i))) for i in pending),
+        *((stream.CLASSIFIED_ITEMS, ClassifiedItemMessage(raw_item_id=str(i))) for i in unenriched),
+        *((stream.ENRICHED_ITEMS, EnrichedItemMessage(
+            raw_item_id=str(row["raw_item_id"]),
+            article_id=str(row["article_id"]),
+            enrichment_id=str(row["enrichment_id"]),
+        )) for row in uncorrelated),
+    ]
+    for topic, message in messages:
+        await stream.publish(topic, message.model_dump())
+    requeued = len(messages)
+    if requeued or skipped:
+        logger.info(
+            "requeued_stalled",
+            pending=len(pending),
+            unenriched=len(unenriched),
+            uncorrelated=len(uncorrelated),
+            skipped_still_queued=skipped,
+        )
+    return requeued
+
+
+async def _still_queued(pending: list, unenriched: list, uncorrelated: list) -> tuple[list, list, list, int]:
+    """Drop the items still unacked on the topic their next stage reads. When
+    Redis cannot say, drop nothing: every handler is idempotent, and a duplicate
+    costs less than an item never recovered."""
+    stalled = {stream.RAW_ITEMS: pending, stream.CLASSIFIED_ITEMS: unenriched, stream.ENRICHED_ITEMS: uncorrelated}
+    try:  # only the topics with something stalled: nothing stalled, no Redis read
+        queued = {t: await stream.unacked_raw_item_ids(t, g) if stalled[t] else set() for t, g in stream.TOPIC_GROUPS}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("queued_items_unknown", error=str(exc)[:160])
+        return pending, unenriched, uncorrelated, 0
+    kept = (
+        [i for i in pending if str(i) not in queued[stream.RAW_ITEMS]],
+        [i for i in unenriched if str(i) not in queued[stream.CLASSIFIED_ITEMS]],
+        [row for row in uncorrelated if str(row["raw_item_id"]) not in queued[stream.ENRICHED_ITEMS]],
+    )
+    skipped = len(pending) + len(unenriched) + len(uncorrelated) - sum(map(len, kept))
+    return *kept, skipped
+
+
+async def _stalled(limit: int) -> tuple[list, list, list]:
+    """The three kinds of stalled item, oldest first, `limit` of each."""
     async with session_scope() as session:
         # Only items older than 20 minutes: fresh ones are still in-flight
         # on the stream from their original publish.
@@ -134,38 +188,7 @@ async def requeue_stalled(limit: int = 500) -> int:
                 {"limit": limit},
             )
         ).mappings().all()
-
-    spent = await _given_up([*pending, *unenriched, *(row["raw_item_id"] for row in uncorrelated)])
-    pending = [i for i in pending if str(i) not in spent]
-    unenriched = [i for i in unenriched if str(i) not in spent]
-    uncorrelated = [row for row in uncorrelated if str(row["raw_item_id"]) not in spent]
-
-    for raw_id in pending:
-        await stream.publish(stream.RAW_ITEMS, RawItemMessage(raw_item_id=str(raw_id)).model_dump())
-        requeued += 1
-    for raw_id in unenriched:
-        await stream.publish(
-            stream.CLASSIFIED_ITEMS, ClassifiedItemMessage(raw_item_id=str(raw_id)).model_dump()
-        )
-        requeued += 1
-    for row in uncorrelated:
-        await stream.publish(
-            stream.ENRICHED_ITEMS,
-            EnrichedItemMessage(
-                raw_item_id=str(row["raw_item_id"]),
-                article_id=str(row["article_id"]),
-                enrichment_id=str(row["enrichment_id"]),
-            ).model_dump(),
-        )
-        requeued += 1
-    if requeued:
-        logger.info(
-            "requeued_stalled",
-            pending=len(pending),
-            unenriched=len(unenriched),
-            uncorrelated=len(uncorrelated),
-        )
-    return requeued
+    return list(pending), list(unenriched), list(uncorrelated)
 
 
 async def _given_up(raw_ids: list) -> set[str]:

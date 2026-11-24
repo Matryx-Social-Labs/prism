@@ -25,6 +25,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from classification.consumer import handle_raw_item
 from common import stream
+from common.db import WORKER_STATEMENT_TIMEOUT, set_default_statement_timeout
 from common.logging import get_logger, setup_logging
 from correlation.consumer import handle_enriched_item, run_due_analyses
 from enrichment.consumer import handle_classified_item
@@ -96,7 +97,7 @@ async def _trending_reconciler() -> None:
     """Reconcile trending stories on an interval, off the ingest path. Keeps the
     /trending slugs stable (see correlation/trending.py)."""
     from common.config import get_settings
-    from common.db import session_scope
+    from common.db import RECONCILER_STATEMENT_TIMEOUT, session_scope
     from correlation.heat import mark_breaking
     from correlation.stories import refresh_stories
     from correlation.trending import reconcile_stories
@@ -104,7 +105,7 @@ async def _trending_reconciler() -> None:
     while True:
         await asyncio.sleep(TRENDING_INTERVAL_S)
         try:
-            async with session_scope() as session:
+            async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
                 # Live, the persistent stories are what /trending lists; Leiden rests.
                 if get_settings().prism_stories == "live":
                     await refresh_stories(session)
@@ -113,7 +114,7 @@ async def _trending_reconciler() -> None:
         except Exception:
             logger.exception("trending_reconciler_error")
         try:  # what is breaking, on the same 10-minute clock (PRISM_BREAKING)
-            async with session_scope() as session:
+            async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
                 await mark_breaking(session)
         except Exception:
             logger.exception("breaking_marker_error")
@@ -126,7 +127,7 @@ async def _story_merger() -> None:
     """Fold split stories into the story they are part of (correlation/story_merge.py),
     over the pairs the judge raised in the last two intervals. PRISM_STORY_MERGE."""
     from common.config import get_settings
-    from common.db import session_scope
+    from common.db import RECONCILER_STATEMENT_TIMEOUT, session_scope
     from correlation.story_merge import apply_merges, plan_merges
 
     hours = max(2, 2 * STORY_MERGE_INTERVAL_S // 3600)
@@ -137,10 +138,10 @@ async def _story_merger() -> None:
             continue
         try:
             # Judged without the assignment lock (judge calls take seconds); applied under it, briefly.
-            async with session_scope() as session:
+            async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
                 merges = await plan_merges(session, hours=hours)
             if mode == "live" and merges:
-                async with session_scope() as session:
+                async with session_scope(RECONCILER_STATEMENT_TIMEOUT) as session:
                     await apply_merges(session, merges)
             for m in merges if mode == "shadow" else []:
                 logger.info("story_merge_shadow", story=str(m["story"]), into=str(m["into"]), records=m["records"],
@@ -251,7 +252,9 @@ async def _health_server() -> None:
 
 
 async def main(stages: list[str]) -> None:
-    logger.info("worker_starting", stages=stages, consumer=CONSUMER_NAME)
+    statement_timeout = os.environ.get("PRISM_WORKER_STATEMENT_TIMEOUT") or WORKER_STATEMENT_TIMEOUT
+    set_default_statement_timeout(statement_timeout)
+    logger.info("worker_starting", stages=stages, consumer=CONSUMER_NAME, statement_timeout=statement_timeout)
 
     tasks = [asyncio.create_task(_health_server())]
 

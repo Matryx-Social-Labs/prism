@@ -17,10 +17,10 @@ from api.schemas import (
     SubsectorOut,
     TaxonomyResponse,
 )
-from common import outlets
+from common import freshness, outlets
 from common.db import get_db
 from common.embeddings import check_corpus_model
-from common.freshness import MAX_WINDOW_HOURS, MIN_WINDOW_HOURS, WINDOW_HOURS, pipeline_freshness
+from common.freshness import MAX_WINDOW_HOURS, MIN_WINDOW_HOURS, WINDOW_HOURS
 from common.lenses import DEFAULT_LENS, active_lenses
 from common.logging import get_logger
 from common.outlets import monitored, record_indexable, record_indexable_sql
@@ -59,7 +59,7 @@ async def healthz(
     return {
         "status": "ok",
         "streams": await backlog(),
-        "freshness": await pipeline_freshness(db, window_hours=freshness_window_hours),
+        "freshness": await freshness.cached(db, window_hours=freshness_window_hours),
         "embeddings": await check_corpus_model(db),
     }
 

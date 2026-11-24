@@ -6,7 +6,9 @@ called by ``/healthz``: observability may be unavailable, but must never make
 the API unavailable.
 """
 
-from datetime import datetime
+import asyncio
+import time
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -238,6 +240,39 @@ def _latency(row: Any, prefix: str, samples: int) -> dict[str, int | float | Non
     }
 
 
+def _clamped(window_hours: int) -> int:
+    return max(MIN_WINDOW_HOURS, min(MAX_WINDOW_HOURS, int(window_hours)))
+
+
+# /healthz reads freshness from here: the query scans whole tables, and a probe
+# every few seconds must not be able to pile copies onto a struggling database.
+CACHE_TTL_S = 60
+_cache: dict[int, tuple[float, dict[str, Any]]] = {}
+_cache_lock = asyncio.Lock()
+
+
+def reset_cache() -> None:
+    """Forget every cached result (tests: each runs on its own event loop)."""
+    global _cache_lock
+    _cache.clear()
+    _cache_lock = asyncio.Lock()
+
+
+async def cached(db: AsyncSession, *, window_hours: int = WINDOW_HOURS) -> dict[str, Any]:
+    """`pipeline_freshness`, at most once a minute per window in this process.
+    The "unavailable" answer is cached too: that is when a re-run hurts most."""
+    window_hours = _clamped(window_hours)
+    # ponytail: one lock for all windows; probes ask for one window in practice.
+    async with _cache_lock:
+        hit = _cache.get(window_hours)
+        if hit is not None and time.monotonic() - hit[0] < CACHE_TTL_S:
+            return hit[1]
+        # as_of: when the query ran, so a cached answer is not read as now.
+        result = {**await pipeline_freshness(db, window_hours=window_hours), "as_of": datetime.now(UTC).isoformat()}
+        _cache[window_hours] = (time.monotonic(), result)
+        return result
+
+
 async def pipeline_freshness(
     db: AsyncSession,
     *,
@@ -254,7 +289,7 @@ async def pipeline_freshness(
     ``newest_observed_at`` then says since when. It is telemetry, not
     liveness: ``/healthz`` still answers "ok" on a paused pipeline.
     """
-    window_hours = max(MIN_WINDOW_HOURS, min(MAX_WINDOW_HOURS, int(window_hours)))
+    window_hours = _clamped(window_hours)
     try:
         result = await db.execute(_FRESHNESS_SQL, {"window_hours": window_hours})
         row = result.mappings().one()
@@ -325,3 +360,42 @@ async def pipeline_freshness(
             ),
         },
     }
+
+
+# Each stage's completion clock, as _FRESHNESS_SQL reads it: observed_at and
+# classified_at on raw_items, an enriched (relevant) item's article fetched_at, an
+# article's membership created_at. One row per raw item and per article
+# (uq_articles_raw_item, uq_event_memberships_article), so no first-of-many here.
+# raw_items (with its article) is read once; each row stamps up to three stages.
+_THROUGHPUT_SQL = text(
+    """
+    WITH since AS (SELECT date_trunc('hour', now(), 'UTC') - make_interval(hours => :hours - 1) AS t),
+    stamps AS (
+        SELECT s.stage, s.at
+        FROM raw_items r
+        LEFT JOIN articles a ON a.raw_item_id = r.id
+        CROSS JOIN LATERAL (VALUES ('observed', r.observed_at), ('classified', r.classified_at),
+                                   ('enriched', CASE WHEN r.relevance = 'relevant' THEN a.fetched_at END)) s(stage, at)
+        UNION ALL
+        SELECT 'correlated', m.created_at FROM event_memberships m
+    )
+    SELECT date_trunc('hour', at, 'UTC') AS hour,
+           count(*) FILTER (WHERE stage = 'observed')::int AS observed,
+           count(*) FILTER (WHERE stage = 'classified')::int AS classified,
+           count(*) FILTER (WHERE stage = 'enriched')::int AS enriched,
+           count(*) FILTER (WHERE stage = 'correlated')::int AS correlated
+    FROM stamps, since WHERE at >= since.t
+    GROUP BY 1 ORDER BY 1 DESC
+    """
+)
+
+
+async def stage_throughput(db: AsyncSession, hours: int = WINDOW_HOURS) -> list[dict[str, Any]]:
+    """Items completing each stage per UTC hour over the last `hours` hours
+    (clamped 1..168; the current hour is partial), newest first. Hours where
+    nothing completed are absent."""
+    # No index on these clocks: whole-table scans. Parallel workers' shared memory filling
+    # /dev/shm took the database down on 2026-10-16 and 2026-10-20; a founder page must not.
+    await db.execute(text("SELECT set_config('max_parallel_workers_per_gather', '0', true)"))
+    rows = (await db.execute(_THROUGHPUT_SQL, {"hours": _clamped(hours)})).mappings().all()
+    return [{**r, "hour": r["hour"].isoformat()} for r in rows]

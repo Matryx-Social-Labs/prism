@@ -31,7 +31,9 @@ import uuid
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common import timings
 from common.config import get_settings
+from common.db import wait_for_xact_lock
 from common.decisions import Choice, ChoiceAnswer, Noul, NoulAnswer, decide
 from common.logging import get_logger
 from correlation.trending import _community_facts, _label, story_slug
@@ -227,8 +229,9 @@ async def _judge(rec, blocks: list[str]) -> tuple[list[tuple[float, str]], str]:
         questions[f"part_{k}"] = Noul(instructions=PART_OF_STORY.format(a="REPORT", b=f"STORY_{k}"))
         questions[f"facet_{k}"] = Choice(instructions=f"What kind of development in STORY_{k} does REPORT report?",
                                          criteria=FACETS)
-    d = await asyncio.wait_for(decide(state, questions, trace_name="story-assign",
-                                      metadata={"stage": "stories", "event_id": str(rec.id)}), VERIFY_TIMEOUT_S)
+    async with timings.timed("jev.story-assign"):
+        d = await asyncio.wait_for(decide(state, questions, trace_name="story-assign",
+                                          metadata={"stage": "stories", "event_id": str(rec.id)}), VERIFY_TIMEOUT_S)
     out = []
     for k in range(1, len(blocks) + 1):
         part, facet = d.answers[f"part_{k}"], d.answers[f"facet_{k}"]
@@ -276,7 +279,7 @@ async def assign_story(session: AsyncSession, event_id: uuid.UUID) -> uuid.UUID 
     mode = settings.prism_stories
     if mode not in ("shadow", "live"):
         return None
-    await session.execute(text("SELECT pg_advisory_xact_lock(hashtext('stories.assign'))"))
+    await wait_for_xact_lock(session, "stories.assign")
     rec = await _record(session, event_id)
     if rec is None or rec.merged_into is not None or rec.placed:
         return None

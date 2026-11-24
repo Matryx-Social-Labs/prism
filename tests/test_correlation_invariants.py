@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from common import db
 from common.db import session_scope
 from common.models import Article, Enrichment, Event, EventMembership, RawItem, Source
 from correlation import consumer
@@ -104,4 +105,6 @@ async def test_match_or_create_holds_the_advisory_lock():
     import inspect
 
     src = inspect.getsource(consumer._attach)
-    assert "pg_advisory_xact_lock" in src.split("raw_item = ")[0], "the lock must precede the match"
+    assert "_take_match_lock(session)" in src.split("raw_item = ")[0], "the lock must precede the match"
+    assert 'wait_for_xact_lock(session, "correlation.match_or_create")' in inspect.getsource(consumer._take_match_lock)
+    assert "pg_advisory_xact_lock" in inspect.getsource(db.wait_for_xact_lock)

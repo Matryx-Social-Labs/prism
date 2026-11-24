@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, update
 from sqlalchemy import text as sa_text
 
-from common import stream
+from common import stream, timings
 from common.config import get_settings
 from common.db import session_scope
 from common.embeddings import embed_texts
@@ -34,6 +34,8 @@ from enrichment.schemas import ArticleExtraction
 logger = get_logger(__name__)
 
 MAX_EXTRACT_CHARS = 12000
+# A raw item's paid mark outlives any redelivery: XAUTOCLAIM, the stalled-item sweep.
+PAID_MARK_TTL_S = 14 * 86400
 
 
 @observe(name="enrichment-stage")
@@ -105,6 +107,11 @@ async def handle_classified_item(payload: dict) -> None:
             published_at=str(published_at or "unknown"),
             text=clean_text[:MAX_EXTRACT_CHARS],
         )
+        # Counted before the call, so an attempt that never returns (a kill
+        # mid-call, a timeout, two invalid answers) is seen too: the upper bound
+        # on paying twice. extract.rebill below is the lower one.
+        if await timings.seen_before(f"extract:tried:{raw_item_id}", PAID_MARK_TTL_S):
+            await timings.count("extract.reattempt")
         extraction = await structured_chat(
             model=extract_model,
             messages=messages,
@@ -125,6 +132,10 @@ async def handle_classified_item(payload: dict) -> None:
             # pipeline was told not to collect any.
             prune_fields={"impacts"},
         )
+        # Paid. A second paid extraction of this item (a redelivery after a crash
+        # or deploy found no article and paid again) is a re-bill.
+        if await timings.seen_before(f"extract:paid:{raw_item_id}", PAID_MARK_TTL_S):
+            await timings.count("extract.rebill")
         # The ACTUAL provider, not a hardcoded one. This read "ollama:" while
         # llm_provider defaulted to openrouter and the OpenRouter key was set, so
         # every row claimed a provider that had not been called. The prefix is

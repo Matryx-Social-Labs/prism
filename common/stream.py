@@ -14,6 +14,7 @@ from collections.abc import Awaitable, Callable
 import redis.asyncio as aioredis
 
 from common.config import get_settings
+from common.db import QUERY_CANCELED, sqlstate_in_chain
 from common.logging import get_logger
 
 logger = get_logger(__name__)
@@ -111,6 +112,58 @@ async def backlog() -> dict[str, dict[str, int]]:
     return out
 
 
+_PAGE = 1000  # entries per Redis call in unacked_raw_item_ids
+
+
+def _raw_item_id(fields: dict) -> str | None:
+    try:
+        raw_item_id = json.loads(fields["data"])["raw_item_id"]
+    except (KeyError, TypeError, ValueError):
+        return None
+    return str(raw_item_id) if raw_item_id else None
+
+
+async def _ids_after(r, topic: str, start: str) -> set[str]:
+    """raw_item_ids of every entry after `start` (exclusive), page by page."""
+    out: set[str] = set()
+    while True:
+        page = await r.xrange(topic, min=f"({start}", max="+", count=_PAGE)
+        out |= {i for _, fields in page if (i := _raw_item_id(fields))}
+        if len(page) < _PAGE:
+            return out
+        start = page[-1][0]
+
+
+async def _ids_pending(r, topic: str, group: str) -> set[str]:
+    """raw_item_ids of the entries `group` was handed and has not acked."""
+    out: set[str] = set()
+    start = "-"
+    while True:
+        rows = await r.xpending_range(topic, group, min=start, max="+", count=_PAGE)
+        pipe = r.pipeline(transaction=False)
+        for row in rows:
+            pipe.xrange(topic, min=row["message_id"], max=row["message_id"], count=1)
+        for found in await pipe.execute() if rows else []:
+            out |= {i for _, fields in found if (i := _raw_item_id(fields))}
+        if len(rows) < _PAGE:
+            return out
+        start = f"({rows[-1]['message_id']}"
+
+
+async def unacked_raw_item_ids(topic: str, group: str) -> set[str]:
+    """The raw_item_id of every entry of `topic` that `group` has not acked:
+    handed out and pending, or never handed out at all. Raises when Redis cannot
+    answer; the caller decides what not knowing means."""
+    r = get_redis()
+    if not await r.exists(topic):
+        return set()
+    groups = await r.xinfo_groups(topic)
+    info = next((g for g in groups if str(g.get("name")) == group), None)
+    if info is None:  # nothing has consumed this topic yet
+        return await _ids_after(r, topic, "0-0")
+    return await _ids_pending(r, topic, group) | await _ids_after(r, topic, str(info["last-delivered-id"]))
+
+
 async def publish(topic: str, message: dict) -> str:
     """Publish a JSON message to a topic. Returns the stream entry id."""
     r = get_redis()
@@ -127,6 +180,16 @@ STALE_CLAIM_IDLE_MS = 300_000  # reclaim messages a dead consumer held > 5 min
 # model) is never mistaken for a dead consumer's and worked twice. Measured
 # 2026-09-17: six raw items got two articles each this way under the 402s.
 HEARTBEAT_S = 60
+# A handler hung past this stops renewing: its idle clock runs, XAUTOCLAIM hands
+# the entry to another slot, and requeue_stalled's "still queued" stops protecting it.
+HEARTBEAT_MAX_S = 1800
+# A statement that timed out is retried while the database may only have been
+# busy; one that keeps timing out is the query, not the load, and each enrichment
+# redelivery re-pays for the extraction. The entry's timeouts are counted (not its
+# deliveries: a reclaim after a deploy is not a timeout); this one dead-letters.
+STATEMENT_TIMEOUTS_BEFORE_DEAD = 3
+STATEMENT_TIMEOUTS_TTL_S = 86400
+COUNT_TIMEOUT_S = 1.0  # the client has no read timeout; a stalled count leaves the entry pending
 async def consume(
     topic: str,
     group: str,
@@ -272,8 +335,8 @@ async def _deliveries(r, topic: str, group: str, entry_id) -> int:
 
 async def _heartbeat(r, topic: str, group: str, consumer_name: str, entry_id) -> None:
     """Renew our claim on a long-running message. JUSTID resets the idle clock
-    without counting as a delivery."""
-    while True:
+    without counting as a delivery. Bounded by HEARTBEAT_MAX_S."""
+    for _ in range(int(HEARTBEAT_MAX_S // HEARTBEAT_S)):  # int: tests shrink HEARTBEAT_S
         await asyncio.sleep(HEARTBEAT_S)
         try:
             await r.xclaim(topic, group, consumer_name, min_idle_time=0, message_ids=[entry_id], justid=True)
@@ -334,6 +397,17 @@ async def _dead_letter(r, topic: str, group: str, entry_id, fields: dict, exc: E
         )
     except Exception:  # noqa: BLE001
         logger.exception("dead_letter_failed", topic=topic, entry_id=entry_id)
+    from common import timings  # here, not at the top: timings imports get_redis from this module
+
+    # A lost insert race on articles.raw_item_id: enrichment paid for an
+    # extraction that a twin already stored — a re-bill.
+    if "uq_articles_raw_item" in str(exc):
+        cause = "rebill"
+    elif sqlstate_in_chain(exc, {QUERY_CANCELED}):
+        cause = "statement_timeout"
+    else:
+        cause = type(exc).__name__
+    await timings.count(f"dead.{topic}.{cause}")
 
 
 async def _handle_one(r, topic: str, group: str, handler, message, consumer_name: str = "") -> None:
@@ -345,7 +419,7 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        if _is_transient(exc):
+        if _is_transient(exc) or await _timed_out_early(r, topic, entry_id, exc):
             # Infrastructure is down, not the message: leave it pending so
             # XAUTOCLAIM redelivers it, and slow down instead of burning the
             # queue (a DB outage once acked-and-dropped 885 messages here).
@@ -365,6 +439,23 @@ async def _handle_one(r, topic: str, group: str, handler, message, consumer_name
         if beat:
             beat.cancel()
     await r.xack(topic, group, entry_id)
+
+
+async def _timed_out_early(r, topic: str, entry_id, exc: BaseException) -> bool:
+    """A statement timeout before the entry's STATEMENT_TIMEOUTS_BEFORE_DEAD-th,
+    or one Redis could not count (left pending, as any transient failure)."""
+    if not sqlstate_in_chain(exc, {QUERY_CANCELED}):
+        return False
+    key = f"stmt_timeouts:{topic}:{entry_id}"
+    try:
+        pipe = r.pipeline(transaction=False)
+        pipe.incr(key)
+        pipe.expire(key, STATEMENT_TIMEOUTS_TTL_S)
+        timeouts, _ = await asyncio.wait_for(pipe.execute(), COUNT_TIMEOUT_S)
+    except Exception as exc_count:  # noqa: BLE001 — not knowing is not a reason to drop it
+        logger.warning("statement_timeout_count_failed", topic=topic, entry_id=entry_id, error=str(exc_count)[:160])
+        return True
+    return int(timeouts) < STATEMENT_TIMEOUTS_BEFORE_DEAD
 
 
 def _is_transient(exc: BaseException | None) -> bool:

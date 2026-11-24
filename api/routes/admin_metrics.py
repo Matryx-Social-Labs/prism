@@ -4,6 +4,9 @@ GET /api/v1/admin/metrics?days=28        — visits, sign-ups, engagement, money
 GET /api/v1/admin/metrics/weekly.csv     — one row per IST week, counts only, for investors
 GET /api/v1/admin/coverage?days=28       — outlets linked by the stories they share (common/coverage)
 GET /api/v1/admin/spend?days=14          — model spend per stage per day (common/spend) + the balance
+GET /api/v1/admin/pipeline?days=7        — lock/Jev timings + dead letters (common/timings), the analysis
+                                           queue, and items per hour per stage (common/freshness); each
+                                           part is null when its store cannot be read
 
 Founder-only (api/deps.require_admin_user). common/metrics says what every
 number is, where it is counted, and what is deliberately not computed.
@@ -19,10 +22,12 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import require_admin_user
-from common import budget, coverage, metrics, spend
+from common import budget, coverage, freshness, metrics, spend, timings
 from common.config import get_settings
 from common.db import get_db
+from common.logging import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter()
 PRIVATE = {"Cache-Control": "no-store"}
 
@@ -76,3 +81,34 @@ async def model_spend(
     response.headers.update(PRIVATE)
     return {"days": await spend.days(days), "balance": await budget.current(),
             "floor": get_settings().prism_llm_budget_floor_usd}
+
+
+@router.get("/api/v1/admin/pipeline")
+async def pipeline(
+    response: Response,
+    days: Annotated[int, Query(ge=1, le=timings.KEEP_DAYS)] = 7,
+    _: str = Depends(require_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Where the pipeline's time goes: per-day timing buckets and counters
+    (common/timings; unrecorded days come back `recorded: false`), the analysis
+    sweeper's queue, and items per hour per stage over the last day. Each part
+    degrades on its own: `days` and `sweeper` are null when Redis cannot be
+    read, `throughput` when the query fails."""
+    # Here, not at the top: the API need not import the worker module at boot for one ZSET read.
+    from correlation.consumer import analysis_queue
+
+    response.headers.update(PRIVATE)
+    try:
+        timed = await timings.days(days)
+    except Exception as exc:  # noqa: BLE001 — one unreadable part must not blank the page
+        logger.warning("pipeline_timings_unavailable", error=str(exc)[:200])
+        timed = None
+    sweeper = await analysis_queue()
+    # Last, so a failed query leaves nothing else to run in the aborted transaction.
+    try:
+        throughput = await freshness.stage_throughput(db)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("pipeline_throughput_unavailable", error=str(exc)[:200])
+        throughput = None
+    return {"days": timed, "sweeper": sweeper, "throughput": throughput}

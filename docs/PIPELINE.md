@@ -147,6 +147,11 @@ count in one pass is a broken model or deploy, not bad articles: nothing is give
 founders get a "systemic" email. Before this, a refused or invalid extraction was re-sent and paid
 for every ten minutes indefinitely.
 
+`requeue_stalled()` does not republish an item whose message is still unacked in the stream its
+next stage reads (`stream.unacked_raw_item_ids`, pending or never delivered): it is waiting its
+turn, and a second copy would be paid for twice. This check runs before the give-up check, since
+an item still queued has not failed again. If Redis cannot answer, it requeues as before.
+
 To retry a given-up item: `DEL failures:<raw_item_id>` in Redis, then
 `UPDATE raw_items SET relevance = 'pending'` (it was never classified) or `'relevant'` (classified,
 never enriched) for that id; the next requeue pass (≤ 10 min) sends it again. `tools/redrive_dead.py`
@@ -193,6 +198,8 @@ yet) is let through with a warning, not refused (`common/embeddings.py:175-182`)
   redelivery) so a slow-but-alive handler — an LLM cooldown of up to 120s, a retry — is never
   mistaken for a dead consumer and worked twice: "measured 2026-09-17: six raw items got two
   articles each this way under the 402s" (`common/stream.py:126-128`).
+  The heartbeat stops after 30 minutes (`HEARTBEAT_MAX_S = 1800`), so the entry of a hung handler
+  goes idle and is reclaimed like any other.
 - **Dead-lettering.** A handler exception that is *not* judged transient
   (`_is_transient()`, `common/stream.py:334-346` — connection/timeout errors anywhere in the
   cause/context chain, SQLAlchemy's `connection_invalidated`, or "connect" in the exception type
@@ -203,8 +210,21 @@ yet) is let through with a warning, not refused (`common/embeddings.py:175-182`)
   (`common/stream.py:313-315`).
 - **Backlog visibility.** `backlog()` (`common/stream.py:67-111`) reports `waiting` (group lag,
   i.e. undelivered), `pending` (PEL — handed out, not yet acked), `oldest_pending_ms`, and
-  `dead_lettered` per topic, feeding `/healthz`. Best-effort: a Redis hiccup degrades the report
+  `dead_lettered` per topic, feeding `/healthz`. The freshness read behind `/healthz`
+  (`common/freshness.cached`) runs its query at most once a minute per window in each process, a
+  failed ("unavailable") answer included, and carries `as_of`, the time the query ran. Best-effort: a Redis hiccup degrades the report
   (`-1` = unknown) rather than failing the health check.
+- **Statement timeout.** The worker sets `statement_timeout` as a connection startup setting when
+  it starts (`worker/__main__.py`, `common/db.py`): `PRISM_WORKER_STATEMENT_TIMEOUT`, default
+  `120s`, `0` = off. A unit is required (`ms|s|min|h`); a bare number is milliseconds to Postgres,
+  so anything else is refused at boot. The API's 30 s per request is unchanged. The periodic
+  reconcilers (trending, story merge, partition, veto) run under `RECONCILER_STATEMENT_TIMEOUT`
+  (`600s`) through `session_scope(statement_timeout=...)`. A statement cancelled by the timeout
+  (SQLSTATE `57014`) counts `db.statement_timeout`; the stream message is left pending and
+  retried, and on the third timeout of the same stream entry it is dead-lettered with cause
+  `statement_timeout` (`STATEMENT_TIMEOUTS_BEFORE_DEAD = 3`, counted in Redis per entry for a day).
+  A dead letter feeds the give-up-after-three rule and its founder alert described under
+  `requeue_stalled()`. If Redis cannot count the timeout, the message stays pending.
 
 ### Redrive tooling — `tools/redrive_dead.py`
 
@@ -226,12 +246,54 @@ Two distinct locking mechanisms, for two distinct problems:
   held for the duration of one match-or-create transaction (`correlation/consumer.py:147`), so a
   second replica or a reclaimed duplicate delivery of the same article cannot seed two events for
   one story.
+- Advisory-lock waits go through `common/db.wait_for_xact_lock()`. It switches `statement_timeout`
+  off for the lock statement only and restores the previous value after it, because waiting for a
+  lock (a repair tool can hold one for minutes) is not a runaway query. The same holds for
+  `stories.assign` (story assignment and story merge) and the partition lock; the entity-variant
+  fold takes the match lock with the same switch-off written inline (`correlation/variants.py`).
 - `common/locks.single_flight()` (`common/locks.py:1-66`) — a **Redis**-backed single-flight lock
   for on-demand, cross-replica-shared work (e.g. the digest, on-demand lens briefs): exactly one
   caller for a key becomes the "leader" (`yield True`) and produces the value; others wait
   (`yield False`) and re-read the shared cache; a leader that stalls past `wait_timeout` (default
   25s) lets a waiter fall back to producing itself, favoring correctness over strict
   single-flighting (`common/locks.py:12-17`).
+
+### Pipeline timings — `common/timings.py`
+
+How long the slow parts of the pipeline take, read by the founder page. One Redis hash per UTC day
+(`timings:<day>`), kept 30 days. A duration is counted into a fixed bucket, so a day is a few dozen
+integers whatever the traffic; the p50 and p95 read back are the upper bound of a bucket, the mean
+is exact. Recording never fails a call and never delays one by more than 1 s: a Redis error is
+logged and dropped. A day with no hash reads `recorded: false`, not zero.
+
+| Name | Recorded where |
+|---|---|
+| `match_lock.wait`, `match_lock.held` | `correlation/consumer.py`: wait for, and hold of, the match-or-create advisory lock, per article |
+| `jev.event-verify`, `jev.story-verify` | `correlation/verify.py`: the verifier call (story variant when it follows a story) |
+| `jev.event-escalate` | `correlation/verify.py`: the two-direction escalation |
+| `jev.story-assign` | `correlation/stories.py`: the story-assignment call |
+| `jev.entity-variant` | `correlation/variants.py`: the entity-variant call |
+| `analysis.queue_age` | `correlation/consumer.py`: how long a debounced analysis was past due when the sweeper claimed it |
+
+Counters: `jev.<kind>.timeout` and `jev.<kind>.error` for each `jev.*` timing above;
+`dead.<topic>.<cause>` for each dead letter, where the cause is `rebill`, `statement_timeout`, or
+the exception class; `extract.rebill`; `extract.reattempt`; `db.statement_timeout`. `extract.rebill` means an article's
+extraction was paid for and then paid for again: the first call returned, the worker was killed (or
+failed) before the article was stored, and the redelivery paid a second time. It is marked by
+`extract:paid:<raw_item_id>` for 14 days and is the lower bound. `extract.reattempt` is counted before
+the call (`extract:tried:<raw_item_id>`), so it also sees an attempt that never returned (a kill
+mid-call, a timeout, two invalid answers) and is the upper bound; whether the provider billed such an
+attempt is not known here. A lost insert race on `articles.raw_item_id` dead-letters with cause
+`rebill` and is also counted in `extract.rebill`: do not add the two. `PRISM_WORKER_STATEMENT_TIMEOUT=0`
+switches the timeout off everywhere, the reconcilers' override included.
+
+Read it at `GET /api/v1/admin/pipeline?days=7` (founders only) or on `/admin/pipeline`, which also
+shows the analysis queue now and articles per hour per stage over the last 24 hours. Each part
+(`days`, `sweeper`, `throughput`) comes back `null` when its store cannot be read, rather than
+failing the page.
+
+Migrations run with a 5 s `lock_timeout`; see `db/README.md` for the rule on
+`CREATE INDEX CONCURRENTLY`.
 
 ### Table: worker & streams
 
@@ -240,7 +302,7 @@ Two distinct locking mechanisms, for two distinct problems:
 | **Inputs** | Redis Streams (`raw.items`, `classified.items`, `enriched.items`, `admin.triggers`); wall-clock schedule |
 | **Outputs** | Downstream stream publishes; scheduled side effects (billing reconcile, IndexNow) |
 | **Tables written** | None directly — the worker orchestrates; each consumer writes its own tables (see §3–§7) |
-| **Models/flags** | `PRISM_STAGES`, `PRISM_CONSUMER_NAME`, `PRISM_INGEST_INTERVAL_MINUTES`, `PRISM_REQUEUE_INTERVAL_MINUTES`, `PRISM_ENRICH_CONCURRENCY`, `PRISM_BUDGET_INTERVAL_S`, `PRISM_TRENDING_INTERVAL_S`, `PRISM_PARTITION_INTERVAL_S`, `PRISM_VETO_INTERVAL_S`, `PRISM_QUOTES_INTERVAL_S`, `PRISM_STREAM_MAXLEN` |
+| **Models/flags** | `PRISM_STAGES`, `PRISM_CONSUMER_NAME`, `PRISM_INGEST_INTERVAL_MINUTES`, `PRISM_REQUEUE_INTERVAL_MINUTES`, `PRISM_ENRICH_CONCURRENCY`, `PRISM_BUDGET_INTERVAL_S`, `PRISM_TRENDING_INTERVAL_S`, `PRISM_PARTITION_INTERVAL_S`, `PRISM_VETO_INTERVAL_S`, `PRISM_QUOTES_INTERVAL_S`, `PRISM_STREAM_MAXLEN`, `PRISM_WORKER_STATEMENT_TIMEOUT`, `PRISM_MIGRATION_LOCK_TIMEOUT` (migrations; see `db/README.md`) |
 | **Failure behaviour** | Per-handler exceptions: dead-letter (permanent) vs. pending+redeliver (transient) per `_is_transient()`; reconciler loops catch-and-log every exception so one bad tick never kills the loop (`except Exception: logger.exception(...)` pattern throughout `worker/__main__.py`); worker exits with `SystemExit("no stages selected")` if `--stages` resolves to nothing (`worker/__main__.py:360-361`) |
 
 ---

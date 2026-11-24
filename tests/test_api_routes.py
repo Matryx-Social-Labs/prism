@@ -92,6 +92,7 @@ EXPECTED = {
     ("GET", "/api/v1/admin/metrics/weekly.csv"),
     ("GET", "/api/v1/admin/coverage"),
     ("GET", "/api/v1/admin/spend"),
+    ("GET", "/api/v1/admin/pipeline"),
     # People, read-only switches, and the collection trigger (api/routes/admin_controls.py).
     ("GET", "/api/v1/admin/people"),
     ("GET", "/api/v1/admin/flags"),
