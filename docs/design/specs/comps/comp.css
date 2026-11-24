@@ -1,0 +1,160 @@
+@import url("../../../../web/src/app/globals.css");
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Anek+Latin:wght@100..800&family=Anek+Devanagari:wght@100..800&family=Anek+Kannada:wght@100..800&family=Anek+Malayalam:wght@100..800&family=Anek+Tamil:wght@100..800&family=Noto+Serif+Devanagari:wght@100..900&family=Noto+Serif+Kannada:wght@100..900&family=Noto+Serif+Malayalam:wght@100..900&family=Noto+Serif+Tamil:wght@100..900&family=Noto+Nastaliq+Urdu:wght@400..700&family=Noto+Naskh+Arabic:wght@400..700&family=Geist+Mono:wght@100..900&display=swap");
+
+/* T-047 comp chrome. The app's real tokens, dark theme and .p-* classes come from
+   globals.css above; this file adds only what a static page lacks.
+
+   CONTRACT (pages build on this; do not rename)
+   Page skeleton:
+     <link rel="stylesheet" href="comp.css">
+     <body data-chrome="app|record|bare" data-current="today|stories|search|following|you"
+           [data-following-count="3"]>
+       <main id="main" class="comp-main"> … </main>
+       <script src="data.js"></script>   (only if the page reads data: window.COMP_DATA)
+       <script src="comp.js"></script>
+   comp.js injects: banner, skip link, icon sprite, masthead, back bar, bare bar, rail,
+     bottom tabs, top bar. CSS shows the right ones per width. ?theme=dark|light.
+   Size classes: compact <600 · medium 600–1023 · expanded ≥1024.
+   Helpers: .comp-main · .comp-col (640 reading column) · .comp-two (> .comp-col + aside, from 1024)
+     · .comp-states (specimen grid; each child a <figure> with a <figcaption>) · .ill (ILLUSTRATION tag)
+     · .comp-lockup (style="--mark:20px") · .comp-badge (count)
+   Rail item specimen: <span class="comp-rail__item [is-hover|is-focus|is-current]">
+     <span class="comp-rail__pill"><svg class="ico"><use href="#i-today"/></svg>[<span class="comp-badge">3</span>]</span>
+     <span class="comp-rail__label">Today</span></span>   inside <div class="comp-specimen">.
+   State classes follow the app's own: .is-hover · .is-focus · .is-current (live: :hover, :focus-visible, aria-current).
+   Icons: <svg class="ico"><use href="#i-check"/></svg>; ids i-today i-stories i-search i-following i-you
+     i-bell i-share i-check i-lock i-arrow-right i-arrow-left i-arrow-up-right i-chevron-down i-close
+     i-info i-speech i-dash i-play i-headphones (+ i-mark, the brand mark). Size with .ico--16/.ico--22/.ico--24. */
+
+/* next/font's variables, which globals.css's voice stacks expect. Faces not loaded above
+   (Telugu, Bengali, Gujarati, Gurmukhi, Odia) still need a value or the whole stack is invalid. */
+:root {
+  --font-newsreader: "Newsreader";
+  --font-noto-serif-devanagari: "Noto Serif Devanagari";
+  --font-noto-serif-kannada: "Noto Serif Kannada";
+  --font-noto-serif-tamil: "Noto Serif Tamil";
+  --font-noto-serif-telugu: "Noto Serif Telugu";
+  --font-noto-serif-bengali: "Noto Serif Bengali";
+  --font-noto-serif-gujarati: "Noto Serif Gujarati";
+  --font-noto-serif-gurmukhi: "Noto Serif Gurmukhi";
+  --font-noto-serif-malayalam: "Noto Serif Malayalam";
+  --font-noto-serif-oriya: "Noto Serif Oriya";
+  --font-noto-nastaliq-urdu: "Noto Nastaliq Urdu";
+  --font-anek-latin: "Anek Latin";
+  --font-anek-devanagari: "Anek Devanagari";
+  --font-anek-kannada: "Anek Kannada";
+  --font-anek-tamil: "Anek Tamil";
+  --font-anek-telugu: "Anek Telugu";
+  --font-anek-bangla: "Anek Bangla";
+  --font-anek-gujarati: "Anek Gujarati";
+  --font-anek-gurmukhi: "Anek Gurmukhi";
+  --font-anek-malayalam: "Anek Malayalam";
+  --font-anek-odia: "Anek Odia";
+  --font-noto-naskh-arabic: "Noto Naskh Arabic";
+  --font-geist-mono: "Geist Mono";
+  --rail-w: 80px;
+}
+
+/* What Tailwind's preflight would have given. */
+*, *::before, *::after { box-sizing: border-box; }
+body, h1, h2, h3, h4, h5, h6, p, ul, ol, figure, blockquote, dl, dd { margin: 0; }
+ul, ol { list-style: none; padding: 0; }
+img, svg, video { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; }
+a { color: inherit; text-decoration: none; }
+body { background: var(--paper); color: var(--ink); font: var(--t-body); font-family: var(--font-read); }
+
+/* ── Comp furniture ── */
+.comp-banner { padding: var(--s-2) var(--gutter); font: var(--t-mono-s); letter-spacing: var(--track-mono); color: var(--ink-3); background: var(--sunken); border-bottom: 1px solid var(--line); }
+.ill { display: inline-block; padding: 1px 6px; font: var(--t-mono-s); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--ink-3); border: 1px dashed var(--line-strong); border-radius: var(--r-record); vertical-align: middle; }
+.comp-skip { position: fixed; left: var(--s-3); top: var(--s-3); z-index: 100; transform: translateY(-200%); }
+.comp-skip:focus { transform: none; }
+.comp-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.ico { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ico--16 { width: 16px; height: 16px; }
+.ico--22 { width: 22px; height: 22px; }
+.ico--24 { width: 24px; height: 24px; }
+
+/* The lockup (Brand.tsx): mark, then readPrism.news; size by --mark. */
+.comp-lockup { --mark: 20px; display: inline-flex; align-items: center; gap: calc(var(--mark) * .42); color: var(--ink); min-height: 44px; }
+.comp-mark { width: var(--mark); height: var(--mark); flex: none; }
+.comp-lockup__word { font-family: var(--font-record); font-weight: 600; font-size: calc(var(--mark) * .95); line-height: 1; letter-spacing: -0.01em; white-space: nowrap; }
+.comp-lockup__q { font-weight: 400; color: var(--ink-3); }
+
+/* A count, never a bare dot. */
+.comp-badge { display: inline-block; min-width: 18px; padding: 0 4px; font: var(--t-mono-s); line-height: 16px; text-align: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-record); }
+
+/* ── The shell: every bar is in the DOM, display decides. Hidden = display:none (out of the a11y tree). ── */
+.comp-masthead, .comp-backbar, .comp-barebar, .comp-rail, .comp-tabs, .comp-topbar { display: none; }
+
+.comp-masthead, .comp-backbar, .comp-barebar { position: sticky; top: 0; z-index: 30; height: var(--masthead); align-items: center; padding-inline: var(--gutter); border-bottom: 1px solid var(--line); }
+.comp-masthead { justify-content: space-between; gap: var(--s-3); }
+.comp-dateline { font: var(--t-mono-s); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.comp-backbar { grid-template-columns: 44px 1fr 44px; padding-inline: var(--s-1); }
+.comp-backbar .comp-lockup { justify-self: center; }
+
+/* Bottom tabs (compact). */
+.comp-tabs { position: fixed; inset: auto 0 0; z-index: 40; grid-template-columns: repeat(5, minmax(0, 1fr)); height: calc(var(--tabbar) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid var(--line); }
+.comp-tabs a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font: 500 12px/1.1 var(--font-read); color: var(--ink-3); text-align: center; }
+.comp-tabs a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+
+/* Navigation rail (medium). */
+.comp-rail { position: fixed; inset: 0 auto 0 0; z-index: 40; width: var(--rail-w); flex-direction: column; align-items: center; overflow-y: auto; background: var(--paper); border-right: 1px solid var(--line); }
+.comp-rail__mark { display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; flex: none; color: var(--ink); }
+.comp-rail__mark .comp-mark { --mark: 24px; }
+.comp-rail__item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-1); width: var(--rail-w); min-height: 64px; padding: var(--s-1) var(--s-1); color: var(--ink-2); border-radius: var(--r-control); }
+.comp-rail__pill { position: relative; display: flex; align-items: center; justify-content: center; width: 56px; height: 32px; border-radius: var(--r-control); transition: background var(--t-micro) var(--ease); }
+.comp-rail__pill .ico { width: 24px; height: 24px; stroke-width: 1.8; }
+.comp-rail__pill .comp-badge { position: absolute; top: -6px; left: calc(50% + 9px); }
+.comp-rail__label { max-width: 72px; font: 500 12.5px/1.2 var(--font-read); text-align: center; overflow-wrap: anywhere; }
+.comp-rail__item:hover .comp-rail__pill, .comp-rail__item.is-hover .comp-rail__pill { background: var(--sunken); }
+.comp-rail__item[aria-current="page"], .comp-rail__item.is-current { color: var(--accent); }
+.comp-rail__item[aria-current="page"] .comp-rail__label, .comp-rail__item.is-current .comp-rail__label { font-weight: 600; }
+.comp-rail__item[aria-current="page"] .comp-rail__pill, .comp-rail__item.is-current .comp-rail__pill { background: var(--accent-soft); }
+.comp-rail__item:focus-visible, .comp-rail__item.is-focus { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* A rail cell drawn on its own in a specimen grid. */
+.comp-specimen { display: inline-flex; padding-block: var(--s-2); background: var(--paper); border-right: 1px solid var(--line); }
+
+/* Top bar (expanded). */
+.comp-topbar { position: sticky; top: 0; z-index: 30; height: var(--topbar); align-items: center; gap: var(--s-7); padding-inline: max(var(--gutter), calc((100% - var(--shell)) / 2)); border-bottom: 1px solid var(--line); }
+.comp-topbar__links { display: flex; gap: var(--s-2); }
+.comp-topbar__links a { display: inline-flex; align-items: center; min-height: 44px; padding-inline: var(--s-2); font: var(--t-ui); color: var(--ink-2); }
+.comp-topbar__links a:hover { color: var(--ink); }
+.comp-topbar__links a[aria-current="page"] { color: var(--accent); }
+.comp-topbar__links .comp-badge { margin-left: 6px; }
+.comp-search { position: relative; width: 300px; margin-left: auto; }
+.comp-search .ico { position: absolute; left: var(--s-3); top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.comp-search .p-input { min-height: 44px; padding-left: 40px; }
+
+/* Which chrome shows where. */
+body[data-chrome="bare"] .comp-barebar { display: flex; }
+@media (max-width: 599.98px) {
+  body[data-chrome="app"] .comp-masthead { display: flex; }
+  body[data-chrome="app"] .comp-tabs { display: grid; }
+  body[data-chrome="app"] { padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom)); }
+  body[data-chrome="record"] .comp-backbar { display: grid; }
+}
+@media (min-width: 600px) and (max-width: 1023.98px) {
+  body:is([data-chrome="app"], [data-chrome="record"]) { padding-left: var(--rail-w); }
+  body:is([data-chrome="app"], [data-chrome="record"]) .comp-rail { display: flex; }
+  body[data-chrome="app"] .comp-masthead { display: flex; }
+  body[data-chrome="record"] .comp-backbar { display: grid; }
+}
+@media (min-width: 1024px) {
+  body:is([data-chrome="app"], [data-chrome="record"]) .comp-topbar { display: flex; }
+}
+
+/* ── Layout helpers ── */
+.comp-main { display: block; padding-block: var(--s-6) var(--s-10); }
+.comp-col { max-width: var(--reading); margin-inline: auto; padding-inline: 16px; }
+@media (min-width: 600px) { .comp-col { padding-inline: 24px; } }
+@media (min-width: 1024px) {
+  .comp-col { padding-inline: 32px; }
+  .comp-two { display: grid; grid-template-columns: minmax(0, 640px) 320px; gap: var(--s-9); justify-content: center; padding-inline: 32px; }
+  .comp-two > .comp-col { max-width: none; margin: 0; padding-inline: 0; }
+}
+.comp-states { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--s-6); }
+.comp-states > * { display: grid; align-content: start; justify-items: start; gap: var(--s-2); }
+.comp-states figcaption { font: var(--t-mono-s); letter-spacing: var(--track-mono); color: var(--ink-3); }

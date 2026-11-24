@@ -1,7 +1,7 @@
 # 05 · The shell by width, with a navigation rail on tablets
 
 Built by T-042. Comp: `comps/shell.html` (the rail's states); every other comp sits in this shell, so
-`comps/edition-a.html` at 390, 768 and 1024 shows the three tiers with real content.
+`comps/edition.html` at 390, 768 and 1024 shows the three tiers with real content.
 
 ## Purpose
 

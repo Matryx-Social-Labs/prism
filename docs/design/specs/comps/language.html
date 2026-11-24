@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comp · Languages · T-047</title>
+<link rel="stylesheet" href="comp.css">
+<!-- The record stack's faces that comp.css does not load (Telugu, Bengali/Assamese, Gujarati, Gurmukhi, Odia). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+Telugu:wght@600&family=Noto+Serif+Bengali:wght@600&family=Noto+Serif+Gujarati:wght@600&family=Noto+Serif+Gurmukhi:wght@600&family=Noto+Serif+Oriya:wght@600&display=swap">
+<style>
+  .cap { margin: var(--s-10) 0 var(--s-5); padding-top: var(--s-3); border-top: var(--rule-section) solid var(--ink); }
+  .cap--first { margin-top: 0; }
+  .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .step { display: flex; align-items: center; gap: var(--s-3); min-height: 24px; }
+  .step .p-mono { font-size: 12px; color: var(--ink-2); }
+  .step__bars { display: grid; grid-template-columns: repeat(4, 28px); gap: 4px; }
+  .step__bars > i { height: 3px; border-radius: 1px; background: var(--line); }
+  .step__bars > i:first-child { background: var(--ink); }
+
+  .lt { margin-top: var(--s-5); font: var(--t-display-l); letter-spacing: var(--track-display); }
+  .q { margin-top: var(--s-7); padding-top: var(--s-3); border-top: var(--rule-section) solid var(--ink); }
+  .q__h { font: var(--t-title); font-family: var(--font-read); }
+  .q__note { margin-top: var(--s-2); font: var(--t-body-s); color: var(--ink-3); max-width: 56ch; }
+
+  /* A choice cell: the real input is hidden, the cell shows checked and focus. */
+  .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); margin-top: var(--s-3); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); margin-top: var(--s-4); }
+  @media (min-width: 600px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 1024px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .cell { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 64px; min-width: 0; padding: var(--s-2) 30px var(--s-2) 12px; border: 1px solid var(--line); border-radius: var(--r-record); background: var(--surface); cursor: pointer; }
+  .cell > input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .cell > .ico { position: absolute; top: 8px; right: 8px; display: none; }
+  .cell:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .cell:has(input:checked) > .ico { display: block; }
+  .cell:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .cell__n { font: var(--t-title); line-height: 1.6; }
+  .cell__n[lang="ur"] { line-height: 2.3; }
+  .cell__g { font: var(--t-ui-s); color: var(--ink-3); }
+
+  [lang="hi"] :is(.lt, .q__h, .p-btn, p) { line-height: 1.6; }
+
+  /* The footer bar: sticky to its step, so at the step's end it sits after the grid. */
+  .foot { display: grid; gap: var(--s-2); padding: var(--s-3) 0 calc(var(--s-3) + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); }
+  .foot--sticky { position: sticky; bottom: 0; z-index: 5; margin-top: var(--s-6); }
+  .foot__btns { display: flex; align-items: center; gap: var(--s-3); }
+  .foot__btns .p-btn--primary { flex: 1; }
+  .fstates { display: grid; gap: var(--s-6); }
+  .fstates figure { display: grid; gap: var(--s-2); }
+  .fstates figcaption { font: var(--t-mono-s); letter-spacing: var(--track-mono); color: var(--ink-3); }
+
+  /* On You. */
+  .yrows { border-bottom: 1px solid var(--line); }
+  .yrow { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: 56px; padding: var(--s-2) 0; border-top: 1px solid var(--line); }
+  .yrow__t { display: grid; gap: 2px; min-width: 0; }
+  .yrow__l { font: 600 15px/1.3 var(--font-read); color: var(--ink); }
+  .yrow__v { font: var(--t-body-s); line-height: 1.6; color: var(--ink-2); }
+  .yrow .p-input { width: auto; min-height: 44px; }
+
+  .offer { align-items: center; }
+  .offer p { flex: 1; min-width: 0; line-height: 1.6; }
+  .offer .p-link { margin-left: var(--s-2); }
+  .offer .p-iconbtn { margin: -10px -8px -10px 0; }
+</style>
+</head>
+<body data-chrome="bare">
+<main id="main" class="comp-main" tabindex="-1">
+<div class="comp-col">
+
+  <!-- A. The step -->
+  <p class="p-eyebrow cap cap--first">Step 1 of 4</p>
+  <form data-langs onsubmit="return false">
+    <div class="step"><span class="p-mono">1 of 4</span><span class="step__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+    <h1 class="lt">Your languages</h1>
+
+    <div class="q">
+      <h2 class="q__h" id="a-q1">Read Prism in</h2>
+      <div class="opts" role="radiogroup" aria-labelledby="a-q1">
+        <label class="cell"><input type="radio" name="ui" value="en" checked><span class="cell__n">English</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="radio" name="ui" value="hi"><span class="cell__n" lang="hi">हिंदी</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+      </div>
+      <p class="q__note">The menus and labels. More languages are being added.</p>
+    </div>
+
+    <div class="q">
+      <h2 class="q__h" id="a-q2">Read the news in</h2>
+      <p class="q__note">Headlines and quotes appear in these languages when an outlet printed them. Choose none to see every language.</p>
+      <div class="grid" role="group" aria-labelledby="a-q2">
+        <label class="cell"><input type="checkbox" name="news" value="en" checked><span class="cell__n" lang="en">English</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="hi"><span class="cell__n" lang="hi">हिंदी</span><span class="cell__g">Hindi</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="kn" checked><span class="cell__n" lang="kn">ಕನ್ನಡ</span><span class="cell__g">Kannada</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="ta"><span class="cell__n" lang="ta">தமிழ்</span><span class="cell__g">Tamil</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="te"><span class="cell__n" lang="te">తెలుగు</span><span class="cell__g">Telugu</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="bn"><span class="cell__n" lang="bn">বাংলা</span><span class="cell__g">Bengali</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="mr"><span class="cell__n" lang="mr">मराठी</span><span class="cell__g">Marathi</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="gu"><span class="cell__n" lang="gu">ગુજરાતી</span><span class="cell__g">Gujarati</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="pa"><span class="cell__n" lang="pa">ਪੰਜਾਬੀ</span><span class="cell__g">Punjabi</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="ur"><span class="cell__n" lang="ur" dir="rtl">اردو</span><span class="cell__g">Urdu</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="ml"><span class="cell__n" lang="ml">മലയാളം</span><span class="cell__g">Malayalam</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="or"><span class="cell__n" lang="or">ଓଡ଼ିଆ</span><span class="cell__g">Odia</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" name="news" value="as"><span class="cell__n" lang="as">অসমীয়া</span><span class="cell__g">Assamese</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+      </div>
+    </div>
+
+    <div class="foot foot--sticky">
+      <div class="foot__btns">
+        <button class="p-btn p-btn--primary" type="submit" data-continue>Continue with 2 languages</button>
+        <button class="p-btn p-btn--text" type="button">Skip for now</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- B. Hindi chosen -->
+  <p class="p-eyebrow cap">After choosing <span lang="hi">हिंदी</span> the step re-renders at once <span class="ill">ILLUSTRATION</span></p>
+  <form lang="hi" onsubmit="return false">
+    <div class="step"><span class="step__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+    <h1 class="lt">आपकी भाषाएँ</h1>
+
+    <div class="q">
+      <h2 class="q__h">Prism इस भाषा में पढ़ें</h2>
+      <div class="opts" role="radiogroup" aria-label="Prism इस भाषा में पढ़ें">
+        <label class="cell"><input type="radio" name="ui-hi" value="en"><span class="cell__n" lang="en">English</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="radio" name="ui-hi" value="hi" checked><span class="cell__n">हिंदी</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+      </div>
+    </div>
+
+    <div class="q">
+      <h2 class="q__h">ख़बरें इन भाषाओं में पढ़ें</h2>
+      <div class="grid" role="group" aria-label="ख़बरें इन भाषाओं में पढ़ें">
+        <label class="cell"><input type="checkbox" checked><span class="cell__n" lang="en">English</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" checked><span class="cell__n">हिंदी</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="kn">ಕನ್ನಡ</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="ta">தமிழ்</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="te">తెలుగు</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="bn">বাংলা</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="mr">मराठी</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="gu">ગુજરાતી</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="pa">ਪੰਜਾਬੀ</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="ur" dir="rtl">اردو</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="ml">മലയാളം</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="or">ଓଡ଼ିଆ</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="as">অসমীয়া</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+      </div>
+    </div>
+
+    <div class="foot" style="margin-top:var(--s-6)">
+      <div class="foot__btns">
+        <button class="p-btn p-btn--primary" type="submit">2 भाषाओं के साथ आगे बढ़ें</button>
+        <button class="p-btn p-btn--text" type="button">अभी नहीं</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- C. One interface language -->
+  <p class="p-eyebrow cap">While only one interface language exists, question 1 is not shown</p>
+  <form data-langs onsubmit="return false">
+    <div class="step"><span class="p-mono">1 of 4</span><span class="step__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+    <h1 class="lt">Your languages</h1>
+    <div class="q">
+      <h2 class="q__h">Read the news in</h2>
+      <p class="q__note">Headlines and quotes appear in these languages when an outlet printed them. Choose none to see every language.</p>
+      <div class="grid" role="group" aria-label="Read the news in">
+        <label class="cell"><input type="checkbox" checked><span class="cell__n" lang="en">English</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="hi">हिंदी</span><span class="cell__g">Hindi</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox" checked><span class="cell__n" lang="kn">ಕನ್ನಡ</span><span class="cell__g">Kannada</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="ta">தமிழ்</span><span class="cell__g">Tamil</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="te">తెలుగు</span><span class="cell__g">Telugu</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="bn">বাংলা</span><span class="cell__g">Bengali</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="mr">मराठी</span><span class="cell__g">Marathi</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="gu">ગુજરાતી</span><span class="cell__g">Gujarati</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="pa">ਪੰਜਾਬੀ</span><span class="cell__g">Punjabi</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="ur" dir="rtl">اردو</span><span class="cell__g">Urdu</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="ml">മലയാളം</span><span class="cell__g">Malayalam</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="or">ଓଡ଼ିଆ</span><span class="cell__g">Odia</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+        <label class="cell"><input type="checkbox"><span class="cell__n" lang="as">অসমীয়া</span><span class="cell__g">Assamese</span><svg class="ico ico--16" aria-hidden="true"><use href="#i-check"/></svg></label>
+      </div>
+    </div>
+    <div class="foot foot--sticky">
+      <div class="foot__btns">
+        <button class="p-btn p-btn--primary" type="submit" data-continue>Continue with 2 languages</button>
+        <button class="p-btn p-btn--text" type="button">Skip for now</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- D. On You -->
+  <p class="p-eyebrow cap">You · Languages</p>
+  <div class="yrows">
+    <div class="yrow">
+      <label class="yrow__l" for="d-ui">Read Prism in</label>
+      <select class="p-input" id="d-ui"><option selected>English</option><option lang="hi">हिंदी</option></select>
+    </div>
+    <div class="yrow">
+      <div class="yrow__t">
+        <span class="yrow__l">Read the news in</span>
+        <span class="yrow__v">English, <span lang="kn">ಕನ್ನಡ</span></span>
+      </div>
+      <button class="p-btn p-btn--text" type="button">Change</button>
+    </div>
+  </div>
+
+  <!-- E. The offer -->
+  <p class="p-eyebrow cap">On an English page, once, when the browser asks for Hindi <span class="ill">ILLUSTRATION</span></p>
+  <div class="p-alert p-alert--info offer" role="status">
+    <p><span lang="hi">Prism हिंदी में भी है।</span><a class="p-link" href="#" lang="hi">हिंदी में पढ़ें</a></p>
+    <button class="p-iconbtn" type="button" aria-label="Dismiss"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+
+  <!-- F. Could not save · Busy -->
+  <p class="p-eyebrow cap">The footer bar <span class="ill">ILLUSTRATION</span></p>
+  <div class="fstates">
+    <figure>
+      <figcaption>Could not save</figcaption>
+      <div class="foot">
+        <div class="p-alert p-alert--error" role="alert"><p>That did not save. Try again.</p></div>
+        <div class="foot__btns">
+          <button class="p-btn p-btn--primary" type="button">Continue with 2 languages</button>
+          <button class="p-btn p-btn--text" type="button">Skip for now</button>
+        </div>
+      </div>
+    </figure>
+    <figure>
+      <figcaption>Busy</figcaption>
+      <div class="foot">
+        <div class="foot__btns">
+          <button class="p-btn p-btn--primary" type="button" disabled aria-busy="true">Saving…</button>
+          <button class="p-btn p-btn--text" type="button">Skip for now</button>
+        </div>
+      </div>
+    </figure>
+  </div>
+
+</div>
+</main>
+<script src="data.js"></script><script src="comp.js"></script>
+<script>
+  // The count on the Continue button follows the checked languages.
+  document.querySelectorAll("[data-langs]").forEach(function (form) {
+    var btn = form.querySelector("[data-continue]");
+    form.addEventListener("change", function () {
+      var n = form.querySelectorAll("input[type=checkbox]:checked").length;
+      btn.textContent = n === 0 ? "Continue with every language" : "Continue with " + n + (n === 1 ? " language" : " languages");
+    });
+  });
+</script>
+</body>
+</html>

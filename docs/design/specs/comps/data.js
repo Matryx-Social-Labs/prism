@@ -1,0 +1,537 @@
+window.COMP_DATA = {
+ "pulled_at": "2026-11-24 ~17:50 UTC from the public API (api.readprism.news), unedited",
+ "edition": [
+  {
+   "id": "2c2b866c-ba00-44c8-a81c-9edd39f0369a",
+   "title": "Locals claim streetlights removed in Rajasthan village after election defeat",
+   "headline_by": "prism",
+   "sector": "politics",
+   "outlets": 16,
+   "languages": [
+    "en",
+    "hi",
+    "ml",
+    "mr",
+    "or",
+    "ta"
+   ],
+   "outlet_names": [
+    "Deccan Chronicle",
+    "Deccan Herald",
+    "NDTV",
+    "Scroll.in",
+    "The Hindu",
+    "The Indian Express",
+    "The Times of India",
+    "Aaj Tak",
+    "Amar Ujala",
+    "Dharitri",
+    "Dinamani",
+    "Madhyamam",
+    "Maharashtra Times",
+    "Malayala Manorama",
+    "Navbharat Times",
+    "Sambad"
+   ],
+   "coverage_origins": [
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional"
+   ],
+   "first_published_at": "2026-11-21T20:59:45+00:00",
+   "latest_published_at": "2026-11-24T16:55:32+00:00",
+   "story_slug": null,
+   "quote": {
+    "text": "People did get relief from darkness, but this arrangement proved true to the saying 'chaar din ki chandani, phir andheri raat hai",
+    "speaker": "Kajod Prajapat",
+    "role": "Ward Panch",
+    "outlet": "The Times of India",
+    "published_at": "2026-11-23T01:36:50+00:00",
+    "lang": "en"
+   },
+   "monitored_outlets": 41,
+   "outlet_headlines": [
+    {
+     "outlet": "The Hindu",
+     "lang": "en",
+     "title": "Lights out after defeat: 50 streetlights disappear from village after BJP candidate loses in Rajasthan’s Tonk"
+    },
+    {
+     "outlet": "Amar Ujala",
+     "lang": "hi",
+     "title": "चुनावी हार का बदला: विधायक के पीए की पत्नी हारीं तो गांवों से उखाड़ लीं स्ट्रीट लाइटें, नतीजे के बाद एक्शन"
+    },
+    {
+     "outlet": "Malayala Manorama",
+     "lang": "ml",
+     "title": "ബിജെപി സ്ഥാനാർഥി തോറ്റു, തെരുവുവിളക്കുകൾ നീക്കി: പ്ര:തികാരമെന്നു നാട്ടുകാർ; അനധികൃത കണക്‌ഷനെന്നു ബോർഡ്"
+    }
+   ]
+  },
+  {
+   "id": "37994623-be1e-419e-b68b-ee46f712fc41",
+   "title": "Samajwadi Party offers 26 seats to Congress for UP Assembly elections",
+   "headline_by": "prism",
+   "sector": "politics",
+   "outlets": 14,
+   "languages": [
+    "en",
+    "hi",
+    "kn",
+    "ml",
+    "or"
+   ],
+   "outlet_names": [
+    "Deccan Chronicle",
+    "Deccan Herald",
+    "Hindustan Times",
+    "Scroll.in",
+    "Telangana Today",
+    "The Hindu",
+    "The Times of India",
+    "Aaj Tak",
+    "Dainik Bhaskar",
+    "Dharitri",
+    "Madhyamam",
+    "Mathrubhumi",
+    "Navbharat Times",
+    "Prajavani"
+   ],
+   "coverage_origins": [
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional"
+   ],
+   "first_published_at": "2026-11-24T06:29:09+00:00",
+   "latest_published_at": "2026-11-24T17:45:26+00:00",
+   "story_slug": "shivpal-singh-yadav-responds-to-seat-sharing-dis-54d149",
+   "quote": {
+    "text": "യോഗത്തിൽ എന്തൊക്കെ പറയേണ്ടിയിരുന്നുവോ, അതെല്ലാം ഞങ്ങൾ ഇന്നലെ പറഞ്ഞു കഴിഞ്ഞു. ഞങ്ങൾ ഞങ്ങളുടെ 26 സീറ്റുകൾ അവർക്ക് വാഗ്ദാനം ചെയ്തിട്ടുണ്ട്, ഇന്ന് ഞങ്ങൾ വീണ്ടും ചർച്ചകൾ നടത്താൻ പോവുകയാണ്",
+    "speaker": "Ram Gopal Yadav",
+    "role": "General Secretary of the Samajwadi Party",
+    "outlet": "Mathrubhumi",
+    "published_at": "2026-11-24T08:38:56+00:00",
+    "lang": "ml"
+   },
+   "monitored_outlets": 41,
+   "story": {
+    "slug": "shivpal-singh-yadav-responds-to-seat-sharing-dis-54d149",
+    "label": "Samajwadi Party offers 26 seats to Congress for UP Assembly elections",
+    "developments": 127,
+    "outlets": 23,
+    "status": "verified"
+   }
+  },
+  {
+   "id": "c134d448-b0b0-424e-b9b1-0c39ea50f5ad",
+   "title": "Bus and truck collision in Ras Al Khaimah kills 11 people",
+   "headline_by": "prism",
+   "sector": "other",
+   "outlets": 13,
+   "languages": [
+    "en",
+    "hi",
+    "kn",
+    "ml",
+    "or"
+   ],
+   "outlet_names": [
+    "Deccan Chronicle",
+    "Deccan Herald",
+    "Hindustan Times",
+    "NDTV",
+    "Telangana Today",
+    "The Indian Express",
+    "The Times of India",
+    "Aaj Tak",
+    "Madhyamam",
+    "Mathrubhumi",
+    "Navbharat Times",
+    "Sambad",
+    "TV9 Kannada"
+   ],
+   "coverage_origins": [
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "national",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional",
+    "regional"
+   ],
+   "first_published_at": "2026-11-24T06:05:51+00:00",
+   "latest_published_at": "2026-11-24T17:34:57+00:00",
+   "story_slug": null,
+   "quote": {
+    "text": "ರಾಸ್ ಅಲ್ ಖೈಮಾದಲ್ಲಿ ಸಂಭವಿಸಿದ ಭೀಕರ ರಸ್ತೆ ಅಪಘಾತದಲ್ಲಿ ಭಾರತೀಯ ಪ್ರಜೆಗಳು ಸೇರಿದಂತೆ ಹಲವರು ಪ್ರಾಣ ಕಳೆದುಕೊಂಡಿರುವುದು ತೀವ್ರ ದುಃಖ ತಂದಿದೆ",
+    "speaker": "Indian Consulate in Dubai",
+    "role": null,
+    "outlet": "TV9 Kannada",
+    "published_at": "2026-11-24T17:18:42+00:00",
+    "lang": "kn"
+   },
+   "monitored_outlets": 41
+  },
+  {
+   "id": "a673903e-3e64-4927-8201-93cb4b66a1ea",
+   "title": "Fire destroys thirty homes in Pawani village of Uttarkashi",
+   "headline_by": "prism",
+   "sector": "other",
+   "outlets": 5,
+   "languages": [
+    "en",
+    "hi"
+   ],
+   "outlet_names": [
+    "Hindustan Times",
+    "The Indian Express",
+    "Amar Ujala",
+    "Dainik Bhaskar",
+    "Navbharat Times"
+   ],
+   "coverage_origins": [
+    "national",
+    "national",
+    "regional",
+    "regional",
+    "regional"
+   ],
+   "first_published_at": "2026-11-24T00:37:19+00:00",
+   "latest_published_at": "2026-11-24T17:33:50+00:00",
+   "story_slug": null,
+   "quote": null,
+   "monitored_outlets": 41
+  },
+  {
+   "id": "e9a5c314-cf04-4cb4-892f-7f457a634231",
+   "title": "Sugarcane growers reach temporary price agreement with sugar factories in Haveri",
+   "headline_by": "prism",
+   "sector": "business",
+   "outlets": 3,
+   "languages": [
+    "en",
+    "kn"
+   ],
+   "outlet_names": [
+    "Deccan Herald",
+    "Prajavani",
+    "TV9 Kannada"
+   ],
+   "coverage_origins": [
+    "national",
+    "regional",
+    "regional"
+   ],
+   "first_published_at": "2026-11-24T01:44:59+00:00",
+   "latest_published_at": "2026-11-24T17:14:20+00:00",
+   "story_slug": "sugarcane-farmers-threaten-agitation-if-frp-is-n-eaea0e",
+   "quote": null,
+   "monitored_outlets": 41,
+   "story": {
+    "slug": "sugarcane-farmers-threaten-agitation-if-frp-is-n-eaea0e",
+    "label": "Sugarcane farmers protest ends in Belagavi",
+    "developments": 406,
+    "outlets": 12,
+    "status": "verified"
+   }
+  },
+  {
+   "id": "6dfc4f27-ccf6-421d-8487-65332366bbeb",
+   "title": "Massive state-wide blood donation camp to be held on November 25",
+   "headline_by": "prism",
+   "sector": "health",
+   "outlets": 2,
+   "languages": [
+    "en",
+    "kn"
+   ],
+   "outlet_names": [
+    "The Hindu",
+    "Prajavani"
+   ],
+   "coverage_origins": [
+    "national",
+    "regional"
+   ],
+   "first_published_at": "2026-11-21T00:40:00+00:00",
+   "latest_published_at": "2026-11-24T17:38:19+00:00",
+   "story_slug": null,
+   "quote": null,
+   "monitored_outlets": 41
+  }
+ ],
+ "stories": [
+  {
+   "slug": "the-election-commission-and-voter-roll-row-12e8b2",
+   "label": "The Election Commission and voter-roll row",
+   "source_count": 31,
+   "velocity": 10,
+   "developments": 5695,
+   "sector": "politics",
+   "hero_title": "Mumbai Police issues notice to actor Imran Khan to leave India",
+   "first_seen_at": "2026-10-02T09:45:16.524221+00:00",
+   "last_updated_at": "2026-11-24T17:40:19.054047+00:00",
+   "boundary_status": "verified"
+  },
+  {
+   "slug": "the-iran-war-2974be",
+   "label": "The Iran war",
+   "source_count": 31,
+   "velocity": 7,
+   "developments": 1827,
+   "sector": "politics",
+   "hero_title": "Missile Hits Riyadh Airport Passenger Terminal, Multiple Injured",
+   "first_seen_at": "2026-10-02T09:40:39.087412+00:00",
+   "last_updated_at": "2026-11-24T15:40:02.210926+00:00",
+   "boundary_status": "verified"
+  },
+  {
+   "slug": "russia-ukraine-war-39b035",
+   "label": "Russia–Ukraine war",
+   "source_count": 32,
+   "velocity": 4,
+   "developments": 707,
+   "sector": "politics",
+   "hero_title": "Modi holds telephone conversation with Zelenskyy, reiterates need for peace",
+   "first_seen_at": "2026-10-02T09:41:26.903795+00:00",
+   "last_updated_at": "2026-11-24T17:40:42.580645+00:00",
+   "boundary_status": "verified"
+  },
+  {
+   "slug": "2026-asian-games-630615",
+   "label": "2026 Asian Games",
+   "source_count": 26,
+   "velocity": 0,
+   "developments": 725,
+   "sector": "sports",
+   "hero_title": "India defeats Pakistan to win gold medal at 2026 Asian Games",
+   "first_seen_at": "2026-10-02T09:42:45.592193+00:00",
+   "last_updated_at": "2026-11-22T02:07:00.404356+00:00",
+   "boundary_status": "verified"
+  },
+  {
+   "slug": "tamil-nadu-opposes-supreme-court-plea-for-asi-te-3d42f9",
+   "label": "Tamil Nadu government files review petition against Supreme Court Deepam order",
+   "source_count": 24,
+   "velocity": 18,
+   "developments": 100,
+   "sector": "politics",
+   "hero_title": "Tamil Nadu government files review petition against Supreme Court Deepam order",
+   "first_seen_at": "2026-11-13T12:40:38.198576+00:00",
+   "last_updated_at": "2026-11-24T16:25:16.952597+00:00",
+   "boundary_status": "verified"
+  },
+  {
+   "slug": "india-and-pakistan-to-face-off-in-asia-cup-risin-4f2d45",
+   "label": "Vaibhav Suryavanshi sets world record with 51 ball double century",
+   "source_count": 22,
+   "velocity": 18,
+   "developments": 61,
+   "sector": "sports",
+   "hero_title": "Vaibhav Suryavanshi sets world record with 51 ball double century",
+   "first_seen_at": "2026-10-25T02:20:38.723703+00:00",
+   "last_updated_at": "2026-11-24T17:20:43.772605+00:00",
+   "boundary_status": "verified"
+  },
+  {
+   "slug": "shivpal-singh-yadav-responds-to-seat-sharing-dis-54d149",
+   "label": "Samajwadi Party offers 26 seats to Congress for UP Assembly elections",
+   "source_count": 23,
+   "velocity": 16,
+   "developments": 127,
+   "sector": "politics",
+   "hero_title": "Samajwadi Party offers 26 seats to Congress for UP Assembly elections",
+   "first_seen_at": "2026-10-01T21:53:16.189275+00:00",
+   "last_updated_at": "2026-11-24T17:15:16.535550+00:00",
+   "boundary_status": "verified"
+  },
+  {
+   "slug": "no-alliance-between-bjp-and-akali-dal-before-pun-518776",
+   "label": "BJP and Shiromani Akali Dal reform political alliance in Punjab",
+   "source_count": 25,
+   "velocity": 9,
+   "developments": 35,
+   "sector": "politics",
+   "hero_title": "BJP and Shiromani Akali Dal reform political alliance in Punjab",
+   "first_seen_at": "2026-10-01T22:29:27.907447+00:00",
+   "last_updated_at": "2026-11-24T17:05:11.118047+00:00",
+   "boundary_status": "verified"
+  }
+ ],
+ "story": {
+  "slug": "tamil-nadu-opposes-supreme-court-plea-for-asi-te-3d42f9",
+  "label": "Tamil Nadu government files review petition against Supreme Court Deepam order",
+  "status": "verified",
+  "sector": "politics",
+  "developments": 100,
+  "outlets": 24,
+  "outlets_listed": 26,
+  "languages": [
+   "en",
+   "hi",
+   "kn",
+   "ml",
+   "or",
+   "ta",
+   "te"
+  ],
+  "first": {
+   "title": "Demonstration held in Thanjavur demanding traditional lamp lighting at Tiruparankundram",
+   "at": "2026-11-11T20:53:54+00:00",
+   "outlets": 1
+  },
+  "latest": [
+   {
+    "title": "BJP criticizes CM Vijay and Madurai officials over Deepam dispute",
+    "at": "2026-11-24T16:19:33+00:00",
+    "outlets": 1
+   },
+   {
+    "title": "Police arrest protesters in Tirupparankundram",
+    "at": "2026-11-24T15:12:49+00:00",
+    "outlets": 1
+   },
+   {
+    "title": "Thirumavalavan praises Vijay government for navigating challenges at Tirupparankundram",
+    "at": "2026-11-24T15:03:05+00:00",
+    "outlets": 1
+   },
+   {
+    "title": "Deepam Lit Away From Approved Spot As Vijay Government Defies Court Order",
+    "at": "2026-11-24T15:01:59+00:00",
+    "outlets": 2
+   },
+   {
+    "title": "HC passes John Doe order restraining violation of deepathoon court ruling",
+    "at": "2026-11-24T14:52:44+00:00",
+    "outlets": 2
+   },
+   {
+    "title": "Temple administration explains why Supreme Court order on Deepam was bypassed",
+    "at": "2026-11-24T14:33:01+00:00",
+    "outlets": 4
+   }
+  ],
+  "days_running": 13,
+  "outlet_names": [
+   "Dinamani",
+   "Deccan Chronicle",
+   "Deccan Herald",
+   "Madhyamam",
+   "The Hindu",
+   "Hindustan Times",
+   "Navbharat Times",
+   "The Times of India",
+   "BBC Tamil",
+   "Amar Ujala",
+   "Dainik Bhaskar",
+   "The Hindu — Tamil Nadu",
+   "Aaj Tak",
+   "NDTV",
+   "Sakshi",
+   "Malayala Manorama",
+   "Mathrubhumi",
+   "Prajavani",
+   "Scroll.in",
+   "TV9 Kannada",
+   "The Economic Times",
+   "The Hindu BusinessLine",
+   "Sambad",
+   "Telangana Today",
+   "BBC News Hindi",
+   "The Indian Express"
+  ],
+  "cast": [
+   "Madras High Court",
+   "Bharatiya Janata Party",
+   "Tamilaga Vettri Kazhagam",
+   "C. Joseph Vijay",
+   "Dravida Munnetra Kazhagam"
+  ],
+  "days_running_note": "counted in IST: 12 Nov to 24 Nov inclusive"
+ },
+ "languages_read": [
+  [
+   "en",
+   "English"
+  ],
+  [
+   "hi",
+   "हिंदी"
+  ],
+  [
+   "kn",
+   "ಕನ್ನಡ"
+  ],
+  [
+   "ta",
+   "தமிழ்"
+  ],
+  [
+   "te",
+   "తెలుగు"
+  ],
+  [
+   "bn",
+   "বাংলা"
+  ],
+  [
+   "mr",
+   "मराठी"
+  ],
+  [
+   "gu",
+   "ગુજરાતી"
+  ],
+  [
+   "pa",
+   "ਪੰਜਾਬੀ"
+  ],
+  [
+   "ur",
+   "اردو"
+  ],
+  [
+   "ml",
+   "മലയാളം"
+  ],
+  [
+   "or",
+   "ଓଡ଼ିଆ"
+  ],
+  [
+   "as",
+   "অসমীয়া"
+  ]
+ ]
+};

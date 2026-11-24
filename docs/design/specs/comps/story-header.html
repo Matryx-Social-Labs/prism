@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comp · Story header · T-047</title>
+<link rel="stylesheet" href="comp.css">
+<style>
+  .cap { margin: var(--s-10) 0 var(--s-5); padding-top: var(--s-3); border-top: var(--rule-section) solid var(--ink); }
+  .cap--first { margin-top: 0; }
+  .furn { margin-top: var(--s-5); font: var(--t-mono-s); letter-spacing: var(--track-mono); color: var(--ink-3); }
+
+  /* The header. Below 1024 one column, actions last; from 1024 the actions sit at the right of the meta line; the h1 keeps the full column. */
+  .sh { display: flex; flex-direction: column; gap: var(--s-4); }
+  .sh__title { font: var(--t-display-l); letter-spacing: var(--track-display); text-wrap: balance; }
+  .sh__acts { order: 1; display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  @media (min-width: 1024px) {
+    .sh { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4) var(--s-6); }
+    .sh > * { grid-column: 1 / -1; }
+    .sh > .p-meta { grid-column: 1; grid-row: 1; align-self: center; }
+    .sh > .sh__acts { grid-column: 2; grid-row: 1; order: 0; align-self: center; flex-wrap: nowrap; }
+  }
+  .sh__note { font: var(--t-body); color: var(--ink-2); }
+  .sh__new { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); font: var(--t-body-s); color: var(--ink); }
+
+  /* Where it stands. */
+  .stand { display: grid; gap: var(--s-3); padding-top: var(--s-3); border-top: var(--rule-section) solid var(--ink); }
+  .stand--prov { border-top: 1px dashed var(--line-strong); }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); }
+  @media (max-width: 419.98px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .stat { display: grid; align-content: start; gap: 2px; min-height: 44px; padding: var(--s-1) 0; border-radius: var(--r-record); }
+  .stat:hover .stat__l { color: var(--ink); text-decoration: underline; text-underline-offset: .2em; }
+  .stat:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .stat__n { font: var(--t-display-m); letter-spacing: var(--track-display); font-variant-numeric: lining-nums tabular-nums; color: var(--ink); white-space: nowrap; }
+  .stat__l { font: var(--t-label); color: var(--ink-3); overflow-wrap: anywhere; }
+  .stat__l[lang="hi"], .stand [lang="hi"] { line-height: 1.6; }
+  .hero { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-3); }
+  .hero .p-count { font-size: 12px; }
+  @media (min-width: 1024px) { .hero .who { display: none; } }
+  .quiet { font: var(--t-body); color: var(--ink-2); }
+
+  /* Latest and Began. */
+  .lb { padding-top: var(--s-3); border-top: 1px solid var(--line); }
+  .lb__in { display: grid; gap: var(--s-1); }
+  .lb--single .lb__in { padding-left: var(--s-3); border-left: 1px dashed var(--line-strong); }
+  .lb--stale { opacity: .62; }
+  .lb__head { display: flex; align-items: baseline; gap: var(--s-2); }
+  .lb__head .p-count { font-size: 12px; }
+  .lb__title { font: var(--t-title); color: var(--ink); text-wrap: balance; }
+  .lb__title:hover, .began__title:hover { text-decoration: underline; text-underline-offset: .2em; }
+  .lb__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); font: var(--t-body-s); color: var(--ink-2); }
+  .began__title { font: var(--t-body); color: var(--ink-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+  /* Who reported it: the rail from 1024, the sheet below. */
+  .who-rail { display: none; }
+  @media (min-width: 1024px) { .who-rail { display: block; padding-top: 52px; } }
+  .who-head { display: grid; gap: 2px; padding-bottom: var(--s-3); }
+  .outlets li { padding: var(--s-2) 0; border-top: 1px solid var(--line); font: var(--t-body-s); color: var(--ink); }
+  .outlets + .p-link { display: inline-flex; align-items: center; min-height: 44px; border-top: 1px solid var(--line); width: 100%; }
+
+  .frame { max-width: 390px; padding-top: var(--s-10); background: var(--scrim); border-radius: var(--r-record); overflow: hidden; }
+  .sheet { gap: var(--s-3); padding: 0 var(--s-5) var(--s-5); }
+  .sheet__row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-2); }
+  .sheet__t { font: 600 17px/1.3 var(--font-read); }
+  .sheet__row .p-iconbtn { margin-right: -10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); font: var(--t-ui-s); color: var(--ink-2); }
+  .legend > span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: var(--r-record); }
+
+  .skel { display: grid; gap: var(--s-4); }
+  .skel .p-skel { border-radius: var(--r-record); }
+  .skel__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); padding-top: var(--s-3); border-top: var(--rule-section) solid var(--sunken); }
+  @media (max-width: 419.98px) { .skel__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .err { display: grid; gap: var(--s-2); }
+  .err__acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4); }
+</style>
+</head>
+<body data-chrome="record" data-current="stories">
+<main id="main" class="comp-main" tabindex="-1">
+
+  <!-- A. The header -->
+  <div class="comp-two">
+    <div class="comp-col">
+      <p class="p-eyebrow cap cap--first">A · The header</p>
+      <header class="sh">
+        <div class="p-meta"><span class="p-status p-status--verified">Verified</span><span class="p-meta__sep" aria-hidden="true"></span><span class="p-meta__subject">Politics</span></div>
+        <h1 class="sh__title">Tamil Nadu government files review petition against Supreme Court Deepam order</h1>
+        <div class="sh__acts">
+          <button class="p-btn p-btn--secondary" type="button">Follow</button>
+          <button class="p-btn p-btn--ghost" type="button"><svg class="ico" aria-hidden="true"><use href="#i-share"/></svg>Share</button>
+        </div>
+        <section class="stand" aria-labelledby="a-stand">
+          <h2 class="p-eyebrow" id="a-stand">Where it stands</h2>
+          <ul class="stats">
+            <li><a class="stat" href="#"><span class="stat__n">13</span><span class="stat__l">days running</span></a></li>
+            <li><a class="stat" href="#"><span class="stat__n">100</span><span class="stat__l">developments</span></a></li>
+            <li><a class="stat" href="#"><span class="stat__n">24</span><span class="stat__l">outlets</span></a></li>
+            <li><a class="stat" href="#"><span class="stat__n">7</span><span class="stat__l">languages</span></a></li>
+          </ul>
+          <div class="hero">
+            <span class="p-covbar p-covbar--lg p-covbar--mono" aria-hidden="true"><i style="width:192px"></i></span>
+            <span class="p-count">24 outlets</span>
+            <button class="p-btn p-btn--text who" type="button" aria-haspopup="dialog">Who reported it<svg class="ico ico--16" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+          </div>
+        </section>
+        <div class="lb lb--single">
+          <div class="lb__in">
+            <p class="lb__head"><span class="p-eyebrow">Latest</span><span class="p-count">21:49</span></p>
+            <a class="lb__title" href="#">BJP criticizes CM Vijay and Madurai officials over Deepam dispute</a>
+            <p class="lb__foot"><span class="p-count">1 outlet</span><span class="p-meta__sep" aria-hidden="true"></span><span>One source so far</span></p>
+          </div>
+        </div>
+        <div class="lb">
+          <div class="lb__in">
+            <p class="lb__head"><span class="p-eyebrow">Began</span><span class="p-count">12 Nov</span></p>
+            <a class="began__title" href="#">Demonstration held in Thanjavur demanding traditional lamp lighting at Tiruparankundram</a>
+          </div>
+        </div>
+      </header>
+      <p class="furn">The timeline (latest three, then by day) follows — not part of this spec.</p>
+    </div>
+
+    <aside class="who-rail" aria-labelledby="a-who">
+      <div class="who-head">
+        <h2 class="p-eyebrow" id="a-who">Who reported it</h2>
+        <span class="p-count">24 outlets · 7 languages</span>
+      </div>
+      <ul class="outlets">
+        <li>Dinamani</li><li>Deccan Chronicle</li><li>Deccan Herald</li><li>Madhyamam</li><li>The Hindu</li><li>Hindustan Times</li>
+        <li>Navbharat Times</li><li>The Times of India</li><li>BBC Tamil</li><li>Amar Ujala</li><li>Dainik Bhaskar</li><li>The Hindu — Tamil Nadu</li>
+      </ul>
+      <a class="p-link" href="#">All 24</a>
+    </aside>
+  </div>
+
+  <div class="comp-col">
+
+    <!-- B. Returning reader -->
+    <p class="p-eyebrow cap">B · Returning reader <span class="ill">ILLUSTRATION</span></p>
+    <header class="sh">
+      <div class="p-meta"><span class="p-status p-status--verified">Verified</span><span class="p-meta__sep" aria-hidden="true"></span><span class="p-meta__subject">Politics</span></div>
+      <h1 class="sh__title">Tamil Nadu government files review petition against Supreme Court Deepam order</h1>
+      <div class="sh__acts">
+        <button class="p-btn p-btn--secondary" type="button" aria-haspopup="menu">Following<svg class="ico ico--16" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        <button class="p-btn p-btn--ghost" type="button"><svg class="ico" aria-hidden="true"><use href="#i-share"/></svg>Share</button>
+      </div>
+      <p class="sh__new"><span class="p-badge p-badge--ink">New</span><span>4 new since you read</span><span class="p-count">Tue 24 Nov, 20:25</span></p>
+      <section class="stand" aria-label="Where it stands">
+        <p class="p-eyebrow">Where it stands</p>
+        <ul class="stats">
+          <li><a class="stat" href="#"><span class="stat__n">13</span><span class="stat__l">days running</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">100</span><span class="stat__l">developments</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">24</span><span class="stat__l">outlets</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">7</span><span class="stat__l">languages</span></a></li>
+        </ul>
+        <div class="hero">
+          <span class="p-covbar p-covbar--lg p-covbar--mono" aria-hidden="true"><i style="width:192px"></i></span>
+          <span class="p-count">24 outlets</span>
+          <button class="p-btn p-btn--text who" type="button" aria-haspopup="dialog">Who reported it<svg class="ico ico--16" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        </div>
+      </section>
+      <div class="lb lb--single">
+        <div class="lb__in">
+          <p class="lb__head"><span class="p-eyebrow">Latest</span><span class="p-count">21:49</span></p>
+          <a class="lb__title" href="#">BJP criticizes CM Vijay and Madurai officials over Deepam dispute</a>
+          <p class="lb__foot"><span class="p-count">1 outlet</span><span class="p-meta__sep" aria-hidden="true"></span><span>One source so far</span></p>
+        </div>
+      </div>
+      <div class="lb">
+        <div class="lb__in">
+          <p class="lb__head"><span class="p-eyebrow">Began</span><span class="p-count">12 Nov</span></p>
+          <a class="began__title" href="#">Demonstration held in Thanjavur demanding traditional lamp lighting at Tiruparankundram</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- C. Who reported it, as a sheet on a phone -->
+    <p class="p-eyebrow cap">C · Who reported it, sheet on a phone <span class="ill">ILLUSTRATION</span></p>
+    <div class="frame">
+      <div class="p-sheet p-sheet--bottom sheet" role="dialog" aria-modal="true" aria-labelledby="c-t">
+        <div class="p-sheet__grab" aria-hidden="true"></div>
+        <div class="sheet__row">
+          <h2 class="sheet__t" id="c-t">Who reported it</h2>
+          <button class="p-iconbtn" type="button" aria-label="Close"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
+        </div>
+        <span class="p-count">24 outlets · 7 languages</span>
+        <span class="p-covbar p-covbar--lg" aria-hidden="true"><i class="p-cov-national" style="width:90px"></i><i class="p-cov-intl" style="width:10px"></i><i class="p-cov-regional" style="width:130px"></i><i class="p-cov-wire" style="width:10px"></i></span>
+        <p class="legend">
+          <span><i class="p-cov-national" aria-hidden="true"></i>English national <span class="p-count">9</span></span>
+          <span><i class="p-cov-intl" aria-hidden="true"></i>International <span class="p-count">1</span></span>
+          <span><i class="p-cov-regional" aria-hidden="true"></i>Indian-language <span class="p-count">13</span></span>
+          <span><i class="p-cov-wire" aria-hidden="true"></i>Wire <span class="p-count">1</span></span>
+        </p>
+        <div>
+          <ul class="outlets">
+            <li>Dinamani</li><li>Deccan Chronicle</li><li>Deccan Herald</li><li>Madhyamam</li><li>The Hindu</li><li>Hindustan Times</li>
+            <li>Navbharat Times</li><li>The Times of India</li><li>BBC Tamil</li><li>Amar Ujala</li><li>Dainik Bhaskar</li><li>The Hindu — Tamil Nadu</li>
+          </ul>
+          <a class="p-link" href="#">All 24</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- D. Provisional -->
+    <p class="p-eyebrow cap">D · Provisional <span class="ill">ILLUSTRATION</span></p>
+    <header class="sh">
+      <div class="p-meta"><span class="p-status p-status--provisional">Provisional grouping</span><span class="p-meta__sep" aria-hidden="true"></span><span class="p-meta__subject">Politics</span></div>
+      <h1 class="sh__title">Tamil Nadu government files review petition against Supreme Court Deepam order</h1>
+      <div class="sh__acts">
+        <button class="p-btn p-btn--secondary" type="button">Follow</button>
+        <button class="p-btn p-btn--ghost" type="button"><svg class="ico" aria-hidden="true"><use href="#i-share"/></svg>Share</button>
+      </div>
+      <p class="sh__note">These reports may belong together. Prism has not confirmed an order of events.</p>
+      <section class="stand stand--prov" aria-label="Where it stands">
+        <p class="p-eyebrow">Where it stands</p>
+        <ul class="stats">
+          <li><a class="stat" href="#"><span class="stat__n">13</span><span class="stat__l">days running</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">100</span><span class="stat__l">records</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">24</span><span class="stat__l">outlets</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">7</span><span class="stat__l">languages</span></a></li>
+        </ul>
+        <div class="hero">
+          <span class="p-covbar p-covbar--lg p-covbar--mono" aria-hidden="true"><i style="width:192px"></i></span>
+          <span class="p-count">24 outlets</span>
+          <button class="p-btn p-btn--text who" type="button" aria-haspopup="dialog">Who reported it<svg class="ico ico--16" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        </div>
+      </section>
+      <div class="lb lb--single">
+        <div class="lb__in">
+          <p class="lb__head"><span class="p-eyebrow">Latest</span><span class="p-count">21:49</span></p>
+          <a class="lb__title" href="#">BJP criticizes CM Vijay and Madurai officials over Deepam dispute</a>
+          <p class="lb__foot"><span class="p-count">1 outlet</span><span class="p-meta__sep" aria-hidden="true"></span><span>One source so far</span></p>
+        </div>
+      </div>
+      <div class="lb">
+        <div class="lb__in">
+          <p class="lb__head"><span class="p-eyebrow">Began</span><span class="p-count">12 Nov</span></p>
+          <a class="began__title" href="#">Demonstration held in Thanjavur demanding traditional lamp lighting at Tiruparankundram</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- E. Gone quiet -->
+    <p class="p-eyebrow cap">E · Gone quiet <span class="ill">ILLUSTRATION</span></p>
+    <header class="sh">
+      <div class="p-meta"><span class="p-status p-status--verified">Verified</span><span class="p-meta__sep" aria-hidden="true"></span><span class="p-meta__subject">Politics</span></div>
+      <h1 class="sh__title">Tamil Nadu government files review petition against Supreme Court Deepam order</h1>
+      <div class="sh__acts">
+        <button class="p-btn p-btn--secondary" type="button">Follow</button>
+        <button class="p-btn p-btn--ghost" type="button"><svg class="ico" aria-hidden="true"><use href="#i-share"/></svg>Share</button>
+      </div>
+      <section class="stand" aria-label="Where it stands">
+        <p class="p-eyebrow">Where it stands</p>
+        <ul class="stats">
+          <li><a class="stat" href="#"><span class="stat__n">13</span><span class="stat__l">days running</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">100</span><span class="stat__l">developments</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">24</span><span class="stat__l">outlets</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">7</span><span class="stat__l">languages</span></a></li>
+        </ul>
+        <p class="quiet">Nothing new in 9 days.</p>
+        <div class="hero">
+          <span class="p-covbar p-covbar--lg p-covbar--mono" aria-hidden="true"><i style="width:192px"></i></span>
+          <span class="p-count">24 outlets</span>
+          <button class="p-btn p-btn--text who" type="button" aria-haspopup="dialog">Who reported it<svg class="ico ico--16" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        </div>
+      </section>
+      <div class="lb lb--single lb--stale">
+        <div class="lb__in">
+          <p class="lb__head"><span class="p-eyebrow">Last development</span><span class="p-count">15 Nov</span></p>
+          <a class="lb__title" href="#">BJP criticizes CM Vijay and Madurai officials over Deepam dispute</a>
+          <p class="lb__foot"><span class="p-count">1 outlet</span><span class="p-meta__sep" aria-hidden="true"></span><span>One source so far</span></p>
+        </div>
+      </div>
+      <div class="lb">
+        <div class="lb__in">
+          <p class="lb__head"><span class="p-eyebrow">Began</span><span class="p-count">12 Nov</span></p>
+          <a class="began__title" href="#">Demonstration held in Thanjavur demanding traditional lamp lighting at Tiruparankundram</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- F. Not counted yet -->
+    <p class="p-eyebrow cap">F · Not counted yet <span class="ill">ILLUSTRATION</span></p>
+    <section class="stand" aria-label="Where it stands">
+      <p class="p-eyebrow">Where it stands</p>
+      <ul class="stats">
+        <li><a class="stat" href="#"><span class="stat__n">13</span><span class="stat__l">days running</span></a></li>
+        <li><a class="stat" href="#"><span class="stat__n">100</span><span class="stat__l">developments</span></a></li>
+        <li><a class="stat" href="#"><span class="stat__n">24</span><span class="stat__l">outlets</span></a></li>
+        <li><a class="stat" href="#"><span class="stat__n">—</span><span class="stat__l">Not counted yet</span></a></li>
+      </ul>
+    </section>
+
+    <!-- G. A long-running story (real: stories[0]) -->
+    <p class="p-eyebrow cap">G · A long-running story</p>
+    <header class="sh">
+      <h1 class="sh__title">The Election Commission and voter-roll row</h1>
+      <section class="stand" aria-label="Where it stands">
+        <p class="p-eyebrow">Where it stands</p>
+        <ul class="stats">
+          <li><a class="stat" href="#"><span class="stat__n">54</span><span class="stat__l">days running</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">5,695</span><span class="stat__l">developments</span></a></li>
+          <li><a class="stat" href="#"><span class="stat__n">31</span><span class="stat__l">outlets</span></a></li>
+        </ul>
+      </section>
+    </header>
+
+    <!-- H. Loading -->
+    <p class="p-eyebrow cap">H · Loading</p>
+    <div class="skel" aria-busy="true" aria-label="Loading">
+      <span class="p-skel" style="width:76px;height:24px"></span>
+      <div class="skel" style="gap:var(--s-2)">
+        <span class="p-skel" style="height:32px"></span>
+        <span class="p-skel" style="height:32px;width:70%"></span>
+      </div>
+      <div class="skel__stats">
+        <span class="p-skel" style="height:56px"></span><span class="p-skel" style="height:56px"></span>
+        <span class="p-skel" style="height:56px"></span><span class="p-skel" style="height:56px"></span>
+      </div>
+      <span class="p-skel" style="width:192px;height:10px"></span>
+    </div>
+
+    <!-- I. Could not load -->
+    <p class="p-eyebrow cap">I · Could not load <span class="ill">ILLUSTRATION</span></p>
+    <div class="p-alert p-alert--error" role="alert">
+      <div class="err">
+        <p class="p-alert__title">This story could not load.</p>
+        <div class="err__acts">
+          <button class="p-btn p-btn--secondary" type="button">Try again</button>
+          <a class="p-link" href="#">All stories</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- J. Hindi interface -->
+    <p class="p-eyebrow cap">J · Hindi interface <span class="ill">ILLUSTRATION</span></p>
+    <section class="stand" aria-label="अब तक" lang="hi">
+      <p class="p-eyebrow">अब तक</p>
+      <ul class="stats">
+        <li><a class="stat" href="#"><span class="stat__n">13</span><span class="stat__l" lang="hi">दिन से जारी</span></a></li>
+        <li><a class="stat" href="#"><span class="stat__n">100</span><span class="stat__l" lang="hi">घटनाक्रम</span></a></li>
+        <li><a class="stat" href="#"><span class="stat__n">24</span><span class="stat__l" lang="hi">आउटलेट</span></a></li>
+        <li><a class="stat" href="#"><span class="stat__n">7</span><span class="stat__l" lang="hi">भाषाएँ</span></a></li>
+      </ul>
+    </section>
+  </div>
+</main>
+<script src="data.js"></script><script src="comp.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comp · The shell at three widths</title>
+<link rel="stylesheet" href="comp.css">
+<style>
+  .shell-title { font: var(--t-display-l); letter-spacing: var(--track-display); }
+  .shell-lede { margin-top: var(--s-4); font: var(--t-body-l); color: var(--ink-2); }
+  .shell-h2 { margin: var(--s-8) 0 var(--s-4); padding-top: var(--s-3); border-top: var(--rule-section) solid var(--ink); }
+</style>
+</head>
+<body data-chrome="app" data-current="following" data-following-count="3">
+<main id="main" class="comp-main" tabindex="-1">
+  <div class="comp-col">
+    <h1 class="font-record shell-title">The shell at three widths</h1>
+    <p class="shell-lede">The five destinations are Today, Stories, Search, Following and You. Below 600 pixels wide they are bottom tabs; from 600 to 1023 they are a navigation rail on the left; from 1024 they move into a top bar beside the search field.</p>
+
+    <h2 class="p-eyebrow shell-h2">Rail destination · states</h2>
+    <div class="comp-states">
+      <figure>
+        <div class="comp-specimen"><span class="comp-rail__item"><span class="comp-rail__pill"><svg class="ico" aria-hidden="true"><use href="#i-stories"/></svg></span><span class="comp-rail__label">Stories</span></span></div>
+        <figcaption>default</figcaption>
+      </figure>
+      <figure>
+        <div class="comp-specimen"><span class="comp-rail__item is-hover"><span class="comp-rail__pill"><svg class="ico" aria-hidden="true"><use href="#i-stories"/></svg></span><span class="comp-rail__label">Stories</span></span></div>
+        <figcaption>hover · sunken pill, no lift</figcaption>
+      </figure>
+      <figure>
+        <div class="comp-specimen"><span class="comp-rail__item is-current"><span class="comp-rail__pill"><svg class="ico" aria-hidden="true"><use href="#i-following"/></svg></span><span class="comp-rail__label">Following</span></span></div>
+        <figcaption>current · aria-current="page"</figcaption>
+      </figure>
+      <figure>
+        <div class="comp-specimen"><span class="comp-rail__item is-focus"><span class="comp-rail__pill"><svg class="ico" aria-hidden="true"><use href="#i-stories"/></svg></span><span class="comp-rail__label">Stories</span></span></div>
+        <figcaption>focus-visible · 2px accent, 2px offset</figcaption>
+      </figure>
+      <figure>
+        <div class="comp-specimen"><span class="comp-rail__item"><span class="comp-rail__pill"><svg class="ico" aria-hidden="true"><use href="#i-following"/></svg><span class="comp-badge">3</span></span><span class="comp-rail__label">Following</span></span></div>
+        <figcaption>with count badge <span class="ill">ILLUSTRATION</span></figcaption>
+      </figure>
+      <figure>
+        <div class="comp-specimen"><span class="comp-rail__item" lang="hi"><span class="comp-rail__pill"><svg class="ico" aria-hidden="true"><use href="#i-following"/></svg></span><span class="comp-rail__label">फ़ॉलो किए गए</span></span></div>
+        <figcaption>long Hindi label · fits 80px</figcaption>
+      </figure>
+    </div>
+  </div>
+</main>
+<script src="comp.js"></script>
+</body>
+</html>

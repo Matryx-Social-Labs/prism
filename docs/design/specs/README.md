@@ -6,7 +6,7 @@ sentence the spec does not give. `DESIGN.md` still governs everything a spec doe
 
 | # | Surface | Spec | Comp | Built by |
 |---|---|---|---|---|
-| 1 | Today's edition and its end block | [01-edition.md](01-edition.md) | `comps/edition-a.html` (chosen), `-b`, `-c`, `edition-states.html` | T-051 (document: T-038) |
+| 1 | Today's edition and its end block | [01-edition.md](01-edition.md) | `comps/edition.html`, `edition-states.html`; the three it was chosen from: `edition-a`, `-b`, `-c` | T-051 (document: T-038) |
 | 2 | Follow, "Following", the Following tab, the free limit, "new since you read" | [02-follow.md](02-follow.md) | `comps/follow-b.html` (chosen), `-a`, `-c`, `following.html` | T-050 |
 | 3 | The notification explanation and settings | [03-notifications.md](03-notifications.md) | `comps/notifications.html` | T-053 (sending: T-036) |
 | 4 | The language step | [04-language.md](04-language.md) | `comps/language.html` | T-054 |
@@ -39,7 +39,7 @@ imports them.
 
 - Open them through a server at the repository root, because they link the app's own stylesheet for the real
   tokens and `.p-*` classes:
-  `python3 -m http.server 8765` then `http://localhost:8765/docs/design/specs/comps/edition-a.html`.
+  `python3 -m http.server 8765` then `http://localhost:8765/docs/design/specs/comps/edition.html`.
   Add `?theme=dark` for the dark ground. If `web/src/app/globals.css` moves, fix the one `@import` at the top
   of `comps/comp.css`.
 - The news in them is real: `comps/data.json` holds records, quotes and one story as the public API returned

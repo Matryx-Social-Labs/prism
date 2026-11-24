@@ -1,7 +1,8 @@
 # 01 · Today's edition and its end block
 
-Built by T-051 from the document T-038 writes. Comp: `comps/edition-a.html`; the other states in
-`comps/edition-states.html`; the two arrangements not taken in `comps/edition-b.html` and `-c.html`.
+Built by T-051 from the document T-038 writes. Comp: `comps/edition.html`; the other states in
+`comps/edition-states.html`; the three arrangements it was chosen from in `comps/edition-a.html`, `-b.html`
+and `-c.html`.
 
 ## Purpose
 
@@ -34,13 +35,15 @@ sends a returning reader to `/feed`.
    item, top to bottom:
    1. **Its numeral** in a left gutter: record voice 600, display-m. A rank is not provenance, so it is not
       mono. Under the numeral, once read, a Check icon.
-   2. **The count line:** the coverage bar, then mono `{k} outlets · {l} languages`, then the time of the
-      latest report in mono. One language prints `1 language`. (When T-014 lands and counts become
-      independent origins, the words follow T-046's vocabulary; the position does not change.)
-   3. **The headline** — h2, record voice; display-m on item 1, title on the rest. It wraps; it is never
+   2. **The headline** — h2, record voice; display-m on item 1, title on the rest. It wraps; it is never
       truncated. It is the link to the record, and the whole row is its target.
-   4. **Whose headline it is**, reading voice, label size, `--ink-3` — one of the four states in "Headline
+   3. **Whose headline it is**, reading voice, label size, `--ink-3` — one of the four states in "Headline
       states" below.
+   4. **The count, as a sentence** in the reading voice with its figures in mono: `Reported by {k} outlets in
+      {l} languages`, then ` · ` and the time of the latest report in mono. One language prints `in 1
+      language`. Directly under it, the coverage bar at the full width of the text column, at its ordinary
+      height. (When T-014 lands and counts become independent origins, the words follow T-046's vocabulary;
+      the position does not change.)
    5. **One exact quote**, when the document carries one: the words in record italic inside quotation marks,
       in the language they were printed in; then one provenance line — speaker (reading voice 600) · role ·
       the language's own name when it is not the interface language · outlet · time (mono). No quote in the
@@ -121,6 +124,7 @@ All strings above are the copy. The rest:
 | Progress rule | under the masthead | under the masthead | under the top bar |
 | Right rail | — | — | `In this edition`: the n headlines as an ordered list (reading voice, ui-s, two lines), each a link to its item, a Check on read ones, mono `{k} of {n} read`. Sticky under the top bar. After the end block scrolls in, nothing replaces it. |
 | End block | stacked, buttons full width | stacked, buttons at their own width | stacked in the 640 column |
+| Coverage bar | the text column's width | same | same |
 | The chart below | as today | as today | as today (its subject rail and two columns begin at its own heading, not beside the edition) |
 
 Fixed chrome on a 740px-tall phone: masthead 52 + progress rule 3 + tab bar 58 = 113px, 15% of the height
@@ -143,7 +147,7 @@ The `Show` pill swaps the list in place with the row print-in. Reduced motion: a
 
 ## Primitives
 
-SectionHead, MetaLine (count line), Coverage (bar), QuoteCard (compact form), FollowButton (spec 02), Button
+SectionHead, Coverage (bar), QuoteCard (compact form), FollowButton (spec 02), Button
 (primary, ghost), Alert (info, error), Skeleton, Chip (the `Show` pill), OnThisPage (the right rail), Toast.
 New on this surface: `EditionItem`, `EditionProgress`, `EndBlock`.
 
@@ -160,14 +164,18 @@ New on this surface: `EditionItem`, `EditionProgress`, `EndBlock`.
 
 ## Decided here
 
-1. **Arrangement A, "count first".** Three arrangements of the same content were drawn. A puts the numeral in
-   a gutter and the count above the headline, with a fixed 3px progress rule. B puts the headline first and
-   prints progress only as "k of n" on each item. C opens with an index of the n headlines, then the rows.
-   A is taken because the count is the product's credential and the eye meets it before the claim (board A4);
-   the numeral shows position without a second device; and the fixed rule costs 3px. B reads as an ordinary
-   news list — the count becomes a footnote — and loses the sense of how much is left. C makes a phone reader
-   meet every headline twice and delays the first quote by a screen. From C, the index is kept where width is
-   free: the right rail at expanded.
+1. **The arrangement is a synthesis of three that were drawn.** A ("count first") put the numeral in a
+   gutter and a mono count line above the headline, with a fixed 3px progress rule. B ("headline first") put
+   the headline first, the count as a plain sentence with a full-width bar under it, and progress only as
+   "k of n" on each item. C opened with an index of the n headlines, then the rows.
+   Side by side on a phone, B's order read best: what happened, then who reported it in words a first-time
+   reader needs no key for, with the bar wide enough to be read as a bar — and it is the order the chart's
+   own rows already use (coverage in the foot), so the edition and the chart below it read alike. A's mono
+   strip above the headline made every item open with provenance type and shrank the bar to a mark. But B
+   alone loses the sense of how much is left. So: **the numeral gutter and the fixed progress rule from A,
+   the reading order and the sentence from B, and C's index only where width is free** — the right rail at
+   expanded. C's index above the rows made a phone reader meet every headline twice and pushed the first
+   quote a screen down.
 2. **No photographs in the edition.** The chart below keeps its thumbnails. The edition is read to be
    finished, its document has a 150KB ceiling, and the reference phone is a low-end Android. This departs from
    the 2026-09-20 decision (a thumbnail on every story row) for this one list; if the lead should carry its
